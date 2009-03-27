@@ -1,0 +1,11 @@
+Installation
+============
+
+To install rbtools, simply run the following as root:
+
+    $ python setup.py install
+
+
+Or to automatically download and install the latest version, you can run:
+
+    $ easy_install -U RBTools

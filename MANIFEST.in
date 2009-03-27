@@ -1,0 +1,4 @@
+include AUTHORS
+include NEWS
+include README
+recursive-include contrib *
