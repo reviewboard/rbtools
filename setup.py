@@ -28,7 +28,7 @@ from setuptools.command.test import test
 
 
 VERSION = "0.2beta1"
-IS_RELEASE = True
+IS_RELEASE = False
 
 
 if IS_RELEASE:
