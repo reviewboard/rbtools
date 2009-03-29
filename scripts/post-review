@@ -1648,7 +1648,7 @@ class GitClient(SCMClient):
 
         # post-review in directories other than the top level of
         # of a work-tree would result in broken diffs on the server
-        os.chdir(os.path.dirname(git_dir))
+        os.chdir(os.path.dirname(os.path.abspath(git_dir)))
 
         # We know we have something we can work with. Let's find out
         # what it is. We'll try SVN first.
