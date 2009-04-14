@@ -279,12 +279,12 @@ class ReviewBoardServer(object):
         opener.addheaders = [('User-agent', 'post-review/' + VERSION)]
         urllib2.install_opener(opener)
 
-    def login(self):
+    def login(self, force=False):
         """
         Logs in to a Review Board server, prompting the user for login
         information if needed.
         """
-        if self.has_valid_cookie():
+        if not force and self.has_valid_cookie():
             return
 
         print "==> Review Board Login Required"
@@ -2004,7 +2004,7 @@ def tempt_fate(server, tool, changenum, diff_content=None,
     except APIError, e:
         rsp, = e.args
         if rsp['err']['code'] == 103: # Not logged in
-            server.login()
+            server.login(force=True)
             tempt_fate(server, tool, changenum, diff_content,
                        parent_diff_content, submit_as)
             return
