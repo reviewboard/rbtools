@@ -2,11 +2,11 @@
 import cookielib
 import difflib
 import getpass
+import marshal
 import mimetools
 import ntpath
 import os
 import re
-import shutil
 import simplejson
 import socket
 import subprocess
@@ -1321,27 +1321,20 @@ class PerforceClient(SCMClient):
 
         return None
 
+    def get_changenum(self, args):
+        if len(args) == 1:
+            try:
+                return str(int(args[0]))
+            except ValueError:
+                pass
+        return None
+
     def diff(self, args):
         """
         Goes through the hard work of generating a diff on Perforce in order
         to take into account adds/deletes and to provide the necessary
         revision information.
         """
-        if len(args) != 1:
-            print "Specify the change number of a pending changeset"
-            sys.exit(1)
-
-        changenum = args[0]
-
-        cl_is_pending = False
-
-        try:
-            changenum = int(changenum)
-        except ValueError:
-            die("You must enter a valid change number")
-
-        debug("Generating diff for changenum %s" % changenum)
-
         # set the P4 enviroment:
         if options.p4_client:
            os.environ['P4CLIENT'] = options.p4_client
@@ -1349,8 +1342,174 @@ class PerforceClient(SCMClient):
         if options.p4_port:
            os.environ['P4PORT'] = options.p4_port
 
+        changenum = self.get_changenum(args)
+        if changenum is None:
+            return self._path_diff(args)
+        else:
+            return self._changenum_diff(changenum)
 
-        description = execute(["p4", "describe", "-s", str(changenum)],
+
+    def _path_diff(self, args):
+        """
+        Process a path-style diff.  See _changenum_diff for the alternate
+        version that handles specific change numbers.
+
+        Multiple paths may be specified in `args`.  The path styles supported
+        are:
+
+        //path/to/file
+        Upload file as a "new" file.
+
+        //path/to/dir/...
+        Upload all files as "new" files.
+
+        //path/to/file[@#]rev
+        Upload file from that rev as a "new" file.
+
+        //path/to/file[@#]rev,[@#]rev
+        Upload a diff between revs.
+
+        //path/to/dir/...[@#]rev,[@#]rev
+        Upload a diff of all files between revs in that directory.
+        """
+        r_revision_range = re.compile(r'^(?P<path>//[^@#]+)' +
+                                      r'(?P<revision1>[#@][^,]+)?' +
+                                      r'(?P<revision2>,[#@][^,]+)?$')
+
+        empty_filename = make_tempfile()
+        tmp_diff_from_filename = make_tempfile()
+        tmp_diff_to_filename = make_tempfile()
+
+        diff_lines = []
+
+        for path in args:
+            m = r_revision_range.match(path)
+
+            if not m:
+                die('Path %r does not match a valid Perforce path.' % (path,))
+            revision1 = m.group('revision1')
+            revision2 = m.group('revision2')
+            first_rev_path = m.group('path')
+
+            if revision1:
+                first_rev_path += revision1
+            records = self._run_p4(['files', first_rev_path])
+
+            # Make a map for convenience.
+            files = {}
+
+            # Records are:
+            # 'rev': '1'
+            # 'func': '...'
+            # 'time': '1214418871'
+            # 'action': 'edit'
+            # 'type': 'ktext'
+            # 'depotFile': '...'
+            # 'change': '123456'
+            for record in records:
+                if record['action'] != 'delete':
+                    if revision2:
+                        files[record['depotFile']] = [record, None]
+                    else:
+                        files[record['depotFile']] = [None, record]
+
+            if revision2:
+                # [1:] to skip the comma.
+                second_rev_path = m.group('path') + revision2[1:]
+                records = self._run_p4(['files', second_rev_path])
+                for record in records:
+                    if record['action'] != 'delete':
+                        try:
+                            m = files[record['depotFile']]
+                            m[1] = record
+                        except KeyError:
+                            files[record['depotFile']] = [None, record]
+
+            old_file = new_file = empty_filename
+            changetype_short = None
+
+            for depot_path, (first_record, second_record) in files.items():
+                old_file = new_file = empty_filename
+                if first_record is None:
+                    self._write_file(depot_path + '#' + second_record['rev'],
+                                     tmp_diff_to_filename)
+                    new_file = tmp_diff_to_filename
+                    changetype_short = 'A'
+                    base_revision = 0
+                elif second_record is None:
+                    self._write_file(depot_path + '#' + first_record['rev'],
+                                     tmp_diff_from_filename)
+                    old_file = tmp_diff_from_filename
+                    changetype_short = 'D'
+                    base_revision = int(first_record['rev'])
+                else:
+                    self._write_file(depot_path + '#' + first_record['rev'],
+                                     tmp_diff_from_filename)
+                    self._write_file(depot_path + '#' + second_record['rev'],
+                                     tmp_diff_to_filename)
+                    new_file = tmp_diff_to_filename
+                    old_file = tmp_diff_from_filename
+                    changetype_short = 'M'
+                    base_revision = int(first_record['rev'])
+
+                dl = self._do_diff(old_file, new_file, depot_path,
+                                   base_revision, changetype_short,
+                                   ignore_unmodified=True)
+                diff_lines += dl
+
+        os.unlink(empty_filename)
+        os.unlink(tmp_diff_from_filename)
+        os.unlink(tmp_diff_to_filename)
+        return (''.join(diff_lines), None)
+
+    def _run_p4(self, command):
+        """Execute a perforce command using the python marshal API.
+
+        - command: A list of strings of the command to execute.
+
+        The return type depends on the command being run.
+        """
+        command = ['p4', '-G'] + command
+        p = subprocess.Popen(command, stdout=subprocess.PIPE)
+        result = []
+        has_error = False
+
+        while 1:
+            try:
+                data = marshal.load(p.stdout)
+            except EOFError:
+                break
+            else:
+                result.append(data)
+                if data.get('code', None) == 'error':
+                    has_error = True
+
+        rc = p.wait()
+
+        if rc or has_error:
+            for record in result:
+                if 'data' in record:
+                    print record['data']
+            die('Failed to execute command: %s\n' % (command,))
+
+        return result
+
+    def _changenum_diff(self, changenum):
+        """
+        Process a diff for a particular change number.  This handles both
+        pending and submitted changelists.
+
+        See _path_diff for the alternate version that does diffs of depot
+        paths.
+        """
+        # TODO: It might be a good idea to enhance PerforceDiffParser to
+        # understand that newFile could include a revision tag for post-submit
+        # reviewing.
+        cl_is_pending = False
+
+        debug("Generating diff for changenum %s" % changenum)
+
+        description = execute(["p4", "describe", "-s", changenum],
                               split_lines=True)
 
         if '*pending*' in description[0]:
@@ -1367,7 +1526,6 @@ class PerforceClient(SCMClient):
 
         description = description[line_num+2:]
 
-        cwd = os.getcwd()
         diff_lines = []
 
         empty_filename = make_tempfile()
@@ -1394,8 +1552,6 @@ class PerforceClient(SCMClient):
             changetype = m.group(3)
 
             debug('Processing %s of %s' % (changetype, depot_path))
-
-            local_name = m.group(1)
 
             old_file = new_file = empty_filename
             old_depot_path = new_depot_path = None
@@ -1441,72 +1597,93 @@ class PerforceClient(SCMClient):
             else:
                 die("Unknown change type '%s' for %s" % (changetype, depot_path))
 
-            diff_cmd = ["diff", "-urNp", old_file, new_file]
-            # Diff returns "1" if differences were found.
-            dl = execute(diff_cmd, extra_ignore_errors=(1,2)).splitlines(True)
-
-            if local_name.startswith(cwd):
-                local_path = local_name[len(cwd) + 1:]
-            else:
-                local_path = local_name
-
-            # Special handling for the output of the diff tool on binary files:
-            #     diff outputs "Files a and b differ"
-            # and the code below expects the outptu to start with
-            #     "Binary files "
-            if len(dl) == 1 and \
-               dl[0].startswith('Files %s and %s differ' %
-                                (old_file, new_file)):
-                dl = ['Binary files %s and %s differ'% (old_file, new_file)]
-
-            if dl == [] or dl[0].startswith("Binary files "):
-                if dl == []:
-                    print "Warning: %s in your changeset is unmodified" % \
-                        local_path
-
-                dl.insert(0, "==== %s#%s ==%s== %s ====\n" % \
-                    (depot_path, base_revision, changetype_short, local_path))
-            else:
-                m = re.search(r'(\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d)', dl[1])
-                if m:
-                    timestamp = m.group(1)
-                else:
-                    # Thu Sep  3 11:24:48 2007
-                    m = re.search(r'(\w+)\s+(\w+)\s+(\d+)\s+(\d\d:\d\d:\d\d)\s+(\d\d\d\d)', dl[1])
-                    if not m:
-                        die("Unable to parse diff header: %s" % dl[1])
-
-                    month_map = {
-                        "Jan": "01",
-                        "Feb": "02",
-                        "Mar": "03",
-                        "Apr": "04",
-                        "May": "05",
-                        "Jun": "06",
-                        "Jul": "07",
-                        "Aug": "08",
-                        "Sep": "09",
-                        "Oct": "10",
-                        "Nov": "11",
-                        "Dec": "12",
-                    }
-                    month = month_map[m.group(2)]
-                    day = m.group(3)
-                    timestamp = m.group(4)
-                    year = m.group(5)
-
-                    timestamp = "%s-%s-%s %s" % (year, month, day, timestamp)
-
-                dl[0] = "--- %s\t%s#%s\n" % (local_path, depot_path, base_revision)
-                dl[1] = "+++ %s\t%s\n" % (local_path, timestamp)
-
+            dl = self._do_diff(old_file, new_file, depot_path, base_revision, changetype_short)
             diff_lines += dl
 
         os.unlink(empty_filename)
         os.unlink(tmp_diff_from_filename)
         os.unlink(tmp_diff_to_filename)
-
         return (''.join(diff_lines), None)
+
+    def _do_diff(self, old_file, new_file, depot_path, base_revision,
+                 changetype_short, ignore_unmodified=False):
+        """
+        Do the work of producing a diff for Perforce.
+
+        old_file - The absolute path to the "old" file.
+        new_file - The absolute path to the "new" file.
+        depot_path - The depot path in Perforce for this file.
+        base_revision - The base perforce revision number of the old file as
+            an integer.
+        changetype_short - The change type as a single character string.
+        ignore_unmodified - If True, will return an empty list if the file
+            is not changed.
+
+        Returns a list of strings of diff lines.
+        """
+        diff_cmd = ["diff", "-urNp", old_file, new_file]
+        # Diff returns "1" if differences were found.
+        dl = execute(diff_cmd, extra_ignore_errors=(1,2)).splitlines(True)
+
+        cwd = os.getcwd()
+        if depot_path.startswith(cwd):
+            local_path = depot_path[len(cwd) + 1:]
+        else:
+            local_path = depot_path
+
+        # Special handling for the output of the diff tool on binary files:
+        #     diff outputs "Files a and b differ"
+        # and the code below expects the output to start with
+        #     "Binary files "
+        if len(dl) == 1 and \
+           dl[0] == ('Files %s and %s differ'% (old_file, new_file)):
+            dl = ['Binary files %s and %s differ'% (old_file, new_file)]
+
+        if dl == [] or dl[0].startswith("Binary files "):
+            if dl == []:
+                if ignore_unmodified:
+                    return []
+                else:
+                    print "Warning: %s in your changeset is unmodified" % \
+                        local_path
+
+            dl.insert(0, "==== %s#%s ==%s== %s ====\n" % \
+                (depot_path, base_revision, changetype_short, local_path))
+        else:
+            m = re.search(r'(\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d)', dl[1])
+            if m:
+                timestamp = m.group(1)
+            else:
+                # Thu Sep  3 11:24:48 2007
+                m = re.search(r'(\w+)\s+(\w+)\s+(\d+)\s+(\d\d:\d\d:\d\d)\s+(\d\d\d\d)', dl[1])
+                if not m:
+                    die("Unable to parse diff header: %s" % dl[1])
+
+                month_map = {
+                    "Jan": "01",
+                    "Feb": "02",
+                    "Mar": "03",
+                    "Apr": "04",
+                    "May": "05",
+                    "Jun": "06",
+                    "Jul": "07",
+                    "Aug": "08",
+                    "Sep": "09",
+                    "Oct": "10",
+                    "Nov": "11",
+                    "Dec": "12",
+                }
+                month = month_map[m.group(2)]
+                day = m.group(3)
+                timestamp = m.group(4)
+                year = m.group(5)
+
+                timestamp = "%s-%s-%s %s" % (year, month, day, timestamp)
+
+            dl[0] = "--- %s\t%s#%s\n" % (local_path, depot_path, base_revision)
+            dl[1] = "+++ %s\t%s\n" % (local_path, timestamp)
+
+        return dl
 
     def _write_file(self, depot_path, tmpfile):
         """
@@ -2266,11 +2443,7 @@ def main(args):
     server = ReviewBoardServer(server_url, repository_info, cookie_file)
 
     if repository_info.supports_changesets:
-        if len(args) < 1:
-            print "You must include a change set number"
-            sys.exit(1)
-
-        changenum = args[0]
+        changenum = tool.get_changenum(args)
     else:
         changenum = None
 
