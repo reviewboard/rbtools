@@ -1206,7 +1206,7 @@ class SVNClient(SCMClient):
                     # add initial slash.
                     if options.repository_url:
                         path = urllib.unquote(
-                            os.path.join(repository_info.base_path, file))
+                            "%s/%s" % (repository_info.base_path, file))
                     else:
                         info = self.svn_info(file)
                         url  = info["URL"]
