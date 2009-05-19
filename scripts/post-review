@@ -739,6 +739,9 @@ class ClearCaseClient(SCMClient):
         return md5(fname).hexdigest()
 
     def get_repository_info(self):
+        if not check_install('cleartool help'):
+            return None
+
         # We must be running this from inside a view.
         # Otherwise it doesn't make sense.
         self.viewinfo = execute(["cleartool", "pwv", "-short"])
