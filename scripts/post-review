@@ -1740,7 +1740,8 @@ class MercurialClient(SCMClient):
 
         svn = execute(["hg", "svn", "info", ], ignore_errors=True)
 
-        if not svn.startswith('abort:'):
+        if (not svn.startswith('abort:') and
+            not svn.startswith("hg: unknown command")):
             self.type = 'svn'
             m = re.search(r'^Repository Root: (.+)$', svn, re.M)
 
