@@ -9,6 +9,7 @@ import os
 import re
 import simplejson
 import socket
+import stat
 import subprocess
 import sys
 import tempfile
@@ -1626,7 +1627,12 @@ class PerforceClient(SCMClient):
         """
         diff_cmd = ["diff", "-urNp", old_file, new_file]
         # Diff returns "1" if differences were found.
-        dl = execute(diff_cmd, extra_ignore_errors=(1,2)).splitlines(True)
+        dl = execute(diff_cmd, extra_ignore_errors=(1,2),
+                     translate_newlines=False)
+
+        # If the input file has ^M characters at end of line, lets ignore them.
+        dl = dl.replace('\r\r\n', '\r\n')
+        dl = dl.splitlines(True)
 
         cwd = os.getcwd()
         if depot_path.startswith(cwd):
@@ -1690,16 +1696,13 @@ class PerforceClient(SCMClient):
 
     def _write_file(self, depot_path, tmpfile):
         """
-        Grabs a file from Perforce and writes it to a temp file. We do this
-        wrather than telling p4 print to write it out in order to work around
-        a permissions bug on Windows.
+        Grabs a file from Perforce and writes it to a temp file. p4 print sets
+        the file readonly and that causes a later call to unlink fail. So we
+        make the file read/write.
         """
         debug('Writing "%s" to "%s"' % (depot_path, tmpfile))
-        data = execute(["p4", "print", "-q", depot_path])
-
-        f = open(tmpfile, "w")
-        f.write(data)
-        f.close()
+        execute(["p4", "print", "-o", tmpfile, "-q", depot_path])
+        os.chmod(tmpfile, stat.S_IWRITE)
 
     def _depot_to_local(self, depot_path):
         """
@@ -2043,7 +2046,7 @@ def check_install(command):
 
 
 def execute(command, env=None, split_lines=False, ignore_errors=False,
-            extra_ignore_errors=()):
+            extra_ignore_errors=(), translate_newlines=True):
     """
     Utility function to execute a command and return the output.
     """
@@ -2066,7 +2069,7 @@ def execute(command, env=None, split_lines=False, ignore_errors=False,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.STDOUT,
                              shell=False,
-                             universal_newlines=True,
+                             universal_newlines=translate_newlines,
                              env=env)
     else:
         p = subprocess.Popen(command,
@@ -2075,7 +2078,7 @@ def execute(command, env=None, split_lines=False, ignore_errors=False,
                              stderr=subprocess.STDOUT,
                              shell=False,
                              close_fds=True,
-                             universal_newlines=True,
+                             universal_newlines=translate_newlines,
                              env=env)
     if split_lines:
         data = p.stdout.readlines()
