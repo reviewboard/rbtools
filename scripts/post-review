@@ -2132,7 +2132,7 @@ def load_config_file(filename):
 
 
 def tempt_fate(server, tool, changenum, diff_content=None,
-               parent_diff_content=None, submit_as=None):
+               parent_diff_content=None, submit_as=None, retries=3):
     """
     Attempts to create a review request on a Review Board server and upload
     a diff. On success, the review request path is displayed.
@@ -2185,10 +2185,18 @@ def tempt_fate(server, tool, changenum, diff_content=None,
     except APIError, e:
         rsp, = e.args
         if rsp['err']['code'] == 103: # Not logged in
-            server.login(force=True)
-            tempt_fate(server, tool, changenum, diff_content,
-                       parent_diff_content, submit_as)
-            return
+            retries = retries - 1
+
+            # We had an odd issue where the server ended up a couple of
+            # years in the future. Login succeeds but the cookie date was
+            # "odd" so use of the cookie appeared to fail and eventually
+            # ended up at max recursion depth :-(. Check for a maximum
+            # number of retries.
+            if retries >= 0:
+                server.login()
+                tempt_fate(server, tool, changenum, diff_content,
+                           parent_diff_content, submit_as, retries=retries)
+                return
 
         if options.rid:
             die("Error getting review request %s: %s (code %s)" % \
