@@ -1707,19 +1707,11 @@ class PerforceClient(SCMClient):
     def _depot_to_local(self, depot_path):
         """
         Given a path in the depot return the path on the local filesystem to
-        the same file.
+        the same file.  If there are multiple results, take only the last
+        result from the where command.
         """
-        # $ p4 where //user/bvanzant/main/testing
-        # //user/bvanzant/main/testing //bvanzant:test05:home/testing /home/bvanzant/home-versioned/testing
-        where_output = execute(["p4", "where", depot_path], split_lines=True)
-        # Take only the last line from the where command.  If you have a
-        # multi-line view mapping with exclusions, Perforce will display
-        # the exclusions in order, with the last line showing the actual
-        # location.
-        last_line = where_output[-1].strip()
-
-        # XXX: This breaks on filenames with spaces.
-        return last_line.split(' ')[2].rstrip()
+        where_output = self._run_p4(['where', depot_path])
+        return where_output[-1]['path']
 
 
 class MercurialClient(SCMClient):
