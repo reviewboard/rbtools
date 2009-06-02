@@ -1702,7 +1702,7 @@ class PerforceClient(SCMClient):
         """
         debug('Writing "%s" to "%s"' % (depot_path, tmpfile))
         execute(["p4", "print", "-o", tmpfile, "-q", depot_path])
-        os.chmod(tmpfile, stat.S_IWRITE)
+        os.chmod(tmpfile, stat.S_IREAD | stat.S_IWRITE)
 
     def _depot_to_local(self, depot_path):
         """
