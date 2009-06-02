@@ -2188,7 +2188,7 @@ def tempt_fate(server, tool, changenum, diff_content=None,
             # ended up at max recursion depth :-(. Check for a maximum
             # number of retries.
             if retries >= 0:
-                server.login()
+                server.login(force=True)
                 tempt_fate(server, tool, changenum, diff_content,
                            parent_diff_content, submit_as, retries=retries)
                 return
