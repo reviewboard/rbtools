@@ -955,7 +955,7 @@ class ClearCaseClient(SCMClient):
         rev_str = ''
 
         for rev in revision_range.split(":"):
-            rev_str += "-r %s" % rev
+            rev_str += "-r %s " % rev
 
         return self.do_diff(rev_str)
 
