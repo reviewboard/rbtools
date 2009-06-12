@@ -7,7 +7,6 @@ import mimetools
 import ntpath
 import os
 import re
-import simplejson
 import socket
 import stat
 import subprocess
@@ -24,6 +23,11 @@ try:
 except ImportError:
     # Support Python versions before 2.5.
     from md5 import md5
+
+try:
+    import json
+except ImportError:
+    import simplejson as json
 
 # This specific import is necessary to handle the paths for
 # cygwin enabled machines.
@@ -478,7 +482,7 @@ class ReviewBoardServer(object):
         Loads in a JSON file and returns the data if successful. On failure,
         APIError is raised.
         """
-        rsp = simplejson.loads(data)
+        rsp = json.loads(data)
 
         if rsp['stat'] == 'fail':
             raise APIError, rsp
