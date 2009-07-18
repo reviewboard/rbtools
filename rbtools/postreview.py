@@ -2005,6 +2005,15 @@ class GitClient(SCMClient):
         pass
 
 
+SCMCLIENTS = (
+    SVNClient(),
+    CVSClient(),
+    GitClient(),
+    MercurialClient(),
+    PerforceClient(),
+    ClearCaseClient(),
+)
+
 def debug(s):
     """
     Prints debugging information if post-review was run with --debug
@@ -2389,8 +2398,7 @@ def determine_client():
     tool = None
 
     # Try to find the SCM Client we're going to be working with.
-    for tool in (SVNClient(), CVSClient(), GitClient(), MercurialClient(),
-                 PerforceClient(), ClearCaseClient()):
+    for tool in SCMCLIENTS:
         repository_info = tool.get_repository_info()
 
         if repository_info:
