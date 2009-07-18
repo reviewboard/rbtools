@@ -40,14 +40,17 @@ else:
 setup(name="RBTools",
       version=VERSION,
       license="MIT",
-      description="Command line applications for use with Review Board",
-      scripts=[
-          "scripts/post-review",
-      ],
+      description="Command line tools for use with Review Board",
+      entry_points = {
+          'console_scripts': [
+              'post-review = rbtools.postreview:main',
+          ],
+      },
       install_requires=['simplejson'],
       dependency_links = [
           download_url,
       ],
+      packages=find_packages(),
       include_package_data=True,
       maintainer="Christian Hammond",
       maintainer_email="chipx86@chipx86.com",

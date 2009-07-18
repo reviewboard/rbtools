@@ -2423,7 +2423,7 @@ def determine_client():
 
     return (repository_info, tool)
 
-def main(args):
+def main():
     if 'USERPROFILE' in os.environ:
         homepath = os.path.join(os.environ["USERPROFILE"], "Local Settings",
                                 "Application Data")
@@ -2437,7 +2437,7 @@ def main(args):
         load_config_file(os.path.join(homepath, ".reviewboardrc"))
     cookie_file = os.path.join(homepath, ".post-review-cookies.txt")
 
-    args = parse_options(args)
+    args = parse_options(sys.argv[1:])
 
     repository_info, tool = determine_client()
 
@@ -2494,4 +2494,4 @@ def main(args):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()
