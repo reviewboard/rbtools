@@ -1665,6 +1665,7 @@ class PerforceClient(SCMClient):
 
             dl.insert(0, "==== %s#%s ==%s== %s ====\n" % \
                 (depot_path, base_revision, changetype_short, local_path))
+            dl.append('\n')
         else:
             m = re.search(r'(\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d)', dl[1])
             if m:
