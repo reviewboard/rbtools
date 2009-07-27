@@ -1796,10 +1796,29 @@ class MercurialClient(SCMClient):
         """
         Performs a diff across all modified files in a Mercurial repository.
         """
-        # We don't support parent diffs with Mercurial yet, so return None
-        # for the parent diff.
+        # We don't support parent diffs with Mercurial yet, so we always
+        # return None for the parent diff.
         if self.type == 'svn':
-            return (execute(["hg", "svn", "diff", ]), None)
+            parent = execute(['hg', 'parent', '--svn', '--template',
+                              '{node}\n']).strip()
+
+            if options.parent_branch:
+                parent = options.parent_branch
+
+            if options.guess_summary and not options.summary:
+                options.summary = execute(['hg', 'log', '-r.', '--template',
+                                            r'{desc|firstline}\n'])
+
+            if options.guess_description and not options.description:
+                numrevs = len(execute(['hg', 'log', '-r.:%s' % parent,
+                                       '--follow', '--template',
+                                       r'{rev}\n']).strip().split('\n'))
+                options.description = execute(['hg', 'log', '-r.:%s' % parent,
+                                               '--follow', '--template',
+                                               r'{desc}\n\n', '--limit',
+                                               str(numrevs-1)]).strip()
+
+            return (execute(["hg", "diff", "--svn", '-r%s:.' % parent]), None)
 
         return (execute(["hg", "diff"] + files), None)
 
@@ -2295,12 +2314,13 @@ def parse_options(args):
     parser.add_option("--guess-summary",
                       dest="guess_summary", action="store_true",
                       default=False,
-                      help="guess summary from the latest commit (git only)")
+                      help="guess summary from the latest commit (git/"
+                           "hgsubversion only)")
     parser.add_option("--guess-description",
                       dest="guess_description", action="store_true",
                       default=False,
                       help="guess description based on commits on this branch "
-                           "(git only)")
+                           "(git/hgsubversion only)")
     parser.add_option("--testing-done",
                       dest="testing_done", default=None,
                       help="details of testing done ")
