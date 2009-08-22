@@ -1970,7 +1970,7 @@ class GitClient(SCMClient):
                                  split_lines=True)
             return self.make_svn_diff(parent_branch, diff_lines)
         elif self.type == "git":
-            return execute(["git", "diff", "--no-color",
+            return execute(["git", "diff", "--no-color", "--full-index",
                             parent_branch])
 
         return None
