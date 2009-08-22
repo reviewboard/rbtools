@@ -1629,7 +1629,7 @@ class PerforceClient(SCMClient):
 
         Returns a list of strings of diff lines.
         """
-        if os.uname and os.uname()[0] == 'SunOS':
+        if hasattr(os, 'uname') and os.uname()[0] == 'SunOS':
             diff_cmd = ["gdiff", "-urNp", old_file, new_file]
         else:
             diff_cmd = ["diff", "-urNp", old_file, new_file]
