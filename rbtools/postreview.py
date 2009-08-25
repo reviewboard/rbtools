@@ -1917,6 +1917,10 @@ class GitClient(SCMClient):
     def scan_for_server(self, repository_info):
         # Scan first for dot files, since it's faster and will cover the
         # user's $HOME/.reviewboardrc
+        server_url = super(GitClient, self).scan_for_server(repository_info)
+
+        if server_url:
+            return server_url
 
         # TODO: Maybe support a server per remote later? Is that useful?
         url = execute(["git", "config", "--get", "reviewboard.url"],
