@@ -153,8 +153,9 @@ class SvnRepositoryInfo(RepositoryInfo):
     A representation of a SVN source code repository. This version knows how to
     find a matching repository on the server even if the URLs differ.
     """
-    def __init__(self, path, base_path, uuid):
-        RepositoryInfo.__init__(self, path, base_path)
+    def __init__(self, path, base_path, uuid, supports_parent_diffs=False):
+        RepositoryInfo.__init__(self, path, base_path,
+                                supports_parent_diffs=supports_parent_diffs)
         self.uuid = uuid
 
     def find_server_repository_info(self, server):
@@ -1864,9 +1865,15 @@ class GitClient(SCMClient):
 
             if m:
                 base_path = m.group(1)[len(path):] or "/"
-                self.type = "svn"
-                return RepositoryInfo(path=path, base_path=base_path,
-                                      supports_parent_diffs=True)
+                m = re.search(r'^Repository UUID: (.+)$', data, re.M)
+
+                if m:
+                    uuid = m.group(1)
+                    self.type = "svn"
+
+                    return SvnRepositoryInfo(path=path, base_path=base_path,
+                                             uuid=uuid,
+                                             supports_parent_diffs=True)
         else:
             # Versions of git-svn before 1.5.4 don't (appear to) support
             # 'git svn info'.  If we fail because of an older git install,
