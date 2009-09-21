@@ -23,22 +23,22 @@ from ez_setup import use_setuptools
 use_setuptools()
 
 from setuptools import setup, find_packages
-
 from setuptools.command.test import test
 
-
-VERSION = "0.2beta2"
-IS_RELEASE = False
+from rbtools import get_package_version, is_release, VERSION
 
 
-if IS_RELEASE:
-    download_url = "http://downloads.review-board.org/releases/"
+PACKAGE_NAME = 'RBTools'
+
+if is_release():
+    download_url = "http://downloads.review-board.org/releases/%s/%s.%s/" % \
+                   (PACKAGE_NAME, VERSION[0], VERSION[1])
 else:
     download_url = "http://downloads.review-board.org/nightlies/"
 
 
-setup(name="RBTools",
-      version=VERSION,
+setup(name=PACKAGE_NAME,
+      version=get_package_version(),
       license="MIT",
       description="Command line tools for use with Review Board",
       entry_points = {
