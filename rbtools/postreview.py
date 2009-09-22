@@ -1288,6 +1288,10 @@ class PerforceClient(SCMClient):
         except (socket.gaierror, socket.herror):
             pass
 
+        m = re.search(r'^Server version: [^ ]*/([0-9]+)\.([0-9]+)/[0-9]+ .*$',
+                      data, re.M)
+        self.p4d_version = int(m.group(1)), int(m.group(2))
+
         return RepositoryInfo(path=repository_path, supports_changesets=True)
 
     def scan_for_server(self, repository_info):
@@ -1332,6 +1336,9 @@ class PerforceClient(SCMClient):
 
     def get_changenum(self, args):
         if len(args) == 1:
+            if args[0] == "default":
+                return "default"
+
             try:
                 return str(int(args[0]))
             except ValueError:
@@ -1503,6 +1510,32 @@ class PerforceClient(SCMClient):
 
         return result
 
+    """
+    Return a "sanitized" change number for submission to the Review Board
+    server. For default changelists, this is always None. Otherwise, use the
+    changelist number for submitted changelists, or if the p4d is 2002.2 or
+    newer.
+
+    This is because p4d < 2002.2 does not return enough information about
+    pending changelists in 'p4 describe' for Review Board to make use of them
+    (specifically, the list of files is missing). This would result in the
+    diffs being rejected.
+    """
+    def sanitize_changenum(self, changenum):
+        if changenum == "default":
+            return None
+        else:
+            v = self.p4d_version
+
+            if v[1] < 2002 or (v[1] == "2002" and v[2] < 2):
+                description = execute(["p4", "describe", "-s", changenum],
+                                      split_lines=True)
+
+                if '*pending*' in description[0]:
+                    return None
+
+        return changenum
+
     def _changenum_diff(self, changenum):
         """
         Process a diff for a particular change number.  This handles both
@@ -1518,22 +1551,41 @@ class PerforceClient(SCMClient):
 
         debug("Generating diff for changenum %s" % changenum)
 
-        description = execute(["p4", "describe", "-s", changenum],
-                              split_lines=True)
+        description = []
 
-        if '*pending*' in description[0]:
+        if changenum == "default":
             cl_is_pending = True
-
-        # Get the file list
-        for line_num, line in enumerate(description):
-            if 'Affected files ...' in line:
-                break
         else:
-            # Got to the end of all the description lines and didn't find
-            # what we were looking for.
-            die("Couldn't find any affected files for this change.")
+            description = execute(["p4", "describe", "-s", changenum],
+                                  split_lines=True)
 
-        description = description[line_num+2:]
+            if '*pending*' in description[0]:
+                cl_is_pending = True
+                description = []
+
+        v = self.p4d_version
+
+        if cl_is_pending and (v[1] < 2002 or (v[1] == "2002" and v[2] < 2)):
+            # Pre-2002.2 doesn't give file list in pending changelists, so we
+            # have to get it a different way
+            info = execute(["p4", "opened", "-c", str(changenum)],
+                           split_lines=True)
+
+            for line in info:
+                data = line.split(" ")
+                description.append("... %s %s" % (data[0], data[2]))
+
+        else:
+            # Get the file list
+            for line_num, line in enumerate(description):
+                if 'Affected files ...' in line:
+                    break
+                else:
+                    # Got to the end of all the description lines and didn't find
+                    # what we were looking for.
+                    die("Couldn't find any affected files for this change.")
+
+            description = description[line_num+2:]
 
         diff_lines = []
 
@@ -1720,7 +1772,12 @@ class PerforceClient(SCMClient):
         result from the where command.
         """
         where_output = self._run_p4(['where', depot_path])
-        return where_output[-1]['path']
+
+        try:
+            return where_output[-1]['path']
+        except:
+            # XXX: This breaks on filenames with spaces.
+            return where_output[-1]['data'].split(' ')[2].strip()
 
 
 class MercurialClient(SCMClient):
@@ -2509,6 +2566,9 @@ def main():
         diff, parent_diff = tool.diff_label(options.label)
     else:
         diff, parent_diff = tool.diff(args)
+
+    if isinstance(tool, PerforceClient) and changenum is not None:
+        changenum = tool.sanitize_changenum(changenum)
 
     if options.output_diff_only:
         print diff
