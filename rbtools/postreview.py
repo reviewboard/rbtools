@@ -2524,9 +2524,8 @@ def determine_client():
     return (repository_info, tool)
 
 def main():
-    if 'USERPROFILE' in os.environ:
-        homepath = os.path.join(os.environ["USERPROFILE"], "Local Settings",
-                                "Application Data")
+    if 'APPDATA' in os.environ:
+        homepath = os.environ['APPDATA']
     elif 'HOME' in os.environ:
         homepath = os.environ["HOME"]
     else:
