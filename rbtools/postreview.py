@@ -2237,8 +2237,6 @@ def tempt_fate(server, tool, changenum, diff_content=None,
     a diff. On success, the review request path is displayed.
     """
     try:
-        save_draft = False
-
         if options.rid:
             review_request = server.get_review_request(options.rid)
         else:
@@ -2247,40 +2245,30 @@ def tempt_fate(server, tool, changenum, diff_content=None,
         if options.target_groups:
             server.set_review_request_field(review_request, 'target_groups',
                                             options.target_groups)
-            save_draft = True
 
         if options.target_people:
             server.set_review_request_field(review_request, 'target_people',
                                             options.target_people)
-            save_draft = True
 
         if options.summary:
             server.set_review_request_field(review_request, 'summary',
                                             options.summary)
-            save_draft = True
 
         if options.branch:
             server.set_review_request_field(review_request, 'branch',
                                             options.branch)
-            save_draft = True
 
         if options.bugs_closed:
             server.set_review_request_field(review_request, 'bugs_closed',
                                             options.bugs_closed)
-            save_draft = True
 
         if options.description:
             server.set_review_request_field(review_request, 'description',
                                             options.description)
-            save_draft = True
 
         if options.testing_done:
             server.set_review_request_field(review_request, 'testing_done',
                                             options.testing_done)
-            save_draft = True
-
-        if save_draft:
-            server.save_draft(review_request)
     except APIError, e:
         rsp, = e.args
         if rsp['err']['code'] == 103: # Not logged in
