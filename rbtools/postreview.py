@@ -1118,8 +1118,11 @@ class SVNClient(SCMClient):
                 revisions.append('HEAD')
 
             # if a new path was supplied at the command line, set it
-            if len(args):
+            files = []
+            if len(args) == 1:
                 repository_info.set_base_path(args[0])
+            elif len(args) > 1:
+                files = args
 
             url = repository_info.path + repository_info.base_path
 
@@ -1127,7 +1130,7 @@ class SVNClient(SCMClient):
             new_url = url + '@' + revisions[1]
 
             return self.do_diff(["svn", "diff", "--diff-cmd=diff", old_url,
-                                 new_url],
+                                 new_url] + files,
                                 repository_info)
         # Otherwise, perform the revision range diff using a working copy
         else:
