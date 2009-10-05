@@ -1756,6 +1756,11 @@ class PerforceClient(SCMClient):
             dl[0] = "--- %s\t%s#%s\n" % (local_path, depot_path, base_revision)
             dl[1] = "+++ %s\t%s\n" % (local_path, timestamp)
 
+            # Not everybody has files that end in a newline (ugh). This ensures
+            # that the resulting diff file isn't broken.
+            if dl[-1][-1] != '\n':
+                dl.append('\n')
+
         return dl
 
     def _write_file(self, depot_path, tmpfile):
