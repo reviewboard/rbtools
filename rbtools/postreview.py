@@ -2260,8 +2260,9 @@ def load_config_file(filename):
     if os.path.exists(filename):
         try:
             execfile(filename, config)
-        except:
-            pass
+        except SyntaxError, e:
+            die('Syntax error in config file: %s\n'
+                'Line %i offset %i\n' % (filename, e.lineno, e.offset))
 
     return config
 
