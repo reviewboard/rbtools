@@ -1530,7 +1530,7 @@ class PerforceClient(SCMClient):
         else:
             v = self.p4d_version
 
-            if v[1] < 2002 or (v[1] == "2002" and v[2] < 2):
+            if v[0] < 2002 or (v[0] == "2002" and v[1] < 2):
                 description = execute(["p4", "describe", "-s", changenum],
                                       split_lines=True)
 
@@ -1708,8 +1708,9 @@ class PerforceClient(SCMClient):
         # and the code below expects the output to start with
         #     "Binary files "
         if len(dl) == 1 and \
-           dl[0] == ('Files %s and %s differ'% (old_file, new_file)):
-            dl = ['Binary files %s and %s differ'% (old_file, new_file)]
+           dl[0].startswith('Files %s and %s differ' %
+                            (old_file, new_file)):
+            dl = ['Binary files %s and %s differ\n' % (old_file, new_file)]
 
         if dl == [] or dl[0].startswith("Binary files "):
             if dl == []:
