@@ -1936,6 +1936,7 @@ class GitClient(SCMClient):
                 if m:
                     uuid = m.group(1)
                     self.type = "svn"
+                    self.upstream_branch = options.parent_branch or 'master'
 
                     return SvnRepositoryInfo(path=path, base_path=base_path,
                                              uuid=uuid,
@@ -1964,7 +1965,28 @@ class GitClient(SCMClient):
         # TODO
 
         # Nope, it's git then.
-        origin = execute(["git", "remote", "show", "origin"])
+        # Check for a tracking branch and determine merge-base
+        self.head_ref = execute(['git', 'symbolic-ref', '-q', 'HEAD']).strip()
+        short_head = self.head_ref.split('/')[-1]
+        merge = execute(['git', 'config', '--get',
+                         'branch.%s.merge' % short_head],
+                        ignore_errors=True).strip()
+        remote = execute(['git', 'config', '--get',
+                          'branch.%s.remote' % short_head],
+                         ignore_errors=True).strip()
+        merge = merge.lstrip('refs/heads/')
+
+        self.upstream_branch = ''
+
+        if remote and remote != '.' and merge:
+            self.upstream_branch = '%s/%s' % (remote, merge)
+
+        self.upstream_branch, origin = self.get_origin(self.upstream_branch,
+                                                       True)
+
+        if origin.startswith("fatal:"):
+            self.upstream_branch, origin = self.get_origin()
+
         m = re.search(r'URL: (.+)', origin)
         if m:
             url = m.group(1).rstrip('/')
@@ -1974,6 +1996,19 @@ class GitClient(SCMClient):
                                       supports_parent_diffs=True)
 
         return None
+
+    def get_origin(self, default_upstream_branch=None, ignore_errors=False):
+        """Get upstream remote origin from options or parameters.
+
+        Returns a tuple: (upstream_branch, remote)
+        """
+        upstream_branch = options.tracking or default_upstream_branch or \
+                          'origin/master'
+        upstream_remote = upstream_branch.split('/')[0]
+        origin = execute(["git", "remote", "show", upstream_remote],
+                         ignore_errors=ignore_errors)
+
+        return (upstream_branch, origin)
 
     def is_valid_version(self, actual, expected):
         """
@@ -2016,13 +2051,16 @@ class GitClient(SCMClient):
         Performs a diff across all modified files in the branch, taking into
         account a parent branch.
         """
-        parent_branch = options.parent_branch or "master"
+        parent_branch = options.parent_branch
 
-        diff_lines = self.make_diff(parent_branch)
+        self.merge_base = execute(["git", "merge-base", self.upstream_branch,
+                                   self.head_ref]).strip()
 
-        if parent_branch != "master":
-            parent_diff_lines = self.make_diff("master", parent_branch)
+        if parent_branch:
+            diff_lines = self.make_diff(parent_branch)
+            parent_diff_lines = self.make_diff(self.merge_base, parent_branch)
         else:
+            diff_lines = self.make_diff(self.merge_base, self.head_ref)
             parent_diff_lines = None
 
         if options.guess_summary and not options.summary:
@@ -2036,19 +2074,20 @@ class GitClient(SCMClient):
 
         return (diff_lines, parent_diff_lines)
 
-    def make_diff(self, parent_branch, source_branch=""):
+    def make_diff(self, ancestor, commit=""):
         """
         Performs a diff on a particular branch range.
         """
+        rev_range = "%s..%s" % (ancestor, commit)
+
         if self.type == "svn":
             diff_lines = execute(["git", "diff", "--no-color", "--no-prefix",
-                                  "-r", "-u", "%s..%s" % (parent_branch,
-                                                          source_branch)],
+                                  "-r", "-u", rev_range],
                                  split_lines=True)
-            return self.make_svn_diff(parent_branch, diff_lines)
+            return self.make_svn_diff(ancestor, diff_lines)
         elif self.type == "git":
             return execute(["git", "diff", "--no-color", "--full-index",
-                            parent_branch])
+                            rev_range])
 
         return None
 
@@ -2455,6 +2494,11 @@ def parse_options(args):
                       help="the parent branch this diff should be against "
                            "(only available if your repository supports "
                            "parent diffs)")
+    parser.add_option("--tracking-branch",
+                      dest="tracking", default=None,
+                      metavar="TRACKING",
+                      help="Tracking branch from which your branch is derived "
+                           "(git only, defaults to origin/master)")
     parser.add_option("--p4-client",
                       dest="p4_client", default=None,
                       help="the Perforce client name that the review is in")
