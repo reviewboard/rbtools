@@ -379,14 +379,17 @@ class ReviewBoardServer(object):
         except APIError, e:
             rsp, = e.args
 
-            if not options.diff_only:
-                if rsp['err']['code'] == 204: # Change number in use
+            if rsp['err']['code'] == 204: # Change number in use
+                if options.diff_only:
+                    # In this case, fall through and return to tempt_fate.
+                    debug("Review request already exists.")
+                else:
                     debug("Review request already exists. Updating it...")
                     rsp = self.api_post(
                         'api/json/reviewrequests/%s/update_from_changenum/' %
                         rsp['review_request']['id'])
-                else:
-                    raise e
+            else:
+                raise e
 
         debug("Review request created")
         return rsp['review_request']
