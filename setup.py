@@ -37,6 +37,15 @@ else:
     download_url = "http://downloads.reviewboard.org/nightlies/"
 
 
+install_requires = []
+
+
+try:
+    import json
+except ImportError:
+    install_requires.append('simplejson')
+
+
 setup(name=PACKAGE_NAME,
       version=get_package_version(),
       license="MIT",
@@ -46,7 +55,7 @@ setup(name=PACKAGE_NAME,
               'post-review = rbtools.postreview:main',
           ],
       },
-      install_requires=['simplejson'],
+      install_requires=install_requires,
       dependency_links = [
           download_url,
       ],
