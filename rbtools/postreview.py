@@ -2138,6 +2138,13 @@ class GitClient(SCMClient):
                 else:
                     # We already printed the "--- " line.
                     diff_data += "+++ %s\t(working copy)\n" % filename
+            elif line.startswith("new file mode"):
+                # Filter this out.
+                pass
+            elif line.startswith("Binary files "):
+                # Add the following so that we know binary files were added/changed
+                diff_data += "Cannot display: file marked as a binary type.\n"
+                diff_data += "svn:mime-type = application/octet-stream\n"
             else:
                 diff_data += line
 
