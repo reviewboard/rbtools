@@ -1923,6 +1923,8 @@ class GitClient(SCMClient):
         # of a work-tree would result in broken diffs on the server
         os.chdir(os.path.dirname(os.path.abspath(git_dir)))
 
+        self.head_ref = execute(['git', 'symbolic-ref', '-q', 'HEAD']).strip()
+
         # We know we have something we can work with. Let's find out
         # what it is. We'll try SVN first.
         data = execute(["git", "svn", "info"], ignore_errors=True)
@@ -1969,7 +1971,6 @@ class GitClient(SCMClient):
 
         # Nope, it's git then.
         # Check for a tracking branch and determine merge-base
-        self.head_ref = execute(['git', 'symbolic-ref', '-q', 'HEAD']).strip()
         short_head = self.head_ref.split('/')[-1]
         merge = execute(['git', 'config', '--get',
                          'branch.%s.merge' % short_head],
