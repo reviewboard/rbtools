@@ -277,11 +277,14 @@ class ReviewBoardServer(object):
         self.cookie_jar  = cookielib.MozillaCookieJar(self.cookie_file)
 
         # Set up the HTTP libraries to support all of the features we need.
-        cookie_handler = urllib2.HTTPCookieProcessor(self.cookie_jar)
-        password_mgr   = ReviewBoardHTTPPasswordMgr(self.url)
-        auth_handler   = urllib2.HTTPBasicAuthHandler(password_mgr)
+        cookie_handler      = urllib2.HTTPCookieProcessor(self.cookie_jar)
+        password_mgr        = ReviewBoardHTTPPasswordMgr(self.url)
+        basic_auth_handler  = urllib2.HTTPBasicAuthHandler(password_mgr)
+        digest_auth_handler = urllib2.HttpDigestAuthHandler(password_mgr)
 
-        opener = urllib2.build_opener(cookie_handler, auth_handler)
+        opener = urllib2.build_opener(cookie_handler,
+                                      basic_auth_handler,
+                                      digest_auth_handler)
         opener.addheaders = [('User-agent', 'post-review/' + VERSION)]
         urllib2.install_opener(opener)
 
