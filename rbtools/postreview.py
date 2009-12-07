@@ -280,7 +280,7 @@ class ReviewBoardServer(object):
         cookie_handler      = urllib2.HTTPCookieProcessor(self.cookie_jar)
         password_mgr        = ReviewBoardHTTPPasswordMgr(self.url)
         basic_auth_handler  = urllib2.HTTPBasicAuthHandler(password_mgr)
-        digest_auth_handler = urllib2.HttpDigestAuthHandler(password_mgr)
+        digest_auth_handler = urllib2.HTTPDigestAuthHandler(password_mgr)
 
         opener = urllib2.build_opener(cookie_handler,
                                       basic_auth_handler,
