@@ -367,8 +367,23 @@ class ReviewBoardServer(object):
         the submitter of the review request (given that the logged in user has
         the appropriate permissions).
         """
+
+        # If repository_path is a list, find a name in the list that's
+        # registered on the server.
+        if isinstance(self.info.path, list):
+            repositories = self.get_repositories()
+
+            debug("Repositories on Server: %s" % repositories)
+            debug("Server Aliases: %s" % self.info.path)
+
+            for repository in repositories:
+                if repository['path'] in self.info.path:
+                    self.info.path = repository['path']
+                    break
+
         try:
-            debug("Attempting to create review request for %s" % changenum)
+            debug("Attempting to create review request on %s for %s" %
+                  (self.info.path, changenum))
             data = { 'repository_path': self.info.path }
 
             if changenum:
@@ -664,9 +679,20 @@ class SCMClient(object):
             if not isinstance(trees, dict):
                 die("Warning: 'TREES' in config file is not a dict!")
 
-            if repository_info.path in trees and \
-               'REVIEWBOARD_URL' in trees[repository_info.path]:
-                return trees[repository_info.path]['REVIEWBOARD_URL']
+            # If repository_info is a list, check if any one entry is in trees.
+            path = None
+
+            if isinstance(repository_info.path, list):
+                for path in repository_info.path:
+                    if path in trees:
+                        break
+                else:
+                    path = None
+            elif repository_info.path in trees:
+                path = repository_info.path
+
+            if path and 'REVIEWBOARD_URL' in trees[path]:
+                return trees[path]['REVIEWBOARD_URL']
 
         return None
 
@@ -1293,7 +1319,15 @@ class PerforceClient(SCMClient):
         try:
             hostname, port = repository_path.split(":")
             info = socket.gethostbyaddr(hostname)
-            repository_path = "%s:%s" % (info[0], port)
+
+            # If aliases exist for hostname, create a list of alias:port
+            # strings for repository_path.
+            if info[1]:
+                servers = [info[0]] + info[1]
+                repository_path = ["%s:%s" % (server, port)
+                                   for server in servers]
+            else:
+                repository_path = "%s:%s" % (info[0], port)
         except (socket.gaierror, socket.herror):
             pass
 
