@@ -1641,7 +1641,10 @@ class PerforceClient(SCMClient):
             if not line:
                 continue
 
-            m = re.search(r'\.\.\. ([^#]+)#(\d+) (add|edit|delete|integrate|branch)', line)
+            m = re.search(r'\.\.\. ([^#]+)#(\d+) '
+                          r'(add|edit|delete|integrate|branch|move/add'
+                          r'|move/delete)',
+                          line)
             if not m:
                 die("Unsupported line from p4 opened: %s" % line)
 
@@ -1661,7 +1664,7 @@ class PerforceClient(SCMClient):
             old_depot_path = new_depot_path = None
             changetype_short = None
 
-            if changetype == 'edit' or changetype == 'integrate':
+            if changetype in ['edit', 'integrate']:
                 # A big assumption
                 new_revision = base_revision + 1
 
@@ -1680,8 +1683,7 @@ class PerforceClient(SCMClient):
                     new_file = tmp_diff_to_filename
 
                 changetype_short = "M"
-
-            elif changetype == 'add' or changetype == 'branch':
+            elif changetype in ['add', 'branch', 'move/add']:
                 # We have a new file, get p4 to put this new file into a pretty
                 # temp file for us. No old file to worry about here.
                 if cl_is_pending:
@@ -1690,8 +1692,7 @@ class PerforceClient(SCMClient):
                     self._write_file(depot_path, tmp_diff_to_filename)
                     new_file = tmp_diff_to_filename
                 changetype_short = "A"
-
-            elif changetype == 'delete':
+            elif changetype in ['delete', 'move/delete']:
                 # We've deleted a file, get p4 to put the deleted file into  a temp
                 # file for us. The new file remains the empty file.
                 old_depot_path = "%s#%s" % (depot_path, base_revision)
