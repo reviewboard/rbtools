@@ -2111,7 +2111,8 @@ class GitClient(SCMClient):
 
         if options.guess_description and not options.description:
             options.description = execute(
-                ["git", "log", "--pretty=format:%s%n%n%b", parent_branch + ".."],
+                ["git", "log", "--pretty=format:%s%n%n%b",
+                 (parent_branch or self.merge_base) + ".."],
                 ignore_errors=True).strip()
 
         return (diff_lines, parent_diff_lines)
