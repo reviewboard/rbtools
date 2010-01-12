@@ -2160,7 +2160,7 @@ class GitClient(SCMClient):
         svn diff would generate. This is needed so the SVNTool in Review
         Board can properly parse this diff.
         """
-        rev = execute(["git", "svn", "find-rev", "master"]).strip()
+        rev = execute(["git", "svn", "find-rev", parent_branch]).strip()
 
         if not rev:
             return None
