@@ -1900,6 +1900,26 @@ class MercurialClient(SCMClient):
         return RepositoryInfo(path=path, base_path='',
                               supports_parent_diffs=True)
 
+    def extract_summary(self, revision):
+        """
+        Extracts the first line from the description of the given changeset.
+        """
+        return execute(['hg', 'log', '-r%s' % revision, '--template',
+                        r'{desc|firstline}\n'])
+
+    def extract_description(self, rev1, rev2):
+        """
+        Extracts all descriptions in the given revision range and concatenates
+        them, most recent ones going first.
+        """
+        numrevs = len(execute(['hg', 'log', '-r%s:%s' % (rev2, rev1),
+                               '--follow', '--template',
+                               r'{rev}\n']).strip().split('\n'))
+        return execute(['hg', 'log', '-r%s:%s' % (rev2, rev1),
+                        '--follow', '--template',
+                        r'{desc}\n\n', '--limit',
+                        str(numrevs - 1)]).strip()
+
     def diff(self, files):
         """
         Performs a diff across all modified files in a Mercurial repository.
@@ -1914,17 +1934,10 @@ class MercurialClient(SCMClient):
                 parent = options.parent_branch
 
             if options.guess_summary and not options.summary:
-                options.summary = execute(['hg', 'log', '-r.', '--template',
-                                            r'{desc|firstline}\n'])
+                options.summary = self.extract_summary(".")
 
             if options.guess_description and not options.description:
-                numrevs = len(execute(['hg', 'log', '-r.:%s' % parent,
-                                       '--follow', '--template',
-                                       r'{rev}\n']).strip().split('\n'))
-                options.description = execute(['hg', 'log', '-r.:%s' % parent,
-                                               '--follow', '--template',
-                                               r'{desc}\n\n', '--limit',
-                                               str(numrevs-1)]).strip()
+                options.description = self.extract_description(parent, ".")
 
             return (execute(["hg", "diff", "--svn", '-r%s:.' % parent]), None)
 
@@ -1938,6 +1951,13 @@ class MercurialClient(SCMClient):
             raise NotImplementedError
 
         r1, r2 = revision_range.split(':')
+
+        if options.guess_summary and not options.summary:
+            options.summary = self.extract_summary(r2)
+
+        if options.guess_description and not options.description:
+            options.description = self.extract_description(r1, r2)
+
         return execute(["hg", "diff", "-r", r1, "-r", r2])
 
 
