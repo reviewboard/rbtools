@@ -4,9 +4,21 @@ import shutil
 import sys
 import tempfile
 import unittest
+import urllib2
+
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
+
+try:
+    import json
+except ImportError:
+    import simplejson as json
 
 from rbtools.postreview import execute, load_config_file
-from rbtools.postreview import GitClient, RepositoryInfo
+from rbtools.postreview import APIError, GitClient, RepositoryInfo, \
+                               ReviewBoardServer
 import rbtools.postreview
 
 
@@ -85,6 +97,32 @@ def is_exe_in_path(name):
             return True
 
     return False
+
+
+class MockHttpUnitTest(unittest.TestCase):
+    def setUp(self):
+        # Save the old http_get and http_post
+        self.saved_http_get = ReviewBoardServer.http_get
+        self.saved_http_post = ReviewBoardServer.http_post
+
+        self.server = ReviewBoardServer('http://localhost:8080/',
+                                        RepositoryInfo(), None)
+        ReviewBoardServer.http_get = self._http_method
+        ReviewBoardServer.http_post = self._http_method
+
+        self.http_response = ""
+
+        rbtools.postreview.options = OptionsStub()
+
+    def tearDown(self):
+        ReviewBoardServer.http_get = self.saved_http_get
+        ReviewBoardServer.http_post = self.saved_http_post
+
+    def _http_method(self, *args, **kwargs):
+        if isinstance(self.http_response, Exception):
+            raise self.http_response
+        else:
+            return self.http_response
 
 
 class OptionsStub(object):
@@ -377,3 +415,77 @@ class GitClientTests(unittest.TestCase):
         ri = self.client.get_repository_info()
         self.assertEqual(self.client.diff(None), (diff, None))
 
+
+class ApiTests(MockHttpUnitTest):
+    SAMPLE_ERROR_STR = json.dumps({
+        'stat': 'fail',
+        'err': {
+            'code': 100,
+            'msg': 'This is a test failure',
+        }
+    })
+
+    def test_parse_get_error_http_200(self):
+        self.http_response = self.SAMPLE_ERROR_STR
+
+        try:
+            data = self.server.api_get('/foo/')
+
+            # Shouldn't be reached
+            self._assert(False)
+        except APIError, e:
+            self.assertEqual(e.http_status, 200)
+            self.assertEqual(e.error_code, 100)
+            self.assertEqual(e.rsp['stat'], 'fail')
+            self.assertEqual(str(e),
+                             'This is a test failure (HTTP 200, API Error 100)')
+
+    def test_parse_post_error_http_200(self):
+        self.http_response = self.SAMPLE_ERROR_STR
+
+        try:
+            data = self.server.api_post('/foo/')
+
+            # Shouldn't be reached
+            self._assert(False)
+        except APIError, e:
+            self.assertEqual(e.http_status, 200)
+            self.assertEqual(e.error_code, 100)
+            self.assertEqual(e.rsp['stat'], 'fail')
+            self.assertEqual(str(e),
+                             'This is a test failure (HTTP 200, API Error 100)')
+
+    def test_parse_get_error_http_400(self):
+        self.http_response = self._make_http_error('/foo/', 400,
+                                                   self.SAMPLE_ERROR_STR)
+
+        try:
+            data = self.server.api_get('/foo/')
+
+            # Shouldn't be reached
+            self._assert(False)
+        except APIError, e:
+            self.assertEqual(e.http_status, 400)
+            self.assertEqual(e.error_code, 100)
+            self.assertEqual(e.rsp['stat'], 'fail')
+            self.assertEqual(str(e),
+                             'This is a test failure (HTTP 400, API Error 100)')
+
+    def test_parse_post_error_http_400(self):
+        self.http_response = self._make_http_error('/foo/', 400,
+                                                   self.SAMPLE_ERROR_STR)
+
+        try:
+            data = self.server.api_post('/foo/')
+
+            # Shouldn't be reached
+            self._assert(False)
+        except APIError, e:
+            self.assertEqual(e.http_status, 400)
+            self.assertEqual(e.error_code, 100)
+            self.assertEqual(e.rsp['stat'], 'fail')
+            self.assertEqual(str(e),
+                             'This is a test failure (HTTP 400, API Error 100)')
+
+    def _make_http_error(self, url, code, body):
+        return urllib2.HTTPError(url, code, body, {}, StringIO(body))
