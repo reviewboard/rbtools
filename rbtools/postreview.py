@@ -2036,7 +2036,11 @@ class GitClient(SCMClient):
         remote = execute(['git', 'config', '--get',
                           'branch.%s.remote' % short_head],
                          ignore_errors=True).strip()
-        merge = merge.lstrip('refs/heads/')
+
+        HEADS_PREFIX = 'refs/heads/'
+
+        if merge.startswith(HEADS_PREFIX):
+            merge = merge[len(HEADS_PREFIX):]
 
         self.upstream_branch = ''
 
