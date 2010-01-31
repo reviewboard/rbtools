@@ -250,6 +250,10 @@ class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
     def find_user_password(self, realm, uri):
         if uri.startswith(self.rb_url):
             if self.rb_user is None or self.rb_pass is None:
+                if options.diff_filename == '-':
+                    die('HTTP authentication is required, but cannot be '
+                        'used with --diff-filename=-')
+
                 print "==> HTTP Authentication Required"
                 print 'Enter username and password for "%s" at %s' % \
                     (realm, urlparse(uri)[1])
@@ -295,6 +299,12 @@ class ReviewBoardServer(object):
         """
         if not force and self.has_valid_cookie():
             return
+
+        if (options.diff_filename == '-' and
+            not options.username and not options.submit_as and
+            not options.password):
+            die('Authentication information needs to be provided on '
+                'the command line when using --diff-filename=-')
 
         print "==> Review Board Login Required"
         print "Enter username and password for Review Board at %s" % self.url
@@ -2716,8 +2726,7 @@ def main():
         parent_diff = None
 
         if options.diff_filename == '-':
-            raise NotImplemented('- for diff filename')
-            #diff = sys.stdin.read()
+            diff = sys.stdin.read()
         else:
             try:
                 fp = open(os.path.join(origcwd, options.diff_filename), 'r')
