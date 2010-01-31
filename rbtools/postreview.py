@@ -2587,6 +2587,10 @@ def parse_options(args):
     parser.add_option("-d", "--debug",
                       action="store_true", dest="debug", default=DEBUG,
                       help="display debug output")
+    parser.add_option("--diff-filename",
+                      dest="diff_filename", default=None,
+                      help='upload an existing diff file, instead of '
+                           'generating a new diff')
 
     (globals()["options"], args) = parser.parse_args(args)
 
@@ -2667,6 +2671,8 @@ def determine_client():
     return (repository_info, tool)
 
 def main():
+    origcwd = os.path.abspath(os.getcwd())
+
     if 'APPDATA' in os.environ:
         homepath = os.environ['APPDATA']
     elif 'HOME' in os.environ:
@@ -2706,6 +2712,19 @@ def main():
         parent_diff = None
     elif options.label and isinstance(tool, ClearCaseClient):
         diff, parent_diff = tool.diff_label(options.label)
+    elif options.diff_filename:
+        parent_diff = None
+
+        if options.diff_filename == '-':
+            raise NotImplemented('- for diff filename')
+            #diff = sys.stdin.read()
+        else:
+            try:
+                fp = open(os.path.join(origcwd, options.diff_filename), 'r')
+                diff = fp.read()
+                fp.close()
+            except IOError, e:
+                die("Unable to open diff filename: %s" % e)
     else:
         diff, parent_diff = tool.diff(args)
 
