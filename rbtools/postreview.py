@@ -653,7 +653,7 @@ class ReviewBoardServer(object):
 
         content_type = "multipart/form-data; boundary=%s" % BOUNDARY
 
-        return content_type, content
+        return content_type, content.encode('utf-8')
 
 
 class SCMClient(object):
