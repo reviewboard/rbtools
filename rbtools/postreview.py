@@ -1612,13 +1612,13 @@ class PerforceClient(SCMClient):
             description = execute(["p4", "describe", "-s", changenum],
                                   split_lines=True)
 
-            if '*pending*' in description[0]:
+            # Some P4 wrappers are addding an extra line before the description
+            if '*pending*' in description[0] or '*pending*' in description[1]:
                 cl_is_pending = True
-                description = []
 
         v = self.p4d_version
 
-        if cl_is_pending and (v[1] < 2002 or (v[1] == "2002" and v[2] < 2)):
+        if cl_is_pending and (v[0] < 2002 or (v[0] == "2002" and v[1] < 2)):
             # Pre-2002.2 doesn't give file list in pending changelists, so we
             # have to get it a different way
             info = execute(["p4", "opened", "-c", str(changenum)],
@@ -1633,10 +1633,10 @@ class PerforceClient(SCMClient):
             for line_num, line in enumerate(description):
                 if 'Affected files ...' in line:
                     break
-                else:
-                    # Got to the end of all the description lines and didn't find
-                    # what we were looking for.
-                    die("Couldn't find any affected files for this change.")
+            else:
+                # Got to the end of all the description lines and didn't find
+                # what we were looking for.
+                die("Couldn't find any affected files for this change.")
 
             description = description[line_num+2:]
 
@@ -2418,7 +2418,11 @@ def tempt_fate(server, tool, changenum, diff_content=None,
             server.set_review_request_field(review_request, 'branch',
                                             options.branch)
 
-        if options.bugs_closed:
+        if options.bugs_closed:     # append to existing list
+            options.bugs_closed = options.bugs_closed.strip(", ")
+            bug_set = set(re.split("[, ]+", options.bugs_closed)) | \
+                      set(review_request['bugs_closed'])
+            options.bugs_closed = ",".join(bug_set)
             server.set_review_request_field(review_request, 'bugs_closed',
                                             options.bugs_closed)
 
