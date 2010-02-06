@@ -2075,34 +2075,32 @@ class GitClient(SCMClient):
         if remote and remote != '.' and merge:
             self.upstream_branch = '%s/%s' % (remote, merge)
 
-        self.upstream_branch, origin = self.get_origin(self.upstream_branch,
+        self.upstream_branch, origin_url = self.get_origin(self.upstream_branch,
                                                        True)
 
-        if origin.startswith("fatal:"):
-            self.upstream_branch, origin = self.get_origin()
+        if not origin_url or origin_url.startswith("fatal:"):
+            self.upstream_branch, origin_url = self.get_origin()
 
-        m = re.search(r'URL: (.+)', origin)
-        if m:
-            url = m.group(1).rstrip('/')
-            if url:
-                self.type = "git"
-                return RepositoryInfo(path=url, base_path='',
-                                      supports_parent_diffs=True)
+        url = origin_url.rstrip('/')
+        if url:
+            self.type = "git"
+            return RepositoryInfo(path=url, base_path='',
+                                  supports_parent_diffs=True)
 
         return None
 
     def get_origin(self, default_upstream_branch=None, ignore_errors=False):
         """Get upstream remote origin from options or parameters.
 
-        Returns a tuple: (upstream_branch, remote)
+        Returns a tuple: (upstream_branch, remote_url)
         """
         upstream_branch = options.tracking or default_upstream_branch or \
                           'origin/master'
         upstream_remote = upstream_branch.split('/')[0]
-        origin = execute(["git", "remote", "show", upstream_remote],
+        origin_url = execute(["git", "config", "remote.%s.url" % upstream_remote],
                          ignore_errors=ignore_errors)
 
-        return (upstream_branch, origin)
+        return (upstream_branch, origin_url.rstrip('\n'))
 
     def is_valid_version(self, actual, expected):
         """
