@@ -2607,7 +2607,8 @@ def parse_options(args):
                       dest="repository_url", default=None,
                       help="the url for a repository for creating a diff "
                            "outside of a working copy (currently only supported "
-                           "by Subversion).  Requires --revision-range")
+                           "by Subversion). Requires either --revision-range"
+                           "or --diff-filename options")
     parser.add_option("-d", "--debug",
                       action="store_true", dest="debug", default=DEBUG,
                       help="display debug output")
@@ -2648,9 +2649,12 @@ def parse_options(args):
                              options.testing_file)
             sys.exit(1)
 
-    if options.repository_url and not options.revision_range:
-        sys.stderr.write("The --repository-url option requires the "
-                         "--revision-range option.\n")
+    if (options.repository_url and
+        not options.revision_range and
+        not options.diff_filename):
+        sys.stderr.write("The --repository-url option requires either the "
+                         "--revision-range option or the --diff-filename "
+                         "option.\n")
         sys.exit(1)
 
     return args
