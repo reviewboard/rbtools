@@ -1924,6 +1924,10 @@ class MercurialClient(SCMClient):
                                   supports_parent_diffs=True)
 
         path = m.group(1).strip()
+        m2 = re.match(r'^(svn\+ssh|http|https)://([-a-zA-Z0-9.]*@)(.*)$',
+                      path)
+        if m2:
+            path = '%s://%s' % (m2.group(1), m2.group(3))
 
         return RepositoryInfo(path=path, base_path='',
                               supports_parent_diffs=True)
