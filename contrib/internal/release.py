@@ -49,83 +49,6 @@ def build_targets():
                        (PACKAGE_NAME, get_package_version()))
 
 
-def build_news():
-    def linkify_bugs(line):
-        return re.sub(r'(Bug #(\d+))',
-                      r'<a href="http://www.reviewboard.org/bug/\2">\1</a>',
-                      line)
-
-    content = ""
-    html_content = ""
-
-    saw_version = False
-    in_list = False
-    in_item = False
-
-    fp = open("NEWS", "r")
-
-    for line in fp.xreadlines():
-        line = line.rstrip()
-
-        if line.startswith("version "):
-            if saw_version:
-                # We're done.
-                break
-
-            saw_version = True
-        elif line.startswith("\t* "):
-            if in_item:
-                html_content += "</li>\n"
-                in_item = False
-
-            if in_list:
-                html_content += "</ul>\n"
-
-            html_content += "<p><b>%s</b></p>\n" % line[3:]
-            html_content += "<ul>\n"
-            in_list = True
-        elif line.startswith("\t\t* "):
-            if not in_list:
-                sys.stderr.write("*** Found a list item without a list!\n")
-                continue
-
-            if in_item:
-                html_content += "</li>\n"
-
-            html_content += " <li>%s" % linkify_bugs(line[4:])
-            in_item = True
-        elif line.startswith("\t\t  "):
-            if not in_item:
-                sys.stderr.write("*** Found list item content without "
-                                 "a list item!\n")
-                continue
-
-            html_content += " " + linkify_bugs(line[4:])
-
-        content += line + "\n"
-
-    fp.close()
-
-    if in_item:
-        html_content += "</li>\n"
-
-    if in_list:
-        html_content += "</ul>\n"
-
-    content = content.rstrip()
-
-    filename = "dist/%s-%s.NEWS" % (PACKAGE_NAME, get_package_version())
-    built_files.append(filename)
-    fp = open(filename, "w")
-    fp.write(content)
-    fp.close()
-
-    filename = "dist/%s-%s.NEWS.html" % (PACKAGE_NAME, get_package_version())
-    fp = open(filename, "w")
-    fp.write(html_content)
-    fp.close()
-
-
 def upload_files():
     execute("scp %s %s" % (" ".join(built_files), RELEASES_URL))
 
@@ -145,7 +68,6 @@ def main():
         sys.exit(1)
 
     build_targets()
-    build_news()
     upload_files()
     tag_release()
     register_release()
