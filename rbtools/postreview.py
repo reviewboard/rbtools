@@ -847,7 +847,7 @@ class ClearCaseClient(SCMClient):
             # Call cleartool to get this version and the previous version
             #   of the element.
             curr_version, pre_version = execute(
-                ["cleartool", "desc", "-pre", elem_path])
+                ["cleartool", "desc", "-pre", elem_path], split_lines=True)
             curr_version = cpath.normpath(curr_version)
             pre_version = pre_version.split(':')[1].strip()
 
