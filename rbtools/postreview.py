@@ -1636,9 +1636,11 @@ class PerforceClient(SCMClient):
 
         v = self.p4d_version
 
-        if cl_is_pending and (v[0] < 2002 or (v[0] == "2002" and v[1] < 2)):
-            # Pre-2002.2 doesn't give file list in pending changelists, so we
-            # have to get it a different way
+        if cl_is_pending and (v[0] < 2002 or (v[0] == "2002" and v[1] < 2)
+                              or changenum == "default"):
+            # Pre-2002.2 doesn't give file list in pending changelists,
+            # or we don't have a description for a default changeset,
+            # so we have to get it a different way.
             info = execute(["p4", "opened", "-c", str(changenum)],
                            split_lines=True)
 
