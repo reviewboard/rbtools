@@ -125,7 +125,7 @@ class APIError(Exception):
         if self.error_code:
             code_str += ', API Error %d' % self.error_code
 
-        if 'err' in self.rsp:
+        if self.rsp and 'err' in self.rsp:
             return '%s (%s)' % (self.rsp['err']['msg'], code_str)
         else:
             return code_str
@@ -417,6 +417,8 @@ class ReviewBoardServer(object):
             rsp = self.api_post('api/json/reviewrequests/new/', data)
         except APIError, e:
             if e.error_code == 204: # Change number in use
+                rsp = e.rsp
+
                 if options.diff_only:
                     # In this case, fall through and return to tempt_fate.
                     debug("Review request already exists.")
@@ -427,8 +429,9 @@ class ReviewBoardServer(object):
                         rsp['review_request']['id'])
             else:
                 raise e
+        else:
+            debug("Review request created")
 
-        debug("Review request created")
         return rsp['review_request']
 
     def set_review_request_field(self, review_request, field, value):
