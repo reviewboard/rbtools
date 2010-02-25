@@ -1186,8 +1186,19 @@ class SVNClient(SCMClient):
 
             url = repository_info.path + repository_info.base_path
 
-            old_url = url + '@' + revisions[0]
             new_url = url + '@' + revisions[1]
+
+            # When the source revision is zero, assume the user wants to
+            # upload a diff containing all the files in ``base_path`` as new
+            # files. If the base path within the repository is added to both
+            # the old and new URLs, the ``svn diff`` command will error out
+            # since the base_path didn't exist at revision zero. To avoid
+            # that error, use the repository's root URL as the source for
+            # the diff.
+            if revisions[0] == "0":
+                url = repository_info.path
+
+            old_url = url + '@' + revisions[0]
 
             return self.do_diff(["svn", "diff", "--diff-cmd=diff", old_url,
                                  new_url] + files,
@@ -1309,8 +1320,9 @@ class SVNClient(SCMClient):
         if "\t" in s:
             # There's a \t separating the filename and info. This is the
             # best case scenario, since it allows for filenames with spaces
-            # without much work.
-            parts = s.split("\t")
+            # without much work. The info can also contain tabs after the
+            # initial one; ignore those when splitting the string.
+            parts = s.split("\t", 1)
 
         # There's spaces being used to separate the filename and info.
         # This is technically wrong, so all we can do is assume that
