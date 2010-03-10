@@ -1809,7 +1809,7 @@ class PerforceClient(SCMClient):
             dl.insert(0, "==== %s#%s ==%s== %s ====\n" % \
                 (depot_path, base_revision, changetype_short, local_path))
             dl.append('\n')
-        else:
+        elif len(dl) > 1:
             m = re.search(r'(\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d)', dl[1])
             if m:
                 timestamp = m.group(1)
@@ -1847,6 +1847,8 @@ class PerforceClient(SCMClient):
             # that the resulting diff file isn't broken.
             if dl[-1][-1] != '\n':
                 dl.append('\n')
+        else:
+            die("ERROR, no valid diffs: %s" % dl[0])
 
         return dl
 
