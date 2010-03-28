@@ -111,6 +111,8 @@ user_config = None
 tempfiles = []
 options = None
 
+GNU_DIFF_WIN32_URL = 'http://gnuwin32.sourceforge.net/packages/diffutils.htm'
+
 
 class APIError(Exception):
     def __init__(self, http_status, error_code, rsp=None, *args, **kwargs):
@@ -1112,10 +1114,13 @@ class SVNClient(SCMClient):
         # Get the SVN repository path (either via a working copy or
         # a supplied URI)
         svn_info_params = ["svn", "info"]
+
         if options.repository_url:
             svn_info_params.append(options.repository_url)
+
         data = execute(svn_info_params,
                        ignore_errors=True)
+
         m = re.search(r'^Repository Root: (.+)$', data, re.M)
         if not m:
             return None
@@ -1131,6 +1136,10 @@ class SVNClient(SCMClient):
         m = re.search(r'^Repository UUID: (.+)$', data, re.M)
         if not m:
             return None
+
+        # Now that we know it's SVN, make sure we have GNU diff installed,
+        # and error out if we don't.
+        check_gnu_diff()
 
         return SvnRepositoryInfo(path, base_path, m.group(1))
 
@@ -2339,6 +2348,31 @@ def check_install(command):
         return False
 
 
+def check_gnu_diff():
+    """Checks if GNU diff is installed, and informs the user if it's not."""
+    has_gnu_diff = False
+
+    try:
+        result = execute(['diff', '--version'], ignore_errors=True)
+        has_gnu_diff = 'GNU diffutils' in result
+    except OSError:
+        pass
+
+    if not has_gnu_diff:
+        sys.stderr.write('\n')
+        sys.stderr.write('GNU diff is required for Subversion '
+                         'repositories. Make sure it is installed\n')
+        sys.stderr.write('and in the path.\n')
+        sys.stderr.write('\n')
+
+        if os.name == 'nt':
+            sys.stderr.write('On Windows, you can install this from:\n')
+            sys.stderr.write(GNU_DIFF_WIN32_URL)
+            sys.stderr.write('\n')
+
+        die()
+
+
 def execute(command, env=None, split_lines=False, ignore_errors=False,
             extra_ignore_errors=(), translate_newlines=True):
     """
@@ -2720,6 +2754,7 @@ def determine_client():
         sys.exit(1)
 
     return (repository_info, tool)
+
 
 def main():
     origcwd = os.path.abspath(os.getcwd())
