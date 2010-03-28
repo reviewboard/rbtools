@@ -111,6 +111,8 @@ user_config = None
 tempfiles = []
 options = None
 
+ADD_REPOSITORY_DOCS_URL = \
+    'http://www.reviewboard.org/docs/manual/dev/admin/management/repositories/'
 GNU_DIFF_WIN32_URL = 'http://gnuwin32.sourceforge.net/packages/diffutils.htm'
 
 
@@ -429,6 +431,21 @@ class ReviewBoardServer(object):
                     rsp = self.api_post(
                         'api/json/reviewrequests/%s/update_from_changenum/' %
                         rsp['review_request']['id'])
+            elif e.error_code == 206: # Invalid repository
+                sys.stderr.write('\n')
+                sys.stderr.write('There was an error creating this review '
+                                 'request.\n')
+                sys.stderr.write('\n')
+                sys.stderr.write('The repository path "%s" is not in the\n' %
+                                 self.info.path)
+                sys.stderr.write('list of known repositories on the server.\n')
+                sys.stderr.write('\n')
+                sys.stderr.write('Ask the administrator to add this '
+                                 'repository to the Review Board server.\n')
+                sys.stderr.write('For information on adding repositories, '
+                                 'please read\n')
+                sys.stderr.write(ADD_REPOSITORY_DOCS_URL + '\n')
+                die()
             else:
                 raise e
         else:
@@ -610,6 +627,9 @@ class ReviewBoardServer(object):
             data = urllib2.urlopen(r).read()
             self.cookie_jar.save(self.cookie_file)
             return data
+        except urllib2.HTTPError, e:
+            # Re-raise so callers can interpret it.
+            raise e
         except urllib2.URLError, e:
             try:
                 debug(e.read())
@@ -2532,7 +2552,19 @@ def tempt_fate(server, tool, changenum, diff_content=None,
             server.upload_diff(review_request, diff_content,
                                parent_diff_content)
         except APIError, e:
-            print "Error uploading diff: %s" % e
+            sys.stderr.write('\n')
+            sys.stderr.write('Error uploading diff\n')
+            sys.stderr.write('\n')
+
+            if e.error_code == 105:
+                sys.stderr.write('The generated diff file was empty. This '
+                                 'usually means no files were\n')
+                sys.stderr.write('modified in this change.\n')
+                sys.stderr.write('\n')
+                sys.stderr.write('Try running with --output-diff and --debug '
+                                 'for more information.\n')
+                sys.stderr.write('\n')
+
             die("Your review request still exists, but the diff is not " +
                 "attached.")
 
@@ -2716,8 +2748,8 @@ def parse_options(args):
 
     return args
 
-def determine_client():
 
+def determine_client():
     repository_info = None
     tool = None
 
