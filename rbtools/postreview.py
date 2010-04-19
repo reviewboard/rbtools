@@ -37,6 +37,9 @@ if (sys.platform.startswith('win')
 else:
     import posixpath as cpath
 
+from rbtools import get_package_version, get_version_string
+
+
 ###
 # Default configuration -- user-settable variables follow.
 ###
@@ -104,8 +107,6 @@ DEBUG           = False
 # End user-settable variables.
 ###
 
-
-VERSION = "0.8"
 
 user_config = None
 tempfiles = []
@@ -307,7 +308,7 @@ class ReviewBoardServer(object):
         opener = urllib2.build_opener(cookie_handler,
                                       basic_auth_handler,
                                       digest_auth_handler)
-        opener.addheaders = [('User-agent', 'post-review/' + VERSION)]
+        opener.addheaders = [('User-agent', 'RBTools/' + get_package_version())]
         urllib2.install_opener(opener)
 
     def login(self, force=False):
@@ -2586,7 +2587,7 @@ def tempt_fate(server, tool, changenum, diff_content=None,
 
 def parse_options(args):
     parser = OptionParser(usage="%prog [-pond] [-r review_id] [changenum]",
-                          version="%prog " + VERSION)
+                          version="RBTools " + get_version_string())
 
     parser.add_option("-p", "--publish",
                       dest="publish", action="store_true", default=PUBLISH,
