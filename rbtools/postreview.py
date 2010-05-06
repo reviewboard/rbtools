@@ -1043,12 +1043,8 @@ class ClearCaseClient(SCMClient):
         """
         Performs a diff between 2 revisions of a CC repository.
         """
-        rev_str = ''
-
-        for rev in revision_range.split(":"):
-            rev_str += "-r %s " % rev
-
-        return self.do_diff(rev_str)
+        revs = revision_range.split(":")
+        return self.do_diff(revs)[0]
 
     def do_diff(self, params):
         # Diff returns "1" if differences were found.
