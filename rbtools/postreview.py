@@ -1053,13 +1053,6 @@ class ClearCaseClient(SCMClient):
     def do_diff(self, params):
         # Diff returns "1" if differences were found.
         # Add the view name and view type to the description
-        if options.description:
-            options.description = ("VIEW: " + self.viewinfo +
-                "VIEWTYPE: " + self.viewtype + "\n" + options.description)
-        else:
-            options.description = (self.viewinfo +
-                "VIEWTYPE: " + self.viewtype + "\n")
-
         o = []
         Feol = False
         while len(params) > 0:
