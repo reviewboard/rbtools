@@ -25,9 +25,11 @@ except ImportError:
     from md5 import md5
 
 try:
-    import json
+    # Specifically import json_loads, to work around some issues with
+    # installations containing incompatible modules named "json".
+    from json import loads as json_loads
 except ImportError:
-    import simplejson as json
+    from simplejson import loads as json_loads
 
 # This specific import is necessary to handle the paths for
 # cygwin enabled machines.
@@ -546,7 +548,7 @@ class ReviewBoardServer(object):
         Loads in a JSON file and returns the data if successful. On failure,
         APIError is raised.
         """
-        rsp = json.loads(data)
+        rsp = json_loads(data)
 
         if rsp['stat'] == 'fail':
             self.process_error(200, data)
@@ -556,7 +558,7 @@ class ReviewBoardServer(object):
     def process_error(self, http_status, data):
         """Processes an error, raising an APIError with the information."""
         try:
-            rsp = json.loads(data)
+            rsp = json_loads(data)
 
             assert rsp['stat'] == 'fail'
 
