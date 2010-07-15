@@ -1,5 +1,7 @@
 recursive-include contrib *.py *.txt README*
 include ez_setup.py
 include AUTHORS
+include COPYING
+include INSTALL
 include NEWS
 include README
