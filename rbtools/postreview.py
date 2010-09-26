@@ -2192,6 +2192,10 @@ class GitClient(SCMClient):
     compatible diffs. This will attempt to generate a diff suitable for the
     remote repository, whether git, SVN or Perforce.
     """
+    def _strip_heads_prefix(self, ref):
+        """ Strips prefix from ref name, if possible """
+        return re.sub(r'^refs/heads/', '', ref)
+
     def get_repository_info(self):
         if not check_install('git --help'):
             return None
@@ -2254,7 +2258,7 @@ class GitClient(SCMClient):
 
         # Nope, it's git then.
         # Check for a tracking branch and determine merge-base
-        short_head = self.head_ref.split('/')[-1]
+        short_head = self._strip_heads_prefix(self.head_ref)
         merge = execute(['git', 'config', '--get',
                          'branch.%s.merge' % short_head],
                         ignore_errors=True).strip()
@@ -2262,11 +2266,7 @@ class GitClient(SCMClient):
                           'branch.%s.remote' % short_head],
                          ignore_errors=True).strip()
 
-        HEADS_PREFIX = 'refs/heads/'
-
-        if merge.startswith(HEADS_PREFIX):
-            merge = merge[len(HEADS_PREFIX):]
-
+        merge = self._strip_heads_prefix(merge)
         self.upstream_branch = ''
 
         if remote and remote != '.' and merge:
