@@ -930,8 +930,12 @@ class ClearCaseClient(SCMClient):
                     splversions.append(fname + ver[1])
                 else :
                     # Linux.
-                    bpath = vkey[:vkey.rfind("vobs")+4]
-                    fpath = vkey[vkey.rfind("vobs")+5:]
+                    if vkey.rfind("vobs") != -1 :
+                        bpath = vkey[:vkey.rfind("vobs")+4]
+                        fpath = vkey[vkey.rfind("vobs")+5:]
+                    else :
+                       bpath = vkey[:0]
+                       fpath = vkey[1:]
                     ver = fpath.split("@@")
                     splversions =  ver[0][:vkey.rfind("@@")].split("/")
                     fname = splversions.pop()
