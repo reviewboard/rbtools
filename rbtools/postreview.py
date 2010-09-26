@@ -1569,6 +1569,11 @@ class PerforceClient(SCMClient):
                     old_file = tmp_diff_from_filename
                     changetype_short = 'D'
                     base_revision = int(first_record['rev'])
+                elif first_record['rev'] == second_record['rev']:
+                    # We when we know the revisions are the same, we don't need
+                    # to do any diffing. This speeds up large revision-range
+                    # diffs quite a bit.
+                    continue
                 else:
                     self._write_file(depot_path + '#' + first_record['rev'],
                                      tmp_diff_from_filename)
