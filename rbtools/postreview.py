@@ -1076,13 +1076,21 @@ class ClearCaseClient(SCMClient):
                     fn = self.get_filename_hash(filenam)
                     fn = cpath.join(tempfile.gettempdir(), fn)
                     do_rem = True
-                fd = open(cpath.normpath(fn))
-                fdata = fd.readlines()
-                fd.close()
-                file_data.append(fdata)
-                # If the file was temp, it should be removed.
-                if do_rem:
-                    os.remove(filenam)
+
+                if cpath.isdir(filenam):
+                    content = [
+                        '%s\n' % s
+                        for s in sorted(os.listdir(filenam))
+                    ]
+                    file_data.append(content)
+                else:
+                    fd = open(cpath.normpath(fn))
+                    fdata = fd.readlines()
+                    fd.close()
+                    file_data.append(fdata)
+                    # If the file was temp, it should be removed.
+                    if do_rem:
+                        os.remove(filenam)
 
             modi = file_data.pop()
             orig = file_data.pop()
@@ -2994,7 +3002,8 @@ def main():
         changenum = tool.sanitize_changenum(changenum)
 
     if options.output_diff_only:
-        print diff
+        # The comma here isn't a typo, but rather suppresses the extra newline
+        print diff,
         sys.exit(0)
 
     # Let's begin.
