@@ -704,6 +704,9 @@ class SCMClient(object):
     def get_repository_info(self):
         return None
 
+    def check_options(self):
+        pass
+
     def scan_for_server(self, repository_info):
         """
         Scans the current directory on up to find a .reviewboard file
@@ -836,7 +839,6 @@ class ClearCaseClient(SCMClient):
     information and generates compatible diffs.
     This client assumes that cygwin is installed on windows.
     """
-    ccroot_path = "/view/reviewboard.diffview/vobs/"
     viewinfo = ""
     viewtype = "snapshot"
 
@@ -858,8 +860,8 @@ class ClearCaseClient(SCMClient):
         #   respository path.
         # There is no reason to have a dynamic path unless you have
         #   multiple clearcase repositories. This should be implemented.
-        return RepositoryInfo(path=self.ccroot_path,
-                              base_path=self.ccroot_path,
+        return RepositoryInfo(path=options.repository_url,
+                              base_path=options.repository_url,
                               supports_parent_diffs=False)
 
     def get_previous_version(self, files):
@@ -1073,6 +1075,7 @@ class ClearCaseClient(SCMClient):
             # Read both original and modified files.
             onam = params.pop(0)
             mnam = params.pop(0)
+
             file_data = []
             do_rem = False
             # If the filename length is greater than 254 char for windows,
@@ -1178,6 +1181,15 @@ class SVNClient(SCMClient):
         check_gnu_diff()
 
         return SvnRepositoryInfo(path, base_path, m.group(1))
+
+    def check_options(self):
+        if (options.repository_url and
+            not options.revision_range and
+            not options.diff_filename):
+            sys.stderr.write("The --repository-url option requires either the "
+                             "--revision-range option or the --diff-filename "
+                             "option.\n")
+            sys.exit(1)
 
     def scan_for_server(self, repository_info):
         # Scan first for dot files, since it's faster and will cover the
@@ -2867,9 +2879,10 @@ def parse_options(args):
     parser.add_option("--repository-url",
                       dest="repository_url", default=None,
                       help="the url for a repository for creating a diff "
-                           "outside of a working copy (currently only supported "
-                           "by Subversion). Requires either --revision-range"
-                           "or --diff-filename options")
+                           "outside of a working copy (currently only "
+                           "supported by Subversion with --revision-range or "
+                           "--diff-filename and ClearCase with relative "
+                           "paths outside the view)")
     parser.add_option("-d", "--debug",
                       action="store_true", dest="debug", default=DEBUG,
                       help="display debug output")
@@ -2909,14 +2922,6 @@ def parse_options(args):
             sys.stderr.write("The testing file %s does not exist.\n" %
                              options.testing_file)
             sys.exit(1)
-
-    if (options.repository_url and
-        not options.revision_range and
-        not options.diff_filename):
-        sys.stderr.write("The --repository-url option requires either the "
-                         "--revision-range option or the --diff-filename "
-                         "option.\n")
-        sys.exit(1)
 
     if options.reopen and not options.rid:
         sys.stderr.write("The --reopen option requires "
@@ -2983,6 +2988,9 @@ def main():
     args = parse_options(sys.argv[1:])
 
     repository_info, tool = determine_client()
+
+    # Verify that options specific to an SCM Client have not been mis-used.
+    tool.check_options()
 
     # Try to find a valid Review Board server to use.
     if options.server:
