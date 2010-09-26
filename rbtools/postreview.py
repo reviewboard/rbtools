@@ -531,6 +531,14 @@ class ReviewBoardServer(object):
         self.api_post('api/json/reviewrequests/%s/diff/new/' %
                       review_request['id'], fields, files)
 
+    def reopen(self, review_request):
+        """
+        Reopen discarded review request.
+        """
+        debug("Reopening")
+        self.api_post('api/json/reviewrequests/%s/reopen/' %
+                      review_request['id'])
+
     def publish(self, review_request):
         """
         Publishes a review request.
@@ -2725,6 +2733,9 @@ def tempt_fate(server, tool, changenum, diff_content=None,
             die("Your review request still exists, but the diff is not " +
                 "attached.")
 
+    if options.reopen:
+        server.reopen(review_request)
+
     if options.publish:
         server.publish(review_request)
 
@@ -2770,6 +2781,10 @@ def parse_options(args):
                       dest="diff_only", action="store_true", default=False,
                       help="uploads a new diff, but does not update "
                            "info from changelist")
+    parser.add_option("--reopen",
+                      dest="reopen", action="store_true", default=False,
+                      help="reopen discarded review request "
+                           "after update")
     parser.add_option("--target-groups",
                       dest="target_groups", default=TARGET_GROUPS,
                       help="names of the groups who will perform "
@@ -2901,6 +2916,11 @@ def parse_options(args):
         sys.stderr.write("The --repository-url option requires either the "
                          "--revision-range option or the --diff-filename "
                          "option.\n")
+        sys.exit(1)
+
+    if options.reopen and not options.rid:
+        sys.stderr.write("The --reopen option requires "
+                         "--review-request-id option.\n")
         sys.exit(1)
 
     return args
