@@ -330,7 +330,7 @@ class ReviewBoardServer(object):
             username = options.username
         elif options.submit_as:
             username = options.submit_as
-        elif not force and has_valid_cookie():
+        elif not force and self.has_valid_cookie():
             # We delay the check for a valid cookie until after looking at args,
             # so that it doesn't override the command line.
             return
