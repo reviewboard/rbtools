@@ -318,9 +318,6 @@ class ReviewBoardServer(object):
         Logs in to a Review Board server, prompting the user for login
         information if needed.
         """
-        if not force and self.has_valid_cookie():
-            return
-
         if (options.diff_filename == '-' and
             not options.username and not options.submit_as and
             not options.password):
@@ -333,6 +330,10 @@ class ReviewBoardServer(object):
             username = options.username
         elif options.submit_as:
             username = options.submit_as
+        elif not force and has_valid_cookie():
+            # We delay the check for a valid cookie until after looking at args,
+            # so that it doesn't override the command line.
+            return
         else:
             username = raw_input('Username: ')
 
