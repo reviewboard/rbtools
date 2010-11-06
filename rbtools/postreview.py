@@ -593,7 +593,10 @@ class ReviewBoardServer(object):
 
         url = self._make_url(path)
         rsp = urllib2.urlopen(url).read()
-        self.cookie_jar.save(self.cookie_file)
+        try:
+            self.cookie_jar.save(self.cookie_file)
+        except IOError, e:
+            debug('Failed to write cookie file: %s' % e)
         return rsp
 
     def _make_url(self, path):
@@ -641,7 +644,10 @@ class ReviewBoardServer(object):
         try:
             r = urllib2.Request(url, body, headers)
             data = urllib2.urlopen(r).read()
-            self.cookie_jar.save(self.cookie_file)
+            try:
+                self.cookie_jar.save(self.cookie_file)
+            except IOError, e:
+                debug('Failed to write cookie file: %s' % e)
             return data
         except urllib2.HTTPError, e:
             # Re-raise so callers can interpret it.
