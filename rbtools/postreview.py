@@ -2416,12 +2416,12 @@ class GitClient(SCMClient):
 
         if self.type == "svn":
             diff_lines = execute(["git", "diff", "--no-color", "--no-prefix",
-                                  "-r", "-u", rev_range],
+                                  "--no-ext-diff", "-r", "-u", rev_range],
                                  split_lines=True)
             return self.make_svn_diff(ancestor, diff_lines)
         elif self.type == "git":
             return execute(["git", "diff", "--no-color", "--full-index",
-                            rev_range])
+                            "--no-ext-diff", rev_range])
 
         return None
 
