@@ -828,7 +828,7 @@ class CVSClient(SCMClient):
         for rev in revision_range.split(":"):
             revs += ["-r", rev]
 
-        return self.do_diff(revs)
+        return self.do_diff(revs + args)
 
     def do_diff(self, params):
         """
