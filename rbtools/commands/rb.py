@@ -20,7 +20,10 @@ def main():
             if pattern.match(n) and not valid:
                 valid = True
                 cmd_list = ['python', 'rb-%s.py' % sys.argv[1]] + sys.argv[2:]
-                print util.execute(cmd_list)
+                data = util.safe_execute(cmd_list)
+
+                if data:
+                    print data
 
     if not valid:
         print "usage: rb COMMAND [OPTIONS] [ARGS]"

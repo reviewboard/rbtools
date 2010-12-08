@@ -84,14 +84,18 @@ class ServerInterface(object):
     A class which performs basic communication with a ReviewBoard server and
     tracks cookie information.
     """
-    def __init__(self, server_url, cookie_path_file, password_mgr=None):
+    def __init__(self, server_url, cookie_path_file=None, password_mgr=None):
         self.server_url = server_url
 
-        if os.path.isfile(cookie_path_file):
+        if cookie_path_file:
             self.cookie_file = cookie_path_file
+            #if not os.path.isfile(cookie_path_file):
+            #    temp_file = open(cookie_path_file, 'w')
+            #    temp_file.close()
+
+            #self.cookie_file = cookie_path_file
         else:
-            self.cookie_file = os.path.join(
-                os.path.split(cookie_path_file)[0], '.default_cookie')
+            self.cookie_file = '.default_cookie'
 
         if password_mgr and \
             isinstance(password_mgr, ReviewBoardHTTPPasswordMgr):

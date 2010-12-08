@@ -17,8 +17,8 @@ class GitClient(Client):
     def get_info(self, parent_branch='master'):
         """Returns information about the repository
 
-This is an actual implementation that returns info about the Git repo
-"""
+        This is an actual implementation that returns info about the Git repo
+        """
 
         if not self.util.check_install('git --help'):
             return None

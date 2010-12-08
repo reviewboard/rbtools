@@ -352,7 +352,6 @@ class ResourceListBase(ResourceBase):
         super(ResourceListBase, self).__init__(server_interface)
         self.url = url
         self.resource_type = RESOURCE_LIST
-        self.field_id = None
         # Set the _index for iteration to -1.  Each call to next() will first
         # increment the index then attempt to return the item
         self._index = -1
@@ -418,6 +417,9 @@ class ResourceListBase(ResourceBase):
     # Methods which allow for the ResourceList to be Iterable.
     def __iter__(self):
         return self
+
+    def next(self):
+        return self.__next__()
 
     def __next__(self):
         self._index += 1
@@ -633,6 +635,34 @@ class ReviewRequest(Resource):
         self.update_field('status', self.SUBMITTED)
         self.save()
 
+
+class RepositoryList(ResourceList):
+    """ Resource list specific to a list of repositories.
+    """
+    def __init__(self, resource_list):
+        if isinstance(resource_list, ResourceList):
+            super(RepositoryList, self).__init__(
+                resource_list.server_interface, resource_list.url)
+
+    def get_repository_id(self, path):
+        """ Finds the repository which matches the path.
+
+        Gets the ID of the repository from the list where the path matches the
+        path specified.
+
+        Parameters:
+            path    The path of the repository to match.  This should be the
+                    upstream path of the repository.
+
+        Returns:
+            The ID of the repository from the list which matches the path
+            specified.  If no match is found, then None is returned.
+        """
+        for repo in self:
+            if repo.get_field('path') == path:
+                return repo.get_field('id')
+
+        return None
 
 # Auxillary methods not specific to any resource
 def _is_resource_list(data):

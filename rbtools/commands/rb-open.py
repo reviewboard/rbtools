@@ -3,15 +3,16 @@ import sys
 
 from rbtools.api.resource import Resource, RootResource, ReviewRequest
 from rbtools.api.serverinterface import ServerInterface
+from rbtools.api.settings import Settings
 
 
 def main():
     valid = False
 
     if len(sys.argv) > 1:
-        cwd = os.getcwd()
-        cookie = os.path.join(cwd, '.rb_cookie')
-        server_url = 'http://demo.reviewboard.org/'
+        settings = Settings(config_file='rb_scripts.dat')
+        cookie = settings.get_cookie_file()
+        server_url = settings.get_server_url()
         resource_id = sys.argv[1]
 
         if resource_id.isdigit():
@@ -24,6 +25,7 @@ def main():
 
     if not valid:
         print "usage: rb open <review_request_id>"
+
 
 if __name__ == '__main__':
     main()

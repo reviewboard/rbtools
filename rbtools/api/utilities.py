@@ -84,11 +84,12 @@ class RBUtilities(object):
                                  close_fds=True,
                                  universal_newlines=translate_newlines,
                                  env=env)
+            
         if split_lines:
             data = p.stdout.readlines()
         else:
             data = p.stdout.read()
-
+        
         rc = p.wait()
 
         if rc and not ignore_errors and rc not in extra_ignore_errors:
@@ -96,6 +97,22 @@ class RBUtilities(object):
             self.die(msg)
 
         return data
+
+    def safe_execute(self, command):
+        """
+        Utility function to execute a command and return the output.
+        """
+        env = os.environ.copy()
+        env['LC_ALL'] = 'en_US.UTF-8'
+        env['LANGUAGE'] = 'en_US.UTF-8'
+
+        if sys.platform.startswith('win'):
+            p = subprocess.Popen(command, env=env)
+        else:
+            p = subprocess.Popen(command, env=env)
+
+	p.wait()	
+	return None
 
     def die(self, msg=None):
         """

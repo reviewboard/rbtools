@@ -4,6 +4,8 @@ import sys
 
 from rbtools.api.resource import Resource, RootResource, ReviewRequest
 from rbtools.api.serverinterface import ServerInterface
+from rbtools.api.settings import Settings
+
 
 INFO = 'info'
 USER = 'usr'
@@ -27,10 +29,9 @@ def main():
     resource_map[REVIEW_REQUEST] = 'review_requests'
 
     if len(sys.argv) > 1:
-        cwd = os.getcwd()
-        cookie = os.path.join(cwd, '.rb_cookie')
-        #server_url = 'http://0.0.0.0:8080/'
-        server_url = 'http://demo.reviewboard.org/'
+        settings = Settings(config_file='rb_scripts.dat')
+        cookie = settings.get_cookie_file()
+        server_url = settings.get_server_url()
 
         if re.match('-', sys.argv[1]):
             valid = True
@@ -52,6 +53,7 @@ def main():
         print "resource_names:"
         for n in RESOURCE_NAMES:
             print "     %s" % n
+
 
 if __name__ == '__main__':
     main()

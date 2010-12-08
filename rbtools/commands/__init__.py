@@ -1,1 +1,12 @@
-__all__ = ['rb-upload', 'rb-info', 'rb-publish', 'rb-open', 'rb-close', 'rb-create', 'rb-echo', 'utils']
+__all__ = [
+    'rb-close',
+    'rb-config',
+    'rb-create',
+    'rb-get-diff',
+    'rb-info',
+    'rb-open',
+    'rb-publish',
+    'rb-upload',
+    'resource_browser',
+    'utils'
+]

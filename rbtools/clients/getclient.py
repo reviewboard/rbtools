@@ -34,7 +34,7 @@ def get_client(url=None, types=CLIENTS):
         message = 'get_client requires a url to be passed as a parameter'
         util.raise_error(type, message)
 
-    for client in CLIENTS:
+    for client in types:
         client.set_url(url)
 
         info = client.get_info()
