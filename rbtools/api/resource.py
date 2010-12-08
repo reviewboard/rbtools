@@ -115,6 +115,34 @@ class ResourceBase(object):
             else:
                 return field
 
+    def get_fields(self):
+        """ provides a list of fields in the resource
+
+        Returns a list of the keys for the fields that exist in the
+        resource with the exception of links, as those are handled
+        separately. If need be, the resource name will be filtered
+        out first.
+        """
+        fields = self.data.keys()
+
+        if self.resource_name in self.data:  # go to subdictionary
+            #could contain a sublist, not a subdictionary
+            sub = self.data[self.resource_name]
+            if isinstance(sub, dict):
+                fields = sub.keys()
+            elif isinstance(sub, list):
+                fields = []
+                for i in range(len(sub)):
+                    fields.append(i + 1)  # rbservers are publicly 1-indexed
+            else:
+                print 'field data is unparsable:\n' + str(sub)
+                exit()
+
+        if ('links' in fields):
+            fields.remove('links')
+
+        return fields
+
     def get_links(self):
         """ Returns the links available to this resource.
 
@@ -129,6 +157,16 @@ class ResourceBase(object):
         except KeyError, e:
             raise InvalidKeyError(
                 'The resource could not retrieve the link %s.' % link_name)
+
+    def get_file(self, accept='*/*'):
+        """returns the file located at the current path
+
+        This makes an HTTP GET request to the server on this resource's url.
+        This is almost completetly the same as resource_string (as loaded in
+        _load()), except this adds the optional field of accept for defining
+        mime_type.
+        """
+        return self.server_interface.get(self.url, accept)
 
     def _load(self):
         """ Loads and populates data from the server.
@@ -636,6 +674,21 @@ class ReviewRequest(Resource):
         self.save()
 
 
+class DiffResource(Resource):
+    """Resource associated with diff files on RB servers"""
+    def __init__(self, resource):
+        if isinstance(resource, Resource):
+            super(DiffResource, self).__init__(resource.server_interface,
+                                           resource.url)
+            if resource._queryable:
+                self.resource_string = resource.resource_string
+                self.data = resource.data
+                self._queryable = resource._queryable
+                self.resource_name = resource.resource_name
+            else:
+                self._load()
+
+
 class RepositoryList(ResourceList):
     """ Resource list specific to a list of repositories.
     """
@@ -663,6 +716,7 @@ class RepositoryList(ResourceList):
                 return repo.get_field('id')
 
         return None
+
 
 # Auxillary methods not specific to any resource
 def _is_resource_list(data):

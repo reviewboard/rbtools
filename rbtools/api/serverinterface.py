@@ -122,7 +122,7 @@ class ServerInterface(object):
     def is_logged_in(self):
         return self.has_valid_cookie()
 
-    def _request(self, method, url, fields=None, files=None):
+    def _request(self, method, url, fields=None, files=None, accept=None):
         """ Makes an HTTP request.
 
         Encodes the input fields and files and performs an HTTP request to the
@@ -137,6 +137,8 @@ class ServerInterface(object):
             files       - any files to be specified in the request.  This data
                           should be stored in a dict of key:dict,
                           filename:value and content:value structure
+            accept      - what file types the client will accept, including
+                          priorities.
 
         Returns:
             The response from the server.  For more information view the
@@ -148,6 +150,9 @@ class ServerInterface(object):
             'Content-Length': str(len(body))
         }
 
+        if accept:
+            headers['Accept'] = accept
+
         if not self._valid_method(method):
             raise InvalidRequestMethod('An invalid HTTP method was used.')
 
@@ -156,25 +161,25 @@ class ServerInterface(object):
         self.cookie_jar.save(self.cookie_file)
         return resource.read()
 
-    def get(self, url):
+    def get(self, url, accept=None):
         """ Make an HTTP GET on the specified url returning the response.
         """
-        return self._request('GET', url)
+        return self._request('GET', url, accept=accept)
 
-    def delete(self, url):
+    def delete(self, url, accept=None):
         """ Make an HTTP DELETE on the specified url returning the response.
         """
-        return self._request('DELETE', url)
+        return self._request('DELETE', url, accept=accept)
 
-    def post(self, url, fields, files=None):
+    def post(self, url, fields, files=None, accept=None):
         """ Make an HTTP POST on the specified url returning the response.
         """
-        return self._request('POST', url, fields, files)
+        return self._request('POST', url, fields, files, accept)
 
-    def put(self, url, fields, files=None):
+    def put(self, url, fields, files=None, accept=None):
         """ Make an HTTP PUT on the specified url returning the response.
         """
-        return self._request('PUT', url, fields, files)
+        return self._request('PUT', url, fields, files, accept)
 
     def _encode_multipart_formdata(self, fields=None, files=None):
         """ Encodes data for use in an HTTP request.

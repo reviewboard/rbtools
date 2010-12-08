@@ -117,8 +117,8 @@ class GitClient(Client):
     def get_origin(self, default_upstream_branch=None, ignore_errors=False):
         """Get upstream remote origin from options or parameters.
 
-Returns a tuple: (upstream_branch, remote_url)
-"""
+        Returns a tuple: (upstream_branch, remote_url)
+        """
         upstream_branch = default_upstream_branch or \
                           'origin/master'
         upstream_remote = upstream_branch.split('/')[0]
@@ -130,11 +130,11 @@ Returns a tuple: (upstream_branch, remote_url)
 
     def is_valid_version(self, actual, expected):
         """
-Takes two tuples, both in the form:
-(major_version, minor_version, micro_version)
-Returns true if the actual version is greater than or equal to
-the expected version, and false otherwise.
-"""
+        Takes two tuples, both in the form:
+            (major_version, minor_version, micro_version)
+        Returns true if the actual version is greater than or equal to
+        the expected version, and false otherwise.
+        """
         return (actual[0] > expected[0]) or \
                (actual[0] == expected[0] and actual[1] > expected[1]) or \
                (actual[0] == expected[0] and actual[1] == expected[1] and \
@@ -143,8 +143,8 @@ the expected version, and false otherwise.
     def scan_for_server(self, repository_info):
         """Scans for a git server
 
-Scans looking for a Git server, or failing that an SVN server
-"""
+        Scans looking for a Git server, or failing that an SVN server
+        """
 
         # Scan first for dot files, since it's faster and will cover the
         # user's $HOME/.reviewboardrc
@@ -174,9 +174,9 @@ Scans looking for a Git server, or failing that an SVN server
     def diff(self, args=None):
         """Creates a diff
 
-Performs a diff across all modified files in the branch, taking into
-account a parent branch.
-"""
+        Performs a diff across all modified files in the branch, taking into
+        account a parent branch.
+        """
 
         self.merge_base = self.util.execute(["git", "merge-base", \
                                 self.upstream_branch, self.head_ref]).strip()
@@ -188,8 +188,8 @@ account a parent branch.
 
     def make_diff(self, ancestor, commit=""):
         """
-Performs a diff on a particular branch range.
-"""
+        Performs a diff on a particular branch range.
+        """
         rev_range = "%s..%s" % (ancestor, commit)
 
         if self.type == "svn":
@@ -206,10 +206,10 @@ Performs a diff on a particular branch range.
     def make_svn_diff(self, parent_branch, diff_lines):
         """Creates a diff for an svn server
 
-Formats the output of git diff such that it's in a form that
-svn diff would generate. This is needed so the SVNTool in Review
-Board can properly parse this diff.
-"""
+        Formats the output of git diff such that it's in a form that
+        svn diff would generate. This is needed so the SVNTool in Review
+        Board can properly parse this diff.
+        """
         rev = self.util.execute(["git", "svn", "find-rev", \
                                     parent_branch]).strip()
 
