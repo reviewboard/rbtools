@@ -1,12 +1,18 @@
 import os
+import sys
 
 from rbtools.api.resource import Resource, ResourceList
 from rbtools.api.serverinterface import ServerInterface
 
+
 def main(params):
-    if len(params) > 0:
+    valid = False
+
+    print "TO DO"
+    """
+    if len(sys.argv) > 1:
         cwd = os.getcwd()
-        cookie = os.path.join(cwd, '.rb_api_cookie')
+        cookie = os.path.join(cwd, '.rb_cookie')
         server_url = 'http://demo.reviewboard.org/'
         resource_id = params[0]
 
@@ -20,5 +26,10 @@ def main(params):
             review_request_draft.publish()
         else:
             print "Could not login"
-    else:
-        print "Command requires a parameter"
+    """
+
+    if not valid:
+        print "usage: rb create ..."
+
+if __name__ == '__main__':
+    main()

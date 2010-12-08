@@ -53,6 +53,7 @@ setup(name=PACKAGE_NAME,
       entry_points = {
           'console_scripts': [
               'post-review = rbtools.postreview:main',
+              'rb = rbtools.commands.rb:main',
           ],
       },
       install_requires=install_requires,

@@ -1,1 +1,1 @@
-__all__ = ['rbpublish', 'rbopen', 'rbclose', 'utils']
+__all__ = ['rb-publish', 'rb-open', 'rb-close', 'rb-create', 'rb-echo', 'utils']

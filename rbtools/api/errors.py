@@ -32,10 +32,6 @@ class InvalidKeyError(ResourceError):
     pass
 
 
-class LoginRequiredError(ResourceError):
-    pass
-
-
 class RequestFailedError(ResourceError):
     pass
 
@@ -45,7 +41,7 @@ class UnloadedResourceError(ResourceError):
 
 
 class UnknownResourceTypeError(ResourceError):
-    pass 
+    pass
 
 
 class InvalidRequestMethodError(ServerInterfaceError):
