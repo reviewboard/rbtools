@@ -10,12 +10,19 @@ except ImportError:
     from simplejson import loads as json_loads
 
 
+DEBUG = False
+
+def debug(str):
+    if DEBUG:
+        print ">>>> %s" % str
+
 class RequestWithMethod(urllib2.Request):
     """
     Wrapper class for urllib2.Request.  This allows for using PUT
     and DELETE, in addition to POST and GET.
     """
     def __init__(self, method, url, data=None, headers={},\
+        origin_req_host=None, unverifiable=False):
         """
         Parameters:
             method   - the HTTP request method (ie. POST, PUT, GET, DELETE)
@@ -25,7 +32,6 @@ class RequestWithMethod(urllib2.Request):
             headers  - the data to be used in the header of the request.  This
                        should be un-encoded and in a dict key:value format.
         """
-        origin_req_host=None, unverifiable=False):
         self._method = method
         urllib2.Request.__init__(self, url, data, headers,\
                  origin_req_host, unverifiable)
@@ -77,14 +83,16 @@ class ServerInterface(object):
         try:
             rsp = json_loads(data)
             print rsp
-            assert rsp['stat'] == 'fail'
 
-            raise APIError(http_status, rsp['err']['code'], rsp,
-                rsp['err']['msg'])
+            if rsp['stat'] == 'fail':
+                raise APIError(http_status, rsp['err']['code'], rsp,\
+                    rsp['err']['msg'])
+	    #else, although an HTTP error was raised the request to the RB server
+            #was successful.  An example of this is an HTTP redirect (303)     
         except ValueError:
             pass
             #debug("Got HTTP error: %s: %s" % (http_status, data))
-    
+
     def _request(self, method, url, fields=None, files=None, return_json=True):
         """
         Encodes the input fields and files and performs an HTTP request to the
@@ -108,7 +116,6 @@ class ServerInterface(object):
             information view the ReviewBoard WebAPI Documentation.
         """
         content_type, body = self._encode_multipart_formdata(fields, files)
-        print body
         headers = {
             'Content-Type': content_type,
             'Content-Length': str(len(body))
@@ -122,6 +129,8 @@ class ServerInterface(object):
                 'An invalid HTTP method was used')
 
         try:
+            debug("_requesting with the header: %s" % headers)
+            debug("and data: %s" % body)
             r = RequestWithMethod(method, url, body, headers)
             resource = urllib2.urlopen(r)
             self.cookie_jar.save(self.cookie_file)
@@ -157,11 +166,15 @@ class ServerInterface(object):
             The response from the server in the format specified.  For more 
             information view the ReviewBoard WebAPI Documentation.
         """
-        body = urllib.urlencode(fields)
-        print body
+        if fields:
+            body = urllib.urlencode(fields)
+        else:
+            body = ""
+
         headers = {
             'Content-Length': str(len(body))
         }
+
 
         if not return_json:
             headers['Accept'] = 'application/xml'
@@ -171,6 +184,8 @@ class ServerInterface(object):
                 'An invalid HTTP method was used')
 
         try:
+            debug("_requesting with the header: %s" % headers)
+            debug("and data: %s" % body)
             r = RequestWithMethod(method, url, body, headers)
             resource = urllib2.urlopen(r)
             self.cookie_jar.save(self.cookie_file)
@@ -225,8 +240,6 @@ class ServerInterface(object):
         files = files or {}
 
         for key in fields:
-            print key
-            print fields[key]
             content += "--" + BOUNDARY + "\r\n"
             content += "Content-Disposition: form-data; name=\"%s\"\r\n" % key
             content += "\r\n"
