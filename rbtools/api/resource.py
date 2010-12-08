@@ -135,8 +135,8 @@ class ResourceBase(object):
                 for i in range(len(sub)):
                     fields.append(i + 1)  # rbservers are publicly 1-indexed
             else:
-                print 'field data is unparsable:\n' + str(sub)
-                exit()
+                raise InvalidKeyError(
+                    'Field data is unparsable:\n' + str(sub))
 
         if ('links' in fields):
             fields.remove('links')
@@ -336,6 +336,12 @@ class Resource(ResourceBase):
         not PUT/POSTed to the server until "save()" is called.
         """
         self.file_updates[path] = file_data
+
+    def clear_updates(self):
+        """ Removes all the updates currently stored for this resource.
+        """
+        self.updates = {}
+        self.file_updates = {}
 
     def get_or_create(self, link):
         """ Get or create then get the resource specified by link.

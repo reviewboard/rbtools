@@ -5,11 +5,17 @@ import os
 import pygtk
 pygtk.require('2.0')
 import sys
+import urllib2
+
+try:
+    from json import loads as json_loads
+except ImportError:
+    from simplejson import loads as json_loads
 
 from rbtools.api.serverinterface import ServerInterface
 from rbtools.api.settings import Settings
 from rbtools.api.resource import Resource, ResourceList, RootResource
-from rbtools.api.resource import RESOURCE
+from rbtools.api.resource import RESOURCE, RESOURCE_LIST
 
 
 COOKIE_FILE = None
@@ -48,6 +54,8 @@ class ResourceWidget(gtk.ScrolledWindow):
         self.header_table.attach(self.actions_box, 2, 3, 0, 1)        
 
         self.table = None
+        self.get_id = None
+        self.changes = {}
         self.build_table(self.root.data)
 
 
@@ -77,20 +85,63 @@ class ResourceWidget(gtk.ScrolledWindow):
             curr = self.stack[len(self.stack) - 1]
 
         self.current = curr[0]
-        self.build_table(self.current.data)
+        self.link_clicked(None, 'self')
+        #self.build_table(self.current.data)
 
     def link_clicked(self, widget, data):
-        current_resource_name = self.current.resource_name
-        if self.current.resource_type == RESOURCE:
-            self.current = self.current.get_or_create(data)
-        else:
-            self.current = self.current.get(data)
-        
-        if not current_resource_name == self.current.resource_name:
-            self.stack.append([self.current, self.make_parent_button(self.current.resource_name)])
-            self.update_tree()
+        if data:
+            if data == 'update':
+                try:
+                    for n in self.changes.keys():
+                        self.current.update_field(n, self.changes[n])
 
-        self.build_table(self.current.data)
+                    self.current.save()
+                except urllib2.HTTPError, e:
+                    #print e.read()
+                    pass
+            elif data == 'create':
+                error = True
+                self.current = self.current.create()
+                
+                while error:
+                    try:
+                        self.current.save()
+                        error = False
+                    except urllib2.HTTPError, e:
+                        text = e.read()
+                        text_json = json_loads(text)
+                        if 'fields' in text_json:
+                            for n in text_json['fields']:
+                                print 'Missing Field Required!'
+                                print 'Please enter a value for %s' % n
+                                value = raw_input('%s: ' % n)
+                                self.current.update_field(n, value)
+                        else:
+                            self.current.clear_updates()
+
+                self.stack.append([self.current, self.make_parent_button(self.current.resource_name)])
+                self.update_tree()                            
+            else:
+                if data == 'get_button':
+                    data = self.get_id.get_text()
+
+                current_resource_name = self.current.resource_name
+    
+                if self.current.resource_type == RESOURCE:
+                    self.current = self.current.get_or_create(data)
+                else:
+                    self.current = self.current.get(data)
+    
+                if not current_resource_name == self.current.resource_name:
+                    self.stack.append([self.current, self.make_parent_button(self.current.resource_name)])
+                    self.update_tree()
+
+            self.changes = {}
+            self.build_table(self.current.data)
+
+    def entry_changed(self, widget, n):
+        self.changes[n] = widget.get_text()
+        #print "%s changed to %s" % (n, self.changes[n])
 
     def update_tree(self):
         i = len(self.stack)
@@ -135,6 +186,20 @@ class ResourceWidget(gtk.ScrolledWindow):
       
     def build_table(self, data):
         self.clear_actions()
+        if self.current.resource_type == RESOURCE_LIST:
+            get_box = gtk.HBox(False, 0)
+            get_box.show()
+            self.actions.append(get_box)
+            self.actions_box.pack_start(get_box)
+            self.get_id = gtk.Entry()
+            self.get_id.set_editable(True)
+            self.get_id.show()
+            get_box.pack_end(self.get_id)
+            get_button = gtk.Button('Get: ')
+            get_button.connect("clicked", self.link_clicked, 'get_button')
+            get_button.show()
+            get_box.pack_start(get_button)
+
         rows, cols = self.get_dimensions(data)
         cols = cols + 1
         
@@ -176,41 +241,62 @@ class ResourceWidget(gtk.ScrolledWindow):
                     j = j + 1
 
                     if isinstance(data[n], list):
-                        # If there is a first item in data[n] and that item
-                        # has a 'links' key, then it is a data[n] is a list
-                        # of resources (which should be loaded in their own
-                        # ResourceWidgets)
-                        #print data[n][0]
                         if len(data[n]) > 0:
-                            if data[n][0] and 'links' in data[n][0]:
-                                scroll_window = gtk.ScrolledWindow()
-                                scroll_window.show()
-                                scroll_window.set_border_width(5)
-                                scroll_window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_ALWAYS)
-                                #print "attaching scroll window at %d, %d, %d, %d" % (j, columns + 1, i, i+1)
-                                self.table.attach(scroll_window, j, columns + 1, i, i + 1)
-                                vbox = gtk.VBox(False, 0)
-                                vbox.show()
-                                scroll_window.add_with_viewport(vbox)
+                            scroll_window = gtk.ScrolledWindow()
+                            scroll_window.show()
+                            scroll_window.set_border_width(5)
+                            scroll_window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_ALWAYS)
+                            #print "attaching scroll window at %d, %d, %d, %d" % (j, columns + 1, i, i+1)
+                            self.table.attach(scroll_window, j, columns + 1, i, i + 1)
+                            vbox = gtk.VBox(False, 0)
+                            vbox.show()
+                            scroll_window.add_with_viewport(vbox)
+                            
+                            # if it is a list where item's in the list have 'links',
+                            # then its a list of resources
+                            if not isinstance(data[n][0], int):
+                                if 'links' in data[n][0]:
+                                    for x in data[n]:
+                                        if 'users' == n:
+                                            id_name = 'username'
+                                        elif 'diffs' == n:
+                                            id_name = 'revision'
+                                        else:
+                                            id_name = 'id'
+   
+                                        button_text = '%s: ' % x[id_name] 
 
-                                for x in data[n]:
-                                    resource_page = ResourceWidget(None, None, x['links']['self']['href'], False)
-                                    resource_page.show()
-                                    vbox.pack_start(resource_page)
+                                        if 'review_requests' == n:
+                                            button_text = button_text + '\n%s' % x['summary']
+                                        elif 'repositories' == n:
+                                            button_text = button_text + '\n%s' % x['name']
     
-                                j = j - 1
+                                        id_button = gtk.Button(button_text)
+                                        id_button.connect('clicked', self.link_clicked, x[id_name])
+                                        id_button.show()
+                                        vbox.pack_start(id_button)
+                                    
+                            # else its a plain ol' list
+                            else:
+                                for x in data[n]:
+                                    next_box = gtk.Entry()
+                                    next_box.set_editable(False)
+                                    next_box.set_text(str(x))
+                                    vbox.pack_start(next_box)
                         else:
                             next_box = gtk.Entry()
-                            next_box.set_editable(True)
+                            next_box.set_editable(False)
                             next_box.set_text(str(data[n]))
                             next_box.show()
                             #print "%s at %d, %d, %d, %d" % (str(data[n]), j, j+1, i, i+1)
                             self.table.attach(next_box, j, j + 1, i, i + 1)
-                            j = j - 1
+                     
+                        j = j - 1
                     else:
                         next_box = gtk.Entry()
                         next_box.set_editable(True)
                         next_box.set_text(str(data[n]))
+                        next_box.connect('changed', self.entry_changed, n)
                         next_box.show()
                         #print "%s at %d, %d, %d, %d" % (str(data[n]), j, j+1, i, i+1)
                         self.table.attach(next_box, j, j + 1, i, i + 1)
@@ -238,7 +324,34 @@ class ResourceWidget(gtk.ScrolledWindow):
             self.actions_box.remove(n)
 
         self.actions = []
-   
+
+"""
+    def msg_entry_change(self, widget):
+        self.prompt_text = widget.get_text()
+
+    def msg_entry_submit(self, widget):
+        
+        self.prompt_msg_box.destroy()    
+
+    def prompt_for_text(self, field):
+        msg_box = gtk.Dialog()
+        msg_box.show()
+        msg_box.set_size_request(500, 500)
+        msg_box.set_title('Missing required field')
+        msg_text = gtk.Label('The field "%s" is required.  Please enter the field''s value.' % field)
+        msg_text.show()
+        msg_box.vbox.pack_start(msg_text)
+        msg_entry = gtk.Entry()
+        msg_entry.set_editable(True)
+        msg_entry.connect('changed', self.msg_entry_changed)
+        msg_box.vbox.pack_start(msg_entry)
+        msg_submit = gtk.Button('Submit')
+        msg_submit.show()
+        msg_submit.connect('clicked', self.msg_entry_submit)
+        msg_box.vbox.pack_start(msg_submit)
+"""   
+
+
 class ResourceBrowser(object):
     def __init__(self, server_url=SERVER_URL):
         super(ResourceBrowser, self).__init__()

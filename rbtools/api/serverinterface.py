@@ -122,7 +122,7 @@ class ServerInterface(object):
     def is_logged_in(self):
         return self.has_valid_cookie()
 
-    def _request(self, method, url, fields=None, files=None, accept=None):
+    def _request(self, method, url, fields=None, files=None, accept='application/json'):
         """ Makes an HTTP request.
 
         Encodes the input fields and files and performs an HTTP request to the
