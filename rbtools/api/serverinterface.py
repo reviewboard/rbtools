@@ -1,10 +1,12 @@
 import cookielib
-import getpass
-from rbtools import get_package_version, get_version_string
 import mimetools
 import urllib
 import urllib2
 import urlparse
+
+from rbtools import get_package_version, get_version_string
+from rbtools.commands.utils import DefaultPasswordInputer
+from rbtools.api.errors import InvalidRequestMethodError
 
 try:
     from json import loads as json_loads
@@ -38,43 +40,27 @@ class RequestWithMethod(urllib2.Request):
         urllib2.Request.__init__(self, *args, **kwargs)
 
     def get_method(self):
-        if self._method:
-            return self._method
-        else:
-            return super(RequestWithMethod, self).get_method()
-
-
-class APIError(Exception):
-    INVALID_REQUEST_METHOD = -1
-
-    def __init__(self, http_status, error_code, rsp=None, *args, **kwargs):
-        Exception.__init__(self, *args, **kwargs)
-        self.http_status = http_status
-        self.error_code = error_code
-        self.rsp = rsp
-
-    def __str__(self):
-        code_str = "HTTP %d" % self.http_status
-
-        if self.error_code:
-            code_str += ', API Error %d' % self.error_code
-
-        if self.rsp and 'err' in self.rsp:
-            return '%s (%s)' % (self.rsp['err']['msg'], code_str)
-        else:
-            return code_str
+        return self._method or super(RequestWithMethod, self).get_method()
 
 
 class ServerInterface(object):
-    """
+    """ An object used to make HTTP requests to a ReviewBoard server.
+
     A class which performs basic communication with a ReviewBoard server and
     tracks cookie information.
     """
     LOGIN_PATH = 'api/json/accounts/login/'
 
-    def __init__(self, server_url, cookie_file=".cookie"):
+    def __init__(self, server_url, cookie_file=".cookie",
+                 password_inputer=None):
         self.server_url = server_url
         self.cookie_file = cookie_file
+
+        if password_inputer:
+            self.password_inputer = password_inputer
+        else:
+            self.password_inputer = DefaultPasswordInputer()
+
         self.cookie_jar = cookielib.MozillaCookieJar(self.cookie_file)
         self.cookie_handler = urllib2.HTTPCookieProcessor(self.cookie_jar)
         self.user = None
@@ -84,46 +70,19 @@ class ServerInterface(object):
         ]
         urllib2.install_opener(opener)
 
-    def process_error(self, http_status, data):
-        """Processes an error, raising an APIError with the information."""
-        try:
-            rsp = json_loads(data)
-            print rsp
-
-            if rsp['stat'] == 'fail':
-                raise APIError(http_status, rsp['err']['code'], rsp,
-                               rsp['err']['msg'])
-            #else, although an HTTP error was raised the request to the RB
-            #server was successful.  An example of this is an HTTP redirect
-            #(error code 303)
-        except ValueError:
-            pass
-            #debug("Got HTTP error: %s: %s" % (http_status, data))
-
     def login(self, username=None, password=None):
         if self.has_valid_cookie():
             return True
         else:
-            if username is None:
-                self.user = raw_input('Username: ')
-            else:
-                self.user = username
+            username, password = self.password_inputer.get_username_password()
+            self.user = username
 
-            if password is None:
-                password = getpass.getpass('Password: ')
+            resp = self.post(self.server_url + self.LOGIN_PATH,
+                            {'username': self.user, 'password': password})
+            data = json_loads(resp)
 
-            try:
-                resp = self.post(self.server_url + self.LOGIN_PATH,
-                                {'username': self.user, 'password': password})
-                data = json_loads(resp)
-
-                if data['stat'] == 'ok':
-                    return True
-
-            except APIError, e:
-                print e
-            except urllib2.HTTPError, e:
-                print e
+            if data['stat'] == 'ok':
+                return True
 
         return False
 
@@ -131,7 +90,8 @@ class ServerInterface(object):
         return self.has_valid_cookie()
 
     def _request(self, method, url, fields=None, files=None):
-        """
+        """ Makes an HTTP request.
+
         Encodes the input fields and files and performs an HTTP request to the
         specified url using the specified method.  Any cookies set are stored.
 
@@ -156,22 +116,12 @@ class ServerInterface(object):
         }
 
         if not self._valid_method(method):
-            raise APIError(APIError.INVALID_REQUEST_METHOD,
-                           'An invalid HTTP method was used')
+            raise InvalidRequestMethod('An invalid HTTP method was used.')
 
-        try:
-            debug("_requesting with the header: %s" % headers)
-            debug("and data: %s" % body)
-            r = RequestWithMethod(method, url, body, headers)
-            resource = urllib2.urlopen(r)
-            self.cookie_jar.save(self.cookie_file)
-            return resource.read()
-        except urllib2.HTTPError, e:
-            # Re-raise so callers can interpret it.
-            raise e
-        except urllib2.URLError, e:
-            # Re-raise so callers can interpret it.
-            raise e
+        r = RequestWithMethod(method, url, body, headers)
+        resource = urllib2.urlopen(r)
+        self.cookie_jar.save(self.cookie_file)
+        return resource.read()
 
     def _request2(self, method, url, fields=None, files=None):
         """
@@ -223,34 +173,27 @@ class ServerInterface(object):
             raise e
 
     def get(self, url):
-        """
-        Make an HTTP GET on the specified url returning the json response
+        """ Make an HTTP GET on the specified url returning the response.
         """
         return self._request('GET', url)
 
     def delete(self, url):
-        """
-        Make an HTTP DELETE on the specified url returning the json response
+        """ Make an HTTP DELETE on the specified url returning the response.
         """
         return self._request('DELETE', url)
 
     def post(self, url, fields, files=None):
-        """
-        Make an HTTP POST on the specified url with the specified data,
-        returning the json response
+        """ Make an HTTP POST on the specified url returning the response.
         """
         return self._request('POST', url, fields, files)
 
     def put(self, url, fields, files=None):
-        """
-        Make an HTTP PUT on the specified url with the specified data,
-        returning the json response
+        """ Make an HTTP PUT on the specified url returning the response.
         """
         return self._request('PUT', url, fields, files)
 
     def _encode_multipart_formdata(self, fields=None, files=None):
-        """
-        Encodes data for use in an HTTP request.
+        """ Encodes data for use in an HTTP request.
 
         Paramaters:
             fields - the fields to be encoded.  This should be a dict in a
@@ -287,7 +230,8 @@ class ServerInterface(object):
         return content_type, content
 
     def _valid_method(self, method):
-        """
+        """ Checks if the method is a valid HTTP request for an RB server.
+
         Returns true if the specified method is a valid HTTP request method for
         the ServerInterface.  Valid methods are:
                                            POST
@@ -299,7 +243,8 @@ class ServerInterface(object):
             or method == 'GET' or method == 'DELETE'
 
     def has_valid_cookie(self):
-        """
+        """ Checks if a valid cookie already exists for to the RB server.
+
         Returns true if the ServerInterface can find and load a cookie for the
         server that has not expired.
         """
@@ -316,9 +261,11 @@ class ServerInterface(object):
 
                 if not cookie.is_expired():
                     return True
-            except KeyError:
-                print "cookie file loaded, but no cookie for this server"
+            except KeyError, e:
+                # Cookie file loaded, but no cookie for this server
+                pass
         except IOError, e:
-            print "couldn't load cookie file"
+            # Couldn't load cookie file
+            pass
 
         return False

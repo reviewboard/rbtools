@@ -3,6 +3,7 @@ import os
 from rbtools.api.resource import Resource, ResourceList
 from rbtools.api.serverinterface import ServerInterface
 
+
 def main(params):
     if len(params) > 0:
         cwd = os.getcwd()
