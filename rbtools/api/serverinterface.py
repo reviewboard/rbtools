@@ -1,12 +1,14 @@
+import base64
 import cookielib
 import mimetools
+import re
 import urllib
 import urllib2
-import urlparse
+from urlparse import urlparse
 
 from rbtools import get_package_version, get_version_string
-from rbtools.commands.utils import DefaultPasswordInputer
-from rbtools.api.errors import InvalidRequestMethodError
+from rbtools.api.errors import *
+from rbtools.commands.utils import *
 
 try:
     from json import loads as json_loads
@@ -43,48 +45,73 @@ class RequestWithMethod(urllib2.Request):
         return self._method or super(RequestWithMethod, self).get_method()
 
 
+class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
+    """ Adds HTTP authentication support for URLs.
+
+    Python 2.4's password manager has a bug in http authentication when the
+    target server uses a non-standard port.  This works around that bug on
+    Python 2.4 installs. This also allows post-review to prompt for passwords
+    in a consistent way.
+
+    See: http://bugs.python.org/issue974757
+    """
+    def __init__(self, reviewboard_url, password_inputer=None):
+        self.passwd  = {}
+        self.rb_url  = reviewboard_url
+        self.rb_user = None
+        self.rb_pass = None
+
+        if password_inputer:
+            if isinstance(password_inputer, ReviewBoardPasswordInputer):
+                self.password_inputer = password_inputer
+            else:
+                raise InvalidPasswordInputerError(
+                    'The password inputer is not a ReviewBoardPasswordInputer')
+        else:
+            self.password_inputer = DefaultPasswordInputer()
+
+    def find_user_password(self, realm, uri):
+        if uri.startswith(self.rb_url):
+            if self.rb_user is None or self.rb_pass is None:
+                self.rb_user, self.rb_pass = \
+                    self.password_inputer.get_user_password(realm,
+                                                            urlparse(uri)[1])
+
+            return self.rb_user, self.rb_pass
+        else:
+            # If this is an auth request for some other domain (since HTTP
+            # handlers are global), fall back to standard password management.
+            return urllib2.HTTPPasswordMgr.find_user_password(self, realm, uri)
+
+
 class ServerInterface(object):
     """ An object used to make HTTP requests to a ReviewBoard server.
 
     A class which performs basic communication with a ReviewBoard server and
     tracks cookie information.
     """
-    LOGIN_PATH = 'api/json/accounts/login/'
-
     def __init__(self, server_url, cookie_file=".cookie",
-                 password_inputer=None):
+                 password_mgr=None):
         self.server_url = server_url
         self.cookie_file = cookie_file
+        self.user = None
 
-        if password_inputer:
-            self.password_inputer = password_inputer
+        if password_mgr and isinstance(password_mgr, ReviewBoardHTTPPasswordMgr):
+            self.password_mgr = password_mgr
         else:
-            self.password_inputer = DefaultPasswordInputer()
+            self.password_mgr = ReviewBoardHTTPPasswordMgr(self.server_url)
 
         self.cookie_jar = cookielib.MozillaCookieJar(self.cookie_file)
-        self.cookie_handler = urllib2.HTTPCookieProcessor(self.cookie_jar)
-        self.user = None
-        opener = urllib2.build_opener(self.cookie_handler)
+        cookie_handler = urllib2.HTTPCookieProcessor(self.cookie_jar)
+        basic_auth_handler = urllib2.HTTPBasicAuthHandler(self.password_mgr)
+        digest_auth_handler = urllib2.HTTPDigestAuthHandler(self.password_mgr)
+        opener = urllib2.build_opener(cookie_handler,
+                                      basic_auth_handler,
+                                      digest_auth_handler)
         opener.addheaders = [
             ('User-agent', 'RBTools/' + get_package_version())
         ]
         urllib2.install_opener(opener)
-
-    def login(self, username=None, password=None):
-        if self.has_valid_cookie():
-            return True
-        else:
-            username, password = self.password_inputer.get_username_password()
-            self.user = username
-
-            resp = self.post(self.server_url + self.LOGIN_PATH,
-                            {'username': self.user, 'password': password})
-            data = json_loads(resp)
-
-            if data['stat'] == 'ok':
-                return True
-
-        return False
 
     def is_logged_in(self):
         return self.has_valid_cookie()
@@ -248,7 +275,7 @@ class ServerInterface(object):
         Returns true if the ServerInterface can find and load a cookie for the
         server that has not expired.
         """
-        parsed_url = urlparse.urlparse(self.server_url)
+        parsed_url = urlparse(self.server_url)
         host = parsed_url[1]
         host = host.split(":")[0]
         path = parsed_url[2] or '/'

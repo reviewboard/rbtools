@@ -50,3 +50,7 @@ class UnknownResourceTypeError(ResourceError):
 
 class InvalidRequestMethodError(ServerInterfaceError):
     pass
+
+
+class AuthenticationFailedError(ServerInterfaceError):
+    pass
