@@ -16,11 +16,12 @@ if (sys.platform.startswith('win')
 else:
     import posixpath as cpath
 
-from client import Client, Repository
+from rbtools.clients.client import Client, Repository
+
 
 class ClearCaseClient(Client):
     """A client for ClearCase repositories"""
-    
+
     viewinfo = ""
     viewtype = "snapshot"
 
@@ -30,7 +31,7 @@ class ClearCaseClient(Client):
 
     def get_info(self):
         """Returns information about the repository
-        
+
         This is an actual implementation that returns info about the CC repo
         """
 
@@ -50,7 +51,7 @@ class ClearCaseClient(Client):
         #   multiple clearcase repositories. This should be implemented.
         return Repository(path=self.url,
                               base_path=self.url,
-                              supports_parent_diffs=False)
+                              supports_parent_diffs=False, util=self.util)
 
     def get_previous_version(self, files):
         file = []
@@ -60,8 +61,8 @@ class ClearCaseClient(Client):
         #   including drive letter.
         if 'cygdrive' in curdir:
             where = curdir.index('cygdrive') + 9
-            drive_letter = curdir[where:where+1]
-            curdir = drive_letter + ":\\" + curdir[where+2:len(curdir)]
+            drive_letter = curdir[where:where + 1]
+            curdir = drive_letter + ":\\" + curdir[where + 2:len(curdir)]
 
         for key in files:
             # Sometimes there is a quote in the filename. It must be removed.
@@ -96,7 +97,7 @@ class ClearCaseClient(Client):
 
     def diff(self, files):
         """Creates a diff
-        
+
         Performs a diff of the specified file and its previous version.
         """
         # We must be running this from inside a view.
@@ -203,9 +204,9 @@ class ClearCaseClient(Client):
                 # For checkedin files.
                 ext_path = []
                 ver = []
-                fname = ""      # fname holds the file name without the version.
+                fname = ""  # fname holds the file name without the version.
                 (bpath, fpath) = cpath.splitdrive(vkey)
-                if bpath :
+                if bpath:
                     # Windows.
                     # The version (if specified like file.c@@/main/1)
                     #   should be kept as a single string
@@ -215,16 +216,16 @@ class ClearCaseClient(Client):
                     splversions = fpath[:vkey.rfind("@@")].split("\\")
                     fname = splversions.pop()
                     splversions.append(fname + ver[1])
-                else :
+                else:
                     # Linux.
-                    if vkey.rfind("vobs") != -1 :
-                        bpath = vkey[:vkey.rfind("vobs")+4]
-                        fpath = vkey[vkey.rfind("vobs")+5:]
-                    else :
-                       bpath = vkey[:0]
-                       fpath = vkey[1:]
+                    if vkey.rfind("vobs") != -1:
+                        bpath = vkey[:vkey.rfind("vobs") + 4]
+                        fpath = vkey[vkey.rfind("vobs") + 5:]
+                    else:
+                        bpath = vkey[:0]
+                        fpath = vkey[1:]
                     ver = fpath.split("@@")
-                    splversions =  ver[0][:vkey.rfind("@@")].split("/")
+                    splversions = ver[0][:vkey.rfind("@@")].split("/")
                     fname = splversions.pop()
                     splversions.append(fname + ver[1])
 
@@ -250,7 +251,7 @@ class ClearCaseClient(Client):
                 # This must be done in case we haven't specified
                 #   the version on the command line.
                 ext_path.append(cpath.normpath(fname + "/@@" +
-                    vkey[vkey.rfind("@@")+2:len(vkey)]))
+                    vkey[vkey.rfind("@@") + 2:len(vkey)]))
                 epstr = cpath.join(bpath, cpath.normpath(''.join(ext_path)))
                 evfiles.append(epstr)
 
@@ -264,7 +265,7 @@ class ClearCaseClient(Client):
                 The previous file must be copied from the CC server
                   to a local dir.
                 """
-                if cpath.exists(epstr) :
+                if cpath.exists(epstr):
                     pass
                 else:
                     if len(epstr) > 254 or self.viewtype == "snapshot":
@@ -283,13 +284,14 @@ class ClearCaseClient(Client):
                         # windows like path including drive letter
                         if 'cygdrive' in td:
                             where = td.index('cygdrive') + 9
-                            drive_letter = td[where:where+1] + ":"
-                            td = cpath.join(drive_letter, td[where+1:])
+                            drive_letter = td[where:where + 1] + ":"
+                            td = cpath.join(drive_letter, td[where + 1:])
                         tf = cpath.normpath(cpath.join(td, name))
                         if cpath.exists(tf):
                             debug("WARNING: FILE EXISTS")
                             os.unlink(tf)
-                        self.util.execute(["cleartool", "get", "-to", tf, normkey])
+                        self.util.execute(["cleartool", "get", "-to", tf, \
+                                        normkey])
                     else:
                         die("ERROR: FILE NOT FOUND : %s" % epstr)
 

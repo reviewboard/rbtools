@@ -1,15 +1,17 @@
 import os
 import re
 
-from repository import Client, Repository
+from rbtools.api.utilities import RBUtilities
+from rbtools.clients.client import Client, Repository
 
-class MercurialCLient(Client):
+
+class MercurialClient(Client):
     """An implementation of Repository for Mercurial repositories"""
 
     url = None
     util = None
 
-    def __init__(self, url=None, util=None):
+    def __init__(self, url=None, util=RBUtilities()):
         self.url = url
         self.util = util
         self.hgrc = {}
@@ -30,7 +32,7 @@ class MercurialCLient(Client):
 
     def get_info(self):
         """Returns information about the repository
-        
+
         This is an actual implementation that returns info about the hg repo
         """
 
@@ -67,7 +69,7 @@ class MercurialCLient(Client):
 
     def _calculate_remote_path(self):
         """Calculate the remote path for the repository
-    
+
         Calculates the correct remote path for the mercurial repository
         """
 
