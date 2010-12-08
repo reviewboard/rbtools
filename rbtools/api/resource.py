@@ -584,12 +584,15 @@ class RootResource(ResourceListBase):
         return rscs
 
 
-class ReviewRequestDraft(Resource):
-    """ Resource specific to a review request draft.
+class ResourceSpecific(Resource):
+    """ Base class for specific resource types.
+
+    The base class to make specific resources which are initialized from
+    an already constructed resource.
     """
     def __init__(self, resource):
         if isinstance(resource, Resource):
-            super(ReviewRequestDraft, self).__init__(resource.server_interface,
+            super(ResourceSpecific, self).__init__(resource.server_interface,
                                            resource.url)
             if resource._queryable:
                 self.resource_string = resource.resource_string
@@ -599,6 +602,10 @@ class ReviewRequestDraft(Resource):
             else:
                 self._load()
 
+
+class ReviewRequestDraft(ResourceSpecific):
+    """ Resource specific to a review request draft.
+    """
     def publish(self):
         """ Publishes the review request draft.
         """
@@ -616,24 +623,12 @@ class ReviewRequestDraft(Resource):
                 raise e
 
 
-class ReviewRequest(Resource):
+class ReviewRequest(ResourceSpecific):
     """ Resource specific to a review request.
     """
     PENDING = 'pending'
     DISCARDED = 'discarded'
     SUBMITTED = 'submitted'
-
-    def __init__(self, resource):
-        if isinstance(resource, Resource):
-            super(ReviewRequest, self).__init__(resource.server_interface,
-                                           resource.url)
-            if resource._queryable:
-                self.resource_string = resource.resource_string
-                self.data = resource.data
-                self._queryable = resource._queryable
-                self.resource_name = resource.resource_name
-            else:
-                self._load()
 
     def publish(self):
         """ Publishes the review request.
@@ -674,19 +669,8 @@ class ReviewRequest(Resource):
         self.save()
 
 
-class DiffResource(Resource):
+class DiffResource(ResourceSpecific):
     """Resource associated with diff files on RB servers"""
-    def __init__(self, resource):
-        if isinstance(resource, Resource):
-            super(DiffResource, self).__init__(resource.server_interface,
-                                           resource.url)
-            if resource._queryable:
-                self.resource_string = resource.resource_string
-                self.data = resource.data
-                self._queryable = resource._queryable
-                self.resource_name = resource.resource_name
-            else:
-                self._load()
 
 
 class RepositoryList(ResourceList):

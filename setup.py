@@ -18,6 +18,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+import re
 
 from ez_setup import use_setuptools
 use_setuptools()
@@ -26,7 +27,7 @@ from setuptools import setup, find_packages
 from setuptools.command.test import test
 
 from rbtools import get_package_version, is_release, VERSION
-
+from rbtools.commands.__init__ import scripts
 
 PACKAGE_NAME = 'RBTools'
 
@@ -46,16 +47,24 @@ except ImportError:
     install_requires.append('simplejson')
 
 
+script_list = []
+script_list.append('post-review = rbtools.postreview:main')
+script_list.append('rb = rbtools.commands.rb:main')
+
+
+for n in scripts:
+    name = re.split('rb', n)[1]
+    script_list.append('rb-%s = rbtools.commands.rb%s:main' % (name, name))
+
+
+entry_scripts = {'console_scripts': script_list}
+
+
 setup(name=PACKAGE_NAME,
       version=get_package_version(),
       license="MIT",
       description="Command line tools for use with Review Board",
-      entry_points = {
-          'console_scripts': [
-              'post-review = rbtools.postreview:main',
-              'rb = rbtools.commands.rb:main',
-          ],
-      },
+      entry_points = entry_scripts,
       install_requires=install_requires,
       dependency_links = [
           download_url,
