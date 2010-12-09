@@ -1,0 +1,15 @@
+commit dfed76da14d35f6652e38c55bcc78e714cbfe451
+
+List of Known Issues:
+    commands/rbpatch.py:
+        -Only implemented for the git SCM.
+        -Although logically this seems to be working, when the patch checks
+        to see if it can apply the check fails.  This seems to be because
+        the patch downloaded from the reviewboard server has some information
+        stripped out of it.
+
+Some Next Steps:
+    commands/rbinfo.py:
+        -This is only implemented for resources directly accessable from
+        the root resource.  It needs to be extended further down the chain.
+        -This would be much nicer if it could have an interactive UI    
