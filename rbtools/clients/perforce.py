@@ -5,10 +5,14 @@ import socket
 import stat
 
 from rbtools.clients.client import Client, Repository
+from rbtools.api.utilities import RBUtilities
 
 
 class PerforceClient(Client):
     """An implementation of Repository for Perforce repositories"""
+    def __init__(self, url=None, util=RBUtilities()):
+        super(PerforceClient, self).__init__(url, util)
+        self.client_type = 'perforce'
 
     def get_info(self):
         """Returns information about the repository

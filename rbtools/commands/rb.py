@@ -29,10 +29,9 @@ def main():
         print "usage: rb COMMAND [OPTIONS] [ARGS]"
         print ""
         print "The commands available are:"
-        pattern = re.compile('(rb-)')
 
         for n in __init__.scripts:
-            sp = re.split('rb-', n)
+            sp = re.split('rb', n)
             if len(sp) > 1:
                 print sp[1]
 

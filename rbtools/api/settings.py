@@ -122,7 +122,7 @@ class Settings(object):
             self.util.raise_error('UnknownFileError', \
                     'Could not open file: ' + config_file)
 
-        for key in self.ordered:
+        for key in keys:
             if key is BLANK:
                 file.write('\n')
             elif key[0] == COMMENT:
@@ -136,6 +136,18 @@ class Settings(object):
                     file.write('\n')
 
         file.close()
+
+    def clear(self):
+        """ Clears the settings.
+
+        After called, the config_file will be empty and if save() were to be
+        called no settings or comments would be added into the config_file.
+        """
+        self.settings = {}
+        self.settings_comment = {}
+        self.ordered = []
+        file = open(self.config_file, 'w')
+        file.close() 
 
     def change_setting(self, name, value, comment=None):
         """changes the value of a setting"""

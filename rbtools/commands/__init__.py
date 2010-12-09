@@ -5,6 +5,7 @@ scripts = [
     'rbdiff',
     'rbinfo',
     'rbopen',
+    'rbpatch',
     'rbpublish',
     'rbupload',
 ]

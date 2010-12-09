@@ -677,6 +677,15 @@ class ReviewRequest(ResourceSpecific):
 
 class DiffResource(ResourceSpecific):
     """Resource associated with diff files on RB servers"""
+    FILE_MIME_TYPE = 'text/x-patch'    
+
+    def get_diff(self):
+        """ Gets the actual diff referenced by this resource.
+
+        The diff is returned as a single string of text.
+        """
+        resp = self.server_interface.get(self.url, self.FILE_MIME_TYPE)
+        return resp
 
 
 class RepositoryList(ResourceList):

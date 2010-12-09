@@ -1,6 +1,8 @@
 import os
 import re
+import string
 import sys
+from urllib2 import HTTPError
 
 from rbtools.api.settings import Settings
 from rbtools.api.resource import Resource, \
@@ -11,199 +13,183 @@ from rbtools.api.resource import Resource, \
 from rbtools.api.serverinterface import ServerInterface
 from rbtools.clients.getclient import get_client
 
-MAKE = 'make'
-VIEW = 'view'
-GET = 'get'
-RESOURCE_NAMES = [MAKE, VIEW, GET]
 
-TIMESTAMP = 'timestamp'
-ID = 'id'
-LINKS = 'name'
-FILE = 'files'
+FILE_OPTION = '--file'
+MAKE = 'make'
+GET = 'get'
+REQUEST_TYPES = [MAKE, GET]
 
 
 def main():
-    valid = False
-    resource_map = {GET: 'diffs', VIEW: 'diffs'}
-    settings = Settings()
+    diff(sys.argv[1:])
 
-    if len(sys.argv) > 1:  # command given
-        cwd = os.getcwd()
-        cookie_file = settings.get_cookie_file()
-        cookie = os.path.join(cwd, cookie_file)
+def diff(args):
+    valid = False
+    settings = Settings(config_file='rb_scripts.dat')
+
+    if len(args) > 0:  # command given
+        cookie = settings.get_cookie_file()
         server_url = settings.get_server_url()
-        command = sys.argv[1]
+        command = args[0]
 
         if command[0] == '-':
             command = command[1:]
 
-            if RESOURCE_NAMES.count(command) == 1:
-                valid = True
+        if REQUEST_TYPES.count(command) == 1:
+            valid = True
+            diff_file_name = 'diff'
 
-                if command == MAKE:
-                    """builds a local diff
+            if command == MAKE:
+                """builds a local diff
 
-                    builds a diff of the local repository. call is:
-                    rb -diff <diff_file> <args>
+                builds a diff of the local repository. call is:
+                rb diff -make [--file:<diff_file>] [args]
 
-                        diff_file: optional, the name of the file to write to
-                        args: arguments required for build a diff. Unneaded for
-                              most clients, but some (e.g. Perforce require it)
-                    """
-                    client = get_client(server_url)
+                    diff_file: optional, the name of the file to write to
+                    args: arguments required for build a diff. Unneaded for
+                          most clients, but some (e.g. Perforce require it)
+                """
+                if len(args) > 1:
+                    m = re.match(FILE_OPTION, args[1])
 
-                    if client == None:
-                        print 'could not find the source control manager'
-                        exit()
-
-                    #determine the file to save to
-                    diff_file = None
-                    if len(sys.argv) > 2:
-                        diff_file = sys.argv[2]
+                    if m:
+                        diff_file_name = string.split(args[1], ':', 1)[1]
                     else:
-                        diff_file = settings.get_setting('client_diff')
+                        valid = False
 
-                    args = None
+                client = get_client(server_url)
 
-                    #args is only used for certain clients (e.g. Perforce)
-                    if len(sys.argv) > 3:
-                        args = sys.argv[3]
+                if client == None:
+                    print 'could not find the source control manager'
+                    exit()
 
-                    diff = client.diff(args)
+                diff_args = None
+                # diff_args is only used for certain clients
+                # (e.g. Perforce)
+                if len(args) > 2 and client.client_type == 'perforce':
+                    diff_args = args[2]
 
-                    #write the diff
-                    file = open(diff_file, 'w')
+                diff, parent_diff = client.diff(diff_args)
+                diff_file = open(diff_file_name, 'w')
 
-                    if file < 0:
-                        print 'could not open the file ' + diff_file + \
-                                ' to write the diff.'
+                if diff_file < 0:
+                    print 'could not open the file ' + \
+                          diff_file_name + ' to write the diff.'
 
-                    diff = diff[0].split('\n')
-                    for line in diff:
-                        file.write(line + '\n')
+                diff_file.write(diff)
+                diff_file.close()
+            else:
+                """ gets diff(s) from a review_request on the server
 
-                    file.close()
+                call structure:
+                    rb diff -GET [--file:<diff_file>] <review_request_id>
+                            [diff_revision]
 
-                elif command == VIEW or command == GET:
-                    """
-                    Viewing info about a diff and requesting the physical diff
-                    is almost completely the same operation, both are stored at
-                    the same location on the server. The only difference in the
-                    request is that to get the diff file, a specific mime-type
-                    is listed in the Accept header of the get request
-                    (currently text/x-patch, it is defined in config.dat).
-                    """
-                    resource_name = resource_map[command]
+                (currently text/x-patch, it is defined in config.dat).
+                """
+                server = ServerInterface(server_url, cookie)
+                root = RootResource(server, server_url + 'api/')
+                diff_id = None
 
-                    #establish a connection to the server
-                    server = ServerInterface(server_url, cookie)
-                    root = RootResource(server, server_url \
-                                    + settings.get_api_uri())
+                if len(args) > 1:
+                    m = re.match(FILE_OPTION, args[1])
 
-                    #find the review
-                    if len(sys.argv) > 2 and sys.argv[2].isdigit():
-                        id = sys.argv[2]
+                    if m:
+                        if len(args) > 2:
+                            diff_file_name = string.split(args[1], ':', 1)[1]
+                            review_request_id = args[2]
+                            valid = True
+
+                            if len(args) > 3:
+                                diff_id = args[3]
+                    else:
+                        review_request_id = args[1]
+                        valid = True
+
+                        if len(args) > 2:
+                            diff_id = args[2]
+
+                    if valid:
                         review_requests = root.get('review_requests')
-                        request = ReviewRequest(review_requests.get(id))
-
-                        diffs = ResourceList(server, \
-                                        request.get_link(resource_name))
+                        request = ReviewRequest( \
+                                    review_requests.get(review_request_id))
+                        diffs = request.get_or_create('diffs')
+                        num_revisions = len(diffs)
 
                         """find out which diff is required
 
-                        find the required diff. If no preference is given, will
-                        default to diff 1. If diff_id of 'all' is requested,
-                        the operation (VIEW or GET) will be run on each diff,
-                        one at a time. In this case, diff files will be
-                        prefixed with <diff_num>_.
+                        find the required diff. If no preference is given the
+                        most recent one will be used.  If diff_revision of
+                        'all' is requested, the operation will be run on each
+                        diff, one at a time. In this case, diff files will be
+                        prefixed with <revision_num>_.
                         """
-                        diff_id = '1' if len(sys.argv) < 4 \
-                                      else str(sys.argv[3])
+                        if not diff_id:
+                            diff_id = num_revisions
+
+                        diff_id = str(diff_id)            
+
                         if diff_id.isdigit():
                             #single diff
-                            diff = DiffResource(diffs.get(diff_id))
-
-                            if command == VIEW:
-                                #VIEW will display all fields unless
-                                #a specific field is requested
-                                if len(sys.argv) > 4 and sys.argv[4] != 'all':
-                                    print diff.get_field(sys.argv[4])
-                                else:
-                                    keys = diff.get_fields()
-
-                                    for key in keys:
-                                        print str(key) + ': ' \
-                                            + str(diff.get_field(key))
-                            else:  # GET
-                                if len(sys.argv) > 4:
-                                    diff_file = sys.argv[4]
-                                else:
-                                    diff_file = \
-                                        settings.get_setting('server_diff')
-
-                                sd = diff.get_file( \
-                                        settings.get_setting('diff_mime'))
-
-                                file = open(diff_file, 'w')
-
-                                if file < 0:
-                                    print 'could not open "' + diff_file \
-                                                    + '" for writing.'
+                            try:
+                                diff = DiffResource(diffs.get(diff_id))
+                            except urllib2.HTTPError, e:
+                                if e.code == 404:
+                                    print 'The specified diff revision ' \
+                                          'does not exist.'
                                     exit()
+                                else:
+                                    raise e
 
-                                file.write(sd)
-                                file.close()
+                            server_diff = diff.get_diff()
+
+                            diff_file = open(diff_file_name, 'w')
+
+                            if diff_file < 0:
+                                print 'could not open "' + \
+                                      diff_file_name + '" for writing.'
+                                exit()
+
+                            diff_file.write(server_diff)
+                            diff_file.close()
                         elif diff_id == 'all':
                             #deal with each dif, one at a time
-                            ids = diffs.get_fields()
-                            for diff_id in ids:
+                            diff_id = 1
+
+                            while diff_id <= num_revisions:
                                 diff = DiffResource(diffs.get(diff_id))
-                                print 'diff ' + str(diff_id) + ':'
+                                server_diff = diff.get_diff()
 
-                                if command == VIEW:
-                                    #VIEW will display all fields
-                                    #unless a specific field is requested
-                                    if len(sys.argv) > 4 and \
-                                                sys.argv[4] != 'all':
-                                        print diff.get_field(sys.argv[4])
-                                    else:
-                                        keys = diff.get_fields()
+                                diff_file = open('%d_%s' % \
+                                                 (diff_id, diff_file_name),
+                                                 'w')
 
-                                        for key in keys:
-                                            print '\t' + str(key) + ': ' \
-                                                + str(diff.get_field(key))
-                                else:  # GET
-                                    if len(sys.argv) > 4:
-                                        diff_file = sys.argv[4]
-                                    else:
-                                        diff_file = \
-                                            settings.get_setting('server_diff')
-                                    diff_file = str(diff_id) + '_' + diff_file
+                                if diff_file < 0:
+                                    print 'could not open "' + \
+                                          diff_id + '_' + diff_file_name + \
+                                          '" for writing.'
+                                    exit()
 
-                                    sd = diff.get_file( \
-                                        settings.get_setting('diff_mime'))
-
-                                    file = open(diff_file, 'w')
-
-                                    if file < 0:
-                                        print 'could not open "' + diff_file \
-                                                        + '" for writing.'
-                                        exit()
-                        else:
-                            print diff_id + ' is not a valid diff ID'
-                    else:
-                        if len(sys.argv) > 2:
-                            print sys.argv[2] + ' is not a valid resource ID'
-                        else:
-                            print VIEW + ' needs a valid resource ID'
-
-            else:
-                print 'Invalid command: ' + command
+                                diff_file.write(server_diff)
+                                diff_file.close()
+                                diff_id = diff_id + 1
 
     if not valid:
-        print 'usage rb diff -resource_name [resource_id]\nresource_names:'
-        for name in RESOURCE_NAMES:
-            print '     ' + name
+        print 'usage: rb diff -type [--file:<file_name>] ' \
+              '<review_request_id> [revision_id]'
+        print ''
+        print 'types:'
+
+        for n in REQUEST_TYPES:
+            print '    %s' % n
+
+        print ''
+        print 'If TYPE is MAKE the options <review_request_id> and ' \
+              '[revision_id] are ignored.'
+        print 'If TYPE is GET, an unspecified [revision_id] will get ' \
+              'the most recent revision''s diff.  [revision_id] may ' \
+              'be set to ''all'' to iteratively get every revision.'
+
 
 if __name__ == '__main__':
     main()

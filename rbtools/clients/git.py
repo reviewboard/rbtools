@@ -273,3 +273,26 @@ class GitClient(Client):
             r1, r2 = revision_range.split(":")
 
             return self.make_diff(r1, r2)
+
+    def _internal_apply_patch(self, patch_file, commit):
+        """actually applies the patch using git-apply"""
+
+        success = False
+
+        #test the patch using -check
+        output = self.util.execute(['git', 'apply', '--check', str(patch_file)])
+
+        if output:
+            self.util.raise_error('Unable to apply patch.  Fix the errors '
+                                  'and try again')
+            return False        
+
+        #apply the patch using git-apply
+        self.util.execute(['git', 'apply', str(patch_file)])
+        success = True
+
+        #commit changes
+        if success and commit:
+            print 'Git is not currently able to commit changes. One day...'
+
+        return success

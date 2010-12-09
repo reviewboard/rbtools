@@ -20,6 +20,7 @@ class Client(object):
     def __init__(self, url=None, util=RBUtilities()):
         self.url = url
         self.util = util
+        self.client_type = None
 
     def set_url(self, url=None):
         self.url = url
@@ -38,6 +39,31 @@ class Client(object):
         The returned tuple is (diff_string, parent_diff_string)
         """
         return (None, None)
+
+    def apply_patch(self, patch_file=None, commit=False):
+        """applies a patch to the current repository and optionally commits changes"""
+
+        if not patch_file:
+            print 'no patch was passed'
+            return False
+        
+        if not os.path.isfile(patch_file):
+            print str(patch_file) + 'is not a file in the current directory'
+            return False
+
+        return self._internal_apply_patch(patch_file, commit)
+
+    def _internal_apply_patch(self, patch_file, commit):
+        """actually applies the patch"""
+
+        success = False
+
+        print 'code to apply patch is not yet implemented'
+        #load file and strip unnecessary parts
+
+        #apply the patch using patch
+
+        return success
 
 
 class Repository(object):
