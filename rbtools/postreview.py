@@ -138,6 +138,15 @@ class APIError(Exception):
             return code_str
 
 
+class HTTPRequest(urllib2.Request):
+    def __init__(self, url, body, headers={}, method="PUT"):
+        urllib2.Request.__init__(self, url, body, headers)
+        self.method = method
+
+    def get_method(self):
+        return self.method
+
+
 class RepositoryInfo:
     """
     A representation of a source code repository.
@@ -262,11 +271,11 @@ class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
 
     See: http://bugs.python.org/issue974757
     """
-    def __init__(self, reviewboard_url):
+    def __init__(self, reviewboard_url, rb_user=None, rb_pass=None):
         self.passwd  = {}
         self.rb_url  = reviewboard_url
-        self.rb_user = None
-        self.rb_pass = None
+        self.rb_user = rb_user
+        self.rb_pass = rb_pass
 
     def find_user_password(self, realm, uri):
         if uri.startswith(self.rb_url):
@@ -298,12 +307,16 @@ class ReviewBoardServer(object):
             self.url += '/'
         self._info = info
         self._server_info = None
+        self.root_resource = None
+        self.deprecated_api = False
         self.cookie_file = cookie_file
         self.cookie_jar  = cookielib.MozillaCookieJar(self.cookie_file)
 
         # Set up the HTTP libraries to support all of the features we need.
         cookie_handler      = urllib2.HTTPCookieProcessor(self.cookie_jar)
-        password_mgr        = ReviewBoardHTTPPasswordMgr(self.url)
+        password_mgr        = ReviewBoardHTTPPasswordMgr(self.url,
+                                                         options.username,
+                                                         options.password)
         basic_auth_handler  = urllib2.HTTPBasicAuthHandler(password_mgr)
         digest_auth_handler = urllib2.HTTPDigestAuthHandler(password_mgr)
 
@@ -313,45 +326,68 @@ class ReviewBoardServer(object):
         opener.addheaders = [('User-agent', 'RBTools/' + get_package_version())]
         urllib2.install_opener(opener)
 
+    def check_api_version(self):
+        """Checks the API version on the server to determine which to use."""
+        try:
+            rsp = self.api_get('api/')
+            self.deprecated_api = False
+            self.root_resource = rsp
+            debug('Using the new web API')
+        except APIError, e:
+            if e.http_status == 404:
+                # This is an older Review Board server with the old API.
+                self.deprecated_api = True
+                debug('Using the deprecated Review Board 1.0 web API')
+            else:
+                # We shouldn't reach this. If there's a permission denied
+                # from lack of logging in, then the basic auth handler
+                # should have hit it.
+                die("Unable to access the root /api/ URL on the server.")
+
     def login(self, force=False):
         """
         Logs in to a Review Board server, prompting the user for login
         information if needed.
         """
+        self.check_api_version()
+
         if (options.diff_filename == '-' and
             not options.username and not options.submit_as and
             not options.password):
             die('Authentication information needs to be provided on '
                 'the command line when using --diff-filename=-')
 
-        print "==> Review Board Login Required"
-        print "Enter username and password for Review Board at %s" % self.url
-        if options.username:
-            username = options.username
-        elif options.submit_as:
-            username = options.submit_as
-        elif not force and self.has_valid_cookie():
-            # We delay the check for a valid cookie until after looking at args,
-            # so that it doesn't override the command line.
-            return
-        else:
-            username = raw_input('Username: ')
+        if self.deprecated_api:
+            print "==> Review Board Login Required"
+            print "Enter username and password for Review Board at %s" % \
+                  self.url
 
-        if not options.password:
-            password = getpass.getpass('Password: ')
-        else:
-            password = options.password
+            if options.username:
+                username = options.username
+            elif options.submit_as:
+                username = options.submit_as
+            elif not force and self.has_valid_cookie():
+                # We delay the check for a valid cookie until after looking
+                # at args, so that it doesn't override the command line.
+                return
+            else:
+                username = raw_input('Username: ')
 
-        debug('Logging in with username "%s"' % username)
-        try:
-            self.api_post('api/json/accounts/login/', {
-                'username': username,
-                'password': password,
-            })
-        except APIError, e:
-            die("Unable to log in: %s" % e)
+            if not options.password:
+                password = getpass.getpass('Password: ')
+            else:
+                password = options.password
 
-        debug("Logged in.")
+            debug('Logging in with username "%s"' % username)
+            try:
+                self.api_post('api/json/accounts/login/', {
+                    'username': username,
+                    'password': password,
+                })
+            except APIError, e:
+                die("Unable to log in: %s" % e)
+
+            debug("Logged in.")
 
     def has_valid_cookie(self):
         """
@@ -417,7 +453,7 @@ class ReviewBoardServer(object):
         try:
             debug("Attempting to create review request on %s for %s" %
                   (self.info.path, changenum))
-            data = { 'repository_path': self.info.path }
+            data = {}
 
             if changenum:
                 data['changenum'] = changenum
@@ -426,7 +462,16 @@ class ReviewBoardServer(object):
                 debug("Submitting the review request as %s" % submit_as)
                 data['submit_as'] = submit_as
 
-            rsp = self.api_post('api/json/reviewrequests/new/', data)
+            if self.deprecated_api:
+                data['repository_path'] = self.info.path
+                rsp = self.api_post('api/json/reviewrequests/new/', data)
+            else:
+                data['repository'] = self.info.path
+
+                links = self.root_resource['links']
+                assert 'review_requests' in links
+                review_request_href = links['review_requests']['href']
+                rsp = self.api_post(review_request_href, data)
         except APIError, e:
             if e.error_code == 204: # Change number in use
                 rsp = e.rsp
@@ -436,9 +481,8 @@ class ReviewBoardServer(object):
                     debug("Review request already exists.")
                 else:
                     debug("Review request already exists. Updating it...")
-                    rsp = self.api_post(
-                        'api/json/reviewrequests/%s/update_from_changenum/' %
-                        rsp['review_request']['id'])
+                    self.update_review_request_from_changenum(
+                        changenum, rsp['review_request'])
             elif e.error_code == 206: # Invalid repository
                 sys.stderr.write('\n')
                 sys.stderr.write('There was an error creating this review '
@@ -461,6 +505,16 @@ class ReviewBoardServer(object):
 
         return rsp['review_request']
 
+    def update_review_request_from_changenum(self, changenum, review_request):
+        if self.deprecated_api:
+            rsp = self.api_post(
+                'api/json/reviewrequests/%s/update_from_changenum/'
+                % review_request['id'])
+        else:
+            rsp = self.api_put(review_request['links']['self']['href'], {
+                'changenum': review_request['changenum'],
+            })
+
     def set_review_request_field(self, review_request, field, value):
         """
         Sets a field in a review request to the specified value.
@@ -470,37 +524,75 @@ class ReviewBoardServer(object):
         debug("Attempting to set field '%s' to '%s' for review request '%s'" %
               (field, value, rid))
 
-        self.api_post('api/json/reviewrequests/%s/draft/set/' % rid, {
-            field: value,
-        })
+        if self.deprecated_api:
+            self.api_post('api/json/reviewrequests/%s/draft/set/' % rid, {
+                field: value,
+            })
+        else:
+            self.api_put(review_request['links']['draft']['href'], {
+                field: value,
+            })
 
     def get_review_request(self, rid):
         """
         Returns the review request with the specified ID.
         """
-        rsp = self.api_get('api/json/reviewrequests/%s/' % rid)
+        if self.deprecated_api:
+            url = 'api/json/reviewrequests/%s/'
+        else:
+            url = '%s%s/' % (
+                self.root_resource['links']['review_requests']['href'], rid)
+
+        rsp = self.api_get(url)
+
         return rsp['review_request']
 
     def get_repositories(self):
         """
         Returns the list of repositories on this server.
         """
-        rsp = self.api_get('/api/json/repositories/')
-        return rsp['repositories']
+        if self.deprecated_api:
+            rsp = self.api_get('api/json/repositories/')
+            repositories = rsp['repositories']
+        else:
+            rsp = self.api_get(
+                self.root_resource['links']['repositories']['href'])
+            repositories = rsp['repositories']
+
+            while 'next' in rsp['links']:
+                rsp = self.api_get(rsp['links']['next']['href'])
+                repositories.extend(rsp['repositories'])
+
+        return repositories
 
     def get_repository_info(self, rid):
         """
         Returns detailed information about a specific repository.
         """
-        rsp = self.api_get('/api/json/repositories/%s/info/' % rid)
+        if self.deprecated_api:
+            url = 'api/json/repositories/%s/info/' % rid
+        else:
+            rsp = self.api_get(
+                '%s%s/' % (self.root_resource['links']['repositories']['href'],
+                           rid))
+            url = rsp['links']['info']['href']
+
+        rsp = self.api_get(url)
+
         return rsp['info']
 
     def save_draft(self, review_request):
         """
         Saves a draft of a review request.
         """
-        self.api_post("api/json/reviewrequests/%s/draft/save/" %
-                      review_request['id'])
+        if self.deprecated_api:
+            self.api_post('api/json/reviewrequests/%s/draft/save/' % \
+                          review_request['id'])
+        else:
+            self.api_put(review_request['links']['draft']['href'], {
+                'public': 1,
+            })
+
         debug("Review request draft saved")
 
     def upload_diff(self, review_request, diff_content, parent_diff_content):
@@ -529,24 +621,40 @@ class ReviewBoardServer(object):
                 'content': parent_diff_content
             }
 
-        self.api_post('api/json/reviewrequests/%s/diff/new/' %
-                      review_request['id'], fields, files)
+        if self.deprecated_api:
+            self.api_post('api/json/reviewrequests/%s/diff/new/' %
+                          review_request['id'], fields, files)
+        else:
+            self.api_post(review_request['links']['diffs']['href'],
+                          fields, files)
 
     def reopen(self, review_request):
         """
         Reopen discarded review request.
         """
         debug("Reopening")
-        self.api_post('api/json/reviewrequests/%s/reopen/' %
-                      review_request['id'])
+
+        if self.deprecated_api:
+            self.api_post('api/json/reviewrequests/%s/reopen/' %
+                          review_request['id'])
+        else:
+            self.api_put(review_request['links']['self']['href'], {
+                'status': 'pending',
+            })
 
     def publish(self, review_request):
         """
         Publishes a review request.
         """
         debug("Publishing")
-        self.api_post('api/json/reviewrequests/%s/publish/' %
-                      review_request['id'])
+
+        if self.deprecated_api:
+            self.api_post('api/json/reviewrequests/%s/publish/' %
+                          review_request['id'])
+        else:
+            self.api_put(review_request['links']['draft']['href'], {
+                'public': 1,
+            })
 
     def _get_server_info(self):
         if not self._server_info:
@@ -564,6 +672,9 @@ class ReviewBoardServer(object):
         rsp = json_loads(data)
 
         if rsp['stat'] == 'fail':
+            # With the new API, we should get something other than HTTP
+            # 200 for errors, in which case we wouldn't get this far.
+            assert self.deprecated_api
             self.process_error(200, data)
 
         return rsp
@@ -601,7 +712,12 @@ class ReviewBoardServer(object):
 
     def _make_url(self, path):
         """Given a path on the server returns a full http:// style url"""
+        if path.startswith('http'):
+            # This is already a full path.
+            return path
+
         app = urlparse(self.url)[2]
+
         if path[0] == '/':
             url = urljoin(self.url, app[:-1] + path)
         else:
@@ -661,12 +777,86 @@ class ReviewBoardServer(object):
             die("Unable to access %s. The host path may be invalid\n%s" % \
                 (url, e))
 
+    def http_put(self, path, fields):
+        """
+        Performs an HTTP PUT on the specified path, storing any cookies that
+        were set.
+        """
+        url = self._make_url(path)
+        debug('HTTP PUTting to %s: %s' % (url, fields))
+
+        content_type, body = self._encode_multipart_formdata(fields, None)
+        headers = {
+            'Content-Type': content_type,
+            'Content-Length': str(len(body))
+        }
+
+        try:
+            r = HTTPRequest(url, body, headers, method='PUT')
+            data = urllib2.urlopen(r).read()
+            self.cookie_jar.save(self.cookie_file)
+            return data
+        except urllib2.HTTPError, e:
+            # Re-raise so callers can interpret it.
+            raise e
+        except urllib2.URLError, e:
+            try:
+                debug(e.read())
+            except AttributeError:
+                pass
+
+            die("Unable to access %s. The host path may be invalid\n%s" % \
+                (url, e))
+
+    def http_delete(self, path):
+        """
+        Performs an HTTP DELETE on the specified path, storing any cookies that
+        were set.
+        """
+        url = self._make_url(path)
+        debug('HTTP DELETing %s: %s' % (url, fields))
+
+        try:
+            r = HTTPRequest(url, body, headers, method='DELETE')
+            data = urllib2.urlopen(r).read()
+            self.cookie_jar.save(self.cookie_file)
+            return data
+        except urllib2.HTTPError, e:
+            # Re-raise so callers can interpret it.
+            raise e
+        except urllib2.URLError, e:
+            try:
+                debug(e.read())
+            except AttributeError:
+                pass
+
+            die("Unable to access %s. The host path may be invalid\n%s" % \
+                (url, e))
+
     def api_post(self, path, fields=None, files=None):
         """
         Performs an API call using HTTP POST at the specified path.
         """
         try:
             return self.process_json(self.http_post(path, fields, files))
+        except urllib2.HTTPError, e:
+            self.process_error(e.code, e.read())
+
+    def api_put(self, path, fields=None):
+        """
+        Performs an API call using HTTP PUT at the specified path.
+        """
+        try:
+            return self.process_json(self.http_put(path, fields))
+        except urllib2.HTTPError, e:
+            self.process_error(e.code, e.read())
+
+    def api_delete(self, path):
+        """
+        Performs an API call using HTTP DELETE at the specified path.
+        """
+        try:
+            return self.process_json(self.http_delete(path))
         except urllib2.HTTPError, e:
             self.process_error(e.code, e.read())
 
@@ -684,7 +874,7 @@ class ReviewBoardServer(object):
             content += "--" + BOUNDARY + "\r\n"
             content += "Content-Disposition: form-data; name=\"%s\"\r\n" % key
             content += "\r\n"
-            content += fields[key] + "\r\n"
+            content += str(fields[key]) + "\r\n"
 
         for key in files:
             filename = files[key]['filename']
