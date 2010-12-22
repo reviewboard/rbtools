@@ -311,6 +311,7 @@ class ReviewBoardServer(object):
         self.deprecated_api = False
         self.cookie_file = cookie_file
         self.cookie_jar  = cookielib.MozillaCookieJar(self.cookie_file)
+        self.cookie_jar.load(self.cookie_file, ignore_expires=True)
 
         # Set up the HTTP libraries to support all of the features we need.
         cookie_handler      = urllib2.HTTPCookieProcessor(self.cookie_jar)
@@ -410,7 +411,6 @@ class ReviewBoardServer(object):
 
             debug("Looking for '%s %s' cookie in %s" % \
                   (host, path, self.cookie_file))
-            self.cookie_jar.load(self.cookie_file, ignore_expires=True)
 
             try:
                 cookie = self.cookie_jar._cookies[host][path]['rbsessionid']
