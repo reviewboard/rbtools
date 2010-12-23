@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import base64
 import cookielib
 import difflib
 import getpass
@@ -260,6 +261,72 @@ class SvnRepositoryInfo(RepositoryInfo):
         return split
 
 
+class PresetHTTPAuthHandler(urllib2.BaseHandler):
+    """urllib2 handler that conditionally presets the use of HTTP Basic Auth.
+
+    This is used when specifying --username= on the command line. It will
+    force an HTTP_AUTHORIZATION header with the user info, asking the user
+    for any missing info beforehand. It will then try this header for that
+    first request.
+
+    It will only do this once.
+    """
+    handler_order = 480 # After Basic auth
+
+    def __init__(self, url, password_mgr):
+        self.url = url
+        self.password_mgr = password_mgr
+        self.used = False
+
+    def reset(self):
+        self.password_mgr.rb_user = None
+        self.password_mgr.rb_pass = None
+        self.used = False
+
+    def http_request(self, request):
+        if options.username and not self.used:
+            # Note that we call password_mgr.find_user_password to get the
+            # username and password we're working with. This allows us to
+            # prompt if, say, --username was specified but --password was not.
+            username, password = \
+                self.password_mgr.find_user_password('Web API', self.url)
+            raw = '%s:%s' % (username, password)
+            request.add_header(
+                urllib2.HTTPBasicAuthHandler.auth_header,
+                'Basic %s' % base64.b64encode(raw).strip())
+            self.used = True
+
+        return request
+
+    https_request = http_request
+
+
+class ReviewBoardHTTPBasicAuthHandler(urllib2.HTTPBasicAuthHandler):
+    """Custom Basic Auth handler that doesn't retry excessively.
+
+    urllib2's HTTPBasicAuthHandler retries over and over, which is useless.
+    This subclass only retries once to make sure we've attempted with a
+    valid username and password. It will then fail so we can use
+    tempt_fate's retry handler.
+    """
+    def __init__(self, *args, **kwargs):
+        urllib2.HTTPBasicAuthHandler.__init__(self, *args, **kwargs)
+        self.retried = False
+
+    def retry_http_basic_auth(self, *args, **kwargs):
+        if not self.retried:
+            self.retried = True
+            response = urllib2.HTTPBasicAuthHandler.retry_http_basic_auth(
+                self, *args, **kwargs)
+
+            if response.code != 401:
+                self.retried = False
+
+            return response
+        else:
+            return None
+
+
 class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
     """
     Adds HTTP authentication support for URLs.
@@ -285,10 +352,14 @@ class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
                         'used with --diff-filename=-')
 
                 print "==> HTTP Authentication Required"
-                print 'Enter username and password for "%s" at %s' % \
+                print 'Enter authorization information for "%s" at %s' % \
                     (realm, urlparse(uri)[1])
-                self.rb_user = raw_input('Username: ')
-                self.rb_pass = getpass.getpass('Password: ')
+
+                if not self.rb_user:
+                    self.rb_user = raw_input('Username: ')
+
+                if not self.rb_pass:
+                    self.rb_pass = getpass.getpass('Password: ')
 
             return self.rb_user, self.rb_pass
         else:
@@ -318,12 +389,14 @@ class ReviewBoardServer(object):
         password_mgr        = ReviewBoardHTTPPasswordMgr(self.url,
                                                          options.username,
                                                          options.password)
-        basic_auth_handler  = urllib2.HTTPBasicAuthHandler(password_mgr)
+        basic_auth_handler  = ReviewBoardHTTPBasicAuthHandler(password_mgr)
         digest_auth_handler = urllib2.HTTPDigestAuthHandler(password_mgr)
+        self.preset_auth_handler = PresetHTTPAuthHandler(self.url, password_mgr)
 
         opener = urllib2.build_opener(cookie_handler,
                                       basic_auth_handler,
-                                      digest_auth_handler)
+                                      digest_auth_handler,
+                                      self.preset_auth_handler)
         opener.addheaders = [('User-agent', 'RBTools/' + get_package_version())]
         urllib2.install_opener(opener)
 
@@ -350,7 +423,8 @@ class ReviewBoardServer(object):
         Logs in to a Review Board server, prompting the user for login
         information if needed.
         """
-        self.check_api_version()
+        if not self.root_resource:
+            self.check_api_version()
 
         if (options.diff_filename == '-' and
             not options.username and not options.submit_as and
@@ -389,6 +463,8 @@ class ReviewBoardServer(object):
                 die("Unable to log in: %s" % e)
 
             debug("Logged in.")
+        elif force:
+            self.preset_auth_handler.reset()
 
     def has_valid_cookie(self):
         """
@@ -704,6 +780,7 @@ class ReviewBoardServer(object):
 
         url = self._make_url(path)
         rsp = urllib2.urlopen(url).read()
+
         try:
             self.cookie_jar.save(self.cookie_file)
         except IOError, e:
