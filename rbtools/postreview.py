@@ -301,6 +301,24 @@ class PresetHTTPAuthHandler(urllib2.BaseHandler):
     https_request = http_request
 
 
+class ReviewBoardHTTPErrorProcessor(urllib2.HTTPErrorProcessor):
+    """Processes HTTP error codes.
+
+    Python 2.6 gets HTTP error code processing right, but 2.4 and 2.5 only
+    accepts HTTP 200 and 206 as success codes. This handler ensures that
+    anything in the 200 range is a success.
+    """
+    def http_response(self, request, response):
+        if not (200 <= response.code < 300):
+            response = self.parent.error('http', request, response,
+                                         response.code, response.msg,
+                                         response.info())
+
+        return response
+
+    https_response = http_response
+
+
 class ReviewBoardHTTPBasicAuthHandler(urllib2.HTTPBasicAuthHandler):
     """Custom Basic Auth handler that doesn't retry excessively.
 
@@ -392,11 +410,13 @@ class ReviewBoardServer(object):
         basic_auth_handler  = ReviewBoardHTTPBasicAuthHandler(password_mgr)
         digest_auth_handler = urllib2.HTTPDigestAuthHandler(password_mgr)
         self.preset_auth_handler = PresetHTTPAuthHandler(self.url, password_mgr)
+        http_error_processor = ReviewBoardHTTPErrorProcessor()
 
         opener = urllib2.build_opener(cookie_handler,
                                       basic_auth_handler,
                                       digest_auth_handler,
-                                      self.preset_auth_handler)
+                                      self.preset_auth_handler,
+                                      http_error_processor)
         opener.addheaders = [('User-agent', 'RBTools/' + get_package_version())]
         urllib2.install_opener(opener)
 
