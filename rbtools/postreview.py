@@ -329,16 +329,16 @@ class ReviewBoardHTTPBasicAuthHandler(urllib2.HTTPBasicAuthHandler):
     """
     def __init__(self, *args, **kwargs):
         urllib2.HTTPBasicAuthHandler.__init__(self, *args, **kwargs)
-        self.retried = False
+        self._retried = False
 
     def retry_http_basic_auth(self, *args, **kwargs):
-        if not self.retried:
-            self.retried = True
+        if not self._retried:
+            self._retried = True
             response = urllib2.HTTPBasicAuthHandler.retry_http_basic_auth(
                 self, *args, **kwargs)
 
             if response.code != 401:
-                self.retried = False
+                self._retried = False
 
             return response
         else:
