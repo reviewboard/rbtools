@@ -674,7 +674,7 @@ class ReviewBoardServer(object):
             rsp = self.api_get(
                 '%s%s/' % (self.root_resource['links']['repositories']['href'],
                            rid))
-            url = rsp['links']['info']['href']
+            url = rsp['repository']['links']['info']['href']
 
         rsp = self.api_get(url)
 
