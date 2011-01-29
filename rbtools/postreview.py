@@ -3639,6 +3639,9 @@ def main():
 
     args = parse_options(sys.argv[1:])
 
+    debug('RBTools %s' % get_version_string())
+    debug('Home = %s' % homepath)
+
     repository_info, tool = determine_client()
 
     # Verify that options specific to an SCM Client have not been mis-used.
