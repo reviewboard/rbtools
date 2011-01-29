@@ -241,7 +241,7 @@ class SvnRepositoryInfo(RepositoryInfo):
 
         # If one of the directories doesn't match, then path is not relative
         # to root.
-        if rootdirs != pathdirs:
+        if rootdirs != pathdirs[:len(rootdirs)]:
             return None
 
         # All the directories matched, so the relative path is whatever
@@ -250,7 +250,7 @@ class SvnRepositoryInfo(RepositoryInfo):
         if len(pathdirs) == len(rootdirs):
             return '/'
         else:
-            return '/'.join(pathdirs[len(rootdirs):])
+            return '/' + '/'.join(pathdirs[len(rootdirs):])
 
     def _split_on_slash(self, path):
         # Split on slashes, but ignore multiple slashes and throw away any

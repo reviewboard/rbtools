@@ -23,7 +23,8 @@ import nose
 
 from rbtools.postreview import execute, load_config_file
 from rbtools.postreview import APIError, GitClient, MercurialClient, \
-                               RepositoryInfo, ReviewBoardServer
+                               RepositoryInfo, ReviewBoardServer, \
+                               SvnRepositoryInfo
 import rbtools.postreview
 
 
@@ -762,6 +763,26 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self._hg_add_file_commit('foo.txt', FOO6, 'edit 6')
 
         self.assertEqual(EXPECTED_HG_SVN_DIFF_1, self.client.diff(None)[0])
+
+
+class SVNClientTests(unittest.TestCase):
+    def test_relative_paths(self):
+        """Testing SvnRepositoryInfo._get_relative_path"""
+        info = SvnRepositoryInfo('http://svn.example.com/svn/', '/', '')
+        self.assertEqual(info._get_relative_path('/foo', '/bar'), None)
+        self.assertEqual(info._get_relative_path('/', '/trunk/myproject'),
+                         None)
+        self.assertEqual(info._get_relative_path('/trunk/myproject', '/'),
+                         '/trunk/myproject')
+        self.assertEqual(
+            info._get_relative_path('/trunk/myproject', ''),
+            '/trunk/myproject')
+        self.assertEqual(
+            info._get_relative_path('/trunk/myproject', '/trunk'),
+            '/myproject')
+        self.assertEqual(
+            info._get_relative_path('/trunk/myproject', '/trunk/myproject'),
+            '/')
 
 
 class ApiTests(MockHttpUnitTest):
