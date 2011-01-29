@@ -400,10 +400,12 @@ class ReviewBoardServer(object):
         self.deprecated_api = False
         self.cookie_file = cookie_file
         self.cookie_jar  = cookielib.MozillaCookieJar(self.cookie_file)
-        try:
-            self.cookie_jar.load(self.cookie_file, ignore_expires=True)
-        except IOError:
-            pass
+
+        if self.cookie_file:
+            try:
+                self.cookie_jar.load(self.cookie_file, ignore_expires=True)
+            except IOError:
+                pass
 
         # Set up the HTTP libraries to support all of the features we need.
         cookie_handler      = urllib2.HTTPCookieProcessor(self.cookie_jar)

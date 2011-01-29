@@ -58,8 +58,12 @@ def _get_tmpdir():
 
 
 class MockHttpUnitTest(unittest.TestCase):
+    deprecated_api = False
+
     def setUp(self):
         # Save the old http_get and http_post
+        rbtools.postreview.options = OptionsStub()
+
         self.saved_http_get = ReviewBoardServer.http_get
         self.saved_http_post = ReviewBoardServer.http_post
 
@@ -68,9 +72,8 @@ class MockHttpUnitTest(unittest.TestCase):
         ReviewBoardServer.http_get = self._http_method
         ReviewBoardServer.http_post = self._http_method
 
+        self.server.deprecated_api = self.deprecated_api
         self.http_response = ""
-
-        rbtools.postreview.options = OptionsStub()
 
     def tearDown(self):
         ReviewBoardServer.http_get = self.saved_http_get
@@ -89,6 +92,8 @@ class OptionsStub(object):
         self.guess_summary = False
         self.guess_description = False
         self.tracking = None
+        self.username = None
+        self.password = None
 
 
 class GitClientTests(unittest.TestCase):
@@ -785,7 +790,9 @@ class SVNClientTests(unittest.TestCase):
             '/')
 
 
-class ApiTests(MockHttpUnitTest):
+class DeprecatedApiTests(MockHttpUnitTest):
+    deprecated_api = True
+
     SAMPLE_ERROR_STR = json.dumps({
         'stat': 'fail',
         'err': {
