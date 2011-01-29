@@ -2555,45 +2555,55 @@ class GitClient(SCMClient):
         self.head_ref = execute(['git', 'symbolic-ref', '-q', 'HEAD']).strip()
 
         # We know we have something we can work with. Let's find out
-        # what it is. We'll try SVN first.
-        data = execute(["git", "svn", "info"], ignore_errors=True)
+        # what it is. We'll try SVN first, but only if there's a .git/svn
+        # directory. Otherwise, it may attempt to create one and scan
+        # revisions, which can be slow.
+        git_svn_dir = os.path.join(git_dir, 'svn')
 
-        m = re.search(r'^Repository Root: (.+)$', data, re.M)
-        if m:
-            path = m.group(1)
-            m = re.search(r'^URL: (.+)$', data, re.M)
+        if os.path.isdir(git_svn_dir) and len(os.listdir(git_svn_dir)) > 0:
+            data = execute(["git", "svn", "info"], ignore_errors=True)
+
+            m = re.search(r'^Repository Root: (.+)$', data, re.M)
 
             if m:
-                base_path = m.group(1)[len(path):] or "/"
-                m = re.search(r'^Repository UUID: (.+)$', data, re.M)
+                path = m.group(1)
+                m = re.search(r'^URL: (.+)$', data, re.M)
 
                 if m:
-                    uuid = m.group(1)
-                    self.type = "svn"
-                    self.upstream_branch = options.parent_branch or 'master'
+                    base_path = m.group(1)[len(path):] or "/"
+                    m = re.search(r'^Repository UUID: (.+)$', data, re.M)
 
-                    return SvnRepositoryInfo(path=path, base_path=base_path,
-                                             uuid=uuid,
-                                             supports_parent_diffs=True)
-        else:
-            # Versions of git-svn before 1.5.4 don't (appear to) support
-            # 'git svn info'.  If we fail because of an older git install,
-            # here, figure out what version of git is installed and give
-            # the user a hint about what to do next.
-            version = execute(["git", "svn", "--version"], ignore_errors=True)
-            version_parts = re.search('version (\d+)\.(\d+)\.(\d+)',
-                                      version)
-            svn_remote = execute(["git", "config", "--get",
-                                  "svn-remote.svn.url"], ignore_errors=True)
+                    if m:
+                        uuid = m.group(1)
+                        self.type = "svn"
+                        self.upstream_branch = options.parent_branch or \
+                                               'master'
 
-            if (version_parts and
-                not self.is_valid_version((int(version_parts.group(1)),
-                                           int(version_parts.group(2)),
-                                           int(version_parts.group(3))),
-                                          (1, 5, 4)) and
-                svn_remote):
-                die("Your installation of git-svn must be upgraded to " + \
-                    "version 1.5.4 or later")
+                        return SvnRepositoryInfo(path=path,
+                                                 base_path=base_path,
+                                                 uuid=uuid,
+                                                 supports_parent_diffs=True)
+            else:
+                # Versions of git-svn before 1.5.4 don't (appear to) support
+                # 'git svn info'.  If we fail because of an older git install,
+                # here, figure out what version of git is installed and give
+                # the user a hint about what to do next.
+                version = execute(["git", "svn", "--version"],
+                                  ignore_errors=True)
+                version_parts = re.search('version (\d+)\.(\d+)\.(\d+)',
+                                          version)
+                svn_remote = execute(["git", "config", "--get",
+                                      "svn-remote.svn.url"],
+                                      ignore_errors=True)
+
+                if (version_parts and
+                    not self.is_valid_version((int(version_parts.group(1)),
+                                               int(version_parts.group(2)),
+                                               int(version_parts.group(3))),
+                                              (1, 5, 4)) and
+                    svn_remote):
+                    die("Your installation of git-svn must be upgraded to "
+                        "version 1.5.4 or later")
 
         # Okay, maybe Perforce.
         # TODO
