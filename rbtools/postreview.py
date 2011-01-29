@@ -16,6 +16,7 @@ import tempfile
 import urllib
 import urllib2
 from optparse import OptionParser
+from pkg_resources import parse_version
 from tempfile import mkstemp
 from urlparse import urljoin, urlparse
 
@@ -428,20 +429,25 @@ class ReviewBoardServer(object):
     def check_api_version(self):
         """Checks the API version on the server to determine which to use."""
         try:
-            rsp = self.api_get('api/')
-            self.deprecated_api = False
-            self.root_resource = rsp
-            debug('Using the new web API')
+            root_resource = self.api_get('api/')
+            rsp = self.api_get(root_resource['links']['info']['href'])
+
+            if (parse_version(rsp['info']['product']['package_version']) >=
+                parse_version('1.5.2')):
+                self.deprecated_api = False
+                self.root_resource = root_resource
+                debug('Using the new web API')
+                return
         except APIError, e:
-            if e.http_status == 404:
-                # This is an older Review Board server with the old API.
-                self.deprecated_api = True
-                debug('Using the deprecated Review Board 1.0 web API')
-            else:
+            if e.http_status != 404:
                 # We shouldn't reach this. If there's a permission denied
                 # from lack of logging in, then the basic auth handler
                 # should have hit it.
                 die("Unable to access the root /api/ URL on the server.")
+
+        # This is an older Review Board server with the old API.
+        self.deprecated_api = True
+        debug('Using the deprecated Review Board 1.0 web API')
 
     def login(self, force=False):
         """

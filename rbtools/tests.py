@@ -73,17 +73,22 @@ class MockHttpUnitTest(unittest.TestCase):
         ReviewBoardServer.http_post = self._http_method
 
         self.server.deprecated_api = self.deprecated_api
-        self.http_response = ""
+        self.http_response = {}
 
     def tearDown(self):
         ReviewBoardServer.http_get = self.saved_http_get
         ReviewBoardServer.http_post = self.saved_http_post
 
-    def _http_method(self, *args, **kwargs):
-        if isinstance(self.http_response, Exception):
-            raise self.http_response
+    def _http_method(self, path, *args, **kwargs):
+        if isinstance(self.http_response, dict):
+            http_response = self.http_response[path]
         else:
-            return self.http_response
+            http_response = self.http_response
+
+        if isinstance(http_response, Exception):
+            raise http_response
+        else:
+            return http_response
 
 
 class OptionsStub(object):
@@ -788,6 +793,60 @@ class SVNClientTests(unittest.TestCase):
         self.assertEqual(
             info._get_relative_path('/trunk/myproject', '/trunk/myproject'),
             '/')
+
+
+class ApiTests(MockHttpUnitTest):
+    def setUp(self):
+        super(ApiTests, self).setUp()
+
+        self.http_response = {
+            'api/': json.dumps({
+                'stat': 'ok',
+                'links': {
+                    'info': {
+                        'href': 'api/info/',
+                        'method': 'GET',
+                    },
+                },
+            }),
+        }
+
+    def test_check_api_version_1_5_2_higher(self):
+        """Testing checking the API version compatibility (RB >= 1.5.2)"""
+        self.http_response.update(self._build_info_resource('1.5.2'))
+        self.server.check_api_version()
+        self.assertFalse(self.server.deprecated_api)
+
+        self.http_response.update(self._build_info_resource('1.5.3alpha0'))
+        self.server.check_api_version()
+        self.assertFalse(self.server.deprecated_api)
+
+    def test_check_api_version_1_5_1_lower(self):
+        """Testing checking the API version compatibility (RB < 1.5.2)"""
+        self.http_response.update(self._build_info_resource('1.5.1'))
+        self.server.check_api_version()
+        self.assertTrue(self.server.deprecated_api)
+
+    def test_check_api_version_old_api(self):
+        """Testing checking the API version compatibility (RB < 1.5.0)"""
+        self.http_response = {
+            'api/': APIError(404, 0),
+        }
+
+        self.server.check_api_version()
+        self.assertTrue(self.server.deprecated_api)
+
+    def _build_info_resource(self, package_version):
+        return {
+            'api/info/': json.dumps({
+                'stat': 'ok',
+                'info': {
+                    'product': {
+                        'package_version': package_version,
+                    },
+                },
+            }),
+        }
 
 
 class DeprecatedApiTests(MockHttpUnitTest):
