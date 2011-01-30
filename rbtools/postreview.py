@@ -557,6 +557,31 @@ class ReviewBoardServer(object):
                     self.info.path = repository['path']
                     break
 
+            if isinstance(self.info.path, list):
+                sys.stderr.write('\n')
+                sys.stderr.write('There was an error creating this review '
+                                 'request.\n')
+                sys.stderr.write('\n')
+                sys.stderr.write('There was no matching repository path'
+                                 'found on the server.\n')
+                sys.stderr.write('List of configured repositories:\n')
+
+                for repository in repositories:
+                    sys.stderr.write('\t%s\n' % repository['path'])
+
+                sys.stderr.write('Unknown repository paths found:\n')
+
+                for foundpath in self.info.path:
+                    sys.stderr.write('\t%s\n' % foundpath)
+
+                sys.stderr.write('Ask the administrator to add one of '
+                                 'these repositories\n')
+                sys.stderr.write('to the Review Board server.\n')
+                sys.stderr.write('For information on adding repositories, '
+                                 'please read\n')
+                sys.stderr.write(ADD_REPOSITORY_DOCS_URL + '\n')
+                die()
+
         try:
             debug("Attempting to create review request on %s for %s" %
                   (self.info.path, changenum))
