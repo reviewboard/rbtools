@@ -1836,6 +1836,9 @@ class PerforceClient(SCMClient):
         if options.p4_port:
            os.environ['P4PORT'] = options.p4_port
 
+        if options.p4_passwd:
+            os.environ['P4PASSWD'] = options.p4_passwd
+
         changenum = self.get_changenum(args)
         if changenum is None:
             return self._path_diff(args)
@@ -2011,8 +2014,15 @@ class PerforceClient(SCMClient):
             v = self.p4d_version
 
             if v[0] < 2002 or (v[0] == "2002" and v[1] < 2):
-                description = execute(["p4", "describe", "-s", changenum],
-                                      split_lines=True)
+                describeCmd = ["p4"]
+
+                if options.p4_passwd:
+                    describeCmd.append("-P")
+                    describeCmd.append(options.p4_passwd)
+
+                describeCmd = describeCmd + ["describe", "-s", changenum]
+
+                description = execute(describeCmd, split_lines=True)
 
                 if '*pending*' in description[0]:
                     return None
@@ -2039,8 +2049,15 @@ class PerforceClient(SCMClient):
         if changenum == "default":
             cl_is_pending = True
         else:
-            description = execute(["p4", "describe", "-s", changenum],
-                                  split_lines=True)
+            describeCmd = ["p4"]
+
+            if options.p4_passwd:
+                describeCmd.append("-P")
+                describeCmd.append(options.p4_passwd)
+
+            describeCmd = describeCmd + ["describe", "-s", changenum]
+
+            description = execute(describeCmd, split_lines=True)
 
             if re.search("no such changelist", description[0]):
                 die("CLN %s does not exist." % changenum)
@@ -3569,6 +3586,9 @@ def parse_options(args):
     parser.add_option("--p4-port",
                       dest="p4_port", default=None,
                       help="the Perforce servers IP address that the review is on")
+    parser.add_option("--p4-passwd",
+                      dest="p4_passwd", default=None,
+                      help="the Perforce password or ticket of the user in the P4USER environment variable")
     parser.add_option("--repository-url",
                       dest="repository_url", default=None,
                       help="the url for a repository for creating a diff "
