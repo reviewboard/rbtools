@@ -1876,7 +1876,7 @@ class PerforceClient(SCMClient):
             # 'depotFile': '...'
             # 'change': '123456'
             for record in records:
-                if record['action'] != 'delete':
+                if record['action'] not in ('delete', 'move/delete'):
                     if revision2:
                         files[record['depotFile']] = [record, None]
                     else:
@@ -1887,7 +1887,7 @@ class PerforceClient(SCMClient):
                 second_rev_path = m.group('path') + revision2[1:]
                 records = self._run_p4(['files', second_rev_path])
                 for record in records:
-                    if record['action'] != 'delete':
+                    if record['action'] not in ('delete', 'move/delete'):
                         try:
                             m = files[record['depotFile']]
                             m[1] = record
