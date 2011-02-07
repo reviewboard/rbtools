@@ -115,6 +115,7 @@ DEBUG           = False
 user_config = None
 tempfiles = []
 options = None
+configs = []
 
 ADD_REPOSITORY_DOCS_URL = \
     'http://www.reviewboard.org/docs/manual/dev/admin/management/repositories/'
@@ -534,6 +535,13 @@ class ReviewBoardServer(object):
 
         return False
 
+    def get_configured_repository(self):
+        for config in configs:
+            if 'REPOSITORY' in config:
+                return config['REPOSITORY']
+
+        return None
+
     def new_review_request(self, changenum, submit_as=None):
         """
         Creates a review request on a Review Board server, updating an
@@ -582,9 +590,11 @@ class ReviewBoardServer(object):
                 sys.stderr.write(ADD_REPOSITORY_DOCS_URL + '\n')
                 die()
 
+        repository = self.get_configured_repository() or self.info.path
+
         try:
             debug("Attempting to create review request on %s for %s" %
-                  (self.info.path, changenum))
+                  (repository, changenum))
             data = {}
 
             if changenum:
@@ -595,10 +605,10 @@ class ReviewBoardServer(object):
                 data['submit_as'] = submit_as
 
             if self.deprecated_api:
-                data['repository_path'] = self.info.path
+                data['repository_path'] = repository
                 rsp = self.api_post('api/json/reviewrequests/new/', data)
             else:
-                data['repository'] = self.info.path
+                data['repository'] = repository
 
                 links = self.root_resource['links']
                 assert 'review_requests' in links
@@ -1042,20 +1052,21 @@ class SCMClient(object):
         Scans the current directory on up to find a .reviewboard file
         containing the server path.
         """
-        server_url = self._get_server_from_config(user_config, repository_info)
-        if server_url:
-            return server_url
+        server_url = None
 
-        for path in walk_parents(os.getcwd()):
-            filename = os.path.join(path, ".reviewboardrc")
-            if os.path.exists(filename):
-                config = load_config_file(filename)
+        if user_config:
+            server_url = self._get_server_from_config(user_config,
+                                                      repository_info)
+
+        if not server_url:
+            for config in configs:
                 server_url = self._get_server_from_config(config,
                                                           repository_info)
-                if server_url:
-                    return server_url
 
-        return None
+                if server_url:
+                    break
+
+        return server_url
 
     def diff(self, args):
         """
@@ -3352,22 +3363,33 @@ def walk_parents(path):
         path = os.path.dirname(path)
 
 
-def load_config_file(filename):
-    """
-    Loads data from a config file.
-    """
-    config = {
-        'TREES': {},
-    }
+def load_config_files(homepath):
+    """Loads data from .reviewboardrc files"""
+    def _load_config(path):
+        config = {
+            'TREES': {},
+        }
 
-    if os.path.exists(filename):
-        try:
-            execfile(filename, config)
-        except SyntaxError, e:
-            die('Syntax error in config file: %s\n'
-                'Line %i offset %i\n' % (filename, e.lineno, e.offset))
+        filename = os.path.join(path, '.reviewboardrc')
 
-    return config
+        if os.path.exists(filename):
+            try:
+                execfile(filename, config)
+            except SyntaxError, e:
+                die('Syntax error in config file: %s\n'
+                    'Line %i offset %i\n' % (filename, e.lineno, e.offset))
+
+            return config
+
+        return None
+
+    for path in walk_parents(os.getcwd()):
+        config = _load_config(path)
+
+        if config:
+            configs.append(config)
+
+    globals()['user_config'] = _load_config(homepath)
 
 
 def tempt_fate(server, tool, changenum, diff_content=None,
@@ -3694,9 +3716,8 @@ def main():
         homepath = ''
 
     # Load the config and cookie files
-    globals()['user_config'] = \
-        load_config_file(os.path.join(homepath, ".reviewboardrc"))
     cookie_file = os.path.join(homepath, ".post-review-cookies.txt")
+    load_config_files(homepath)
 
     args = parse_options(sys.argv[1:])
 
