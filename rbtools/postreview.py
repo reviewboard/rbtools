@@ -680,7 +680,7 @@ class ReviewBoardServer(object):
         Returns the review request with the specified ID.
         """
         if self.deprecated_api:
-            url = 'api/json/reviewrequests/%s/'
+            url = 'api/json/reviewrequests/%s/' % rid
         else:
             url = '%s%s/' % (
                 self.root_resource['links']['review_requests']['href'], rid)
