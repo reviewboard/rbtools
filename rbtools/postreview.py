@@ -2403,7 +2403,7 @@ class MercurialClient(SCMClient):
             if not root.startswith('abort:'):
                 self._hg_root = root.strip()
             else:
-                self._hg_root = '.'
+                return None
 
         return self._hg_root
 
