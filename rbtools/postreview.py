@@ -433,8 +433,9 @@ class ReviewBoardServer(object):
             root_resource = self.api_get('api/')
             rsp = self.api_get(root_resource['links']['info']['href'])
 
-            if (parse_version(rsp['info']['product']['package_version']) >=
-                parse_version('1.5.2')):
+            self.rb_version = rsp['info']['product']['package_version']
+
+            if parse_version(self.rb_version) >= parse_version('1.5.2'):
                 self.deprecated_api = False
                 self.root_resource = root_resource
                 debug('Using the new web API')
@@ -455,9 +456,6 @@ class ReviewBoardServer(object):
         Logs in to a Review Board server, prompting the user for login
         information if needed.
         """
-        if not self.root_resource:
-            self.check_api_version()
-
         if (options.diff_filename == '-' and
             not options.username and not options.submit_as and
             not options.password):
@@ -3740,6 +3738,7 @@ def main():
         sys.exit(1)
 
     server = ReviewBoardServer(server_url, repository_info, cookie_file)
+    server.check_api_version()
 
     if repository_info.supports_changesets:
         changenum = tool.get_changenum(args)
@@ -3773,6 +3772,14 @@ def main():
     if (isinstance(tool, PerforceClient) or
         isinstance(tool, PlasticClient)) and changenum is not None:
         changenum = tool.sanitize_changenum(changenum)
+
+        # NOTE: In Review Board 1.5.2, the changenum support is broken,
+        #       so we have to force the deprecated API.
+        server.rb_version = '1.5.2'
+        if parse_version(server.rb_version) == parse_version('1.5.2'):
+            debug('Using changenums on Review Board 1.5.2. '
+                  'Falling back to the deprecated 1.0 API')
+            server.deprecated_api = True
 
     if options.output_diff_only:
         # The comma here isn't a typo, but rather suppresses the extra newline
