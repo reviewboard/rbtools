@@ -1131,7 +1131,7 @@ class CVSClient(SCMClient):
         if i != -1:
             repository_path = repository_path[i + 1:]
 
-        i = repository_path.find(":")
+        i = repository_path.rfind(":")
         if i != -1:
             host = repository_path[:i]
             try:
