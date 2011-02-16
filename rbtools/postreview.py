@@ -3773,12 +3773,12 @@ def main():
         isinstance(tool, PlasticClient)) and changenum is not None:
         changenum = tool.sanitize_changenum(changenum)
 
-        # NOTE: In Review Board 1.5.2, the changenum support is broken,
-        #       so we have to force the deprecated API.
-        server.rb_version = '1.5.2'
-        if parse_version(server.rb_version) == parse_version('1.5.2'):
-            debug('Using changenums on Review Board 1.5.2. '
-                  'Falling back to the deprecated 1.0 API')
+        # NOTE: In Review Board 1.5.2 through 1.5.3.1, the changenum support
+        #       is broken, so we have to force the deprecated API.
+        if (parse_version(server.rb_version) >= parse_version('1.5.2') and
+            parse_version(server.rb_version) <= parse_version('1.5.3.1')):
+            debug('Using changenums on Review Board %s, which is broken. '
+                  'Falling back to the deprecated 1.0 API' % server.rb_version)
             server.deprecated_api = True
 
     if options.output_diff_only:
