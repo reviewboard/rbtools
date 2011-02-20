@@ -2703,9 +2703,9 @@ class GitClient(SCMClient):
         upstream_branch = options.tracking or default_upstream_branch or \
                           'origin/master'
         upstream_remote = upstream_branch.split('/')[0]
-        origin_url = execute(["git", "config", "remote.%s.url" % upstream_remote],
-                         ignore_errors=ignore_errors)
-
+        remoteOutput = execute(["git", "remote", "show", "-n", upstream_remote])
+        gitRemoteMatch = re.search('Fetch URL: (.*)', remoteOutput)
+        origin_url = gitRemoteMatch.group(1)
         return (upstream_branch, origin_url.rstrip('\n'))
 
     def is_valid_version(self, actual, expected):
