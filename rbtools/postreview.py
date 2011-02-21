@@ -5,7 +5,6 @@ import difflib
 import getpass
 import marshal
 import mimetools
-import ntpath
 import os
 import re
 import socket
@@ -142,7 +141,7 @@ class APIError(Exception):
 
 
 class HTTPRequest(urllib2.Request):
-    def __init__(self, url, body, headers={}, method="PUT"):
+    def __init__(self, url, body='', headers={}, method="PUT"):
         urllib2.Request.__init__(self, url, body, headers)
         self.method = method
 
@@ -647,11 +646,11 @@ class ReviewBoardServer(object):
 
     def update_review_request_from_changenum(self, changenum, review_request):
         if self.deprecated_api:
-            rsp = self.api_post(
+            self.api_post(
                 'api/json/reviewrequests/%s/update_from_changenum/'
                 % review_request['id'])
         else:
-            rsp = self.api_put(review_request['links']['self']['href'], {
+            self.api_put(review_request['links']['self']['href'], {
                 'changenum': review_request['changenum'],
             })
 
@@ -955,10 +954,10 @@ class ReviewBoardServer(object):
         were set.
         """
         url = self._make_url(path)
-        debug('HTTP DELETing %s: %s' % (url, fields))
+        debug('HTTP DELETing %s' % url)
 
         try:
-            r = HTTPRequest(url, body, headers, method='DELETE')
+            r = HTTPRequest(url, method='DELETE')
             data = urllib2.urlopen(r).read()
             self.cookie_jar.save(self.cookie_file)
             return data
@@ -1290,7 +1289,7 @@ class ClearCaseClient(SCMClient):
                     fname = splversions.pop()
                     splversions.append(fname + ver[1])
 
-                filename = splversions.pop()
+                splversions.pop()
                 bpath = cpath.normpath(bpath + "/")
                 elem_path = bpath
 
@@ -1333,7 +1332,7 @@ class ClearCaseClient(SCMClient):
                         name = self.get_filename_hash(epstr)
                         # Check if this hash is already in the list
                         try:
-                            i = hlist.index(name)
+                            hlist.index(name)
                             die("ERROR: duplicate value %s : %s" %
                                 (name, epstr))
                         except ValueError:
@@ -1409,7 +1408,7 @@ class ClearCaseClient(SCMClient):
         # Diff returns "1" if differences were found.
         # Add the view name and view type to the description
         o = []
-        Feol = False
+
         while len(params) > 0:
             # Read both original and modified files.
             onam = params.pop(0)
@@ -2803,7 +2802,6 @@ class GitClient(SCMClient):
 
         diff_data = ""
         filename = ""
-        revision = ""
         newfile = False
 
         for line in diff_lines:
@@ -3255,10 +3253,10 @@ def check_install(command):
     instance, 'svn help' or 'git --version').
     """
     try:
-        p = subprocess.Popen(command.split(' '),
-                             stdin=subprocess.PIPE,
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
+        subprocess.Popen(command.split(' '),
+                         stdin=subprocess.PIPE,
+                         stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE)
         return True
     except OSError:
         return False

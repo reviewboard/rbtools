@@ -211,7 +211,7 @@ class GitClientTests(unittest.TestCase):
                " \n"
 
         os.chdir(self.clone_dir)
-        ri = self.client.get_repository_info()
+        self.client.get_repository_info()
 
         self._git_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
 
@@ -241,7 +241,7 @@ class GitClientTests(unittest.TestCase):
                " \n"
 
         os.chdir(self.clone_dir)
-        ri = self.client.get_repository_info()
+        self.client.get_repository_info()
 
         self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
         self._git_add_file_commit('foo.txt', FOO2, 'commit 1')
@@ -291,11 +291,11 @@ class GitClientTests(unittest.TestCase):
         self._gitcmd(['checkout', '-b', 'mybranch', '--track', 'origin/master'])
         self._git_add_file_commit('foo.txt', FOO2, 'commit 2')
 
-        ri = self.client.get_repository_info()
+        self.client.get_repository_info()
         self.assertEqual(self.client.diff(None), (diff1, None))
 
         self._gitcmd(['checkout', 'master'])
-        ri = self.client.get_repository_info()
+        self.client.get_repository_info()
         self.assertEqual(self.client.diff(None), (diff2, None))
 
     def test_diff_tracking_no_origin(self):
@@ -320,7 +320,7 @@ class GitClientTests(unittest.TestCase):
         self._gitcmd(['checkout', '-b', 'mybranch', '--track', 'quux/master'])
         self._git_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
 
-        ri = self.client.get_repository_info()
+        self.client.get_repository_info()
 
         self.assertEqual(self.client.diff(None), (diff, None))
 
@@ -353,7 +353,7 @@ class GitClientTests(unittest.TestCase):
         self._gitcmd(['checkout', '-b', 'mybranch', '--track', 'master'])
         self._git_add_file_commit('foo.txt', FOO2, 'commit 2')
 
-        ri = self.client.get_repository_info()
+        self.client.get_repository_info()
         self.assertEqual(self.client.diff(None), (diff, None))
 
     def test_diff_tracking_override(self):
@@ -380,7 +380,7 @@ class GitClientTests(unittest.TestCase):
 
         self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
 
-        ri = self.client.get_repository_info()
+        self.client.get_repository_info()
         self.assertEqual(self.client.diff(None), (diff, None))
 
     def test_diff_slash_tracking(self):
@@ -406,7 +406,7 @@ class GitClientTests(unittest.TestCase):
         self._gitcmd(['checkout', '-b', 'my/branch', '--track', 'origin/not-master'])
         self._git_add_file_commit('foo.txt', FOO2, 'commit 2')
 
-        ri = self.client.get_repository_info()
+        self.client.get_repository_info()
         self.assertEqual(self.client.diff(None), (diff, None))
 
 
@@ -558,7 +558,7 @@ class MercurialClientTests(MercurialTestBase):
 
     def testDiffSimple(self):
         """Test MercurialClient diff, simple case"""
-        ri = self.client.get_repository_info()
+        self.client.get_repository_info()
 
         self._hg_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
 
@@ -567,7 +567,7 @@ class MercurialClientTests(MercurialTestBase):
 
     def testDiffSimpleMultiple(self):
         """Test MercurialClient diff with multiple commits"""
-        ri = self.client.get_repository_info()
+        self.client.get_repository_info()
 
         self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
         self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
@@ -864,7 +864,7 @@ class DeprecatedApiTests(MockHttpUnitTest):
         self.http_response = self.SAMPLE_ERROR_STR
 
         try:
-            data = self.server.api_get('/foo/')
+            self.server.api_get('/foo/')
 
             # Shouldn't be reached
             self._assert(False)
@@ -879,7 +879,7 @@ class DeprecatedApiTests(MockHttpUnitTest):
         self.http_response = self.SAMPLE_ERROR_STR
 
         try:
-            data = self.server.api_post('/foo/')
+            self.server.api_post('/foo/')
 
             # Shouldn't be reached
             self._assert(False)
@@ -895,7 +895,7 @@ class DeprecatedApiTests(MockHttpUnitTest):
                                                    self.SAMPLE_ERROR_STR)
 
         try:
-            data = self.server.api_get('/foo/')
+            self.server.api_get('/foo/')
 
             # Shouldn't be reached
             self._assert(False)
@@ -911,7 +911,7 @@ class DeprecatedApiTests(MockHttpUnitTest):
                                                    self.SAMPLE_ERROR_STR)
 
         try:
-            data = self.server.api_post('/foo/')
+            self.server.api_post('/foo/')
 
             # Shouldn't be reached
             self._assert(False)
