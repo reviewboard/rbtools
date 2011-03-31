@@ -336,7 +336,9 @@ class ReviewBoardHTTPBasicAuthHandler(urllib2.HTTPBasicAuthHandler):
     def retry_http_basic_auth(self, *args, **kwargs):
         if self._lasturl != args[0]:
             self._retried = False
+
         self._lasturl = args[0]
+
         if not self._retried:
             self._retried = True
             self.retried = 0
@@ -445,13 +447,14 @@ class ReviewBoardServer(object):
                 debug('Using the new web API')
                 return
         except APIError, e:
-            if e.http_status != 404 and e.http_status != 401:
+            if e.http_status not in (401,404):
                 # We shouldn't reach this. If there's a permission denied
                 # from lack of logging in, then the basic auth handler
                 # should have hit it.
-                # However in 1.5.1 it wants you to be logged in and returns
-                # a 401 from the application after you've done your http
-                # basic auth
+
+                # However in some versions it wants you to be logged in 
+                # and returns a 401 from the application after you've
+                # done your http basic auth
                 die("Unable to access the root /api/ URL on the server.")
 
         # This is an older Review Board server with the old API.
