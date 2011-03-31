@@ -2590,15 +2590,26 @@ class GitClient(SCMClient):
     compatible diffs. This will attempt to generate a diff suitable for the
     remote repository, whether git, SVN or Perforce.
     """
+    def __init__(self):
+        SCMClient.__init__(self)
+        # Store the 'correct' way to invoke git, just plain old 'git' by default
+        self.git = 'git'
+
     def _strip_heads_prefix(self, ref):
         """ Strips prefix from ref name, if possible """
         return re.sub(r'^refs/heads/', '', ref)
 
     def get_repository_info(self):
         if not check_install('git --help'):
-            return None
+            # CreateProcess (launched via subprocess, used by check_install)
+            # does not automatically append .cmd for things it finds in PATH.
+            # If we're on Windows, and this works, save it for further use.
+            if sys.platform.startswith('win') and check_install('git.cmd --help'):
+                self.git = 'git.cmd'
+            else:
+                return None
 
-        git_dir = execute(["git", "rev-parse", "--git-dir"],
+        git_dir = execute([self.git, "rev-parse", "--git-dir"],
                           ignore_errors=True).strip()
 
         if git_dir.startswith("fatal:") or not os.path.isdir(git_dir):
@@ -2608,7 +2619,7 @@ class GitClient(SCMClient):
         # of a work-tree would result in broken diffs on the server
         os.chdir(os.path.dirname(os.path.abspath(git_dir)))
 
-        self.head_ref = execute(['git', 'symbolic-ref', '-q', 'HEAD']).strip()
+        self.head_ref = execute([self.git, 'symbolic-ref', '-q', 'HEAD']).strip()
 
         # We know we have something we can work with. Let's find out
         # what it is. We'll try SVN first, but only if there's a .git/svn
@@ -2617,7 +2628,7 @@ class GitClient(SCMClient):
         git_svn_dir = os.path.join(git_dir, 'svn')
 
         if os.path.isdir(git_svn_dir) and len(os.listdir(git_svn_dir)) > 0:
-            data = execute(["git", "svn", "info"], ignore_errors=True)
+            data = execute([self.git, "svn", "info"], ignore_errors=True)
 
             m = re.search(r'^Repository Root: (.+)$', data, re.M)
 
@@ -2644,11 +2655,11 @@ class GitClient(SCMClient):
                 # 'git svn info'.  If we fail because of an older git install,
                 # here, figure out what version of git is installed and give
                 # the user a hint about what to do next.
-                version = execute(["git", "svn", "--version"],
+                version = execute([self.git, "svn", "--version"],
                                   ignore_errors=True)
                 version_parts = re.search('version (\d+)\.(\d+)\.(\d+)',
                                           version)
-                svn_remote = execute(["git", "config", "--get",
+                svn_remote = execute([self.git, "config", "--get",
                                       "svn-remote.svn.url"],
                                       ignore_errors=True)
 
@@ -2667,10 +2678,10 @@ class GitClient(SCMClient):
         # Nope, it's git then.
         # Check for a tracking branch and determine merge-base
         short_head = self._strip_heads_prefix(self.head_ref)
-        merge = execute(['git', 'config', '--get',
+        merge = execute([self.git, 'config', '--get',
                          'branch.%s.merge' % short_head],
                         ignore_errors=True).strip()
-        remote = execute(['git', 'config', '--get',
+        remote = execute([self.git, 'config', '--get',
                           'branch.%s.remote' % short_head],
                          ignore_errors=True).strip()
 
@@ -2702,7 +2713,7 @@ class GitClient(SCMClient):
         upstream_branch = options.tracking or default_upstream_branch or \
                           'origin/master'
         upstream_remote = upstream_branch.split('/')[0]
-        remoteOutput = execute(["git", "remote", "show", "-n", upstream_remote])
+        remoteOutput = execute([self.git, "remote", "show", "-n", upstream_remote])
         gitRemoteMatch = re.search('URL: (.*)', remoteOutput)
         origin_url = gitRemoteMatch.group(1)
         return (upstream_branch, origin_url.rstrip('\n'))
@@ -2728,7 +2739,7 @@ class GitClient(SCMClient):
             return server_url
 
         # TODO: Maybe support a server per remote later? Is that useful?
-        url = execute(["git", "config", "--get", "reviewboard.url"],
+        url = execute([self.git, "config", "--get", "reviewboard.url"],
                       ignore_errors=True).strip()
         if url:
             return url
@@ -2750,7 +2761,7 @@ class GitClient(SCMClient):
         """
         parent_branch = options.parent_branch
 
-        self.merge_base = execute(["git", "merge-base", self.upstream_branch,
+        self.merge_base = execute([self.git, "merge-base", self.upstream_branch,
                                    self.head_ref]).strip()
 
         if parent_branch:
@@ -2761,12 +2772,12 @@ class GitClient(SCMClient):
             parent_diff_lines = None
 
         if options.guess_summary and not options.summary:
-            options.summary = execute(["git", "log", "--pretty=format:%s",
+            options.summary = execute([self.git, "log", "--pretty=format:%s",
                                        "HEAD^.."], ignore_errors=True).strip()
 
         if options.guess_description and not options.description:
             options.description = execute(
-                ["git", "log", "--pretty=format:%s%n%n%b",
+                [self.git, "log", "--pretty=format:%s%n%n%b",
                  (parent_branch or self.merge_base) + ".."],
                 ignore_errors=True).strip()
 
@@ -2779,12 +2790,12 @@ class GitClient(SCMClient):
         rev_range = "%s..%s" % (ancestor, commit)
 
         if self.type == "svn":
-            diff_lines = execute(["git", "diff", "--no-color", "--no-prefix",
+            diff_lines = execute([self.git, "diff", "--no-color", "--no-prefix",
                                   "--no-ext-diff", "-r", "-u", rev_range],
                                  split_lines=True)
             return self.make_svn_diff(ancestor, diff_lines)
         elif self.type == "git":
-            return execute(["git", "diff", "--no-color", "--full-index",
+            return execute([self.git, "diff", "--no-color", "--full-index",
                             "--no-ext-diff", rev_range])
 
         return None
@@ -2795,7 +2806,7 @@ class GitClient(SCMClient):
         svn diff would generate. This is needed so the SVNTool in Review
         Board can properly parse this diff.
         """
-        rev = execute(["git", "svn", "find-rev", parent_branch]).strip()
+        rev = execute([self.git, "svn", "find-rev", parent_branch]).strip()
 
         if not rev:
             return None
@@ -2850,12 +2861,12 @@ class GitClient(SCMClient):
             # only one revision is specified
             if options.guess_summary and not options.summary:
                 options.summary = execute(
-                    ["git", "log", "--pretty=format:%s", revision_range + ".."],
+                    [self.git, "log", "--pretty=format:%s", revision_range + ".."],
                     ignore_errors=True).strip()
 
             if options.guess_description and not options.description:
                 options.description = execute(
-                    ["git", "log", "--pretty=format:%s%n%n%b", revision_range + ".."],
+                    [self.git, "log", "--pretty=format:%s%n%n%b", revision_range + ".."],
                     ignore_errors=True).strip()
 
             return self.make_diff(revision_range)
@@ -2864,12 +2875,12 @@ class GitClient(SCMClient):
 
             if options.guess_summary and not options.summary:
                 options.summary = execute(
-                    ["git", "log", "--pretty=format:%s", "%s..%s" % (r1, r2)],
+                    [self.git, "log", "--pretty=format:%s", "%s..%s" % (r1, r2)],
                     ignore_errors=True).strip()
 
             if options.guess_description and not options.description:
                 options.description = execute(
-                    ["git", "log", "--pretty=format:%s%n%n%b", "%s..%s" % (r1, r2)],
+                    [self.git, "log", "--pretty=format:%s%n%n%b", "%s..%s" % (r1, r2)],
                     ignore_errors=True).strip()
 
             return self.make_diff(r1, r2)
