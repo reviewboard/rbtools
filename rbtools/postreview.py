@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import base64
 import cookielib
-import difflib
 import getpass
 import marshal
 import mimetools
@@ -14,6 +13,7 @@ import sys
 import tempfile
 import urllib
 import urllib2
+from datetime import datetime
 from optparse import OptionParser
 from pkg_resources import parse_version
 from tempfile import mkstemp
@@ -260,6 +260,77 @@ class SvnRepositoryInfo(RepositoryInfo):
         if split[-1] == '':
             split = split[0:-1]
         return split
+
+class ClearCaseRepositoryInfo(RepositoryInfo):
+    """
+    A representation of a ClearCase source code repository. This version knows
+    how to find a matching repository on the server even if the URLs differ.
+    """
+
+    def __init__(self, path, base_path, vobstag, supports_parent_diffs=False):
+        RepositoryInfo.__init__(self, path, base_path,
+                                supports_parent_diffs=supports_parent_diffs)
+        self.vobstag = vobstag
+
+    def find_server_repository_info(self, server):
+        """
+        The point of this function is to find a repository on the server that
+        matches self, even if the paths aren't the same. (For example, if self
+        uses an 'http' path, but the server uses a 'file' path for the same
+        repository.) It does this by comparing VOB's name. If the
+        repositories use the same path, you'll get back self, otherwise you'll
+        get a different ClearCaseRepositoryInfo object (with a different path).
+        """
+
+        # Find VOB's family uuid based on VOB's tag
+        uuid = self._get_vobs_uuid(self.vobstag)
+        debug("Repositorie's %s uuid is %r" % (self.vobstag, uuid))
+
+        repositories = server.get_repositories()
+        for repository in repositories:
+            if repository['tool'] != 'ClearCase':
+                continue
+
+            info = self._get_repository_info(server, repository)
+
+            if not info or uuid != info['uuid']:
+                continue
+
+            debug('Matching repository uuid:%s with path:%s' %(uuid,
+                  info['repopath']))
+            return ClearCaseRepositoryInfo(info['repopath'],
+                    info['repopath'], uuid)
+
+        # We didn't found uuid but if version is >= 1.5.3
+        # we can try to use VOB's name hoping it is better
+        # than current VOB's path.
+        if server.rb_version >= '1.5.3':
+            self.path = cpath.split(self.vobstag)[1]
+
+        # We didn't find a matching repository on the server.
+        # We'll just return self and hope for the best.
+        return self
+
+    def _get_vobs_uuid(self, vobstag):
+        """Return family uuid of VOB."""
+
+        property_lines = execute(["cleartool", "lsvob", "-long", vobstag],
+                                 split_lines=True)
+        for line  in property_lines:
+            if line.startswith('Vob family uuid:'):
+                return  line.split(' ')[-1].rstrip()
+
+    def _get_repository_info(self, server, repository):
+        try:
+            return server.get_repository_info(repository['id'])
+        except APIError, e:
+            # If the server couldn't fetch the repository info, it will return
+            # code 210. Ignore those.
+            # Other more serious errors should still be raised, though.
+            if e.error_code == 210:
+                return None
+
+            raise e
 
 
 class PresetHTTPAuthHandler(urllib2.BaseHandler):
@@ -587,7 +658,9 @@ class ReviewBoardServer(object):
                 sys.stderr.write(ADD_REPOSITORY_DOCS_URL + '\n')
                 die()
 
-        repository = self.get_configured_repository() or self.info.path
+        repository = options.repository_url \
+                     or self.get_configured_repository() \
+                     or self.info.path
 
         try:
             debug("Attempting to create review request on %s for %s" %
@@ -1177,306 +1250,315 @@ class ClearCaseClient(SCMClient):
     information and generates compatible diffs.
     This client assumes that cygwin is installed on windows.
     """
-    viewinfo = ""
-    viewtype = "snapshot"
-
-    def get_filename_hash(self, fname):
-        # Hash the filename string so its easy to find the file later on.
-        return md5(fname).hexdigest()
+    viewtype = None
 
     def get_repository_info(self):
+        """Returns information on the Clear Case repository.
+
+        This will first check if the cleartool command is
+        installed and in the path, and post-review was run
+        from inside of the view.
+        """
         if not check_install('cleartool help'):
             return None
 
-        # We must be running this from inside a view.
-        # Otherwise it doesn't make sense.
-        self.viewinfo = execute(["cleartool", "pwv", "-short"])
-        if self.viewinfo.startswith('\*\* NONE'):
+        viewname = execute(["cleartool", "pwv", "-short"]).strip()
+        if viewname.startswith('** NONE'):
             return None
 
-        # Returning the hardcoded clearcase root path to match the server
-        #   respository path.
-        # There is no reason to have a dynamic path unless you have
-        #   multiple clearcase repositories. This should be implemented.
-        return RepositoryInfo(path=options.repository_url,
-                              base_path=options.repository_url,
+        # Now that we know it's ClearCase, make sure we have GNU diff installed,
+        # and error out if we don't.
+        check_gnu_diff()
+
+        property_lines = execute(["cleartool", "lsview", "-full", "-properties",
+                                  "-cview"], split_lines=True)
+        for line in property_lines:
+            properties = line.split(' ')
+            if properties[0] == 'Properties:':
+                # Determine the view type and check if it's supported.
+                #
+                # Specifically check if webview was listed in properties
+                # because webview types also list the 'snapshot'
+                # entry in properties.
+                if 'webview' in properties:
+                    die("Webviews are not supported. You can use post-review"
+                        " only in dynamic or snapshot view.")
+                self.viewtype = 'dynamic' if 'dynamic' in properties else \
+                                'snapshot'
+
+                break
+
+        # Find current VOB's tag
+        vobstag = execute(["cleartool", "describe", "-short", "vob:."],
+                            ignore_errors=True).strip()
+        if "Error: " in vobstag:
+            die("To generate diff run post-review inside vob.")
+
+        # From current working directory cut path to VOB.
+        # VOB's tag contain backslash character before VOB's name.
+        # I hope that first character of VOB's tag like '\new_proj'
+        # won't be treat as new line character but two separate:
+        # backslash and letter 'n'
+        cwd = os.getcwd()
+        base_path = cwd[:cwd.find(vobstag) + len(vobstag)]
+
+        return ClearCaseRepositoryInfo(path=base_path,
+                              base_path=base_path,
+                              vobstag=vobstag,
                               supports_parent_diffs=False)
 
-    def get_previous_version(self, files):
-        file = []
-        curdir = os.getcwd()
+    def check_options(self):
+        if ((options.revision_range or options.tracking)
+            and self.viewtype != "dynamic"):
+            die("To generate diff using parent branch or by passing revision "
+                "ranges, you must use a dynamic view.")
 
-        # Cygwin case must transform a linux-like path to windows like path
-        #   including drive letter.
-        if 'cygdrive' in curdir:
-            where = curdir.index('cygdrive') + 9
-            drive_letter = curdir[where:where+1]
-            curdir = drive_letter + ":\\" + curdir[where+2:len(curdir)]
+    def _determine_version(self, version_path):
+        """Determine numeric version of revision.
 
-        for key in files:
-            # Sometimes there is a quote in the filename. It must be removed.
-            key = key.replace('\'', '')
-            elem_path = cpath.normpath(os.path.join(curdir, key))
-
-            # Removing anything before the last /vobs
-            #   because it may be repeated.
-            elem_path_idx = elem_path.rfind("/vobs")
-            if elem_path_idx != -1:
-                elem_path = elem_path[elem_path_idx:len(elem_path)].strip("\"")
-
-            # Call cleartool to get this version and the previous version
-            #   of the element.
-            curr_version, pre_version = execute(
-                ["cleartool", "desc", "-pre", elem_path], split_lines=True)
-            curr_version = cpath.normpath(curr_version)
-            pre_version = pre_version.split(':')[1].strip()
-
-            # If a specific version was given, remove it from the path
-            #   to avoid version duplication
-            if "@@" in elem_path:
-                elem_path = elem_path[:elem_path.rfind("@@")]
-            file.append(elem_path + "@@" + pre_version)
-            file.append(curr_version)
-
-        # Determnine if the view type is snapshot or dynamic.
-        if os.path.exists(file[0]):
-            self.viewtype = "dynamic"
-
-        return file
-
-    def get_extended_namespace(self, files):
+        CHECKEDOUT is marked as infinity to be treated
+        always as highest possible version of file.
+        CHECKEDOUT, in ClearCase, is something like HEAD.
         """
-        Parses the file path to get the extended namespace
+        branch, number = cpath.split(version_path)
+        if number == 'CHECKEDOUT':
+            return float('inf')
+        return int(number)
+
+    def _construct_extended_path(self, path, version):
+        """Combine extended_path from path and version.
+
+        CHECKEDOUT must be removed becasue this one version
+        doesn't exists in MVFS (ClearCase dynamic view file
+        system). Only way to get content of checked out file
+        is to use filename only."""
+        if not version or version.endswith('CHECKEDOUT'):
+            return path
+
+        return "%s@@%s" % (path, version)
+
+    def _sanitize_branch_changeset(self, changeset):
+        """Return changeset containing non-binary, branched file versions.
+
+        Changeset contain only first and last version of file made on branch.
         """
-        versions = self.get_previous_version(files)
+        changelist = {}
 
-        evfiles = []
-        hlist = []
+        for path, previous, current in changeset:
+            version_number = self._determine_version(current)
 
-        for vkey in versions:
-            # Verify if it is a checkedout file.
-            if "CHECKEDOUT" in vkey:
-                # For checkedout files just add it to the file list
-                #   since it cannot be accessed outside the view.
-                splversions = vkey[:vkey.rfind("@@")]
-                evfiles.append(splversions)
-            else:
-                # For checkedin files.
-                ext_path = []
-                ver = []
-                fname = ""      # fname holds the file name without the version.
-                (bpath, fpath) = cpath.splitdrive(vkey)
-                if bpath :
-                    # Windows.
-                    # The version (if specified like file.c@@/main/1)
-                    #   should be kept as a single string
-                    #   so split the path and concat the file name
-                    #   and version in the last position of the list.
-                    ver = fpath.split("@@")
-                    splversions = fpath[:vkey.rfind("@@")].split("\\")
-                    fname = splversions.pop()
-                    splversions.append(fname + ver[1])
-                else :
-                    # Linux.
-                    if vkey.rfind("vobs") != -1 :
-                        bpath = vkey[:vkey.rfind("vobs")+4]
-                        fpath = vkey[vkey.rfind("vobs")+5:]
-                    else :
-                       bpath = vkey[:0]
-                       fpath = vkey[1:]
-                    ver = fpath.split("@@")
-                    splversions =  ver[0][:vkey.rfind("@@")].split("/")
-                    fname = splversions.pop()
-                    splversions.append(fname + ver[1])
+            if path not in changelist:
+                changelist[path] = {
+                    'highest': version_number,
+                    'current': current,
+                    'previous': previous
+                }
 
-                splversions.pop()
-                bpath = cpath.normpath(bpath + "/")
-                elem_path = bpath
+            if version_number == 0:
+                # Previous version of 0 version on branch is base
+                changelist[path]['previous'] = previous
+            elif version_number > changelist[path]['highest']:
+                changelist[path]['highest'] = version_number
+                changelist[path]['current'] = current
 
-                for key in splversions:
-                    # For each element (directory) in the path,
-                    #   get its version from clearcase.
-                    elem_path = cpath.join(elem_path, key)
+        # Convert to list
+        changeranges = []
+        for path, version in changelist.iteritems():
+            changeranges.append(
+                (self._construct_extended_path(path, version['previous']),
+                 self._construct_extended_path(path, version['current']))
+            )
 
-                    # This is the version to be appended to the extended
-                    #   path list.
-                    this_version = execute(
-                        ["cleartool", "desc", "-fmt", "%Vn",
-                        cpath.normpath(elem_path)])
-                    if this_version:
-                        ext_path.append(key + "/@@" + this_version + "/")
-                    else:
-                        ext_path.append(key + "/")
+        return changeranges
 
-                # This must be done in case we haven't specified
-                #   the version on the command line.
-                ext_path.append(cpath.normpath(fname + "/@@" +
-                    vkey[vkey.rfind("@@")+2:len(vkey)]))
-                epstr = cpath.join(bpath, cpath.normpath(''.join(ext_path)))
-                evfiles.append(epstr)
+    def _sanitize_checkedout_changeset(self, changeset):
+        """Return changeset containing non-binary, checkdout file versions."""
 
-                """
-                In windows, there is a problem with long names(> 254).
-                In this case, we hash the string and copy the unextended
-                  filename to a temp file whose name is the hash.
-                This way we can get the file later on for diff.
-                The same problem applies to snapshot views where the
-                  extended name isn't available.
-                The previous file must be copied from the CC server
-                  to a local dir.
-                """
-                if cpath.exists(epstr) :
-                    pass
-                else:
-                    if len(epstr) > 254 or self.viewtype == "snapshot":
-                        name = self.get_filename_hash(epstr)
-                        # Check if this hash is already in the list
-                        try:
-                            hlist.index(name)
-                            die("ERROR: duplicate value %s : %s" %
-                                (name, epstr))
-                        except ValueError:
-                            hlist.append(name)
+        changeranges = []
+        for path, previous, current in changeset:
+            version_number = self._determine_version(current)
+            changeranges.append(
+                (self._construct_extended_path(path, previous),
+                self._construct_extended_path(path, current))
+            )
 
-                        normkey = cpath.normpath(vkey)
-                        td = tempfile.gettempdir()
-                        # Cygwin case must transform a linux-like path to
-                        # windows like path including drive letter
-                        if 'cygdrive' in td:
-                            where = td.index('cygdrive') + 9
-                            drive_letter = td[where:where+1] + ":"
-                            td = cpath.join(drive_letter, td[where+1:])
-                        tf = cpath.normpath(cpath.join(td, name))
-                        if cpath.exists(tf):
-                            debug("WARNING: FILE EXISTS")
-                            os.unlink(tf)
-                        execute(["cleartool", "get", "-to", tf, normkey])
-                    else:
-                        die("ERROR: FILE NOT FOUND : %s" % epstr)
+        return changeranges
 
-        return evfiles
+    def _directory_content(self, path):
+        """Return directory content ready for saving to tempfile."""
 
-    def get_files_from_label(self, label):
-        voblist=[]
-        # Get the list of vobs for the current view
-        allvoblist = execute(["cleartool", "lsvob", "-short"]).split()
-        # For each vob, find if the label is present
-        for vob in allvoblist:
-            try:
-                execute(["cleartool", "describe", "-local",
-                    "lbtype:%s@%s" % (label, vob)]).split()
-                voblist.append(vob)
-            except:
-                pass
+        return ''.join([
+            '%s\n' % s
+            for s in sorted(os.listdir(path))
+        ])
 
-        filelist=[]
-        # For each vob containing the label, get the file list
-        for vob in voblist:
-            try:
-                res = execute(["cleartool", "find", vob, "-all", "-version",
-                    "lbtype(%s)" % label, "-print"])
-                filelist.extend(res.split())
-            except :
-                pass
+    def _construct_changeset(self, output):
+        return [
+            info.split('\t')
+            for info in output.strip().split('\n')
+        ]
 
-        # Return only the unique itens
-        return set(filelist)
+    def get_checkedout_changeset(self):
+        """Return information about the checked out changeset.
+
+        This function returns: kind of element, path to file,
+        previews and current file version.
+        """
+        changeset = []
+        # We ignore return code 1 in order to
+        # omit files that Clear Case can't read.
+        output = execute([
+            "cleartool",
+            "lscheckout",
+            "-all",
+            "-cview",
+            "-me",
+            "-fmt",
+            r"%En\t%PVn\t%Vn\n"],
+            extra_ignore_errors=(1,),
+            with_errors=False)
+
+        if output:
+            changeset = self._construct_changeset(output)
+
+        return self._sanitize_checkedout_changeset(changeset)
+
+    def get_branch_changeset(self, branch):
+        """Returns information about the versions changed on a branch.
+
+        This takes into account the changes on the branch owned by the
+        current user in all vobs of the current view.
+        """
+        changeset = []
+
+        # We ignore return code 1 in order to
+        # omit files that Clear Case can't read.
+        if sys.platform.startswith('win'):
+            CLEARCASE_XPN = '%CLEARCASE_XPN%'
+        else:
+            CLEARCASE_XPN = '$CLEARCASE_XPN'
+
+        output = execute([
+            "cleartool",
+            "find",
+            "-all",
+            "-version",
+            "brtype(%s)" % branch,
+            "-exec",
+            'cleartool descr -fmt ' \
+            r'"%En\t%PVn\t%Vn\n" ' \
+            + CLEARCASE_XPN],
+            extra_ignore_errors=(1,),
+            with_errors=False)
+
+        if output:
+            changeset = self._construct_changeset(output)
+
+        return self._sanitize_branch_changeset(changeset)
 
     def diff(self, files):
-        """
-        Performs a diff of the specified file and its previous version.
-        """
-        # We must be running this from inside a view.
-        # Otherwise it doesn't make sense.
-        return self.do_diff(self.get_extended_namespace(files))
+        """Performs a diff of the specified file and its previous version."""
 
-    def diff_label(self, label):
-        """
-        Get the files that are attached to a label and diff them
-        TODO
-        """
-        return self.diff(self.get_files_from_label(label))
+        if options.tracking:
+            changeset = self.get_branch_changeset(options.tracking)
+        else:
+            changeset = self.get_checkedout_changeset()
+
+        return self.do_diff(changeset)
 
     def diff_between_revisions(self, revision_range, args, repository_info):
+        """Performs a diff between passed revisions or branch."""
+
+        # Convert revision range to list of:
+        # (previous version, current version) tuples
+        revision_range = revision_range.split(';')
+        changeset = zip(revision_range[0::2], revision_range[1::2])
+
+        return self.do_diff(changeset)[0]
+
+    def diff_files(self, old_file, new_file):
+        """Return unified diff for file.
+
+        Most effective and reliable way is use gnu diff.
         """
-        Performs a diff between 2 revisions of a CC repository.
+        diff_cmd = ["diff", "-uN", old_file, new_file]
+        dl = execute(diff_cmd, extra_ignore_errors=(1,2),
+                     translate_newlines=False)
+
+        # If the input file has ^M characters at end of line, lets ignore them.
+        dl = dl.replace('\r\r\n', '\r\n')
+        dl = dl.splitlines(True)
+
+        # Special handling for the output of the diff tool on binary files:
+        #     diff outputs "Files a and b differ"
+        # and the code below expects the output to start with
+        #     "Binary files "
+        if (len(dl) == 1 and
+            dl[0].startswith('Files %s and %s differ' % (old_file, new_file))):
+            dl = ['Binary files %s and %s differ\n' % (old_file, new_file)]
+
+        # We need oids of files to translate them to paths on reviewboard repository
+        old_oid = execute(["cleartool", "describe", "-fmt", "%On", old_file])
+        new_oid = execute(["cleartool", "describe", "-fmt", "%On", new_file])
+
+        if dl == [] or dl[0].startswith("Binary files "):
+            if dl == []:
+                dl = ["File %s in your changeset is unmodified\n" % new_file]
+
+            dl.insert(0, "==== %s %s ====\n" % (old_oid, new_oid))
+            dl.append('\n')
+        else:
+            dl.insert(2, "==== %s %s ====\n" % (old_oid, new_oid))
+
+        return dl
+
+    def diff_directories(self, old_dir, new_dir):
+        """Return uniffied diff between two directories content.
+
+        Function save two version's content of directory to temp
+        files and treate them as casual diff between two files.
         """
-        revs = revision_range.split(":")
-        return self.do_diff(revs)[0]
+        old_content = self._directory_content(old_dir)
+        new_content = self._directory_content(new_dir)
 
-    def do_diff(self, params):
-        # Diff returns "1" if differences were found.
-        # Add the view name and view type to the description
-        o = []
+        old_tmp = make_tempfile(content=old_content)
+        new_tmp = make_tempfile(content=new_content)
 
-        while len(params) > 0:
-            # Read both original and modified files.
-            onam = params.pop(0)
-            mnam = params.pop(0)
+        diff_cmd = ["diff", "-uN", old_tmp, new_tmp]
+        dl = execute(diff_cmd,
+                     extra_ignore_errors=(1,2),
+                     translate_newlines=False,
+                     split_lines=True)
 
-            file_data = []
-            do_rem = False
-            # If the filename length is greater than 254 char for windows,
-            #   we copied the file to a temp file
-            #   because the open will not work for path greater than 254.
-            # This is valid for the original and
-            #   modified files if the name size is > 254.
-            for filenam in (onam, mnam) :
-                if cpath.exists(filenam) and self.viewtype == "dynamic":
-                    do_rem = False
-                    fn = filenam
-                elif len(filenam) > 254 or self.viewtype == "snapshot":
-                    fn = self.get_filename_hash(filenam)
-                    fn = cpath.join(tempfile.gettempdir(), fn)
-                    do_rem = True
+        # Replacing temporary filenames to
+        # real directory names and add ids
+        if dl:
+            dl[0] = dl[0].replace(old_tmp, old_dir)
+            dl[1] = dl[1].replace(new_tmp, new_dir)
+            old_oid = execute(["cleartool", "describe", "-fmt", "%On", old_dir])
+            new_oid = execute(["cleartool", "describe", "-fmt", "%On", new_dir])
+            dl.insert(2, "==== %s %s ====\n" % (old_oid, new_oid))
 
-                if cpath.isdir(filenam):
-                    content = [
-                        '%s\n' % s
-                        for s in sorted(os.listdir(filenam))
-                    ]
-                    file_data.append(content)
-                else:
-                    fd = open(cpath.normpath(fn))
-                    fdata = fd.readlines()
-                    fd.close()
-                    file_data.append(fdata)
-                    # If the file was temp, it should be removed.
-                    if do_rem:
-                        os.remove(filenam)
+        return dl
 
-            modi = file_data.pop()
-            orig = file_data.pop()
+    def do_diff(self, changeset):
+        """Generates a unified diff for all files in the changeset."""
 
-            # For snapshot views, the local directories must be removed because
-            #   they will break the diff on the server. Just replacing
-            #   everything before the view name (including the view name) for
-            #   vobs do the work.
-            if (self.viewtype == "snapshot"
-                and (sys.platform.startswith('win')
-                  or sys.platform.startswith('cygwin'))):
-                    vinfo = self.viewinfo.rstrip("\r\n")
-                    mnam = "c:\\\\vobs" + mnam[mnam.rfind(vinfo) + len(vinfo):]
-                    onam = "c:\\\\vobs" + onam[onam.rfind(vinfo) + len(vinfo):]
-            # Call the diff lib to generate a diff.
-            # The dates are bogus, since they don't natter anyway.
-            # The only thing is that two spaces are needed to the server
-            #   so it can identify the heades correctly.
-            diff = difflib.unified_diff(orig, modi, onam, mnam,
-               '  2002-02-21 23:30:39.942229878 -0800',
-               '  2002-02-21 23:30:50.442260588 -0800', lineterm=' \n')
-            # Transform the generator output into a string output
-            #   Use a comprehension instead of a generator,
-            #   so 2.3.x doesn't fail to interpret.
-            diffstr = ''.join([str(l) for l in diff])
-            # Workaround for the difflib no new line at end of file
-            #   problem.
-            if not diffstr.endswith('\n'):
-                diffstr = diffstr + ("\n\\ No newline at end of file\n")
-            o.append(diffstr)
+        diff = []
+        for old_file, new_file in changeset:
+            dl = []
+            if cpath.isdir(new_file):
+                dl = self.diff_directories(old_file, new_file)
+            elif cpath.exists(new_file):
+                dl = self.diff_files(old_file, new_file)
+            else:
+                debug("File %s does not exist or access is denied." % new_file)
+                continue
 
-        ostr = ''.join(o)
-        return (ostr, None) # diff, parent_diff (not supported)
+            if dl:
+                diff.append(''.join(dl))
+
+        return (''.join(diff), None)
 
 
 class SVNClient(SCMClient):
@@ -3245,12 +3327,14 @@ def debug(s):
         print ">>> %s" % s
 
 
-def make_tempfile():
+def make_tempfile(content=None):
     """
     Creates a temporary file and returns the path. The path is stored
     in an array for later cleanup.
     """
     fd, tmpfile = mkstemp()
+    if content:
+        os.write(fd, content)
     os.close(fd)
     tempfiles.append(tmpfile)
     return tmpfile
@@ -3299,7 +3383,7 @@ def check_gnu_diff():
 
 
 def execute(command, env=None, split_lines=False, ignore_errors=False,
-            extra_ignore_errors=(), translate_newlines=True):
+            extra_ignore_errors=(), translate_newlines=True, with_errors=True):
     """
     Utility function to execute a command and return the output.
     """
@@ -3316,11 +3400,16 @@ def execute(command, env=None, split_lines=False, ignore_errors=False,
     env['LC_ALL'] = 'en_US.UTF-8'
     env['LANGUAGE'] = 'en_US.UTF-8'
 
+    if with_errors:
+        errors_output = subprocess.STDOUT
+    else:
+        errors_output = subprocess.PIPE
+
     if sys.platform.startswith('win'):
         p = subprocess.Popen(command,
                              stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT,
+                             stderr=errors_output,
                              shell=False,
                              universal_newlines=translate_newlines,
                              env=env)
@@ -3328,7 +3417,7 @@ def execute(command, env=None, split_lines=False, ignore_errors=False,
         p = subprocess.Popen(command,
                              stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT,
+                             stderr=errors_output,
                              shell=False,
                              close_fds=True,
                              universal_newlines=translate_newlines,
@@ -3579,9 +3668,6 @@ def parse_options(args):
                       dest="revision_range", default=None,
                       help="generate the diff for review based on given "
                            "revision range")
-    parser.add_option("--label",
-                      dest="label", default=None,
-                      help="label (ClearCase Only) ")
     parser.add_option("--submit-as",
                       dest="submit_as", default=SUBMIT_AS, metavar="USERNAME",
                       help="user name to be recorded as the author of the "
@@ -3758,8 +3844,6 @@ def main():
         diff = tool.diff_between_revisions(options.revision_range, args,
                                            repository_info)
         parent_diff = None
-    elif options.label and isinstance(tool, ClearCaseClient):
-        diff, parent_diff = tool.diff_label(options.label)
     elif options.diff_filename:
         parent_diff = None
 
