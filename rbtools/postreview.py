@@ -1283,8 +1283,10 @@ class ClearCaseClient(SCMClient):
                 if 'webview' in properties:
                     die("Webviews are not supported. You can use post-review"
                         " only in dynamic or snapshot view.")
-                self.viewtype = 'dynamic' if 'dynamic' in properties else \
-                                'snapshot'
+                if 'dynamic' in properties:
+                    self.viewtype = 'dynamic'
+                else:
+                    self.viewtype = 'snapshot'
 
                 break
 
