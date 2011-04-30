@@ -1,4 +1,9 @@
 import getpass
+from json import dumps 
+
+
+def json_to_string(json):
+    return dumps(json, sort_keys=True, indent=4)
 
 
 class ReviewBoardPasswordInputer(object):
