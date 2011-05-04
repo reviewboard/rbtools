@@ -2738,8 +2738,21 @@ class GitClient(SCMClient):
                     if m:
                         uuid = m.group(1)
                         self.type = "svn"
-                        self.upstream_branch = options.parent_branch or \
-                                               'master'
+
+                        # Get SVN tracking branch
+                        if options.parent_branch:
+                            self.upstream_branch = options.parent_branch
+                        else:
+                            data = execute([self.git, "svn", "rebase", "-n"],
+                                           ignore_errors=True)
+                            m = re.search(r'^Remote Branch:\s*(.+)$', data, re.M)
+
+                            if m:
+                                self.upstream_branch = m.group(1)
+                            else:
+                                sys.stderr.write('Failed to determine SVN tracking '
+                                                 'branch. Defaulting to "master"\n')
+                                self.upstream_branch = 'master'
 
                         return SvnRepositoryInfo(path=path,
                                                  base_path=base_path,
