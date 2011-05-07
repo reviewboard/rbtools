@@ -13,7 +13,7 @@ except ImportError:
 RESOURCE = 'Resource'
 RESOURCE_LIST = 'Resource List'
 ROOT_RESOURCE = 'Root Resource'
-
+ROOT = 'root'
 
 class ResourceBase(object):
     """ Base class from which other Resource objects should inherit.
@@ -148,7 +148,10 @@ class ResourceBase(object):
 
         This is equivilant to calling get_field('links').
         """
-        return self.get_field('links')
+        try:
+            return self.get_field('links')
+        except InvalidKeyError, e:
+            return []
 
     def get_link(self, link_name):
         try:
@@ -178,6 +181,7 @@ class ResourceBase(object):
         self.resource_string = self.server_interface.get(self.url)
         self.data = json_loads(self.resource_string)
         self._queryable = True
+        self.url = _trim_url(self.url)
 
         if not self.is_ok():
             raise RequestFailedError(
@@ -563,7 +567,7 @@ class RootResource(ResourceListBase):
         """ Loads the resource list from the server.
         """
         super(ResourceListBase, self)._load()
-        self.resource_name = 'root'
+        self.resource_name = ROOT
 
     def __next__(self):
         self._index += 1
@@ -718,6 +722,15 @@ class RepositoryList(ResourceList):
 
 
 # Auxillary methods not specific to any resource
+def _trim_url(url):
+    end = url.rfind('/')
+
+    if end < len(url) - 1 and end > 0:
+        return url[:end + 1]
+    else:
+        return url
+
+
 def _is_resource_list(data):
     """ Returns true if the data set is a resource list.
 
