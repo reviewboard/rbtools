@@ -2799,13 +2799,18 @@ class GitClient(SCMClient):
         if remote and remote != '.' and merge:
             self.upstream_branch = '%s/%s' % (remote, merge)
 
-        self.upstream_branch, origin_url = self.get_origin(self.upstream_branch,
-                                                       True)
+        url = None
+        if not options.repository_url:
+            self.upstream_branch, origin_url = self.get_origin(self.upstream_branch,
+                                                               True)
 
-        if not origin_url or origin_url.startswith("fatal:"):
-            self.upstream_branch, origin_url = self.get_origin()
+            if not origin_url or origin_url.startswith("fatal:"):
+                self.upstream_branch, origin_url = self.get_origin()
 
-        url = origin_url.rstrip('/')
+            url = origin_url.rstrip('/')
+        else:
+            url = options.repository_url
+
         if url:
             self.type = "git"
             return RepositoryInfo(path=url, base_path='',
@@ -3735,8 +3740,9 @@ def parse_options(args):
                       help="the url for a repository for creating a diff "
                            "outside of a working copy (currently only "
                            "supported by Subversion with --revision-range or "
-                           "--diff-filename and ClearCase with relative "
-                           "paths outside the view)")
+                           "--diff-filename, ClearCase with relative "
+                           "paths outside the view). for git, tells post-review "
+                           "to generate a diff from a repo at the given url.")
     parser.add_option("-d", "--debug",
                       action="store_true", dest="debug", default=DEBUG,
                       help="display debug output")
