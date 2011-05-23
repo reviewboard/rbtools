@@ -3741,7 +3741,7 @@ def parse_options(args):
                            "outside of a working copy (currently only "
                            "supported by Subversion with --revision-range or "
                            "--diff-filename, ClearCase with relative "
-                           "paths outside the view). for git, this specifies")
+                           "paths outside the view). for git, this specifies"
                            "the origin url of the current repository, "
                            "overriding the origin url supplied by the git client.")
     parser.add_option("-d", "--debug",
