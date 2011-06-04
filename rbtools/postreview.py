@@ -1162,7 +1162,7 @@ class SCMClient(object):
         """
         Returns the generated diff between revisions in the repository.
         """
-        return None
+        return (None, None)
 
     def _get_server_from_config(self, config, repository_info):
         if 'REVIEWBOARD_URL' in config:
@@ -1243,7 +1243,7 @@ class CVSClient(SCMClient):
         for rev in revision_range.split(":"):
             revs += ["-r", rev]
 
-        return self.do_diff(revs + args)
+        return (self.do_diff(revs + args), None)
 
     def do_diff(self, params):
         """
@@ -1487,7 +1487,7 @@ class ClearCaseClient(SCMClient):
         revision_range = revision_range.split(';')
         changeset = zip(revision_range[0::2], revision_range[1::2])
 
-        return self.do_diff(changeset)[0]
+        return (self.do_diff(changeset)[0], None)
 
     def diff_files(self, old_file, new_file):
         """Return unified diff for file.
@@ -1693,14 +1693,14 @@ class SVNClient(SCMClient):
 
             old_url = url + '@' + revisions[0]
 
-            return self.do_diff(["svn", "diff", "--diff-cmd=diff", old_url,
-                                 new_url] + files,
-                                repository_info)
+            return (self.do_diff(["svn", "diff", "--diff-cmd=diff", old_url,
+                                  new_url] + files,
+                                 repository_info), None)
         # Otherwise, perform the revision range diff using a working copy
         else:
-            return self.do_diff(["svn", "diff", "--diff-cmd=diff", "-r",
-                                 revision_range],
-                                repository_info)
+            return (self.do_diff(["svn", "diff", "--diff-cmd=diff", "-r",
+                                  revision_range],
+                                 repository_info), None)
 
     def do_diff(self, cmd, repository_info=None):
         """
@@ -2656,8 +2656,8 @@ class MercurialClient(SCMClient):
         if options.guess_description and not options.description:
             options.description = self.extract_description(r1, r2)
 
-        return execute(["hg", "diff", "-r", r1, "-r", r2],
-                       env=self._hg_env)
+        return (execute(["hg", "diff", "-r", r1, "-r", r2],
+                        env=self._hg_env), None)
 
     def scan_for_server(self, repository_info):
         # Scan first for dot files, since it's faster and will cover the
@@ -2965,8 +2965,24 @@ class GitClient(SCMClient):
 
     def diff_between_revisions(self, revision_range, args, repository_info):
         """Perform a diff between two arbitrary revisions"""
+
+        # Make a parent diff to the first of the revisions so that we
+        # never end up with broken patches:
+        self.merge_base = execute([self.git, "merge-base", self.upstream_branch,
+                                   self.head_ref]).strip()
+
         if ":" not in revision_range:
             # only one revision is specified
+
+            # Check if parent contains the first revision and make a
+            # parent diff if not:
+            pdiff_required = execute([self.git, "branch", "-r",
+                                      "--contains", revision_range])
+            parent_diff_lines = None
+
+            if not pdiff_required:
+                parent_diff_lines = self.make_diff(self.merge_base, revision_range)
+
             if options.guess_summary and not options.summary:
                 options.summary = execute(
                     [self.git, "log", "--pretty=format:%s", revision_range + ".."],
@@ -2977,9 +2993,17 @@ class GitClient(SCMClient):
                     [self.git, "log", "--pretty=format:%s%n%n%b", revision_range + ".."],
                     ignore_errors=True).strip()
 
-            return self.make_diff(revision_range)
+            return (self.make_diff(revision_range), parent_diff_lines)
         else:
             r1, r2 = revision_range.split(":")
+            # Check if parent contains the first revision and make a
+            # parent diff if not:
+            pdiff_required = execute([self.git, "branch", "-r",
+                                      "--contains", r1])
+            parent_diff_lines = None
+
+            if not pdiff_required:
+                parent_diff_lines = self.make_diff(self.merge_base, r1)
 
             if options.guess_summary and not options.summary:
                 options.summary = execute(
@@ -2991,7 +3015,7 @@ class GitClient(SCMClient):
                     [self.git, "log", "--pretty=format:%s%n%n%b", "%s..%s" % (r1, r2)],
                     ignore_errors=True).strip()
 
-            return self.make_diff(r1, r2)
+            return (self.make_diff(r1, r2), parent_diff_lines)
 
 
 class PlasticClient(SCMClient):
@@ -3066,7 +3090,7 @@ class PlasticClient(SCMClient):
         Assume revision_range is a branch specification (br:/main/task001)
         and hand over to branch_diff
         """
-        return self.branch_diff(revision_range)
+        return (self.branch_diff(revision_range), None)
 
     def changenum_diff(self, changenum):
         debug("changenum_diff: %s" % (changenum))
@@ -3867,9 +3891,8 @@ def main():
         changenum = None
 
     if options.revision_range:
-        diff = tool.diff_between_revisions(options.revision_range, args,
-                                           repository_info)
-        parent_diff = None
+        diff, parent_diff = tool.diff_between_revisions(options.revision_range, args,
+                                                        repository_info)
     elif options.diff_filename:
         parent_diff = None
 
