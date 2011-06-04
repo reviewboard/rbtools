@@ -2705,14 +2705,16 @@ class GitClient(SCMClient):
                 return None
 
         git_dir = execute([self.git, "rev-parse", "--git-dir"],
-                          ignore_errors=True).strip()
+                          ignore_errors=True).rstrip("\n")
 
         if git_dir.startswith("fatal:") or not os.path.isdir(git_dir):
             return None
+        self.bare = execute([self.git, "config", "core.bare"]).strip() == 'true'
 
         # post-review in directories other than the top level of
         # of a work-tree would result in broken diffs on the server
-        os.chdir(os.path.dirname(os.path.abspath(git_dir)))
+        if not self.bare:
+            os.chdir(os.path.dirname(os.path.abspath(git_dir)))
 
         self.head_ref = execute([self.git, 'symbolic-ref', '-q', 'HEAD']).strip()
 
@@ -2800,12 +2802,20 @@ class GitClient(SCMClient):
             self.upstream_branch = '%s/%s' % (remote, merge)
 
         self.upstream_branch, origin_url = self.get_origin(self.upstream_branch,
-                                                       True)
+                                                           True)
 
         if not origin_url or origin_url.startswith("fatal:"):
             self.upstream_branch, origin_url = self.get_origin()
 
+        # Central bare repositories don't have origin URLs.
+        # We return git_dir instead and hope for the best.
         url = origin_url.rstrip('/')
+
+        if not url:
+            url = os.path.abspath(git_dir)
+
+            # There is no remote, so skip this part of upstream_branch.
+            self.upstream_branch = self.upstream_branch.split('/')[-1]
         if url:
             self.type = "git"
             return RepositoryInfo(path=url, base_path='',
@@ -2821,10 +2831,10 @@ class GitClient(SCMClient):
         upstream_branch = options.tracking or default_upstream_branch or \
                           'origin/master'
         upstream_remote = upstream_branch.split('/')[0]
-        remoteOutput = execute([self.git, "remote", "show", "-n", upstream_remote])
-        gitRemoteMatch = re.search('URL: (.*)', remoteOutput)
-        origin_url = gitRemoteMatch.group(1)
-        return (upstream_branch, origin_url.rstrip('\n'))
+        origin_url = execute([self.git, "config", "--get",
+                              "remote.%s.url" % upstream_remote],
+                              ignore_errors=True).rstrip("\n")
+        return (upstream_branch, origin_url)
 
     def is_valid_version(self, actual, expected):
         """
@@ -2895,7 +2905,10 @@ class GitClient(SCMClient):
         """
         Performs a diff on a particular branch range.
         """
-        rev_range = "%s..%s" % (ancestor, commit)
+        if commit:
+            rev_range = "%s..%s" % (ancestor, commit)
+        else:
+            rev_range = ancestor
 
         if self.type == "svn":
             diff_lines = execute([self.git, "diff", "--no-color", "--no-prefix",
