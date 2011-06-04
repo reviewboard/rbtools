@@ -2596,6 +2596,12 @@ class MercurialClient(SCMClient):
         top_rev, bottom_rev = \
             self._get_top_and_bottom_outgoing_revs(outgoing_changesets)
 
+        if options.guess_summary and not options.summary:
+            options.summary = self.extract_summary(top_rev).rstrip("\n")
+
+        if options.guess_description and not options.description:
+            options.description = self.extract_description(bottom_rev, top_rev)
+
         full_command = ['hg', 'diff', '-r', str(bottom_rev), '-r',
                         str(top_rev)] + files
 
