@@ -2813,11 +2813,17 @@ class GitClient(SCMClient):
         if remote and remote != '.' and merge:
             self.upstream_branch = '%s/%s' % (remote, merge)
 
-        self.upstream_branch, origin_url = self.get_origin(self.upstream_branch,
-                                                           True)
+        url = None
+        if options.repository_url:
+            url = options.repository_url
+        else:
+            self.upstream_branch, origin_url = \
+                self.get_origin(self.upstream_branch, True)
 
-        if not origin_url or origin_url.startswith("fatal:"):
-            self.upstream_branch, origin_url = self.get_origin()
+            if not origin_url or origin_url.startswith("fatal:"):
+                self.upstream_branch, origin_url = self.get_origin()
+
+            url = origin_url.rstrip('/')
 
         # Central bare repositories don't have origin URLs.
         # We return git_dir instead and hope for the best.
@@ -3785,7 +3791,9 @@ def parse_options(args):
                            "outside of a working copy (currently only "
                            "supported by Subversion with --revision-range or "
                            "--diff-filename and ClearCase with relative "
-                           "paths outside the view)")
+                           "paths outside the view). For git, this specifies"
+                           "the origin url of the current repository, "
+                           "overriding the origin url supplied by the git client.")
     parser.add_option("-d", "--debug",
                       action="store_true", dest="debug", default=DEBUG,
                       help="display debug output")
