@@ -1663,6 +1663,13 @@ class SVNClient(SCMClient):
         return (self.do_diff(["svn", "diff", "--diff-cmd=diff"] + files),
                 None)
 
+    def diff_changelist(self, changelist):
+        """
+        Performs a diff for a local changelist.
+        """
+        return (self.do_diff(["svn", "diff", "--changelist", changelist]),
+                None)
+
     def diff_between_revisions(self, revision_range, args, repository_info):
         """
         Performs a diff between 2 revisions of a Subversion repository.
@@ -3785,6 +3792,9 @@ def parse_options(args):
     parser.add_option("--p4-passwd",
                       dest="p4_passwd", default=None,
                       help="the Perforce password or ticket of the user in the P4USER environment variable")
+    parser.add_option('--svn-changelist', dest='svn_changelist', default=None,
+                      help='generate the diff for review based on a local SVN '
+                           'changelist')
     parser.add_option("--repository-url",
                       dest="repository_url", default=None,
                       help="the url for a repository for creating a diff "
@@ -3932,6 +3942,8 @@ def main():
     if options.revision_range:
         diff, parent_diff = tool.diff_between_revisions(options.revision_range, args,
                                                         repository_info)
+    elif options.svn_changelist:
+        diff, parent_diff = tool.diff_changelist(options.svn_changelist)
     elif options.diff_filename:
         parent_diff = None
 
