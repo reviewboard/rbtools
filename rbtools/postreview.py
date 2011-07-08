@@ -351,8 +351,8 @@ class PresetHTTPAuthHandler(urllib2.BaseHandler):
         self.used = False
 
     def reset(self):
-        self.password_mgr.rb_user = None
-        self.password_mgr.rb_pass = None
+        self.password_mgr.rb_user = options.http_username
+        self.password_mgr.rb_pass = options.http_password
         self.used = False
 
     def http_request(self, request):
@@ -3801,6 +3801,12 @@ def parse_options(args):
                       dest="diff_filename", default=None,
                       help='upload an existing diff file, instead of '
                            'generating a new diff')
+    parser.add_option('--http-username',
+                      dest='http_username', default=None, metavar='USERNAME',
+                      help='username for HTTP Basic authentication')
+    parser.add_option('--http-password',
+                      dest='http_password', default=None, metavar='PASSWORD',
+                      help='password for HTTP Basic authentication')
 
     (globals()["options"], args) = parser.parse_args(args)
 
