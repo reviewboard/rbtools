@@ -21,7 +21,7 @@ except ImportError:
 
 import nose
 
-from rbtools.postreview import execute, load_config_file
+from rbtools.postreview import execute, load_config_files
 from rbtools.postreview import APIError, GitClient, MercurialClient, \
                                RepositoryInfo, ReviewBoardServer, \
                                SvnRepositoryInfo
@@ -99,6 +99,7 @@ class OptionsStub(object):
         self.tracking = None
         self.username = None
         self.password = None
+        self.repository_url = None
 
 
 class GitClientTests(unittest.TestCase):
@@ -149,7 +150,8 @@ class GitClientTests(unittest.TestCase):
         self.client = GitClient()
         os.chdir(self.orig_dir)
 
-        rbtools.postreview.user_config = load_config_file('')
+        rbtools.postreview.user_config = {}
+        rbtools.postreview.configs = []
         rbtools.postreview.options = OptionsStub()
         rbtools.postreview.options.parent_branch = None
 
@@ -182,6 +184,7 @@ class GitClientTests(unittest.TestCase):
         rc = open(os.path.join(self.clone_dir, '.reviewboardrc'), 'w')
         rc.write('REVIEWBOARD_URL = "%s"' % self.TESTSERVER)
         rc.close()
+        rbtools.postreview.user_config = load_config_files(self.clone_dir)
 
         ri = self.client.get_repository_info()
         server = self.client.scan_for_server(ri)
@@ -493,7 +496,7 @@ class MercurialClientTests(MercurialTestBase):
         clone_hgrc.close()
 
         self.client.get_repository_info()
-        rbtools.postreview.user_config = load_config_file('')
+        rbtools.postreview.user_config = {}
         rbtools.postreview.options = OptionsStub()
         rbtools.postreview.options.parent_branch = None
         os.chdir(self.clone_dir)
@@ -708,7 +711,7 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self.client = MercurialClient()
 
     def _stub_in_config_and_options(self):
-        rbtools.postreview.user_config = load_config_file('')
+        rbtools.postreview.user_config = {}
         rbtools.postreview.options = OptionsStub()
         rbtools.postreview.options.parent_branch = None
 
