@@ -21,11 +21,14 @@ except ImportError:
 
 import nose
 
-from rbtools.postreview import execute, load_config_files
-from rbtools.postreview import APIError, GitClient, MercurialClient, \
-                               RepositoryInfo, ReviewBoardServer, \
-                               SvnRepositoryInfo
-import rbtools.postreview
+from rbtools import postreview
+from rbtools.api.errors import APIError
+from rbtools.clients import RepositoryInfo
+from rbtools.clients.git import GitClient
+from rbtools.clients.mercurial import MercurialClient
+from rbtools.clients.svn import SVNRepositoryInfo
+from rbtools.postreview import load_config_files, ReviewBoardServer
+from rbtools.utils.process import execute
 
 
 TEMPDIR_SUFFIX = '__' + __name__.replace('.', '_')
@@ -62,7 +65,7 @@ class MockHttpUnitTest(unittest.TestCase):
 
     def setUp(self):
         # Save the old http_get and http_post
-        rbtools.postreview.options = OptionsStub()
+        postreview.options = OptionsStub()
 
         self.saved_http_get = ReviewBoardServer.http_get
         self.saved_http_post = ReviewBoardServer.http_post
@@ -147,13 +150,14 @@ class GitClientTests(unittest.TestCase):
         self.clone_dir = _get_tmpdir()
         os.rmdir(self.clone_dir)
         self._gitcmd(['clone', self.git_dir, self.clone_dir])
-        self.client = GitClient()
+        self.client = GitClient(options=postreview.options)
         os.chdir(self.orig_dir)
 
-        rbtools.postreview.user_config = {}
-        rbtools.postreview.configs = []
-        rbtools.postreview.options = OptionsStub()
-        rbtools.postreview.options.parent_branch = None
+        postreview.user_config = {}
+        postreview.configs = []
+        self.client.user_config = postreview.user_config
+        self.client.configs = postreview.configs
+        postreview.options.parent_branch = None
 
     def tearDown(self):
         os.chdir(self.orig_dir)
@@ -184,7 +188,7 @@ class GitClientTests(unittest.TestCase):
         rc = open(os.path.join(self.clone_dir, '.reviewboardrc'), 'w')
         rc.write('REVIEWBOARD_URL = "%s"' % self.TESTSERVER)
         rc.close()
-        rbtools.postreview.user_config = load_config_files(self.clone_dir)
+        self.client.user_config = load_config_files(self.clone_dir)
 
         ri = self.client.get_repository_info()
         server = self.client.scan_for_server(ri)
@@ -375,7 +379,7 @@ class GitClientTests(unittest.TestCase):
                " \n"
 
         os.chdir(self.clone_dir)
-        rbtools.postreview.options.tracking = 'origin/master'
+        postreview.options.tracking = 'origin/master'
 
         self._gitcmd(['remote', 'add', 'bad', self.git_dir])
         self._gitcmd(['fetch', 'bad'])
@@ -485,7 +489,7 @@ class MercurialClientTests(MercurialTestBase):
         os.rmdir(self.clone_dir)
         self._hgcmd(['clone', self.hg_dir, self.clone_dir])
         os.chdir(self.clone_dir)
-        self.client = MercurialClient()
+        self.client = MercurialClient(options=postreview.options)
 
         clone_hgrc = open(self.clone_hgrc_path, 'wb')
         clone_hgrc.write(self.CLONE_HGRC % {
@@ -496,9 +500,11 @@ class MercurialClientTests(MercurialTestBase):
         clone_hgrc.close()
 
         self.client.get_repository_info()
-        rbtools.postreview.user_config = {}
-        rbtools.postreview.options = OptionsStub()
-        rbtools.postreview.options.parent_branch = None
+        postreview.user_config = {}
+        postreview.configs = []
+        self.client.user_config = postreview.user_config
+        self.client.configs = postreview.configs
+        postreview.options.parent_branch = None
         os.chdir(self.clone_dir)
 
     @property
@@ -708,12 +714,14 @@ class MercurialSubversionClientTests(MercurialTestBase):
 
     def _spin_up_client(self):
         os.chdir(self.clone_dir)
-        self.client = MercurialClient()
+        self.client = MercurialClient(options=postreview.options)
 
     def _stub_in_config_and_options(self):
-        rbtools.postreview.user_config = {}
-        rbtools.postreview.options = OptionsStub()
-        rbtools.postreview.options.parent_branch = None
+        postreview.user_config = {}
+        postreview.configs = []
+        self.client.user_config = postreview.user_config
+        self.client.configs = postreview.configs
+        postreview.options.parent_branch = None
 
     def testGetRepositoryInfoSimple(self):
         """Test MercurialClient (+svn) get_repository_info, simple case"""
@@ -780,8 +788,8 @@ class MercurialSubversionClientTests(MercurialTestBase):
 
 class SVNClientTests(unittest.TestCase):
     def test_relative_paths(self):
-        """Testing SvnRepositoryInfo._get_relative_path"""
-        info = SvnRepositoryInfo('http://svn.example.com/svn/', '/', '')
+        """Testing SVNRepositoryInfo._get_relative_path"""
+        info = SVNRepositoryInfo('http://svn.example.com/svn/', '/', '')
         self.assertEqual(info._get_relative_path('/foo', '/bar'), None)
         self.assertEqual(info._get_relative_path('/', '/trunk/myproject'),
                          None)
