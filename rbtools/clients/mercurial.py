@@ -1,19 +1,22 @@
+import logging
 import os
 import re
 
-from rbtools.api.utilities import RBUtilities
-from rbtools.clients.client import Client, Repository
+from rbtools.clients import SCMClient, RepositoryInfo
+from rbtools.clients.svn import SVNClient
+from rbtools.utils.checks import check_install
+from rbtools.utils.process import execute
 
 
-class MercurialClient(Client):
-    """An implementation of Repository for Mercurial repositories"""
+class MercurialClient(SCMClient):
+    """
+    A wrapper around the hg Mercurial tool that fetches repository
+    information and generates compatible diffs.
+    """
 
-    url = None
-    util = None
+    def __init__(self, **kwargs):
+        super(MercurialClient, self).__init__(**kwargs)
 
-    def __init__(self, url=None, util=RBUtilities()):
-        self.url = url
-        self.util = util
         self.hgrc = {}
         self._type = 'hg'
         self._hg_root = ''
@@ -30,13 +33,8 @@ class MercurialClient(Client):
         self._remote_path_candidates = ['reviewboard', 'origin', 'parent',
                                         'default']
 
-    def get_info(self):
-        """Returns information about the repository
-
-        This is an actual implementation that returns info about the hg repo
-        """
-
-        if not self.util.check_install('hg --help'):
+    def get_repository_info(self):
+        if not check_install('hg --help'):
             return None
 
         self._load_hgrc()
@@ -45,7 +43,7 @@ class MercurialClient(Client):
             # hg aborted => no mercurial repository here.
             return None
 
-        svn_info = self.util.execute(["hg", "svn", "info"], ignore_errors=True)
+        svn_info = execute(["hg", "svn", "info"], ignore_errors=True)
 
         if (not svn_info.startswith('abort:') and
             not svn_info.startswith("hg: unknown command") and
@@ -64,23 +62,18 @@ class MercurialClient(Client):
                 path = self._remote_path[1]
                 base_path = ''
 
-        return Repository(path=path, base_path=base_path,
+        return RepositoryInfo(path=path, base_path=base_path,
                               supports_parent_diffs=True)
 
     def _calculate_remote_path(self):
-        """Calculate the remote path for the repository
-
-        Calculates the correct remote path for the mercurial repository
-        """
-
         for candidate in self._remote_path_candidates:
 
             rc_key = 'paths.%s' % candidate
 
             if (not self._remote_path and self.hgrc.get(rc_key)):
                 self._remote_path = (candidate, self.hgrc.get(rc_key))
-                self.util.execute('Using candidate path %r: %r' % \
-                        self._remote_path)
+                logging.debug('Using candidate path %r: %r' %
+                              self._remote_path)
 
                 return
 
@@ -108,20 +101,19 @@ class MercurialClient(Client):
 
     @property
     def hg_root(self):
-
         if not self._hg_root:
-            root = self.util.execute(['hg', 'root'], env=self._hg_env,
+            root = execute(['hg', 'root'], env=self._hg_env,
                            ignore_errors=True)
 
             if not root.startswith('abort:'):
                 self._hg_root = root.strip()
             else:
-                self._hg_root = '.'
+                return None
 
         return self._hg_root
 
     def _load_hgrc(self):
-        for line in self.util.execute(['hg', 'showconfig'], split_lines=True):
+        for line in execute(['hg', 'showconfig'], split_lines=True):
             key, value = line.split('=', 1)
             self.hgrc[key] = value.strip()
 
@@ -129,7 +121,7 @@ class MercurialClient(Client):
         """
         Extracts the first line from the description of the given changeset.
         """
-        return self.util.execute(['hg', 'log', '-r%s' % revision, '--template',
+        return execute(['hg', 'log', '-r%s' % revision, '--template',
                         r'{desc|firstline}\n'], env=self._hg_env)
 
     def extract_description(self, rev1, rev2):
@@ -137,12 +129,12 @@ class MercurialClient(Client):
         Extracts all descriptions in the given revision range and concatenates
         them, most recent ones going first.
         """
-        numrevs = len(self.util.execute([
+        numrevs = len(execute([
             'hg', 'log', '-r%s:%s' % (rev2, rev1),
             '--follow', '--template', r'{rev}\n'], env=self._hg_env
         ).strip().split('\n'))
 
-        return self.util.execute(['hg', 'log', '-r%s:%s' % (rev2, rev1),
+        return execute(['hg', 'log', '-r%s:%s' % (rev2, rev1),
                         '--follow', '--template',
                         r'{desc}\n\n', '--limit',
                         str(numrevs - 1)], env=self._hg_env).strip()
@@ -159,11 +151,19 @@ class MercurialClient(Client):
             return self._get_outgoing_diff(files)
 
     def _get_hgsubversion_diff(self, files):
-        parent = self.util.execute(['hg', 'parent', '--svn', '--template',
+        parent = execute(['hg', 'parent', '--svn', '--template',
                           '{node}\n']).strip()
 
-        return (self.util.execute(["hg", "diff", "--svn", \
-                                    '-r%s:.' % parent]), None)
+        if self._options.parent_branch:
+            parent = self._options.parent_branch
+
+        if self._options.guess_summary and not self._options.summary:
+            self._options.summary = self.extract_summary(".")
+
+        if self._options.guess_description and not self._options.description:
+            self._options.description = self.extract_description(parent, ".")
+
+        return (execute(["hg", "diff", "--svn", '-r%s:.' % parent]), None)
 
     def _get_outgoing_diff(self, files):
         """
@@ -196,8 +196,10 @@ class MercurialClient(Client):
 
         remote = self._remote_path[0]
 
-        current_branch = self.util.execute(['hg', 'branch'], \
-                                            env=self._hg_env).strip()
+        if not remote and self._options.parent_branch:
+            remote = self._options.parent_branch
+
+        current_branch = execute(['hg', 'branch'], env=self._hg_env).strip()
 
         outgoing_changesets = \
             self._get_outgoing_changesets(current_branch, remote)
@@ -205,10 +207,16 @@ class MercurialClient(Client):
         top_rev, bottom_rev = \
             self._get_top_and_bottom_outgoing_revs(outgoing_changesets)
 
+        if self._options.guess_summary and not self._options.summary:
+            self._options.summary = self.extract_summary(top_rev).rstrip("\n")
+
+        if self._options.guess_description and not self._options.description:
+            self._options.description = self.extract_description(bottom_rev, top_rev)
+
         full_command = ['hg', 'diff', '-r', str(bottom_rev), '-r',
                         str(top_rev)] + files
 
-        return (self.util.execute(full_command, env=self._hg_env), None)
+        return (execute(full_command, env=self._hg_env), None)
 
     def _get_outgoing_changesets(self, current_branch, remote):
         """
@@ -216,12 +224,11 @@ class MercurialClient(Client):
         of outgoing changeset numbers.
         """
         outgoing_changesets = []
-        raw_outgoing = self.util.execute(['hg', '-q', 'outgoing', '--template',
+        raw_outgoing = execute(['hg', '-q', 'outgoing', '--template',
                                 'b:{branches}\nr:{rev}\n\n', remote],
                                env=self._hg_env)
 
         for pair in raw_outgoing.split('\n\n'):
-
             if not pair.strip():
                 continue
 
@@ -232,8 +239,8 @@ class MercurialClient(Client):
             revno = rev[len('r:'):]
 
             if branch_name == current_branch and revno.isdigit():
-                #debug('Found outgoing changeset %s for branch %r'
-                 #     % (revno, branch_name))
+                logging.debug('Found outgoing changeset %s for branch %r'
+                              % (revno, branch_name))
                 outgoing_changesets.append(int(revno))
 
         return outgoing_changesets
@@ -255,20 +262,25 @@ class MercurialClient(Client):
         """
         Performs a diff between 2 revisions of a Mercurial repository.
         """
-
         if self._type != 'hg':
             raise NotImplementedError
 
         r1, r2 = revision_range.split(':')
 
-        return self.util.execute(["hg", "diff", "-r", r1, "-r", r2],
-                       env=self._hg_env)
+        if self._options.guess_summary and not self._options.summary:
+            self._options.summary = self.extract_summary(r2)
+
+        if self._options.guess_description and not self._options.description:
+            self._options.description = self.extract_description(r1, r2)
+
+        return (execute(["hg", "diff", "-r", r1, "-r", r2],
+                        env=self._hg_env), None)
 
     def scan_for_server(self, repository_info):
         # Scan first for dot files, since it's faster and will cover the
         # user's $HOME/.reviewboardrc
         server_url = \
-            super(MercurialRepository, self).scan_for_server(repository_info)
+            super(MercurialClient, self).scan_for_server(repository_info)
 
         if not server_url and self.hgrc.get('reviewboard.url'):
             server_url = self.hgrc.get('reviewboard.url').strip()
@@ -276,7 +288,7 @@ class MercurialClient(Client):
         if not server_url and self._type == "svn":
             # Try using the reviewboard:url property on the SVN repo, if it
             # exists.
-            prop = SVNRepository().scan_for_server_property(repository_info)
+            prop = SVNClient().scan_for_server_property(repository_info)
 
             if prop:
                 return prop
