@@ -211,7 +211,8 @@ class MercurialClient(SCMClient):
             self._options.summary = self.extract_summary(top_rev).rstrip("\n")
 
         if self._options.guess_description and not self._options.description:
-            self._options.description = self.extract_description(bottom_rev, top_rev)
+            self._options.description = self.extract_description(bottom_rev,
+                                                                 top_rev)
 
         full_command = ['hg', 'diff', '-r', str(bottom_rev), '-r',
                         str(top_rev)] + files

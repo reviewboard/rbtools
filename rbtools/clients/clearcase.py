@@ -5,7 +5,7 @@ import sys
 from rbtools.api.errors import APIError
 from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.utils.checks import check_gnu_diff, check_install
-from rbtools.utils.files import make_tempfile
+from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import die, execute
 
 # This specific import is necessary to handle the paths for
@@ -259,7 +259,7 @@ class ClearCaseClient(SCMClient):
         Most effective and reliable way is use gnu diff.
         """
         diff_cmd = ["diff", "-uN", old_file, new_file]
-        dl = execute(diff_cmd, extra_ignore_errors=(1,2),
+        dl = execute(diff_cmd, extra_ignore_errors=(1, 2),
                      translate_newlines=False)
 
         # If the input file has ^M characters at end of line, lets ignore them.
@@ -274,7 +274,8 @@ class ClearCaseClient(SCMClient):
             dl[0].startswith('Files %s and %s differ' % (old_file, new_file))):
             dl = ['Binary files %s and %s differ\n' % (old_file, new_file)]
 
-        # We need oids of files to translate them to paths on reviewboard repository
+        # We need oids of files to translate them to paths on reviewboard
+        # repository.
         old_oid = execute(["cleartool", "describe", "-fmt", "%On", old_file])
         new_oid = execute(["cleartool", "describe", "-fmt", "%On", new_file])
 
@@ -303,7 +304,7 @@ class ClearCaseClient(SCMClient):
 
         diff_cmd = ["diff", "-uN", old_tmp, new_tmp]
         dl = execute(diff_cmd,
-                     extra_ignore_errors=(1,2),
+                     extra_ignore_errors=(1, 2),
                      translate_newlines=False,
                      split_lines=True)
 
@@ -312,8 +313,10 @@ class ClearCaseClient(SCMClient):
         if dl:
             dl[0] = dl[0].replace(old_tmp, old_dir)
             dl[1] = dl[1].replace(new_tmp, new_dir)
-            old_oid = execute(["cleartool", "describe", "-fmt", "%On", old_dir])
-            new_oid = execute(["cleartool", "describe", "-fmt", "%On", new_dir])
+            old_oid = execute(["cleartool", "describe", "-fmt", "%On",
+                               old_dir])
+            new_oid = execute(["cleartool", "describe", "-fmt", "%On",
+                               new_dir])
             dl.insert(2, "==== %s %s ====\n" % (old_oid, new_oid))
 
         return dl
@@ -374,7 +377,7 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
             if not info or uuid != info['uuid']:
                 continue
 
-            logging.debug('Matching repository uuid:%s with path:%s' %(uuid,
+            logging.debug('Matching repository uuid:%s with path:%s' % (uuid,
                           info['repopath']))
             return ClearCaseRepositoryInfo(info['repopath'],
                     info['repopath'], uuid)

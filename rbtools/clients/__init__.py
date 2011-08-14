@@ -179,7 +179,8 @@ def scan_usable_client(options):
 
     if not repository_info:
         if options.repository_url:
-            print "No supported repository could be access at the supplied url."
+            print "No supported repository could be accessed at the supplied "\
+                  "url."
         else:
             print "The current directory does not contain a checkout from a"
             print "supported source code repository."
@@ -196,7 +197,7 @@ def scan_usable_client(options):
                          "current SCM client.\n")
         sys.exit(1)
 
-    if ((options.p4_client or options.p4_port) and \
+    if ((options.p4_client or options.p4_port) and
         not isinstance(tool, PerforceClient)):
         sys.stderr.write("The --p4-client and --p4-port options are not valid "
                          "for the current SCM client.\n")
