@@ -3,14 +3,14 @@ import os
 import subprocess
 import sys
 
-from rbtools.utils.filesystem import cleanup_tempfiles
-
 
 def die(msg=None):
     """
     Cleanly exits the program with an error message. Erases all remaining
     temporary files.
     """
+    from rbtools.utils.filesystem import cleanup_tempfiles
+
     cleanup_tempfiles()
 
     if msg:
