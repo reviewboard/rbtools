@@ -1194,7 +1194,7 @@ def main():
 
     # Load the config and cookie files
     cookie_file = os.path.join(homepath, ".post-review-cookies.txt")
-    user_config, configs = load_config_files(homepath)
+    user_config, globals()['configs'] = load_config_files(homepath)
 
     args = parse_options(sys.argv[1:])
 
