@@ -188,7 +188,7 @@ class GitClientTests(unittest.TestCase):
         rc = open(os.path.join(self.clone_dir, '.reviewboardrc'), 'w')
         rc.write('REVIEWBOARD_URL = "%s"' % self.TESTSERVER)
         rc.close()
-        self.client.user_config = load_config_files(self.clone_dir)
+        self.client.user_config, configs = load_config_files(self.clone_dir)
 
         ri = self.client.get_repository_info()
         server = self.client.scan_for_server(ri)

@@ -16,7 +16,7 @@ from rbtools.api.errors import APIError
 from rbtools.clients import scan_usable_client
 from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.plastic import PlasticClient
-from rbtools.utils.filesystem import walk_parents
+from rbtools.utils.filesystem import get_config_value, load_config_files
 from rbtools.utils.process import die
 
 try:
@@ -96,7 +96,6 @@ DEBUG           = False
 ###
 
 
-user_config = None
 options = None
 configs = []
 
@@ -395,11 +394,7 @@ class ReviewBoardServer(object):
         return False
 
     def get_configured_repository(self):
-        for config in configs:
-            if 'REPOSITORY' in config:
-                return config['REPOSITORY']
-
-        return None
+        return get_config_value(configs, 'REPOSITORY')
 
     def new_review_request(self, changenum, submit_as=None):
         """
@@ -905,35 +900,6 @@ def debug(s):
         print ">>> %s" % s
 
 
-def load_config_files(homepath):
-    """Loads data from .reviewboardrc files"""
-    def _load_config(path):
-        config = {
-            'TREES': {},
-        }
-
-        filename = os.path.join(path, '.reviewboardrc')
-
-        if os.path.exists(filename):
-            try:
-                execfile(filename, config)
-            except SyntaxError, e:
-                die('Syntax error in config file: %s\n'
-                    'Line %i offset %i\n' % (filename, e.lineno, e.offset))
-
-            return config
-
-        return None
-
-    for path in walk_parents(os.getcwd()):
-        config = _load_config(path)
-
-        if config:
-            configs.append(config)
-
-    globals()['user_config'] = _load_config(homepath)
-
-
 def tempt_fate(server, tool, changenum, diff_content=None,
                parent_diff_content=None, submit_as=None, retries=3):
     """
@@ -1228,7 +1194,7 @@ def main():
 
     # Load the config and cookie files
     cookie_file = os.path.join(homepath, ".post-review-cookies.txt")
-    load_config_files(homepath)
+    user_config, configs = load_config_files(homepath)
 
     args = parse_options(sys.argv[1:])
 
