@@ -16,7 +16,8 @@ class GitClient(SCMClient):
     """
     def __init__(self, **kwargs):
         super(GitClient, self).__init__(**kwargs)
-        # Store the 'correct' way to invoke git, just plain old 'git' by default
+        # Store the 'correct' way to invoke git, just plain old 'git' by
+        # default.
         self.git = 'git'
 
     def _strip_heads_prefix(self, ref):
@@ -28,7 +29,8 @@ class GitClient(SCMClient):
             # CreateProcess (launched via subprocess, used by check_install)
             # does not automatically append .cmd for things it finds in PATH.
             # If we're on Windows, and this works, save it for further use.
-            if sys.platform.startswith('win') and check_install('git.cmd --help'):
+            if (sys.platform.startswith('win') and
+                check_install('git.cmd --help')):
                 self.git = 'git.cmd'
             else:
                 return None
@@ -38,14 +40,16 @@ class GitClient(SCMClient):
 
         if git_dir.startswith("fatal:") or not os.path.isdir(git_dir):
             return None
-        self.bare = execute([self.git, "config", "core.bare"]).strip() == 'true'
+        self.bare = execute([self.git, "config",
+                             "core.bare"]).strip() == 'true'
 
         # post-review in directories other than the top level of
         # of a work-tree would result in broken diffs on the server
         if not self.bare:
             os.chdir(os.path.dirname(os.path.abspath(git_dir)))
 
-        self.head_ref = execute([self.git, 'symbolic-ref', '-q', 'HEAD']).strip()
+        self.head_ref = execute([self.git, 'symbolic-ref', '-q',
+                                 'HEAD']).strip()
 
         # We know we have something we can work with. Let's find out
         # what it is. We'll try SVN first, but only if there's a .git/svn
@@ -76,13 +80,15 @@ class GitClient(SCMClient):
                         else:
                             data = execute([self.git, "svn", "rebase", "-n"],
                                            ignore_errors=True)
-                            m = re.search(r'^Remote Branch:\s*(.+)$', data, re.M)
+                            m = re.search(r'^Remote Branch:\s*(.+)$', data,
+                                          re.M)
 
                             if m:
                                 self.upstream_branch = m.group(1)
                             else:
-                                sys.stderr.write('Failed to determine SVN tracking '
-                                                 'branch. Defaulting to "master"\n')
+                                sys.stderr.write('Failed to determine SVN '
+                                                 'tracking branch. Defaulting'
+                                                 'to "master"\n')
                                 self.upstream_branch = 'master'
 
                         return SVNRepositoryInfo(path=path,
@@ -163,8 +169,9 @@ class GitClient(SCMClient):
 
         Returns a tuple: (upstream_branch, remote_url)
         """
-        upstream_branch = self._options.tracking or default_upstream_branch or \
-                          'origin/master'
+        upstream_branch = (self._options.tracking or
+                           default_upstream_branch or
+                           'origin/master')
         upstream_remote = upstream_branch.split('/')[0]
         origin_url = execute([self.git, "config", "--get",
                               "remote.%s.url" % upstream_remote],
@@ -178,10 +185,10 @@ class GitClient(SCMClient):
         Returns true if the actual version is greater than or equal to
         the expected version, and false otherwise.
         """
-        return (actual[0] > expected[0]) or \
-               (actual[0] == expected[0] and actual[1] > expected[1]) or \
-               (actual[0] == expected[0] and actual[1] == expected[1] and \
-                actual[2] >= expected[2])
+        return ((actual[0] > expected[0]) or
+                (actual[0] == expected[0] and actual[1] > expected[1]) or
+                (actual[0] == expected[0] and actual[1] == expected[1] and
+                 actual[2] >= expected[2]))
 
     def scan_for_server(self, repository_info):
         # Scan first for dot files, since it's faster and will cover the
@@ -214,7 +221,8 @@ class GitClient(SCMClient):
         """
         parent_branch = self._options.parent_branch
 
-        self.merge_base = execute([self.git, "merge-base", self.upstream_branch,
+        self.merge_base = execute([self.git, "merge-base",
+                                   self.upstream_branch,
                                    self.head_ref]).strip()
 
         if parent_branch:
@@ -225,8 +233,10 @@ class GitClient(SCMClient):
             parent_diff_lines = None
 
         if self._options.guess_summary and not self._options.summary:
-            self._options.summary = execute([self.git, "log", "--pretty=format:%s",
-                                            "HEAD^.."], ignore_errors=True).strip()
+            self._options.summary = execute([self.git, "log",
+                                             "--pretty=format:%s",
+                                             "HEAD^.."],
+                                            ignore_errors=True).strip()
 
         if self._options.guess_description and not self._options.description:
             self._options.description = execute(
@@ -246,8 +256,9 @@ class GitClient(SCMClient):
             rev_range = ancestor
 
         if self.type == "svn":
-            diff_lines = execute([self.git, "diff", "--no-color", "--no-prefix",
-                                  "--no-ext-diff", "-r", "-u", rev_range],
+            diff_lines = execute([self.git, "diff", "--no-color",
+                                  "--no-prefix", "--no-ext-diff", "-r", "-u",
+                                  rev_range],
                                  split_lines=True)
             return self.make_svn_diff(ancestor, diff_lines)
         elif self.type == "git":
@@ -303,7 +314,8 @@ class GitClient(SCMClient):
                 # Filter this out.
                 pass
             elif line.startswith("Binary files "):
-                # Add the following so that we know binary files were added/changed
+                # Add the following so that we know binary files were
+                # added/changed.
                 diff_data += "Cannot display: file marked as a binary type.\n"
                 diff_data += "svn:mime-type = application/octet-stream\n"
             else:
@@ -316,7 +328,8 @@ class GitClient(SCMClient):
 
         # Make a parent diff to the first of the revisions so that we
         # never end up with broken patches:
-        self.merge_base = execute([self.git, "merge-base", self.upstream_branch,
+        self.merge_base = execute([self.git, "merge-base",
+                                   self.upstream_branch,
                                    self.head_ref]).strip()
 
         if ":" not in revision_range:
@@ -329,16 +342,20 @@ class GitClient(SCMClient):
             parent_diff_lines = None
 
             if not pdiff_required:
-                parent_diff_lines = self.make_diff(self.merge_base, revision_range)
+                parent_diff_lines = self.make_diff(self.merge_base,
+                                                   revision_range)
 
             if self._options.guess_summary and not self._options.summary:
                 self._options.summary = execute(
-                    [self.git, "log", "--pretty=format:%s", revision_range + ".."],
+                    [self.git, "log", "--pretty=format:%s",
+                     revision_range + ".."],
                     ignore_errors=True).strip()
 
-            if self._options.guess_description and not self._options.description:
+            if (self._options.guess_description and
+                not self._options.description):
                 self._options.description = execute(
-                    [self.git, "log", "--pretty=format:%s%n%n%b", revision_range + ".."],
+                    [self.git, "log", "--pretty=format:%s%n%n%b",
+                     revision_range + ".."],
                     ignore_errors=True).strip()
 
             return (self.make_diff(revision_range), parent_diff_lines)
@@ -355,12 +372,15 @@ class GitClient(SCMClient):
 
             if self._options.guess_summary and not self._options.summary:
                 self._options.summary = execute(
-                    [self.git, "log", "--pretty=format:%s", "%s..%s" % (r1, r2)],
+                    [self.git, "log",
+                     "--pretty=format:%s", "%s..%s" % (r1, r2)],
                     ignore_errors=True).strip()
 
-            if self._options.guess_description and not self._options.description:
+            if (self._options.guess_description and
+                not self._options.description):
                 self._options.description = execute(
-                    [self.git, "log", "--pretty=format:%s%n%n%b", "%s..%s" % (r1, r2)],
+                    [self.git, "log", "--pretty=format:%s%n%n%b",
+                     "%s..%s" % (r1, r2)],
                     ignore_errors=True).strip()
 
             return (self.make_diff(r1, r2), parent_diff_lines)

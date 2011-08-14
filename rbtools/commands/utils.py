@@ -1,5 +1,9 @@
 import getpass
-from json import dumps 
+
+try:
+    from json import dumps
+except ImportError:
+    from simplejson import dumps
 
 
 def json_to_string(json):

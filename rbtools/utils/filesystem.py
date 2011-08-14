@@ -19,8 +19,10 @@ def make_tempfile(content=None):
     in an array for later cleanup.
     """
     fd, tmpfile = tempfile.mkstemp()
+
     if content:
         os.write(fd, content)
+
     os.close(fd)
     tempfiles.append(tmpfile)
     return tmpfile

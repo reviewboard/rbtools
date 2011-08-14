@@ -67,7 +67,7 @@ def main():
                 print "Review request created at: %s\n" % review_request.url
                 print "To view the review request in a browser go to: " \
                     "%sr/%s/" % (server_url, review_request.get_field('id'))
-            except Error, e:
+            except Exception, e:
                 raise e
         else:
             print "The repository could not be found on the server."

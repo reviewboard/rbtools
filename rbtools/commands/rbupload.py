@@ -14,7 +14,8 @@ DIFF_OPTION = '-diff'
 FILE_TYPES = [
     SCREENSHOT_OPTION,
     DIFF_OPTION,
-]        
+]
+
 
 def main():
     valid = False

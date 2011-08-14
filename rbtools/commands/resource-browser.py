@@ -58,7 +58,6 @@ class ResourceWidget(gtk.ScrolledWindow):
         self.changes = {}
         self.build_table(self.root.data)
 
-
     def init_root_resource(self, is_root=True):
         self.server = ServerInterface(self.server_url, COOKIE_FILE)
 

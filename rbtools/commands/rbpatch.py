@@ -26,7 +26,7 @@ def main():
         cookie = settings.get_cookie_file()
         server_url = settings.get_server_url()
         diff_file_name = 'patch_diff'
-        arg_index = 1        
+        arg_index = 1
         commit = False
 
         if sys.argv[arg_index] == COMMIT_OPTION:
@@ -48,7 +48,7 @@ def main():
         if len(sys.argv) > arg_index:
             if sys.argv[arg_index].isdigit():
                 revision_id = sys.argv[arg_index]
-            
+
         try:
             diff = DiffResource(diffs.get(revision_id))
         except HTTPError, e:
