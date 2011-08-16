@@ -273,7 +273,17 @@ class MercurialClient(SCMClient):
         if self._type != 'hg':
             raise NotImplementedError
 
-        r1, r2 = revision_range.split(':')
+        if ':' in revision_range:
+            r1, r2 = revision_range.split(':')
+        else:
+            # If only 1 revision is given, we find the first parent and use
+            # that as the second revision.
+            #
+            # We could also use "hg diff -c r1", but then we couldn't reuse the
+            # code for extracting descriptions.
+            r2 = revision_range
+            r1 = execute(["hg", "parents", "-r", r2,
+                          "--template", "{rev}\n"]).split()[0]
 
         if self._options.guess_summary and not self._options.summary:
             self._options.summary = self.extract_summary(r2)
