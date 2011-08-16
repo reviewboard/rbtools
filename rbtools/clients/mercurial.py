@@ -246,18 +246,25 @@ class MercurialClient(SCMClient):
 
         return outgoing_changesets
 
-    def _get_top_and_bottom_outgoing_revs(cls, outgoing_changesets):
+    def _get_top_and_bottom_outgoing_revs(self, outgoing_changesets):
         # This is a classmethod rather than a func mostly just to keep the
         # module namespace clean.  Pylint told me to do it.
         top_rev = max(outgoing_changesets)
         bottom_rev = min(outgoing_changesets)
-        bottom_rev = max([0, bottom_rev - 1])
+
+        parents = execute(["hg", "log", "-r", str(bottom_rev),
+                           "--template", "{parents}"],
+                          env=self._hg_env)
+        parents = parents.rstrip("\n").split(":")
+
+        if len(parents) > 1:
+            bottom_rev = parents[0]
+        else:
+            bottom_rev = bottom_rev - 1
+
+        bottom_rev = max(0, bottom_rev)
 
         return top_rev, bottom_rev
-
-    # postfix decorators to stay pre-2.5 compatible
-    _get_top_and_bottom_outgoing_revs = \
-        classmethod(_get_top_and_bottom_outgoing_revs)
 
     def diff_between_revisions(self, revision_range, args, repository_info):
         """
@@ -266,7 +273,17 @@ class MercurialClient(SCMClient):
         if self._type != 'hg':
             raise NotImplementedError
 
-        r1, r2 = revision_range.split(':')
+        if ':' in revision_range:
+            r1, r2 = revision_range.split(':')
+        else:
+            # If only 1 revision is given, we find the first parent and use
+            # that as the second revision.
+            #
+            # We could also use "hg diff -c r1", but then we couldn't reuse the
+            # code for extracting descriptions.
+            r2 = revision_range
+            r1 = execute(["hg", "parents", "-r", r2,
+                          "--template", "{rev}\n"]).split()[0]
 
         if self._options.guess_summary and not self._options.summary:
             self._options.summary = self.extract_summary(r2)
