@@ -2647,18 +2647,25 @@ class MercurialClient(SCMClient):
 
         return outgoing_changesets
 
-    def _get_top_and_bottom_outgoing_revs(cls, outgoing_changesets):
+    def _get_top_and_bottom_outgoing_revs(self, outgoing_changesets):
         # This is a classmethod rather than a func mostly just to keep the
         # module namespace clean.  Pylint told me to do it.
         top_rev = max(outgoing_changesets)
         bottom_rev = min(outgoing_changesets)
-        bottom_rev = max([0, bottom_rev - 1])
+
+        parents = execute(["hg", "log", "-r", str(bottom_rev),
+                           "--template", "{parents}"],
+                          env=self._hg_env)
+        parents = parents.rstrip("\n").split(":")
+
+        if len(parents) > 1:
+            bottom_rev = parents[0]
+        else:
+            bottom_rev = bottom_rev - 1
+
+        bottom_rev = max(0, bottom_rev)
 
         return top_rev, bottom_rev
-
-    # postfix decorators to stay pre-2.5 compatible
-    _get_top_and_bottom_outgoing_revs = \
-        classmethod(_get_top_and_bottom_outgoing_revs)
 
     def diff_between_revisions(self, revision_range, args, repository_info):
         """
