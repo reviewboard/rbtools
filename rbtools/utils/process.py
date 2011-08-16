@@ -3,14 +3,14 @@ import os
 import subprocess
 import sys
 
-from rbtools.utils.files import cleanup_tempfiles
-
 
 def die(msg=None):
     """
     Cleanly exits the program with an error message. Erases all remaining
     temporary files.
     """
+    from rbtools.utils.filesystem import cleanup_tempfiles
+
     cleanup_tempfiles()
 
     if msg:
@@ -63,7 +63,9 @@ def execute(command, env=None, split_lines=False, ignore_errors=False,
         data = p.stdout.readlines()
     else:
         data = p.stdout.read()
+
     rc = p.wait()
+
     if rc and not ignore_errors and rc not in extra_ignore_errors:
         die('Failed to execute command: %s\n%s' % (command, data))
 

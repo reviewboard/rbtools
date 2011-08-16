@@ -4,7 +4,7 @@ import re
 
 from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.utils.checks import check_install
-from rbtools.utils.files import make_tempfile
+from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import die, execute
 
 

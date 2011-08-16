@@ -8,7 +8,7 @@ import subprocess
 
 from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.utils.checks import check_install
-from rbtools.utils.files import make_tempfile
+from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import die, execute
 
 
@@ -17,6 +17,9 @@ class PerforceClient(SCMClient):
     A wrapper around the p4 Perforce tool that fetches repository information
     and generates compatible diffs.
     """
+    DATE_RE = re.compile(r'(\w+)\s+(\w+)\s+(\d+)\s+(\d\d:\d\d:\d\d)\s+'
+                          '(\d\d\d\d)')
+
     def __init__(self, **kwargs):
         super(PerforceClient, self).__init__(**kwargs)
 
@@ -117,10 +120,10 @@ class PerforceClient(SCMClient):
         """
         # set the P4 enviroment:
         if self._options.p4_client:
-           os.environ['P4CLIENT'] = self._options.p4_client
+            os.environ['P4CLIENT'] = self._options.p4_client
 
         if self._options.p4_port:
-           os.environ['P4PORT'] = self._options.p4_port
+            os.environ['P4PORT'] = self._options.p4_port
 
         if self._options.p4_passwd:
             os.environ['P4PASSWD'] = self._options.p4_passwd
@@ -130,7 +133,6 @@ class PerforceClient(SCMClient):
             return self._path_diff(args)
         else:
             return self._changenum_diff(changenum)
-
 
     def _path_diff(self, args):
         """
@@ -282,18 +284,18 @@ class PerforceClient(SCMClient):
 
         return result
 
-    """
-    Return a "sanitized" change number for submission to the Review Board
-    server. For default changelists, this is always None. Otherwise, use the
-    changelist number for submitted changelists, or if the p4d is 2002.2 or
-    newer.
-
-    This is because p4d < 2002.2 does not return enough information about
-    pending changelists in 'p4 describe' for Review Board to make use of them
-    (specifically, the list of files is missing). This would result in the
-    diffs being rejected.
-    """
     def sanitize_changenum(self, changenum):
+        """
+        Return a "sanitized" change number for submission to the Review Board
+        server. For default changelists, this is always None. Otherwise, use
+        the changelist number for submitted changelists, or if the p4d is
+        2002.2 or newer.
+
+        This is because p4d < 2002.2 does not return enough information about
+        pending changelists in 'p4 describe' for Review Board to make use of
+        them (specifically, the list of files is missing). This would result
+        in the diffs being rejected.
+        """
         if changenum == "default":
             return None
         else:
@@ -362,7 +364,8 @@ class PerforceClient(SCMClient):
             info = execute(["p4", "opened", "-c", str(changenum)],
                            split_lines=True)
 
-            if len(info) == 1 and info[0].startswith("File(s) not opened on this client."):
+            if (len(info) == 1 and
+                info[0].startswith("File(s) not opened on this client.")):
                 die("Couldn't find any affected files for this change.")
 
             for line in info:
@@ -379,7 +382,7 @@ class PerforceClient(SCMClient):
                 # what we were looking for.
                 die("Couldn't find any affected files for this change.")
 
-            description = description[line_num+2:]
+            description = description[line_num + 2:]
 
         diff_lines = []
 
@@ -402,9 +405,9 @@ class PerforceClient(SCMClient):
             depot_path = m.group(1)
             base_revision = int(m.group(2))
             if not cl_is_pending:
-                # If the changelist is pending our base revision is the one that's
-                # currently in the depot. If we're not pending the base revision is
-                # actually the revision prior to this one
+                # If the changelist is pending our base revision is the one
+                # that's currently in the depot. If we're not pending the base
+                # revision is actually the revision prior to this one.
                 base_revision -= 1
 
             changetype = m.group(3)
@@ -429,7 +432,7 @@ class PerforceClient(SCMClient):
                 if cl_is_pending:
                     new_file = self._depot_to_local(depot_path)
                 else:
-                    new_depot_path = "%s#%s" %(depot_path, new_revision)
+                    new_depot_path = "%s#%s" % (depot_path, new_revision)
                     self._write_file(new_depot_path, tmp_diff_to_filename)
                     new_file = tmp_diff_to_filename
 
@@ -444,16 +447,18 @@ class PerforceClient(SCMClient):
                     new_file = tmp_diff_to_filename
                 changetype_short = "A"
             elif changetype in ['delete', 'move/delete']:
-                # We've deleted a file, get p4 to put the deleted file into  a temp
-                # file for us. The new file remains the empty file.
+                # We've deleted a file, get p4 to put the deleted file into a
+                # temp file for us. The new file remains the empty file.
                 old_depot_path = "%s#%s" % (depot_path, base_revision)
                 self._write_file(old_depot_path, tmp_diff_from_filename)
                 old_file = tmp_diff_from_filename
                 changetype_short = "D"
             else:
-                die("Unknown change type '%s' for %s" % (changetype, depot_path))
+                die("Unknown change type '%s' for %s" % (changetype,
+                                                         depot_path))
 
-            dl = self._do_diff(old_file, new_file, depot_path, base_revision, changetype_short)
+            dl = self._do_diff(old_file, new_file, depot_path, base_revision,
+                               changetype_short)
             diff_lines += dl
 
         os.unlink(empty_filename)
@@ -482,7 +487,7 @@ class PerforceClient(SCMClient):
         else:
             diff_cmd = ["diff", "-urNp", old_file, new_file]
         # Diff returns "1" if differences were found.
-        dl = execute(diff_cmd, extra_ignore_errors=(1,2),
+        dl = execute(diff_cmd, extra_ignore_errors=(1, 2),
                      translate_newlines=False)
 
         # If the input file has ^M characters at end of line, lets ignore them.
@@ -499,9 +504,9 @@ class PerforceClient(SCMClient):
         #     diff outputs "Files a and b differ"
         # and the code below expects the output to start with
         #     "Binary files "
-        if len(dl) == 1 and \
-           dl[0].startswith('Files %s and %s differ' %
-                            (old_file, new_file)):
+        if (len(dl) == 1 and
+            dl[0].startswith('Files %s and %s differ' %
+                            (old_file, new_file))):
             dl = ['Binary files %s and %s differ\n' % (old_file, new_file)]
 
         if dl == [] or dl[0].startswith("Binary files "):
@@ -521,7 +526,7 @@ class PerforceClient(SCMClient):
                 timestamp = m.group(1)
             else:
                 # Thu Sep  3 11:24:48 2007
-                m = re.search(r'(\w+)\s+(\w+)\s+(\d+)\s+(\d\d:\d\d:\d\d)\s+(\d\d\d\d)', dl[1])
+                m = self.DATE_RE.search(dl[1])
                 if not m:
                     die("Unable to parse diff header: %s" % dl[1])
 

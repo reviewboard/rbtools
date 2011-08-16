@@ -6,7 +6,7 @@ import urllib
 from rbtools.api.errors import APIError
 from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.utils.checks import check_gnu_diff, check_install
-from rbtools.utils.files import walk_parents
+from rbtools.utils.filesystem import walk_parents
 from rbtools.utils.process import execute
 
 
@@ -275,7 +275,6 @@ class SVNClient(SCMClient):
             result.append(line)
 
         return result
-
 
     def convert_to_absolute_paths(self, diff_content, repository_info):
         """
