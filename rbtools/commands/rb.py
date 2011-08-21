@@ -1,39 +1,53 @@
-import os
-import re
 import sys
+from optparse import IndentedHelpFormatter, OptionParser
 
-from rbtools.commands import *
-from rbtools.api.utilities import RBUtilities
-#from rbtools.api.temputilities import execute
-import __init__
+from rbtools import get_version_string
+from rbtools.commands import RB_CMD_PATTERN, RB_COMMANDS, RB_MAIN
+from rbtools.utils.process import execute
+
+
+_indent = max([len(cmd) for cmd in RB_COMMANDS]) - len(RB_MAIN)
+
+_COMMANDS_LIST_STR = 'Available commands are:\n' + '\n'.join([
+    "  %-*s  %s" % (_indent, cmd[len(RB_MAIN):], desc)
+    for cmd, desc in RB_COMMANDS.iteritems()
+])
+
+
+class SimpleIndentedFormatter(IndentedHelpFormatter):
+    """Indents text without causing the description text to wrap.
+
+    IndentedHelpFormatter wraps the output so that it fits into the
+    terminal width. This generally is intended to wrap the description text.
+    However, we store our list of commands in the description, and we don't
+    want this to wrap oddly.
+    """
+    def format_description(self, description):
+        if description:
+            return description + '\n'
+        else:
+            return ''
 
 
 def main():
-    valid = False
+    parser = OptionParser(prog=RB_MAIN,
+                          usage='%prog [options] <command> [<args>]',
+                          formatter=SimpleIndentedFormatter(),
+                          description=_COMMANDS_LIST_STR,
+                          version='RBTools %s' % get_version_string())
+    parser.disable_interspersed_args()
+    opt, args = parser.parse_args()
 
-    if len(sys.argv) > 1:
-        util = RBUtilities()
+    if not args:
+        parser.print_help()
+        sys.exit(1)
 
-        # Check if the first parameter is a rb<name>.py file in this dir
-        pattern = re.compile('(rb%s){1}(?!.)' % sys.argv[1])
-        for n in __init__.scripts:
-            if pattern.match(n) and not valid:
-                valid = True
-                cmd_list = ['rb-%s' % sys.argv[1]] + sys.argv[2:]
-                data = util.safe_execute(cmd_list)
+    if RB_MAIN + args[0] in RB_COMMANDS:
+        args[0] = RB_CMD_PATTERN % {'name': args[0]}
+        print execute(args)
+    else:
+        parser.error("'%s' is not a command" % args[0])
 
-                if data:
-                    print data
-
-    if not valid:
-        print "usage: rb COMMAND [OPTIONS] [ARGS]"
-        print ""
-        print "The commands available are:"
-
-        for n in __init__.scripts:
-            sp = re.split('rb', n)
-            if len(sp) > 1:
-                print sp[1]
 
 if __name__ == "__main__":
     main()
