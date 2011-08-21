@@ -7,6 +7,7 @@ from rbtools.utils.process import die
 CONFIG_FILE = '.reviewboardrc'
 
 tempfiles = []
+builtin = {}
 
 
 def cleanup_tempfiles():
@@ -41,7 +42,8 @@ def load_config_files(homepath):
                 die('Syntax error in config file: %s\n'
                     'Line %i offset %i\n' % (filename, e.lineno, e.offset))
 
-            return config
+            return dict((k, config[k])
+                        for k in set(config.keys()) - set(builtin.keys()))
 
         return None
 
@@ -78,3 +80,9 @@ def walk_parents(path):
     while os.path.splitdrive(path)[1] != os.sep:
         yield path
         path = os.path.dirname(path)
+
+
+# This extracts a dictionary of the built-in globals in order to have a clean
+# dictionary of settings, consisting of only what has been specified in the
+# config file.
+exec('True', builtin)
