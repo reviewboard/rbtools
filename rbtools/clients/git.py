@@ -233,10 +233,9 @@ class GitClient(SCMClient):
             parent_diff_lines = None
 
         if self._options.guess_summary and not self._options.summary:
-            self._options.summary = execute([self.git, "log",
-                                             "--pretty=format:%s",
-                                             "HEAD^.."],
-                                            ignore_errors=True).strip()
+            s = execute([self.git, "log", "--pretty=format:%s", "HEAD^.."],
+                              ignore_errors=True)
+            self._options.summary = s.replace('\n', ' ').strip()
 
         if self._options.guess_description and not self._options.description:
             self._options.description = execute(
@@ -346,10 +345,9 @@ class GitClient(SCMClient):
                                                    revision_range)
 
             if self._options.guess_summary and not self._options.summary:
-                self._options.summary = execute(
-                    [self.git, "log", "--pretty=format:%s",
-                     revision_range + ".."],
-                    ignore_errors=True).strip()
+                s = execute([self.git, "log", "--pretty=format:%s",
+                             revision_range + ".."], ignore_errors=True)
+                self._options.summary = s.replace('\n', ' ').strip()
 
             if (self._options.guess_description and
                 not self._options.description):
@@ -371,10 +369,9 @@ class GitClient(SCMClient):
                 parent_diff_lines = self.make_diff(self.merge_base, r1)
 
             if self._options.guess_summary and not self._options.summary:
-                self._options.summary = execute(
-                    [self.git, "log",
-                     "--pretty=format:%s", "%s..%s" % (r1, r2)],
-                    ignore_errors=True).strip()
+                s = execute([self.git, "log", "--pretty=format:%s",
+                             "%s..%s" % (r1, r2)], ignore_errors=True)
+                self._options.summary = s.replace('\n', ' ').strip()
 
             if (self._options.guess_description and
                 not self._options.description):
