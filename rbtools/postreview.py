@@ -295,7 +295,7 @@ class ReviewBoardServer(object):
                 self.deprecated_api = False
                 self.root_resource = root_resource
                 debug('Using the new web API')
-                return
+                return True
         except APIError, e:
             if e.http_status not in (401, 404):
                 # We shouldn't reach this. If there's a permission denied
@@ -307,9 +307,12 @@ class ReviewBoardServer(object):
                 # done your http basic auth
                 die("Unable to access the root /api/ URL on the server.")
 
+            return False
+
         # This is an older Review Board server with the old API.
         self.deprecated_api = True
         debug('Using the deprecated Review Board 1.0 web API')
+        return True
 
     def login(self, force=False):
         """
@@ -1219,7 +1222,10 @@ def main():
         sys.exit(1)
 
     server = ReviewBoardServer(server_url, repository_info, cookie_file)
-    server.check_api_version()
+
+    # Handle the case where /api/ requires authorization (RBCommons).
+    if not server.check_api_version():
+        die("Unable to log in with the supplied username and password.")
 
     if repository_info.supports_changesets:
         changenum = tool.get_changenum(args)
