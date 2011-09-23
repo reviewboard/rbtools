@@ -760,7 +760,7 @@ class ReviewBoardServer(object):
         }
 
         try:
-            r = urllib2.Request(url, body, headers)
+            r = urllib2.Request(str(url), body, headers)
             data = urllib2.urlopen(r).read()
             try:
                 self.cookie_jar.save(self.cookie_file)
@@ -946,6 +946,10 @@ def tempt_fate(server, tool, changenum, diff_content=None,
         if options.testing_done:
             server.set_review_request_field(review_request, 'testing_done',
                                             options.testing_done)
+
+        if options.change_description:
+            server.set_review_request_field(review_request, 'changedescription',
+                                            options.change_description)
     except APIError, e:
         if e.error_code == 103: # Not logged in
             retries = retries - 1
@@ -1079,6 +1083,9 @@ def parse_options(args):
     parser.add_option("--bugs-closed",
                       dest="bugs_closed", default=None,
                       help="list of bugs closed ")
+    parser.add_option("--change-description", default=None,
+                      help="description of what changed in this revision of "
+                      "the review request when updating an existing request")
     parser.add_option("--revision-range",
                       dest="revision_range", default=None,
                       help="generate the diff for review based on given "
@@ -1180,6 +1187,11 @@ def parse_options(args):
     if options.reopen and not options.rid:
         sys.stderr.write("The --reopen option requires "
                          "--review-request-id option.\n")
+        sys.exit(1)
+
+    if options.change_description and not options.rid:
+        sys.stderr.write("--change-description may only be used "
+                         "when updating an existing review-request\n")
         sys.exit(1)
 
     return args
