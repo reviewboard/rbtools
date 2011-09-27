@@ -143,7 +143,7 @@ class PerforceClient(SCMClient):
                              "See: "
                              "http://www.reviewboard.org/docs/manual/dev/users/"
                              "tools/post-review/#posting-paths")
-        sys.exit(1)
+            sys.exit(1)
 
     def _path_diff(self, args):
         """
