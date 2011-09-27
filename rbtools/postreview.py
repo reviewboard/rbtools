@@ -2935,8 +2935,9 @@ class GitClient(SCMClient):
             parent_diff_lines = None
 
         if options.guess_summary and not options.summary:
-            options.summary = execute([self.git, "log", "--pretty=format:%s",
-                                       "HEAD^.."], ignore_errors=True).strip()
+            s = execute([self.git, "log", "--pretty=format:%s", "HEAD^.."],
+                        ignore_errors=True)
+            options.summary = s.replace('\n', ' ').strip()
 
         if options.guess_description and not options.description:
             options.description = execute(
@@ -3042,9 +3043,10 @@ class GitClient(SCMClient):
                 parent_diff_lines = self.make_diff(self.merge_base, revision_range)
 
             if options.guess_summary and not options.summary:
-                options.summary = execute(
-                    [self.git, "log", "--pretty=format:%s", revision_range + ".."],
-                    ignore_errors=True).strip()
+                s = execute([self.git, "log", "--pretty=format:%s",
+                             revision_range + ".."],
+                            ignore_errors=True)
+                options.summary = s.replace('\n', ' ').strip()
 
             if options.guess_description and not options.description:
                 options.description = execute(
@@ -3064,9 +3066,10 @@ class GitClient(SCMClient):
                 parent_diff_lines = self.make_diff(self.merge_base, r1)
 
             if options.guess_summary and not options.summary:
-                options.summary = execute(
-                    [self.git, "log", "--pretty=format:%s", "%s..%s" % (r1, r2)],
-                    ignore_errors=True).strip()
+                s = execute([self.git, "log", "--pretty=format:%s",
+                             "%s..%s" % (r1, r2)],
+                            ignore_errors=True)
+                options.summary = s.replace('\n', ' ').strip()
 
             if options.guess_description and not options.description:
                 options.description = execute(
