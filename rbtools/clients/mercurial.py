@@ -204,8 +204,10 @@ class MercurialClient(SCMClient):
         outgoing_changesets = \
             self._get_outgoing_changesets(current_branch, remote)
 
+
         top_rev, bottom_rev = \
-            self._get_top_and_bottom_outgoing_revs(outgoing_changesets)
+            self._get_top_and_bottom_outgoing_revs(outgoing_changesets) \
+            if len(outgoing_changesets) > 0 else (None, None)
 
         if self._options.guess_summary and not self._options.summary:
             self._options.summary = self.extract_summary(top_rev).rstrip("\n")
@@ -214,20 +216,27 @@ class MercurialClient(SCMClient):
             self._options.description = self.extract_description(bottom_rev,
                                                                  top_rev)
 
-        full_command = ['hg', 'diff', '-r', str(bottom_rev), '-r',
-                        str(top_rev)] + files
+        if bottom_rev is not None and top_rev is not None:
+            full_command = ['hg', 'diff', '-r', str(bottom_rev), '-r',
+                            str(top_rev)] + files
 
-        return (execute(full_command, env=self._hg_env), None)
+            return (execute(full_command, env=self._hg_env), None)
+        else:
+            return ("", None)
 
     def _get_outgoing_changesets(self, current_branch, remote):
         """
         Given the current branch name and a remote path, return a list
         of outgoing changeset numbers.
         """
+
+        # We must handle the special case where there are no outgoing commits
+        # as mercurial has a non-zero return value in this case.
         outgoing_changesets = []
         raw_outgoing = execute(['hg', '-q', 'outgoing', '--template',
                                 'b:{branches}\nr:{rev}\n\n', remote],
-                               env=self._hg_env)
+                               env=self._hg_env,
+                               extra_ignore_errors=(1,))
 
         for pair in raw_outgoing.split('\n\n'):
             if not pair.strip():
