@@ -261,15 +261,20 @@ class MercurialClient(SCMClient):
         top_rev = max(outgoing_changesets)
         bottom_rev = min(outgoing_changesets)
 
-        parents = execute(["hg", "log", "-r", str(bottom_rev),
-                           "--template", "{parents}"],
-                          env=self._hg_env)
-        parents = parents.rstrip("\n").split(":")
+        for rev in reversed(outgoing_changesets):
+            parents = execute(["hg", "log", "-r", str(rev),
+                               "--template", "{parents}"],
+                               env=self._hg_env)
+            parents = re.split(':[^\s]+\s*', parents)
+            parents = [int(p) for p in parents if p != '']
 
-        if len(parents) > 1:
-            bottom_rev = parents[0]
-        else:
-            bottom_rev = bottom_rev - 1
+            parents = [p for p in parents if p not in outgoing_changesets]
+
+            if len(parents) > 0:
+                bottom_rev = parents[0]
+                break
+            else:
+                bottom_rev = rev - 1
 
         bottom_rev = max(0, bottom_rev)
 
