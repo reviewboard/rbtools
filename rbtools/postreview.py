@@ -100,7 +100,7 @@ options = None
 configs = []
 
 ADD_REPOSITORY_DOCS_URL = \
-    'http://www.reviewboard.org/docs/manual/dev/admin/management/repositories/'
+    'http://www.reviewboard.org/docs/manual/dev/admin/configuration/repositories/'
 
 
 class HTTPRequest(urllib2.Request):
