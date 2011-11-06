@@ -117,7 +117,7 @@ options = None
 configs = []
 
 ADD_REPOSITORY_DOCS_URL = \
-    'http://www.reviewboard.org/docs/manual/dev/admin/management/repositories/'
+    'http://www.reviewboard.org/docs/manual/dev/admin/configuration/repositories/'
 GNU_DIFF_WIN32_URL = 'http://gnuwin32.sourceforge.net/packages/diffutils.htm'
 
 
