@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import urllib
+import xml.etree.ElementTree as ET
 
 from rbtools.api.errors import APIError
 from rbtools.clients import SCMClient, RepositoryInfo
@@ -149,9 +150,66 @@ class SVNClient(SCMClient):
                                  repository_info), None)
         # Otherwise, perform the revision range diff using a working copy
         else:
+            if ((self._options.guess_summary and not self._options.summary) or
+                (self._options.guess_description and not self._options.guess_description)):
+                # Get log entries.
+                log_entries = self.extract_log_entries(revision_range)
+                # Extract description and summary.
+                summary = self.extract_summary(log_entries, revision_range)
+                description = self.extract_description(log_entries, revision_range)
+                # Put description and summary into the options.
+                if self._options.guess_summary and not self._options.summary and summary:
+                    self._options.summary = summary
+                if self._options.guess_description and not self._options.description and description:
+                    self._options.description = description
+                
             return (self.do_diff(["svn", "diff", "--diff-cmd=diff", "-r",
                                   revision_range],
                                  repository_info), None)
+
+    def extract_log_entries(self, revision_range):
+        """
+        Retrieve the log entries for the given revision range and return a
+        list with the entries.  Each entry is representd by a dict and has
+        the entries 'revision', 'author', 'date', 'msg'.
+        """
+        xml = execute(["svn", "log", "--xml", "-r", revision_range])
+        log = ET.XML(xml)
+        entries = []
+        for logentry in log:
+            entry = {'revision': logentry.attrib.get('revision')}
+            for child in logentry:
+                if child.tag in ['author', 'date', 'msg']:
+                    entry[child.tag] = child.text
+            entries.append(entry)
+        return entries
+
+    def extract_summary(self, log_entries, revision_range):
+        """
+        Return the guessed summary from a list of log entries.  If there
+        only is one log entry then this is used.  Otherwise, a summary is
+        generated from the revision range.
+        """
+        if len(log_entries) == 1:
+            lines = log_entries['msg'].strip().split()
+            if not lines:
+                return None
+            return lines[0]
+        else:
+            return 'Diffs for revision range %s' % revision_range
+
+    def extract_description(self, log_entries, revision_range):
+        """
+        Generate description from the log entries, most current log entry comes first.
+        """
+        result_lines = ['Revision range: ' + revision_range, '=' * 78, '']
+        for entry in log_entries:
+            result_lines.append('Revision ' + entry['revision'])
+            result_lines.append('')
+            result_lines.append(entry['msg'])
+            result_lines.append('')
+            result_lines.append('-' * 78)
+        return '\n'.join(result_lines)
 
     def do_diff(self, cmd, repository_info=None):
         """
