@@ -145,11 +145,30 @@ class SVNClient(SCMClient):
 
             old_url = url + '@' + revisions[0]
 
+            # If summary and/or description are to be guessed then get log entries,
+            # extract description and summary and set it into options if
+            # necessary.
+            if ((self._options.guess_summary and not self._options.summary) or
+                (self._options.guess_description and not self._options.guess_description)):
+                # Get log entries.
+                log_entries = self.extract_log_entries(revision_range, url)
+                # Extract description and summary.
+                summary = self.extract_summary(log_entries, revision_range, url)
+                description = self.extract_description(log_entries, revision_range, url)
+                # Put description and summary into the options.
+                if self._options.guess_summary and not self._options.summary and summary:
+                    self._options.summary = summary
+                if self._options.guess_description and not self._options.description and description:
+                    self._options.description = description
+
             return (self.do_diff(["svn", "diff", "--diff-cmd=diff", old_url,
                                   new_url] + files,
                                  repository_info), None)
         # Otherwise, perform the revision range diff using a working copy
         else:
+            # If summary and/or description are to be guessed then get log entries,
+            # extract description and summary and set it into options if
+            # necessary.
             if ((self._options.guess_summary and not self._options.summary) or
                 (self._options.guess_description and not self._options.guess_description)):
                 # Get log entries.
@@ -167,13 +186,17 @@ class SVNClient(SCMClient):
                                   revision_range],
                                  repository_info), None)
 
-    def extract_log_entries(self, revision_range):
+    def extract_log_entries(self, revision_range, url=None, files=[]):
         """
         Retrieve the log entries for the given revision range and return a
         list with the entries.  Each entry is representd by a dict and has
         the entries 'revision', 'author', 'date', 'msg'.
         """
-        xml = execute(["svn", "log", "--xml", "-r", revision_range])
+        cmd = ["svn", "log", "--xml", "-r", revision_range]
+        if url:
+          cmd.append(url)
+        cmd += files
+        xml = execute(cmd)
         log = ET.XML(xml)
         entries = []
         for logentry in log:
@@ -184,7 +207,7 @@ class SVNClient(SCMClient):
             entries.append(entry)
         return entries
 
-    def extract_summary(self, log_entries, revision_range):
+    def extract_summary(self, log_entries, revision_range, url=None, files=[]):
         """
         Return the guessed summary from a list of log entries.  If there
         only is one log entry then this is used.  Otherwise, a summary is
@@ -196,13 +219,26 @@ class SVNClient(SCMClient):
                 return None
             return lines[0]
         else:
-            return 'Diffs for revision range %s' % revision_range
+            if url and files:
+                return 'Diffs for revision range %s at %s (limited to files).' % (revision_range, url)
+            elif url:
+                return 'Diffs for revision range %s at %s.' % (revision_range, url)
+            elif files:
+                return 'Diffs for revision range %s (limited to files).' % revision_range
+            else:
+                return 'Diffs for revision range %s.' % revision_range
 
-    def extract_description(self, log_entries, revision_range):
+    def extract_description(self, log_entries, revision_range, url=None, files=[]):
         """
         Generate description from the log entries, most current log entry comes first.
         """
-        result_lines = ['Revision range: ' + revision_range, '=' * 78, '']
+        result_lines = ['Revision range: ' + revision_range, '=' * 78]
+        if url:
+            result_lines.append('URL: ' + url)
+        if files:
+            for f in files:
+                result_lines.append('File: ' + f)
+        result_lines.append('')
         for entry in log_entries:
             result_lines.append('Revision ' + entry['revision'])
             result_lines.append('')
@@ -216,6 +252,7 @@ class SVNClient(SCMClient):
         Performs the actual diff operation, handling renames and converting
         paths to absolute.
         """
+        print cmd
         diff = execute(cmd, split_lines=True)
         diff = self.handle_renames(diff)
         diff = self.convert_to_absolute_paths(diff, repository_info)
