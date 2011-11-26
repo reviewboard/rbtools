@@ -240,9 +240,9 @@ class SVNClient(SCMClient):
                 result_lines.append('File: ' + f)
         result_lines.append('')
         for entry in log_entries:
-            result_lines.append('Revision ' + entry['revision'])
+            result_lines.append('Revision ' + entry['revision'] + ' author: ' + entry.get('author', ''))
             result_lines.append('')
-            result_lines.append(entry['msg'])
+            result_lines.append(entry.get('msg', ''))
             result_lines.append('')
             result_lines.append('-' * 78)
         return '\n'.join(result_lines)
@@ -252,7 +252,6 @@ class SVNClient(SCMClient):
         Performs the actual diff operation, handling renames and converting
         paths to absolute.
         """
-        print cmd
         diff = execute(cmd, split_lines=True)
         diff = self.handle_renames(diff)
         diff = self.convert_to_absolute_paths(diff, repository_info)
