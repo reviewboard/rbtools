@@ -5,6 +5,7 @@ import re
 import socket
 import stat
 import subprocess
+import sys
 
 from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.utils.checks import check_install
@@ -133,6 +134,16 @@ class PerforceClient(SCMClient):
             return self._path_diff(args)
         else:
             return self._changenum_diff(changenum)
+
+    def check_options(self):
+        if self._options.revision_range:
+            sys.stderr.write("The --revision-range option is not supported "
+                             "for Perforce repositories.  Please use the "
+                             "Perforce range path syntax instead.\n\n"
+                             "See: "
+                             "http://www.reviewboard.org/docs/manual/dev/users/"
+                             "tools/post-review/#posting-paths")
+            sys.exit(1)
 
     def _path_diff(self, args):
         """

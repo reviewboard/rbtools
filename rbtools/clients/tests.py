@@ -3,12 +3,14 @@ import re
 import sys
 import time
 from nose import SkipTest
+from nose.tools import raises
 from random import randint
 from textwrap import dedent
 
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.git import GitClient
 from rbtools.clients.mercurial import MercurialClient
+from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.svn import SVNRepositoryInfo
 from rbtools.tests import OptionsStub
 from rbtools.utils.filesystem import load_config_files
@@ -695,6 +697,18 @@ class SVNClientTests(SCMClientTests):
         self.assertEqual(
             info._get_relative_path('/trunk/myproject', '/trunk/myproject'),
             '/')
+
+
+class PerforceClientTests(SCMClientTests):
+    def setUp(self):
+        super(PerforceClientTests, self).setUp()
+
+    @raises(SystemExit)
+    def test_error_on_revision_range(self):
+        """Testing that passing a revision_range causes the client to exit."""
+        self.options.revision_range = "12345"
+        client = PerforceClient(options=self.options)
+        client.check_options()
 
 
 FOO = """\
