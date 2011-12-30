@@ -1016,7 +1016,7 @@ def parse_options(args):
                           version="RBTools " + get_version_string())
 
     parser.add_option("-p", "--publish",
-                      dest="publish", action="store_true", default=PUBLISH,
+                      dest="publish", action="store_true", default=PUBLISH  or get_config_value(configs, 'PUBLISH'),
                       help="publish the review request immediately after "
                            "submitting")
     parser.add_option("-r", "--review-request-id",
@@ -1024,7 +1024,7 @@ def parse_options(args):
                       help="existing review request ID to update")
     parser.add_option("-o", "--open",
                       dest="open_browser", action="store_true",
-                      default=OPEN_BROWSER,
+                      default=OPEN_BROWSER or get_config_value(configs, 'OPEN_BROWSER'),
                       help="open a web browser to the review request page")
     parser.add_option("-n", "--output-diff",
                       dest="output_diff_only", action="store_true",
@@ -1063,12 +1063,12 @@ def parse_options(args):
                       help="text file containing a description of the review")
     parser.add_option("--guess-summary",
                       dest="guess_summary", action="store_true",
-                      default=False,
+                      default=get_config_value(configs, 'GUESS_SUMMARY'),
                       help="guess summary from the latest commit (git/"
                            "hg/hgsubversion only)")
     parser.add_option("--guess-description",
                       dest="guess_description", action="store_true",
-                      default=False,
+                      default=get_config_value(configs, 'GUESS_DESCRIPTION'),
                       help="guess description based on commits on this branch "
                            "(git/hg/hgsubversion only)")
     parser.add_option("--testing-done",
