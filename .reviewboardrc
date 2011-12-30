@@ -1,1 +1,5 @@
 REVIEWBOARD_URL = "http://reviews.reviewboard.org"
+PUBLISH=False
+OPEN_BROWSER=False
+GUESS_SUMMARY=False
+GUESS_DESCRIPTION=False
