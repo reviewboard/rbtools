@@ -20,30 +20,26 @@ class PlasticClient(SCMClient):
         if not check_install('cm version'):
             return None
 
-        # Get the repository that the current directory is from.  If there
-        # is more than one repository mounted in the current directory,
-        # bail out for now (in future, should probably enter a review
-        # request per each repository.)
-        split = execute(["cm", "ls", "--format={8}"], split_lines=True,
-                        ignore_errors=True)
-        m = re.search(r'^rep:(.+)$', split[0], re.M)
-
-        if not m:
-            return None
-
-        # Make sure the repository list contains only one unique entry
-        if len(split) != split.count(split[0]):
-            # Not unique!
-            die('Directory contains more than one mounted repository')
-
-        path = m.group(1)
-
         # Get the workspace directory, so we can strip it from the diff output
         self.workspacedir = execute(["cm", "gwp", ".", "--format={1}"],
                                     split_lines=False,
                                     ignore_errors=True).strip()
 
         logging.debug("Workspace is %s" % self.workspacedir)
+
+        # Get the repository that the current directory is from
+        split = execute(["cm", "ls", self.workspacedir, "--format={8}"], split_lines=True,
+                        ignore_errors=True)
+
+        # remove blank lines
+        split = filter(None, split)
+
+        m = re.search(r'^rep:(.+)$', split[0], re.M)
+
+        if not m:
+            return None
+
+        path = m.group(1)
 
         return RepositoryInfo(path,
                               supports_changesets=True,
@@ -78,25 +74,47 @@ class PlasticClient(SCMClient):
 
     def diff_between_revisions(self, revision_range, args, repository_info):
         """
-        Performs a diff between 2 revisions of a Plastic repository.
-
-        Assume revision_range is a branch specification (br:/main/task001)
-        and hand over to branch_diff
+        This doesn't make much sense in Plastic SCM 4.
+        We'll only implement revisions for changests and branches
         """
-        return (self.branch_diff(revision_range), None)
+        die("This option is not supported. Only reviews of a changeset or branch are supported")
+
+    def branch_diff(self, args):
+        logging.debug("branch diff: %s" % (args))
+
+        if len(args) > 0:
+            branch = args[0]
+        else:
+            branch = args
+
+        if not self._options.branch:
+            self._options.branch = branch
+
+        diff_entries = execute(["cm", "diff", branch,
+                         "--format={status} {path} "
+                         "rev:revid:{revid} rev:revid:{parentrevid} "
+                         "src:{srccmpath} "
+                         "dst:{dstcmpath}{newline}"],
+                         split_lines = True)
+
+        logging.debug("got files: %s" % (diff_entries))
+        return self.process_diffs(diff_entries)
+
 
     def changenum_diff(self, changenum):
         logging.debug("changenum_diff: %s" % (changenum))
-        files = execute(["cm", "log", "cs:" + changenum,
-                         "--csFormat={items}",
-                         "--itemFormat={shortstatus} {path} "
+
+        diff_entries = execute(["cm", "diff", "cs:" + changenum,
+                         "--format={status} {path} "
                          "rev:revid:{revid} rev:revid:{parentrevid} "
-                         "src:{srccmpath} rev:revid:{srcdirrevid} "
-                         "dst:{dstcmpath} rev:revid:{dstdirrevid}{newline}"],
-                        split_lines = True)
+                         "src:{srccmpath} "
+                         "dst:{dstcmpath}{newline}"],
+                         split_lines = True)
 
-        logging.debug("got files: %s" % (files))
+        logging.debug("got files: %s" % (diff_entries))
+        return self.process_diffs(diff_entries)
 
+    def process_diffs(self, my_diff_entries):
         # Diff generation based on perforce client
         diff_lines = []
 
@@ -104,19 +122,17 @@ class PlasticClient(SCMClient):
         tmp_diff_from_filename = make_tempfile()
         tmp_diff_to_filename = make_tempfile()
 
-        for f in files:
+        for f in my_diff_entries:
             f = f.strip()
 
             if not f:
                 continue
 
-            m = re.search(r'(?P<type>[ACIMR]) (?P<file>.*) '
+            m = re.search(r'(?P<type>[ACMD]) (?P<file>.*) '
                           r'(?P<revspec>rev:revid:[-\d]+) '
                           r'(?P<parentrevspec>rev:revid:[-\d]+) '
                           r'src:(?P<srcpath>.*) '
-                          r'(?P<srcrevspec>rev:revid:[-\d]+) '
-                          r'dst:(?P<dstpath>.*) '
-                          r'(?P<dstrevspec>rev:revid:[-\d]+)$',
+                          r'dst:(?P<dstpath>.*)$',
                           f)
             if not m:
                 die("Could not parse 'cm log' response: %s" % f)
@@ -128,21 +144,22 @@ class PlasticClient(SCMClient):
                 # Handle moved files as a delete followed by an add.
                 # Clunky, but at least it works
                 oldfilename = m.group("srcpath")
-                oldspec = m.group("srcrevspec")
+                oldspec = m.group("revspec")
                 newfilename = m.group("dstpath")
-                newspec = m.group("dstrevspec")
+                newspec = m.group("revspec")
 
                 self.write_file(oldfilename, oldspec, tmp_diff_from_filename)
                 dl = self.diff_files(tmp_diff_from_filename, empty_filename,
-                                     oldfilename, "rev:revid:-1", oldspec,
-                                     changetype)
+                                    oldfilename, "rev:revid:-1", oldspec,
+                                    changetype)
                 diff_lines += dl
 
                 self.write_file(newfilename, newspec, tmp_diff_to_filename)
                 dl = self.diff_files(empty_filename, tmp_diff_to_filename,
-                                     newfilename, newspec, "rev:revid:-1",
-                                     changetype)
+                                    newfilename, newspec, "rev:revid:-1",
+                                    changetype)
                 diff_lines += dl
+
             else:
                 newrevspec = m.group("revspec")
                 parentrevspec = m.group("parentrevspec")
@@ -155,30 +172,27 @@ class PlasticClient(SCMClient):
                 old_file = new_file = empty_filename
 
                 if (changetype in ['A'] or
-                    (changetype in ['C', 'I'] and
-                     parentrevspec == "rev:revid:-1")):
-                    # File was Added, or a Change or Merge (type I) and there
-                    # is no parent revision
+                    (changetype in ['C'] and
+                    parentrevspec == "rev:revid:-1")):
+                    # There's only one content to show
                     self.write_file(filename, newrevspec, tmp_diff_to_filename)
                     new_file = tmp_diff_to_filename
-                elif changetype in ['C', 'I']:
-                    # File was Changed or Merged (type I)
+                elif changetype in ['C']:
                     self.write_file(filename, parentrevspec,
-                                    tmp_diff_from_filename)
+                                tmp_diff_from_filename)
                     old_file = tmp_diff_from_filename
                     self.write_file(filename, newrevspec, tmp_diff_to_filename)
                     new_file = tmp_diff_to_filename
-                elif changetype in ['R']:
-                    # File was Removed
+                elif changetype in ['D']:
                     self.write_file(filename, parentrevspec,
-                                    tmp_diff_from_filename)
+                                tmp_diff_from_filename)
                     old_file = tmp_diff_from_filename
                 else:
                     die("Don't know how to handle change type '%s' for %s" %
                         (changetype, filename))
 
                 dl = self.diff_files(old_file, new_file, filename,
-                                     newrevspec, parentrevspec, changetype)
+                                 newrevspec, parentrevspec, changetype)
                 diff_lines += dl
 
         os.unlink(empty_filename)
@@ -187,109 +201,9 @@ class PlasticClient(SCMClient):
 
         return ''.join(diff_lines)
 
-    def branch_diff(self, args):
-        logging.debug("branch diff: %s" % (args))
-
-        if len(args) > 0:
-            branch = args[0]
-        else:
-            branch = args
-
-        if not branch.startswith("br:"):
-            return None
-
-        if not self._options.branch:
-            self._options.branch = branch
-
-        files = execute(["cm", "fbc", branch, "--format={3} {4}"],
-                        split_lines = True)
-        logging.debug("got files: %s" % (files))
-
-        diff_lines = []
-
-        empty_filename = make_tempfile()
-        tmp_diff_from_filename = make_tempfile()
-        tmp_diff_to_filename = make_tempfile()
-
-        for f in files:
-            f = f.strip()
-
-            if not f:
-                continue
-
-            m = re.search(r'^(?P<branch>.*)#(?P<revno>\d+) (?P<file>.*)$', f)
-
-            if not m:
-                die("Could not parse 'cm fbc' response: %s" % f)
-
-            filename = m.group("file")
-            branch = m.group("branch")
-            revno = m.group("revno")
-
-            # Get the base revision with a cm find
-            basefiles = execute(["cm", "find", "revs", "where",
-                                 "item='" + filename + "'", "and",
-                                 "branch='" + branch + "'", "and",
-                                 "revno=" + revno,
-                                 "--format={item} rev:revid:{id} "
-                                 "rev:revid:{parent}", "--nototal"],
-                                split_lines = True)
-
-            # We only care about the first line
-            m = re.search(r'^(?P<filename>.*) '
-                              r'(?P<revspec>rev:revid:[-\d]+) '
-                              r'(?P<parentrevspec>rev:revid:[-\d]+)$',
-                              basefiles[0])
-            basefilename = m.group("filename")
-            newrevspec = m.group("revspec")
-            parentrevspec = m.group("parentrevspec")
-
-            # Cope with adds/removes
-            changetype = "C"
-
-            if parentrevspec == "rev:revid:-1":
-                changetype = "A"
-            elif newrevspec == "rev:revid:-1":
-                changetype = "R"
-
-            logging.debug("Type %s File %s Old %s New %s" % (changetype,
-                                                     basefilename,
-                                                     parentrevspec,
-                                                     newrevspec))
-
-            old_file = new_file = empty_filename
-
-            if changetype == "A":
-                # File Added
-                self.write_file(basefilename, newrevspec,
-                                tmp_diff_to_filename)
-                new_file = tmp_diff_to_filename
-            elif changetype == "R":
-                # File Removed
-                self.write_file(basefilename, parentrevspec,
-                                tmp_diff_from_filename)
-                old_file = tmp_diff_from_filename
-            else:
-                self.write_file(basefilename, parentrevspec,
-                                tmp_diff_from_filename)
-                old_file = tmp_diff_from_filename
-
-                self.write_file(basefilename, newrevspec,
-                                tmp_diff_to_filename)
-                new_file = tmp_diff_to_filename
-
-            dl = self.diff_files(old_file, new_file, basefilename,
-                                 newrevspec, parentrevspec, changetype)
-            diff_lines += dl
-
-        os.unlink(empty_filename)
-        os.unlink(tmp_diff_from_filename)
-        os.unlink(tmp_diff_to_filename)
-
-        return ''.join(diff_lines)
 
     def diff_files(self, old_file, new_file, filename, newrevspec,
-                   parentrevspec, changetype, ignore_unmodified=False):
+                   parentrevspec, changetype):
         """
         Do the work of producing a diff for Plastic (based on the Perforce one)
 
@@ -299,8 +213,6 @@ class PlasticClient(SCMClient):
         newrevspec - The revid spec of the changed file
         parentrevspecspec - The revision spec of the "old" file
         changetype - The change type as a single character string
-        ignore_unmodified - If true, will return an empty list if the file
-            is not changed.
 
         Returns a list of strings of diff lines.
         """
@@ -326,11 +238,7 @@ class PlasticClient(SCMClient):
 
         if dl == [] or dl[0].startswith("Binary files "):
             if dl == []:
-                if ignore_unmodified:
-                    return []
-                else:
-                    print "Warning: %s in your changeset is unmodified" % \
-                          filename
+                return []
 
             dl.insert(0, "==== %s (%s) ==%s==\n" % (filename, newrevspec,
                                                     changetype))
@@ -350,3 +258,4 @@ class PlasticClient(SCMClient):
         """ Grabs a file from Plastic and writes it to a temp file """
         logging.debug("Writing '%s' (rev %s) to '%s'" % (filename, filespec, tmpfile))
         execute(["cm", "cat", filespec, "--file=" + tmpfile])
+
