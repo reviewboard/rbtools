@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 from rbtools.clients import SCMClient, RepositoryInfo
-from rbtools.utils.checks import check_install
+from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import die, execute
 
@@ -54,6 +54,10 @@ class PerforceClient(SCMClient):
         m = re.search(r'^Server version: [^ ]*/([0-9]+)\.([0-9]+)/[0-9]+ .*$',
                       data, re.M)
         self.p4d_version = int(m.group(1)), int(m.group(2))
+
+        # Now that we know it's Perforce, make sure we have GNU diff
+        # installed, and error out if we don't.
+        check_gnu_diff()
 
         return RepositoryInfo(path=repository_path, supports_changesets=True)
 
