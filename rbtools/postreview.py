@@ -1884,6 +1884,10 @@ class PerforceClient(SCMClient):
                       data, re.M)
         self.p4d_version = int(m.group(1)), int(m.group(2))
 
+        # Now that we know it's Perforce, make sure we have GNU diff installed,
+        # and error out if we don't.
+        check_gnu_diff()
+
         return RepositoryInfo(path=repository_path, supports_changesets=True)
 
     def scan_for_server(self, repository_info):
