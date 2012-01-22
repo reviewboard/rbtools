@@ -458,7 +458,8 @@ class PerforceClient(SCMClient):
                 if cl_is_pending:
                     new_file = self._depot_to_local(depot_path)
                 else:
-                    self._write_file(depot_path, tmp_diff_to_filename)
+                    new_depot_path = "%s#%s" % (depot_path, 1)
+                    self._write_file(new_depot_path, tmp_diff_to_filename)
                     new_file = tmp_diff_to_filename
                 changetype_short = "A"
             elif changetype in ['delete', 'move/delete']:
