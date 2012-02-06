@@ -150,8 +150,6 @@ class GitClient(SCMClient):
 
         # Central bare repositories don't have origin URLs.
         # We return git_dir instead and hope for the best.
-        url = origin_url.rstrip('/')
-
         if not url:
             url = os.path.abspath(git_dir)
 
