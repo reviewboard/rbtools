@@ -1021,7 +1021,10 @@ class ReviewBoardServer(object):
         try:
             r = HTTPRequest(url, body, headers, method='PUT')
             data = urllib2.urlopen(r).read()
-            self.cookie_jar.save(self.cookie_file)
+            try:
+                self.cookie_jar.save(self.cookie_file)
+            except IOError, e:
+                debug('Failed to write cookie file: %s' % e)
             return data
         except urllib2.HTTPError, e:
             # Re-raise so callers can interpret it.
@@ -1046,7 +1049,10 @@ class ReviewBoardServer(object):
         try:
             r = HTTPRequest(url, method='DELETE')
             data = urllib2.urlopen(r).read()
-            self.cookie_jar.save(self.cookie_file)
+            try:
+                self.cookie_jar.save(self.cookie_file)
+            except IOError, e:
+                debug('Failed to write cookie file: %s' % e)
             return data
         except urllib2.HTTPError, e:
             # Re-raise so callers can interpret it.
