@@ -320,8 +320,8 @@ class ReviewBoardServer(object):
         information if needed.
         """
         if (options.diff_filename == '-' and
-            not options.username and not options.submit_as and
-            not options.password):
+            not self.has_valid_cookie() or
+            (options.username and options.password)):
             die('Authentication information needs to be provided on '
                 'the command line when using --diff-filename=-')
 
