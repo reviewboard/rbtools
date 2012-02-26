@@ -54,10 +54,12 @@ class GitClient(SCMClient):
         # We know we have something we can work with. Let's find out
         # what it is. We'll try SVN first, but only if there's a .git/svn
         # directory. Otherwise, it may attempt to create one and scan
-        # revisions, which can be slow.
+        # revisions, which can be slow. Also skip SVN detection if the git
+        # repository was specified on command line.
         git_svn_dir = os.path.join(git_dir, 'svn')
 
-        if os.path.isdir(git_svn_dir) and len(os.listdir(git_svn_dir)) > 0:
+        if (not self._options.repository_url and
+            os.path.isdir(git_svn_dir) and len(os.listdir(git_svn_dir)) > 0):
             data = execute([self.git, "svn", "info"], ignore_errors=True)
 
             m = re.search(r'^Repository Root: (.+)$', data, re.M)
@@ -139,6 +141,7 @@ class GitClient(SCMClient):
         url = None
         if self._options.repository_url:
             url = self._options.repository_url
+            self.upstream_branch = self.get_origin(self.upstream_branch, True)[0]
         else:
             self.upstream_branch, origin_url = \
                 self.get_origin(self.upstream_branch, True)
@@ -148,13 +151,14 @@ class GitClient(SCMClient):
 
             url = origin_url.rstrip('/')
 
-        # Central bare repositories don't have origin URLs.
-        # We return git_dir instead and hope for the best.
-        if not url:
-            url = os.path.abspath(git_dir)
+            # Central bare repositories don't have origin URLs.
+            # We return git_dir instead and hope for the best.
+            if not url:
+                url = os.path.abspath(git_dir)
 
-            # There is no remote, so skip this part of upstream_branch.
-            self.upstream_branch = self.upstream_branch.split('/')[-1]
+                # There is no remote, so skip this part of upstream_branch.
+                self.upstream_branch = self.upstream_branch.split('/')[-1]
+
         if url:
             self.type = "git"
             return RepositoryInfo(path=url, base_path='',
