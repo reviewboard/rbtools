@@ -998,6 +998,11 @@ def parse_options(args):
     parser.add_option("--description-file",
                       dest="description_file", default=None,
                       help="text file containing a description of the review")
+    parser.add_option('-g', '--guess-fields',
+                      dest="guess_fields", action="store_true",
+                      default=get_config_value(configs, 'GUESS_FIELDS',
+                                               False),
+                      help="equivalent to --guess-summary --guess-description")
     parser.add_option("--guess-summary",
                       dest="guess_summary", action="store_true",
                       default=get_config_value(configs, 'GUESS_SUMMARY',
@@ -1129,6 +1134,10 @@ def parse_options(args):
             sys.stderr.write("The description file %s does not exist.\n" %
                              options.description_file)
             sys.exit(1)
+
+    if options.guess_fields:
+        options.guess_summary = True
+        options.guess_description = True
 
     if options.testing_done and options.testing_file:
         sys.stderr.write("The --testing-done and --testing-done-file options "
