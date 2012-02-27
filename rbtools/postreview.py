@@ -197,20 +197,26 @@ class ReviewBoardServer(object):
                 pass
 
         # Set up the HTTP libraries to support all of the features we need.
-        cookie_handler      = urllib2.HTTPCookieProcessor(self.cookie_jar)
-        password_mgr        = ReviewBoardHTTPPasswordMgr(self.url,
-                                                         options.username,
-                                                         options.password)
-        basic_auth_handler  = ReviewBoardHTTPBasicAuthHandler(password_mgr)
-        digest_auth_handler = urllib2.HTTPDigestAuthHandler(password_mgr)
+        password_mgr = ReviewBoardHTTPPasswordMgr(self.url,
+                                                  options.username,
+                                                  options.password)
         self.preset_auth_handler = PresetHTTPAuthHandler(self.url, password_mgr)
-        http_error_processor = ReviewBoardHTTPErrorProcessor()
 
-        opener = urllib2.build_opener(cookie_handler,
-                                      basic_auth_handler,
-                                      digest_auth_handler,
-                                      self.preset_auth_handler,
-                                      http_error_processor)
+        handlers = []
+
+        if options.disable_proxy:
+            debug('Disabling HTTP(s) proxy support')
+            handlers.append(urllib2.ProxyHandler({}))
+
+        handlers += [
+            urllib2.HTTPCookieProcessor(self.cookie_jar),
+            ReviewBoardHTTPBasicAuthHandler(password_mgr),
+            urllib2.HTTPDigestAuthHandler(password_mgr),
+            self.preset_auth_handler,
+            ReviewBoardHTTPErrorProcessor(),
+        ]
+
+        opener = urllib2.build_opener(*handlers)
         opener.addheaders = [('User-agent', 'RBTools/' + get_package_version())]
         urllib2.install_opener(opener)
 
@@ -971,6 +977,13 @@ def parse_options(args):
                       default=get_config_value(configs, 'REVIEWBOARD_URL'),
                       metavar="SERVER",
                       help="specify a different Review Board server to use")
+    parser.add_option("--disable-proxy",
+                      action='store_true',
+                      dest='disable_proxy',
+                      default=not get_config_value(configs, 'ENABLE_PROXY',
+                                                   True),
+                      help="prevents requests from going through a proxy "
+                           "server")
     parser.add_option("--diff-only",
                       dest="diff_only", action="store_true", default=False,
                       help="uploads a new diff, but does not update "
