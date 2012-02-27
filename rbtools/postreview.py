@@ -244,7 +244,7 @@ class ReviewBoardServer(object):
                 # done your http basic auth
                 die("Unable to access the root /api/ URL on the server.")
 
-            return False
+                return False
 
         # This is an older Review Board server with the old API.
         self.deprecated_api = True
