@@ -139,7 +139,7 @@ def tag_release():
 
 
 def register_release():
-    if __version_info__[4] == 'final':
+    if __version_info__[3] == 'final':
         run_setup("register")
 
     scm_revision = execute(['git rev-parse', 'release-%s' % __version__])
