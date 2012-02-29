@@ -60,6 +60,7 @@ class OptionsStub(object):
         self.username = None
         self.password = None
         self.repository_url = None
+        self.disable_proxy = False
 
 
 class ApiTests(MockHttpUnitTest):

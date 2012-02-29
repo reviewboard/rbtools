@@ -1,1 +1,2 @@
 REVIEWBOARD_URL = "http://reviews.reviewboard.org"
+BRANCH = "master"

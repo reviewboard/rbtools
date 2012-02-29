@@ -15,9 +15,9 @@ class SCMClient(object):
     """
 
     def __init__(self, user_config=None, configs=[], options=None):
-        self._user_config = user_config
-        self._configs = configs
-        self._options = options
+        self.user_config = user_config
+        self.configs = configs
+        self.options = options
 
     def get_repository_info(self):
         return None
@@ -32,12 +32,12 @@ class SCMClient(object):
         """
         server_url = None
 
-        if self._user_config:
-            server_url = self._get_server_from_config(self._user_config,
+        if self.user_config:
+            server_url = self._get_server_from_config(self.user_config,
                                                       repository_info)
 
         if not server_url:
-            for config in self._configs:
+            for config in self.configs:
                 server_url = self._get_server_from_config(config,
                                                           repository_info)
 
@@ -85,26 +85,6 @@ class SCMClient(object):
                 return trees[path]['REVIEWBOARD_URL']
 
         return None
-
-    @property
-    def user_config(self):
-        return self._user_config
-
-    @user_config.setter
-    def user_config(self, value):
-        self._user_config = value
-
-    @property
-    def configs(self):
-        return self._configs
-
-    @configs.setter
-    def configs(self, value):
-        self._configs = value
-
-    @property
-    def options(self):
-        return self._options
 
 
 class RepositoryInfo(object):

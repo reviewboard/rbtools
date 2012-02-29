@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Performs a release of Review Board. This can only be run by the core
+# Performs a release of RBTools. This can only be run by the core
 # developers with release permissions.
 #
 
@@ -89,7 +89,7 @@ def execute(cmdline):
     return s
 
 
-def run_setup(target, pyver = LATEST_PY_VERSION):
+def run_setup(target, pyver=LATEST_PY_VERSION):
     execute("python%s ./setup.py release %s" % (pyver, target))
 
 
@@ -139,7 +139,7 @@ def tag_release():
 
 
 def register_release():
-    if __version_info__[4] == 'final':
+    if __version_info__[3] == 'final':
         run_setup("register")
 
     scm_revision = execute(['git rev-parse', 'release-%s' % __version__])
@@ -189,14 +189,13 @@ def register_release():
 def main():
     if not os.path.exists("setup.py"):
         sys.stderr.write("This must be run from the root of the "
-                         "Djblets tree.\n")
+                         "RBTools tree.\n")
         sys.exit(1)
 
     load_config()
 
     if not is_release():
-        sys.stderr.write('This has not been marked as a release in '
-                         'rbtools/__init__.py\n')
+        sys.stderr.write("This version is not listed as a release.\n")
         sys.exit(1)
 
     cur_dir = os.getcwd()

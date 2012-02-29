@@ -18,12 +18,12 @@ def cleanup_tempfiles():
             pass
 
 
-def get_config_value(configs, name):
+def get_config_value(configs, name, default=None):
     for c in configs:
         if name in c:
             return c[name]
 
-    return None
+    return default
 
 
 def load_config_files(homepath):

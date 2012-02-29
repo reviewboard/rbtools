@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 from rbtools.clients import SCMClient, RepositoryInfo
-from rbtools.utils.checks import check_install
+from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import die, execute
 
@@ -54,6 +54,10 @@ class PerforceClient(SCMClient):
         m = re.search(r'^Server version: [^ ]*/([0-9]+)\.([0-9]+)/[0-9]+ .*$',
                       data, re.M)
         self.p4d_version = int(m.group(1)), int(m.group(2))
+
+        # Now that we know it's Perforce, make sure we have GNU diff
+        # installed, and error out if we don't.
+        check_gnu_diff()
 
         return RepositoryInfo(path=repository_path, supports_changesets=True)
 
@@ -120,14 +124,14 @@ class PerforceClient(SCMClient):
         revision information.
         """
         # set the P4 enviroment:
-        if self._options.p4_client:
-            os.environ['P4CLIENT'] = self._options.p4_client
+        if self.options.p4_client:
+            os.environ['P4CLIENT'] = self.options.p4_client
 
-        if self._options.p4_port:
-            os.environ['P4PORT'] = self._options.p4_port
+        if self.options.p4_port:
+            os.environ['P4PORT'] = self.options.p4_port
 
-        if self._options.p4_passwd:
-            os.environ['P4PASSWD'] = self._options.p4_passwd
+        if self.options.p4_passwd:
+            os.environ['P4PASSWD'] = self.options.p4_passwd
 
         changenum = self.get_changenum(args)
         if changenum is None:
@@ -136,7 +140,7 @@ class PerforceClient(SCMClient):
             return self._changenum_diff(changenum)
 
     def check_options(self):
-        if self._options.revision_range:
+        if self.options.revision_range:
             sys.stderr.write("The --revision-range option is not supported "
                              "for Perforce repositories.  Please use the "
                              "Perforce range path syntax instead.\n\n"
@@ -315,9 +319,9 @@ class PerforceClient(SCMClient):
             if v[0] < 2002 or (v[0] == "2002" and v[1] < 2):
                 describeCmd = ["p4"]
 
-                if self._options.p4_passwd:
+                if self.options.p4_passwd:
                     describeCmd.append("-P")
-                    describeCmd.append(self._options.p4_passwd)
+                    describeCmd.append(self.options.p4_passwd)
 
                 describeCmd = describeCmd + ["describe", "-s", changenum]
 
@@ -350,9 +354,9 @@ class PerforceClient(SCMClient):
         else:
             describeCmd = ["p4"]
 
-            if self._options.p4_passwd:
+            if self.options.p4_passwd:
                 describeCmd.append("-P")
-                describeCmd.append(self._options.p4_passwd)
+                describeCmd.append(self.options.p4_passwd)
 
             describeCmd = describeCmd + ["describe", "-s", changenum]
 
@@ -454,7 +458,8 @@ class PerforceClient(SCMClient):
                 if cl_is_pending:
                     new_file = self._depot_to_local(depot_path)
                 else:
-                    self._write_file(depot_path, tmp_diff_to_filename)
+                    new_depot_path = "%s#%s" % (depot_path, 1)
+                    self._write_file(new_depot_path, tmp_diff_to_filename)
                     new_file = tmp_diff_to_filename
                 changetype_short = "A"
             elif changetype in ['delete', 'move/delete']:

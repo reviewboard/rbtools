@@ -27,80 +27,11 @@ except ImportError:
     from simplejson import loads as json_loads
 
 
-
-###
-# Default configuration -- user-settable variables follow.
-###
-
-# The following settings usually aren't needed, but if your Review
-# Board crew has specific preferences and doesn't want to express
-# them with command line switches, set them here and you're done.
-# In particular, setting the REVIEWBOARD_URL variable will allow
-# you to make it easy for people to submit reviews regardless of
-# their SCM setup.
-#
-# Note that in order for this script to work with a reviewboard site
-# that uses local paths to access a repository, the 'Mirror path'
-# in the repository setup page must be set to the remote URL of the
-# repository.
-
-#
-# Reviewboard URL.
-#
-# Set this if you wish to hard-code a default server to always use.
-# It's generally recommended to set this using your SCM repository
-# (for those that support it -- currently only SVN, Git, and Perforce).
-#
-# For example, on SVN:
-#   $ svn propset reviewboard:url http://reviewboard.example.com .
-#
-# Or with Git:
-#   $ git config reviewboard.url http://reviewboard.example.com
-#
-# On Perforce servers version 2008.1 and above:
-#   $ p4 counter reviewboard.url http://reviewboard.example.com
-#
-# Older Perforce servers only allow numerical counters, so embedding
-# the url in the counter name is also supported:
-#   $ p4 counter reviewboard.url.http:\|\|reviewboard.example.com 1
-#
-# Note that slashes are not allowed in Perforce counter names, so replace them
-# with pipe characters (they are a safe substitute as they are not used
-# unencoded in URLs). You may need to escape them when issuing the p4 counter
-# command as above.
-#
-# If this is not possible or desired, setting the value here will let
-# you get started quickly.
-#
-# For all other repositories, a .reviewboardrc file present at the top of
-# the checkout will also work. For example:
-#
-#   $ cat .reviewboardrc
-#   REVIEWBOARD_URL = "http://reviewboard.example.com"
-#
-REVIEWBOARD_URL = None
-
-# Default submission arguments.  These are all optional; run this
-# script with --help for descriptions of each argument.
-TARGET_GROUPS   = None
-TARGET_PEOPLE   = None
-SUBMIT_AS       = None
-PUBLISH         = False
-OPEN_BROWSER    = False
-
-# Debugging.  For development...
-DEBUG           = False
-
-###
-# End user-settable variables.
-###
-
-
 options = None
 configs = []
 
 ADD_REPOSITORY_DOCS_URL = \
-    'http://www.reviewboard.org/docs/manual/dev/admin/management/repositories/'
+    'http://www.reviewboard.org/docs/manual/dev/admin/configuration/repositories/'
 
 
 class HTTPRequest(urllib2.Request):
@@ -266,20 +197,26 @@ class ReviewBoardServer(object):
                 pass
 
         # Set up the HTTP libraries to support all of the features we need.
-        cookie_handler      = urllib2.HTTPCookieProcessor(self.cookie_jar)
-        password_mgr        = ReviewBoardHTTPPasswordMgr(self.url,
-                                                         options.username,
-                                                         options.password)
-        basic_auth_handler  = ReviewBoardHTTPBasicAuthHandler(password_mgr)
-        digest_auth_handler = urllib2.HTTPDigestAuthHandler(password_mgr)
+        password_mgr = ReviewBoardHTTPPasswordMgr(self.url,
+                                                  options.username,
+                                                  options.password)
         self.preset_auth_handler = PresetHTTPAuthHandler(self.url, password_mgr)
-        http_error_processor = ReviewBoardHTTPErrorProcessor()
 
-        opener = urllib2.build_opener(cookie_handler,
-                                      basic_auth_handler,
-                                      digest_auth_handler,
-                                      self.preset_auth_handler,
-                                      http_error_processor)
+        handlers = []
+
+        if options.disable_proxy:
+            debug('Disabling HTTP(s) proxy support')
+            handlers.append(urllib2.ProxyHandler({}))
+
+        handlers += [
+            urllib2.HTTPCookieProcessor(self.cookie_jar),
+            ReviewBoardHTTPBasicAuthHandler(password_mgr),
+            urllib2.HTTPDigestAuthHandler(password_mgr),
+            self.preset_auth_handler,
+            ReviewBoardHTTPErrorProcessor(),
+        ]
+
+        opener = urllib2.build_opener(*handlers)
         opener.addheaders = [('User-agent', 'RBTools/' + get_package_version())]
         urllib2.install_opener(opener)
 
@@ -307,7 +244,7 @@ class ReviewBoardServer(object):
                 # done your http basic auth
                 die("Unable to access the root /api/ URL on the server.")
 
-            return False
+                return False
 
         # This is an older Review Board server with the old API.
         self.deprecated_api = True
@@ -320,8 +257,8 @@ class ReviewBoardServer(object):
         information if needed.
         """
         if (options.diff_filename == '-' and
-            not options.username and not options.submit_as and
-            not options.password):
+            not (self.has_valid_cookie() or
+                 (options.username and options.password))):
             die('Authentication information needs to be provided on '
                 'the command line when using --diff-filename=-')
 
@@ -396,9 +333,6 @@ class ReviewBoardServer(object):
 
         return False
 
-    def get_configured_repository(self):
-        return get_config_value(configs, 'REPOSITORY')
-
     def new_review_request(self, changenum, submit_as=None):
         """
         Creates a review request on a Review Board server, updating an
@@ -447,9 +381,7 @@ class ReviewBoardServer(object):
                 sys.stderr.write(ADD_REPOSITORY_DOCS_URL + '\n')
                 die()
 
-        repository = options.repository_url \
-                     or self.get_configured_repository() \
-                     or self.info.path
+        repository = options.repository_url or self.info.path
 
         try:
             debug("Attempting to create review request on %s for %s" %
@@ -796,7 +728,10 @@ class ReviewBoardServer(object):
         try:
             r = HTTPRequest(url, body, headers, method='PUT')
             data = urllib2.urlopen(r).read()
-            self.cookie_jar.save(self.cookie_file)
+            try:
+                self.cookie_jar.save(self.cookie_file)
+            except IOError, e:
+                debug('Failed to write cookie file: %s' % e)
             return data
         except urllib2.HTTPError, e:
             # Re-raise so callers can interpret it.
@@ -821,7 +756,10 @@ class ReviewBoardServer(object):
         try:
             r = HTTPRequest(url, method='DELETE')
             data = urllib2.urlopen(r).read()
-            self.cookie_jar.save(self.cookie_file)
+            try:
+                self.cookie_jar.save(self.cookie_file)
+            except IOError, e:
+                debug('Failed to write cookie file: %s' % e)
             return data
         except urllib2.HTTPError, e:
             # Re-raise so callers can interpret it.
@@ -899,7 +837,7 @@ def debug(s):
     """
     Prints debugging information if post-review was run with --debug
     """
-    if DEBUG or options and options.debug:
+    if options and options.debug:
         print ">>> %s" % s
 
 
@@ -980,7 +918,9 @@ def tempt_fate(server, tool, changenum, diff_content=None,
             sys.stderr.write('Error uploading diff\n')
             sys.stderr.write('\n')
 
-            if e.error_code == 105:
+            if e.error_code == 101 and e.http_status == 403:
+                die('You do not have permissions to modify this review request\n')
+            elif e.error_code == 105:
                 sys.stderr.write('The generated diff file was empty. This '
                                  'usually means no files were\n')
                 sys.stderr.write('modified in this change.\n')
@@ -1016,7 +956,8 @@ def parse_options(args):
                           version="RBTools " + get_version_string())
 
     parser.add_option("-p", "--publish",
-                      dest="publish", action="store_true", default=PUBLISH,
+                      dest="publish", action="store_true",
+                      default=get_config_value(configs, 'PUBLISH', False),
                       help="publish the review request immediately after "
                            "submitting")
     parser.add_option("-r", "--review-request-id",
@@ -1024,7 +965,7 @@ def parse_options(args):
                       help="existing review request ID to update")
     parser.add_option("-o", "--open",
                       dest="open_browser", action="store_true",
-                      default=OPEN_BROWSER,
+                      default=get_config_value(configs, 'OPEN_BROWSER', False),
                       help="open a web browser to the review request page")
     parser.add_option("-n", "--output-diff",
                       dest="output_diff_only", action="store_true",
@@ -1032,10 +973,17 @@ def parse_options(args):
                       help="outputs a diff to the console and exits. "
                            "Does not post")
     parser.add_option("--server",
-                      dest="server", default=REVIEWBOARD_URL,
+                      dest="server",
+                      default=get_config_value(configs, 'REVIEWBOARD_URL'),
                       metavar="SERVER",
-                      help="specify a different Review Board server "
-                           "to use")
+                      help="specify a different Review Board server to use")
+    parser.add_option("--disable-proxy",
+                      action='store_true',
+                      dest='disable_proxy',
+                      default=not get_config_value(configs, 'ENABLE_PROXY',
+                                                   True),
+                      help="prevents requests from going through a proxy "
+                           "server")
     parser.add_option("--diff-only",
                       dest="diff_only", action="store_true", default=False,
                       help="uploads a new diff, but does not update "
@@ -1045,11 +993,13 @@ def parse_options(args):
                       help="reopen discarded review request "
                            "after update")
     parser.add_option("--target-groups",
-                      dest="target_groups", default=TARGET_GROUPS,
+                      dest="target_groups",
+                      default=get_config_value(configs, 'TARGET_GROUPS'),
                       help="names of the groups who will perform "
                            "the review")
     parser.add_option("--target-people",
-                      dest="target_people", default=TARGET_PEOPLE,
+                      dest="target_people",
+                      default=get_config_value(configs, 'TARGET_PEOPLE'),
                       help="names of the people who will perform "
                            "the review")
     parser.add_option("--summary",
@@ -1061,14 +1011,21 @@ def parse_options(args):
     parser.add_option("--description-file",
                       dest="description_file", default=None,
                       help="text file containing a description of the review")
+    parser.add_option('-g', '--guess-fields',
+                      dest="guess_fields", action="store_true",
+                      default=get_config_value(configs, 'GUESS_FIELDS',
+                                               False),
+                      help="equivalent to --guess-summary --guess-description")
     parser.add_option("--guess-summary",
                       dest="guess_summary", action="store_true",
-                      default=False,
+                      default=get_config_value(configs, 'GUESS_SUMMARY',
+                                               False),
                       help="guess summary from the latest commit (git/"
                            "hg/hgsubversion only)")
     parser.add_option("--guess-description",
                       dest="guess_description", action="store_true",
-                      default=False,
+                      default=get_config_value(configs, 'GUESS_DESCRIPTION',
+                                               False),
                       help="guess description based on commits on this branch "
                            "(git/hg/hgsubversion only)")
     parser.add_option("--testing-done",
@@ -1078,7 +1035,8 @@ def parse_options(args):
                       dest="testing_file", default=None,
                       help="text file containing details of testing done ")
     parser.add_option("--branch",
-                      dest="branch", default=None,
+                      dest="branch",
+                      default=get_config_value(configs, 'BRANCH'),
                       help="affected branch ")
     parser.add_option("--bugs-closed",
                       dest="bugs_closed", default=None,
@@ -1091,14 +1049,21 @@ def parse_options(args):
                       help="generate the diff for review based on given "
                            "revision range")
     parser.add_option("--submit-as",
-                      dest="submit_as", default=SUBMIT_AS, metavar="USERNAME",
+                      dest="submit_as",
+                      default=get_config_value(configs, 'SUBMIT_AS'),
+                      metavar="USERNAME",
                       help="user name to be recorded as the author of the "
                            "review request, instead of the logged in user")
     parser.add_option("--username",
-                      dest="username", default=None, metavar="USERNAME",
-                      help="user name to be supplied to the reviewboard server")
+                      dest="username",
+                      default=get_config_value(configs, 'USERNAME'),
+                      metavar="USERNAME",
+                      help="user name to be supplied to the reviewboard "
+                           "server")
     parser.add_option("--password",
-                      dest="password", default=None, metavar="PASSWORD",
+                      dest="password",
+                      default=get_config_value(configs, 'PASSWORD'),
+                      metavar="PASSWORD",
                       help="password to be supplied to the reviewboard server")
     parser.add_option("--change-only",
                       dest="change_only", action="store_true",
@@ -1107,49 +1072,63 @@ def parse_options(args):
                            "not upload a new diff (only available if your "
                            "repository supports changesets)")
     parser.add_option("--parent",
-                      dest="parent_branch", default=None,
+                      dest="parent_branch",
+                      default=get_config_value(configs, 'PARENT_BRANCH'),
                       metavar="PARENT_BRANCH",
                       help="the parent branch this diff should be against "
                            "(only available if your repository supports "
                            "parent diffs)")
     parser.add_option("--tracking-branch",
-                      dest="tracking", default=None,
+                      dest="tracking",
+                      default=get_config_value(configs, 'TRACKING_BRANCH'),
                       metavar="TRACKING",
                       help="Tracking branch from which your branch is derived "
                            "(git only, defaults to origin/master)")
     parser.add_option("--p4-client",
-                      dest="p4_client", default=None,
+                      dest="p4_client",
+                      default=get_config_value(configs, 'P4_CLIENT'),
                       help="the Perforce client name that the review is in")
     parser.add_option("--p4-port",
-                      dest="p4_port", default=None,
-                      help="the Perforce servers IP address that the review is on")
+                      dest="p4_port",
+                      default=get_config_value(configs, 'P4_PORT'),
+                      help="the Perforce servers IP address that the review "
+                           "is on")
     parser.add_option("--p4-passwd",
-                      dest="p4_passwd", default=None,
-                      help="the Perforce password or ticket of the user in the P4USER environment variable")
+                      dest="p4_passwd",
+                      default=get_config_value(configs, 'P4_PASSWD'),
+                      help="the Perforce password or ticket of the user "
+                           "in the P4USER environment variable")
     parser.add_option('--svn-changelist', dest='svn_changelist', default=None,
                       help='generate the diff for review based on a local SVN '
                            'changelist')
     parser.add_option("--repository-url",
-                      dest="repository_url", default=None,
+                      dest="repository_url",
+                      default=get_config_value(configs, 'REPOSITORY'),
                       help="the url for a repository for creating a diff "
                            "outside of a working copy (currently only "
                            "supported by Subversion with --revision-range or "
                            "--diff-filename and ClearCase with relative "
                            "paths outside the view). For git, this specifies"
                            "the origin url of the current repository, "
-                           "overriding the origin url supplied by the git client.")
+                           "overriding the origin url supplied by the git "
+                           "client.")
     parser.add_option("-d", "--debug",
-                      action="store_true", dest="debug", default=DEBUG,
+                      action="store_true", dest="debug",
+                      default=get_config_value(configs, 'DEBUG', False),
                       help="display debug output")
     parser.add_option("--diff-filename",
                       dest="diff_filename", default=None,
                       help='upload an existing diff file, instead of '
                            'generating a new diff')
     parser.add_option('--http-username',
-                      dest='http_username', default=None, metavar='USERNAME',
+                      dest='http_username',
+                      default=get_config_value(configs, 'HTTP_USERNAME'),
+                      metavar='USERNAME',
                       help='username for HTTP Basic authentication')
     parser.add_option('--http-password',
-                      dest='http_password', default=None, metavar='PASSWORD',
+                      dest='http_password',
+                      default=get_config_value(configs, 'HTTP_PASSWORD'),
+                      metavar='PASSWORD',
                       help='password for HTTP Basic authentication')
 
     (globals()["options"], args) = parser.parse_args(args)
@@ -1168,6 +1147,10 @@ def parse_options(args):
             sys.stderr.write("The description file %s does not exist.\n" %
                              options.description_file)
             sys.exit(1)
+
+    if options.guess_fields:
+        options.guess_summary = True
+        options.guess_description = True
 
     if options.testing_done and options.testing_file:
         sys.stderr.write("The --testing-done and --testing-done-file options "
