@@ -124,14 +124,14 @@ class PerforceClient(SCMClient):
         revision information.
         """
         # set the P4 enviroment:
-        if self._options.p4_client:
-            os.environ['P4CLIENT'] = self._options.p4_client
+        if self.options.p4_client:
+            os.environ['P4CLIENT'] = self.options.p4_client
 
-        if self._options.p4_port:
-            os.environ['P4PORT'] = self._options.p4_port
+        if self.options.p4_port:
+            os.environ['P4PORT'] = self.options.p4_port
 
-        if self._options.p4_passwd:
-            os.environ['P4PASSWD'] = self._options.p4_passwd
+        if self.options.p4_passwd:
+            os.environ['P4PASSWD'] = self.options.p4_passwd
 
         changenum = self.get_changenum(args)
         if changenum is None:
@@ -140,7 +140,7 @@ class PerforceClient(SCMClient):
             return self._changenum_diff(changenum)
 
     def check_options(self):
-        if self._options.revision_range:
+        if self.options.revision_range:
             sys.stderr.write("The --revision-range option is not supported "
                              "for Perforce repositories.  Please use the "
                              "Perforce range path syntax instead.\n\n"
@@ -319,9 +319,9 @@ class PerforceClient(SCMClient):
             if v[0] < 2002 or (v[0] == "2002" and v[1] < 2):
                 describeCmd = ["p4"]
 
-                if self._options.p4_passwd:
+                if self.options.p4_passwd:
                     describeCmd.append("-P")
-                    describeCmd.append(self._options.p4_passwd)
+                    describeCmd.append(self.options.p4_passwd)
 
                 describeCmd = describeCmd + ["describe", "-s", changenum]
 
@@ -354,9 +354,9 @@ class PerforceClient(SCMClient):
         else:
             describeCmd = ["p4"]
 
-            if self._options.p4_passwd:
+            if self.options.p4_passwd:
                 describeCmd.append("-P")
-                describeCmd.append(self._options.p4_passwd)
+                describeCmd.append(self.options.p4_passwd)
 
             describeCmd = describeCmd + ["describe", "-s", changenum]
 
