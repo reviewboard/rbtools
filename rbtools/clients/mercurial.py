@@ -205,9 +205,12 @@ class MercurialClient(SCMClient):
             self._get_outgoing_changesets(current_branch, remote)
 
 
-        top_rev, bottom_rev = \
-            self._get_top_and_bottom_outgoing_revs(outgoing_changesets) \
-            if len(outgoing_changesets) > 0 else (None, None)
+        if outgoing_changesets:
+            top_rev, bottom_rev = \
+                self._get_top_and_bottom_outgoing_revs(outgoing_changesets)
+        else:
+            top_rev = None
+            bottom_rev = None
 
         if self.options.guess_summary and not self.options.summary:
             self.options.summary = self.extract_summary(top_rev).rstrip("\n")

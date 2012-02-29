@@ -326,7 +326,7 @@ class SVNRepositoryInfo(RepositoryInfo):
     def _get_repository_info(self, server, repository):
         try:
             return server.get_repository_info(repository['id'])
-        except APIError as e:
+        except APIError, e:
             # If the server couldn't fetch the repository info, it will return
             # code 210. Ignore those.
             # Other more serious errors should still be raised, though.
