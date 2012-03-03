@@ -190,8 +190,8 @@ class SVNClient(SCMClient):
             # This is where we decide how mangle the previous '--- '
             if self.DIFF_NEW_FILE_LINE_RE.match(line):
                 to_file, _ = self.parse_filename_header(line[4:])
-                info       = self.svn_info(to_file)
-                if info.has_key("Copied From URL"):
+                info       = self.svn_info(to_file, True)
+                if info is not None and info.has_key("Copied From URL"):
                     url       = info["Copied From URL"]
                     root      = info["Repository Root"]
                     from_file = urllib.unquote(url[len(root):])
@@ -216,6 +216,7 @@ class SVNClient(SCMClient):
 
         for line in diff_content:
             front = None
+            orig_line = line
             if (self.DIFF_NEW_FILE_LINE_RE.match(line)
                 or self.DIFF_ORIG_FILE_LINE_RE.match(line)
                 or line.startswith('Index: ')):
@@ -236,7 +237,10 @@ class SVNClient(SCMClient):
                         path = urllib.unquote(
                             "%s/%s" % (repository_info.base_path, file))
                     else:
-                        info = self.svn_info(file)
+                        info = self.svn_info(file, True)
+                        if info is None:
+                            result.append(orig_line)
+                            continue
                         url  = info["URL"]
                         root = info["Repository Root"]
                         path = urllib.unquote(url[len(root):])
@@ -247,11 +251,17 @@ class SVNClient(SCMClient):
 
         return result
 
-    def svn_info(self, path):
+    def svn_info(self, path, ignore_errors=False):
         """Return a dict which is the result of 'svn info' at a given path."""
         svninfo = {}
-        for info in execute(["svn", "info", path],
-                            split_lines=True):
+        result = execute(["svn", "info", path],
+                         split_lines=True,
+                         ignore_errors=ignore_errors,
+                         none_on_ignored_error=True)
+        if result is None:
+            return None
+
+        for info in result:
             parts = info.strip().split(": ", 1)
             if len(parts) == 2:
                 key, value = parts

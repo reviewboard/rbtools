@@ -19,8 +19,14 @@ def die(msg=None):
     sys.exit(1)
 
 
-def execute(command, env=None, split_lines=False, ignore_errors=False,
-            extra_ignore_errors=(), translate_newlines=True, with_errors=True):
+def execute(command,
+            env=None,
+            split_lines=False,
+            ignore_errors=False,
+            extra_ignore_errors=(),
+            translate_newlines=True,
+            with_errors=True,
+            none_on_ignored_error=False):
     """
     Utility function to execute a command and return the output.
     """
@@ -68,5 +74,8 @@ def execute(command, env=None, split_lines=False, ignore_errors=False,
 
     if rc and not ignore_errors and rc not in extra_ignore_errors:
         die('Failed to execute command: %s\n%s' % (command, data))
+
+    if rc and none_on_ignored_error:
+        return None
 
     return data
