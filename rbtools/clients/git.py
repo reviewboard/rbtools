@@ -46,7 +46,14 @@ class GitClient(SCMClient):
         # post-review in directories other than the top level of
         # of a work-tree would result in broken diffs on the server
         if not self.bare:
-            os.chdir(os.path.dirname(os.path.abspath(git_dir)))
+            git_top = execute([self.git, "rev-parse", "--show-toplevel"],
+                          ignore_errors=True).rstrip("\n")
+
+            # top level might not work on old git version se we use git dir to find it
+            if git_top.startswith("fatal:") or not os.path.isdir(git_dir):
+                git_top = git_dir
+
+            os.chdir(os.path.abspath(git_top))
 
         self.head_ref = execute([self.git, 'symbolic-ref', '-q',
                                  'HEAD']).strip()
