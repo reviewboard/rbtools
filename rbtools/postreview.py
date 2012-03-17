@@ -1190,6 +1190,10 @@ def main():
     else:
         homepath = ''
 
+    # If we end up creating a cookie file, make sure it's only readable by the
+    # user.
+    os.umask(0077)
+
     # Load the config and cookie files
     cookie_file = os.path.join(homepath, ".post-review-cookies.txt")
     user_config, globals()['configs'] = load_config_files(homepath)
