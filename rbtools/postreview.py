@@ -900,9 +900,9 @@ def tempt_fate(server, tool, changenum, diff_content=None,
             # number of retries.
             if retries >= 0:
                 server.login(force=True)
-                tempt_fate(server, tool, changenum, diff_content,
-                           parent_diff_content, submit_as, retries=retries)
-                return
+                return tempt_fate(server, tool, changenum, diff_content,
+                                  parent_diff_content, submit_as,
+                                  retries=retries)
 
         if options.rid:
             die("Error getting review request %s: %s" % (options.rid, e))
