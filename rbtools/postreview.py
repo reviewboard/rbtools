@@ -2,6 +2,7 @@
 import base64
 import cookielib
 import getpass
+import logging
 import mimetools
 import os
 import re
@@ -1132,6 +1133,9 @@ def parse_options(args):
                       help='password for HTTP Basic authentication')
 
     (globals()["options"], args) = parser.parse_args(args)
+
+    if options.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
 
     if options.description and options.description_file:
         sys.stderr.write("The --description and --description-file options "
