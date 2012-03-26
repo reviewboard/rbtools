@@ -11,3 +11,49 @@ This consists of the following officially supported tools:
 
 There are also some user-contributed scripts and application plugins in the
 contrib directory. See the associated README files for more information.
+
+
+Testing rbtools
+===============
+
+This is of interest mostly to developers of rbtools.
+
+
+Installation
+------------
+
+To run all the tests, you will need to install hgsubversion::
+
+   $ easy_install hgsubversion
+
+This may need apr-config, also known as apr-1-config, to run.  This is
+part of the apache distribution.  On ubuntu, you can get it via::
+
+   $ sudo apt-get install libapr1-dev  # also try apache2-dev or httpd-dev
+
+hgsubversion also requires that you set up an :file:`.hgrc` in your home
+directory with the following contents::
+
+   [extensions]
+   hgsvn = /path/to/hgsubversion
+
+This will be something like
+:file:`/usr/local/lib/python2.7/dist-packages/hgsubversion`.
+If you already have an ``[extensions]`` section in your :file:`.hgrc`, just add
+the hgsvn line to it.
+
+You will also need nose::
+
+   $ easy_install nose
+
+
+Running
+-------
+
+Just run::
+
+   $ nosetests
+
+from the top of the rbtools directory. You can run nosetests in subdirectories
+to just run the tests in that directory.  See `'nosetests --help'` for more
+options.
