@@ -153,7 +153,7 @@ class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
         self.rb_pass = rb_pass
 
     def find_user_password(self, realm, uri):
-        if realm == 'Web API':
+        if realm.strip():
             if self.rb_user is None or self.rb_pass is None:
                 if options.diff_filename == '-':
                     die('HTTP authentication is required, but cannot be '
