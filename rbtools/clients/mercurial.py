@@ -245,7 +245,10 @@ class MercurialClient(SCMClient):
             if not pair.strip():
                 continue
 
-            branch, rev = pair.strip().split('\n')
+            # Ignore warning messages that hg might put in, such as
+            # "warning: certificate for foo can't be verified (Python too old)"
+            branch, rev = [l for l in pair.strip().split('\n')
+                           if not l.startswith('warning: ')]
 
             branch_name = branch[len('b:'):].strip()
             branch_name = branch_name or 'default'
