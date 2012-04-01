@@ -37,8 +37,8 @@ def check_gnu_diff():
 
     if not has_gnu_diff:
         sys.stderr.write('\n')
-        sys.stderr.write('GNU diff is required for Subversion '
-                         'repositories. Make sure it is installed\n')
+        sys.stderr.write('GNU diff is required in order to generate diffs. '
+                         'Make sure it is installed\n')
         sys.stderr.write('and in the path.\n')
         sys.stderr.write('\n')
 

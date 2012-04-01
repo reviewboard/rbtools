@@ -2,6 +2,7 @@
 import base64
 import cookielib
 import getpass
+import logging
 import mimetools
 import os
 import re
@@ -899,9 +900,9 @@ def tempt_fate(server, tool, changenum, diff_content=None,
             # number of retries.
             if retries >= 0:
                 server.login(force=True)
-                tempt_fate(server, tool, changenum, diff_content,
-                           parent_diff_content, submit_as, retries=retries)
-                return
+                return tempt_fate(server, tool, changenum, diff_content,
+                                  parent_diff_content, submit_as,
+                                  retries=retries)
 
         if options.rid:
             die("Error getting review request %s: %s" % (options.rid, e))
@@ -1133,6 +1134,9 @@ def parse_options(args):
 
     (globals()["options"], args) = parser.parse_args(args)
 
+    if options.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+
     if options.description and options.description_file:
         sys.stderr.write("The --description and --description-file options "
                          "are mutually exclusive.\n")
@@ -1189,6 +1193,10 @@ def main():
         homepath = os.environ["HOME"]
     else:
         homepath = ''
+
+    # If we end up creating a cookie file, make sure it's only readable by the
+    # user.
+    os.umask(0077)
 
     # Load the config and cookie files
     cookie_file = os.path.join(homepath, ".post-review-cookies.txt")
