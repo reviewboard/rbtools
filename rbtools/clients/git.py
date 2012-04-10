@@ -272,7 +272,7 @@ class GitClient(SCMClient):
             return self.make_svn_diff(ancestor, diff_lines)
         elif self.type == "git":
             return execute([self.git, "diff", "--no-color", "--full-index",
-                            "--no-ext-diff", rev_range])
+                            "--no-ext-diff", "--ignore-submodules", rev_range])
 
         return None
 
