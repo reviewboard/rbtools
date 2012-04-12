@@ -57,7 +57,7 @@ class GitClient(SCMClient):
             os.chdir(os.path.abspath(git_top))
 
         self.head_ref = execute([self.git, 'symbolic-ref', '-q',
-                                 'HEAD']).strip()
+                                 'HEAD'], ignore_errors=True).strip()
 
         # We know we have something we can work with. Let's find out
         # what it is. We'll try SVN first, but only if there's a .git/svn
@@ -132,19 +132,20 @@ class GitClient(SCMClient):
 
         # Nope, it's git then.
         # Check for a tracking branch and determine merge-base
-        short_head = self._strip_heads_prefix(self.head_ref)
-        merge = execute([self.git, 'config', '--get',
-                         'branch.%s.merge' % short_head],
-                        ignore_errors=True).strip()
-        remote = execute([self.git, 'config', '--get',
-                          'branch.%s.remote' % short_head],
-                         ignore_errors=True).strip()
-
-        merge = self._strip_heads_prefix(merge)
         self.upstream_branch = ''
+        if self.head_ref:
+            short_head = self._strip_heads_prefix(self.head_ref)
+            merge = execute([self.git, 'config', '--get',
+                             'branch.%s.merge' % short_head],
+                            ignore_errors=True).strip()
+            remote = execute([self.git, 'config', '--get',
+                              'branch.%s.remote' % short_head],
+                             ignore_errors=True).strip()
 
-        if remote and remote != '.' and merge:
-            self.upstream_branch = '%s/%s' % (remote, merge)
+            merge = self._strip_heads_prefix(merge)
+
+            if remote and remote != '.' and merge:
+                self.upstream_branch = '%s/%s' % (remote, merge)
 
         url = None
         if self.options.repository_url:
@@ -230,16 +231,19 @@ class GitClient(SCMClient):
         account a parent branch.
         """
         parent_branch = self.options.parent_branch
+        head_ref = "HEAD"
+        if self.head_ref:
+            head_ref = self.head_ref
 
         self.merge_base = execute([self.git, "merge-base",
                                    self.upstream_branch,
-                                   self.head_ref]).strip()
+                                   head_ref]).strip()
 
         if parent_branch:
             diff_lines = self.make_diff(parent_branch)
             parent_diff_lines = self.make_diff(self.merge_base, parent_branch)
         else:
-            diff_lines = self.make_diff(self.merge_base, self.head_ref)
+            diff_lines = self.make_diff(self.merge_base, head_ref)
             parent_diff_lines = None
 
         if self.options.guess_summary and not self.options.summary:
@@ -335,11 +339,15 @@ class GitClient(SCMClient):
     def diff_between_revisions(self, revision_range, args, repository_info):
         """Perform a diff between two arbitrary revisions"""
 
+        head_ref = "HEAD"
+        if self.head_ref:
+            head_ref = self.head_ref
+
         # Make a parent diff to the first of the revisions so that we
         # never end up with broken patches:
         self.merge_base = execute([self.git, "merge-base",
                                    self.upstream_branch,
-                                   self.head_ref]).strip()
+                                   head_ref]).strip()
 
         if ":" not in revision_range:
             # only one revision is specified
