@@ -127,14 +127,14 @@ class GitClient(SCMClient):
                     die("Your installation of git-svn must be upgraded to "
                         "version 1.5.4 or later")
 
-        # Okay, maybe Perforce.
-        data = execute(["git", "config", '--get', "git-p4.port"], ignore_errors=True)
+        # Okay, maybe Perforce/git-p4.
+        git_p4_ref = os.path.join(git_dir, 'refs', 'remotes', 'p4', 'master')
+        data = execute([self.git, 'config', '--get', 'git-p4.port'], ignore_errors=True)
         m = re.search(r'(.+)', data)
-        if m:
+        if os.path.exists(git_p4_ref) and m:
             port = m.group(1)
-            self.type = "perforce"
-            self.upstream_branch = "remotes/p4/master"
-            # TODO hef: figure out what a base path is and add it here
+            self.type = 'perforce'
+            self.upstream_branch = 'remotes/p4/master'
             return RepositoryInfo(path=port, base_path='', supports_parent_diffs=True)
 
         # Nope, it's git then.
