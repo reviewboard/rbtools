@@ -1,0 +1,4 @@
+*.pyc
+RBTools.egg-info/
+build/
+dist/
