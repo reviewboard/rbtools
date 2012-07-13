@@ -189,6 +189,7 @@ class ReviewBoardServer(object):
         self._server_info = None
         self.root_resource = None
         self.deprecated_api = False
+        self.rb_version = "0.0.0.0"
         self.cookie_file = cookie_file
         self.cookie_jar  = cookielib.MozillaCookieJar(self.cookie_file)
 
