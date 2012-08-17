@@ -727,7 +727,7 @@ class ReviewBoardServer(object):
         }
 
         try:
-            r = HTTPRequest(url, body, headers, method='PUT')
+            r = HTTPRequest(str(url), body, headers, method='PUT')
             data = urllib2.urlopen(r).read()
             try:
                 self.cookie_jar.save(self.cookie_file)
@@ -851,6 +851,12 @@ def tempt_fate(server, tool, changenum, diff_content=None,
     try:
         if options.rid:
             review_request = server.get_review_request(options.rid)
+            status = review_request['status']
+
+            if status == 'submitted':
+                die("Review request %s is marked as %s. In order to "
+                    "update it, please reopen the request using the web "
+                    "interface and try again." % (options.rid, status))
         else:
             review_request = server.new_review_request(changenum, submit_as)
 
