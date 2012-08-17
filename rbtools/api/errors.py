@@ -15,3 +15,57 @@ class APIError(Exception):
             return '%s (%s)' % (self.rsp['err']['msg'], code_str)
         else:
             return code_str
+
+
+class ResourceError(Exception):
+    def __init__(self, msg, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)
+        self.msg = msg
+
+    def __str__(self):
+        return self.msg
+
+
+class ServerInterfaceError(Exception):
+    def __init__(self, msg, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)
+        self.msg = msg
+
+    def __str__(self):
+        return self.msg
+
+
+class ChildResourceUncreatableError(ResourceError):
+    pass
+
+
+class InvalidChildResourceUrlError(ResourceError):
+    pass
+
+
+class InvalidResourceTypeError(ResourceError):
+    pass
+
+
+class InvalidKeyError(ResourceError):
+    pass
+
+
+class RequestFailedError(ResourceError):
+    pass
+
+
+class UnloadedResourceError(ResourceError):
+    pass
+
+
+class UnknownResourceTypeError(ResourceError):
+    pass
+
+
+class InvalidRequestMethodError(ServerInterfaceError):
+    pass
+
+
+class AuthenticationFailedError(ServerInterfaceError):
+    pass
