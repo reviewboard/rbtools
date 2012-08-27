@@ -164,6 +164,45 @@ class SVNClient(SCMClient):
 
         return ''.join(diff)
 
+    def find_copyfrom(self, path):
+        """
+        A helper function for handle_renames
+
+        The output of 'svn info' reports the "Copied From" header when invoked
+        on the exact path that was copied. If the current file was copied as a
+        part of a parent or any further ancestor directory, 'svn info' will not
+        report the origin. Thus it is needed to ascend from the path until
+        either a copied path is found or there are no more path components to
+        try.
+        """
+        def smart_join(p1, p2):
+            if p2:
+                return os.path.join(p1, p2)
+
+            return p1
+
+        path1 = path
+        path2 = None
+
+        while path1:
+            info = self.svn_info(path1)
+            url = info.get('Copied From URL', None)
+
+            if url:
+                root = info["Repository Root"]
+                from_path1 = urllib.unquote(url[len(root):])
+                return smart_join(from_path1, path2)
+
+            # Strip one component from path1 to path2
+            path1, tmp = os.path.split(path1)
+
+            if path1 == "" or path1 == "/":
+                path1 = None
+            else:
+                path2 = smart_join(tmp, path2)
+
+        return None
+
     def handle_renames(self, diff_content):
         """
         The output of svn diff is incorrect when the file in question came
@@ -190,12 +229,9 @@ class SVNClient(SCMClient):
             # This is where we decide how mangle the previous '--- '
             if self.DIFF_NEW_FILE_LINE_RE.match(line):
                 to_file, _ = self.parse_filename_header(line[4:])
-                info       = self.svn_info(to_file, True)
-                if info is not None and info.has_key("Copied From URL"):
-                    url       = info["Copied From URL"]
-                    root      = info["Repository Root"]
-                    from_file = urllib.unquote(url[len(root):])
-                    result.append(from_line.replace(to_file, from_file))
+                copied_from = self.find_copyfrom(to_file)
+                if copied_from is not None:
+                    result.append(from_line.replace(to_file, copied_from))
                 else:
                     result.append(from_line) #as is, no copy performed
 
