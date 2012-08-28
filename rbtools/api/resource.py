@@ -249,9 +249,136 @@ class RootResource(ResourceItem):
 RESOURCE_MAP['application/vnd.reviewboard.org.root'] = RootResource
 
 
+class DiffListResource(ResourceList):
+    """The Diff List resource specific base class.
+
+    Provides additional functionality to assist in the uploading of
+    new diffs.
+    """
+    def upload_diff(self, diff, parent_diff=None, base_dir=None, **kwargs):
+        """Uploads a new diff.
+
+        The diff and parent_diff arguments should be strings containing
+        the diff output.
+        """
+        request = HttpRequest(self.url, method='POST', query_args=kwargs)
+        request.add_file('path', 'diff', diff)
+
+        if parent_diff:
+            request.add_file('parent_diff_path', 'parent_diff', parent_diff)
+
+        if base_dir:
+            request.add_field("basedir", base_dir)
+
+        return request
+
+RESOURCE_MAP['application/vnd.reviewboard.org.diffs'] = DiffListResource
+
+
 class DiffResource(ResourceItem):
-    def get_patch(self):
-        """ Returns unified diff content."""
-        pass
+    """The Diff resource specific base class.
+
+    Provides the 'get_patch' method for retrieving the content of the
+    actual diff file itself.
+    """
+    def get_patch(self, **kwargs):
+        """Retrieves the actual diff file contents."""
+        request = HttpRequest(self.url, query_args=kwargs)
+        request.headers['Accept'] = 'text/x-patch'
+        return request
 
 RESOURCE_MAP['application/vnd.reviewboard.org.diff'] = DiffResource
+
+
+class FileDiffResource(ResourceItem):
+    """The File Diff resource specific base class."""
+    def get_patch(self, **kwargs):
+        """Retrieves the actual diff file contents."""
+        request = HttpRequest(self.url, query_args=kwargs)
+        request.headers['Accept'] = 'text/x-patch'
+        return request
+
+    def get_diff_data(self, **kwargs):
+        """Retrieves the actual raw diff data for the file."""
+        request = HttpRequest(self.url, query_args=kwargs)
+        request.headers['Accept'] = \
+            'application/vnd.reviewboard.org.diff.data+json'
+        return request
+
+RESOURCE_MAP['application/vnd.reviewboard.org.file'] = FileDiffResource
+
+
+class FileAttachmentListResource(ResourceList):
+    """The File Attachment List resource specific base class."""
+    def upload_attachment(self, filename, content, caption=None, **kwargs):
+        """Uploads a new attachment.
+
+        The content argument should contain the body of the file to be
+        uploaded, in string format.
+        """
+        request = HttpRequest(self.url, method='POST', query_args=kwargs)
+        request.add_file('path', filename, content)
+
+        if caption:
+            request.add_field('caption', caption)
+
+        return request
+
+RESOURCE_MAP['application/vnd.reviewboard.org.file-attachments'] = \
+    FileAttachmentListResource
+
+
+class DraftFileAttachmentListResource(FileAttachmentListResource):
+    """The Draft File Attachment List resource specific base class."""
+    pass
+
+RESOURCE_MAP['application/vnd.reviewboard.org.draft-file-attachments'] = \
+    DraftFileAttachmentListResource
+
+
+class ScreenshotListResource(ResourceList):
+    """The Screenshot List resource specific base class."""
+    def upload_screenshot(self, filename, content, caption=None, **kwargs):
+        """Uploads a new screenshot.
+
+        The content argument should contain the body of the screenshot
+        to be uploaded, in string format.
+        """
+        request = HttpRequest(self.url, method='POST', query_args=kwargs)
+        request.add_file('path', filename, content)
+
+        if caption:
+            request.add_field('caption', caption)
+
+        return request
+
+RESOURCE_MAP['application/vnd.reviewboard.org.screenshots'] = \
+    ScreenshotListResource
+
+
+class DraftScreenshotListResource(ScreenshotListResource):
+    """The Draft Screenshot List resource specific base class."""
+    pass
+
+RESOURCE_MAP['application/vnd.reviewboard.org.draft-screenshots'] = \
+    DraftScreenshotListResource
+
+
+class ReviewRequestResource(ResourceItem):
+    """The Review Request resource specific base class."""
+    def submit(self, description=None, changenum=None):
+        """Submit a review request"""
+        data = {
+            'status': 'submitted',
+        }
+
+        if description:
+            data['description'] = description
+
+        if changenum:
+            data['changenum'] = changenum
+
+        return self.update(data=data)
+
+RESOURCE_MAP['application/vnd.reviewboard.org.review-request'] = \
+    ReviewRequestResource

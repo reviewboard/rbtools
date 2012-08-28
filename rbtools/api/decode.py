@@ -30,10 +30,22 @@ DECODER_MAP['application/json'] = JsonDecoder
 
 def PlainTextDecoder(payload):
     return {
-        'text': payload,
+        'resource': {
+            'text': payload,
+        },
     }
 
 DECODER_MAP['text/plain'] = PlainTextDecoder
+
+
+def PatchDecoder(payload):
+    return {
+        'resource': {
+            'diff': payload,
+        },
+    }
+
+DECODER_MAP['text/x-patch'] = PatchDecoder
 
 
 def decode_response(payload, mime_type):
