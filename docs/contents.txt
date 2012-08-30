@@ -1,0 +1,18 @@
+==============================
+RBTools Documentation Contents
+==============================
+
+.. toctree::
+   :maxdepth: 2
+   :glob:
+
+   index
+
+
+Indices, glossary and tables
+============================
+
+* :ref:`genindex`
+* :ref:`modindex`
+
+.. comment: vim: ft=rst et ts=3

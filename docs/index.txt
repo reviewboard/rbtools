@@ -1,0 +1,33 @@
+=====================
+RBTools Documentation
+=====================
+
+
+Introduction
+============
+
+RBTools is a set of client tools to use with Review Board.
+
+
+API
+===
+
+Included with RBTools is a Python client for the Review Board Web API.
+
+.. note::
+   This documentation assumes knowledge of the Review Board Web API. When
+   possible links will be provided to relevant sections of the Web API
+   documentation which can be found in the `Web API Guide`_.
+
+.. _`Web API Guide`: http://www.reviewboard.org/docs/manual/dev/webapi/
+
+
+.. toctree::
+   :maxdepth: 1
+
+   api/overview
+   api/resource-specific
+   api/tutorial
+
+
+.. comment: vim: ft=rst et ts=3
