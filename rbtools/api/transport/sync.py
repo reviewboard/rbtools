@@ -65,6 +65,16 @@ class SyncTransport(Transport):
         else:
             return value
 
+    def __repr__(self):
+        return ('<SyncTransport(url=%r, cookie_file=%r, username=%r, '
+                'password=%r, agent=%r)>') % (
+            self.url,
+            self.server.cookie_file,
+            self.server.preset_auth_handler.password_mgr.rb_user,
+            # Actual password not shown for security reasons.
+            '*********',
+            self.server.agent)
+
 
 class ResourceDictField(object):
     """Wrapper for dictionaries returned from a resource.
@@ -88,6 +98,11 @@ class ResourceDictField(object):
 
     def __setattr__(self, name, value):
             object.__getattribute__(self, '_fields_dict')[name] = value
+
+    def __repr__(self):
+        return 'ResourceDictField(transport=%r, fields_dict=%r)' % (
+            object.__getattribute__(self, '_transport'),
+            object.__getattribute__(self, '_fields_dict'))
 
 
 class SyncTransportListIterator(object):
@@ -126,6 +141,11 @@ class ResourceListField(list):
     def __iter__(self):
         return SyncTransportListIterator(self)
 
+    def __repr__(self):
+        return 'ResourceListField(transport=%r, list_field=%s)' % (
+            self._transport,
+            super(ResourceListField, self).__repr__())
+
 
 class SyncTransportResourceLink(object):
     """Wrapper for links returned from a resource.
@@ -148,6 +168,14 @@ class SyncTransportResourceLink(object):
 
     def _get(self):
         return HttpRequest(self.href)
+
+    def __repr__(self):
+        return ('SyncTransportResourceLink(transport=%r, href=%r, method=%r,'
+            ' title=%r)') % (
+            self.get._transport,
+            self.href,
+            self.method,
+            self.title)
 
 
 class SyncTransportItemResource(object):
@@ -195,6 +223,11 @@ class SyncTransportItemResource(object):
                 resource.fields[name] = value
             else:
                 raise AttributeError
+
+    def __repr__(self):
+        return 'SyncTransportItemResource(transport=%r, resource=%r)' % (
+            object.__getattribute__(self, '_transport'),
+            object.__getattribute__(self, '_resource'))
 
 
 class SyncTransportListResource(object):
@@ -249,6 +282,11 @@ class SyncTransportListResource(object):
     def __iter__(self):
         return SyncTransportListIterator(self)
 
+    def __repr__(self):
+        return 'SyncTransportListResource(transport=%r, resource=%r)' % (
+            object.__getattribute__(self, '_transport'),
+            object.__getattribute__(self, '_resource'))
+
 
 class SyncTransportMethod(object):
     """Wrapper for resource methods.
@@ -280,3 +318,8 @@ class SyncTransportMethod(object):
                                    item_mime_type=item_content_type)
 
         return self._transport.wrap(resource)
+
+    def __repr__(self):
+        return 'SyncTransportMethod(transport=%r, method=%r)' % (
+            self._transport,
+            self._method)

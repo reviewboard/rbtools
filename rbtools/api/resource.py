@@ -137,6 +137,13 @@ class ResourceItem(Resource):
             if name not in self._excluded_attrs:
                 self.fields[name] = value
 
+    def __repr__(self):
+        return '%s(payload=%r, url=%r, token=%r)' % (
+            self.__class__.__name__,
+            self._payload,
+            self.url,
+            self._token)
+
 
 class CountResource(ResourceItem):
     """Resource returned by a query with 'counts-only' true.
@@ -163,6 +170,11 @@ class CountResource(ResourceItem):
         # as true.
         kwargs.update({'counts_only': False})
         return HttpRequest(self.url, query_args=kwargs)
+
+    def __repr__(self):
+        return 'CountResource(payload=%r, url=%r)' % (
+            self._payload,
+            self.url)
 
 
 class ResourceList(Resource):
@@ -215,6 +227,14 @@ class ResourceList(Resource):
             raise StopIteration()
 
         return HttpRequest(self._links['prev']['href'], query_args=kwargs)
+
+    def __repr__(self):
+        return '%s(payload=%r, url=%r, token=%r, item_mime_type=%r)' % (
+            self.__class__.__name__,
+            self._payload,
+            self.url,
+            self._token,
+            self._item_mime_type)
 
 
 class RootResource(ResourceItem):
