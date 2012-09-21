@@ -229,11 +229,16 @@ class SyncTransportListResource(object):
 
         payload = self._resource[key]
 
-        # TODO: A proper url for the resource should be passed
-        # in to the factory.
+        # TODO: Should try and guess the url based on the parent url,
+        # and the id number if the self link doesn't exist.
+        try:
+            url = payload['links']['self']['href']
+        except KeyError:
+            url = ''
+
         resource = create_resource(
             payload,
-            '',
+            url,
             mime_type=self._resource._item_mime_type,
             guess_token=False)
 
