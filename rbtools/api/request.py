@@ -25,6 +25,9 @@ except ImportError:
     from cgi import parse_qsl
 
 
+RB_COOKIE_NAME = 'rbsessionid'
+
+
 class HttpRequest(object):
     """High-level HTTP-request object."""
     def __init__(self, url, method='GET', query_args={}):
@@ -131,7 +134,7 @@ class PresetHTTPAuthHandler(urllib2.BaseHandler):
         self.used = False
 
     def http_request(self, request):
-        if not self.used:
+        if not self.used and self.password_mgr.rb_user:
             # Note that we call password_mgr.find_user_password to get the
             # username and password we're working with.
             username, password = \
@@ -228,9 +231,8 @@ class ReviewBoardServer(object):
     Provides methods for executing HTTP requests on a Review Board
     server's Web API.
     """
-
     def __init__(self, url, cookie_file, username=None, password=None,
-                 agent=None):
+                 agent=None, session=None):
         self.url = url
         if self.url[-1] != '/':
             self.url += '/'
@@ -242,6 +244,35 @@ class ReviewBoardServer(object):
                 self.cookie_jar.load(self.cookie_file, ignore_expires=True)
             except IOError:
                 pass
+
+        if session:
+            parsed_url = urlparse(url)
+            # Get the cookie domain from the url. If the domain
+            # does not contain a '.' (e.g. 'localhost'), we assume
+            # it is a local domain and suffix it (See RFC 2109).
+            domain = parsed_url.hostname
+            if domain.count('.') < 1:
+                domain = "%s.local" % domain
+
+            cookie = cookielib.Cookie(
+                version=0,
+                name=RB_COOKIE_NAME,
+                value=session,
+                port=None,
+                port_specified=False,
+                domain=domain,
+                domain_specified=True,
+                domain_initial_dot=True,
+                path=parsed_url.path,
+                path_specified=True,
+                secure=False,
+                expires=None,
+                discard=False,
+                comment=None,
+                comment_url=None,
+                rest={'HttpOnly': None})
+            self.cookie_jar.set_cookie(cookie)
+            self.cookie_jar.save()
 
         # Set up the HTTP libraries to support all of the features we need.
         password_mgr = ReviewBoardHTTPPasswordMgr(self.url,

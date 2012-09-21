@@ -19,11 +19,18 @@ class SyncTransport(Transport):
     The optional agent parameter can be used to specify a custom
     User-Agent string for the API. If not provided, the default
     RBTools User-Agent will be used.
+
+    The optional session can be used to specify an 'rbsessionid'
+    to use when authenticating with reviewboard.
+
     """
-    def __init__(self, url, cookie_file, username, password, agent=None):
+    def __init__(self, url, cookie_file, username=None, password=None,
+                 agent=None, session=None):
         super(SyncTransport, self).__init__(url)
         self.server = ReviewBoardServer(self.url, cookie_file,
-                                        username=username, password=password)
+                                        username=username,
+                                        password=password,
+                                        session=session)
 
         self.get_root = SyncTransportMethod(self, self._root_request)
 
