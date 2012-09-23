@@ -236,6 +236,8 @@ class ReviewBoardServer(object):
         self.url = url
         if self.url[-1] != '/':
             self.url += '/'
+
+        self.url = self.url + 'api/'
         self.cookie_file = cookie_file
         self.cookie_jar = cookielib.MozillaCookieJar(self.cookie_file)
 
@@ -250,7 +252,7 @@ class ReviewBoardServer(object):
             # Get the cookie domain from the url. If the domain
             # does not contain a '.' (e.g. 'localhost'), we assume
             # it is a local domain and suffix it (See RFC 2109).
-            domain = parsed_url.hostname
+            domain = parsed_url[1].partition(':')[0]  # Remove Port.
             if domain.count('.') < 1:
                 domain = "%s.local" % domain
 
@@ -263,7 +265,7 @@ class ReviewBoardServer(object):
                 domain=domain,
                 domain_specified=True,
                 domain_initial_dot=True,
-                path=parsed_url.path,
+                path=parsed_url[2],
                 path_specified=True,
                 secure=False,
                 expires=None,

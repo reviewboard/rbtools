@@ -1,4 +1,5 @@
 import re
+import urlparse
 
 from rbtools.api.request import HttpRequest
 
@@ -227,6 +228,11 @@ class ResourceList(Resource):
             raise StopIteration()
 
         return HttpRequest(self._links['prev']['href'], query_args=kwargs)
+
+    def get_item(self, pk, **kwargs):
+        """Retrieve the item resource with the corresponding primary key."""
+        return HttpRequest(urlparse.urljoin(self.url, '%s/' % pk),
+                           query_args=kwargs)
 
     def __repr__(self):
         return '%s(payload=%r, url=%r, token=%r, item_mime_type=%r)' % (
