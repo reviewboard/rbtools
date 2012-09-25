@@ -13,6 +13,7 @@ class SCMClient(object):
     A base representation of an SCM tool for fetching repository information
     and generating diffs.
     """
+    name = None
 
     def __init__(self, user_config=None, configs=[], options=None):
         self.user_config = user_config
@@ -152,6 +153,7 @@ def scan_usable_client(options):
 
     # Try to find the SCM Client we're going to be working with.
     for tool in SCMCLIENTS:
+        logging.debug('Checking for a %s repository...' % tool.name)
         repository_info = tool.get_repository_info()
 
         if repository_info:

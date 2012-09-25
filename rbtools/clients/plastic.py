@@ -13,6 +13,8 @@ class PlasticClient(SCMClient):
     A wrapper around the cm Plastic tool that fetches repository
     information and generates compatible diffs
     """
+    name = 'Plastic'
+
     def __init__(self, **kwargs):
         super(PlasticClient, self).__init__(**kwargs)
 

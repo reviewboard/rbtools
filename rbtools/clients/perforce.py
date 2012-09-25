@@ -18,6 +18,8 @@ class PerforceClient(SCMClient):
     A wrapper around the p4 Perforce tool that fetches repository information
     and generates compatible diffs.
     """
+    name = 'Perforce'
+
     DATE_RE = re.compile(r'(\w+)\s+(\w+)\s+(\d+)\s+(\d\d:\d\d:\d\d)\s+'
                           '(\d\d\d\d)')
 

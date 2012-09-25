@@ -5,6 +5,7 @@ import getpass
 import logging
 import mimetools
 import os
+import platform
 import re
 import sys
 import urllib2
@@ -1211,9 +1212,15 @@ def main():
     args = parse_options(sys.argv[1:])
 
     debug('RBTools %s' % get_version_string())
+    debug('Python %s' % sys.version)
+    debug('Running on %s' % (platform.platform()))
     debug('Home = %s' % homepath)
+    debug('Current Directory = %s' % os.getcwd())
 
+    debug('Checking the repository type. Errors shown below are mostly harmless.')
     repository_info, tool = scan_usable_client(options)
+    debug('Finished checking the repository type.')
+
     tool.user_config = user_config
     tool.configs = configs
 

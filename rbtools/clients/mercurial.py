@@ -15,6 +15,7 @@ class MercurialClient(SCMClient):
     A wrapper around the hg Mercurial tool that fetches repository
     information and generates compatible diffs.
     """
+    name = 'Mercurial'
 
     def __init__(self, **kwargs):
         super(MercurialClient, self).__init__(**kwargs)
