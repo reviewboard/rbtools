@@ -1227,22 +1227,6 @@ def main():
     # Verify that options specific to an SCM Client have not been mis-used.
     tool.check_options()
 
-    # Try to find a valid Review Board server to use.
-    if options.server:
-        server_url = options.server
-    else:
-        server_url = tool.scan_for_server(repository_info)
-
-    if not server_url:
-        print "Unable to find a Review Board server for this source code tree."
-        sys.exit(1)
-
-    server = ReviewBoardServer(server_url, repository_info, cookie_file)
-
-    # Handle the case where /api/ requires authorization (RBCommons).
-    if not server.check_api_version():
-        die("Unable to log in with the supplied username and password.")
-
     if repository_info.supports_changesets:
         changenum = tool.get_changenum(args)
     else:
@@ -1287,6 +1271,22 @@ def main():
         # The comma here isn't a typo, but rather suppresses the extra newline
         print diff,
         sys.exit(0)
+
+    # Try to find a valid Review Board server to use.
+    if options.server:
+        server_url = options.server
+    else:
+        server_url = tool.scan_for_server(repository_info)
+
+    if not server_url:
+        print "Unable to find a Review Board server for this source code tree."
+        sys.exit(1)
+
+    server = ReviewBoardServer(server_url, repository_info, cookie_file)
+
+    # Handle the case where /api/ requires authorization (RBCommons).
+    if not server.check_api_version():
+        die("Unable to log in with the supplied username and password.")
 
     # Let's begin.
     server.login()
