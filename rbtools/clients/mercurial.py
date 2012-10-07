@@ -121,7 +121,7 @@ class MercurialClient(SCMClient):
         Extracts the first line from the description of the given changeset.
         """
         return execute(['hg', 'log', '-r%s' % revision, '--template',
-                        r'{desc|firstline}'], env=self._hg_env)
+                        r'{desc|firstline}'], env=self._hg_env).replace('\n', ' ')
 
     def extract_description(self, rev1, rev2):
         """
