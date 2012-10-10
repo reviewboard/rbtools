@@ -351,10 +351,12 @@ class MercurialTestBase(SCMClientTests):
         return execute(full_command, env, split_lines, ignore_errors,
                        extra_ignore_errors, translate_newlines)
 
-    def _hg_add_file_commit(self, filename, data, msg):
+    def _hg_add_file_commit(self, filename, data, msg, branch=None):
         outfile = open(filename, 'w')
         outfile.write(data)
         outfile.close()
+        if branch:
+            self._hgcmd(['branch', branch])
         self._hgcmd(['add', filename])
         self._hgcmd(['commit', '-m', msg])
 
@@ -621,6 +623,27 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self.assertEqual('svn://127.0.0.1:%s/svnrepo' % self._svnserve_port,
                         ri.path)
 
+    def testCalculateRepositoryInfo(self):
+        """
+        Test MercurialClient (+svn) _calculate_hgsubversion_repository_info
+        properly determines repository and base paths.
+
+        """
+        info = (
+            "URL: svn+ssh://testuser@svn.example.net/repo/trunk\n"
+            "Repository Root: svn+ssh://testuser@svn.example.net/repo\n"
+            "Repository UUID: bfddb570-5023-0410-9bc8-bc1659bf7c01\n"
+            "Revision: 9999\n"
+            "Node Kind: directory\n"
+            "Last Changed Author: user\n"
+            "Last Changed Rev: 9999\n"
+            "Last Changed Date: 2012-09-05 18:04:28 +0000 (Wed, 05 Sep 2012)")
+
+        repo_info = self.client._calculate_hgsubversion_repository_info(info)
+
+        self.assertEqual(repo_info.path, "svn+ssh://svn.example.net/repo")
+        self.assertEqual(repo_info.base_path, "/trunk")
+
     def testScanForServerSimple(self):
         """Test MercurialClient (+svn) scan_for_server, simple case"""
         ri = self.client.get_repository_info()
@@ -674,6 +697,18 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self._hg_add_file_commit('foo.txt', FOO6, 'edit 6')
 
         self.assertEqual(EXPECTED_HG_SVN_DIFF_1, self.client.diff(None)[0])
+
+    def testDiffOfRevision(self):
+        """Test MercurialClient (+svn) diff specifying a revision."""
+        self.client.get_repository_info()
+
+        self._hg_add_file_commit('foo.txt', FOO4, 'edit 4', branch='b')
+        self._hg_add_file_commit('foo.txt', FOO5, 'edit 5', branch='b')
+        self._hg_add_file_commit('foo.txt', FOO6, 'edit 6', branch='b')
+        self._hg_add_file_commit('foo.txt', FOO4, 'edit 7', branch='b')
+
+        self.assertEqual(EXPECTED_HG_SVN_DIFF_0, self.client.diff(['3'])[0])
+        self.assertEqual(EXPECTED_HG_SVN_DIFF_1, self.client.diff(['5'])[0])
 
 
 class SVNClientTests(SCMClientTests):

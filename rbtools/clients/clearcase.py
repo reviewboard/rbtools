@@ -23,6 +23,7 @@ class ClearCaseClient(SCMClient):
     information and generates compatible diffs.
     This client assumes that cygwin is installed on windows.
     """
+    name = 'ClearCase'
     viewtype = None
 
     def __init__(self, **kwargs):

@@ -55,7 +55,11 @@ def load_config_files(homepath):
         if config:
             configs.append(config)
 
-    return _load_config(homepath), configs
+    user_config = _load_config(homepath)
+    if user_config:
+        configs.append(user_config)
+
+    return user_config, configs
 
 
 def make_tempfile(content=None):

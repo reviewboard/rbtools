@@ -2,6 +2,8 @@ import logging
 import os
 import re
 
+from urlparse import urlsplit, urlunparse
+
 from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.clients.svn import SVNClient
 from rbtools.utils.checks import check_install
@@ -13,6 +15,7 @@ class MercurialClient(SCMClient):
     A wrapper around the hg Mercurial tool that fetches repository
     information and generates compatible diffs.
     """
+    name = 'Mercurial'
 
     def __init__(self, **kwargs):
         super(MercurialClient, self).__init__(**kwargs)
@@ -79,24 +82,20 @@ class MercurialClient(SCMClient):
 
     def _calculate_hgsubversion_repository_info(self, svn_info):
         self._type = 'svn'
-        m = re.search(r'^Repository Root: (.+)$', svn_info, re.M)
+        def _info(r):
+            m = re.search(r, svn_info, re.M)
+            return urlsplit(m.group(1)) if m else None
 
-        if not m:
-            return None
+        root = _info(r'^Repository Root: (.+)$')
+        url = _info(r'^URL: (.+)$')
 
-        path = m.group(1)
-        m2 = re.match(r'^(svn\+ssh|http|https|svn)://([-a-zA-Z0-9.]*@)(.*)$',
-                        path)
-        if m2:
-            path = '%s://%s' % (m2.group(1), m2.group(3))
+        if not (root and url): return None
+        scheme, netloc, path, _, _ = root
+        root = urlunparse([scheme, root.netloc.split("@")[-1], path,
+                           "", "", ""])
+        base_path = url.path[len(path):]
 
-        m = re.search(r'^URL: (.+)$', svn_info, re.M)
-
-        if not m:
-            return None
-
-        base_path = m.group(1)[len(path):] or "/"
-        return RepositoryInfo(path=path, base_path=base_path,
+        return RepositoryInfo(path=root, base_path=base_path,
                               supports_parent_diffs=True)
 
     @property
@@ -122,7 +121,7 @@ class MercurialClient(SCMClient):
         Extracts the first line from the description of the given changeset.
         """
         return execute(['hg', 'log', '-r%s' % revision, '--template',
-                        r'{desc|firstline}'], env=self._hg_env)
+                        r'{desc|firstline}'], env=self._hg_env).replace('\n', ' ')
 
     def extract_description(self, rev1, rev2):
         """
@@ -163,7 +162,9 @@ class MercurialClient(SCMClient):
         if self.options.guess_description and not self.options.description:
             self.options.description = self.extract_description(parent, ".")
 
-        return (execute(["hg", "diff", "--svn", '-r%s:.' % parent]), None)
+        rs = "-r{0}:{1}".format(parent, files[0] if len(files) == 1 else '.')
+
+        return (execute(["hg", "diff", "--svn", rs]), None)
 
     def _get_outgoing_diff(self, files):
         """
