@@ -186,7 +186,7 @@ class SVNClient(SCMClient):
         path2 = None
 
         while path1:
-            info = self.svn_info(path1)
+            info = self.svn_info(path1, ignore_errors=True) or {}
             url = info.get('Copied From URL', None)
 
             if url:
