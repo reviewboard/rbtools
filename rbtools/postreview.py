@@ -545,6 +545,9 @@ class ReviewBoardServer(object):
         if self.info.base_path:
             fields['basedir'] = self.info.base_path
 
+        if options.basedir:
+            fields['basedir'] = options.basedir
+
         files['path'] = {
             'filename': 'diff',
             'content': diff_content
@@ -1138,6 +1141,12 @@ def parse_options(args):
                       default=get_config_value(configs, 'HTTP_PASSWORD'),
                       metavar='PASSWORD',
                       help='password for HTTP Basic authentication')
+    parser.add_option('--basedir',
+                      dest='basedir',
+                      default=None,
+                      help='the absolute path in the repository the diff was '
+                           'generated in. Will override the path detected '
+                           'by post-review.')
 
     (globals()["options"], args) = parser.parse_args(args)
 
