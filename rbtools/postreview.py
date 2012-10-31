@@ -1031,14 +1031,14 @@ def parse_options(args):
                       dest="guess_summary", action="store_true",
                       default=get_config_value(configs, 'GUESS_SUMMARY',
                                                False),
-                      help="guess summary from the latest commit (git/"
+                      help="guess summary from the latest commit (bzr/git/"
                            "hg/hgsubversion only)")
     parser.add_option("--guess-description",
                       dest="guess_description", action="store_true",
                       default=get_config_value(configs, 'GUESS_DESCRIPTION',
                                                False),
                       help="guess description based on commits on this branch "
-                           "(git/hg/hgsubversion only)")
+                           "(bzr/git/hg/hgsubversion only)")
     parser.add_option("--testing-done",
                       dest="testing_done", default=None,
                       help="details of testing done ")
