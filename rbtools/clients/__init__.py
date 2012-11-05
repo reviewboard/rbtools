@@ -138,9 +138,9 @@ def load_scmclients(options):
         ClearCaseClient(options=options),
         GitClient(options=options),
         MercurialClient(options=options),
+        SVNClient(options=options),
         PerforceClient(options=options),
         PlasticClient(options=options),
-        SVNClient(options=options),
     ]
 
 
