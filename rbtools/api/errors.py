@@ -17,13 +17,8 @@ class APIError(Exception):
             return code_str
 
 
-class ResourceError(Exception):
-    def __init__(self, msg, *args, **kwargs):
-        Exception.__init__(self, *args, **kwargs)
-        self.msg = msg
-
-    def __str__(self):
-        return self.msg
+class AuthorizationError(APIError):
+    pass
 
 
 class ServerInterfaceError(Exception):
@@ -35,37 +30,11 @@ class ServerInterfaceError(Exception):
         return self.msg
 
 
-class ChildResourceUncreatableError(ResourceError):
-    pass
+API_ERROR_TYPE = {
+    401: AuthorizationError,
+}
 
 
-class InvalidChildResourceUrlError(ResourceError):
-    pass
-
-
-class InvalidResourceTypeError(ResourceError):
-    pass
-
-
-class InvalidKeyError(ResourceError):
-    pass
-
-
-class RequestFailedError(ResourceError):
-    pass
-
-
-class UnloadedResourceError(ResourceError):
-    pass
-
-
-class UnknownResourceTypeError(ResourceError):
-    pass
-
-
-class InvalidRequestMethodError(ServerInterfaceError):
-    pass
-
-
-class AuthenticationFailedError(ServerInterfaceError):
-    pass
+def create_api_error(http_status, *args, **kwargs):
+    error_type = API_ERROR_TYPE.get(http_status, APIError)
+    return error_type(http_status, *args, **kwargs)

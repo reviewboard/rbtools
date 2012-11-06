@@ -25,12 +25,15 @@ class SyncTransport(Transport):
 
     """
     def __init__(self, url, cookie_file, username=None, password=None,
-                 agent=None, session=None):
+                 agent=None, session=None, disable_proxy=False,
+                 auth_callback=None):
         super(SyncTransport, self).__init__(url)
         self.server = ReviewBoardServer(self.url, cookie_file,
                                         username=username,
                                         password=password,
-                                        session=session)
+                                        session=session,
+                                        disable_proxy=disable_proxy,
+                                        auth_callback=auth_callback)
 
         self.get_root = SyncTransportMethod(self, self._root_request)
 

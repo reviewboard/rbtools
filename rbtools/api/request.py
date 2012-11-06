@@ -8,7 +8,7 @@ import urllib2
 from urlparse import urlparse, urlunparse
 
 from rbtools import get_package_version
-from rbtools.api.errors import APIError, ServerInterfaceError
+from rbtools.api.errors import APIError, create_api_error, ServerInterfaceError
 
 try:
     # Specifically import json_loads, to work around some issues with
@@ -98,9 +98,8 @@ class HttpRequest(object):
             content.write('Content-Disposition: form-data; name="%s"; ' % key)
             content.write('filename="%s"' % filename + NEWLINE)
             content.write('Content-Type: %s' % mime_type + NEWLINE)
-            content.write('Content-Transfer-Encoding: base64' + NEWLINE)
             content.write(NEWLINE)
-            content.write(base64.b64encode(value).decode())
+            content.write(value)
             content.write(NEWLINE)
 
         content.write('--' + BOUNDARY + '--' + NEWLINE + NEWLINE)
@@ -193,7 +192,7 @@ class ReviewBoardHTTPBasicAuthHandler(urllib2.HTTPBasicAuthHandler):
             response = urllib2.HTTPBasicAuthHandler.retry_http_basic_auth(
                 self, *args, **kwargs)
 
-            if response.code != 401:
+            if response and response.code != 401:
                 self._retried = False
 
             return response
@@ -210,14 +209,22 @@ class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
 
     See: http://bugs.python.org/issue974757
     """
-    def __init__(self, reviewboard_url, rb_user=None, rb_pass=None):
+    def __init__(self, reviewboard_url, rb_user=None, rb_pass=None,
+                 auth_callback=None):
         self.passwd = {}
         self.rb_url = reviewboard_url
         self.rb_user = rb_user
         self.rb_pass = rb_pass
+        self.auth_callback = auth_callback
 
     def find_user_password(self, realm, uri):
         if realm == 'Web API':
+            if (self.auth_callback and (
+                self.rb_user is None or self.rb_pass is None)):
+                username, password = self.auth_callback(realm, uri)
+                self.rb_user = username
+                self.rb_pass = password
+
             return self.rb_user, self.rb_pass
         else:
             # If this is an auth request for some other domain (since HTTP
@@ -230,9 +237,16 @@ class ReviewBoardServer(object):
 
     Provides methods for executing HTTP requests on a Review Board
     server's Web API.
+
+    The ``auth_callback`` parameter can be used to specify a callable
+    which will be called when authentication fails. This callable will
+    be passed the realm, and url of the Review Board server and should
+    return a 2-tuple of username, password. The user can be prompted
+    for their credentials using this mechanism.
     """
     def __init__(self, url, cookie_file, username=None, password=None,
-                 agent=None, session=None):
+                 agent=None, session=None, disable_proxy=False,
+                 auth_callback=None):
         self.url = url
         if self.url[-1] != '/':
             self.url += '/'
@@ -279,11 +293,15 @@ class ReviewBoardServer(object):
         # Set up the HTTP libraries to support all of the features we need.
         password_mgr = ReviewBoardHTTPPasswordMgr(self.url,
                                                   username,
-                                                  password)
+                                                  password,
+                                                  auth_callback)
         self.preset_auth_handler = PresetHTTPAuthHandler(self.url,
                                                          password_mgr)
 
         handlers = []
+
+        if disable_proxy:
+            handlers.append(urllib2.ProxyHandler({}))
 
         handlers += [
             urllib2.HTTPCookieProcessor(self.cookie_jar),
@@ -315,8 +333,8 @@ class ReviewBoardServer(object):
 
             assert rsp['stat'] == 'fail'
 
-            raise APIError(http_status, rsp['err']['code'], rsp,
-                           rsp['err']['msg'])
+            raise create_api_error(http_status, rsp['err']['code'], rsp,
+                                   rsp['err']['msg'])
         except ValueError:
             raise APIError(http_status, None, None, data)
 
@@ -335,7 +353,8 @@ class ReviewBoardServer(object):
                     'Content-Length': str(len(body)),
                     })
 
-            r = Request(request.url, body, headers, request.method)
+            r = Request(request.url.encode('utf-8'), body, headers,
+                        request.method)
             rsp = urllib2.urlopen(r)
         except urllib2.HTTPError, e:
             self.process_error(e.code, e.read())
