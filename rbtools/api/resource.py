@@ -266,10 +266,23 @@ class RootResource(ResourceItem):
                         lambda url=url, **kwargs: self._get_template_request(
                             url, **kwargs))
 
-    def _get_template_request(self, url_template, values, **kwargs):
-        url = self._TEMPLATE_PARAM_RE.sub(
-            lambda m: str(values[m.group('key')]),
-            url_template)
+    def _get_template_request(self, url_template, values={}, **kwargs):
+        """Generate an HttpRequest from a uri-template.
+
+        This will replace each '{variable}' in the template with the
+        value from kwargs['variable'], or if it does not exist, the
+        value from values['variable']. The resulting url is used to
+        create an HttpRequest.
+        """
+        def get_template_value(m):
+            try:
+                return str(kwargs.pop(m.group('key'), None) or
+                           values[m.group('key')])
+            except KeyError:
+                raise ValueError("Template was not provided a value for '%s'" %
+                                 m.group('key'))
+
+        url = self._TEMPLATE_PARAM_RE.sub(get_template_value, url_template)
         return HttpRequest(url, query_args=kwargs)
 
 RESOURCE_MAP['application/vnd.reviewboard.org.root'] = RootResource
