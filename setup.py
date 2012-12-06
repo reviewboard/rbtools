@@ -22,8 +22,6 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-import re
-
 from ez_setup import use_setuptools
 use_setuptools()
 
@@ -31,7 +29,6 @@ from setuptools import setup, find_packages
 from setuptools.command.test import test
 
 from rbtools import get_package_version, is_release, VERSION
-from rbtools.commands import RB_CMD_PATTERN, RB_COMMANDS, RB_MAIN
 
 PACKAGE_NAME = 'RBTools'
 
@@ -51,31 +48,21 @@ except ImportError:
     install_requires.append('simplejson')
 
 
-script_list = []
-script_list.append('post-review = rbtools.postreview:main')
-script_list.append('%(main)s = rbtools.commands.%(main)s:main'
-                   % {'main': RB_MAIN})
-
-
-for cmd in RB_COMMANDS:
-    if cmd.startswith(RB_MAIN):
-        name = cmd[len(RB_MAIN):]
-    else:
-        name = cmd
-
-    script_list.append((RB_CMD_PATTERN +
-                       ' = rbtools.commands.%(main)s%(name)s:main')
-                       % {'main': RB_MAIN, 'name': name})
-
-
-entry_scripts = {'console_scripts': script_list}
-
+rb_commands = [
+    'post = rbtools.commands.rbpost:Post',
+]
 
 setup(name=PACKAGE_NAME,
       version=get_package_version(),
       license="MIT",
       description="Command line tools for use with Review Board",
-      entry_points=entry_scripts,
+      entry_points={
+          'console_scripts': [
+              'post-review = rbtools.postreview:main',
+              'rb = rbtools.commands.rb:main',
+          ],
+          'rb_commands': rb_commands,
+      },
       install_requires=install_requires,
       dependency_links=[
           download_url,

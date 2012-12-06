@@ -1,39 +1,22 @@
+import os
+import pkg_resources
+import subprocess
 import sys
-from optparse import IndentedHelpFormatter, OptionParser
+from optparse import OptionParser
 
 from rbtools import get_version_string
-from rbtools.commands import RB_CMD_PATTERN, RB_COMMANDS, RB_MAIN
-from rbtools.utils.process import execute
+from rbtools.commands import RB_MAIN
 
 
-_indent = max([len(cmd) for cmd in RB_COMMANDS]) - len(RB_MAIN)
-
-_COMMANDS_LIST_STR = 'Available commands are:\n' + '\n'.join([
-    "  %-*s  %s" % (_indent, cmd[len(RB_MAIN):], desc)
-    for cmd, desc in RB_COMMANDS.iteritems()
-])
-
-
-class SimpleIndentedFormatter(IndentedHelpFormatter):
-    """Indents text without causing the description text to wrap.
-
-    IndentedHelpFormatter wraps the output so that it fits into the
-    terminal width. This generally is intended to wrap the description text.
-    However, we store our list of commands in the description, and we don't
-    want this to wrap oddly.
-    """
-    def format_description(self, description):
-        if description:
-            return description + '\n'
-        else:
-            return ''
+GLOBAL_OPTIONS = []
 
 
 def main():
+    """Execute a rb command."""
+
     parser = OptionParser(prog=RB_MAIN,
                           usage='%prog [options] <command> [<args>]',
-                          formatter=SimpleIndentedFormatter(),
-                          description=_COMMANDS_LIST_STR,
+                          option_list=GLOBAL_OPTIONS,
                           version='RBTools %s' % get_version_string())
     parser.disable_interspersed_args()
     opt, args = parser.parse_args()
@@ -42,11 +25,37 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    if RB_MAIN + args[0] in RB_COMMANDS:
-        args[0] = RB_CMD_PATTERN % {'name': args[0]}
-        print execute(args)
+    command_name = args[0]
+
+    # Attempt to retrieve the command class from the entry points.
+    ep = pkg_resources.get_entry_info("rbtools", "rb_commands", args[0])
+
+    if ep:
+        try:
+            command = ep.load()()
+        except ImportError:
+            sys.stderr.write("Could not load command entry point %s\n" %
+                             ep.name)
+            sys.exit(1)
+        except Exception, e:
+            sys.stderr.write("Unexpexted error loading command %s: %s\n" %
+                             (ep.name, e))
+            sys.exit(1)
+
+        command.run_from_argv([RB_MAIN] + args)
     else:
-        parser.error("'%s' is not a command" % args[0])
+        # A command class could not be found, so try and execute
+        # the "rb-<command>" on the system.
+        args[0] = "%s-%s" % (RB_MAIN, args[0])
+
+        try:
+            sys.exit(subprocess.call(args,
+                                     stdin=sys.stdin,
+                                     stdout=sys.stdout,
+                                     stderr=sys.stderr,
+                                     env=os.environ.copy()))
+        except OSError:
+            parser.error("'%s' is not a command" % command_name)
 
 
 if __name__ == "__main__":
