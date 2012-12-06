@@ -1,5 +1,5 @@
-#!/usr/bin/env python
 #
+#!/usr/bin/env python
 # setup.py -- Installation for rbtools.
 #
 # Copyright (C) 2009 Christian Hammond
@@ -29,6 +29,7 @@ from setuptools import setup, find_packages
 from setuptools.command.test import test
 
 from rbtools import get_package_version, is_release, VERSION
+
 
 PACKAGE_NAME = 'RBTools'
 
