@@ -107,7 +107,7 @@ class RepositoryInfo(object):
     def set_base_path(self, base_path):
         if not base_path.startswith('/'):
             base_path = '/' + base_path
-        logging.debug("changing repository info base_path from %s to %s" % \
+        logging.debug("changing repository info base_path from %s to %s" %
                       (self.base_path, base_path))
         self.base_path = base_path
 
@@ -169,18 +169,21 @@ def scan_usable_client(options):
         sys.exit(1)
 
     # Verify that options specific to an SCM Client have not been mis-used.
-    if options.change_only and not repository_info.supports_changesets:
+    if (getattr(options, 'change_only', False) and
+        not repository_info.supports_changesets):
         sys.stderr.write("The --change-only option is not valid for the "
                          "current SCM client.\n")
         sys.exit(1)
 
-    if options.parent_branch and not repository_info.supports_parent_diffs:
+    if (getattr(options, 'parent_branch', None) and
+        not repository_info.supports_parent_diffs):
         sys.stderr.write("The --parent option is not valid for the "
                          "current SCM client.\n")
         sys.exit(1)
 
-    if ((options.p4_client or options.p4_port) and
-        not isinstance(tool, PerforceClient)):
+    if (not isinstance(tool, PerforceClient) and
+        (getattr(options, 'p4_client', None) or
+         getattr(options, 'p4_port', None))):
         sys.stderr.write("The --p4-client and --p4-port options are not valid "
                          "for the current SCM client.\n")
         sys.exit(1)
