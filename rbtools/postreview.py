@@ -1265,18 +1265,6 @@ def main():
     if len(diff) == 0:
         die("There don't seem to be any diffs!")
 
-    if (isinstance(tool, PerforceClient) or
-        isinstance(tool, PlasticClient)) and changenum is not None:
-        changenum = tool.sanitize_changenum(changenum)
-
-        # NOTE: In Review Board 1.5.2 through 1.5.3.1, the changenum support
-        #       is broken, so we have to force the deprecated API.
-        if (parse_version(server.rb_version) >= parse_version('1.5.2') and
-            parse_version(server.rb_version) <= parse_version('1.5.3.1')):
-            debug('Using changenums on Review Board %s, which is broken. '
-                  'Falling back to the deprecated 1.0 API' % server.rb_version)
-            server.deprecated_api = True
-
     if options.output_diff_only:
         # The comma here isn't a typo, but rather suppresses the extra newline
         print diff,
@@ -1293,6 +1281,18 @@ def main():
         sys.exit(1)
 
     server = ReviewBoardServer(server_url, repository_info, cookie_file)
+
+    if (isinstance(tool, PerforceClient) or
+        isinstance(tool, PlasticClient)) and changenum is not None:
+        changenum = tool.sanitize_changenum(changenum)
+
+        # NOTE: In Review Board 1.5.2 through 1.5.3.1, the changenum support
+        #       is broken, so we have to force the deprecated API.
+        if (parse_version(server.rb_version) >= parse_version('1.5.2') and
+            parse_version(server.rb_version) <= parse_version('1.5.3.1')):
+            debug('Using changenums on Review Board %s, which is broken. '
+                  'Falling back to the deprecated 1.0 API' % server.rb_version)
+            server.deprecated_api = True
 
     # Handle the case where /api/ requires authorization (RBCommons).
     if not server.check_api_version():
