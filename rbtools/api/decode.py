@@ -54,9 +54,6 @@ def decode_response(payload, mime_type):
     The body of a Web API response will be decoded into a dictionary,
     according to the provided mime_type.
     """
-    if not payload:
-        return {}
-
     mime = parse_mimetype(mime_type)
 
     format = '%s/%s' % (mime['main_type'], mime['format'])
