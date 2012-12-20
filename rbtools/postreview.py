@@ -165,7 +165,10 @@ class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
                     (realm, urlparse(uri)[1])
 
                 if not self.rb_user:
-                    self.rb_user = raw_input('Username: ')
+                    # getpass will write its prompt to stderr but raw_input
+                    # writes to stdout. See bug 2831.
+                    sys.stderr.write('Username: ')
+                    self.rb_user = raw_input()
 
                 if not self.rb_pass:
                     self.rb_pass = getpass.getpass('Password: ')
@@ -279,7 +282,10 @@ class ReviewBoardServer(object):
                 # at args, so that it doesn't override the command line.
                 return
             else:
-                username = raw_input('Username: ')
+                # getpass will write its prompt to stderr but raw_input
+                # writes to stdout. See bug 2831.
+                sys.stderr.write('Username: ')
+                username = raw_input()
 
             if not options.password:
                 password = getpass.getpass('Password: ')
