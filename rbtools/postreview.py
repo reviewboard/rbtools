@@ -50,25 +50,21 @@ class PresetHTTPAuthHandler(urllib2.BaseHandler):
 
     This is used when specifying --username= on the command line. It will
     force an HTTP_AUTHORIZATION header with the user info, asking the user
-    for any missing info beforehand. It will then try this header for that
-    first request.
-
-    It will only do this once.
+    for any missing info beforehand. It will use the authorization header 
+    on future requests.
     """
     handler_order = 480 # After Basic auth
 
     def __init__(self, url, password_mgr):
         self.url = url
         self.password_mgr = password_mgr
-        self.used = False
 
     def reset(self):
         self.password_mgr.rb_user = options.http_username
         self.password_mgr.rb_pass = options.http_password
-        self.used = False
 
     def http_request(self, request):
-        if options.username and not self.used:
+        if options.username:
             # Note that we call password_mgr.find_user_password to get the
             # username and password we're working with. This allows us to
             # prompt if, say, --username was specified but --password was not.
@@ -78,7 +74,6 @@ class PresetHTTPAuthHandler(urllib2.BaseHandler):
             request.add_header(
                 urllib2.HTTPBasicAuthHandler.auth_header,
                 'Basic %s' % base64.b64encode(raw).strip())
-            self.used = True
 
         return request
 
