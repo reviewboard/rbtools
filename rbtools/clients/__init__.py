@@ -15,10 +15,12 @@ class SCMClient(object):
     """
     name = None
 
-    def __init__(self, user_config=None, configs=[], options=None):
+    def __init__(self, user_config=None, configs=[], options=None,
+                 server=None):
         self.user_config = user_config
         self.configs = configs
         self.options = options
+        self.server = server
 
     def get_repository_info(self):
         return None

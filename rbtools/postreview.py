@@ -14,6 +14,7 @@ from pkg_resources import parse_version
 from urlparse import urljoin, urlparse
 
 from rbtools import get_package_version, get_version_string
+from rbtools.api.capabilities import Capabilities
 from rbtools.api.errors import APIError
 from rbtools.clients import scan_usable_client
 from rbtools.clients.perforce import PerforceClient
@@ -190,11 +191,14 @@ class ReviewBoardServer(object):
             self.url += '/'
         self._info = info
         self._server_info = None
+        self.capabilities = None
         self.root_resource = None
         self.deprecated_api = False
         self.rb_version = "0.0.0.0"
         self.cookie_file = cookie_file
         self.cookie_jar  = cookielib.MozillaCookieJar(self.cookie_file)
+        self.deprecated_api = False
+        self.root_resource = None
 
         if self.cookie_file:
             try:
@@ -256,6 +260,19 @@ class ReviewBoardServer(object):
         self.deprecated_api = True
         debug('Using the deprecated Review Board 1.0 web API')
         return True
+
+    def load_capabilities(self):
+        """Loads the server capabilities."""
+        info = self.api_get('api/info/')
+        caps = None
+
+        try:
+            caps = info['info']['capabilities']
+        except KeyError:
+            # The capabilities list is left empty.
+            pass
+
+        self.capabilities = Capabilities(caps)
 
     def login(self, force=False):
         """
@@ -1242,6 +1259,12 @@ def main():
 
     # Verify that options specific to an SCM Client have not been mis-used.
     tool.check_options()
+
+    # Load the server capabilities
+    server.load_capabilities()
+
+    # Pass the tool a pointer to the server
+    tool.server = server
 
     if repository_info.supports_changesets:
         changenum = tool.get_changenum(args)
