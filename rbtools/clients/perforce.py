@@ -45,6 +45,26 @@ class P4Wrapper(object):
     def files(self, path):
         return self.run_p4(['files', path], marshalled=True)
 
+    def fstat(self, depot_path, fields=[]):
+        args = ['fstat']
+
+        if fields:
+            args += ['-T', ','.join(fields)]
+
+        args.append(depot_path)
+
+        lines = self.run_p4(args, split_lines=True)
+        stat_info = {}
+
+        for line in lines:
+            line = line.strip()
+
+            if line.startswith('... '):
+                parts = line.split(' ', 2)
+                stat_info[parts[1]] = parts[2]
+
+        return stat_info
+
     def info(self):
         lines = self.run_p4(['info'],
                             ignore_errors=True,
@@ -500,7 +520,11 @@ class PerforceClient(SCMClient):
 
             old_file = new_file = empty_filename
             old_depot_path = new_depot_path = None
+            new_depot_path = ''
             changetype_short = None
+            supports_moves = (
+                self.capabilities and
+                self.capabilities.has_capability('diffs', 'moved_files'))
 
             if changetype in ['edit', 'integrate']:
                 # A big assumption
@@ -521,7 +545,8 @@ class PerforceClient(SCMClient):
                     new_file = tmp_diff_to_filename
 
                 changetype_short = "M"
-            elif changetype in ['add', 'branch', 'move/add']:
+            elif (changetype in ('add', 'branch') or
+                  (changetype == 'move/add' and not supports_moves)):
                 # We have a new file, get p4 to put this new file into a pretty
                 # temp file for us. No old file to worry about here.
                 if cl_is_pending:
@@ -530,20 +555,58 @@ class PerforceClient(SCMClient):
                     new_depot_path = "%s#%s" % (depot_path, 1)
                     self._write_file(new_depot_path, tmp_diff_to_filename)
                     new_file = tmp_diff_to_filename
+
                 changetype_short = "A"
-            elif changetype in ['delete', 'move/delete']:
+            elif (changetype == 'delete' or
+                  (changetype == 'move/delete' and not supports_moves)):
                 # We've deleted a file, get p4 to put the deleted file into a
                 # temp file for us. The new file remains the empty file.
                 old_depot_path = "%s#%s" % (depot_path, base_revision)
                 self._write_file(old_depot_path, tmp_diff_from_filename)
                 old_file = tmp_diff_from_filename
                 changetype_short = "D"
+            elif changetype == 'move/add':
+                # The server supports move information. We can ignore this,
+                # though, since there should be a "move/delete" that's handled
+                # at some point.
+                continue
+            elif changetype == 'move/delete':
+                # The server supports move information, and we found a moved
+                # file. We'll figure out where we moved to and represent
+                # that information.
+                stat_info = self.p4.fstat(depot_path,
+                                          ['clientFile', 'movedFile'])
+
+                if ('clientFile' not in stat_info or
+                    'movedFile' not in stat_info):
+                    die('Unable to get necessary fstat information on %s' %
+                        depot_path)
+
+                old_depot_path = '%s#%s' % (depot_path, base_revision)
+                self._write_file(old_depot_path, tmp_diff_from_filename)
+                old_file = tmp_diff_from_filename
+
+                # Get information on the new file.
+                moved_stat_info = self.p4.fstat(stat_info['movedFile'],
+                                                ['clientFile', 'depotFile'])
+
+                if ('clientFile' not in moved_stat_info or
+                    'depotFile' not in moved_stat_info):
+                    die('Unable to get necessary fstat information on %s' %
+                        stat_info['movedFile'])
+
+                # This is a new file and we can just access it directly.
+                # There's no revision 1 like with an add.
+                new_file = moved_stat_info['clientFile']
+                new_depot_path = moved_stat_info['depotFile']
+
+                changetype_short = 'MV'
             else:
                 die("Unknown change type '%s' for %s" % (changetype,
                                                          depot_path))
 
             dl = self._do_diff(old_file, new_file, depot_path, base_revision,
-                               changetype_short)
+                               new_depot_path, changetype_short)
             diff_lines += dl
 
         os.unlink(empty_filename)
@@ -552,7 +615,7 @@ class PerforceClient(SCMClient):
         return (''.join(diff_lines), None)
 
     def _do_diff(self, old_file, new_file, depot_path, base_revision,
-                 changetype_short, ignore_unmodified=False):
+                 new_depot_path, changetype_short, ignore_unmodified=False):
         """
         Do the work of producing a diff for Perforce.
 
@@ -561,7 +624,8 @@ class PerforceClient(SCMClient):
         depot_path - The depot path in Perforce for this file.
         base_revision - The base perforce revision number of the old file as
             an integer.
-        changetype_short - The change type as a single character string.
+        new_depot_path - Location of the new file. Only used for moved files.
+        changetype_short - The change type as a short string.
         ignore_unmodified - If True, will return an empty list if the file
             is not changed.
 
@@ -581,10 +645,22 @@ class PerforceClient(SCMClient):
         dl = dl.splitlines(True)
 
         cwd = os.getcwd()
+
         if depot_path.startswith(cwd):
             local_path = depot_path[len(cwd) + 1:]
         else:
             local_path = depot_path
+
+        if changetype_short == 'MV':
+            is_move = True
+
+            if new_depot_path.startswith(cwd):
+                new_local_path = new_depot_path[len(cwd) + 1:]
+            else:
+                new_local_path = new_depot_path
+        else:
+            is_move = False
+            new_local_path = local_path
 
         # Special handling for the output of the diff tool on binary files:
         #     diff outputs "Files a and b differ"
@@ -601,10 +677,11 @@ class PerforceClient(SCMClient):
                     return []
                 else:
                     print "Warning: %s in your changeset is unmodified" % \
-                        local_path
+                          local_path
 
-            dl.insert(0, "==== %s#%s ==%s== %s ====\n" % \
-                (depot_path, base_revision, changetype_short, local_path))
+            dl.insert(0, "==== %s#%s ==%s== %s ====\n" %
+                      (depot_path, base_revision, changetype_short,
+                       new_local_path))
             dl.append('\n')
         elif len(dl) > 1:
             m = re.search(r'(\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d)', dl[1])
@@ -638,7 +715,11 @@ class PerforceClient(SCMClient):
                 timestamp = "%s-%s-%s %s" % (year, month, day, timestamp)
 
             dl[0] = "--- %s\t%s#%s\n" % (local_path, depot_path, base_revision)
-            dl[1] = "+++ %s\t%s\n" % (local_path, timestamp)
+            dl[1] = "+++ %s\t%s\n" % (new_local_path, timestamp)
+
+            if is_move:
+                dl.insert(0, 'Moved to: %s\n' % new_depot_path)
+                dl.insert(0, 'Moved from: %s\n' % depot_path)
 
             # Not everybody has files that end in a newline (ugh). This ensures
             # that the resulting diff file isn't broken.

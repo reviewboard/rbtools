@@ -8,6 +8,7 @@ from random import randint
 from tempfile import mktemp
 from textwrap import dedent
 
+from rbtools.api.capabilities import Capabilities
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.bazaar import BazaarClient
 from rbtools.clients.git import GitClient
@@ -803,6 +804,16 @@ class PerforceClientTests(SCMClientTests):
                 if info['change'] == changenum
             ]
 
+        def fstat(self, depot_path, fields=[]):
+            assert depot_path in self.fstat_files
+
+            fstat_info = self.fstat_files[depot_path]
+
+            for field in fields:
+                assert field in fstat_info
+
+            return fstat_info
+
         def opened(self, changenum):
             return [
                 '%s - %s change %s (text)\n'
@@ -889,11 +900,7 @@ class PerforceClientTests(SCMClientTests):
 
     def test_diff_with_changenum(self):
         """Testing PerforceClient.diff with changenums"""
-        self.options.p4_client = 'myclient'
-        self.options.p4_port = 'perforce.example.com:1666'
-        self.options.p4_passwd = ''
-        client = PerforceClient(self.P4DiffTestWrapper, options=self.options)
-        client.p4d_version = (2012, 2)
+        client = self._build_client()
         client.p4.repo_files = {
             '//mydepot/test/README#2': {
                 'action': 'edit',
@@ -928,12 +935,7 @@ class PerforceClientTests(SCMClientTests):
         }
 
         diff = client.diff(['12345'])
-        self.assertNotEqual(diff[0], None)
-        self.assertEqual(diff[1], None)
-        diff_content = re.sub('\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}',
-                              '1970-01-01 00:00:00',
-                              diff[0])
-        self.assertEqual(diff_content,
+        self._compare_diff(diff,
             '--- //mydepot/test/README\t//mydepot/test/README#2\n'
             '+++ //mydepot/test/README\t1970-01-01 00:00:00\n'
             '@@ -1 +1 @@\n'
@@ -947,6 +949,124 @@ class PerforceClientTests(SCMClientTests):
             '+++ //mydepot/test/Makefile\t1970-01-01 00:00:00\n'
             '@@ -1 +0,0 @@\n'
             '-all: all\n')
+
+    def test_diff_with_moved_files_cap_on(self):
+        """Testing PerforceClient.diff with moved files and capability on"""
+        self._test_diff_with_moved_files(
+            'Moved from: //mydepot/test/README\n'
+            'Moved to: //mydepot/test/README-new\n'
+            '--- //mydepot/test/README\t//mydepot/test/README#2\n'
+            '+++ //mydepot/test/README-new\t1970-01-01 00:00:00\n'
+            '@@ -1 +1 @@\n'
+            '-This is a test.\n'
+            '+This is a mess.\n'
+            '==== //mydepot/test/COPYING#2 ==MV== '
+            '//mydepot/test/COPYING-new ====\n\n',
+            caps={
+                'diffs': {
+                    'moved_files': True
+                }
+            })
+
+    def test_diff_with_moved_files_cap_off(self):
+        """Testing PerforceClient.diff with moved files and capability off"""
+        self._test_diff_with_moved_files(
+            '--- //mydepot/test/README-new\t//mydepot/test/README-new#1\n'
+            '+++ //mydepot/test/README-new\t1970-01-01 00:00:00\n'
+            '@@ -0,0 +1 @@\n'
+            '+This is a mess.\n'
+            '--- //mydepot/test/README\t//mydepot/test/README#2\n'
+            '+++ //mydepot/test/README\t1970-01-01 00:00:00\n'
+            '@@ -1 +0,0 @@\n'
+            '-This is a test.\n'
+            '--- //mydepot/test/COPYING-new\t//mydepot/test/COPYING-new#1\n'
+            '+++ //mydepot/test/COPYING-new\t1970-01-01 00:00:00\n'
+            '@@ -0,0 +1 @@\n'
+            '+Copyright 2013 Joe User.\n'
+            '--- //mydepot/test/COPYING\t//mydepot/test/COPYING#2\n'
+            '+++ //mydepot/test/COPYING\t1970-01-01 00:00:00\n'
+            '@@ -1 +0,0 @@\n'
+            '-Copyright 2013 Joe User.\n')
+
+    def _test_diff_with_moved_files(self, expected_diff, caps={}):
+        client = self._build_client()
+        client.capabilities = Capabilities(caps)
+        client.p4.repo_files = {
+            '//mydepot/test/README#2': {
+                'action': 'move/delete',
+                'change': '12345',
+                'text': 'This is a test.\n',
+            },
+            '//mydepot/test/README-new#1': {
+                'action': 'move/add',
+                'change': '12345',
+                'text': 'This is a mess.\n',
+            },
+            '//mydepot/test/COPYING#2': {
+                'action': 'move/delete',
+                'change': '12345',
+                'text': 'Copyright 2013 Joe User.\n',
+            },
+            '//mydepot/test/COPYING-new#1': {
+                'action': 'move/add',
+                'change': '12345',
+                'text': 'Copyright 2013 Joe User.\n',
+            },
+        }
+
+        readme_file = make_tempfile()
+        copying_file = make_tempfile()
+        readme_file_new = make_tempfile()
+        copying_file_new = make_tempfile()
+        client.p4.print_file('//mydepot/test/README#2', readme_file)
+        client.p4.print_file('//mydepot/test/COPYING#2', copying_file)
+        client.p4.print_file('//mydepot/test/README-new#1', readme_file_new)
+        client.p4.print_file('//mydepot/test/COPYING-new#1', copying_file_new)
+
+        client.p4.where_files = {
+            '//mydepot/test/README': readme_file,
+            '//mydepot/test/COPYING': copying_file,
+            '//mydepot/test/README-new': readme_file_new,
+            '//mydepot/test/COPYING-new': copying_file_new,
+        }
+
+        client.p4.fstat_files = {
+            '//mydepot/test/README': {
+                'clientFile': readme_file,
+                'movedFile': '//mydepot/test/README-new',
+            },
+            '//mydepot/test/README-new': {
+                'clientFile': readme_file_new,
+                'depotFile': '//mydepot/test/README-new',
+            },
+            '//mydepot/test/COPYING': {
+                'clientFile': copying_file,
+                'movedFile': '//mydepot/test/COPYING-new',
+            },
+            '//mydepot/test/COPYING-new': {
+                'clientFile': copying_file_new,
+                'depotFile': '//mydepot/test/COPYING-new',
+            },
+        }
+
+        diff = client.diff(['12345'])
+        self._compare_diff(diff, expected_diff)
+
+    def _build_client(self):
+        self.options.p4_client = 'myclient'
+        self.options.p4_port = 'perforce.example.com:1666'
+        self.options.p4_passwd = ''
+        client = PerforceClient(self.P4DiffTestWrapper, options=self.options)
+        client.p4d_version = (2012, 2)
+        return client
+
+    def _compare_diff(self, diff, expected_diff):
+        self.assertNotEqual(diff[0], None)
+        self.assertEqual(diff[1], None)
+        diff_content = re.sub('\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}',
+                              '1970-01-01 00:00:00',
+                              diff[0])
+        self.assertEqual(diff_content, expected_diff)
         self.assertEqual(diff[1], None)
 
 
