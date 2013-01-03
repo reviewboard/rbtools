@@ -1260,12 +1260,6 @@ def main():
     # Verify that options specific to an SCM Client have not been mis-used.
     tool.check_options()
 
-    # Load the server capabilities
-    server.load_capabilities()
-
-    # Pass the tool a pointer to the server
-    tool.server = server
-
     if repository_info.supports_changesets:
         changenum = tool.get_changenum(args)
     else:
@@ -1310,6 +1304,12 @@ def main():
         sys.exit(1)
 
     server = ReviewBoardServer(server_url, repository_info, cookie_file)
+
+    # Load the server capabilities
+    server.load_capabilities()
+
+    # Pass the tool a pointer to the server
+    tool.server = server
 
     if (isinstance(tool, PerforceClient) or
         isinstance(tool, PlasticClient)) and changenum is not None:
