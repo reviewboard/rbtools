@@ -12,10 +12,10 @@ from rbtools.clients import RepositoryInfo
 from rbtools.clients.bazaar import BazaarClient
 from rbtools.clients.git import GitClient
 from rbtools.clients.mercurial import MercurialClient
-from rbtools.clients.perforce import PerforceClient
+from rbtools.clients.perforce import PerforceClient, P4Wrapper
 from rbtools.clients.svn import SVNRepositoryInfo
 from rbtools.tests import OptionsStub
-from rbtools.utils.filesystem import load_config_files
+from rbtools.utils.filesystem import load_config_files, make_tempfile
 from rbtools.utils.process import execute
 from rbtools.utils.testbase import RBTestBase
 
@@ -550,6 +550,8 @@ class MercurialSubversionClientTests(MercurialTestBase):
         return not re.search("unknown command ['\"]svn['\"]", output, re.I)
 
     def tearDown(self):
+        super(MercurialSubversionClientTests, self).tearDown()
+
         os.kill(self._svnserve_pid, 9)
 
     def _svn_add_file_commit(self, filename, data, msg):
@@ -736,16 +738,216 @@ class SVNClientTests(SCMClientTests):
             '/')
 
 
+class P4WrapperTests(RBTestBase):
+    def is_supported(self):
+        return True
+
+    def test_counters(self):
+        """Testing P4Wrapper.counters"""
+        class TestWrapper(P4Wrapper):
+            def run_p4(self, cmd, *args, **kwargs):
+                return [
+                    'a = 1\n',
+                    'b = 2\n',
+                    'c = 3\n',
+                ]
+
+        p4 = TestWrapper()
+        info = p4.counters()
+
+        self.assertEqual(len(info), 3)
+        self.assertEqual(info['a'], '1')
+        self.assertEqual(info['b'], '2')
+        self.assertEqual(info['c'], '3')
+
+    def test_info(self):
+        """Testing P4Wrapper.info"""
+        class TestWrapper(P4Wrapper):
+            def run_p4(self, cmd, *args, **kwargs):
+                return [
+                    'User name: myuser\n',
+                    'Client name: myclient\n',
+                    'Client host: myclient.example.com\n',
+                    'Client root: /path/to/client\n',
+                    'Server uptime: 111:43:38\n',
+                ]
+
+        p4 = TestWrapper()
+        info = p4.info()
+
+        self.assertEqual(len(info), 5)
+        self.assertEqual(info['User name'], 'myuser')
+        self.assertEqual(info['Client name'], 'myclient')
+        self.assertEqual(info['Client host'], 'myclient.example.com')
+        self.assertEqual(info['Client root'], '/path/to/client')
+        self.assertEqual(info['Server uptime'], '111:43:38')
+
+
 class PerforceClientTests(SCMClientTests):
-    def setUp(self):
-        super(PerforceClientTests, self).setUp()
+    class P4DiffTestWrapper(P4Wrapper):
+        def __init__(self):
+            self._timestamp = time.mktime(time.gmtime(0))
+
+        def describe(self, changenum, password):
+            return [
+                'Change 12345 by joe@example on 2013/01/02 22:33:44 '
+                '*pending*\n',
+                '\n',
+                '\tThis is a test.\n',
+                '\n',
+                'Affected files ...\n',
+                '\n',
+            ] + [
+                '... %s %s\n' % (depot_path, info['action'])
+                for depot_path, info in self.repo_files.iteritems()
+                if info['change'] == changenum
+            ]
+
+        def opened(self, changenum):
+            return [
+                '%s - %s change %s (text)\n'
+                % (depot_path, info['action'], changenum)
+                for depot_path, info in self.repo_files.iteritems()
+                if info['change'] == changenum
+            ]
+
+        def print_file(self, depot_path, out_file):
+            assert depot_path in self.repo_files
+
+            fp = open(out_file, 'w')
+            fp.write(self.repo_files[depot_path]['text'])
+            fp.close()
+
+        def where(self, depot_path):
+            assert depot_path in self.where_files
+
+            return [{
+                'path': self.where_files[depot_path],
+            }]
+
+        def run_p4(self, *args, **kwargs):
+            assert False
 
     @raises(SystemExit)
     def test_error_on_revision_range(self):
-        """Testing that passing a revision_range causes the client to exit."""
+        """Testing PerforceClient with --revision-range causes an exit"""
         self.options.revision_range = "12345"
         client = PerforceClient(options=self.options)
         client.check_options()
+
+    def test_scan_for_server_counter_with_reviewboard_url(self):
+        """Testing PerforceClient.scan_for_server_counter with reviewboard.url"""
+        RB_URL = 'http://reviewboard.example.com/'
+
+        class TestWrapper(P4Wrapper):
+            def counters(self):
+                return {
+                    'reviewboard.url': RB_URL,
+                    'foo': 'bar',
+                }
+
+        client = PerforceClient(TestWrapper)
+        url = client.scan_for_server_counter(None)
+
+        self.assertEqual(url, RB_URL)
+
+    def test_repository_info(self):
+        """Testing PerforceClient.get_repository_info"""
+        SERVER_PATH = 'perforce.example.com:1666'
+
+        class TestWrapper(P4Wrapper):
+            def info(self):
+                return {
+                    'Server address': SERVER_PATH,
+                    'Server version': 'P4D/FREEBSD60X86_64/2012.2/525804 '
+                                      '(2012/09/18)',
+                }
+
+        client = PerforceClient(TestWrapper)
+        info = client.get_repository_info()
+
+        self.assertNotEqual(info, None)
+        self.assertEqual(info.path, SERVER_PATH)
+        self.assertEqual(client.p4d_version, (2012, 2))
+
+    def test_scan_for_server_counter_with_reviewboard_url_encoded(self):
+        """Testing PerforceClient.scan_for_server_counter with encoded reviewboard.url.http:||"""
+        URL_KEY = 'reviewboard.url.http:||reviewboard.example.com/'
+        RB_URL = 'http://reviewboard.example.com/'
+
+        class TestWrapper(P4Wrapper):
+            def counters(self):
+                return {
+                    URL_KEY: '1',
+                    'foo': 'bar',
+                }
+
+        client = PerforceClient(TestWrapper)
+        url = client.scan_for_server_counter(None)
+
+        self.assertEqual(url, RB_URL)
+
+    def test_diff_with_changenum(self):
+        """Testing PerforceClient.diff with changenums"""
+        self.options.p4_client = 'myclient'
+        self.options.p4_port = 'perforce.example.com:1666'
+        self.options.p4_passwd = ''
+        client = PerforceClient(self.P4DiffTestWrapper, options=self.options)
+        client.p4d_version = (2012, 2)
+        client.p4.repo_files = {
+            '//mydepot/test/README#2': {
+                'action': 'edit',
+                'change': '12345',
+                'text': 'This is a test.\n',
+            },
+            '//mydepot/test/README#3': {
+                'action': 'edit',
+                'change': '',
+                'text': 'This is a mess.\n',
+            },
+            '//mydepot/test/COPYING#1': {
+                'action': 'add',
+                'change': '12345',
+                'text': 'Copyright 2013 Joe User.\n',
+            },
+            '//mydepot/test/Makefile#3': {
+                'action': 'delete',
+                'change': '12345',
+                'text': 'all: all\n',
+            },
+        }
+
+        readme_file = make_tempfile()
+        copying_file = make_tempfile()
+        client.p4.print_file('//mydepot/test/README#3', readme_file)
+        client.p4.print_file('//mydepot/test/COPYING#1', copying_file)
+
+        client.p4.where_files = {
+            '//mydepot/test/README': readme_file,
+            '//mydepot/test/COPYING': copying_file,
+        }
+
+        diff = client.diff(['12345'])
+        self.assertNotEqual(diff[0], None)
+        self.assertEqual(diff[1], None)
+        diff_content = re.sub('\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}',
+                              '1970-01-01 00:00:00',
+                              diff[0])
+        self.assertEqual(diff_content,
+            '--- //mydepot/test/README\t//mydepot/test/README#2\n'
+            '+++ //mydepot/test/README\t1970-01-01 00:00:00\n'
+            '@@ -1 +1 @@\n'
+            '-This is a test.\n'
+            '+This is a mess.\n'
+            '--- //mydepot/test/COPYING\t//mydepot/test/COPYING#1\n'
+            '+++ //mydepot/test/COPYING\t1970-01-01 00:00:00\n'
+            '@@ -0,0 +1 @@\n'
+            '+Copyright 2013 Joe User.\n'
+            '--- //mydepot/test/Makefile\t//mydepot/test/Makefile#3\n'
+            '+++ //mydepot/test/Makefile\t1970-01-01 00:00:00\n'
+            '@@ -1 +0,0 @@\n'
+            '-all: all\n')
+        self.assertEqual(diff[1], None)
 
 
 class BazaarClientTests(SCMClientTests):

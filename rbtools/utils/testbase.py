@@ -4,6 +4,8 @@ import unittest
 import uuid
 from tempfile import mkdtemp
 
+from rbtools.utils.filesystem import cleanup_tempfiles
+
 
 class RBTestBase(unittest.TestCase):
     """Base class for RBTools tests.
@@ -13,6 +15,9 @@ class RBTestBase(unittest.TestCase):
     tests employ file I/O operations."""
     def setUp(self):
         self.set_user_home_tmp()
+
+    def tearDown(self):
+        cleanup_tempfiles()
 
     def create_tmp_dir(self):
         """Creates and returnds tmp directory located in CWD."""

@@ -13,6 +13,109 @@ from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import die, execute
 
 
+class P4Wrapper(object):
+    """A wrapper around p4 commands.
+
+    All calls out to p4 go through an instance of this class. It keeps a
+    separation between all the standard SCMClient logic and any parsing
+    and handling of p4 invocation and results.
+    """
+    KEYVAL_RE = re.compile('^([^:]+): (.+)$')
+    COUNTERS_RE = re.compile('^([^ ]+) = (.+)$')
+
+    def is_supported(self):
+        return check_install('p4 help')
+
+    def counters(self):
+        lines = self.run_p4(['counters'],
+                            split_lines=True)
+
+        return self._parse_keyval_lines(lines, self.COUNTERS_RE)
+
+    def describe(self, changenum, password=None):
+        cmd = []
+
+        if password is not None:
+            cmd += ['-P', password]
+
+        cmd += ['describe', '-s', str(changenum)]
+
+        return self.run_p4(cmd, split_lines=True)
+
+    def files(self, path):
+        return self.run_p4(['files', path], marshalled=True)
+
+    def info(self):
+        lines = self.run_p4(['info'],
+                            ignore_errors=True,
+                            split_lines=True)
+
+        return self._parse_keyval_lines(lines)
+
+    def opened(self, changenum):
+        return self.run_p4(['opened', '-c', str(changenum)],
+                           split_lines=True)
+
+    def print_file(self, depot_path, out_file=None):
+        cmd = ['print']
+
+        if out_file:
+            cmd += ['-o', out_file]
+
+        cmd += ['-q', depot_path]
+
+        return self.run_p4(cmd)
+
+    def where(self, depot_path):
+        return self.run_p4(['where', depot_path], marshalled=True)
+
+    def run_p4(self, cmd, marshalled=False, *args, **kwargs):
+        cmd = ['p4'] + cmd
+
+        if marshalled:
+            cmd += ['-G']
+            p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+            result = []
+            has_error = False
+
+            while 1:
+                try:
+                    data = marshal.load(p.stdout)
+                except EOFError:
+                    break
+                else:
+                    result.append(data)
+                    if data.get('code', None) == 'error':
+                        has_error = True
+
+            rc = p.wait()
+
+            if rc or has_error:
+                for record in result:
+                    if 'data' in record:
+                        print record['data']
+                die('Failed to execute command: %s\n' % (cmd,))
+
+            return result
+        else:
+            result = execute(cmd, *args, **kwargs)
+
+        return result
+
+    def _parse_keyval_lines(self, lines, regex=KEYVAL_RE):
+        keyvals = {}
+
+        for line in lines:
+            m = regex.match(line)
+
+            if m:
+                key = m.groups()[0]
+                value = m.groups()[1]
+                keyvals[key] = value.strip()
+
+        return keyvals
+
+
 class PerforceClient(SCMClient):
     """
     A wrapper around the p4 Perforce tool that fetches repository information
@@ -22,21 +125,22 @@ class PerforceClient(SCMClient):
 
     DATE_RE = re.compile(r'(\w+)\s+(\w+)\s+(\d+)\s+(\d\d:\d\d:\d\d)\s+'
                           '(\d\d\d\d)')
+    ENCODED_COUNTER_URL_RE = re.compile('reviewboard.url\.(\S+)')
 
-    def __init__(self, **kwargs):
+    def __init__(self, p4_class=P4Wrapper, **kwargs):
         super(PerforceClient, self).__init__(**kwargs)
+        self.p4 = p4_class()
 
     def get_repository_info(self):
-        if not check_install('p4 help'):
+        if not self.p4.is_supported():
             return None
 
-        data = execute(["p4", "info"], ignore_errors=True)
+        p4_info = self.p4.info()
 
-        m = re.search(r'^Server address: (.+)$', data, re.M)
-        if not m:
+        repository_path = p4_info.get('Server address', None)
+
+        if repository_path is None:
             return None
-
-        repository_path = m.group(1).strip()
 
         try:
             hostname, port = repository_path.split(":")
@@ -53,8 +157,13 @@ class PerforceClient(SCMClient):
         except (socket.gaierror, socket.herror):
             pass
 
-        m = re.search(r'^Server version: [^ ]*/([0-9]+)\.([0-9]+)/[0-9]+ .*$',
-                      data, re.M)
+        server_version = p4_info.get('Server version', None)
+
+        if not server_version:
+            return None
+
+        m = re.search(r'[^ ]*/([0-9]+)\.([0-9]+)/[0-9]+ .*$',
+                      server_version, re.M)
         self.p4d_version = int(m.group(1)), int(m.group(2))
 
         # Now that we know it's Perforce, make sure we have GNU diff
@@ -85,21 +194,21 @@ class PerforceClient(SCMClient):
         pipe ('|') characters should be used. These should be safe because they
         should not be used unencoded in urls.
         """
-
-        counters_text = execute(["p4", "counters"])
+        counters = self.p4.counters()
 
         # Try for a "reviewboard.url" counter first.
-        m = re.search(r'^reviewboard.url = (\S+)', counters_text, re.M)
+        url = counters.get('reviewboard.url', None)
 
-        if m:
-            return m.group(1)
+        if url:
+            return url
 
         # Next try for a counter of the form:
         # reviewboard_url.http:||reviewboard.example.com
-        m2 = re.search(r'^reviewboard.url\.(\S+)', counters_text, re.M)
+        for key, value in counters.iteritems():
+            m = self.ENCODED_COUNTER_URL_RE.match(key)
 
-        if m2:
-            return m2.group(1).replace('|', '/')
+            if m:
+                return m.group(1).replace('|', '/')
 
         return None
 
@@ -195,7 +304,7 @@ class PerforceClient(SCMClient):
 
             if revision1:
                 first_rev_path += revision1
-            records = self._run_p4(['files', first_rev_path])
+            records = self.p4.files(first_rev_path)
 
             # Make a map for convenience.
             files = {}
@@ -218,7 +327,7 @@ class PerforceClient(SCMClient):
             if revision2:
                 # [1:] to skip the comma.
                 second_rev_path = m.group('path') + revision2[1:]
-                records = self._run_p4(['files', second_rev_path])
+                records = self.p4.files(second_rev_path)
                 for record in records:
                     if record['action'] not in ('delete', 'move/delete'):
                         try:
@@ -269,38 +378,6 @@ class PerforceClient(SCMClient):
         os.unlink(tmp_diff_to_filename)
         return (''.join(diff_lines), None)
 
-    def _run_p4(self, command):
-        """Execute a perforce command using the python marshal API.
-
-        - command: A list of strings of the command to execute.
-
-        The return type depends on the command being run.
-        """
-        command = ['p4', '-G'] + command
-        p = subprocess.Popen(command, stdout=subprocess.PIPE)
-        result = []
-        has_error = False
-
-        while 1:
-            try:
-                data = marshal.load(p.stdout)
-            except EOFError:
-                break
-            else:
-                result.append(data)
-                if data.get('code', None) == 'error':
-                    has_error = True
-
-        rc = p.wait()
-
-        if rc or has_error:
-            for record in result:
-                if 'data' in record:
-                    print record['data']
-            die('Failed to execute command: %s\n' % (command,))
-
-        return result
-
     def sanitize_changenum(self, changenum):
         """
         Return a "sanitized" change number for submission to the Review Board
@@ -319,15 +396,9 @@ class PerforceClient(SCMClient):
             v = self.p4d_version
 
             if v[0] < 2002 or (v[0] == "2002" and v[1] < 2):
-                describeCmd = ["p4"]
-
-                if self.options.p4_passwd:
-                    describeCmd.append("-P")
-                    describeCmd.append(self.options.p4_passwd)
-
-                describeCmd = describeCmd + ["describe", "-s", changenum]
-
-                description = execute(describeCmd, split_lines=True)
+                description = self.p4.description(
+                    changenum=changenum,
+                    password=self.options.p4_passwd)
 
                 if '*pending*' in description[0]:
                     return None
@@ -354,15 +425,8 @@ class PerforceClient(SCMClient):
         if changenum == "default":
             cl_is_pending = True
         else:
-            describeCmd = ["p4"]
-
-            if self.options.p4_passwd:
-                describeCmd.append("-P")
-                describeCmd.append(self.options.p4_passwd)
-
-            describeCmd = describeCmd + ["describe", "-s", changenum]
-
-            description = execute(describeCmd, split_lines=True)
+            description = self.p4.describe(changenum=changenum,
+                                           password=self.options.p4_passwd)
 
             if re.search("no such changelist", description[0]):
                 die("CLN %s does not exist." % changenum)
@@ -378,8 +442,7 @@ class PerforceClient(SCMClient):
             # Pre-2002.2 doesn't give file list in pending changelists,
             # or we don't have a description for a default changeset,
             # so we have to get it a different way.
-            info = execute(["p4", "opened", "-c", str(changenum)],
-                           split_lines=True)
+            info = self.p4.opened(changenum)
 
             if (len(info) == 1 and
                 info[0].startswith("File(s) not opened on this client.")):
@@ -504,6 +567,7 @@ class PerforceClient(SCMClient):
             diff_cmd = ["gdiff", "-urNp", old_file, new_file]
         else:
             diff_cmd = ["diff", "-urNp", old_file, new_file]
+
         # Diff returns "1" if differences were found.
         dl = execute(diff_cmd, extra_ignore_errors=(1, 2),
                      translate_newlines=False)
@@ -588,7 +652,7 @@ class PerforceClient(SCMClient):
         make the file read/write.
         """
         logging.debug('Writing "%s" to "%s"' % (depot_path, tmpfile))
-        execute(["p4", "print", "-o", tmpfile, "-q", depot_path])
+        self.p4.print_file(depot_path, out_file=tmpfile)
         os.chmod(tmpfile, stat.S_IREAD | stat.S_IWRITE)
 
     def _depot_to_local(self, depot_path):
@@ -597,7 +661,7 @@ class PerforceClient(SCMClient):
         the same file.  If there are multiple results, take only the last
         result from the where command.
         """
-        where_output = self._run_p4(['where', depot_path])
+        where_output = self.p4.where(depot_path)
 
         try:
             return where_output[-1]['path']
