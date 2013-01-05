@@ -1,60 +1,90 @@
-import os
-import sys
-import urllib2
+from optparse import make_option
 
-from rbtools.api.resource import Resource, RootResource, ReviewRequest
-from rbtools.api.serverinterface import ServerInterface
-from rbtools.api.settings import Settings
+from rbtools.api.errors import APIError
+from rbtools.commands import Command
+from rbtools.utils.process import die
 
-
-SUBMITTED_OPTION = '-s'
-DISCARDED_OPTION = '-d'
 SUBMITTED = 'submitted'
 DISCARDED = 'discarded'
 
 
-def close_type(option_type):
-    if option_type == SUBMITTED_OPTION:
-        return SUBMITTED
-    else:
-        return DISCARDED
+class Close(Command):
+    """Close a specific review request as discarded or submitted.
 
+    By default, the command will change the status to submitted. The
+    user can provide an optional description for this action."""
+    name = "close"
+    author = "John Sintal"
+    option_list = [
+        make_option("--close_type",
+                    dest="close_type",
+                    default=SUBMITTED,
+                    help="either submitted or discarded"),
+        make_option("--description",
+                    dest="description",
+                    default=None,
+                    help="optional description accompanied with change"),
+        make_option("--server",
+                    dest="server",
+                    metavar="SERVER",
+                    help="specify a different Review Board server to use"),
+        make_option("-d", "--debug",
+                    action="store_true",
+                    dest="debug",
+                    help="display debug output"),
+    ]
 
-def main():
-    valid = False
+    def __init__(self):
+        super(Close, self).__init__()
+        self.option_defaults = {
+            'server': self.config.get('REVIEWBOARD_URL', None),
+            'username': self.config.get('USERNAME', None),
+            'password': self.config.get('PASSWORD', None),
+            'debug': self.config.get('DEBUG', False),
+        }
 
-    if len(sys.argv) > 2:
-        settings = Settings(config_file='rb_scripts.dat')
-        cookie = settings.get_cookie_file()
-        server_url = settings.get_server_url()
-        resource_id = sys.argv[2]
+    def get_review_request(self, request_id):
+        """Return the review request resource for the given ID."""
+        try:
+            request = \
+                self.root_resource.get_review_requests().get_item(request_id)
+        except APIError, e:
+            die("Error getting review request: %s" % (e))
 
-        if resource_id.isdigit():
-            if sys.argv[1] == SUBMITTED_OPTION \
-                or sys.argv[1] == DISCARDED_OPTION:
-                valid = True
-                server = ServerInterface(server_url, cookie)
+        return request
 
-                try:
-                    root = RootResource(server, server_url + 'api/')
-                    review_requests = root.get('review_requests')
-                    review_request = \
-                        ReviewRequest(review_requests.get(resource_id))
+    def check_valid_type(self, close_type):
+        """Check if the user specificed a proper type.
 
-                    if sys.argv[1] == SUBMITTED_OPTION:
-                        review_request.submit()
-                    else:
-                        review_request.discard()
+        Type must either be 'discarded' or 'submitted'. If the type
+        is wrong, the command will stop and alert the user."""
+        if close_type not in (SUBMITTED, DISCARDED):
+            die("%s is not valid type. Try '%s' or '%s'" %
+                (self.options.close_type, SUBMITTED, DISCARDED))
 
-                    print 'Successfully %s review request #%s' % \
-                        (close_type(sys.argv[1]), resource_id)
-                except urllib2.HTTPError, e:
-                    print 'Close failed..  Make sure the resource exists on ' \
-                          'the server and try again.'
+    def main(self, request_id, *args):
+        """Run the command."""
+        close_type = self.options.close_type
+        self.check_valid_type(close_type)
 
-    if not valid:
-        print "usage: rb close [-s|-d] <review_request_id>"
+        self.repository_info, self.tool = self.initialize_scm_tool()
+        server_url = self.get_server_url(self.repository_info, self.tool)
+        self.root_resource = self.get_root(server_url)
 
+        request = self.get_review_request(request_id)
 
-if __name__ == '__main__':
-    main()
+        if request.status == close_type:
+            die("Request request #%s is already %s." % (request_id,
+                                                        close_type))
+
+        if self.options.description:
+            request.update(data={
+                'status': close_type,
+                'description': self.options.description,
+            })
+        else:
+            request.update(data={'status': close_type})
+
+        request = self.get_review_request(request_id)
+
+        print "Review request #%s is set to %s." % (request_id, request.status)

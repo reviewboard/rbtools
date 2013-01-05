@@ -50,6 +50,7 @@ except ImportError:
 
 
 rb_commands = [
+    'close = rbtools.commands.rbclose:Close',
     'diff = rbtools.commands.rbdiff:Diff',
     'patch = rbtools.commands.rbpatch:Patch',
     'post = rbtools.commands.rbpost:Post',
