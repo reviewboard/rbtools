@@ -10,7 +10,7 @@ from rbtools.clients import scan_usable_client
 from rbtools.utils.filesystem import get_home_path, load_config
 from rbtools.utils.process import die
 
-RB_MAIN = "rb"
+RB_MAIN = "rbt"
 
 
 class Command(object):

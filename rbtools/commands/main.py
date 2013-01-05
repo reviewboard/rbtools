@@ -28,7 +28,7 @@ def main():
     command_name = args[0]
 
     # Attempt to retrieve the command class from the entry points.
-    ep = pkg_resources.get_entry_info("rbtools", "rb_commands", args[0])
+    ep = pkg_resources.get_entry_info("rbtools", "rbtools_commands", args[0])
 
     if ep:
         try:
