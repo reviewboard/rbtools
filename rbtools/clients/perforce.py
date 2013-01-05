@@ -167,7 +167,18 @@ class PerforceClient(SCMClient):
             return None
 
         try:
-            hostname, port = repository_path.split(":")
+            parts = repository_path.split(':')
+            hostname = None
+
+            if len(parts) == 3 and parts[0] == 'ssl':
+                hostname = parts[1]
+                port = parts[2]
+            elif len(parts) == 2:
+                hostname, port = parts
+
+            if not hostname:
+                die('Path %s is not a valid Perforce P4PORT' % repository_path)
+
             info = socket.gethostbyaddr(hostname)
 
             # If aliases exist for hostname, create a list of alias:port
