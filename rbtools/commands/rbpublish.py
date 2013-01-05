@@ -1,33 +1,56 @@
-import os
-import sys
+from optparse import make_option
 
-from rbtools.api.resource import Resource, RootResource, ReviewRequestDraft
-from rbtools.api.serverinterface import ServerInterface
-from rbtools.api.settings import Settings
-
-
-def main():
-    valid = False
-
-    if len(sys.argv) > 1:
-        settings = Settings(config_file='rb_scripts.dat')
-        cookie = settings.get_cookie_file()
-        server_url = settings.get_server_url()
-        resource_id = sys.argv[1]
-
-        if resource_id.isdigit():
-            valid = True
-            server = ServerInterface(server_url, cookie)
-            root = RootResource(server, server_url + 'api/')
-            review_requests = root.get('review_requests')
-            review_request = review_requests.get(resource_id)
-            review_request_draft = \
-                ReviewRequestDraft(review_request.get_or_create('draft'))
-            review_request_draft.publish()
-
-    if not valid:
-        print "usage: rb publish <review_request_id>"
+from rbtools.api.errors import APIError
+from rbtools.commands import Command
+from rbtools.utils.process import die
 
 
-if __name__ == '__main__':
-    main()
+class Publish(Command):
+    """Publish a specific review request from a draft."""
+    name = "publish"
+    author = "John Sintal"
+    option_list = [
+        make_option("--server",
+                    dest="server",
+                    metavar="SERVER",
+                    help="specify a different Review Board server to use"),
+        make_option("-d", "--debug",
+                    action="store_true",
+                    dest="debug",
+                    help="display debug output"),
+    ]
+
+    def __init__(self):
+        super(Publish, self).__init__()
+        self.option_defaults = {
+            'server': self.config.get('REVIEWBOARD_URL', None),
+            'username': self.config.get('USERNAME', None),
+            'password': self.config.get('PASSWORD', None),
+            'debug': self.config.get('DEBUG', False),
+        }
+
+    def get_review_request(self, request_id):
+        """Return the review request resource for the given ID."""
+        try:
+            request = \
+                self.root_resource.get_review_requests().get_item(request_id)
+        except APIError, e:
+            die("Error getting review request: %s" % e)
+
+        return request
+
+    def main(self, request_id, *args):
+        """Run the command."""
+        self.repository_info, self.tool = self.initialize_scm_tool()
+        server_url = self.get_server_url(self.repository_info, self.tool)
+        self.root_resource = self.get_root(server_url)
+
+        request = self.get_review_request(request_id)
+        try:
+            draft = request.get_draft()
+            draft = draft.update(data={'public': True})
+        except APIError, e:
+            die("Error publishing review request (it may already be"
+                "publish): %s" % e)
+
+        print "Review request #%s is published." % (request_id)

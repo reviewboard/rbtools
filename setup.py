@@ -55,6 +55,7 @@ rb_commands = [
     'diff = rbtools.commands.rbdiff:Diff',
     'patch = rbtools.commands.rbpatch:Patch',
     'post = rbtools.commands.rbpost:Post',
+    'publish = rbtools.commands.rbpublish:Publish',
 ]
 
 setup(name=PACKAGE_NAME,
