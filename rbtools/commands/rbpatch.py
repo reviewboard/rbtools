@@ -1,87 +1,93 @@
+from optparse import make_option
 import os
-import re
-import string
-import sys
-from urllib2 import HTTPError
 
-from rbtools.api.settings import Settings
-from rbtools.api.resource import Resource, \
-                                RootResource, \
-                                ReviewRequest, \
-                                ResourceList, \
-                                DiffResource
-from rbtools.api.serverinterface import ServerInterface
-from rbtools.clients.getclient import get_client
+from rbtools.api.errors import APIError
+from rbtools.commands import Command
+from rbtools.utils.filesystem import make_tempfile
 
 
-COMMIT_OPTION = '-c'
+class Patch(Command):
+    """Applies a specific patch from a RB server.
 
+    The patch file indicated by the request id is downloaded from the
+    server and then applied locally."""
+    name = "patch"
+    author = "John Sintal"
+    option_list = [
+        make_option("--diff-revision",
+                    dest="diff_revision",
+                    default=None,
+                    help="revision id of diff to be used as patch"),
+        make_option("--px",
+                    dest="px",
+                    default=None,
+                    help="numerical pX argument for patch"),
+        make_option("--server",
+                    dest="server",
+                    metavar="SERVER",
+                    help="specify a different Review Board server to use"),
+        make_option("-d", "--debug",
+                    action="store_true",
+                    dest="debug",
+                    help="display debug output"),
+    ]
 
-def main():
-    valid = False
-    settings = Settings(config_file='rb_scripts.dat')
+    def __init__(self):
+        super(Patch, self).__init__()
+        self.option_defaults = {
+            'server': self.config.get('REVIEWBOARD_URL', None),
+            'username': self.config.get('USERNAME', None),
+            'password': self.config.get('PASSWORD', None),
+            'debug': self.config.get('DEBUG', False),
+        }
 
-    if len(sys.argv) > 1:
-        valid = True
-        cookie = settings.get_cookie_file()
-        server_url = settings.get_server_url()
-        diff_file_name = 'patch_diff'
-        arg_index = 1
-        commit = False
+    def get_patch(self, request_id, patch_id=None):
+        """Given a review request ID request_id and a diff/patch ID
+        patch_id, return the patch as a string, the used patch ID,
+        and its basedir.
 
-        if sys.argv[arg_index] == COMMIT_OPTION:
-            if len(sys.argv) > 2:
-                commit = True
-                arg_index = arg_index + 1
-            else:
-                valid = False
+        If patch ID is not specified, then this will look at the most
+        recent patch."""
+        try:
+            diffs = self.root_resource \
+                .get_review_requests() \
+                .get_item(request_id) \
+                .get_diffs()
+        except APIError, e:
+            die("Error getting diffs: %s" % (e))
 
-        review_request_id = sys.argv[arg_index]
-        arg_index = arg_index + 1
-        server = ServerInterface(server_url, cookie)
-        root = RootResource(server, server_url + 'api/')
-        review_requests = root.get('review_requests')
-        request = ReviewRequest(review_requests.get(review_request_id))
-        diffs = request.get_or_create('diffs')
-        revision_id = len(diffs)
-
-        if len(sys.argv) > arg_index:
-            if sys.argv[arg_index].isdigit():
-                revision_id = sys.argv[arg_index]
+        # Use the latest patch if a patch ID was not given.
+        if not patch_id:
+            patch_id = diffs.total_results
 
         try:
-            diff = DiffResource(diffs.get(revision_id))
-        except HTTPError, e:
-            if e.code == 404:
-                print 'The specified diff revision ' \
-                      'does not exist.'
-                exit()
-            else:
-                raise e
+            diff = diffs.get_item(patch_id).get_patch().diff
+            base_dir = diffs.get_item(patch_id).basedir
+        except APIError:
+            die('The specified diff revision does not exist.')
 
-        server_diff = diff.get_diff()
-        diff_file = open(diff_file_name, 'w')
+        return diff, patch_id, base_dir
 
-        if diff_file < 0:
-            print 'could not open "' + diff_file_name + '" for writing.'
-            exit()
+    def apply_patch(self, request_id, patch_id, patch_file, base_dir):
+        """Apply patch patch_file and display results to user."""
+        print "Patch is being applied to request %s with patch revision" \
+              " %s." % (request_id, patch_id)
+        self.tool.apply_patch(patch_file, self.repository_info.base_path,
+                              base_dir, self.options.px)
 
-        diff_file.write(server_diff)
-        diff_file.close()
-        client = get_client(server_url)
-        client.apply_patch(diff_file_name, commit)
+    def main(self, request_id, *args):
+        """Run the command."""
+        self.repository_info, self.tool = self.initialize_scm_tool()
+        server_url = self.get_server_url(self.repository_info, self.tool)
+        self.root_resource = self.get_root(server_url)
 
-    if not valid:
-        print 'usage: rb patch [-c] ' \
-              '<review_request_id> [revision_id]'
-        print ''
-        print '[-c] is used to commit the patch, in addition to applying it.'
-        print '[file_name] can be used to set the name of the file to save ' \
-              'the patch to.'
-        print '[revision_id] may be specified to indicate which revision ' \
-              'of the patch in the review request to use.  If unspecified ' \
-              'the most recent revision is used.'
+        # Get the patch, the used patch ID and base dir for the diff
+        patch, patch_id, base_dir = self.get_patch(request_id,
+                                                   self.options.
+                                                   diff_revision)
 
+        tmp_patch_file = make_tempfile(patch)
 
-if __name__ == '__main__':
-    main()
+        self.apply_patch(request_id, patch_id, tmp_patch_file, base_dir)
+
+        os.remove(tmp_patch_file)

@@ -50,6 +50,7 @@ except ImportError:
 
 
 rb_commands = [
+    'patch = rbtools.commands.rbpatch:Patch',
     'post = rbtools.commands.rbpost:Post',
 ]
 
