@@ -4,6 +4,7 @@ import os
 from rbtools.api.errors import APIError
 from rbtools.commands import Command
 from rbtools.utils.filesystem import make_tempfile
+from rbtools.utils.process import die
 
 
 class Patch(Command):

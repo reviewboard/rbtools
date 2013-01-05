@@ -1,8 +1,9 @@
 import getpass
 import logging
 import os
+import sys
 from optparse import OptionParser
-from urlparse import urljoin, urlparse
+from urlparse import urlparse
 
 from rbtools.api.client import RBClient
 from rbtools.api.errors import APIError, ServerInterfaceError
@@ -102,7 +103,7 @@ class Command(object):
         username and password. This is used as a callback in the
         API when the user requires authorization.
         """
-        if getattr(options, 'diff_filename', None) == '-':
+        if getattr(self.options, 'diff_filename', None) == '-':
             die('HTTP authentication is required, but cannot be '
                 'used with --diff-filename=-')
 
