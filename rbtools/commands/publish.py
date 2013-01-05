@@ -8,7 +8,7 @@ from rbtools.utils.process import die
 class Publish(Command):
     """Publish a specific review request from a draft."""
     name = "publish"
-    author = "John Sintal"
+    author = "The Review Board Project"
     option_list = [
         make_option("--server",
                     dest="server",

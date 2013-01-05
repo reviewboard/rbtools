@@ -9,7 +9,7 @@ from rbtools.utils.process import die
 class Attach(Command):
     """Attach a file to a review request."""
     name = "attach"
-    author = "John Sintal"
+    author = "The Review Board Project"
     option_list = [
         make_option("--filename",
                     dest="filename",

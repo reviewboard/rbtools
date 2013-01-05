@@ -16,7 +16,7 @@ class Close(Command):
     user can provide an optional description for this action.
     """
     name = "close"
-    author = "John Sintal"
+    author = "The Review Board Project"
     option_list = [
         make_option("--close_type",
                     dest="close_type",

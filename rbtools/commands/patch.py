@@ -12,7 +12,7 @@ class Patch(Command):
     The patch file indicated by the request id is downloaded from the
     server and then applied locally."""
     name = "patch"
-    author = "John Sintal"
+    author = "The Review Board Project"
     option_list = [
         make_option("--diff-revision",
                     dest="diff_revision",

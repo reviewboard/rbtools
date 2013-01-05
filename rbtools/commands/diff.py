@@ -7,7 +7,7 @@ from rbtools.utils.process import die
 class Diff(Command):
     """Prints a diff to the terminal."""
     name = "diff"
-    author = "John Sintal"
+    author = "The Review Board Project"
     option_list = [
         make_option("--revision-range",
                     dest="revision_range",
