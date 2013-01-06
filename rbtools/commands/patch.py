@@ -13,6 +13,7 @@ class Patch(Command):
     server and then applied locally."""
     name = "patch"
     author = "The Review Board Project"
+    args = "<request-id>"
     option_list = [
         Option("--diff-revision",
                dest="diff_revision",

@@ -7,6 +7,7 @@ class Publish(Command):
     """Publish a specific review request from a draft."""
     name = "publish"
     author = "The Review Board Project"
+    args = "<request-id>"
     option_list = [
         Option("--server",
                dest="server",

@@ -54,33 +54,54 @@ class Command(object):
     This class will handle retrieving the configuration, and parsing
     command line options.
 
+    ``description`` is a string containing a short description of the
+    command which is suitable for display in usage text.
+
+    ``usage`` is a list of usage strings each showing a use case. These
+    should not include the main rbt command or the command name; they
+    will be added automatically.
+
+    ``args`` is a string containing the usage text for what arguments the
+    command takes.
+
     ``option_list`` is a list of command line options for the command.
     Each list entry should be an option created using the optparse.make_option
     function.
     """
-    name = None
-    author = None
+    name = ""
+    author = ""
+    description = ""
+    args = ""
     option_list = []
 
     def __init__(self):
         self.log = logging.getLogger('rb.%s' % self.name)
-        self.config = load_config()
 
-    def create_parser(self, prog_name, subcommand):
+    def create_parser(self, config):
         """Create and return the ``OptionParser`` which will be used to
         parse the arguments to this command.
         """
         option_list = [
-            opt.make_option(self.config) for opt in self.option_list
+            opt.make_option(config) for opt in self.option_list
         ]
 
-        return OptionParser(prog=prog_name,
+        return OptionParser(prog=RB_MAIN,
+                            usage=self.usage(),
                             option_list=option_list,
                             add_help_option=False)
 
-    def print_help(self, prog_name, subcommand):
+    def usage(self):
+        """Return a usage string for the command."""
+        usage = '%%prog %s [options] %s' % (self.name, self.args)
+
+        if self.description:
+            return '%s\n\n%s' % (usage, self.description)
+        else:
+            return usage
+
+    def print_help(self):
         """Print the help message for the command."""
-        parser = self.create_parser(prog_name, subcommand)
+        parser = self.create_parser(self.config)
         parser.print_help()
         # TODO: Properly print help text from the .txt documentation.
         raise NotImplementedError()
@@ -92,7 +113,8 @@ class Command(object):
         from ``argv`` and the commands ``main`` method will
         be called.
         """
-        parser = self.create_parser(argv[0], argv[1])
+        self.config = load_config()
+        parser = self.create_parser(self.config)
         options, args = parser.parse_args(argv[2:])
         self.options = options
 

@@ -15,8 +15,9 @@ def main():
     """Execute a rb command."""
 
     parser = OptionParser(prog=RB_MAIN,
-                          usage='%prog [options] <command> [<args>]',
+                          usage='%prog <command> [options] [<args>]',
                           option_list=GLOBAL_OPTIONS,
+                          add_help_option=False,
                           version='RBTools %s' % get_version_string())
     parser.disable_interspersed_args()
     opt, args = parser.parse_args()

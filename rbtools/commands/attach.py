@@ -9,6 +9,7 @@ class Attach(Command):
     """Attach a file to a review request."""
     name = "attach"
     author = "The Review Board Project"
+    args = "<request-id> <file>"
     option_list = [
         Option("--filename",
                dest="filename",
