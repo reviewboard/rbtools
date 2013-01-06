@@ -2,7 +2,7 @@ import getpass
 import logging
 import os
 import sys
-from optparse import OptionParser
+from optparse import make_option, OptionParser
 from urlparse import urlparse
 
 from rbtools.api.client import RBClient
@@ -11,7 +11,41 @@ from rbtools.clients import scan_usable_client
 from rbtools.utils.filesystem import get_home_path, load_config
 from rbtools.utils.process import die
 
+
 RB_MAIN = "rbt"
+
+
+class Option(object):
+    """Represents an option for a command.
+
+    The arguments to the constructor should be treated like those
+    to optparse.make_option, with the exception that the keyword
+    argument 'config_key' is also valid. If config_key is provided
+    it will be used to retreive the config value as a default if the
+    option is not specified. This will take precedence over the
+    default argument.
+
+    Serves as a wrapper around the OptionParser options, allowing us
+    to specify defaults which will be grabbed from the configuration
+    after it is loaded.
+    """
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+
+    def make_option(self, config):
+        """Return an optparse option.
+
+        Check the loaded configuration for a provided default and
+        return an optparse option using it as the default.
+        """
+        if 'config_key' in self.kwargs:
+            if self.kwargs['config_key'] in config:
+                self.kwargs['default'] = config[self.kwargs['config_key']]
+
+            del self.kwargs['config_key']
+
+        return make_option(*self.args, **self.kwargs)
 
 
 class Command(object):
@@ -27,7 +61,6 @@ class Command(object):
     name = None
     author = None
     option_list = []
-    option_defaults = {}
 
     def __init__(self):
         self.log = logging.getLogger('rb.%s' % self.name)
@@ -37,8 +70,12 @@ class Command(object):
         """Create and return the ``OptionParser`` which will be used to
         parse the arguments to this command.
         """
+        option_list = [
+            opt.make_option(self.config) for opt in self.option_list
+        ]
+
         return OptionParser(prog=prog_name,
-                            option_list=self.option_list,
+                            option_list=option_list,
                             add_help_option=False)
 
     def print_help(self, prog_name, subcommand):
@@ -56,7 +93,6 @@ class Command(object):
         be called.
         """
         parser = self.create_parser(argv[0], argv[1])
-        parser.set_defaults(**self.option_defaults)
         options, args = parser.parse_args(argv[2:])
         self.options = options
 

@@ -1,6 +1,4 @@
-from optparse import make_option
-
-from rbtools.commands import Command
+from rbtools.commands import Command, Option
 from rbtools.utils.process import die
 
 
@@ -9,52 +7,44 @@ class Diff(Command):
     name = "diff"
     author = "The Review Board Project"
     option_list = [
-        make_option("--revision-range",
-                    dest="revision_range",
-                    default=None,
-                    help="generate the diff for review based on given "
-                         "revision range"),
-        make_option("--parent",
-                    dest="parent_branch",
-                    metavar="PARENT_BRANCH",
-                    help="the parent branch this diff should be against "
-                         "(only available if your repository supports "
-                         "parent diffs)"),
-        make_option("--tracking-branch",
-                    dest="tracking",
-                    metavar="TRACKING",
-                    help="Tracking branch from which your branch is derived "
-                         "(git only, defaults to origin/master)"),
-        make_option('--svn-changelist',
-                    dest='svn_changelist',
-                    default=None,
-                    help='generate the diff for review based on a local SVN '
-                         'changelist'),
-        make_option("--repository-url",
-                    dest="repository_url",
-                    help="the url for a repository for creating a diff "
-                         "outside of a working copy (currently only "
-                         "supported by Subversion with --revision-range or "
-                         "--diff-filename and ClearCase with relative "
-                         "paths outside the view). For git, this specifies"
-                         "the origin url of the current repository, "
-                         "overriding the origin url supplied by the git "
-                         "client."),
-        make_option("-d", "--debug",
-                    action="store_true",
-                    dest="debug",
-                    help="display debug output"),
+        Option("--revision-range",
+               dest="revision_range",
+               default=None,
+               help="generate the diff for review based on given "
+                    "revision range"),
+        Option("--parent",
+               dest="parent_branch",
+               metavar="PARENT_BRANCH",
+               help="the parent branch this diff should be against "
+                    "(only available if your repository supports "
+                    "parent diffs)"),
+        Option("--tracking-branch",
+               dest="tracking",
+               metavar="TRACKING",
+               help="Tracking branch from which your branch is derived "
+                    "(git only, defaults to origin/master)"),
+        Option('--svn-changelist',
+               dest='svn_changelist',
+               default=None,
+               help='generate the diff for review based on a local SVN '
+                    'changelist'),
+        Option("--repository-url",
+               dest="repository_url",
+               help="the url for a repository for creating a diff "
+                    "outside of a working copy (currently only "
+                    "supported by Subversion with --revision-range or "
+                    "--diff-filename and ClearCase with relative "
+                    "paths outside the view). For git, this specifies"
+                    "the origin url of the current repository, "
+                    "overriding the origin url supplied by the git "
+                    "client."),
+        Option("-d", "--debug",
+               action="store_true",
+               dest="debug",
+               config_key="DEBUG",
+               default=False,
+               help="display debug output"),
     ]
-
-    def __init__(self):
-        super(Diff, self).__init__()
-
-        self.option_defaults = {
-            'p4_client': self.config.get('P4_CLIENT', None),
-            'p4_port': self.config.get('P4_PORT', None),
-            'p4_passwd': self.config.get('P4_PASSWD', None),
-            'debug': self.config.get('DEBUG', False),
-        }
 
     def get_diff(self, *args):
         """Returns a diff as a string."""

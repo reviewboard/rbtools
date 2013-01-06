@@ -1,8 +1,7 @@
 import os
-from optparse import make_option
 
 from rbtools.api.errors import APIError
-from rbtools.commands import Command
+from rbtools.commands import Command, Option
 from rbtools.utils.process import die
 
 
@@ -11,32 +10,39 @@ class Attach(Command):
     name = "attach"
     author = "The Review Board Project"
     option_list = [
-        make_option("--filename",
-                    dest="filename",
-                    default=None,
-                    help="custom filename for file attachment"),
-        make_option("--caption",
-                    dest="caption",
-                    default=None,
-                    help="caption for file attachment"),
-        make_option("--server",
-                    dest="server",
-                    metavar="SERVER",
-                    help="specify a different Review Board server to use"),
-        make_option("-d", "--debug",
-                    action="store_true",
-                    dest="debug",
-                    help="display debug output"),
+        Option("--filename",
+               dest="filename",
+               default=None,
+               help="custom filename for file attachment"),
+        Option("--caption",
+               dest="caption",
+               default=None,
+               help="caption for file attachment"),
+        Option("--server",
+               dest="server",
+               metavar="SERVER",
+               config_key="REVIEWBOARD_URL",
+               default=None,
+               help="specify a different Review Board server to use"),
+        Option("-d", "--debug",
+               action="store_true",
+               dest="debug",
+               config_key="DEBUG",
+               default=False,
+               help="display debug output"),
+        Option("--username",
+               dest="username",
+               metavar="USERNAME",
+               config_key="USERNAME",
+               default=None,
+               help="user name to be supplied to the Review Board server"),
+        Option("--password",
+               dest="password",
+               metavar="PASSWORD",
+               config_key="PASSWORD",
+               default=None,
+               help="password to be supplied to the Review Board server"),
     ]
-
-    def __init__(self):
-        super(Attach, self).__init__()
-        self.option_defaults = {
-            'server': self.config.get('REVIEWBOARD_URL', None),
-            'username': self.config.get('USERNAME', None),
-            'password': self.config.get('PASSWORD', None),
-            'debug': self.config.get('DEBUG', False),
-        }
 
     def get_review_request(self, request_id):
         """Returns the review request resource for the given ID."""
