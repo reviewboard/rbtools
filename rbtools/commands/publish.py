@@ -45,7 +45,7 @@ class Publish(Command):
 
         return request
 
-    def main(self, request_id, *args):
+    def main(self, request_id):
         """Run the command."""
         repository_info, tool = self.initialize_scm_tool()
         server_url = self.get_server_url(repository_info, tool)

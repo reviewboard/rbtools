@@ -88,7 +88,7 @@ class Patch(Command):
         self.tool.apply_patch(diff_file_path, self.repository_info.base_path,
                               base_dir, self.options.px)
 
-    def main(self, request_id, *args):
+    def main(self, request_id):
         """Run the command."""
         self.repository_info, self.tool = self.initialize_scm_tool()
         server_url = self.get_server_url(self.repository_info, self.tool)

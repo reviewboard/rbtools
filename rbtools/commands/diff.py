@@ -6,6 +6,7 @@ class Diff(Command):
     """Prints a diff to the terminal."""
     name = "diff"
     author = "The Review Board Project"
+    args = "[changenum]"
     option_list = [
         Option("--revision-range",
                dest="revision_range",

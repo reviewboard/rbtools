@@ -55,7 +55,7 @@ class Attach(Command):
 
         return request
 
-    def main(self, request_id, path_to_file, *args):
+    def main(self, request_id, path_to_file):
         """Run the command."""
         self.repository_info, self.tool = self.initialize_scm_tool()
         server_url = self.get_server_url(self.repository_info, self.tool)

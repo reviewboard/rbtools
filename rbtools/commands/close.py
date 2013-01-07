@@ -71,7 +71,7 @@ class Close(Command):
             die("%s is not valid type. Try '%s' or '%s'" %
                 (self.options.close_type, SUBMITTED, DISCARDED))
 
-    def main(self, request_id, *args):
+    def main(self, request_id):
         """Run the command."""
         close_type = self.options.close_type
         self.check_valid_type(close_type)

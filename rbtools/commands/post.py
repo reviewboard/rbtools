@@ -19,6 +19,7 @@ class Post(Command):
     """Create and update review requests."""
     name = "post"
     author = "The Review Board Project"
+    args = "[changenum]"
     option_list = [
         Option("-r", "--review-request-id",
                dest="rid",

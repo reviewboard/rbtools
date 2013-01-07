@@ -1,4 +1,5 @@
 import getpass
+import inspect
 import logging
 import os
 import sys
@@ -99,13 +100,6 @@ class Command(object):
         else:
             return usage
 
-    def print_help(self):
-        """Print the help message for the command."""
-        parser = self.create_parser(self.config)
-        parser.print_help()
-        # TODO: Properly print help text from the .txt documentation.
-        raise NotImplementedError()
-
     def run_from_argv(self, argv):
         """Execute the command using the provided arguments.
 
@@ -118,9 +112,20 @@ class Command(object):
         options, args = parser.parse_args(argv[2:])
         self.options = options
 
-        # TODO: Implement proper exception handling here. A
-        # friendly error should be printed if the command
-        # throws any exceptions.
+        # Check that the proper number of arguments have been provided.
+        argspec = inspect.getargspec(self.main)
+        minargs = len(argspec[0]) - 1
+        maxargs = minargs
+
+        if argspec[1] is not None:
+            maxargs = None
+
+        if len(args) < minargs or (maxargs is not None and
+                                   len(args) > maxargs):
+
+            parser.error("Invalid number of arguments provided")
+            sys.exit(1)
+
         self.main(*args)
 
     def get_cookie(self):
