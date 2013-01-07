@@ -4,6 +4,11 @@ import subprocess
 import sys
 from optparse import OptionParser
 
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
+
 from rbtools import get_version_string
 from rbtools.commands import RB_MAIN
 
@@ -11,11 +16,54 @@ from rbtools.commands import RB_MAIN
 GLOBAL_OPTIONS = []
 
 
-def main():
-    """Execute a rb command."""
+def build_help_text(command_class):
+    """Generate help text from a command class."""
+    command = command_class()
+    parser = command.create_parser({})
+    help_file = StringIO()
+    parser.print_help(help_file)
+    help_text = help_file.getvalue()
+    help_file.close()
+    return help_text
 
+
+def help(args, parser):
+    if args:
+        # TODO: First check for static help text file before
+        # generating it at run time.
+        ep = pkg_resources.get_entry_info("rbtools", "rbtools_commands",
+                                          args[0])
+
+        if ep:
+            help_text = build_help_text(ep.load())
+            print help_text
+            sys.exit(0)
+
+        print "No help found for %s" % args[0]
+        sys.exit(0)
+
+    parser.print_usage()
+
+    # TODO: For now we'll print every command found with an entry
+    # point. In the future this needs to be switched to printing
+    # a hard-coded list, so that we can include commands we create
+    # using shell scripts etc.
+    commands = pkg_resources.get_entry_map('rbtools', 'rbtools_commands')
+    print "The most commonly used commands are:"
+
+    for command in commands:
+        print "  %s" % command
+
+    print ("See '%s help <command>' for more information "
+           "on a specific command." % RB_MAIN)
+    sys.exit(0)
+
+
+def main():
+    """Execute a command."""
     parser = OptionParser(prog=RB_MAIN,
-                          usage='%prog <command> [options] [<args>]',
+                          usage='%prog [--version] <command> [options]'
+                                ' [<args>]',
                           option_list=GLOBAL_OPTIONS,
                           add_help_option=False,
                           version='RBTools %s' % get_version_string())
@@ -23,10 +71,12 @@ def main():
     opt, args = parser.parse_args()
 
     if not args:
-        parser.print_help()
-        sys.exit(1)
+        help([], parser)
 
     command_name = args[0]
+
+    if command_name == "help":
+        help(args[1:], parser)
 
     # Attempt to retrieve the command class from the entry points.
     ep = pkg_resources.get_entry_info("rbtools", "rbtools_commands", args[0])
