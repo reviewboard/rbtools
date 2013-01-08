@@ -41,13 +41,14 @@ class Patch(Command):
             'debug': self.config.get('DEBUG', False),
         }
 
-    def get_patch(self, request_id, patch_id=None):
-        """Given a review request ID request_id and a diff/patch ID
-        patch_id, return the patch as a string, the used patch ID,
+    def get_patch(self, request_id, diff_revision=None):
+        """Given a review request ID and a diff revision,
+        return the diff as a string, the used diff revision,
         and its basedir.
 
-        If patch ID is not specified, then this will look at the most
-        recent patch."""
+        If a diff revision is not specified, then this will
+        look at the most recent diff.
+        """
         try:
             diffs = self.root_resource \
                 .get_review_requests() \
@@ -56,23 +57,27 @@ class Patch(Command):
         except APIError, e:
             die("Error getting diffs: %s" % (e))
 
-        # Use the latest patch if a patch ID was not given.
-        if not patch_id:
-            patch_id = diffs.total_results
+        # Use the latest diff if a diff revision was not given.
+        # Since diff revisions start a 1, increment by one, and
+        # never skip a number, the latest diff revisions number
+        # should be equal to the number of diffs.
+        if diff_revision is None:
+            diff_revision = diffs.total_results
 
         try:
-            diff = diffs.get_item(patch_id).get_patch().diff
-            base_dir = diffs.get_item(patch_id).basedir
+            diff = diffs.get_item(diff_revision)
+            diff_body = diff.get_patch().diff
+            base_dir = diff.basedir
         except APIError:
             die('The specified diff revision does not exist.')
 
-        return diff, patch_id, base_dir
+        return diff_body, diff_revision, base_dir
 
-    def apply_patch(self, request_id, patch_id, patch_file, base_dir):
+    def apply_patch(self, request_id, diff_revision, diff_file_path, base_dir):
         """Apply patch patch_file and display results to user."""
-        print "Patch is being applied to request %s with patch revision" \
-              " %s." % (request_id, patch_id)
-        self.tool.apply_patch(patch_file, self.repository_info.base_path,
+        print "Patch is being applied from request %s with diff revision" \
+              " %s." % (request_id, diff_revision)
+        self.tool.apply_patch(diff_file_path, self.repository_info.base_path,
                               base_dir, self.options.px)
 
     def main(self, request_id, *args):
@@ -82,12 +87,12 @@ class Patch(Command):
         self.root_resource = self.get_root(server_url)
 
         # Get the patch, the used patch ID and base dir for the diff
-        patch, patch_id, base_dir = self.get_patch(request_id,
-                                                   self.options.
-                                                   diff_revision)
+        diff_body, diff_revision, base_dir = self.get_patch(
+            request_id,
+            self.options.diff_revision)
 
-        tmp_patch_file = make_tempfile(patch)
+        tmp_patch_file = make_tempfile(diff_body)
 
-        self.apply_patch(request_id, patch_id, tmp_patch_file, base_dir)
+        self.apply_patch(request_id, diff_revision, tmp_patch_file, base_dir)
 
         os.remove(tmp_patch_file)
