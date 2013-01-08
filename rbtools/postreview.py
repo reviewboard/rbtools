@@ -721,7 +721,9 @@ class ReviewBoardServer(object):
         }
 
         try:
-            r = urllib2.Request(str(url), body, headers)
+            if type(url) == unicode:
+                url = url.encode('utf8')
+            r = urllib2.Request(url, body, headers)
             data = urllib2.urlopen(r).read()
             try:
                 self.cookie_jar.save(self.cookie_file)
@@ -755,7 +757,9 @@ class ReviewBoardServer(object):
         }
 
         try:
-            r = HTTPRequest(str(url), body, headers, method='PUT')
+            if type(url) == unicode:
+                url = url.encode('utf8')
+            r = HTTPRequest(url, body, headers, method='PUT')
             data = urllib2.urlopen(r).read()
             try:
                 self.cookie_jar.save(self.cookie_file)
