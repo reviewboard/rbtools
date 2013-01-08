@@ -4,6 +4,7 @@ from rbtools.api.errors import APIError
 from rbtools.commands import Command
 from rbtools.utils.process import die
 
+
 SUBMITTED = 'submitted'
 DISCARDED = 'discarded'
 
@@ -12,7 +13,8 @@ class Close(Command):
     """Close a specific review request as discarded or submitted.
 
     By default, the command will change the status to submitted. The
-    user can provide an optional description for this action."""
+    user can provide an optional description for this action.
+    """
     name = "close"
     author = "John Sintal"
     option_list = [
@@ -57,7 +59,8 @@ class Close(Command):
         """Check if the user specificed a proper type.
 
         Type must either be 'discarded' or 'submitted'. If the type
-        is wrong, the command will stop and alert the user."""
+        is wrong, the command will stop and alert the user.
+        """
         if close_type not in (SUBMITTED, DISCARDED):
             die("%s is not valid type. Try '%s' or '%s'" %
                 (self.options.close_type, SUBMITTED, DISCARDED))
@@ -67,8 +70,8 @@ class Close(Command):
         close_type = self.options.close_type
         self.check_valid_type(close_type)
 
-        self.repository_info, self.tool = self.initialize_scm_tool()
-        server_url = self.get_server_url(self.repository_info, self.tool)
+        repository_info, tool = self.initialize_scm_tool()
+        server_url = self.get_server_url(repository_info, tool)
         self.root_resource = self.get_root(server_url)
 
         request = self.get_review_request(request_id)

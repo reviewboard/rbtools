@@ -41,8 +41,8 @@ class Publish(Command):
 
     def main(self, request_id, *args):
         """Run the command."""
-        self.repository_info, self.tool = self.initialize_scm_tool()
-        server_url = self.get_server_url(self.repository_info, self.tool)
+        repository_info, tool = self.initialize_scm_tool()
+        server_url = self.get_server_url(repository_info, tool)
         self.root_resource = self.get_root(server_url)
 
         request = self.get_review_request(request_id)

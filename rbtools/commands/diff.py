@@ -77,7 +77,7 @@ class Diff(Command):
         """Print the diff to terminal."""
         diff = self.get_diff(*args)
 
-        if len(diff) == 0:
+        if not diff:
             die("There don't seem to be any diffs!")
-        else:
-            print diff
+
+        print diff

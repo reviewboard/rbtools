@@ -306,12 +306,12 @@ class Post(Command):
 
             if review_request.status == 'submitted':
                 die("Review request %s is marked as %s. In order to "
-                    "update it, please reopen the request using the web "
-                    "interface and try again." % (self.options.rid,
-                                                  review_request.status))
+                    "update it, please reopen the request and try again." % (
+                        self.options.rid,
+                        review_request.status))
         else:
             # The user did not provide a request id, so we will create
-            # a new request.
+            # a new review request.
             try:
                 repository = \
                     self.options.repository_url or self.get_repository_path()
@@ -459,7 +459,6 @@ class Post(Command):
                 self.server_url)
         except APIError, e:
             die("Error: %s" % e)
-            pass
 
         if self.repository_info.supports_changesets:
             changenum = self.tool.get_changenum(args)

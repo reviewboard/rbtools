@@ -34,6 +34,9 @@ def main():
         try:
             command = ep.load()()
         except ImportError:
+            # TODO: It might be useful to actual have the strack
+            # trace here, due to an import somewhere down the import
+            # chain failing.
             sys.stderr.write("Could not load command entry point %s\n" %
                              ep.name)
             sys.exit(1)

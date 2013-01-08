@@ -57,9 +57,9 @@ class Attach(Command):
         request = self.get_review_request(request_id)
 
         try:
-            opened_file = open(path_to_file, 'r')
-            content = opened_file.read()
-            opened_file.close()
+            f = open(path_to_file, 'r')
+            content = f.read()
+            f.close()
         except IOError:
             die("%s is not a valid file." % (path_to_file))
 
