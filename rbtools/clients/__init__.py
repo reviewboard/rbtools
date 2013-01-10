@@ -16,11 +16,11 @@ class SCMClient(object):
     name = None
 
     def __init__(self, user_config=None, configs=[], options=None,
-                 server=None):
+                 capabilities=None):
         self.user_config = user_config
         self.configs = configs
         self.options = options
-        self.server = server
+        self.capabilities = capabilities
 
     def get_repository_info(self):
         return None

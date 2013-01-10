@@ -281,9 +281,8 @@ class GitClient(SCMClient):
                        "--no-ext-diff", "--ignore-submodules", "--no-renames",
                        rev_range]
 
-            if (self.server and
-                self.server.capabilities.has_capability('diffs',
-                                                        'moved_files')):
+            if (self.capabilities is not None and
+                self.capabilities.has_capability('diffs', 'moved_files')):
                 cmdline.append('-M')
 
             return execute(cmdline)
