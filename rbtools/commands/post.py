@@ -77,14 +77,14 @@ class Post(Command):
                config_key="GUESS_SUMMARY",
                default=False,
                help="guess summary from the latest commit "
-                    "(git/hg/hgsubversion only)"),
+                    "(bzr/git/hg/hgsubversion only)"),
         Option("--guess-description",
                dest="guess_description",
                action="store_true",
                config_key="GUESS_DESCRIPTION",
                default=False,
                help="guess description based on commits on this branch "
-                    "(git/hg/hgsubversion only)"),
+                    "(bzr/git/hg/hgsubversion only)"),
         Option("--testing-done",
                dest="testing_done",
                default=None,
