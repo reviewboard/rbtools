@@ -50,7 +50,12 @@ except ImportError:
 
 
 rb_commands = [
-    'post = rbtools.commands.rbpost:Post',
+    'attach = rbtools.commands.attach:Attach',
+    'close = rbtools.commands.close:Close',
+    'diff = rbtools.commands.diff:Diff',
+    'patch = rbtools.commands.patch:Patch',
+    'post = rbtools.commands.post:Post',
+    'publish = rbtools.commands.publish:Publish',
 ]
 
 setup(name=PACKAGE_NAME,
@@ -60,9 +65,9 @@ setup(name=PACKAGE_NAME,
       entry_points={
           'console_scripts': [
               'post-review = rbtools.postreview:main',
-              'rb = rbtools.commands.rb:main',
+              'rbt = rbtools.commands.main:main',
           ],
-          'rb_commands': rb_commands,
+          'rbtools_commands': rb_commands,
       },
       install_requires=install_requires,
       dependency_links=[

@@ -1,7 +1,9 @@
 import logging
+import os
+import re
 import sys
 
-from rbtools.utils.process import die
+from rbtools.utils.process import die, execute
 
 
 # The clients are lazy loaded via load_scmclients()
@@ -86,6 +88,40 @@ class SCMClient(object):
                 return trees[path]['REVIEWBOARD_URL']
 
         return None
+
+    def _get_p_number(self, patch_file, base_path, base_dir):
+        """
+        Returns the appropriate int used for patch -pX argument,
+        where x is the aforementioned int.
+        """
+        if (base_dir.startswith(base_path)):
+            return base_path.count('/') + 1
+        else:
+            return -1
+
+    def _execute(self, cmd):
+        """
+        Prints the results of the executed command and returns
+        the data result from execute.
+        """
+        print 'Command:\n' + str(cmd)
+        res = execute(cmd, ignore_errors=True)
+        print 'Results:\n' + res
+        return res
+
+    def apply_patch(self, patch_file, base_path, base_dir, p=None):
+        """
+        Apply the patch patch_file and return True if the patch was
+        successful, otherwise return False.
+        """
+        # Figure out the pX for patch. Override the p_num if it was
+        # specified in the command's options.
+        p_num = p or self._get_p_number(patch_file, base_path, base_dir)
+        if (p_num >= 0):
+            cmd = ['patch', '-p' + str(p_num), '-i', str(patch_file)]
+        else:
+            cmd = ['patch', '-i', str(patch_file)]
+        self._execute(cmd)
 
 
 class RepositoryInfo(object):

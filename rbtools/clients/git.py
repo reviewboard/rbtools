@@ -403,3 +403,15 @@ class GitClient(SCMClient):
                     ignore_errors=True).strip()
 
             return (self.make_diff(r1, r2), parent_diff_lines)
+
+    def apply_patch(self, patch_file, base_path=None, base_dir=None, p=None):
+        """
+        Apply the patch patch_file and return True if the patch was
+        successful, otherwise return False.
+        """
+        if p:
+            cmd = ['git', 'apply', '-p', p, patch_file]
+        else:
+            cmd = ['git', 'apply', patch_file]
+
+        self._execute(cmd)

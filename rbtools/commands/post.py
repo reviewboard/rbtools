@@ -1,6 +1,5 @@
 import getpass
 import logging
-from optparse import make_option
 import os
 import re
 import sys
@@ -11,7 +10,7 @@ from rbtools.api.errors import APIError, ServerInterfaceError
 from rbtools.clients import scan_usable_client
 from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.plastic import PlasticClient
-from rbtools.commands import Command
+from rbtools.commands import Command, Option
 from rbtools.utils.filesystem import get_home_path
 from rbtools.utils.process import die
 
@@ -20,173 +19,201 @@ class Post(Command):
     """Create and update review requests."""
     name = "post"
     author = "The Review Board Project"
+    args = "[changenum]"
     option_list = [
-        make_option("-r", "--review-request-id",
-                    dest="rid", metavar="ID", default=None,
-                    help="existing review request ID to update"),
-        make_option("--server",
-                    dest="server",
-                    metavar="SERVER",
-                    help="specify a different Review Board server to use"),
-        make_option("--disable-proxy",
-                    action='store_true',
-                    dest='disable_proxy',
-                    help="prevents requests from going through a proxy "
-                         "server"),
-        make_option('-p', '--publish',
-                    dest="publish", action="store_true", default=False,
-                    help="publish the review request immediately after "
-                         "submitting"),
-        make_option("--target-groups",
-                    dest="target_groups",
-                    help="names of the groups who will perform "
-                          "the review"),
-        make_option("--target-people",
-                    dest="target_people",
-                    help="names of the people who will perform "
-                         "the review"),
-        make_option("--summary",
-                    dest="summary", default=None,
-                    help="summary of the review "),
-        make_option("--description",
-                    dest="description", default=None,
-                    help="description of the review "),
-        make_option("--description-file",
-                    dest="description_file", default=None,
-                    help="text file containing a description of the review"),
-        make_option('-g', '--guess-fields',
-                    dest="guess_fields", action="store_true",
-                    help="equivalent to --guess-summary --guess-description"),
-        make_option("--guess-summary",
-                    dest="guess_summary", action="store_true",
-                    help="guess summary from the latest commit (git/"
-                         "hg/hgsubversion only)"),
-        make_option("--guess-description",
-                    dest="guess_description", action="store_true",
-                    help="guess description based on commits on this branch "
-                         "(git/hg/hgsubversion only)"),
-        make_option("--testing-done",
-                    dest="testing_done", default=None,
-                    help="details of testing done "),
-        make_option("--testing-done-file",
-                    dest="testing_file", default=None,
-                    help="text file containing details of testing done "),
-        make_option("--branch",
-                    dest="branch",
-                    help="affected branch "),
-        make_option("--bugs-closed",
-                    dest="bugs_closed", default=None,
-                    help="list of bugs closed "),
-        make_option("--change-description", default=None,
-                    help="description of what changed in this revision of "
+        Option("-r", "--review-request-id",
+               dest="rid",
+               metavar="ID",
+               default=None,
+               help="existing review request ID to update"),
+        Option("--server",
+               dest="server",
+               metavar="SERVER",
+               config_key="REVIEWBOARD_URL",
+               default=None,
+               help="specify a different Review Board server to use"),
+        Option("--disable-proxy",
+               action='store_false',
+               dest='enable_proxy',
+               config_key="ENABLE_PROXY",
+               default=True,
+               help="prevents requests from going through a proxy server"),
+        Option('-p', '--publish',
+               dest="publish",
+               action="store_true",
+               default=False,
+               help="publish the review request immediately after submitting"),
+        Option("--target-groups",
+               dest="target_groups",
+               config_key="TARGET_GROUPS",
+               default=None,
+               help="names of the groups who will perform the review"),
+        Option("--target-people",
+               dest="target_people",
+               config_key="TARGET_PEOPLE",
+               default=None,
+               help="names of the people who will perform the review"),
+        Option("--summary",
+               dest="summary",
+               default=None,
+               help="summary of the review "),
+        Option("--description",
+               dest="description",
+               default=None,
+               help="description of the review "),
+        Option("--description-file",
+               dest="description_file",
+               default=None,
+               help="text file containing a description of the review"),
+        Option('-g', '--guess-fields',
+               dest="guess_fields",
+               action="store_true",
+               config_key="GUESS_FIELDS",
+               default=False,
+               help="equivalent to --guess-summary --guess-description"),
+        Option("--guess-summary",
+               dest="guess_summary",
+               action="store_true",
+               config_key="GUESS_SUMMARY",
+               default=False,
+               help="guess summary from the latest commit "
+                    "(git/hg/hgsubversion only)"),
+        Option("--guess-description",
+               dest="guess_description",
+               action="store_true",
+               config_key="GUESS_DESCRIPTION",
+               default=False,
+               help="guess description based on commits on this branch "
+                    "(git/hg/hgsubversion only)"),
+        Option("--testing-done",
+               dest="testing_done",
+               default=None,
+               help="details of testing done "),
+        Option("--testing-done-file",
+               dest="testing_file",
+               default=None,
+               help="text file containing details of testing done "),
+        Option("--branch",
+               dest="branch",
+               config_key="BRANCH",
+               default=None,
+               help="affected branch "),
+        Option("--bugs-closed",
+               dest="bugs_closed",
+               default=None,
+               help="list of bugs closed "),
+        Option("--change-description",
+               default=None,
+               help="description of what changed in this revision of "
                     "the review request when updating an existing request"),
-        make_option("--revision-range",
-                    dest="revision_range", default=None,
-                    help="generate the diff for review based on given "
-                         "revision range"),
-        make_option("--submit-as",
-                    dest="submit_as",
-                    metavar="USERNAME",
-                    help="user name to be recorded as the author of the "
-                         "review request, instead of the logged in user"),
-        make_option("--username",
-                    dest="username",
-                    metavar="USERNAME",
-                    help="user name to be supplied to the reviewboard "
-                         "server"),
-        make_option("--password",
-                    dest="password",
-                    metavar="PASSWORD",
-                    help="password to be supplied to the reviewboard server"),
-        make_option("--change-only",
-                    dest="change_only", action="store_true",
-                    default=False,
-                    help="updates info from changelist, but does "
-                         "not upload a new diff (only available if your "
-                         "repository supports changesets)"),
-        make_option("--parent",
-                    dest="parent_branch",
-                    metavar="PARENT_BRANCH",
-                    help="the parent branch this diff should be against "
-                         "(only available if your repository supports "
-                         "parent diffs)"),
-        make_option("--tracking-branch",
-                    dest="tracking",
-                    metavar="TRACKING",
-                    help="Tracking branch from which your branch is derived "
-                         "(git only, defaults to origin/master)"),
-        make_option("--p4-client",
-                    dest="p4_client",
-                    help="the Perforce client name that the review is in"),
-        make_option("--p4-port",
-                    dest="p4_port",
-                    help="the Perforce servers IP address that the review "
-                         "is on"),
-        make_option("--p4-passwd",
-                    dest="p4_passwd",
-                    help="the Perforce password or ticket of the user "
-                         "in the P4USER environment variable"),
-        make_option('--svn-changelist', dest='svn_changelist', default=None,
-                    help='generate the diff for review based on a local SVN '
-                         'changelist'),
-        make_option("--repository-url",
-                    dest="repository_url",
-                    help="the url for a repository for creating a diff "
-                         "outside of a working copy (currently only "
-                         "supported by Subversion with --revision-range or "
-                         "--diff-filename and ClearCase with relative "
-                         "paths outside the view). For git, this specifies"
-                         "the origin url of the current repository, "
-                         "overriding the origin url supplied by the git "
-                         "client."),
-        make_option("-d", "--debug",
-                    action="store_true", dest="debug",
-                    help="display debug output"),
-        make_option("--diff-filename",
-                    dest="diff_filename", default=None,
-                    help='upload an existing diff file, instead of '
-                         'generating a new diff'),
-        make_option('--http-username',
-                    dest='http_username',
-                    metavar='USERNAME',
-                    help='username for HTTP Basic authentication'),
-        make_option('--http-password',
-                    dest='http_password',
-                    metavar='PASSWORD',
-                    help='password for HTTP Basic authentication'),
-        make_option('--basedir',
-                    dest='basedir',
-                    default=None,
-                    help='the absolute path in the repository the diff was '
-                         'generated in. Will override the path detected '
-                         'by post-review.'),
+        Option("--revision-range",
+               dest="revision_range",
+               default=None,
+               help="generate the diff for review based on given "
+                    "revision range"),
+        Option("--submit-as",
+               dest="submit_as",
+               metavar="USERNAME",
+               config_key="SUBMIT_AS",
+               default=None,
+               help="user name to be recorded as the author of the "
+                    "review request, instead of the logged in user"),
+        Option("--username",
+               dest="username",
+               metavar="USERNAME",
+               config_key="USERNAME",
+               default=None,
+               help="user name to be supplied to the Review Board server"),
+        Option("--password",
+               dest="password",
+               metavar="PASSWORD",
+               config_key="PASSWORD",
+               default=None,
+               help="password to be supplied to the Review Board server"),
+        Option("--change-only",
+               dest="change_only",
+               action="store_true",
+               default=False,
+               help="updates info from changelist, but does "
+                    "not upload a new diff (only available if your "
+                    "repository supports changesets)"),
+        Option("--parent",
+               dest="parent_branch",
+               metavar="PARENT_BRANCH",
+               config_key="PARENT_BRANCH",
+               default=None,
+               help="the parent branch this diff should be against "
+                    "(only available if your repository supports "
+                    "parent diffs)"),
+        Option("--tracking-branch",
+               dest="tracking",
+               metavar="TRACKING",
+               config_key="TRACKING_BRANCH",
+               default=None,
+               help="Tracking branch from which your branch is derived "
+                    "(git only, defaults to origin/master)"),
+        Option("--p4-client",
+               dest="p4_client",
+               config_key="P4_CLIENT",
+               default=None,
+               help="the Perforce client name that the review is in"),
+        Option("--p4-port",
+               dest="p4_port",
+               config_key="P4_PORT",
+               default=None,
+               help="the Perforce servers IP address that the review is on"),
+        Option("--p4-passwd",
+               dest="p4_passwd",
+               config_key="P4_PASSWD",
+               default=None,
+               help="the Perforce password or ticket of the user "
+                    "in the P4USER environment variable"),
+        Option("--svn-changelist",
+               dest="svn_changelist",
+               default=None,
+               help="generate the diff for review based on a local SVN "
+                    "changelist"),
+        Option("--repository-url",
+               dest="repository_url",
+               config_key="REPOSITORY",
+               default=None,
+               help="the url for a repository for creating a diff "
+                    "outside of a working copy (currently only "
+                    "supported by Subversion with --revision-range or "
+                    "--diff-filename and ClearCase with relative "
+                    "paths outside the view). For git, this specifies"
+                    "the origin url of the current repository, "
+                    "overriding the origin url supplied by the git "
+                    "client."),
+        Option("-d", "--debug",
+               action="store_true",
+               dest="debug",
+               config_key="DEBUG",
+               default=False,
+               help="display debug output"),
+        Option("--diff-filename",
+               dest="diff_filename",
+               default=None,
+               help="upload an existing diff file, instead of "
+                    "generating a new diff"),
+        Option("--http-username",
+               dest="http_username",
+               metavar="USERNAME",
+               config_key="HTTP_USERNAME",
+               default=None,
+               help="username for HTTP Basic authentication"),
+        Option("--http-password",
+               dest="http_password",
+               metavar="PASSWORD",
+               config_key="HTTP_PASSWORD",
+               default=None,
+               help="password for HTTP Basic authentication"),
+        Option("--basedir",
+               dest="basedir",
+               default=None,
+               help="the absolute path in the repository the diff was "
+                    "generated in. Will override the detected path."),
     ]
-
-    def __init__(self):
-        super(Post, self).__init__()
-
-        self.option_defaults = {
-            'server': self.config.get('REVIEWBOARD_URL', None),
-            'disable_proxy': not self.config.get('ENABLE_PROXY', True),
-            'target_groups': self.config.get('TARGET_GROUPS', None),
-            'target_people': self.config.get('TARGET_PEOPLE', None),
-            'guess_fields': self.config.get('GUESS_FIELDS', False),
-            'guess_summary': self.config.get('GUESS_SUMMARY', False),
-            'guess_description': self.config.get('GUESS_DESCRIPTION', False),
-            'branch': self.config.get('BRANCH', None),
-            'submit_as': self.config.get('SUBMIT_AS', None),
-            'username': self.config.get('USERNAME', None),
-            'password': self.config.get('PASSWORD', None),
-            'parent_branch': self.config.get('PARENT_BRANCH', None),
-            'tracking': self.config.get('TRACKING_BRANCH', None),
-            'p4_client': self.config.get('P4_CLIENT', None),
-            'p4_port': self.config.get('P4_PORT', None),
-            'p4_passwd': self.config.get('P4_PASSWD', None),
-            'repository_url': self.config.get('REPOSITORY', None),
-            'debug': self.config.get('DEBUG', False),
-            'http_username': self.config.get('HTTP_USERNAME', None),
-            'http_password': self.config.get('HTTP_PASSWORD', None),
-        }
 
     def post_process_options(self):
         if self.options.debug:
@@ -306,12 +333,12 @@ class Post(Command):
 
             if review_request.status == 'submitted':
                 die("Review request %s is marked as %s. In order to "
-                    "update it, please reopen the request using the web "
-                    "interface and try again." % (self.options.rid,
-                                                  review_request.status))
+                    "update it, please reopen the request and try again." % (
+                        self.options.rid,
+                        review_request.status))
         else:
             # The user did not provide a request id, so we will create
-            # a new request.
+            # a new review request.
             try:
                 repository = \
                     self.options.repository_url or self.get_repository_path()
@@ -459,7 +486,6 @@ class Post(Command):
                 self.server_url)
         except APIError, e:
             die("Error: %s" % e)
-            pass
 
         if self.repository_info.supports_changesets:
             changenum = self.tool.get_changenum(args)
