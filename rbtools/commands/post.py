@@ -1,17 +1,13 @@
-import getpass
 import logging
 import os
 import re
 import sys
-from urlparse import urljoin, urlparse
+from urlparse import urljoin
 
-from rbtools.api.client import RBClient
-from rbtools.api.errors import APIError, ServerInterfaceError
-from rbtools.clients import scan_usable_client
+from rbtools.api.errors import APIError
 from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.plastic import PlasticClient
 from rbtools.commands import Command, Option
-from rbtools.utils.filesystem import get_home_path
 from rbtools.utils.process import die
 
 
@@ -253,49 +249,27 @@ class Post(Command):
                                  self.options.testing_file)
                 sys.exit(1)
 
-    def initialize_scm_tool(self):
-        """Initialize the SCM tool for the current working directory."""
-        repository_info, tool = scan_usable_client(self.options)
-        tool.user_config = self.config
-        tool.configs = [self.config]
-        tool.check_options()
-        return repository_info, tool
-
-    def get_server_url(self):
-        """Returns the Review Board server url"""
-        if self.options.server:
-            server_url = self.options.server
-        else:
-            server_url = self.tool.scan_for_server(self.repository_info)
-
-        if not server_url:
-            print ("Unable to find a Review Board server "
-                   "for this source code tree.")
-            sys.exit(1)
-
-        return server_url
-
-    def get_repository_path(self):
+    def get_repository_path(self, repository_info, api_root):
         """Get the repository path from the server.
 
         This will compare the paths returned by the SCM client
         with those one the server, and return the first match.
         """
-        if isinstance(self.repository_info.path, list):
-            repositories = self.api_root.get_repositories()
+        if isinstance(repository_info.path, list):
+            repositories = api_root.get_repositories()
 
             try:
                 while True:
                     for repo in repositories:
-                        if repo['path'] in self.repository_info.path:
-                            self.repository_info.path = repo['path']
+                        if repo['path'] in repository_info.path:
+                            repository_info.path = repo['path']
                             raise StopIteration()
 
                     repositories = repositories.get_next()
             except StopIteration:
                 pass
 
-        if isinstance(self.repository_info.path, list):
+        if isinstance(repository_info.path, list):
             sys.stderr.write('\n')
             sys.stderr.write('There was an error creating this review '
                              'request.\n')
@@ -305,7 +279,7 @@ class Post(Command):
 
             sys.stderr.write('Unknown repository paths found:\n')
 
-            for foundpath in self.repository_info.path:
+            for foundpath in repository_info.path:
                 sys.stderr.write('\t%s\n' % foundpath)
 
             sys.stderr.write('Ask the administrator to add one of '
@@ -313,9 +287,10 @@ class Post(Command):
             sys.stderr.write('to the Review Board server.\n')
             die()
 
-        return self.repository_info.path
+        return repository_info.path
 
-    def post_request(self, tool, changenum=None, diff_content=None,
+    def post_request(self, tool, repository_info, server_url, api_root,
+                     changenum=None, diff_content=None,
                      parent_diff_content=None, submit_as=None, retries=3):
         """Creates or updates a review request, and uploads a diff.
 
@@ -325,7 +300,7 @@ class Post(Command):
             # Retrieve the review request coresponding to the user
             # provided id.
             try:
-                review_request = self.api_root.get_review_request(
+                review_request = api_root.get_review_request(
                     review_request_id=self.options.rid)
             except APIError, e:
                 die("Error getting review request %s: %s" % (self.options.rid,
@@ -340,8 +315,9 @@ class Post(Command):
             # The user did not provide a request id, so we will create
             # a new review request.
             try:
-                repository = \
-                    self.options.repository_url or self.get_repository_path()
+                repository = (
+                    self.options.repository_url or
+                    self.get_repository_path(repository_info, api_root))
                 request_data = {
                     'repository': repository
                 }
@@ -352,17 +328,17 @@ class Post(Command):
                 if submit_as:
                     request_data['submit_as'] = submit_as
 
-                review_request = self.api_root.get_review_requests().create(
+                review_request = api_root.get_review_requests().create(
                     data=request_data)
             except APIError, e:
                 die("Error creating review request: %s" % e)
 
         # Upload the diff if we're not using changesets.
-        if (not self.repository_info.supports_changesets or
+        if (not repository_info.supports_changesets or
             not self.options.change_only):
             try:
                 basedir = (self.options.basedir or
-                           self.repository_info.base_path)
+                           repository_info.base_path)
                 review_request.get_diffs().upload_diff(
                     diff_content,
                     parent_diff=parent_diff_content,
@@ -432,73 +408,28 @@ class Post(Command):
             die("Error updating review request draft: %s" % e)
 
         request_url = 'r/%s/' % review_request.id
-        review_url = urljoin(self.server_url, request_url)
+        review_url = urljoin(server_url, request_url)
 
         if not review_url.startswith('http'):
             review_url = 'http://%s' % review_url
 
         return review_request.id, review_url
 
-    def credentials_prompt(self, realm, uri, *args, **kwargs):
-        """Prompt the user for credentials using the command line.
-
-        This will prompt the user, and then return the provided
-        username and password. This is used as a callback in the
-        API when the user requires authorization.
-        """
-        if self.options.diff_filename == '-':
-            die('HTTP authentication is required, but cannot be '
-                'used with --diff-filename=-')
-
-        print "==> HTTP Authentication Required"
-        print 'Enter authorization information for "%s" at %s' % \
-            (realm, urlparse(uri)[1])
-        username = raw_input('Username: ')
-        password = getpass.getpass('Password: ')
-
-        return username, password
-
     def main(self, *args):
         """Create and update review requests."""
         self.post_process_options()
-
         origcwd = os.path.abspath(os.getcwd())
-
-        # If we end up creating a cookie file, make sure it's only
-        # readable by the user.
-        os.umask(0077)
-
-        # Generate a path to the cookie file.
-        cookie_file = os.path.join(get_home_path(), ".post-review-cookies.txt")
-
-        self.repository_info, self.tool = self.initialize_scm_tool()
-        self.server_url = self.get_server_url()
-        self.rb_api = RBClient(self.server_url,
-                               cookie_file=cookie_file,
-                               username=self.options.username,
-                               password=self.options.password,
-                               auth_callback=self.credentials_prompt)
-
-        try:
-            self.api_root = self.rb_api.get_root()
-        except ServerInterfaceError, e:
-            die("Could not reach the review board server at %s" %
-                self.server_url)
-        except APIError, e:
-            die("Error: %s" % e)
-
-        if self.repository_info.supports_changesets:
-            changenum = self.tool.get_changenum(args)
-        else:
-            changenum = None
+        repository_info, tool = self.initialize_scm_tool()
+        server_url = self.get_server_url(repository_info, tool)
+        api_root = self.get_root(server_url)
 
         if self.options.revision_range:
-            diff, parent_diff = self.tool.diff_between_revisions(
+            diff, parent_diff = tool.diff_between_revisions(
                 self.options.revision_range,
                 args,
-                self.repository_info)
+                repository_info)
         elif self.options.svn_changelist:
-            diff, parent_diff = self.tool.diff_changelist(
+            diff, parent_diff = tool.diff_changelist(
                 self.options.svn_changelist)
         elif self.options.diff_filename:
             parent_diff = None
@@ -515,17 +446,25 @@ class Post(Command):
                 except IOError, e:
                     die("Unable to open diff filename: %s" % e)
         else:
-            diff, parent_diff = self.tool.diff(args)
+            diff, parent_diff = tool.diff(args)
 
         if len(diff) == 0:
             die("There don't seem to be any diffs!")
 
-        if (isinstance(self.tool, PerforceClient) or
-            isinstance(self.tool, PlasticClient)) and changenum is not None:
-            changenum = self.tool.sanitize_changenum(changenum)
+        if repository_info.supports_changesets:
+            changenum = tool.get_changenum(args)
+        else:
+            changenum = None
+
+        if (isinstance(tool, PerforceClient) or
+            isinstance(tool, PlasticClient)) and changenum is not None:
+            changenum = tool.sanitize_changenum(changenum)
 
         request_id, review_url = self.post_request(
-            self.tool,
+            tool,
+            repository_info,
+            server_url,
+            api_root,
             changenum=changenum,
             diff_content=diff,
             parent_diff_content=parent_diff,
