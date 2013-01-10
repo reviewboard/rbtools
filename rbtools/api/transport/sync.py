@@ -107,6 +107,16 @@ class ResourceDictField(object):
             object.__getattribute__(self, '_transport'),
             object.__getattribute__(self, '_fields_dict'))
 
+    def __getitem__(self, key):
+        try:
+            return self.__getattr__(key)
+        except AttributeError:
+            raise KeyError
+
+    def __contains__(self, key):
+        fields = object.__getattribute__(self, '_fields_dict')
+        return key in fields
+
 
 class SyncTransportListIterator(object):
     """Iterator for lists which uses __getitem__."""
@@ -231,6 +241,16 @@ class SyncTransportItemResource(object):
         return 'SyncTransportItemResource(transport=%r, resource=%r)' % (
             object.__getattribute__(self, '_transport'),
             object.__getattribute__(self, '_resource'))
+
+    def __getitem__(self, key):
+        try:
+            return self.__getattr__(key)
+        except AttributeError:
+            raise KeyError
+
+    def __contains__(self, key):
+        resource = object.__getattribute__(self, '_resource')
+        return key in resource.fields
 
 
 class SyncTransportListResource(object):

@@ -8,6 +8,12 @@ class Diff(Command):
     author = "The Review Board Project"
     args = "[changenum]"
     option_list = [
+        Option("--server",
+               dest="server",
+               metavar="SERVER",
+               config_key="REVIEWBOARD_URL",
+               default=None,
+               help="specify a different Review Board server to use"),
         Option("--revision-range",
                dest="revision_range",
                default=None,
@@ -45,11 +51,26 @@ class Diff(Command):
                config_key="DEBUG",
                default=False,
                help="display debug output"),
+        Option("--username",
+               dest="username",
+               metavar="USERNAME",
+               config_key="USERNAME",
+               default=None,
+               help="user name to be supplied to the Review Board server"),
+        Option("--password",
+               dest="password",
+               metavar="PASSWORD",
+               config_key="PASSWORD",
+               default=None,
+               help="password to be supplied to the Review Board server"),
     ]
 
     def get_diff(self, *args):
         """Returns a diff as a string."""
         repository_info, tool = self.initialize_scm_tool()
+        server_url = self.get_server_url(repository_info, tool)
+        root_resource = self.get_root(server_url)
+        tool.capabilities = self.get_capabilities(root_resource)
 
         if self.options.revision_range:
             diff, parent_diff = tool.diff_between_revisions(

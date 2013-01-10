@@ -6,6 +6,7 @@ import sys
 from optparse import make_option, OptionParser
 from urlparse import urlparse
 
+from rbtools.api.capabilities import Capabilities
 from rbtools.api.client import RBClient
 from rbtools.api.errors import APIError, ServerInterfaceError
 from rbtools.clients import scan_usable_client
@@ -199,6 +200,10 @@ class Command(object):
             die("Error: %s" % e)
 
         return root
+
+    def get_capabilities(self, api_root):
+        """Retrieve Capabilities from the server and return them."""
+        return Capabilities(api_root.get_info().capabilities)
 
     def main(self, *args):
         """The main logic of the command.
