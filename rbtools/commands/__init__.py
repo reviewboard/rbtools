@@ -173,7 +173,10 @@ class Command(object):
         print "==> HTTP Authentication Required"
         print 'Enter authorization information for "%s" at %s' % \
             (realm, urlparse(uri)[1])
-        username = raw_input('Username: ')
+        # getpass will write its prompt to stderr but raw_input
+        # writes to stdout. See bug 2831.
+        sys.stderr.write('Username: ')
+        username = raw_input()
         password = getpass.getpass('Password: ')
 
         return username, password
