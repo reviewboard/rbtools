@@ -422,6 +422,7 @@ class Post(Command):
         repository_info, tool = self.initialize_scm_tool()
         server_url = self.get_server_url(repository_info, tool)
         api_root = self.get_root(server_url)
+        tool.capabilities = self.get_capabilities(api_root)
 
         if self.options.revision_range:
             diff, parent_diff = tool.diff_between_revisions(
