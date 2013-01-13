@@ -70,7 +70,7 @@ class Diff(Command):
         repository_info, tool = self.initialize_scm_tool()
         server_url = self.get_server_url(repository_info, tool)
         root_resource = self.get_root(server_url)
-        tool.capabilities = self.get_capabilities(root_resource)
+        self.setup_tool(tool, api_root=root_resource)
 
         if self.options.revision_range:
             diff, parent_diff = tool.diff_between_revisions(

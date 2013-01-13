@@ -1,6 +1,4 @@
 import logging
-import os
-import re
 import sys
 
 from rbtools.utils.process import die, execute
@@ -124,6 +122,19 @@ class SCMClient(object):
         else:
             cmd = ['patch', '-i', str(patch_file)]
         self._execute(cmd)
+
+    def sanitize_changenum(self, changenum):
+        """Return a "sanitized" change number.
+
+        Dervied classes should override this method if they
+        support change numbers. It will be called before
+        uploading the change number to the Review Board
+        server.
+
+        TODO: Possibly refactor this into get_changenum
+        once post-review is deprecated.
+        """
+        raise NotImplementedError
 
 
 class RepositoryInfo(object):

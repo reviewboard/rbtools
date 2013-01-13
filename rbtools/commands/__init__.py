@@ -146,6 +146,14 @@ class Command(object):
         tool.check_options()
         return repository_info, tool
 
+    def setup_tool(self, tool, api_root=None):
+        """Performs extra initialization on the tool.
+
+        If api_root is not provided we'll assume we want to
+        initialize the tool using only local information
+        """
+        tool.capabilities = self.get_capabilities(api_root)
+
     def get_server_url(self, repository_info, tool):
         """Returns the Review Board server url."""
         if self.options.server:

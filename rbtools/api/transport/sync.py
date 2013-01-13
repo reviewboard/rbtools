@@ -100,7 +100,7 @@ class ResourceDictField(object):
             raise AttributeError
 
     def __setattr__(self, name, value):
-            object.__getattribute__(self, '_fields_dict')[name] = value
+        object.__getattribute__(self, '_fields_dict')[name] = value
 
     def __repr__(self):
         return 'ResourceDictField(transport=%r, fields_dict=%r)' % (

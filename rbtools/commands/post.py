@@ -422,7 +422,7 @@ class Post(Command):
         repository_info, tool = self.initialize_scm_tool()
         server_url = self.get_server_url(repository_info, tool)
         api_root = self.get_root(server_url)
-        tool.capabilities = self.get_capabilities(api_root)
+        self.setup_tool(tool, api_root=api_root)
 
         if self.options.revision_range:
             diff, parent_diff = tool.diff_between_revisions(
@@ -453,13 +453,9 @@ class Post(Command):
             die("There don't seem to be any diffs!")
 
         if repository_info.supports_changesets:
-            changenum = tool.get_changenum(args)
+            changenum = tool.sanitize_changenum(tool.get_changenum(args))
         else:
             changenum = None
-
-        if (isinstance(tool, PerforceClient) or
-            isinstance(tool, PlasticClient)) and changenum is not None:
-            changenum = tool.sanitize_changenum(changenum)
 
         request_id, review_url = self.post_request(
             tool,
