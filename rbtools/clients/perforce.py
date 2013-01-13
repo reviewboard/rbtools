@@ -69,11 +69,15 @@ class P4Wrapper(object):
     def where(self, depot_path):
         return self.run_p4(['where', depot_path], marshalled=True)
 
-    def run_p4(self, cmd, marshalled=False, *args, **kwargs):
-        cmd = ['p4'] + cmd
+    def run_p4(self, p4_args, marshalled=False, *args, **kwargs):
+        cmd = ['p4']
 
         if marshalled:
             cmd += ['-G']
+
+        cmd += p4_args
+
+        if marshalled:
             p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
             result = []
             has_error = False
