@@ -329,7 +329,7 @@ class Post(Command):
                     request_data['submit_as'] = submit_as
 
                 review_request = api_root.get_review_requests().create(
-                    data=request_data)
+                    **request_data)
             except APIError, e:
                 die("Error creating review request: %s" % e)
 
@@ -403,7 +403,7 @@ class Post(Command):
             update_fields['public'] = True
 
         try:
-            draft = draft.update(data=update_fields)
+            draft = draft.update(**update_fields)
         except APIError, e:
             die("Error updating review request draft: %s" % e)
 

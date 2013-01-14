@@ -87,12 +87,10 @@ class Close(Command):
                                                         close_type))
 
         if self.options.description:
-            request.update(data={
-                'status': close_type,
-                'description': self.options.description,
-            })
+            request.update(status=close_type,
+                           description=self.options.description)
         else:
-            request.update(data={'status': close_type})
+            request.update(status=close_type)
 
         request = self.get_review_request(request_id)
 

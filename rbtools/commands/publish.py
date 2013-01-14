@@ -54,7 +54,7 @@ class Publish(Command):
         request = self.get_review_request(request_id)
         try:
             draft = request.get_draft()
-            draft = draft.update(data={'public': True})
+            draft = draft.update(public=True)
         except APIError, e:
             die("Error publishing review request (it may already be"
                 "publish): %s" % e)

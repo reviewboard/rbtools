@@ -74,7 +74,7 @@ class Patch(Command):
 
         try:
             diff = diffs.get_item(diff_revision)
-            diff_body = diff.get_patch().diff
+            diff_body = diff.get_patch().data
             base_dir = diff.basedir
         except APIError:
             die('The specified diff revision does not exist.')
