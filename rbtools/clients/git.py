@@ -279,8 +279,15 @@ class GitClient(SCMClient):
                                  split_lines=True)
             return self.make_svn_diff(ancestor, diff_lines)
         elif self.type == "git":
-            return execute([self.git, "diff", "--no-color", "--full-index",
-                            "--no-ext-diff", "--ignore-submodules", rev_range])
+            cmdline = [self.git, "diff", "--no-color", "--full-index",
+                       "--no-ext-diff", "--ignore-submodules", "--no-renames",
+                       rev_range]
+
+            if (self.capabilities is not None and
+                self.capabilities.has_capability('diffs', 'moved_files')):
+                cmdline.append('-M')
+
+            return execute(cmdline)
 
         return None
 

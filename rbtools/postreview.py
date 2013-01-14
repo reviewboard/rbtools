@@ -14,6 +14,7 @@ from pkg_resources import parse_version
 from urlparse import urljoin, urlparse
 
 from rbtools import get_package_version, get_version_string
+from rbtools.api.capabilities import Capabilities
 from rbtools.api.errors import APIError
 from rbtools.clients import scan_usable_client
 from rbtools.clients.perforce import PerforceClient
@@ -165,7 +166,10 @@ class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
                     (realm, urlparse(uri)[1])
 
                 if not self.rb_user:
-                    self.rb_user = raw_input('Username: ')
+                    # getpass will write its prompt to stderr but raw_input
+                    # writes to stdout. See bug 2831.
+                    sys.stderr.write('Username: ')
+                    self.rb_user = raw_input()
 
                 if not self.rb_pass:
                     self.rb_pass = getpass.getpass('Password: ')
@@ -187,10 +191,14 @@ class ReviewBoardServer(object):
             self.url += '/'
         self._info = info
         self._server_info = None
+        self.capabilities = None
         self.root_resource = None
         self.deprecated_api = False
+        self.rb_version = "0.0.0.0"
         self.cookie_file = cookie_file
         self.cookie_jar  = cookielib.MozillaCookieJar(self.cookie_file)
+        self.deprecated_api = False
+        self.root_resource = None
 
         if self.cookie_file:
             try:
@@ -253,6 +261,19 @@ class ReviewBoardServer(object):
         debug('Using the deprecated Review Board 1.0 web API')
         return True
 
+    def load_capabilities(self):
+        """Loads the server capabilities."""
+        info = self.api_get('api/info/')
+        caps = None
+
+        try:
+            caps = info['info']['capabilities']
+        except KeyError:
+            # The capabilities list is left empty.
+            pass
+
+        self.capabilities = Capabilities(caps)
+
     def login(self, force=False):
         """
         Logs in to a Review Board server, prompting the user for login
@@ -278,7 +299,10 @@ class ReviewBoardServer(object):
                 # at args, so that it doesn't override the command line.
                 return
             else:
-                username = raw_input('Username: ')
+                # getpass will write its prompt to stderr but raw_input
+                # writes to stdout. See bug 2831.
+                sys.stderr.write('Username: ')
+                username = raw_input()
 
             if not options.password:
                 password = getpass.getpass('Password: ')
@@ -545,6 +569,9 @@ class ReviewBoardServer(object):
         if self.info.base_path:
             fields['basedir'] = self.info.base_path
 
+        if options.basedir:
+            fields['basedir'] = options.basedir
+
         files['path'] = {
             'filename': 'diff',
             'content': diff_content
@@ -694,7 +721,9 @@ class ReviewBoardServer(object):
         }
 
         try:
-            r = urllib2.Request(str(url), body, headers)
+            if type(url) == unicode:
+                url = url.encode('utf8')
+            r = urllib2.Request(url, body, headers)
             data = urllib2.urlopen(r).read()
             try:
                 self.cookie_jar.save(self.cookie_file)
@@ -728,7 +757,9 @@ class ReviewBoardServer(object):
         }
 
         try:
-            r = HTTPRequest(str(url), body, headers, method='PUT')
+            if type(url) == unicode:
+                url = url.encode('utf8')
+            r = HTTPRequest(url, body, headers, method='PUT')
             data = urllib2.urlopen(r).read()
             try:
                 self.cookie_jar.save(self.cookie_file)
@@ -1028,14 +1059,14 @@ def parse_options(args):
                       dest="guess_summary", action="store_true",
                       default=get_config_value(configs, 'GUESS_SUMMARY',
                                                False),
-                      help="guess summary from the latest commit (git/"
+                      help="guess summary from the latest commit (bzr/git/"
                            "hg/hgsubversion only)")
     parser.add_option("--guess-description",
                       dest="guess_description", action="store_true",
                       default=get_config_value(configs, 'GUESS_DESCRIPTION',
                                                False),
                       help="guess description based on commits on this branch "
-                           "(git/hg/hgsubversion only)")
+                           "(bzr/git/hg/hgsubversion only)")
     parser.add_option("--testing-done",
                       dest="testing_done", default=None,
                       help="details of testing done ")
@@ -1138,6 +1169,12 @@ def parse_options(args):
                       default=get_config_value(configs, 'HTTP_PASSWORD'),
                       metavar='PASSWORD',
                       help='password for HTTP Basic authentication')
+    parser.add_option('--basedir',
+                      dest='basedir',
+                      default=None,
+                      help='the absolute path in the repository the diff was '
+                           'generated in. Will override the path detected '
+                           'by post-review.')
 
     (globals()["options"], args) = parser.parse_args(args)
 
@@ -1227,6 +1264,24 @@ def main():
     # Verify that options specific to an SCM Client have not been mis-used.
     tool.check_options()
 
+    # Try to find a valid Review Board server to use.
+    if options.server:
+        server_url = options.server
+    else:
+        server_url = tool.scan_for_server(repository_info)
+
+    if not server_url:
+        print "Unable to find a Review Board server for this source code tree."
+        sys.exit(1)
+
+    server = ReviewBoardServer(server_url, repository_info, cookie_file)
+
+    # Load the server capabilities
+    server.load_capabilities()
+
+    # Pass the tool a pointer to the capabilities
+    tool.capabilities = server.capabilities
+
     if repository_info.supports_changesets:
         changenum = tool.get_changenum(args)
     else:
@@ -1255,6 +1310,11 @@ def main():
     if len(diff) == 0:
         die("There don't seem to be any diffs!")
 
+    if options.output_diff_only:
+        # The comma here isn't a typo, but rather suppresses the extra newline
+        print diff,
+        sys.exit(0)
+
     if (isinstance(tool, PerforceClient) or
         isinstance(tool, PlasticClient)) and changenum is not None:
         changenum = tool.sanitize_changenum(changenum)
@@ -1266,23 +1326,6 @@ def main():
             debug('Using changenums on Review Board %s, which is broken. '
                   'Falling back to the deprecated 1.0 API' % server.rb_version)
             server.deprecated_api = True
-
-    if options.output_diff_only:
-        # The comma here isn't a typo, but rather suppresses the extra newline
-        print diff,
-        sys.exit(0)
-
-    # Try to find a valid Review Board server to use.
-    if options.server:
-        server_url = options.server
-    else:
-        server_url = tool.scan_for_server(repository_info)
-
-    if not server_url:
-        print "Unable to find a Review Board server for this source code tree."
-        sys.exit(1)
-
-    server = ReviewBoardServer(server_url, repository_info, cookie_file)
 
     # Handle the case where /api/ requires authorization (RBCommons).
     if not server.check_api_version():

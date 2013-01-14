@@ -5,15 +5,18 @@ import time
 from nose import SkipTest
 from nose.tools import raises
 from random import randint
+from tempfile import mktemp
 from textwrap import dedent
 
+from rbtools.api.capabilities import Capabilities
 from rbtools.clients import RepositoryInfo
+from rbtools.clients.bazaar import BazaarClient
 from rbtools.clients.git import GitClient
 from rbtools.clients.mercurial import MercurialClient
-from rbtools.clients.perforce import PerforceClient
+from rbtools.clients.perforce import PerforceClient, P4Wrapper
 from rbtools.clients.svn import SVNRepositoryInfo
 from rbtools.tests import OptionsStub
-from rbtools.utils.filesystem import load_config_files
+from rbtools.utils.filesystem import load_config_files, make_tempfile
 from rbtools.utils.process import execute
 from rbtools.utils.testbase import RBTestBase
 
@@ -548,6 +551,8 @@ class MercurialSubversionClientTests(MercurialTestBase):
         return not re.search("unknown command ['\"]svn['\"]", output, re.I)
 
     def tearDown(self):
+        super(MercurialSubversionClientTests, self).tearDown()
+
         os.kill(self._svnserve_pid, 9)
 
     def _svn_add_file_commit(self, filename, data, msg):
@@ -734,16 +739,542 @@ class SVNClientTests(SCMClientTests):
             '/')
 
 
+class P4WrapperTests(RBTestBase):
+    def is_supported(self):
+        return True
+
+    def test_counters(self):
+        """Testing P4Wrapper.counters"""
+        class TestWrapper(P4Wrapper):
+            def run_p4(self, cmd, *args, **kwargs):
+                return [
+                    'a = 1\n',
+                    'b = 2\n',
+                    'c = 3\n',
+                ]
+
+        p4 = TestWrapper()
+        info = p4.counters()
+
+        self.assertEqual(len(info), 3)
+        self.assertEqual(info['a'], '1')
+        self.assertEqual(info['b'], '2')
+        self.assertEqual(info['c'], '3')
+
+    def test_info(self):
+        """Testing P4Wrapper.info"""
+        class TestWrapper(P4Wrapper):
+            def run_p4(self, cmd, *args, **kwargs):
+                return [
+                    'User name: myuser\n',
+                    'Client name: myclient\n',
+                    'Client host: myclient.example.com\n',
+                    'Client root: /path/to/client\n',
+                    'Server uptime: 111:43:38\n',
+                ]
+
+        p4 = TestWrapper()
+        info = p4.info()
+
+        self.assertEqual(len(info), 5)
+        self.assertEqual(info['User name'], 'myuser')
+        self.assertEqual(info['Client name'], 'myclient')
+        self.assertEqual(info['Client host'], 'myclient.example.com')
+        self.assertEqual(info['Client root'], '/path/to/client')
+        self.assertEqual(info['Server uptime'], '111:43:38')
+
+
 class PerforceClientTests(SCMClientTests):
-    def setUp(self):
-        super(PerforceClientTests, self).setUp()
+    class P4DiffTestWrapper(P4Wrapper):
+        def __init__(self):
+            self._timestamp = time.mktime(time.gmtime(0))
+
+        def describe(self, changenum, password):
+            return [
+                'Change 12345 by joe@example on 2013/01/02 22:33:44 '
+                '*pending*\n',
+                '\n',
+                '\tThis is a test.\n',
+                '\n',
+                'Affected files ...\n',
+                '\n',
+            ] + [
+                '... %s %s\n' % (depot_path, info['action'])
+                for depot_path, info in self.repo_files.iteritems()
+                if info['change'] == changenum
+            ]
+
+        def fstat(self, depot_path, fields=[]):
+            assert depot_path in self.fstat_files
+
+            fstat_info = self.fstat_files[depot_path]
+
+            for field in fields:
+                assert field in fstat_info
+
+            return fstat_info
+
+        def opened(self, changenum):
+            return [
+                '%s - %s change %s (text)\n'
+                % (depot_path, info['action'], changenum)
+                for depot_path, info in self.repo_files.iteritems()
+                if info['change'] == changenum
+            ]
+
+        def print_file(self, depot_path, out_file):
+            assert depot_path in self.repo_files
+
+            fp = open(out_file, 'w')
+            fp.write(self.repo_files[depot_path]['text'])
+            fp.close()
+
+        def where(self, depot_path):
+            assert depot_path in self.where_files
+
+            return [{
+                'path': self.where_files[depot_path],
+            }]
+
+        def run_p4(self, *args, **kwargs):
+            assert False
 
     @raises(SystemExit)
     def test_error_on_revision_range(self):
-        """Testing that passing a revision_range causes the client to exit."""
+        """Testing PerforceClient with --revision-range causes an exit"""
         self.options.revision_range = "12345"
         client = PerforceClient(options=self.options)
         client.check_options()
+
+    def test_scan_for_server_counter_with_reviewboard_url(self):
+        """Testing PerforceClient.scan_for_server_counter with reviewboard.url"""
+        RB_URL = 'http://reviewboard.example.com/'
+
+        class TestWrapper(P4Wrapper):
+            def counters(self):
+                return {
+                    'reviewboard.url': RB_URL,
+                    'foo': 'bar',
+                }
+
+        client = PerforceClient(TestWrapper)
+        url = client.scan_for_server_counter(None)
+
+        self.assertEqual(url, RB_URL)
+
+    def test_repository_info(self):
+        """Testing PerforceClient.get_repository_info"""
+        SERVER_PATH = 'perforce.example.com:1666'
+
+        class TestWrapper(P4Wrapper):
+            def info(self):
+                return {
+                    'Server address': SERVER_PATH,
+                    'Server version': 'P4D/FREEBSD60X86_64/2012.2/525804 '
+                                      '(2012/09/18)',
+                }
+
+        client = PerforceClient(TestWrapper)
+        info = client.get_repository_info()
+
+        self.assertNotEqual(info, None)
+        self.assertEqual(info.path, SERVER_PATH)
+        self.assertEqual(client.p4d_version, (2012, 2))
+
+    def test_scan_for_server_counter_with_reviewboard_url_encoded(self):
+        """Testing PerforceClient.scan_for_server_counter with encoded reviewboard.url.http:||"""
+        URL_KEY = 'reviewboard.url.http:||reviewboard.example.com/'
+        RB_URL = 'http://reviewboard.example.com/'
+
+        class TestWrapper(P4Wrapper):
+            def counters(self):
+                return {
+                    URL_KEY: '1',
+                    'foo': 'bar',
+                }
+
+        client = PerforceClient(TestWrapper)
+        url = client.scan_for_server_counter(None)
+
+        self.assertEqual(url, RB_URL)
+
+    def test_diff_with_changenum(self):
+        """Testing PerforceClient.diff with changenums"""
+        client = self._build_client()
+        client.p4.repo_files = {
+            '//mydepot/test/README#2': {
+                'action': 'edit',
+                'change': '12345',
+                'text': 'This is a test.\n',
+            },
+            '//mydepot/test/README#3': {
+                'action': 'edit',
+                'change': '',
+                'text': 'This is a mess.\n',
+            },
+            '//mydepot/test/COPYING#1': {
+                'action': 'add',
+                'change': '12345',
+                'text': 'Copyright 2013 Joe User.\n',
+            },
+            '//mydepot/test/Makefile#3': {
+                'action': 'delete',
+                'change': '12345',
+                'text': 'all: all\n',
+            },
+        }
+
+        readme_file = make_tempfile()
+        copying_file = make_tempfile()
+        client.p4.print_file('//mydepot/test/README#3', readme_file)
+        client.p4.print_file('//mydepot/test/COPYING#1', copying_file)
+
+        client.p4.where_files = {
+            '//mydepot/test/README': readme_file,
+            '//mydepot/test/COPYING': copying_file,
+        }
+
+        diff = client.diff(['12345'])
+        self._compare_diff(diff,
+            '--- //mydepot/test/README\t//mydepot/test/README#2\n'
+            '+++ //mydepot/test/README\t1970-01-01 00:00:00\n'
+            '@@ -1 +1 @@\n'
+            '-This is a test.\n'
+            '+This is a mess.\n'
+            '--- //mydepot/test/COPYING\t//mydepot/test/COPYING#1\n'
+            '+++ //mydepot/test/COPYING\t1970-01-01 00:00:00\n'
+            '@@ -0,0 +1 @@\n'
+            '+Copyright 2013 Joe User.\n'
+            '--- //mydepot/test/Makefile\t//mydepot/test/Makefile#3\n'
+            '+++ //mydepot/test/Makefile\t1970-01-01 00:00:00\n'
+            '@@ -1 +0,0 @@\n'
+            '-all: all\n')
+
+    def test_diff_with_moved_files_cap_on(self):
+        """Testing PerforceClient.diff with moved files and capability on"""
+        self._test_diff_with_moved_files(
+            'Moved from: //mydepot/test/README\n'
+            'Moved to: //mydepot/test/README-new\n'
+            '--- //mydepot/test/README\t//mydepot/test/README#2\n'
+            '+++ //mydepot/test/README-new\t1970-01-01 00:00:00\n'
+            '@@ -1 +1 @@\n'
+            '-This is a test.\n'
+            '+This is a mess.\n'
+            '==== //mydepot/test/COPYING#2 ==MV== '
+            '//mydepot/test/COPYING-new ====\n\n',
+            caps={
+                'diffs': {
+                    'moved_files': True
+                }
+            })
+
+    def test_diff_with_moved_files_cap_off(self):
+        """Testing PerforceClient.diff with moved files and capability off"""
+        self._test_diff_with_moved_files(
+            '--- //mydepot/test/README-new\t//mydepot/test/README-new#1\n'
+            '+++ //mydepot/test/README-new\t1970-01-01 00:00:00\n'
+            '@@ -0,0 +1 @@\n'
+            '+This is a mess.\n'
+            '--- //mydepot/test/README\t//mydepot/test/README#2\n'
+            '+++ //mydepot/test/README\t1970-01-01 00:00:00\n'
+            '@@ -1 +0,0 @@\n'
+            '-This is a test.\n'
+            '--- //mydepot/test/COPYING-new\t//mydepot/test/COPYING-new#1\n'
+            '+++ //mydepot/test/COPYING-new\t1970-01-01 00:00:00\n'
+            '@@ -0,0 +1 @@\n'
+            '+Copyright 2013 Joe User.\n'
+            '--- //mydepot/test/COPYING\t//mydepot/test/COPYING#2\n'
+            '+++ //mydepot/test/COPYING\t1970-01-01 00:00:00\n'
+            '@@ -1 +0,0 @@\n'
+            '-Copyright 2013 Joe User.\n')
+
+    def _test_diff_with_moved_files(self, expected_diff, caps={}):
+        client = self._build_client()
+        client.capabilities = Capabilities(caps)
+        client.p4.repo_files = {
+            '//mydepot/test/README#2': {
+                'action': 'move/delete',
+                'change': '12345',
+                'text': 'This is a test.\n',
+            },
+            '//mydepot/test/README-new#1': {
+                'action': 'move/add',
+                'change': '12345',
+                'text': 'This is a mess.\n',
+            },
+            '//mydepot/test/COPYING#2': {
+                'action': 'move/delete',
+                'change': '12345',
+                'text': 'Copyright 2013 Joe User.\n',
+            },
+            '//mydepot/test/COPYING-new#1': {
+                'action': 'move/add',
+                'change': '12345',
+                'text': 'Copyright 2013 Joe User.\n',
+            },
+        }
+
+        readme_file = make_tempfile()
+        copying_file = make_tempfile()
+        readme_file_new = make_tempfile()
+        copying_file_new = make_tempfile()
+        client.p4.print_file('//mydepot/test/README#2', readme_file)
+        client.p4.print_file('//mydepot/test/COPYING#2', copying_file)
+        client.p4.print_file('//mydepot/test/README-new#1', readme_file_new)
+        client.p4.print_file('//mydepot/test/COPYING-new#1', copying_file_new)
+
+        client.p4.where_files = {
+            '//mydepot/test/README': readme_file,
+            '//mydepot/test/COPYING': copying_file,
+            '//mydepot/test/README-new': readme_file_new,
+            '//mydepot/test/COPYING-new': copying_file_new,
+        }
+
+        client.p4.fstat_files = {
+            '//mydepot/test/README': {
+                'clientFile': readme_file,
+                'movedFile': '//mydepot/test/README-new',
+            },
+            '//mydepot/test/README-new': {
+                'clientFile': readme_file_new,
+                'depotFile': '//mydepot/test/README-new',
+            },
+            '//mydepot/test/COPYING': {
+                'clientFile': copying_file,
+                'movedFile': '//mydepot/test/COPYING-new',
+            },
+            '//mydepot/test/COPYING-new': {
+                'clientFile': copying_file_new,
+                'depotFile': '//mydepot/test/COPYING-new',
+            },
+        }
+
+        diff = client.diff(['12345'])
+        self._compare_diff(diff, expected_diff)
+
+    def _build_client(self):
+        self.options.p4_client = 'myclient'
+        self.options.p4_port = 'perforce.example.com:1666'
+        self.options.p4_passwd = ''
+        client = PerforceClient(self.P4DiffTestWrapper, options=self.options)
+        client.p4d_version = (2012, 2)
+        return client
+
+    def _compare_diff(self, diff, expected_diff):
+        self.assertNotEqual(diff[0], None)
+        self.assertEqual(diff[1], None)
+        diff_content = re.sub('\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}',
+                              '1970-01-01 00:00:00',
+                              diff[0])
+        self.assertEqual(diff_content, expected_diff)
+        self.assertEqual(diff[1], None)
+
+
+class BazaarClientTests(SCMClientTests):
+    
+    def _bzr_cmd(self, command, *args, **kwargs):
+        
+        full_command = ["bzr"] + command
+
+        return execute(full_command, *args, **kwargs)
+
+    def _bzr_add_file_commit(self, file, data, msg):
+        """
+        Add a file to a Bazaar repository with the content of data and commit
+        with msg.
+        
+        """
+        foo = open(file, "w")
+        foo.write(data)
+        foo.close()
+        self._bzr_cmd(["add", file])
+        self._bzr_cmd(["commit", "-m", msg])
+    
+    def _compare_diffs(self, filename, full_diff, expected_diff):
+        """
+        Test that the full_diff for ``filename`` matches the ``expected_diff``.
+        
+        """
+        diff_lines = full_diff.splitlines()
+        
+        self.assertEqual("=== modified file %r" % filename, diff_lines[0])
+        self.assert_(diff_lines[1].startswith("--- %s\t" % filename))
+        self.assert_(diff_lines[2].startswith("+++ %s\t" % filename))
+        
+        diff_body = "\n".join(diff_lines[3:])
+        self.assertEqual(diff_body, expected_diff)
+    
+    def setUp(self):
+        super(BazaarClientTests, self).setUp()
+
+        if not self.is_exe_in_path("bzr"):
+            raise SkipTest("bzr not found in path")
+
+        self.orig_dir = os.getcwd()
+
+        self.original_branch = self.chdir_tmp()
+        self._bzr_cmd(["init", "."])
+        self._bzr_add_file_commit("foo.txt", FOO, "initial commit")
+
+        self.child_branch = mktemp()
+        self._bzr_cmd(["branch", self.original_branch, self.child_branch])
+        self.client = BazaarClient(options=self.options)
+        os.chdir(self.orig_dir)
+
+        self.user_config = {}
+        self.configs = []
+        self.client.user_config = self.user_config
+        self.client.configs = self.configs
+        self.options.parent_branch = None
+
+    def test_get_repository_info_original_branch(self):
+        """Test BazaarClient get_repository_info with original branch"""
+        os.chdir(self.original_branch)
+        ri = self.client.get_repository_info()
+        
+        self.assert_(isinstance(ri, RepositoryInfo))
+        self.assertEqual(ri.path, self.original_branch)
+        self.assertTrue(ri.supports_parent_diffs)
+        
+        self.assertEqual(ri.base_path, "/")
+        self.assertFalse(ri.supports_changesets)
+
+    def test_get_repository_info_child_branch(self):
+        """Test BazaarClient get_repository_info with child branch"""
+        os.chdir(self.child_branch)
+        ri = self.client.get_repository_info()
+        
+        self.assert_(isinstance(ri, RepositoryInfo))
+        self.assertEqual(ri.path, self.child_branch)
+        self.assertTrue(ri.supports_parent_diffs)
+        
+        self.assertEqual(ri.base_path, "/")
+        self.assertFalse(ri.supports_changesets)
+
+    def test_get_repository_info_no_branch(self):
+        """Test BazaarClient get_repository_info, no branch"""
+        self.chdir_tmp()
+        ri = self.client.get_repository_info()
+        self.assertEqual(ri, None)
+
+    def test_diff_simple(self):
+        """Test BazaarClient simple diff case"""
+        os.chdir(self.child_branch)
+
+        self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
+        
+        outgoing_diff, parent_diff = self.client.diff(None)
+        
+        self._compare_diffs("foo.txt", outgoing_diff, EXPECTED_BZR_DIFF_0)
+        self.assertEqual(parent_diff, None)
+
+    def test_diff_specific_files(self):
+        """Test BazaarClient diff with specific files"""
+        os.chdir(self.child_branch)
+
+        self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
+        self._bzr_add_file_commit("bar.txt", "baz", "added bar")
+        
+        outgoing_diff, parent_diff = self.client.diff(["foo.txt"])
+        
+        self._compare_diffs("foo.txt", outgoing_diff, EXPECTED_BZR_DIFF_0)
+        self.assertEqual(parent_diff, None)
+    
+    def test_diff_simple_multiple(self):
+        """Test BazaarClient simple diff with multiple commits case"""
+        os.chdir(self.child_branch)
+
+        self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
+        self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
+        self._bzr_add_file_commit("foo.txt", FOO3, "commit 3")
+        
+        outgoing_diff, parent_diff = self.client.diff(None)
+        
+        self._compare_diffs("foo.txt", outgoing_diff, EXPECTED_BZR_DIFF_1)
+        self.assertEqual(parent_diff, None)
+
+    def test_diff_parent(self):
+        """Test BazaarClient diff with changes only in the parent branch"""
+        os.chdir(self.child_branch)
+        self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
+        
+        grand_child_branch = mktemp()
+        self._bzr_cmd(["branch", self.child_branch, grand_child_branch])
+        os.chdir(grand_child_branch)
+        
+        outgoing_diff, parent_diff = self.client.diff(None)
+        
+        self.assertEqual(outgoing_diff, None)
+        self.assertEqual(parent_diff, None)
+
+    def test_diff_grand_parent(self):
+        """Test BazaarClient diff with changes between a 2nd level descendant"""
+        os.chdir(self.child_branch)
+        self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
+        
+        grand_child_branch = mktemp()
+        self._bzr_cmd(["branch", self.child_branch, grand_child_branch])
+        os.chdir(grand_child_branch)
+        
+        # Requesting the diff between the grand child branch and its grand
+        # parent:
+        self.options.parent_branch = self.original_branch
+        
+        outgoing_diff, parent_diff = self.client.diff(None)
+        
+        self._compare_diffs("foo.txt", outgoing_diff, EXPECTED_BZR_DIFF_0)
+        self.assertEqual(parent_diff, None)
+    
+    def test_guessed_summary_and_description_in_diff(self):
+        """Test BazaarClient diff with summary and description guessed"""
+        os.chdir(self.child_branch)
+        
+        self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
+        self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
+        self._bzr_add_file_commit("foo.txt", FOO3, "commit 3")
+        
+        self.options.guess_summary = True
+        self.options.guess_description = True
+        self.client.diff(None)
+        
+        self.assertEquals("commit 3", self.options.summary)
+        
+        description = self.options.description
+        self.assert_("commit 1" in description, description)
+        self.assert_("commit 2" in description, description)
+        self.assert_("commit 3" in description, description)
+    
+    def test_guessed_summary_and_description_in_grand_parent_branch_diff(self):
+        """
+        Test BazaarClient diff with summary and description guessed for
+        grand parent branch.
+        
+        """
+        os.chdir(self.child_branch)
+        
+        self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
+        self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
+        self._bzr_add_file_commit("foo.txt", FOO3, "commit 3")
+        
+        self.options.guess_summary = True
+        self.options.guess_description = True
+        
+        grand_child_branch = mktemp()
+        self._bzr_cmd(["branch", self.child_branch, grand_child_branch])
+        os.chdir(grand_child_branch)
+        
+        # Requesting the diff between the grand child branch and its grand
+        # parent:
+        self.options.parent_branch = self.original_branch
+        
+        self.client.diff(None)
+        
+        self.assertEquals("commit 3", self.options.summary)
+        
+        description = self.options.description
+        self.assert_("commit 1" in description, description)
+        self.assert_("commit 2" in description, description)
+        self.assert_("commit 3" in description, description)
 
 
 FOO = """\
@@ -944,3 +1475,35 @@ Index: foo.txt
 +moenia Romae. Albanique patres, atque altae
 +moenia Romae. Musa, mihi causas memora, quo numine laeso,
  \n"""
+
+# Partial diff for Bazaar, excluding the initial comments because they contain
+# the time when it was generated:
+EXPECTED_BZR_DIFF_0 = """\
+@@ -6,7 +6,4 @@
+ inferretque deos Latio, genus unde Latinum,
+ Albanique patres, atque altae moenia Romae.
+ Musa, mihi causas memora, quo numine laeso,
+-quidve dolens, regina deum tot volvere casus
+-insignem pietate virum, tot adire labores
+-impulerit. Tantaene animis caelestibus irae?
+ 
+"""
+
+EXPECTED_BZR_DIFF_1 = """\
+@@ -1,12 +1,11 @@
+ ARMA virumque cano, Troiae qui primus ab oris
++ARMA virumque cano, Troiae qui primus ab oris
+ Italiam, fato profugus, Laviniaque venit
+ litora, multum ille et terris iactatus et alto
+ vi superum saevae memorem Iunonis ob iram;
+-multa quoque et bello passus, dum conderet urbem,
++dum conderet urbem,
+ inferretque deos Latio, genus unde Latinum,
+ Albanique patres, atque altae moenia Romae.
++Albanique patres, atque altae moenia Romae.
+ Musa, mihi causas memora, quo numine laeso,
+-quidve dolens, regina deum tot volvere casus
+-insignem pietate virum, tot adire labores
+-impulerit. Tantaene animis caelestibus irae?
+ 
+"""

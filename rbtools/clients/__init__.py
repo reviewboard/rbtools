@@ -17,10 +17,12 @@ class SCMClient(object):
     """
     name = None
 
-    def __init__(self, user_config=None, configs=[], options=None):
+    def __init__(self, user_config=None, configs=[], options=None,
+                 capabilities=None):
         self.user_config = user_config
         self.configs = configs
         self.options = options
+        self.capabilities = capabilities
 
     def get_repository_info(self):
         return None
@@ -159,6 +161,7 @@ class RepositoryInfo(object):
 def load_scmclients(options):
     global SCMCLIENTS
 
+    from rbtools.clients.bazaar import BazaarClient
     from rbtools.clients.clearcase import ClearCaseClient
     from rbtools.clients.cvs import CVSClient
     from rbtools.clients.git import GitClient
@@ -168,6 +171,7 @@ def load_scmclients(options):
     from rbtools.clients.svn import SVNClient
 
     SCMCLIENTS = [
+        BazaarClient(options=options),
         CVSClient(options=options),
         ClearCaseClient(options=options),
         GitClient(options=options),
