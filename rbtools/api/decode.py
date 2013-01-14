@@ -10,8 +10,8 @@ def DefaultDecoder(payload):
     """Default decoder for API payloads.
 
     The default decoder is used when a decoder is not found in the
-    DECODER_MAP. This is a last resort which should only be used when
-    something has gone wrong.
+    DECODER_MAP. This will stick the body of the response into the
+    'data' field.
     """
     return {
         'resource': {
@@ -26,26 +26,6 @@ def JsonDecoder(payload):
     return json.loads(payload)
 
 DECODER_MAP['application/json'] = JsonDecoder
-
-
-def PlainTextDecoder(payload):
-    return {
-        'resource': {
-            'text': payload,
-        },
-    }
-
-DECODER_MAP['text/plain'] = PlainTextDecoder
-
-
-def PatchDecoder(payload):
-    return {
-        'resource': {
-            'diff': payload,
-        },
-    }
-
-DECODER_MAP['text/x-patch'] = PatchDecoder
 
 
 def decode_response(payload, mime_type):

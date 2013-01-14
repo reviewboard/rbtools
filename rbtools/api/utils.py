@@ -1,6 +1,6 @@
 def parse_mimetype(mime_type):
     """Parse the mime type in to it's component parts."""
-    types = mime_type.split('/')
+    types = mime_type.split(';')[0].split('/')
 
     ret_val = {
         'type': mime_type,
