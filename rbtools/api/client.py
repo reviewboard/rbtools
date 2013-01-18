@@ -9,6 +9,7 @@ class RBClient(object):
     'transport_cls' parameter.
     """
     def __init__(self, url, transport_cls=SyncTransport, *args, **kwargs):
+        self.url = url
         self._transport = transport_cls(url, *args, **kwargs)
 
     def get_root(self, *args, **kwargs):

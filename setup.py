@@ -56,6 +56,7 @@ rb_commands = [
     'patch = rbtools.commands.patch:Patch',
     'post = rbtools.commands.post:Post',
     'publish = rbtools.commands.publish:Publish',
+    'status = rbtools.commands.status:Status',
 ]
 
 setup(name=PACKAGE_NAME,
