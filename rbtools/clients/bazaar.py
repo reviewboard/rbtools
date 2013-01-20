@@ -45,6 +45,9 @@ class BazaarClient(SCMClient):
             if path == ".":
                 path = os.getcwd()
             
+            if self.options.repository_url:
+                path = self.options.repository_url
+            
             repository_info = RepositoryInfo(
                 path=path,
                 base_path="/",    # Diffs are always relative to the root.
