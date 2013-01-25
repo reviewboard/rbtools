@@ -13,3 +13,6 @@ class RBClient(object):
 
     def get_root(self, *args, **kwargs):
         return self._transport.get_root(*args, **kwargs)
+
+    def login(self, *args, **kwargs):
+        return self._transport.login(*args, **kwargs)

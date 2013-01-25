@@ -26,8 +26,8 @@ class SyncTransport(Transport):
     """
     def __init__(self, url, cookie_file, username=None, password=None,
                  agent=None, session=None, disable_proxy=False,
-                 auth_callback=None):
-        super(SyncTransport, self).__init__(url)
+                 auth_callback=None, *args, **kwargs):
+        super(SyncTransport, self).__init__(url, *args, **kwargs)
         self.server = ReviewBoardServer(self.url, cookie_file,
                                         username=username,
                                         password=password,
@@ -39,6 +39,9 @@ class SyncTransport(Transport):
 
     def _root_request(self):
         return HttpRequest(self.server.url)
+
+    def login(self, username, password):
+        self.server.login(username, password)
 
     def wrap(self, value):
         """Wrap any values returned to the user
