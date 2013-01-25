@@ -1,5 +1,3 @@
-import os
-
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option
 from rbtools.utils.filesystem import make_tempfile
@@ -42,19 +40,14 @@ class Patch(Command):
                help="password to be supplied to the Review Board server"),
     ]
 
-    def get_patch(self, request_id, diff_revision=None):
-        """Given a review request ID and a diff revision,
-        return the diff as a string, the used diff revision,
-        and its basedir.
+    def get_patch(self, request_id, api_root, diff_revision=None):
+        """Return the diff as a string, the used diff revision and its basedir.
 
-        If a diff revision is not specified, then this will
-        look at the most recent diff.
+        If a diff revision is not specified, then this will look at the most
+        recent diff.
         """
         try:
-            diffs = self.root_resource \
-                .get_review_requests() \
-                .get_item(request_id) \
-                .get_diffs()
+            diffs = api_root.get_diffs(review_request_id=request_id)
         except APIError, e:
             raise CommandError("Error getting diffs: %s" % e)
 
@@ -74,18 +67,19 @@ class Patch(Command):
 
         return diff_body, diff_revision, base_dir
 
-    def apply_patch(self, request_id, diff_revision, diff_file_path, base_dir):
+    def apply_patch(self, tool, request_id, diff_revision, diff_file_path,
+                    base_dir):
         """Apply patch patch_file and display results to user."""
-        print "Patch is being applied from request %s with diff revision" \
-              " %s." % (request_id, diff_revision)
-        self.tool.apply_patch(diff_file_path, self.repository_info.base_path,
+        print ("Patch is being applied from request %s with diff revision "
+               " %s." % (request_id, diff_revision))
+        tool.apply_patch(diff_file_path, self.repository_info.base_path,
                               base_dir, self.options.px)
 
     def main(self, request_id):
         """Run the command."""
-        self.repository_info, self.tool = self.initialize_scm_tool()
+        repository_info, tool = self.initialize_scm_tool()
         server_url = self.get_server_url(self.repository_info, self.tool)
-        self.root_resource = self.get_root(server_url)
+        api_client, api_root = self.get_api(server_url)
 
         # Get the patch, the used patch ID and base dir for the diff
         diff_body, diff_revision, base_dir = self.get_patch(
@@ -94,6 +88,5 @@ class Patch(Command):
 
         tmp_patch_file = make_tempfile(diff_body)
 
-        self.apply_patch(request_id, diff_revision, tmp_patch_file, base_dir)
-
-        os.remove(tmp_patch_file)
+        self.apply_patch(tool, request_id, diff_revision, tmp_patch_file,
+                         base_dir)

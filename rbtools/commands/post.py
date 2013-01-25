@@ -418,7 +418,7 @@ class Post(Command):
         origcwd = os.path.abspath(os.getcwd())
         repository_info, tool = self.initialize_scm_tool()
         server_url = self.get_server_url(repository_info, tool)
-        api_root = self.get_root(server_url)
+        api_client, api_root = self.get_api(server_url)
         self.setup_tool(tool, api_root=api_root)
 
         if self.options.diff_filename:

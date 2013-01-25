@@ -44,11 +44,10 @@ class Close(Command):
                help="password to be supplied to the Review Board server"),
     ]
 
-    def get_review_request(self, request_id):
-        """Return the review request resource for the given ID."""
+    def get_review_request(self, request_id, api_root):
+        """Returns the review request resource for the given ID."""
         try:
-            request = \
-                self.root_resource.get_review_requests().get_item(request_id)
+            request = api_root.get_review_request(review_request_id=request_id)
         except APIError, e:
             raise CommandError("Error getting review request: %s" % e)
 
@@ -68,23 +67,19 @@ class Close(Command):
         """Run the command."""
         close_type = self.options.close_type
         self.check_valid_type(close_type)
-
         repository_info, tool = self.initialize_scm_tool()
         server_url = self.get_server_url(repository_info, tool)
-        self.root_resource = self.get_root(server_url)
-
-        request = self.get_review_request(request_id)
+        api_client, api_root = self.get_api(server_url)
+        request = self.get_review_request(request_id, api_root)
 
         if request.status == close_type:
             raise CommandError("Request request #%s is already %s." % (
                 request_id, close_type))
 
         if self.options.description:
-            request.update(status=close_type,
-                           description=self.options.description)
+            request = request.update(status=close_type,
+                                     description=self.options.description)
         else:
-            request.update(status=close_type)
-
-        request = self.get_review_request(request_id)
+            request = request.update(status=close_type)
 
         print "Review request #%s is set to %s." % (request_id, request.status)

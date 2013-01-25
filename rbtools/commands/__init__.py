@@ -10,7 +10,9 @@ from rbtools.api.capabilities import Capabilities
 from rbtools.api.client import RBClient
 from rbtools.api.errors import APIError, ServerInterfaceError
 from rbtools.clients import scan_usable_client
-from rbtools.utils.filesystem import get_home_path, load_config
+from rbtools.utils.filesystem import cleanup_tempfiles, \
+                                     get_home_path, \
+                                     load_config
 from rbtools.utils.process import die
 
 
@@ -145,7 +147,7 @@ class Command(object):
             logging.getLogger().setLevel(logging.DEBUG)
 
         try:
-            self.main(*args)
+            exit_code = self.main(*args) or 0
         except Exception, e:
             # If debugging is on, we'll let python spit out the
             # stack trace and report the exception, otherwise
@@ -155,7 +157,10 @@ class Command(object):
                 raise
 
             logging.critical(e)
-            sys.exit(1)
+            exit_code = 1
+
+        cleanup_tempfiles()
+        sys.exit(exit_code)
 
     def get_cookie(self):
         """Return a cookie file that is read-only."""
@@ -218,24 +223,35 @@ class Command(object):
 
         return username, password
 
-    def get_root(self, server_url):
-        """Returns the root resource of an RBClient."""
-        cookie_file = self.get_cookie()
+    def _make_api_client(self, server_url):
+        """Return an RBClient object for the server.
 
-        self.rb_api = RBClient(server_url,
-                               cookie_file=cookie_file,
-                               username=self.options.username,
-                               password=self.options.password,
-                               auth_callback=self.credentials_prompt)
-        root = None
+        The RBClient will be instantiated with the proper arguments
+        for talking to the provided Review Board server url.
+        """
+        return RBClient(server_url,
+                        cookie_file=self.get_cookie(),
+                        username=self.options.username,
+                        password=self.options.password,
+                        auth_callback=self.credentials_prompt)
+
+    def get_api(self, server_url):
+        """Returns an RBClient instance and the associated root resource.
+
+        Commands should use this method to gain access to the API,
+        instead of instantianting their own client.
+        """
+        api_client = self._make_api_client(server_url)
+
         try:
-            root = self.rb_api.get_root()
+            api_root = api_client.get_root()
         except ServerInterfaceError, e:
-            die("Could not reach the review board server at %s" % server_url)
+            raise CommandError("Could not reach the Review Board "
+                               "server at %s" % server_url)
         except APIError, e:
-            die("Error: %s" % e)
+            raise CommandError("Unexpected API Error: %s" % e)
 
-        return root
+        return api_client, api_root
 
     def get_capabilities(self, api_root):
         """Retrieve Capabilities from the server and return them."""

@@ -38,23 +38,21 @@ class Attach(Command):
                help="password to be supplied to the Review Board server"),
     ]
 
-    def get_review_request(self, request_id):
+    def get_review_request(self, request_id, api_root):
         """Returns the review request resource for the given ID."""
         try:
-            request = \
-                self.root_resource.get_review_requests().get_item(request_id)
-        except APIError:
-            raise CommandError('The specified review request does not exist.')
+            request = api_root.get_review_request(review_request_id=request_id)
+        except APIError, e:
+            raise CommandError("Error getting review request: %s" % e)
 
         return request
 
     def main(self, request_id, path_to_file):
-        """Run the command."""
         self.repository_info, self.tool = self.initialize_scm_tool()
         server_url = self.get_server_url(self.repository_info, self.tool)
-        self.root_resource = self.get_root(server_url)
+        api_client, api_root = self.get_api(server_url)
 
-        request = self.get_review_request(request_id)
+        request = self.get_review_request(request_id, api_root)
 
         try:
             f = open(path_to_file, 'r')
