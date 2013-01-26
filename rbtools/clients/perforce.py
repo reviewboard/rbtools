@@ -535,7 +535,8 @@ class PerforceClient(SCMClient):
             changetype_short = None
             supports_moves = (
                 self.capabilities and
-                self.capabilities.has_capability('diffs', 'moved_files'))
+                self.capabilities.has_capability('scmtools', 'perforce',
+                                                 'moved_files'))
 
             if changetype in ['edit', 'integrate']:
                 # A big assumption
