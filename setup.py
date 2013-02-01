@@ -1,5 +1,5 @@
-#!/usr/bin/env python
 #
+#!/usr/bin/env python
 # setup.py -- Installation for rbtools.
 #
 # Copyright (C) 2009 Christian Hammond
@@ -22,7 +22,6 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-
 from ez_setup import use_setuptools
 use_setuptools()
 
@@ -50,17 +49,28 @@ except ImportError:
     install_requires.append('simplejson')
 
 
+rb_commands = [
+    'attach = rbtools.commands.attach:Attach',
+    'close = rbtools.commands.close:Close',
+    'diff = rbtools.commands.diff:Diff',
+    'patch = rbtools.commands.patch:Patch',
+    'post = rbtools.commands.post:Post',
+    'publish = rbtools.commands.publish:Publish',
+]
+
 setup(name=PACKAGE_NAME,
       version=get_package_version(),
       license="MIT",
       description="Command line tools for use with Review Board",
-      entry_points = {
+      entry_points={
           'console_scripts': [
               'post-review = rbtools.postreview:main',
+              'rbt = rbtools.commands.main:main',
           ],
+          'rbtools_commands': rb_commands,
       },
       install_requires=install_requires,
-      dependency_links = [
+      dependency_links=[
           download_url,
       ],
       packages=find_packages(),

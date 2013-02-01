@@ -15,3 +15,26 @@ class APIError(Exception):
             return '%s (%s)' % (self.rsp['err']['msg'], code_str)
         else:
             return code_str
+
+
+class AuthorizationError(APIError):
+    pass
+
+
+class ServerInterfaceError(Exception):
+    def __init__(self, msg, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)
+        self.msg = msg
+
+    def __str__(self):
+        return self.msg
+
+
+API_ERROR_TYPE = {
+    401: AuthorizationError,
+}
+
+
+def create_api_error(http_status, *args, **kwargs):
+    error_type = API_ERROR_TYPE.get(http_status, APIError)
+    return error_type(http_status, *args, **kwargs)

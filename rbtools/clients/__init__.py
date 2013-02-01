@@ -1,7 +1,7 @@
 import logging
 import sys
 
-from rbtools.utils.process import die
+from rbtools.utils.process import die, execute
 
 
 # The clients are lazy loaded via load_scmclients()
@@ -89,6 +89,53 @@ class SCMClient(object):
 
         return None
 
+    def _get_p_number(self, patch_file, base_path, base_dir):
+        """
+        Returns the appropriate int used for patch -pX argument,
+        where x is the aforementioned int.
+        """
+        if (base_dir.startswith(base_path)):
+            return base_path.count('/') + 1
+        else:
+            return -1
+
+    def _execute(self, cmd):
+        """
+        Prints the results of the executed command and returns
+        the data result from execute.
+        """
+        print 'Command:\n' + str(cmd)
+        res = execute(cmd, ignore_errors=True)
+        print 'Results:\n' + res
+        return res
+
+    def apply_patch(self, patch_file, base_path, base_dir, p=None):
+        """
+        Apply the patch patch_file and return True if the patch was
+        successful, otherwise return False.
+        """
+        # Figure out the pX for patch. Override the p_num if it was
+        # specified in the command's options.
+        p_num = p or self._get_p_number(patch_file, base_path, base_dir)
+        if (p_num >= 0):
+            cmd = ['patch', '-p' + str(p_num), '-i', str(patch_file)]
+        else:
+            cmd = ['patch', '-i', str(patch_file)]
+        self._execute(cmd)
+
+    def sanitize_changenum(self, changenum):
+        """Return a "sanitized" change number.
+
+        Dervied classes should override this method if they
+        support change numbers. It will be called before
+        uploading the change number to the Review Board
+        server.
+
+        TODO: Possibly refactor this into get_changenum
+        once post-review is deprecated.
+        """
+        raise NotImplementedError
+
 
 class RepositoryInfo(object):
     """
@@ -109,7 +156,7 @@ class RepositoryInfo(object):
     def set_base_path(self, base_path):
         if not base_path.startswith('/'):
             base_path = '/' + base_path
-        logging.debug("changing repository info base_path from %s to %s" % \
+        logging.debug("changing repository info base_path from %s to %s" %
                       (self.base_path, base_path))
         self.base_path = base_path
 
@@ -173,18 +220,21 @@ def scan_usable_client(options):
         sys.exit(1)
 
     # Verify that options specific to an SCM Client have not been mis-used.
-    if options.change_only and not repository_info.supports_changesets:
+    if (getattr(options, 'change_only', False) and
+        not repository_info.supports_changesets):
         sys.stderr.write("The --change-only option is not valid for the "
                          "current SCM client.\n")
         sys.exit(1)
 
-    if options.parent_branch and not repository_info.supports_parent_diffs:
+    if (getattr(options, 'parent_branch', None) and
+        not repository_info.supports_parent_diffs):
         sys.stderr.write("The --parent option is not valid for the "
                          "current SCM client.\n")
         sys.exit(1)
 
-    if ((options.p4_client or options.p4_port) and
-        not isinstance(tool, PerforceClient)):
+    if (not isinstance(tool, PerforceClient) and
+        (getattr(options, 'p4_client', None) or
+         getattr(options, 'p4_port', None))):
         sys.stderr.write("The --p4-client and --p4-port options are not valid "
                          "for the current SCM client.\n")
         sys.exit(1)

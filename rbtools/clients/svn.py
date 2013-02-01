@@ -32,7 +32,7 @@ class SVNClient(SCMClient):
         # a supplied URI)
         svn_info_params = ["svn", "info"]
 
-        if self.options.repository_url:
+        if getattr(self.options, 'repository_url', None):
             svn_info_params.append(self.options.repository_url)
 
         data = execute(svn_info_params,
@@ -61,9 +61,9 @@ class SVNClient(SCMClient):
         return SVNRepositoryInfo(path, base_path, m.group(1))
 
     def check_options(self):
-        if (self.options.repository_url and
-            not self.options.revision_range and
-            not self.options.diff_filename):
+        if (getattr(self.options, 'repository_url', None) and
+            not getattr(self.options, 'revision_range', None) and
+            not getattr(self.options, 'diff_filename', None)):
             sys.stderr.write("The --repository-url option requires either the "
                              "--revision-range option or the --diff-filename "
                              "option.\n")
