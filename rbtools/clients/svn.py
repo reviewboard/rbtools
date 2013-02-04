@@ -35,6 +35,10 @@ class SVNClient(SCMClient):
         if getattr(self.options, 'repository_url', None):
             svn_info_params.append(self.options.repository_url)
 
+        # Add --non-interactive so that this command will not hang
+        #  when used  on a https repository path
+        svn_info_params.append("--non-interactive")
+
         data = execute(svn_info_params,
                        ignore_errors=True)
 
