@@ -5,8 +5,6 @@ import sys
 from urlparse import urljoin
 
 from rbtools.api.errors import APIError
-from rbtools.clients.perforce import PerforceClient
-from rbtools.clients.plastic import PlasticClient
 from rbtools.commands import Command, Option
 from rbtools.utils.process import die
 
@@ -15,6 +13,7 @@ class Post(Command):
     """Create and update review requests."""
     name = "post"
     author = "The Review Board Project"
+    description = "Uploads diffs to create and update review requests."
     args = "[changenum]"
     option_list = [
         Option("-r", "--review-request-id",
@@ -39,6 +38,12 @@ class Post(Command):
                action="store_true",
                default=False,
                help="publish the review request immediately after submitting"),
+        Option("-o", "--open",
+               dest="open_browser",
+               action="store_true",
+               config_key='OPEN_BROWSER',
+               default=False,
+               help="open a web browser to the review request page"),
         Option("--target-groups",
                dest="target_groups",
                config_key="TARGET_GROUPS",
@@ -470,3 +475,17 @@ class Post(Command):
         print "Review request #%s posted." % request_id
         print
         print review_url
+
+        # Load the review up in the browser if requested to.
+        if self.options.open_browser:
+            try:
+                import webbrowser
+                if 'open_new_tab' in dir(webbrowser):
+                    # open_new_tab is only in python 2.5+
+                    webbrowser.open_new_tab(review_url)
+                elif 'open_new' in dir(webbrowser):
+                    webbrowser.open_new(review_url)
+                else:
+                    os.system('start %s' % review_url)
+            except:
+                print 'Error opening review URL: %s' % review_url
