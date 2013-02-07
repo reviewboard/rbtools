@@ -1,5 +1,4 @@
 from rbtools.commands import Command, Option
-from rbtools.utils.process import die
 
 
 class Diff(Command):
@@ -45,12 +44,6 @@ class Diff(Command):
                     "the origin url of the current repository, "
                     "overriding the origin url supplied by the git "
                     "client."),
-        Option("-d", "--debug",
-               action="store_true",
-               dest="debug",
-               config_key="DEBUG",
-               default=False,
-               help="display debug output"),
         Option("--username",
                dest="username",
                metavar="USERNAME",
@@ -89,7 +82,5 @@ class Diff(Command):
         """Print the diff to terminal."""
         diff = self.get_diff(*args)
 
-        if not diff:
-            die("There don't seem to be any diffs!")
-
-        print diff
+        if diff:
+            print diff

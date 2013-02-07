@@ -1,8 +1,7 @@
 import os
 
 from rbtools.api.errors import APIError
-from rbtools.commands import Command, Option
-from rbtools.utils.process import die
+from rbtools.commands import Command, CommandError, Option
 
 
 class Attach(Command):
@@ -25,12 +24,6 @@ class Attach(Command):
                config_key="REVIEWBOARD_URL",
                default=None,
                help="specify a different Review Board server to use"),
-        Option("-d", "--debug",
-               action="store_true",
-               dest="debug",
-               config_key="DEBUG",
-               default=False,
-               help="display debug output"),
         Option("--username",
                dest="username",
                metavar="USERNAME",
@@ -51,7 +44,7 @@ class Attach(Command):
             request = \
                 self.root_resource.get_review_requests().get_item(request_id)
         except APIError:
-            die('The specified review request does not exist.')
+            raise CommandError('The specified review request does not exist.')
 
         return request
 
@@ -68,7 +61,7 @@ class Attach(Command):
             content = f.read()
             f.close()
         except IOError:
-            die("%s is not a valid file." % (path_to_file))
+            raise CommandError("%s is not a valid file." % path_to_file)
 
         # Check if the user specified a custom filename, otherwise
         # use the original filename.
@@ -78,6 +71,6 @@ class Attach(Command):
             request.get_file_attachments() \
                 .upload_attachment(filename, content, self.options.caption)
         except APIError, e:
-            die("Error uploading file: %s" % (e))
+            raise CommandError("Error uploading file: %s" % e)
 
         print "Uploaded %s to review request %s." % (path_to_file, request_id)

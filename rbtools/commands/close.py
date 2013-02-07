@@ -1,6 +1,5 @@
 from rbtools.api.errors import APIError
-from rbtools.commands import Command, Option
-from rbtools.utils.process import die
+from rbtools.commands import Command, CommandError, Option
 
 
 SUBMITTED = 'submitted'
@@ -31,12 +30,6 @@ class Close(Command):
                config_key="REVIEWBOARD_URL",
                default=None,
                help="specify a different Review Board server to use"),
-        Option("-d", "--debug",
-               action="store_true",
-               dest="debug",
-               config_key="DEBUG",
-               default=False,
-               help="display debug output"),
         Option("--username",
                dest="username",
                metavar="USERNAME",
@@ -57,7 +50,7 @@ class Close(Command):
             request = \
                 self.root_resource.get_review_requests().get_item(request_id)
         except APIError, e:
-            die("Error getting review request: %s" % (e))
+            raise CommandError("Error getting review request: %s" % e)
 
         return request
 
@@ -68,8 +61,8 @@ class Close(Command):
         is wrong, the command will stop and alert the user.
         """
         if close_type not in (SUBMITTED, DISCARDED):
-            die("%s is not valid type. Try '%s' or '%s'" %
-                (self.options.close_type, SUBMITTED, DISCARDED))
+            raise CommandError("%s is not valid type. Try '%s' or '%s'" % (
+                self.options.close_type, SUBMITTED, DISCARDED))
 
     def main(self, request_id):
         """Run the command."""
@@ -83,8 +76,8 @@ class Close(Command):
         request = self.get_review_request(request_id)
 
         if request.status == close_type:
-            die("Request request #%s is already %s." % (request_id,
-                                                        close_type))
+            raise CommandError("Request request #%s is already %s." % (
+                request_id, close_type))
 
         if self.options.description:
             request.update(status=close_type,

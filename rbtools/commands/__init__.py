@@ -17,6 +17,10 @@ from rbtools.utils.process import die
 RB_MAIN = "rbt"
 
 
+class CommandError(Exception):
+    pass
+
+
 class Option(object):
     """Represents an option for a command.
 
@@ -75,6 +79,14 @@ class Command(object):
     description = ""
     args = ""
     option_list = []
+    _global_options = [
+        Option("-d", "--debug",
+               action="store_true",
+               dest="debug",
+               config_key="DEBUG",
+               default=False,
+               help="display debug output"),
+    ]
 
     def __init__(self):
         self.log = logging.getLogger('rb.%s' % self.name)
@@ -85,6 +97,8 @@ class Command(object):
         """
         option_list = [
             opt.make_option(config) for opt in self.option_list
+        ] + [
+            opt.make_option(config) for opt in self._global_options
         ]
 
         return OptionParser(prog=RB_MAIN,
@@ -127,7 +141,21 @@ class Command(object):
             parser.error("Invalid number of arguments provided")
             sys.exit(1)
 
-        self.main(*args)
+        if self.options.debug:
+            logging.getLogger().setLevel(logging.DEBUG)
+
+        try:
+            self.main(*args)
+        except Exception, e:
+            # If debugging is on, we'll let python spit out the
+            # stack trace and report the exception, otherwise
+            # we'll suppress the trace and print the exception
+            # manually.
+            if self.options.debug:
+                raise
+
+            logging.critical(e)
+            sys.exit(1)
 
     def get_cookie(self):
         """Return a cookie file that is read-only."""

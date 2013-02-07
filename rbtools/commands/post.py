@@ -5,8 +5,7 @@ import sys
 from urlparse import urljoin
 
 from rbtools.api.errors import APIError
-from rbtools.commands import Command, Option
-from rbtools.utils.process import die
+from rbtools.commands import Command, CommandError, Option
 
 
 class Post(Command):
@@ -186,12 +185,6 @@ class Post(Command):
                     "the origin url of the current repository, "
                     "overriding the origin url supplied by the git "
                     "client."),
-        Option("-d", "--debug",
-               action="store_true",
-               dest="debug",
-               config_key="DEBUG",
-               default=False,
-               help="display debug output"),
         Option("--diff-filename",
                dest="diff_filename",
                default=None,
@@ -217,13 +210,9 @@ class Post(Command):
     ]
 
     def post_process_options(self):
-        if self.options.debug:
-            logging.getLogger().setLevel(logging.DEBUG)
-
         if self.options.description and self.options.description_file:
-            sys.stderr.write("The --description and --description-file "
-                             "options are mutually exclusive.\n")
-            sys.exit(1)
+            raise CommandError("The --description and --description-file "
+                               "options are mutually exclusive.\n")
 
         if self.options.description_file:
             if os.path.exists(self.options.description_file):
@@ -231,18 +220,17 @@ class Post(Command):
                 self.options.description = fp.read()
                 fp.close()
             else:
-                sys.stderr.write("The description file %s does not exist.\n" %
-                                 self.options.description_file)
-                sys.exit(1)
+                raise CommandError(
+                  "The description file %s does not exist.\n" %
+                  self.options.description_file)
 
         if self.options.guess_fields:
             self.options.guess_summary = True
             self.options.guess_description = True
 
         if self.options.testing_done and self.options.testing_file:
-            sys.stderr.write("The --testing-done and --testing-done-file "
-                             "options are mutually exclusive.\n")
-            sys.exit(1)
+            raise CommandError("The --testing-done and --testing-done-file "
+                               "options are mutually exclusive.\n")
 
         if self.options.testing_file:
             if os.path.exists(self.options.testing_file):
@@ -250,9 +238,8 @@ class Post(Command):
                 self.options.testing_done = fp.read()
                 fp.close()
             else:
-                sys.stderr.write("The testing file %s does not exist.\n" %
-                                 self.options.testing_file)
-                sys.exit(1)
+                raise CommandError("The testing file %s does not exist.\n" %
+                                   self.options.testing_file)
 
     def get_repository_path(self, repository_info, api_root):
         """Get the repository path from the server.
@@ -275,22 +262,22 @@ class Post(Command):
                 pass
 
         if isinstance(repository_info.path, list):
-            sys.stderr.write('\n')
-            sys.stderr.write('There was an error creating this review '
-                             'request.\n')
-            sys.stderr.write('\n')
-            sys.stderr.write('There was no matching repository path'
-                             'found on the server.\n')
-
-            sys.stderr.write('Unknown repository paths found:\n')
+            error_str = [
+                'There was an error creating this review request.\n',
+                '\n',
+                'There was no matching repository path found on the server.\n',
+                'Unknown repository paths found:\n',
+            ]
 
             for foundpath in repository_info.path:
-                sys.stderr.write('\t%s\n' % foundpath)
+                error_str.append('\t%s\n' % foundpath)
 
-            sys.stderr.write('Ask the administrator to add one of '
-                             'these repositories\n')
-            sys.stderr.write('to the Review Board server.\n')
-            die()
+            error_str += [
+                'Ask the administrator to add one of these repositories\n',
+                'to the Review Board server.\n',
+            ]
+
+            raise CommandError(''.join(error_str))
 
         return repository_info.path
 
@@ -308,12 +295,13 @@ class Post(Command):
                 review_request = api_root.get_review_request(
                     review_request_id=self.options.rid)
             except APIError, e:
-                die("Error getting review request %s: %s" % (self.options.rid,
-                                                             e))
+                raise CommandError("Error getting review request %s: %s" % (
+                    self.options.rid, e))
 
             if review_request.status == 'submitted':
-                die("Review request %s is marked as %s. In order to "
-                    "update it, please reopen the request and try again." % (
+                raise CommandError(
+                    "Review request %s is marked as %s. In order to update "
+                    "it, please reopen the request and try again." % (
                         self.options.rid,
                         review_request.status))
         else:
@@ -336,7 +324,7 @@ class Post(Command):
                 review_request = api_root.get_review_requests().create(
                     **request_data)
             except APIError, e:
-                die("Error creating review request: %s" % e)
+                raise CommandError("Error creating review request: %s" % e)
 
         # Upload the diff if we're not using changesets.
         if (not repository_info.supports_changesets or
@@ -349,26 +337,29 @@ class Post(Command):
                     parent_diff=parent_diff_content,
                     base_dir=basedir)
             except APIError, e:
-                sys.stderr.write('\n')
-                sys.stderr.write('Error uploading diff\n')
-                sys.stderr.write('\n')
+                error_msg = [
+                    'Error uploading diff\n\n',
+                ]
 
                 if e.error_code == 101 and e.http_status == 403:
-                    die('You do not have permissions to modify '
+                    error_msg.append(
+                        'You do not have permissions to modify '
                         'this review request\n')
                 elif e.error_code == 105:
-                    sys.stderr.write('The generated diff file was empty. This '
-                                     'usually means no files were\n')
-                    sys.stderr.write('modified in this change.\n')
-                    sys.stderr.write('\n')
+                    error_msg.append(
+                        'The generated diff file was empty. This '
+                        'usually means no files were\n'
+                        'modified in this change.\n'
+                        '\n'
+                        'Your review request still exists, but the diff is '
+                        'not attached. %s' % e)
 
-                die("Your review request still exists, but the diff is not "
-                    "attached. %s" % e)
+                raise CommandError(''.join(error_msg))
 
         try:
             draft = review_request.get_draft()
         except APIError, e:
-            die("Error retrieving review request draft: %s" % e)
+            raise CommandError("Error retrieving review request draft: %s" % e)
 
         # Update the review request draft fields based on options set
         # by the user, or configuration.
@@ -410,7 +401,7 @@ class Post(Command):
         try:
             draft = draft.update(**update_fields)
         except APIError, e:
-            die("Error updating review request draft: %s" % e)
+            raise CommandError("Error updating review request draft: %s" % e)
 
         request_url = 'r/%s/' % review_request.id
         review_url = urljoin(server_url, request_url)
@@ -450,12 +441,12 @@ class Post(Command):
                     diff = fp.read()
                     fp.close()
                 except IOError, e:
-                    die("Unable to open diff filename: %s" % e)
+                    raise CommandError("Unable to open diff filename: %s" % e)
         else:
             diff, parent_diff = tool.diff(args)
 
         if len(diff) == 0:
-            die("There don't seem to be any diffs!")
+            raise CommandError("There don't seem to be any diffs!")
 
         if repository_info.supports_changesets:
             changenum = tool.sanitize_changenum(tool.get_changenum(args))
@@ -488,4 +479,4 @@ class Post(Command):
                 else:
                     os.system('start %s' % review_url)
             except:
-                print 'Error opening review URL: %s' % review_url
+                logging.error('Error opening review URL: %s' % review_url)

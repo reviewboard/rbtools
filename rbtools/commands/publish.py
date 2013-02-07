@@ -1,6 +1,5 @@
 from rbtools.api.errors import APIError
-from rbtools.commands import Command, Option
-from rbtools.utils.process import die
+from rbtools.commands import Command, CommandError, Option
 
 
 class Publish(Command):
@@ -15,12 +14,6 @@ class Publish(Command):
                config_key="REVIEWBOARD_URL",
                default=None,
                help="specify a different Review Board server to use"),
-        Option("-d", "--debug",
-               action="store_true",
-               dest="debug",
-               config_key="DEBUG",
-               default=False,
-               help="display debug output"),
         Option("--username",
                dest="username",
                metavar="USERNAME",
@@ -41,7 +34,7 @@ class Publish(Command):
             request = \
                 self.root_resource.get_review_requests().get_item(request_id)
         except APIError, e:
-            die("Error getting review request: %s" % e)
+            raise CommandError("Error getting review request: %s" % e)
 
         return request
 
@@ -56,7 +49,7 @@ class Publish(Command):
             draft = request.get_draft()
             draft = draft.update(public=True)
         except APIError, e:
-            die("Error publishing review request (it may already be"
-                "publish): %s" % e)
+            raise CommandError("Error publishing review request (it may "
+                               "already be published): %s" % e)
 
         print "Review request #%s is published." % (request_id)

@@ -1,9 +1,8 @@
 import os
 
 from rbtools.api.errors import APIError
-from rbtools.commands import Command, Option
+from rbtools.commands import Command, CommandError, Option
 from rbtools.utils.filesystem import make_tempfile
-from rbtools.utils.process import die
 
 
 class Patch(Command):
@@ -29,12 +28,6 @@ class Patch(Command):
                config_key="REVIEWBOARD_URL",
                default=None,
                help="specify a different Review Board server to use"),
-        Option("-d", "--debug",
-               action="store_true",
-               dest="debug",
-               config_key="DEBUG",
-               default=False,
-               help="display debug output"),
         Option("--username",
                dest="username",
                metavar="USERNAME",
@@ -63,7 +56,7 @@ class Patch(Command):
                 .get_item(request_id) \
                 .get_diffs()
         except APIError, e:
-            die("Error getting diffs: %s" % (e))
+            raise CommandError("Error getting diffs: %s" % e)
 
         # Use the latest diff if a diff revision was not given.
         # Since diff revisions start a 1, increment by one, and
@@ -77,7 +70,7 @@ class Patch(Command):
             diff_body = diff.get_patch().data
             base_dir = diff.basedir
         except APIError:
-            die('The specified diff revision does not exist.')
+            raise CommandError('The specified diff revision does not exist.')
 
         return diff_body, diff_revision, base_dir
 
