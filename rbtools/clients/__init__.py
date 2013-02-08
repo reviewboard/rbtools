@@ -123,7 +123,6 @@ class RepositoryInfo(object):
 def load_scmclients(options):
     global SCMCLIENTS
 
-    from rbtools.clients.bazaar import BazaarClient
     from rbtools.clients.clearcase import ClearCaseClient
     from rbtools.clients.cvs import CVSClient
     from rbtools.clients.git import GitClient
@@ -133,7 +132,6 @@ def load_scmclients(options):
     from rbtools.clients.svn import SVNClient
 
     SCMCLIENTS = [
-        BazaarClient(options=options),
         CVSClient(options=options),
         ClearCaseClient(options=options),
         GitClient(options=options),

@@ -1,7 +1,6 @@
 import logging
 import os
 import sys
-from pkg_resources import parse_version
 
 from rbtools.api.errors import APIError
 from rbtools.clients import SCMClient, RepositoryInfo
@@ -392,7 +391,7 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
         # We didn't found uuid but if version is >= 1.5.3
         # we can try to use VOB's name hoping it is better
         # than current VOB's path.
-        if parse_version(server.rb_version) >= parse_version('1.5.3'):
+        if server.rb_version >= '1.5.3':
             self.path = cpath.split(self.vobstag)[1]
 
         # We didn't find a matching repository on the server.

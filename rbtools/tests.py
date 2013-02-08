@@ -14,11 +14,18 @@ except ImportError:
 from rbtools import postreview
 from rbtools.api.errors import APIError
 from rbtools.clients import RepositoryInfo
-from rbtools.postreview import ReviewBoardServer
+from rbtools.reviewboard.reviewboard_server import ReviewBoardServer
+from rbtools.reviewboard.custom_http import HTTPPasswordMgr, PresetHTTPAuthHandler
 
 
 class MockHttpUnitTest(unittest.TestCase):
     deprecated_api = False
+
+    def prepare_server(self):
+        url = 'http://localhost:8080/'
+        password_mgr = HTTPPasswordMgr(url, postreview.options, "TestUser", "TestPass")
+        auth_handler = PresetHTTPAuthHandler(url, password_mgr, postreview.options)
+        self.server = ReviewBoardServer(url, RepositoryInfo(), None, password_mgr, auth_handler, postreview.options)
 
     def setUp(self):
         # Save the old http_get and http_post
@@ -27,8 +34,8 @@ class MockHttpUnitTest(unittest.TestCase):
         self.saved_http_get = ReviewBoardServer.http_get
         self.saved_http_post = ReviewBoardServer.http_post
 
-        self.server = ReviewBoardServer('http://localhost:8080/',
-                                        RepositoryInfo(), None)
+        self.prepare_server()
+
         ReviewBoardServer.http_get = self._http_method
         ReviewBoardServer.http_post = self._http_method
 
@@ -61,8 +68,6 @@ class OptionsStub(object):
         self.password = None
         self.repository_url = None
         self.disable_proxy = False
-        self.summary = None
-        self.description = None
 
 
 class ApiTests(MockHttpUnitTest):
