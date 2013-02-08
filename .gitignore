@@ -1,0 +1,7 @@
+build
+dist
+RBTools.egg-info
+*.pyc
+*~
+.idea
+.svn
