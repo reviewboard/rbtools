@@ -30,7 +30,10 @@ class SVNClient(SCMClient):
 
         # Get the SVN repository path (either via a working copy or
         # a supplied URI)
-        svn_info_params = ["svn", "info"]
+        # Force the svn user and password
+        svnuser = "--username="+self.options.username
+        svnpass = "--password="+self.options.password
+        svn_info_params = ["svn", svnuser, svnpass, "info"]
 
         if getattr(self.options, 'repository_url', None):
             svn_info_params.append(self.options.repository_url)
@@ -131,7 +134,10 @@ class SVNClient(SCMClient):
             if len(args) == 1:
                 repository_info.set_base_path(args[0])
             elif len(args) > 1:
-                files = args
+                for arg in args:
+                    if (len(arg) > 0):
+                        files.add(arg)
+                #files = args
 
             url = repository_info.path + repository_info.base_path
 
@@ -190,7 +196,7 @@ class SVNClient(SCMClient):
         path2 = None
 
         while path1:
-            info = self.svn_info(path1, ignore_errors=True) or {}
+            info = self.svn_info(path1)
             url = info.get('Copied From URL', None)
 
             if url:
