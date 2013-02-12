@@ -1,4 +1,5 @@
 from rbtools.commands import Command, Option
+from rbtools.utils.diffs import get_diff
 
 
 class Diff(Command):
@@ -58,29 +59,19 @@ class Diff(Command):
                help="password to be supplied to the Review Board server"),
     ]
 
-    def get_diff(self, *args):
-        """Returns a diff as a string."""
+    def main(self, *args):
+        """Print the diff to terminal."""
         repository_info, tool = self.initialize_scm_tool()
         server_url = self.get_server_url(repository_info, tool)
         root_resource = self.get_root(server_url)
         self.setup_tool(tool, api_root=root_resource)
 
-        if self.options.revision_range:
-            diff, parent_diff = tool.diff_between_revisions(
-                self.options.revision_range,
-                args,
-                repository_info)
-        elif self.options.svn_changelist:
-            diff, parent_diff = tool.diff_changelist(
-                self.options.svn_changelist)
-        else:
-            diff, parent_diff = tool.diff(list(args))
-
-        return diff
-
-    def main(self, *args):
-        """Print the diff to terminal."""
-        diff = self.get_diff(*args)
+        diff, parent_diff = get_diff(
+            tool,
+            repository_info,
+            revision_range=self.options.revision_range,
+            svn_changelist=self.options.svn_changelist,
+            files=args)
 
         if diff:
             print diff

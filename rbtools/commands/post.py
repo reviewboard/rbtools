@@ -6,6 +6,7 @@ from urlparse import urljoin
 
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option
+from rbtools.utils.diffs import get_diff
 
 
 class Post(Command):
@@ -420,15 +421,7 @@ class Post(Command):
         api_root = self.get_root(server_url)
         self.setup_tool(tool, api_root=api_root)
 
-        if self.options.revision_range:
-            diff, parent_diff = tool.diff_between_revisions(
-                self.options.revision_range,
-                args,
-                repository_info)
-        elif self.options.svn_changelist:
-            diff, parent_diff = tool.diff_changelist(
-                self.options.svn_changelist)
-        elif self.options.diff_filename:
+        if self.options.diff_filename:
             parent_diff = None
 
             if self.options.diff_filename == '-':
@@ -443,7 +436,12 @@ class Post(Command):
                 except IOError, e:
                     raise CommandError("Unable to open diff filename: %s" % e)
         else:
-            diff, parent_diff = tool.diff(args)
+            diff, parent_diff = get_diff(
+                tool,
+                repository_info,
+                revision_range=self.options.revision_range,
+                svn_changelist=self.options.svn_changelist,
+                files=args)
 
         if len(diff) == 0:
             raise CommandError("There don't seem to be any diffs!")
