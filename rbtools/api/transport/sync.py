@@ -1,3 +1,5 @@
+import logging
+
 from rbtools.api.decode import decode_response
 from rbtools.api.factory import create_resource
 from rbtools.api.request import HttpRequest, ReviewBoardServer
@@ -331,6 +333,9 @@ class SyncTransportMethod(object):
         call_result = self._method(*args, **kwargs)
         if not isinstance(call_result, HttpRequest):
             return call_result
+
+        logging.debug('Making HTTP %s request to %s' % (call_result.method,
+                                                        call_result.url))
 
         rsp = self._transport.server.make_request(call_result)
         info = rsp.info()
