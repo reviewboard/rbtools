@@ -239,7 +239,12 @@ class Command(object):
 
     def get_capabilities(self, api_root):
         """Retrieve Capabilities from the server and return them."""
-        return Capabilities(api_root.get_info().capabilities)
+        info = api_root.get_info()
+
+        if 'capabilites' in info:
+            return Capabilities(api_root.get_info().capabilities)
+        else:
+            return Capabilities({})
 
     def main(self, *args):
         """The main logic of the command.
