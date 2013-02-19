@@ -1,5 +1,5 @@
-#
 #!/usr/bin/env python
+#
 # setup.py -- Installation for rbtools.
 #
 # Copyright (C) 2009 Christian Hammond
