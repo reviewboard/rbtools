@@ -270,18 +270,18 @@ class ClearCaseClient(SCMClient):
 
             # delete so cleartool can write to them
             try:
-                os.remove(temp_old_file)
+                os.remove(tmp_old_file)
             except OSError:
                 pass
 
             try:
-                os.remove(temp_new_file)
+                os.remove(tmp_new_file)
             except OSError:
                 pass
 
-            execute(["cleartool", "get", "-to", tmp_old_file.name, old_file])
-            execute(["cleartool", "get", "-to", tmp_new_file.name, new_file])
-            diff_cmd = ["diff", "-uN", tmp_old_file.name, tmp_new_file.name]
+            execute(["cleartool", "get", "-to", tmp_old_file, old_file])
+            execute(["cleartool", "get", "-to", tmp_new_file, new_file])
+            diff_cmd = ["diff", "-uN", tmp_old_file, tmp_new_file]
         else:
             diff_cmd = ["diff", "-uN", old_file, new_file]
 
@@ -290,8 +290,8 @@ class ClearCaseClient(SCMClient):
 
         # replace temporary file name in diff with the one in snapshot view
         if self.viewtype == "snapshot":
-            dl = dl.replace(tmp_old_file.name, old_file)
-            dl = dl.replace(tmp_new_file.name, new_file)
+            dl = dl.replace(tmp_old_file, old_file)
+            dl = dl.replace(tmp_new_file, new_file)
 
         # If the input file has ^M characters at end of line, lets ignore them.
         dl = dl.replace('\r\r\n', '\r\n')
