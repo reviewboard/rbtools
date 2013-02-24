@@ -122,6 +122,10 @@ class ResourceDictField(object):
         fields = object.__getattribute__(self, '_fields_dict')
         return key in fields
 
+    def iter_fields(self):
+        for field in object.__getattribute__(self, '_fields_dict'):
+            yield field
+
 
 class SyncTransportListIterator(object):
     """Iterator for lists which uses __getitem__."""
@@ -256,6 +260,10 @@ class SyncTransportItemResource(object):
     def __contains__(self, key):
         resource = object.__getattribute__(self, '_resource')
         return key in resource.fields
+
+    def iter_fields(self):
+        for field in object.__getattribute__(self, '_resource').iter_fields():
+            yield field
 
 
 class SyncTransportListResource(object):

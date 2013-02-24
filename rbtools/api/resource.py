@@ -159,6 +159,10 @@ class ResourceItem(Resource):
             self.url,
             self._token)
 
+    def iter_fields(self):
+        for key in self.fields:
+            yield key
+
 
 class CountResource(ResourceItem):
     """Resource returned by a query with 'counts-only' true.
