@@ -199,7 +199,11 @@ class PerforceClient(SCMClient):
 
         m = re.search(r'[^ ]*/([0-9]+)\.([0-9]+)/[0-9]+ .*$',
                       server_version, re.M)
-        self.p4d_version = int(m.group(1)), int(m.group(2))
+        if m:
+            self.p4d_version = int(m.group(1)), int(m.group(2))
+        else:
+            # Gracefully bail if we don't get a match
+            return None
 
         # Now that we know it's Perforce, make sure we have GNU diff
         # installed, and error out if we don't.
