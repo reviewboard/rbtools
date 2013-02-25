@@ -2,13 +2,17 @@ import base64
 import cookielib
 import mimetools
 import mimetypes
-from StringIO import StringIO
+import os
+import shutil
 import urllib
 import urllib2
+from StringIO import StringIO
 from urlparse import urlparse, urlunparse
 
-from rbtools import get_package_version
-from rbtools.api.errors import APIError, create_api_error, ServerInterfaceError
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 try:
     # Specifically import json_loads, to work around some issues with
@@ -25,6 +29,12 @@ except ImportError:
     from cgi import parse_qsl
 
 
+from rbtools import get_package_version
+from rbtools.api.errors import APIError, create_api_error, ServerInterfaceError
+from rbtools.utils.filesystem import get_home_path
+
+
+RBTOOLS_COOKIE_FILE = '.rbtools-cookies'
 RB_COOKIE_NAME = 'rbsessionid'
 
 
@@ -232,6 +242,43 @@ class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
             return urllib2.HTTPPasswordMgr.find_user_password(self, realm, uri)
 
 
+def create_cookie_jar(cookie_file=None):
+    """Return a cookie jar backed by cookie_file
+
+    If cooie_file is not provided, we will default it. If the
+    cookie_file does not exist, we will create it with the proper
+    permissions.
+
+    In the case where we default cookie_file, and it does not exist,
+    we will attempt to copy the .post-review-cookies.txt file.
+    """
+    home_path = get_home_path()
+
+    if not cookie_file:
+        cookie_file = os.path.join(home_path, RBTOOLS_COOKIE_FILE)
+        post_review_cookies = os.path.join(home_path,
+                                           '.post-review-cookies.txt')
+
+        if (not os.path.isfile(cookie_file) and
+            os.path.isfile(post_review_cookies)):
+                try:
+                    shutil.copyfile(post_review_cookies, cookie_file)
+                    os.chmod(cookie_file, 0600)
+                except IOError, e:
+                    logging.warning("There was an error while copying "
+                                    "post-review's cookies: %s" % e)
+
+    if not os.path.isfile(cookie_file):
+        try:
+            open(cookie_file, 'w').close()
+            os.chmod(cookie_file, 0600)
+        except IOError, e:
+            logging.warning("There was an error while creating a "
+                            "cookie file: %s" % e)
+
+    return cookielib.MozillaCookieJar(cookie_file), cookie_file
+
+
 class ReviewBoardServer(object):
     """Represents a Review Board server we are communicating with.
 
@@ -244,7 +291,7 @@ class ReviewBoardServer(object):
     return a 2-tuple of username, password. The user can be prompted
     for their credentials using this mechanism.
     """
-    def __init__(self, url, cookie_file, username=None, password=None,
+    def __init__(self, url, cookie_file=None, username=None, password=None,
                  agent=None, session=None, disable_proxy=False,
                  auth_callback=None):
         self.url = url
@@ -252,14 +299,13 @@ class ReviewBoardServer(object):
             self.url += '/'
 
         self.url = self.url + 'api/'
-        self.cookie_file = cookie_file
-        self.cookie_jar = cookielib.MozillaCookieJar(self.cookie_file)
+        self.cookie_jar, self.cookie_file = create_cookie_jar(
+            cookie_file=cookie_file)
 
-        if self.cookie_file:
-            try:
-                self.cookie_jar.load(self.cookie_file, ignore_expires=True)
-            except IOError:
-                pass
+        try:
+            self.cookie_jar.load(ignore_expires=True)
+        except IOError:
+            pass
 
         if session:
             parsed_url = urlparse(url)
@@ -362,7 +408,7 @@ class ReviewBoardServer(object):
             raise ServerInterfaceError("%s" % e.reason)
 
         try:
-            self.cookie_jar.save(self.cookie_file)
+            self.cookie_jar.save()
         except IOError:
             pass
 

@@ -26,11 +26,12 @@ class SyncTransport(Transport):
     to use when authenticating with reviewboard.
 
     """
-    def __init__(self, url, cookie_file, username=None, password=None,
+    def __init__(self, url, cookie_file=None, username=None, password=None,
                  agent=None, session=None, disable_proxy=False,
                  auth_callback=None, *args, **kwargs):
         super(SyncTransport, self).__init__(url, *args, **kwargs)
-        self.server = ReviewBoardServer(self.url, cookie_file,
+        self.server = ReviewBoardServer(self.url,
+                                        cookie_file=cookie_file,
                                         username=username,
                                         password=password,
                                         session=session,

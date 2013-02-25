@@ -162,15 +162,6 @@ class Command(object):
         cleanup_tempfiles()
         sys.exit(exit_code)
 
-    def get_cookie(self):
-        """Return a cookie file that is read-only."""
-        # If we end up creating a cookie file, make sure it's only
-        # readable by the user.
-        os.umask(0077)
-
-        # Generate a path to the cookie file.
-        return os.path.join(get_home_path(), ".post-review-cookies.txt")
-
     def initialize_scm_tool(self):
         """Initialize the SCM tool for the current working directory."""
         repository_info, tool = scan_usable_client(self.options)
@@ -230,7 +221,6 @@ class Command(object):
         for talking to the provided Review Board server url.
         """
         return RBClient(server_url,
-                        cookie_file=self.get_cookie(),
                         username=self.options.username,
                         password=self.options.password,
                         auth_callback=self.credentials_prompt)
