@@ -963,8 +963,10 @@ class PerforceClientTests(SCMClientTests):
             '==== //mydepot/test/COPYING#2 ==MV== '
             '//mydepot/test/COPYING-new ====\n\n',
             caps={
-                'diffs': {
-                    'moved_files': True
+                'scmtools': {
+                    'perforce': {
+                        'moved_files': True
+                    }
                 }
             })
 
