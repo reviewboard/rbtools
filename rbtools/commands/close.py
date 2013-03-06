@@ -14,7 +14,7 @@ class Close(Command):
     """
     name = "close"
     author = "The Review Board Project"
-    args = "<request-id>"
+    args = "<review-request-id>"
     option_list = [
         Option("--close-type",
                dest="close_type",

@@ -1,0 +1,16 @@
+============
+rbt Commands
+============
+
+.. toctree::
+   :maxdepth: 1
+
+   attach
+   close
+   diff
+   patch
+   post
+   publish
+   status
+
+.. comment: vim: ft=rst et ts=3

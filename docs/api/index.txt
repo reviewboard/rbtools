@@ -1,0 +1,23 @@
+=================
+Python API Client
+=================
+
+Included with RBTools is a Python client for interacting with the Review Board
+Web API.
+
+.. note::
+   This documentation assumes knowledge of the Review Board Web API. When
+   possible links will be provided to relevant sections of the Web API
+   documentation which can be found in the `Web API Guide`_.
+
+.. _`Web API Guide`: http://www.reviewboard.org/docs/manual/dev/webapi/
+
+.. toctree::
+   :maxdepth: 2
+
+   overview
+   tutorial
+   resource-specific
+
+
+.. comment: vim: ft=rst et ts=3

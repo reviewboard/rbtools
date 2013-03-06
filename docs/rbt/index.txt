@@ -1,0 +1,24 @@
+===
+rbt
+===
+
+:command:`rbt` is a command line tool for Windows, Linux and MacOS X
+which allows executing a number of useful sub-commands. :command:`rbt`
+has the following usage::
+
+   $ rbt [--version] <command> [options] [<args>]
+
+While :command:`rbt` is currently in beta, it will eventually replace
+:command:`post-review` completely. For built in help you may execute::
+
+   $ rbt help
+
+
+.. toctree::
+   :maxdepth: 2
+
+   configuration
+   commands/index
+
+
+.. comment: vim: ft=rst et ts=3
