@@ -267,24 +267,19 @@ class GitClient(SCMClient):
         """
         Performs a diff on a particular branch range.
         """
-
-        # Use `git diff ancestor..commit` by default, except from when there
-        # is no `commit` given - then use `git show ancestor`.
         if commit:
-            diff_command = 'diff'
             rev_range = "%s..%s" % (ancestor, commit)
         else:
-            diff_command = 'show'
             rev_range = ancestor
 
         if self.type == "svn":
-            diff_lines = execute([self.git, diff_command, "--no-color",
+            diff_lines = execute([self.git, "diff", "--no-color",
                                   "--no-prefix", "--no-ext-diff", "-r", "-u",
                                   rev_range],
                                  split_lines=True)
             return self.make_svn_diff(ancestor, diff_lines)
         elif self.type == "git":
-            cmdline = [self.git, diff_command, "--no-color", "--full-index",
+            cmdline = [self.git, "diff", "--no-color", "--full-index",
                        "--no-ext-diff", "--ignore-submodules", "--no-renames",
                        rev_range]
 
