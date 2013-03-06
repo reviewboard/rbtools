@@ -63,8 +63,8 @@ class Diff(Command):
         """Print the diff to terminal."""
         repository_info, tool = self.initialize_scm_tool()
         server_url = self.get_server_url(repository_info, tool)
-        root_resource = self.get_root(server_url)
-        self.setup_tool(tool, api_root=root_resource)
+        api_client, api_root = self.get_api(server_url)
+        self.setup_tool(tool, api_root=api_root)
 
         diff, parent_diff = get_diff(
             tool,
