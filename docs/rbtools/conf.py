@@ -56,7 +56,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'RBTools Documentation'
-copyright = u'2013, Steven MacLeod'
+copyright = u'2013, Beanbag, Inc.'
 
 # The version info for the project you're documenting, acts as
 # replacement for |version| and |release|, also used in various other
@@ -191,7 +191,7 @@ latex_documents = [
     (
         'index',
         'RBtools.tex',
-         ur'RBTools Documentation',
+        ur'RBTools Documentation',
         ur'Steven MacLeod',
         'manual'
     ),
