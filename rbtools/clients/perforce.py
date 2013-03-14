@@ -622,7 +622,8 @@ class PerforceClient(SCMClient):
                                                          depot_path))
 
             dl = self._do_diff(old_file, new_file, depot_path, base_revision,
-                               new_depot_path, changetype_short)
+                               new_depot_path, changetype_short,
+                               ignore_unmodified=True)
             diff_lines += dl
 
         os.unlink(empty_filename)
