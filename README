@@ -1,12 +1,20 @@
 About rbtools
 =============
 
-rbtools is a collection of console utility scripts for use with Review Board.
+rbtools is a set of client tools to use with Review Board.
 
 This consists of the following officially supported tools:
 
-    * post-review - Create and update review requests based on changes in
-                    a local tree.
+    * post-review
+      - Create and update review requests based on changes in a local tree.
+
+    * rbt
+      - Execute a number of useful sub-commands to interact with local source
+        code repositories and Review Board.
+
+    * Python API Client
+      - Python bindings to simplify interaction with the the Review Board
+        Web API.
 
 
 There are also some user-contributed scripts and application plugins in the
