@@ -1,0 +1,177 @@
+===========================
+RBTools 0.5.0 Release Notes
+===========================
+
+**Release date**: March 19, 2013
+
+
+New Features
+============
+
+API Client
+----------
+
+* A new Python API Client has been introduced for communication with the
+  Review Board Web API.
+
+  The API client provides convenient access to Review Board Web API
+  resources, and makes performing REST operations simple. The API
+  client will be used internally by RBTools going forward, and can
+  be leveraged by third party programs.
+
+  Some of the initial design work, and HTTPRequest abstraction was
+  provided by Alexander Solovets.
+
+
+rbt
+---
+
+This is the initial release of our new command line tool, rbt. It
+provides access to useful sub-commands which interact with local
+source code repositories and Review Board. This tool will eventually
+replace post-review, but is currently considered beta.
+
+There are a number of bulit in sub-commands.
+
+
+rbt attach
+~~~~~~~~~~
+
+The attach command is used to upload file attachments to a review request.
+
+Largely implemented by John Sintal.
+
+
+rbt close
+~~~~~~~~~
+
+Close review requests as submitted. Optionally, a review request may be
+discarded by providing the value ``discarded`` to the
+:option:`--close-type` option.
+
+Largely implemented by John Sintal.
+
+
+rbt diff
+~~~~~~~~
+
+Generate a diff from the local repository and print it to the screen
+instead of creating a review request for it.
+
+Largely implemented by John Sintal.
+
+
+rbt patch
+~~~~~~~~~
+
+Download the latest diff from a review request and apply it to the
+local working directory. The :option:`--diff-revision` option may be
+used to specify a specific revision of the diff to use.
+
+Largely implemented by John Sintal.
+
+
+rbt post
+~~~~~~~~
+
+Simplifies both creating and updating review requests. It can look
+at your source directory, generate a diff, and upload it to a new or
+existing review request on an associated Review Board server. This
+saves a lot of time over the web UI, and for some types of code
+repositories (such as Perforce), it's actually required in order to
+produce a compatible diff.
+
+This command serves as the replacement for post-review's primary
+workflow.
+
+
+rbt publish
+~~~~~~~~~~~
+
+Publish the draft associated with a review request.
+
+Largely implemented by John Sintal.
+
+
+rbt status
+~~~~~~~~~~
+
+Output a list of your pending review requests associated with the
+working directory's repository. Review requests which currently have
+a draft will be identified by an asterisk (``*``).
+
+Optionally, pending review requests from all repositories can be
+displayed by providing the :option:`--all` option.
+
+
+Bug Fixes
+=========
+
+* Fix treating an SVN repository as Perforce by mistake.
+
+  This changes the order in which we check for repositories. Perforce was
+  coming before Subversion, but Perforce would give us a false-positive
+  due to the fact that it says we have a valid repository so long as
+  :envvar:`P4PORT` is set to something real.
+
+  Patch by Chris Liu.
+
+
+Perforce
+--------
+
+* Fix diff generation with unedited files in Perforce.
+
+  If you made a Perforce-backed code review with an unedited (but opened)
+  file, then Review Board would choke on the empty diff content.
+
+  Patch by Damian (:bug:`2754`).
+
+* Gracefully handle no-match in p4 info regex.
+
+  If a match for the p4d version was not found, a Python traceback
+  would be triggered and printed to the screen. We will now gracefully
+  bail out in this situation.
+
+  Patch by Ed Wehrwein.
+
+
+ClearCase
+---------
+
+* Support posting review requests in ClearCase snapshot view.
+
+  When using snapshot view, RBTools would report a confusing error
+  message. Proper support for snapshot view was added.
+
+  Patch by Tao Zhou.
+
+
+Subversion
+----------
+
+* Don't block waiting for user input from :command:`svn`.
+
+  Certain situations, like using Subversion with https, would cause
+  :command:`svn` to hang waiting for user input. Calls to
+  :command:`svn` will no longer trigger prompts.
+
+  Patch by Tom Masterson
+
+
+Contributors
+============
+
+* Alexander Solovets
+* Chris Liu
+* Christian Hammond
+* Damian
+* David Trowbridge
+* Ed Wehrwein
+* John Sintal
+* Steven MacLeod
+* Tao Zhou
+* Tom Masterson
+
+
+.. comment: vim: ft=rst et
