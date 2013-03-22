@@ -56,6 +56,7 @@ except ImportError:
 
 
 rb_commands = [
+    'api-get = rbtools.commands.api_get:APIGet',
     'attach = rbtools.commands.attach:Attach',
     'close = rbtools.commands.close:Close',
     'diff = rbtools.commands.diff:Diff',
@@ -107,5 +108,4 @@ setup(name=PACKAGE_NAME,
           "Operating System :: OS Independent",
           "Programming Language :: Python",
           "Topic :: Software Development",
-      ]
-)
+      ])

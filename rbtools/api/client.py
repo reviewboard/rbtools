@@ -18,5 +18,8 @@ class RBClient(object):
     def get_path(self, path, *args, **kwargs):
         return self._transport.get_path(path, *args, **kwargs)
 
+    def get_url(self, url, *args, **kwargs):
+        return self._transport.get_url(url, *args, **kwargs)
+
     def login(self, *args, **kwargs):
         return self._transport.login(*args, **kwargs)

@@ -1,4 +1,7 @@
-import json
+try:
+    import json
+except ImportError:
+    import simplejson as json
 
 from rbtools.api.utils import parse_mimetype
 

@@ -5,6 +5,7 @@ rbt Commands
 .. toctree::
    :maxdepth: 1
 
+   api-get
    attach
    close
    diff

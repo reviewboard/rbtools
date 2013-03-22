@@ -35,14 +35,20 @@ class SyncTransport(Transport):
         return self._execute_request(HttpRequest(self.server.url))
 
     def get_path(self, path, *args, **kwargs):
-        if path[-1] != '/':
+        if not path.endswith('/'):
             path = path + '/'
 
-        if path[0] == '/':
+        if path.startswith('/'):
             path = path[1:]
 
         return self._execute_request(
             HttpRequest(self.server.url + path, query_args=kwargs))
+
+    def get_url(self, url, *args, **kwargs):
+        if not url.endswith('/'):
+            url = url + '/'
+
+        return self._execute_request(HttpRequest(url, query_args=kwargs))
 
     def login(self, username, password):
         self.server.login(username, password)

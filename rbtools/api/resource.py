@@ -150,6 +150,11 @@ class Resource(object):
     def _get_url(self, url, **kwargs):
         return HttpRequest(url, query_args=kwargs)
 
+    @property
+    def rsp(self):
+        """Return the response payload used to create the resource."""
+        return self._payload
+
 
 class ResourceDictField(object):
     """Wrapper for dictionaries returned from a resource.

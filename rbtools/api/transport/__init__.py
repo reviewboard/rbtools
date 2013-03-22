@@ -20,6 +20,14 @@ class Transport(object):
         """Retrieve the api resource at the provided path."""
         raise NotImplementedError
 
+    def get_url(self, url, *args, **kwargs):
+        """Retrieve the resource at the provided URL.
+
+        The URL is not guaranteed to be part of the configured Review
+        Board domain.
+        """
+        raise NotImplementedError
+
     def login(self, username, password, *args, **kwargs):
         """Reset login information to be populated on next request.
 
