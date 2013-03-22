@@ -23,6 +23,10 @@ class CommandError(Exception):
     pass
 
 
+class ParseError(CommandError):
+    pass
+
+
 class Option(object):
     """Represents an option for a command.
 
@@ -148,6 +152,13 @@ class Command(object):
 
         try:
             exit_code = self.main(*args) or 0
+        except CommandError, e:
+            if isinstance(e, ParseError):
+                parser.error(e)
+            elif self.options.debug:
+                raise
+
+            exit_code = 1
         except Exception, e:
             # If debugging is on, we'll let python spit out the
             # stack trace and report the exception, otherwise

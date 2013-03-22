@@ -18,6 +18,9 @@ class Transport(object):
     def get_root(self, *args, **kwargs):
         raise NotImplementedError
 
+    def get_path(self, *args, **kwargs):
+        raise NotImplementedError
+
     def login(self, username, password, *args, **kwargs):
         """Reset login information to be populated on next request.
 

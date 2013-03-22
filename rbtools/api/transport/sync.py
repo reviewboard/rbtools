@@ -43,6 +43,16 @@ class SyncTransport(Transport):
     def _root_request(self):
         return HttpRequest(self.server.url)
 
+    def get_path(self, path, *args, **kwargs):
+        if path[-1] != '/':
+            path = path + '/'
+
+        if path[0] == '/':
+            path = path[1:]
+
+        return self._execute_request(
+            HttpRequest(self.server.url + path, query_args=kwargs))
+
     def login(self, username, password):
         self.server.login(username, password)
 
@@ -73,6 +83,24 @@ class SyncTransport(Transport):
                 return ResourceDictField(self, value)
         else:
             return value
+
+    def _execute_request(self, request):
+        """Execute an HTTPRequest and construct a resource from the payload"""
+        logging.debug('Making HTTP %s request to %s' % (request.method,
+                                                        request.url))
+
+        rsp = self.server.make_request(request)
+        info = rsp.info()
+        mime_type = info['Content-Type']
+        item_content_type = info.get('Item-Content-Type', None)
+        payload = rsp.read()
+        payload = decode_response(payload, mime_type)
+
+        resource = create_resource(payload, request.url,
+                                   mime_type=mime_type,
+                                   item_mime_type=item_content_type)
+
+        return self.wrap(resource)
 
     def __repr__(self):
         return ('<SyncTransport(url=%r, cookie_file=%r, username=%r, '
@@ -340,24 +368,11 @@ class SyncTransportMethod(object):
     def __call__(self, *args, **kwargs):
         """Executed when a resource's method is called."""
         call_result = self._method(*args, **kwargs)
+
         if not isinstance(call_result, HttpRequest):
             return call_result
 
-        logging.debug('Making HTTP %s request to %s' % (call_result.method,
-                                                        call_result.url))
-
-        rsp = self._transport.server.make_request(call_result)
-        info = rsp.info()
-        mime_type = info['Content-Type']
-        item_content_type = info.get('Item-Content-Type', None)
-        payload = rsp.read()
-        payload = decode_response(payload, mime_type)
-
-        resource = create_resource(payload, call_result.url,
-                                   mime_type=mime_type,
-                                   item_mime_type=item_content_type)
-
-        return self._transport.wrap(resource)
+        return self._transport._execute_request(call_result)
 
     def __repr__(self):
         return 'SyncTransportMethod(transport=%r, method=%r)' % (
