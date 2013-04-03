@@ -5,16 +5,12 @@ from rbtools.api.capabilities import Capabilities
 from rbtools.api.factory import create_resource
 from rbtools.api.request import HttpRequest
 from rbtools.api.resource import CountResource, \
-                                 ResourceItem, \
-                                 ResourceList, \
+                                 ItemResource, \
+                                 ListResource, \
+                                 ResourceDictField, \
+                                 ResourceLinkField, \
                                  RootResource
-from rbtools.api.transport.sync import ResourceListField, \
-                                       ResourceDictField, \
-                                       SyncTransport, \
-                                       SyncTransportItemResource, \
-                                       SyncTransportListResource, \
-                                       SyncTransportMethod, \
-                                       SyncTransportResourceLink
+from rbtools.api.transport import Transport
 
 
 class CapabilitiesTests(unittest.TestCase):
@@ -49,7 +45,14 @@ class CapabilitiesTests(unittest.TestCase):
         self.assertFalse(caps.has_capability('foo', 'bar'))
 
 
+class MockTransport(Transport):
+    """Mock transport which returns HttpRequests without executing them"""
+    def __init__(self):
+        pass
+
+
 class TestWithPayloads(unittest.TestCase):
+    transport = MockTransport()
     item_payload = {
         'resource_token': {
             'field1': 1,
@@ -140,8 +143,8 @@ class TestWithPayloads(unittest.TestCase):
     }
     root_payload = {
         'uri_templates': {
-            'reviews': 'http://localhost:8080/api/review-requests/' +
-                '{review_request_id}/reviews/',
+            'reviews': ('http://localhost:8080/api/review-requests/'
+                        '{review_request_id}/reviews/'),
         },
         'links': {
             'self': {
@@ -160,49 +163,53 @@ class TestWithPayloads(unittest.TestCase):
 class ResourceFactoryTests(TestWithPayloads):
     def test_token_guessing(self):
         """Test guessing the resource's token."""
-        r = create_resource(self.item_payload, '')
+        r = create_resource(self.transport, self.item_payload, '')
         self.assertTrue('resource_token' not in r.fields)
-        for field in self.item_payload['resource_token']:
-            self.assertTrue(field in r.fields)
 
-        r = create_resource(self.count_payload, '')
-        self.assertTrue('count' in r.fields)
+        for field in self.item_payload['resource_token']:
+            self.assertTrue(field in r)
+
+        r = create_resource(self.transport, self.count_payload, '')
+        self.assertTrue('count' in r)
 
     def test_no_token_guessing(self):
         """Test constructing without guessing the resource token."""
-        r = create_resource(self.item_payload, '', guess_token=False)
-        self.assertTrue('resource_token' in r.fields)
-        self.assertTrue('field1' not in r.fields)
-        self.assertTrue('field1' in r.fields['resource_token'])
+        r = create_resource(self.transport, self.item_payload, '',
+                            guess_token=False)
+        self.assertTrue('resource_token' in r)
+        self.assertTrue('field1' not in r)
+        self.assertTrue('field1' in r.resource_token)
 
-        r = create_resource(self.list_payload, '', guess_token=False)
-        self.assertTrue('resource_token' in r.fields)
+        r = create_resource(self.transport, self.list_payload, '',
+                            guess_token=False)
+        self.assertTrue('resource_token' in r)
 
     def test_item_construction(self):
         """Test constructing an item resource."""
-        r = create_resource(self.item_payload, '')
-        self.assertTrue(isinstance(r, ResourceItem))
-        self.assertEqual(r.fields['field1'],
+        r = create_resource(self.transport, self.item_payload, '')
+        self.assertTrue(isinstance(r, ItemResource))
+        self.assertEqual(r.field1,
                          self.item_payload['resource_token']['field1'])
-        self.assertEqual(r.fields['field2'],
+        self.assertEqual(r.field2,
                          self.item_payload['resource_token']['field2'])
 
     def test_list_construction(self):
         """Test constructing a list resource."""
-        r = create_resource(self.list_payload, '')
-        self.assertTrue(isinstance(r, ResourceList))
+        r = create_resource(self.transport, self.list_payload, '')
+        self.assertTrue(isinstance(r, ListResource))
 
     def test_count_construction(self):
         """Test constructing a count resource."""
-        r = create_resource(self.count_payload, '')
+        r = create_resource(self.transport, self.count_payload, '')
         self.assertTrue(isinstance(r, CountResource))
-        self.assertEqual(r.fields['count'], self.count_payload['count'])
+        self.assertEqual(r.count, self.count_payload['count'])
 
     def test_resource_specific_base_class(self):
         """Test constructing a resource with a specific base class."""
-        r = create_resource(self.root_payload, '')
+        r = create_resource(self.transport, self.root_payload, '')
         self.assertFalse(isinstance(r, RootResource))
         r = create_resource(
+            self.transport,
             self.root_payload,
             '',
             mime_type='application/vnd.reviewboard.org.root+json')
@@ -212,64 +219,88 @@ class ResourceFactoryTests(TestWithPayloads):
 class ResourceTests(TestWithPayloads):
     def test_item_resource_fields(self):
         """Test item resource fields."""
-        r = create_resource(self.item_payload, '')
+        r = create_resource(self.transport, self.item_payload, '')
         for field in self.item_payload['resource_token']:
-            self.assertTrue(field in r.fields)
+            self.assertTrue(field in r)
+            self.assertTrue(hasattr(r, field))
 
     def test_item_resource_links(self):
         """Test item resource link generation."""
-        r = create_resource(self.item_payload, '')
+        r = create_resource(self.transport, self.item_payload, '')
+
         self.assertTrue(hasattr(r, 'get_self'))
         self.assertTrue(callable(r.get_self))
-        self.assertTrue(isinstance(r.get_self(), HttpRequest))
-        self.assertEqual(r.get_self().method, 'GET')
+        request = r.get_self()
+        self.assertTrue(isinstance(request, HttpRequest))
+        self.assertEqual(request.method, 'GET')
+        self.assertEqual(request.url,
+                         self.item_payload['links']['self']['href'])
 
         self.assertTrue(hasattr(r, 'update'))
         self.assertTrue(callable(r.update))
-        self.assertTrue(isinstance(r.update(), HttpRequest))
-        self.assertEqual(r.update().method, 'PUT')
+        request = r.update()
+        self.assertTrue(isinstance(request, HttpRequest))
+        self.assertEqual(request.method, 'PUT')
+        self.assertEqual(request.url,
+                         self.item_payload['links']['update']['href'])
 
         self.assertTrue(hasattr(r, 'delete'))
         self.assertTrue(callable(r.delete))
-        self.assertTrue(isinstance(r.delete(), HttpRequest))
-        self.assertEqual(r.delete().method, 'DELETE')
+        request = r.delete()
+        self.assertTrue(isinstance(request, HttpRequest))
+        self.assertEqual(request.method, 'DELETE')
+        self.assertEqual(request.url,
+                         self.item_payload['links']['delete']['href'])
 
         self.assertTrue(hasattr(r, 'get_other_link'))
         self.assertTrue(callable(r.get_other_link))
-        self.assertTrue(isinstance(r.get_other_link(), HttpRequest))
-        self.assertEqual(r.get_other_link().method, 'GET')
+        request = r.get_other_link()
+        self.assertTrue(isinstance(request, HttpRequest))
+        self.assertEqual(request.method, 'GET')
+        self.assertEqual(request.url,
+                         self.item_payload['links']['other_link']['href'])
 
         self.assertFalse(hasattr(r, 'create'))
 
     def test_list_resource_list(self):
         """Test list resource lists."""
-        r = create_resource(self.list_payload, '')
+        r = create_resource(self.transport, self.list_payload, '')
         self.assertEqual(r.num_items, len(self.list_payload['resource_token']))
         self.assertEqual(r.total_results, self.list_payload['total_results'])
 
         for index in range(r.num_items):
-            for field in r[index]:
+            for field in r[index].iterfields():
                 self.assertEqual(
                     r[index][field],
                     self.list_payload['resource_token'][index][field])
 
     def test_list_resource_links(self):
         """Test link resource link generation."""
-        r = create_resource(self.list_payload, '')
+        r = create_resource(self.transport, self.list_payload, '')
+
         self.assertTrue(hasattr(r, 'get_self'))
         self.assertTrue(callable(r.get_self))
-        self.assertTrue(isinstance(r.get_self(), HttpRequest))
-        self.assertEqual(r.get_self().method, 'GET')
+        request = r.get_self()
+        self.assertTrue(isinstance(request, HttpRequest))
+        self.assertEqual(request.method, 'GET')
+        self.assertEqual(request.url,
+                         self.list_payload['links']['self']['href'])
 
         self.assertTrue(hasattr(r, 'create'))
         self.assertTrue(callable(r.create))
-        self.assertTrue(isinstance(r.create(), HttpRequest))
-        self.assertEqual(r.create().method, 'POST')
+        request = r.create()
+        self.assertTrue(isinstance(request, HttpRequest))
+        self.assertEqual(request.method, 'POST')
+        self.assertEqual(request.url,
+                         self.list_payload['links']['create']['href'])
 
         self.assertTrue(hasattr(r, 'get_other_link'))
         self.assertTrue(callable(r.get_other_link))
-        self.assertTrue(isinstance(r.get_other_link(), HttpRequest))
-        self.assertEqual(r.get_other_link().method, 'GET')
+        request = r.get_other_link()
+        self.assertTrue(isinstance(request, HttpRequest))
+        self.assertEqual(request.method, 'GET')
+        self.assertEqual(request.url,
+                         self.list_payload['links']['other_link']['href'])
 
         self.assertFalse(hasattr(r, 'update'))
         self.assertFalse(hasattr(r, 'delete'))
@@ -277,6 +308,7 @@ class ResourceTests(TestWithPayloads):
     def test_root_resource_templates(self):
         """Test generation of methods for the root resource uri templates."""
         r = create_resource(
+            self.transport,
             self.root_payload,
             '',
             mime_type='application/vnd.reviewboard.org.root+json')
@@ -286,77 +318,41 @@ class ResourceTests(TestWithPayloads):
             self.assertTrue(hasattr(r, method_name))
             self.assertTrue(callable(getattr(r, method_name)))
 
+    def test_resource_dict_field(self):
+        """Test access of a dictionary field."""
+        r = create_resource(self.transport, self.item_payload, '')
 
-class MockSyncTransport(SyncTransport):
-    """Sync Transport without initialization of ReviewBoardServer"""
-    def __init__(self):
-        self.server = None
+        field = r.nested_field
 
+        self.assertTrue(isinstance(field, ResourceDictField))
+        self.assertEqual(
+            field.nested1,
+            self.item_payload['resource_token']['nested_field']['nested1'])
 
-class SyncTransportTests(TestWithPayloads):
-    def setUp(self):
-        self.transport = MockSyncTransport()
-        self.item_resource = create_resource(self.item_payload, '')
-        self.item = SyncTransportItemResource(self.transport,
-                                              self.item_resource)
+    def test_resource_dict_field_iteration(self):
+        """Test iterating sub-fields of a dictionary field."""
+        r = create_resource(self.transport, self.item_payload, '')
 
-        self.list_resource = create_resource(self.list_payload, '')
-        self.list = SyncTransportListResource(self.transport,
-                                              self.list_resource)
+        field = r.nested_field
+        iterated_fields = set(f for f in field.iterfields())
+        nested_fields = set(
+            f for f in self.item_payload['resource_token']['nested_field'])
 
-    def test_item_attributes(self):
-        """Test item resource attributes."""
-        for field, value in self.item_payload['resource_token'].iteritems():
-            self.assertTrue(hasattr(self.item, field))
-            attr = getattr(self.item, field)
+        self.assertEqual(set(),
+                         nested_fields.symmetric_difference(iterated_fields))
 
-            if isinstance(value, list):
-                # Test list wrapping.
-                self.assertTrue(isinstance(attr, ResourceListField))
-            elif isinstance(value, dict):
-                # Test dict wrapping and link detection.
-                self.assertTrue(isinstance(attr, ResourceDictField) or
-                                isinstance(attr, SyncTransportResourceLink))
+    def test_link_field(self):
+        """Test access of a link field."""
+        r = create_resource(self.transport, self.item_payload, '')
 
-                if isinstance(attr, SyncTransportResourceLink):
-                    self.assertEqual(attr.href, value['href'])
-                    self.assertEqual(attr.method, value.get('method', 'GET'))
-                    self.assertEqual(attr.title, value.get('title', None))
-            else:
-                self.assertEquals(attr, value)
+        field = r.link_field
+        self.assertTrue(isinstance(field, ResourceLinkField))
 
-    def test_item_links(self):
-        """Test item resource links."""
-        self.assertTrue(hasattr(self.item, 'get_self'))
-        self.assertTrue(callable(self.item.get_self))
-        self.assertTrue(isinstance(self.item.get_self, SyncTransportMethod))
-
-        self.assertTrue(hasattr(self.item, 'update'))
-        self.assertTrue(callable(self.item.update))
-        self.assertTrue(isinstance(self.item.update, SyncTransportMethod))
-
-        self.assertTrue(hasattr(self.item, 'delete'))
-        self.assertTrue(callable(self.item.delete))
-        self.assertTrue(isinstance(self.item.delete, SyncTransportMethod))
-
-        self.assertTrue(hasattr(self.item, 'get_other_link'))
-        self.assertTrue(callable(self.item.get_other_link))
-        self.assertTrue(
-            isinstance(self.item.get_other_link, SyncTransportMethod))
-
-        self.assertFalse(hasattr(self.item, 'create'))
-
-    def test_list_items(self):
-        """Test items of a list resource."""
-        self.assertTrue(hasattr(self.list, 'num_items'))
-        self.assertTrue(hasattr(self.list, 'total_results'))
-        for index in range(self.list.num_items):
-            self.assertTrue(
-                isinstance(self.list[index], SyncTransportItemResource))
-
-            for field in self.list_payload['resource_token'][index]:
-                if field != 'links':
-                    self.assertTrue(hasattr(self.list[index], field))
+        request = field.get()
+        self.assertEqual(request.method, 'GET')
+        self.assertEqual(
+            request.url,
+            self.item_payload['resource_token']['link_field']['href'])
 
 
 class HttpRequestTests(unittest.TestCase):

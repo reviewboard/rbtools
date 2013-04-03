@@ -8,17 +8,16 @@ class Transport(object):
     unique interfaces which operate on the same underlying resource
     classes. Specifically, this allows for both a synchronous, and an
     asynchronous implementation of the transport.
-
-    TODO: Actually make this class useful by pulling out
-    common functionality.
     """
     def __init__(self, url, *args, **kwargs):
         self.url = url
 
     def get_root(self, *args, **kwargs):
+        """Retrieve the root api resource."""
         raise NotImplementedError
 
-    def get_path(self, *args, **kwargs):
+    def get_path(self, path, *args, **kwargs):
+        """Retrieve the api resource at the provided path."""
         raise NotImplementedError
 
     def login(self, username, password, *args, **kwargs):
@@ -29,3 +28,7 @@ class Transport(object):
         in the next request.
         """
         raise NotImplementedError
+
+    def execute_request_method(self, method, *args, **kwargs):
+        """Execute a method and carry out the returned HttpRequest."""
+        return method(*args, **kwargs)

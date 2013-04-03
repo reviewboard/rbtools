@@ -1,14 +1,17 @@
 import re
 import urlparse
 
+from rbtools.api.decorators import request_method_decorator
 from rbtools.api.request import HttpRequest
 
 
 RESOURCE_MAP = {}
 LINKS_TOK = 'links'
+LINK_KEYS = set(['href', 'method', 'title'])
 _EXCLUDE_ATTRS = [LINKS_TOK, 'stat']
 
 
+@request_method_decorator
 def _create(resource, data={}, query_args={}, *args, **kwargs):
     """Generate a POST request on a resource.
 
@@ -27,17 +30,20 @@ def _create(resource, data={}, query_args={}, *args, **kwargs):
     return request
 
 
+@request_method_decorator
 def _delete(resource, *args, **kwargs):
     """Generate a DELETE request on a resource."""
     return HttpRequest(resource._links['delete']['href'], method='DELETE',
                        query_args=kwargs)
 
 
+@request_method_decorator
 def _get_self(resource, *args, **kwargs):
     """Generate a request for a resource's 'self' link."""
     return HttpRequest(resource._links['self']['href'], query_args=kwargs)
 
 
+@request_method_decorator
 def _update(resource, data={}, query_args={}, *args, **kwargs):
     """Generate a PUT request on a resource.
 
@@ -89,8 +95,9 @@ class Resource(object):
     """
     _excluded_attrs = []
 
-    def __init__(self, payload, url, token=None, **kwargs):
+    def __init__(self, transport, payload, url, token=None, **kwargs):
         self.url = url
+        self._transport = transport
         self._token = token
         self._payload = payload
         self._excluded_attrs = self._excluded_attrs + _EXCLUDE_ATTRS
@@ -108,23 +115,129 @@ class Resource(object):
             self._links = {}
 
         # Add a method for each supported REST operation, and
-        # retrieving 'self'.
+        # for retrieving 'self'.
         for link, method in SPECIAL_LINKS.iteritems():
             if link in self._links and method[1]:
-                setattr(self, method[0],
-                    lambda resource=self, meth=method[1], **kwargs:
-                    meth(resource, **kwargs))
+                setattr(self,
+                        method[0],
+                        lambda resource=self, meth=method[1], **kwargs: (
+                            meth(resource, **kwargs)))
 
         # Generate request methods for any additional links
         # the resource has.
         for link, body in self._links.iteritems():
             if link not in SPECIAL_LINKS:
-                setattr(self, "get_%s" % (link),
-                        lambda url=body['href'], **kwargs: HttpRequest(
-                            url, query_args=kwargs))
+                setattr(self,
+                        "get_%s" % link,
+                        lambda resource=self, url=body['href'], **kwargs: (
+                            self._get_url(url, **kwargs)))
+
+    def _wrap_field(self, field):
+        if isinstance(field, dict):
+            dict_keys = set(field.keys())
+
+            if ('href' in dict_keys and
+                len(dict_keys.difference(LINK_KEYS)) == 0):
+                return ResourceLinkField(self, field)
+            else:
+                return ResourceDictField(self, field)
+        elif isinstance(field, list):
+            return ResourceListField(self, field)
+        else:
+            return field
+
+    @request_method_decorator
+    def _get_url(self, url, **kwargs):
+        return HttpRequest(url, query_args=kwargs)
 
 
-class ResourceItem(Resource):
+class ResourceDictField(object):
+    """Wrapper for dictionaries returned from a resource.
+
+    Any dictionary returned from a resource will be wrapped using this
+    class. Attribute access will correspond to accessing the
+    dictionary key with the name of the attribute.
+    """
+    def __init__(self, resource, fields):
+        self._resource = resource
+        self._fields = fields
+
+    def __getattr__(self, name):
+        if name in self._fields:
+            return self._resource._wrap_field(self._fields[name])
+        else:
+            raise AttributeError
+
+    def __getitem__(self, key):
+        try:
+            return self.__getattr__(key)
+        except AttributeError:
+            raise KeyError
+
+    def __contains__(self, key):
+        return key in self._fields
+
+    def iterfields(self):
+        for field in self._fields:
+            yield field
+
+    def iteritems(self):
+        for key, value in self._fields.iteritems():
+            yield key, self._resource._wrap_field(value)
+
+    def __repr__(self):
+        return '%s(resource=%r, fields=%r)' % (
+            self.__class__.__name__,
+            self._resource,
+            self._fields)
+
+
+class ResourceLinkField(ResourceDictField):
+    """Wrapper for link dictionaries returned from a resource.
+
+    In order to support operations on links found outside of a
+    resource's links dictionary, detected links are wrapped with this
+    class.
+
+    A links fields (href, method, and title) are accessed as
+    attributes, and link operations are supported through method
+    calls. Currently the only supported method is "GET", which can be
+    invoked using the 'get' method.
+    """
+    def __init__(self, resource, fields):
+        super(ResourceLinkField, self).__init__(resource, fields)
+        self._transport = resource._transport
+
+    @request_method_decorator
+    def get(self):
+        return HttpRequest(self._fields['href'])
+
+
+class ResourceListField(list):
+    """Wrapper for lists returned from a resource.
+
+    Acts as a normal list, but wraps any returned items.
+    """
+    def __init__(self, resource, list_field):
+        super(ResourceListField, self).__init__(list_field)
+        self._resource = resource
+
+    def __getitem__(self, key):
+        item = super(ResourceListField, self).__getitem__(key)
+        return self._resource._wrap_field(item)
+
+    def __iter__(self):
+        for item in super(ResourceListField, self).__iter__():
+            yield self._resource._wrap_field(item)
+
+    def __repr__(self):
+        return '%s(resource=%r, list_field=%s)' % (
+            self.__class__.__name__,
+            self._resource,
+            super(ResourceListField, self).__repr__())
+
+
+class ItemResource(Resource):
     """The base class for Item Resources.
 
     Any resource specific base classes for Item Resources should
@@ -138,8 +251,9 @@ class ResourceItem(Resource):
     """
     _excluded_attrs = []
 
-    def __init__(self, payload, url, token=None, **kwargs):
-        super(ResourceItem, self).__init__(payload, url, token=token)
+    def __init__(self, transport, payload, url, token=None, **kwargs):
+        super(ItemResource, self).__init__(transport, payload, url,
+                                           token=token, **kwargs)
         self.fields = {}
 
         # Determine the body of the resource's data.
@@ -152,19 +266,39 @@ class ResourceItem(Resource):
             if name not in self._excluded_attrs:
                 self.fields[name] = value
 
+    def __getattr__(self, name):
+        if name in self.fields:
+            return self._wrap_field(self.fields[name])
+        else:
+            raise AttributeError
+
+    def __getitem__(self, key):
+        try:
+            return self.__getattr__(key)
+        except AttributeError:
+            raise KeyError
+
+    def __contains__(self, key):
+        return key in self.fields
+
+    def iterfields(self):
+        for key in self.fields:
+            yield key
+
+    def iteritems(self):
+        for key, value in self.fields.iteritems():
+            yield (key, self._wrap_field(value))
+
     def __repr__(self):
-        return '%s(payload=%r, url=%r, token=%r)' % (
+        return '%s(transport=%r, payload=%r, url=%r, token=%r)' % (
             self.__class__.__name__,
+            self._transport,
             self._payload,
             self.url,
             self._token)
 
-    def iter_fields(self):
-        for key in self.fields:
-            yield key
 
-
-class CountResource(ResourceItem):
+class CountResource(ItemResource):
     """Resource returned by a query with 'counts-only' true.
 
     When a resource is requested using 'counts-only', the payload will
@@ -172,9 +306,11 @@ class CountResource(ResourceItem):
     special case all payloads of this form, this class is used for
     resource construction.
     """
-    def __init__(self, payload, url, **kwargs):
-        super(CountResource, self).__init__(payload, url, token=None)
+    def __init__(self, transport, payload, url, **kwargs):
+        super(CountResource, self).__init__(transport, payload, url,
+                                            token=None)
 
+    @request_method_decorator
     def get_self(self, **kwargs):
         """Generate an GET request for the resource list.
 
@@ -190,13 +326,8 @@ class CountResource(ResourceItem):
         kwargs.update({'counts_only': False})
         return HttpRequest(self.url, query_args=kwargs)
 
-    def __repr__(self):
-        return 'CountResource(payload=%r, url=%r)' % (
-            self._payload,
-            self.url)
 
-
-class ResourceList(Resource):
+class ListResource(Resource):
     """The base class for List Resources.
 
     Any resource specific base classes for List Resources should
@@ -211,8 +342,10 @@ class ResourceList(Resource):
     resources 'get_next()' or 'get_prev()' should be used to grab
     additional pages of items.
     """
-    def __init__(self, payload, url, token=None, item_mime_type=None):
-        super(ResourceList, self).__init__(payload, url, token=token)
+    def __init__(self, transport, payload, url, token=None,
+                 item_mime_type=None, **kwargs):
+        super(ListResource, self).__init__(transport, payload, url,
+                                           token=token, **kwargs)
         self._item_mime_type = item_mime_type
 
         if token:
@@ -230,38 +363,59 @@ class ResourceList(Resource):
         return True
 
     def __getitem__(self, key):
-        return self._item_list[key]
+        payload = self._item_list[key]
+
+        # TODO: Should try and guess the url based on the parent url,
+        # and the id number if the self link doesn't exist.
+        try:
+            url = payload['links']['self']['href']
+        except KeyError:
+            url = ''
+
+        # We need to import this here because of the mutual imports.
+        from rbtools.api.factory import create_resource
+
+        return create_resource(self._transport,
+                               payload,
+                               url,
+                               mime_type=self._item_mime_type,
+                               guess_token=False)
 
     def __iter__(self):
-        return self._item_list.__iter__()
+        for i in xrange(self.num_items):
+            yield self[i]
 
+    @request_method_decorator
     def get_next(self, **kwargs):
         if 'next' not in self._links:
             raise StopIteration()
 
         return HttpRequest(self._links['next']['href'], query_args=kwargs)
 
+    @request_method_decorator
     def get_prev(self, **kwargs):
         if 'prev' not in self._links:
             raise StopIteration()
 
         return HttpRequest(self._links['prev']['href'], query_args=kwargs)
 
+    @request_method_decorator
     def get_item(self, pk, **kwargs):
         """Retrieve the item resource with the corresponding primary key."""
         return HttpRequest(urlparse.urljoin(self.url, '%s/' % pk),
                            query_args=kwargs)
 
     def __repr__(self):
-        return '%s(payload=%r, url=%r, token=%r, item_mime_type=%r)' % (
-            self.__class__.__name__,
-            self._payload,
-            self.url,
-            self._token,
-            self._item_mime_type)
+        return ('%s(transport=%r, payload=%r, url=%r, token=%r, '
+                'item_mime_type=%r)' % (self.__class__.__name__,
+                                        self._transport,
+                                        self._payload,
+                                        self.url,
+                                        self._token,
+                                        self._item_mime_type))
 
 
-class RootResource(ResourceItem):
+class RootResource(ItemResource):
     """The Root resource specific base class.
 
     Provides additional methods for fetching any resource directly
@@ -273,17 +427,20 @@ class RootResource(ResourceItem):
     _excluded_attrs = ['uri_templates']
     _TEMPLATE_PARAM_RE = re.compile('\{(?P<key>[A-Za-z_0-9]*)\}')
 
-    def __init__(self, payload, url, **kwargs):
-        super(RootResource, self).__init__(payload, url, token=None)
+    def __init__(self, transport, payload, url, **kwargs):
+        super(RootResource, self).__init__(transport, payload, url, token=None)
         # Generate methods for accessing resources directly using
         # the uri-templates.
         for name, url in payload['uri_templates'].iteritems():
             attr_name = "get_%s" % name
-            if not hasattr(self, attr_name):
-                setattr(self, attr_name,
-                        lambda url=url, **kwargs: self._get_template_request(
-                            url, **kwargs))
 
+            if not hasattr(self, attr_name):
+                setattr(self,
+                        attr_name,
+                        lambda resource=self, url=url, **kwargs: (
+                            self._get_template_request(url, **kwargs)))
+
+    @request_method_decorator
     def _get_template_request(self, url_template, values={}, **kwargs):
         """Generate an HttpRequest from a uri-template.
 
@@ -306,12 +463,13 @@ class RootResource(ResourceItem):
 RESOURCE_MAP['application/vnd.reviewboard.org.root'] = RootResource
 
 
-class DiffListResource(ResourceList):
+class DiffListResource(ListResource):
     """The Diff List resource specific base class.
 
     Provides additional functionality to assist in the uploading of
     new diffs.
     """
+    @request_method_decorator
     def upload_diff(self, diff, parent_diff=None, base_dir=None, **kwargs):
         """Uploads a new diff.
 
@@ -332,12 +490,13 @@ class DiffListResource(ResourceList):
 RESOURCE_MAP['application/vnd.reviewboard.org.diffs'] = DiffListResource
 
 
-class DiffResource(ResourceItem):
+class DiffResource(ItemResource):
     """The Diff resource specific base class.
 
     Provides the 'get_patch' method for retrieving the content of the
     actual diff file itself.
     """
+    @request_method_decorator
     def get_patch(self, **kwargs):
         """Retrieves the actual diff file contents."""
         request = HttpRequest(self.url, query_args=kwargs)
@@ -347,14 +506,16 @@ class DiffResource(ResourceItem):
 RESOURCE_MAP['application/vnd.reviewboard.org.diff'] = DiffResource
 
 
-class FileDiffResource(ResourceItem):
+class FileDiffResource(ItemResource):
     """The File Diff resource specific base class."""
+    @request_method_decorator
     def get_patch(self, **kwargs):
         """Retrieves the actual diff file contents."""
         request = HttpRequest(self.url, query_args=kwargs)
         request.headers['Accept'] = 'text/x-patch'
         return request
 
+    @request_method_decorator
     def get_diff_data(self, **kwargs):
         """Retrieves the actual raw diff data for the file."""
         request = HttpRequest(self.url, query_args=kwargs)
@@ -365,8 +526,9 @@ class FileDiffResource(ResourceItem):
 RESOURCE_MAP['application/vnd.reviewboard.org.file'] = FileDiffResource
 
 
-class FileAttachmentListResource(ResourceList):
+class FileAttachmentListResource(ListResource):
     """The File Attachment List resource specific base class."""
+    @request_method_decorator
     def upload_attachment(self, filename, content, caption=None, **kwargs):
         """Uploads a new attachment.
 
@@ -393,8 +555,9 @@ RESOURCE_MAP['application/vnd.reviewboard.org.draft-file-attachments'] = \
     DraftFileAttachmentListResource
 
 
-class ScreenshotListResource(ResourceList):
+class ScreenshotListResource(ListResource):
     """The Screenshot List resource specific base class."""
+    @request_method_decorator
     def upload_screenshot(self, filename, content, caption=None, **kwargs):
         """Uploads a new screenshot.
 
@@ -421,8 +584,10 @@ RESOURCE_MAP['application/vnd.reviewboard.org.draft-screenshots'] = \
     DraftScreenshotListResource
 
 
-class ReviewRequestResource(ResourceItem):
+class ReviewRequestResource(ItemResource):
     """The Review Request resource specific base class."""
+
+    @request_method_decorator
     def submit(self, description=None, changenum=None):
         """Submit a review request"""
         data = {
@@ -435,7 +600,7 @@ class ReviewRequestResource(ResourceItem):
         if changenum:
             data['changenum'] = changenum
 
-        return self.update(data=data)
+        return self.update(data=data, internal=True)
 
 RESOURCE_MAP['application/vnd.reviewboard.org.review-request'] = \
     ReviewRequestResource

@@ -1,6 +1,6 @@
 from rbtools.api.resource import CountResource, \
-                                 ResourceItem, \
-                                 ResourceList, \
+                                 ItemResource, \
+                                 ListResource, \
                                  RESOURCE_MAP
 from rbtools.api.utils import rem_mime_format
 
@@ -8,8 +8,8 @@ from rbtools.api.utils import rem_mime_format
 SPECIAL_KEYS = set(('links', 'total_results', 'stat', 'count'))
 
 
-def create_resource(payload, url, mime_type=None, item_mime_type=None,
-                    guess_token=True):
+def create_resource(transport, payload, url, mime_type=None,
+                    item_mime_type=None, guess_token=True):
     """Construct and return a resource object.
 
     The mime type will be used to find a resource specific base class.
@@ -39,9 +39,9 @@ def create_resource(payload, url, mime_type=None, item_mime_type=None,
     elif mime_type and rem_mime_format(mime_type) in RESOURCE_MAP:
         resource_class = RESOURCE_MAP[rem_mime_format(mime_type)]
     elif token and isinstance(payload[token], list):
-        resource_class = ResourceList
+        resource_class = ListResource
     else:
-        resource_class = ResourceItem
+        resource_class = ItemResource
 
-    return resource_class(payload, url, token=token,
+    return resource_class(transport, payload, url, token=token,
                           item_mime_type=item_mime_type)
