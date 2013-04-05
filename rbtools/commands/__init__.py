@@ -247,8 +247,8 @@ class Command(object):
         """Retrieve Capabilities from the server and return them."""
         info = api_root.get_info()
 
-        if 'capabilites' in info:
-            return Capabilities(api_root.get_info().capabilities)
+        if 'capabilities' in info:
+            return Capabilities(info.capabilities)
         else:
             return Capabilities({})
 
