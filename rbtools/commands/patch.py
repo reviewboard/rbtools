@@ -67,26 +67,27 @@ class Patch(Command):
 
         return diff_body, diff_revision, base_dir
 
-    def apply_patch(self, tool, request_id, diff_revision, diff_file_path,
-                    base_dir):
+    def apply_patch(self, repository_info, tool, request_id, diff_revision,
+                    diff_file_path, base_dir):
         """Apply patch patch_file and display results to user."""
         print ("Patch is being applied from request %s with diff revision "
                " %s." % (request_id, diff_revision))
-        tool.apply_patch(diff_file_path, self.repository_info.base_path,
-                              base_dir, self.options.px)
+        tool.apply_patch(diff_file_path, repository_info.base_path,
+                         base_dir, self.options.px)
 
     def main(self, request_id):
         """Run the command."""
         repository_info, tool = self.initialize_scm_tool()
-        server_url = self.get_server_url(self.repository_info, self.tool)
+        server_url = self.get_server_url(repository_info, tool)
         api_client, api_root = self.get_api(server_url)
 
         # Get the patch, the used patch ID and base dir for the diff
         diff_body, diff_revision, base_dir = self.get_patch(
             request_id,
+            api_root,
             self.options.diff_revision)
 
         tmp_patch_file = make_tempfile(diff_body)
 
-        self.apply_patch(tool, request_id, diff_revision, tmp_patch_file,
-                         base_dir)
+        self.apply_patch(repository_info, tool, request_id, diff_revision,
+                         tmp_patch_file, base_dir)
