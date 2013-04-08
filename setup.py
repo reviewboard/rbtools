@@ -22,10 +22,16 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-from ez_setup import use_setuptools
-use_setuptools()
 
-from setuptools import setup, find_packages
+# Attempt to use currently-installed setuptools first
+try:
+    from setuptools import setup, find_packages
+except ImportError:
+    # setuptools was unavailable. Install it then try again
+    from ez_setup import use_setuptools
+    use_setuptools()
+    from setuptools import setup, find_packages
+
 from setuptools.command.test import test
 
 from rbtools import get_package_version, is_release, VERSION
