@@ -394,11 +394,14 @@ class ReviewBoardServer(object):
         try:
             content_type, body = request.encode_multipart_formdata()
             headers = request.headers
+
             if body:
                 headers.update({
                     'Content-Type': content_type,
                     'Content-Length': str(len(body)),
-                    })
+                })
+            else:
+                headers['Content-Length'] = "0"
 
             r = Request(request.url.encode('utf-8'), body, headers,
                         request.method)

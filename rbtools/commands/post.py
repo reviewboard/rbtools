@@ -196,6 +196,12 @@ class Post(Command):
                default=None,
                help="the absolute path in the repository the diff was "
                     "generated in. Will override the detected path."),
+        Option("--diff-only",
+               dest="diff_only",
+               action="store_true",
+               default=False,
+               help="uploads a new diff, but does not update info from "
+                    "the changelist."),
     ]
 
     def post_process_options(self):
@@ -210,8 +216,8 @@ class Post(Command):
                 fp.close()
             else:
                 raise CommandError(
-                  "The description file %s does not exist.\n" %
-                  self.options.description_file)
+                    "The description file %s does not exist.\n" %
+                    self.options.description_file)
 
         if self.options.guess_fields:
             self.options.guess_summary = True
@@ -313,9 +319,17 @@ class Post(Command):
                 review_request = api_root.get_review_requests().create(
                     **request_data)
             except APIError, e:
-                raise CommandError("Error creating review request: %s" % e)
+                if e.error_code == 204:  # Change number in use.
+                    rid = e.rsp['review_request']['id']
+                    review_request = api_root.get_review_request(
+                        review_request_id=rid)
 
-        # Upload the diff if we're not using changesets.
+                    if not self.options.diff_only:
+                        review_request = review_request.update(
+                            changenum=changenum)
+                else:
+                    raise CommandError("Error creating review request: %s" % e)
+
         if (not repository_info.supports_changesets or
             not self.options.change_only):
             try:
@@ -387,10 +401,12 @@ class Post(Command):
         if self.options.publish:
             update_fields['public'] = True
 
-        try:
-            draft = draft.update(**update_fields)
-        except APIError, e:
-            raise CommandError("Error updating review request draft: %s" % e)
+        if update_fields:
+            try:
+                draft = draft.update(**update_fields)
+            except APIError, e:
+                raise CommandError(
+                    "Error updating review request draft: %s" % e)
 
         request_url = 'r/%s/' % review_request.id
         review_url = urljoin(server_url, request_url)
