@@ -61,6 +61,10 @@ class Diff(Command):
 
     def main(self, *args):
         """Print the diff to terminal."""
+        # The 'args' tuple must be made into a list for some of the
+        # SCM Clients code. See comment in post.
+        args = list(args)
+
         repository_info, tool = self.initialize_scm_tool()
         server_url = self.get_server_url(repository_info, tool)
         api_client, api_root = self.get_api(server_url)

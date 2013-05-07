@@ -418,6 +418,14 @@ class Post(Command):
 
     def main(self, *args):
         """Create and update review requests."""
+        # The 'args' tuple must be made into a list for some of the
+        # SCM Clients code. The way arguments were structured in
+        # post-review meant this was a list, and certain parts of
+        # the code base try and concatenate args to the end of
+        # other lists. Until the client code is restructured and
+        # cleaned up we will satisfy the assumption here.
+        args = list(args)
+
         self.post_process_options()
         origcwd = os.path.abspath(os.getcwd())
         repository_info, tool = self.initialize_scm_tool()
