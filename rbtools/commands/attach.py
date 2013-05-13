@@ -36,6 +36,17 @@ class Attach(Command):
                config_key="PASSWORD",
                default=None,
                help="password to be supplied to the Review Board server"),
+        Option('--repository-type',
+               dest='repository_type',
+               config_key="REPOSITORY_TYPE",
+               default=None,
+               help='the type of repository in the current directory. '
+                    'In most cases this should be detected '
+                    'automatically, but some directory structures '
+                    'containing multiple repositories require this '
+                    'option to select the proper type. Use '
+                    '``rbt list-repo-types`` to see the supported '
+                    'values.'),
     ]
 
     def get_review_request(self, request_id, api_root):
@@ -48,7 +59,8 @@ class Attach(Command):
         return request
 
     def main(self, request_id, path_to_file):
-        self.repository_info, self.tool = self.initialize_scm_tool()
+        self.repository_info, self.tool = self.initialize_scm_tool(
+            client_name=self.options.repository_type)
         server_url = self.get_server_url(self.repository_info, self.tool)
         api_client, api_root = self.get_api(server_url)
 

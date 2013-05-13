@@ -16,7 +16,7 @@ from urlparse import urljoin, urlparse
 from rbtools import get_package_version, get_version_string
 from rbtools.api.capabilities import Capabilities
 from rbtools.api.errors import APIError
-from rbtools.clients import scan_usable_client
+from rbtools.clients import print_clients, scan_usable_client
 from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.plastic import PlasticClient
 from rbtools.utils.filesystem import get_config_value, load_config_files
@@ -1175,11 +1175,33 @@ def parse_options(args):
                       help='the absolute path in the repository the diff was '
                            'generated in. Will override the path detected '
                            'by post-review.')
+    parser.add_option('--repository-type',
+                      dest='repository_type',
+                      default=get_config_value(configs, 'REPOSITORY_TYPE',
+                                               None),
+                      help='the type of repository in the current directory. '
+                           'In most cases this should be detected '
+                           'automatically, but some directory structures '
+                           'containing multiple repositories require this '
+                           'option to select the proper type. The '
+                           '`--list-repository-types` option can be used to '
+                           'list the supported values.')
+    parser.add_option('--list-repository-types',
+                      dest='list_repository_types',
+                      action="store_true",
+                      default=False,
+                      help='print the list of supported repository types. '
+                           'Each printed type can be used as a value to the '
+                           '`--repository-type` option.')
 
     (globals()["options"], args) = parser.parse_args(args)
 
     if options.debug:
         logging.getLogger().setLevel(logging.DEBUG)
+
+    if options.list_repository_types:
+        print_clients(options)
+        sys.exit(0)
 
     if options.description and options.description_file:
         sys.stderr.write("The --description and --description-file options "
@@ -1255,7 +1277,9 @@ def main():
     debug('Current Directory = %s' % os.getcwd())
 
     debug('Checking the repository type. Errors shown below are mostly harmless.')
-    repository_info, tool = scan_usable_client(options)
+    repository_info, tool = scan_usable_client(
+        options,
+        client_name=options.repository_type)
     debug('Finished checking the repository type.')
 
     tool.user_config = user_config

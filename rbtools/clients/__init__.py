@@ -1,4 +1,5 @@
 import logging
+import pkg_resources
 import sys
 
 from rbtools.utils.process import die, execute
@@ -172,38 +173,39 @@ class RepositoryInfo(object):
 def load_scmclients(options):
     global SCMCLIENTS
 
-    from rbtools.clients.bazaar import BazaarClient
-    from rbtools.clients.clearcase import ClearCaseClient
-    from rbtools.clients.cvs import CVSClient
-    from rbtools.clients.git import GitClient
-    from rbtools.clients.mercurial import MercurialClient
-    from rbtools.clients.perforce import PerforceClient
-    from rbtools.clients.plastic import PlasticClient
-    from rbtools.clients.svn import SVNClient
+    SCMCLIENTS = {}
 
-    SCMCLIENTS = [
-        BazaarClient(options=options),
-        CVSClient(options=options),
-        ClearCaseClient(options=options),
-        GitClient(options=options),
-        MercurialClient(options=options),
-        PerforceClient(options=options),
-        PlasticClient(options=options),
-        SVNClient(options=options),
-    ]
+    for ep in pkg_resources.iter_entry_points(group='rbtools_scm_clients'):
+        try:
+            SCMCLIENTS[ep.name] = ep.load()(options=options)
+        except Exception, e:
+            logging.error('Could not load SCM Client "%s": %s' % (ep.name, e))
 
 
-def scan_usable_client(options):
+def scan_usable_client(options, client_name=None):
     from rbtools.clients.perforce import PerforceClient
 
     repository_info = None
     tool = None
 
+    # TODO: We should only load all of the scm clients if the
+    # client_name isn't provided.
     if SCMCLIENTS is None:
         load_scmclients(options)
 
-    # Try to find the SCM Client we're going to be working with.
-    for tool in SCMCLIENTS:
+    if client_name:
+        if client_name not in SCMCLIENTS:
+            logging.error('The provided repository type "%s" is invalid.' %
+                          client_name)
+            sys.exit(1)
+        else:
+            scmclients = {
+                client_name: SCMCLIENTS[client_name]
+            }
+    else:
+        scmclients = SCMCLIENTS
+
+    for name, tool in scmclients.iteritems():
         logging.debug('Checking for a %s repository...' % tool.name)
         repository_info = tool.get_repository_info()
 
@@ -211,12 +213,16 @@ def scan_usable_client(options):
             break
 
     if not repository_info:
-        if options.repository_url:
-            print "No supported repository could be accessed at the supplied "\
-                  "url."
+        if client_name:
+            logging.error('The provided repository type was not detected '
+                          'in the current directory.')
+        elif options.repository_url:
+            logging.error('No supported repository could be accessed at '
+                          'the supplied url.')
         else:
-            print "The current directory does not contain a checkout from a"
-            print "supported source code repository."
+            logging.error('The current directory does not contain a checkout '
+                          'from a supported source code repository.')
+
         sys.exit(1)
 
     # Verify that options specific to an SCM Client have not been mis-used.
@@ -240,3 +246,28 @@ def scan_usable_client(options):
         sys.exit(1)
 
     return (repository_info, tool)
+
+
+def print_clients(options):
+    """Print the supported detected SCM clients.
+
+    Each SCM client, including those provided by third party packages,
+    will be printed. Additionally, SCM clients which are detected in
+    the current directory will be highlighted.
+    """
+    print 'The following repository types are supported by this installation'
+    print 'of RBTools. Each "<type>" may be used as a value for the'
+    print '"--repository-type=<type>" command line argument. Repository types'
+    print 'which are detected in the current directory are marked with a "*"'
+    print '[*] "<type>": <Name>'
+
+    if SCMCLIENTS is None:
+        load_scmclients(options)
+
+    for name, tool in SCMCLIENTS.iteritems():
+        repository_info = tool.get_repository_info()
+
+        if repository_info:
+            print ' * "%s": %s' % (name, tool.name)
+        else:
+            print '   "%s": %s' % (name, tool.name)

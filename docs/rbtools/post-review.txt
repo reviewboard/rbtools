@@ -443,6 +443,7 @@ The options include:
 * ``PARENT_BRANCH`` (:option:`--parent`)
 * ``PASSWORD`` (:option:`--password`)
 * ``PUBLISH`` (:option:`-p`)
+* ``REPOSITORY_TYPE`` (:option:`--repository-type`)
 * ``SUBMIT_AS`` (:option:`--submit-as`)
 * ``TARGET_GROUPS`` (:option:`--target-groups`)
 * ``TARGET_PEOPLE`` (:option:`--target-people`)
@@ -466,11 +467,26 @@ Basic Options
 
    Shows the help for the program and exits.
 
+.. cmdoption:: --list-repository-types
+
+   Prints the list of supported repository types. Each printed type can
+   be used as a value to the :option:`--repository-type` option.'
+
 .. cmdoption:: -o, --open
 
    Opens a web browser to the address of the review request.
 
    The default can be set in ``OPEN_BROWSER`` in :file:`.reviewboardrc`.
+
+.. cmdoption:: --repository-type
+
+   Specifies the type of repository in the current directory. In most cases
+   this should be detected automatically, but some directory structures
+   containing multiple repositories require this option to select the proper
+   type. The :option:`--list-repository-types` option can be used to list the
+   supported values.
+
+   The default can be set in ``REPOSITORY_TYPE`` in :file:`.reviewboardrc`.
 
 .. cmdoption:: --version
 

@@ -42,6 +42,17 @@ class Close(Command):
                config_key="PASSWORD",
                default=None,
                help="password to be supplied to the Review Board server"),
+        Option('--repository-type',
+               dest='repository_type',
+               config_key="REPOSITORY_TYPE",
+               default=None,
+               help='the type of repository in the current directory. '
+                    'In most cases this should be detected '
+                    'automatically but some directory structures '
+                    'containing multiple repositories require this '
+                    'option to select the proper type. Valid '
+                    'values include bazaar, clearcase, cvs, git, '
+                    'mercurial, perforce, plastic, and svn.'),
     ]
 
     def get_review_request(self, request_id, api_root):
@@ -67,7 +78,8 @@ class Close(Command):
         """Run the command."""
         close_type = self.options.close_type
         self.check_valid_type(close_type)
-        repository_info, tool = self.initialize_scm_tool()
+        repository_info, tool = self.initialize_scm_tool(
+            client_name=self.options.repository_type)
         server_url = self.get_server_url(repository_info, tool)
         api_client, api_root = self.get_api(server_url)
         request = self.get_review_request(request_id, api_root)

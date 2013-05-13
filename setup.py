@@ -59,10 +59,22 @@ rb_commands = [
     'attach = rbtools.commands.attach:Attach',
     'close = rbtools.commands.close:Close',
     'diff = rbtools.commands.diff:Diff',
+    'list-repo-types = rbtools.commands.list_repo_types:ListRepoTypes',
     'patch = rbtools.commands.patch:Patch',
     'post = rbtools.commands.post:Post',
     'publish = rbtools.commands.publish:Publish',
     'status = rbtools.commands.status:Status',
+]
+
+scm_clients = [
+    'bazaar = rbtools.clients.bazaar:BazaarClient',
+    'clearcase = rbtools.clients.clearcase:ClearCaseClient',
+    'cvs = rbtools.clients.cvs:CVSClient',
+    'git = rbtools.clients.git:GitClient',
+    'mercurial = rbtools.clients.mercurial:MercurialClient',
+    'perforce = rbtools.clients.perforce:PerforceClient',
+    'plastic = rbtools.clients.plastic:PlasticClient',
+    'svn = rbtools.clients.svn:SVNClient',
 ]
 
 setup(name=PACKAGE_NAME,
@@ -75,6 +87,7 @@ setup(name=PACKAGE_NAME,
               'rbt = rbtools.commands.main:main',
           ],
           'rbtools_commands': rb_commands,
+          'rbtools_scm_clients': scm_clients,
       },
       install_requires=install_requires,
       dependency_links=[

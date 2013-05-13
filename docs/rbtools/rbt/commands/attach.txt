@@ -27,6 +27,7 @@ The options include:
 * ``REVIEWBOARD_URL`` (:option:`--server`)
 * ``USERNAME`` (:option:`--username`)
 * ``PASSWORD`` (:option:`--password`)
+* ``REPOSITORY_TYPE`` (:option:`--repository-type`)
 
 
 Options
@@ -64,3 +65,12 @@ Options
 
    The default can be set in ``PASSWORD`` in :file:`.reviewboardrc`.
 
+.. cmdoption:: --repository-type
+
+   Specifies the type of repository in the current directory. In most cases
+   this should be detected automatically, but some directory structures
+   containing multiple repositories require this option to select the proper
+   type. The :command:`rbt list-repo-types` command can be used to list the
+   supported values.
+
+   The default can be set in ``REPOSITORY_TYPE`` in :file:`.reviewboardrc`.

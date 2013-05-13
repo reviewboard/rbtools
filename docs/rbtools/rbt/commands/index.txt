@@ -8,6 +8,7 @@ rbt Commands
    attach
    close
    diff
+   list-repo-types
    patch
    post
    publish

@@ -324,6 +324,7 @@ The options include:
 * ``PARENT_BRANCH`` (:option:`--parent`)
 * ``PASSWORD`` (:option:`--password`)
 * ``PUBLISH`` (:option:`-p`)
+* ``REPOSITORY_TYPE`` (:option:`--repository-type`)
 * ``SUBMIT_AS`` (:option:`--submit-as`)
 * ``TARGET_GROUPS`` (:option:`--target-groups`)
 * ``TARGET_PEOPLE`` (:option:`--target-people`)
@@ -515,3 +516,13 @@ Options
 
    the absolute path in the repository the diff was generated in. Will override
    the detected path.
+
+.. cmdoption:: --repository-type
+
+   Specifies the type of repository in the current directory. In most cases
+   this should be detected automatically, but some directory structures
+   containing multiple repositories require this option to select the proper
+   type. The :command:`rbt list-repo-types` command can be used to list the
+   supported values.
+
+   The default can be set in ``REPOSITORY_TYPE`` in :file:`.reviewboardrc`.

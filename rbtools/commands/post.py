@@ -202,6 +202,17 @@ class Post(Command):
                default=False,
                help="uploads a new diff, but does not update info from "
                     "the changelist."),
+        Option('--repository-type',
+               dest='repository_type',
+               config_key="REPOSITORY_TYPE",
+               default=None,
+               help='the type of repository in the current directory. '
+                    'In most cases this should be detected '
+                    'automatically, but some directory structures '
+                    'containing multiple repositories require this '
+                    'option to select the proper type. The '
+                    '``rbt list-repo-types`` command can be used to list '
+                    'the supported values.'),
     ]
 
     def post_process_options(self):
@@ -431,7 +442,8 @@ class Post(Command):
 
         self.post_process_options()
         origcwd = os.path.abspath(os.getcwd())
-        repository_info, tool = self.initialize_scm_tool()
+        repository_info, tool = self.initialize_scm_tool(
+            client_name=self.options.repository_type)
         server_url = self.get_server_url(repository_info, tool)
         api_client, api_root = self.get_api(server_url)
         self.setup_tool(tool, api_root=api_root)

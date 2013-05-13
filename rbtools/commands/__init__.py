@@ -1,7 +1,6 @@
 import getpass
 import inspect
 import logging
-import os
 import sys
 from optparse import make_option, OptionParser
 from urlparse import urlparse
@@ -11,12 +10,17 @@ from rbtools.api.client import RBClient
 from rbtools.api.errors import APIError, ServerInterfaceError
 from rbtools.clients import scan_usable_client
 from rbtools.utils.filesystem import cleanup_tempfiles, \
-                                     get_home_path, \
                                      load_config
 from rbtools.utils.process import die
 
 
 RB_MAIN = "rbt"
+
+
+class CommandExit(Exception):
+    def __init__(self, exit_code=0):
+        super(CommandExit, self).__init__("Exit with code %s" % exit_code)
+        self.exit_code = exit_code
 
 
 class CommandError(Exception):
@@ -159,6 +163,8 @@ class Command(object):
                 raise
 
             exit_code = 1
+        except CommandExit, e:
+            exit_code = e.exit_code
         except Exception, e:
             # If debugging is on, we'll let python spit out the
             # stack trace and report the exception, otherwise
@@ -173,9 +179,10 @@ class Command(object):
         cleanup_tempfiles()
         sys.exit(exit_code)
 
-    def initialize_scm_tool(self):
+    def initialize_scm_tool(self, client_name=None):
         """Initialize the SCM tool for the current working directory."""
-        repository_info, tool = scan_usable_client(self.options)
+        repository_info, tool = scan_usable_client(self.options,
+                                                   client_name=client_name)
         tool.user_config = self.config
         tool.configs = [self.config]
         tool.check_options()
