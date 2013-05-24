@@ -99,7 +99,7 @@ directories to your system path.
 5. Add ``;C:\Python27;C:\Python27\Scripts`` (substitute your Python
    directory if it's not ``C:\Python27``) to the end of the list.
 
-.. _`Python spetuptools Installer`: http://pypi.python.org/pypi/setuptools#windows
+.. _`Python setuptools Installer`: http://pypi.python.org/pypi/setuptools#windows
 
 
 Installing RBTools
