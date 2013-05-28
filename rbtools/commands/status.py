@@ -64,10 +64,10 @@ class Status(Command):
     ]
 
     def output_request(self, request):
-        print "r/%s - %s" % (request.id, request.summary)
+        print "   r/%s - %s" % (request.id, request.summary)
 
     def output_draft(self, request, draft):
-        print "* r/%s - %s" % (request.id, draft.summary)
+        print " * r/%s - %s" % (request.id, draft.summary)
 
     def main(self):
         repository_info, tool = self.initialize_scm_tool()
