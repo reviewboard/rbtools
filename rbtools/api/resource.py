@@ -602,5 +602,15 @@ class ReviewRequestResource(ItemResource):
 
         return self.update(data=data, internal=True)
 
+    @request_method_decorator
+    def get_or_create_draft(self, **kwargs):
+        request = self.get_draft(internal=True)
+        request.method = 'POST'
+
+        for name, value in kwargs.iteritems():
+            request.add_field(name, value)
+
+        return request
+
 RESOURCE_MAP['application/vnd.reviewboard.org.review-request'] = \
     ReviewRequestResource

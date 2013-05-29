@@ -134,3 +134,17 @@ provides the following additional methods.
 
    Uploads a new screenshot contained in ``content``, named ``filename``, with
    the optional ``caption``.
+
+
+.. _review-request-resource-specific-functionality:
+
+Review Request Resource Functionality
+=====================================
+
+The resource object for a :ref:`webapi2.0-review-request-resource`
+provides the following additional methods.
+
+.. py:method:: ReviewRequestResource.get_or_create_draft(**kwargs)
+
+   Retrieve the review request's draft resource. If the draft does not exist
+   it will be created and retrieved.
