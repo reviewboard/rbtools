@@ -407,8 +407,12 @@ class PerforceClient(SCMClient):
                     changetype_short = 'M'
                     base_revision = int(first_record['rev'])
 
+                # TODO: We're passing new_depot_path='' here just to make
+                # things work like they did before the moved file change was
+                # added (58ccae27). This section of code needs to be updated
+                # to properly work with moved files.
                 dl = self._do_diff(old_file, new_file, depot_path,
-                                   base_revision, changetype_short,
+                                   base_revision, '', changetype_short,
                                    ignore_unmodified=True)
                 diff_lines += dl
 
