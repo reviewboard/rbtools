@@ -81,10 +81,15 @@ class MercurialClient(SCMClient):
                 return
 
     def _calculate_hgsubversion_repository_info(self, svn_info):
-        self._type = 'svn'
         def _info(r):
             m = re.search(r, svn_info, re.M)
-            return urlsplit(m.group(1)) if m else None
+
+            if m:
+                return urlsplit(m.group(1))
+            else:
+                return None
+
+        self._type = 'svn'
 
         root = _info(r'^Repository Root: (.+)$')
         url = _info(r'^URL: (.+)$')
@@ -162,7 +167,10 @@ class MercurialClient(SCMClient):
         if self.options.guess_description and not self.options.description:
             self.options.description = self.extract_description(parent, ".")
 
-        rs = "-r{0}:{1}".format(parent, files[0] if len(files) == 1 else '.')
+        if len(files) == 1:
+            rs = "-r%s:%s" % (parent, files[0])
+        else:
+            rs = '.'
 
         return (execute(["hg", "diff", "--svn", rs]), None)
 
