@@ -959,7 +959,7 @@ def tempt_fate(server, tool, changenum, diff_content=None,
 
             if e.error_code == 101 and e.http_status == 403:
                 die('You do not have permissions to modify this review request\n')
-            elif e.error_code == 105:
+            elif e.error_code == 219:
                 sys.stderr.write('The generated diff file was empty. This '
                                  'usually means no files were\n')
                 sys.stderr.write('modified in this change.\n')

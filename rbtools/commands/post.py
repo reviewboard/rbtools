@@ -348,16 +348,19 @@ class Post(Command):
                     error_msg.append(
                         'You do not have permissions to modify '
                         'this review request\n')
-                elif e.error_code == 105:
+                elif e.error_code == 219:
                     error_msg.append(
                         'The generated diff file was empty. This '
                         'usually means no files were\n'
                         'modified in this change.\n'
-                        '\n'
-                        'Your review request still exists, but the diff is '
-                        'not attached. %s' % e)
+                else:
+                    error_msg.append(e.rsp['err']['msg'] + '\n')
 
-                raise CommandError(''.join(error_msg))
+                error_msg.append(
+                    'Your review request still exists, but the diff is '
+                    'not attached.\n')
+
+                raise CommandError('\n'.join(error_msg))
 
         try:
             draft = review_request.get_draft()
