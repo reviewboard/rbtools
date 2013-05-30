@@ -1,0 +1,163 @@
+===========================
+RBTools 0.5.1 Release Notes
+===========================
+
+**Release date**: May 30, 2013
+
+
+New Features
+============
+
+* Improved the readability of :command:`rbt status` output.
+
+  Each review request output is now indented, causing the IDs and
+  draft indicators to line up.
+
+* Added a :option:`--repository-type` option to most commands.
+
+  Any :command:`rbt` commands which work with the repository, including
+  :command:`post-review`, now have a :option:`--repository-type` option. This
+  option allows the user to specify a particular repository type to be used.
+
+  This type can also be set for a repository by setting
+  ``REPOSITORY_TYPE`` in :file:`.reviewboardrc`.
+
+* Added a :option:`--list-repository-types` option to :command:`post-review`.
+
+  This option will cause :command:`post-review` to print the valid repository
+  types and then exit. This can be used to see valid values for the new
+  :option:`--repository-type` option.
+
+* Added a new :command:`rbt list-repo-types` command.
+
+  The new :command:`rbt list-repo-types` command will print the valid
+  repository types. These values can be used for the new
+  :option:`--repository-type` option.
+
+* Third-parties can now write new SCM support by creating Python packages
+  leveraging Python entry points. SCMClient subclasses can be registered
+  through the ``rbtools_scm_clients`` entry point.
+
+  All our SCMClients are registered this way as well.
+
+
+API Client Changes
+==================
+
+* Added an API Client method for retrieving resources from a path.
+
+  The RBClient now has a ``get_path`` method, which will accept a path and
+  retrieve the API resource at that path. For example, a path of
+  ``/review-requests/123/`` would retrieve the resource at
+  ``http://example.com/api/review-requests/123/``
+
+* Add a ``get_or_create_draft`` method to the API.
+
+  This new resource-specific method for Review Request Resources allows
+  creating/retrieving a Review Request Draft resource. Previously,
+  this was only accessible after first uploading a diff, which is no longer
+  required.
+
+* Restructured the API Client internally.
+
+  Instead of wrapping everything and hiding resources inside of various
+  Transport objects, Resource objects are now returned to the user. The
+  Transport no longer serves as an all-wrapping, interface to and
+  between everything, super object, but as a simple interface to the
+  Review Board server.
+
+  Resource method calls which return HttpRequests are now decorated,
+  which serves as the new wrapping mechanism. The decorator captures
+  calls to these methods, and passes the internal method, and arguments,
+  off to the Transport to be executed. The new simpler Transport now
+  only provides a few core methods; primarily it needs to be able to
+  massage the provided arguments, call the method, and deal with the
+  returned HttpRequest in a suitable manner. This should make writing
+  a new synchronous Transport simple.
+
+  Now that proper Resource objects are returned, API users can rely on
+  checking class types using :py:func:`isinstance` to differentiate
+  between item and list resources, etc.
+
+  Additionally, dictionary or list fields returned from a resource use
+  standard class types, regardless of the transport used.
+
+
+Bug Fixes
+=========
+
+* Fixed crash when copying old post-review cookies for use with
+  :command:`rbt`.
+
+  An edge case existed where copying old post-review cookies to be used with
+  the :command:`rbt` command would cause a crash. Cookies will now be copied
+  properly.
+
+* :command:`rbt` commands will now properly generate diffs with moved files.
+
+  The :command:`rbt` commands were not properly checking the capabilities of
+  the Review Board server, and always assumed there was no support for moved
+  file diffs. The capabilities of the server are now properly checked, and
+  diffs with moved files will be generated when appropriate.
+
+* Fixed references to non-existent variables in :command:`rbt patch`.
+
+  The :command:`rbt patch` command would immediately crash, making it
+  unusable.  The command now functions properly.
+
+  Patch by Adam Collard.
+
+* Fixed :command:`rbt post` for Perforce repositories.
+
+  When using :command:`rbt post` with Perforce, posting an update to a review
+  request using a change number would result in an error. We now properly
+  update the review request instead of failing.
+
+* Fixed :command:`rbt post` and :command:`rbt diff` for Subversion and
+  Bazaar.
+
+  A number of cases causing crashes when using :command:`rbt` with Subversion
+  and Bazaar have been fixed.
+
+* Fixed :command:`post-review` and :command:`rbt` when used for Perforce
+  paths.
+
+  Posting a code review using a path no longer results in a crash.
+
+  Patch by Damian Johnson (:bug:`2881`).
+
+* Fixed error handling when posting a review request.
+
+  If an unhandled error code was returned from the server, the process
+  would just quit without any useful indication of what went wrong. We
+  now use the error message from the server.
+
+  On top of this, :command:`rbt post` and :command:`post-review` now check
+  against the proper error code for the Empty Diff error.
+
+
+Packaging Changes
+=================
+
+* Conditionalize ez_setup.
+
+  This makes life simpler for packagers, since most packaging tools
+  will ensure that the appropriate packages are available on the
+  system. Additionally, most packaging tools prefer not to rely on
+  network access (since it can mean that identical rebuilds cannot be
+  performed).
+
+  Patch by Stephen Gallagher.
+
+
+Contributors
+============
+
+* Adam Collard
+* Christian Hammond
+* Damian Johnson
+* Stephen Gallagher
+* Steven MacLeod
+
+
+.. comment: vim: ft=rst et
