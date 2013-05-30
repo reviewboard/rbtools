@@ -363,7 +363,7 @@ class Post(Command):
                     error_msg.append(
                         'The generated diff file was empty. This '
                         'usually means no files were\n'
-                        'modified in this change.\n'
+                        'modified in this change.\n')
                 else:
                     error_msg.append(e.rsp['err']['msg'] + '\n')
 
