@@ -162,6 +162,7 @@ class Command(object):
             elif self.options.debug:
                 raise
 
+            logging.error(e)
             exit_code = 1
         except CommandExit, e:
             exit_code = e.exit_code
