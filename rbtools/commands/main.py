@@ -10,10 +10,15 @@ except ImportError:
     from StringIO import StringIO
 
 from rbtools import get_version_string
-from rbtools.commands import RB_MAIN
+from rbtools.commands import Option, RB_MAIN
 
 
-GLOBAL_OPTIONS = []
+GLOBAL_OPTIONS = [
+    Option('-h', '--help',
+           action='store_true',
+           dest='help',
+           default=False).make_option({})
+]
 
 
 def build_help_text(command_class):
@@ -42,14 +47,14 @@ def help(args, parser):
         print "No help found for %s" % args[0]
         sys.exit(0)
 
-    parser.print_usage()
+    parser.print_help()
 
     # TODO: For now we'll print every command found with an entry
     # point. In the future this needs to be switched to printing
     # a hard-coded list, so that we can include commands we create
     # using shell scripts etc.
     commands = pkg_resources.get_entry_map('rbtools', 'rbtools_commands')
-    print "The most commonly used commands are:"
+    print "\nThe most commonly used commands are:"
 
     for command in commands:
         print "  %s" % command
@@ -77,6 +82,8 @@ def main():
 
     if command_name == "help":
         help(args[1:], parser)
+    elif opt.help or "--help" in args or '-h' in args:
+        help(args, parser)
 
     # Attempt to retrieve the command class from the entry points.
     ep = pkg_resources.get_entry_info("rbtools", "rbtools_commands", args[0])
