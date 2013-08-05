@@ -89,8 +89,8 @@ class PlasticClient(SCMClient):
         else:
             branch = args
 
-        if not self._options.branch:
-            self._options.branch = branch
+        if not getattr(self.options, 'branch', None):
+            self.options.branch = branch
 
         diff_entries = execute(["cm", "diff", branch,
                          "--format={status} {path} "
