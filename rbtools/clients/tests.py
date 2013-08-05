@@ -867,6 +867,9 @@ class PerforceClientTests(SCMClientTests):
         SERVER_PATH = 'perforce.example.com:1666'
 
         class TestWrapper(P4Wrapper):
+            def is_supported(self):
+                return True
+
             def info(self):
                 return {
                     'Server address': SERVER_PATH,
