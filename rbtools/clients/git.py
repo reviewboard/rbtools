@@ -87,7 +87,7 @@ class GitClient(SCMClient):
                         self.type = "svn"
 
                         # Get SVN tracking branch
-                        if hasattr(self.options, 'parent_branch'):
+                        if getattr(self.options, 'parent_branch', None):
                             self.upstream_branch = self.options.parent_branch
                         else:
                             data = execute([self.git, "svn", "rebase", "-n"],
