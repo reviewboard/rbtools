@@ -21,6 +21,7 @@ from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.plastic import PlasticClient
 from rbtools.utils.filesystem import get_config_value, load_config_files
 from rbtools.utils.process import die
+from rbtools.utils.users import query_yes_no
 
 try:
     # Specifically import json_loads, to work around some issues with
@@ -1333,6 +1334,10 @@ def main():
 
     if len(diff) == 0:
         die("There don't seem to be any diffs!")
+
+    if len(tool.make_diff("HEAD")) != 0:
+        if not query_yes_no("You have uncommitted changes, post review anyway?"):
+            die("There are uncommitted changes")
 
     if options.output_diff_only:
         # The comma here isn't a typo, but rather suppresses the extra newline
