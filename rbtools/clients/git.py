@@ -261,7 +261,11 @@ class GitClient(SCMClient):
                  (parent_branch or self.merge_base) + ".."],
                 ignore_errors=True).strip()
 
-        return (diff_lines, parent_diff_lines)
+        return {
+            'diff': diff_lines,
+            'parent_diff': parent_diff_lines,
+            'base_commit_id': self.merge_base,
+        }
 
     def make_diff(self, ancestor, commit=""):
         """
@@ -389,7 +393,7 @@ class GitClient(SCMClient):
                      revision_range + ".."],
                     ignore_errors=True).strip()
 
-            return (self.make_diff(revision_range), parent_diff_lines)
+            diff_lines = self.make_diff(revision_range)
         else:
             r1, r2 = revision_range.split(":")
             # Check if parent contains the first revision and make a
@@ -413,7 +417,13 @@ class GitClient(SCMClient):
                      "%s..%s" % (r1, r2)],
                     ignore_errors=True).strip()
 
-            return (self.make_diff(r1, r2), parent_diff_lines)
+            diff_lines = self.make_diff(r1, r2)
+
+        return {
+            'diff': diff_lines,
+            'parent_diff_lines': parent_diff_lines,
+            'base_commit_id': self.merge_base,
+        }
 
     def apply_patch(self, patch_file, base_path=None, base_dir=None, p=None):
         """

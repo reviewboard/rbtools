@@ -289,7 +289,8 @@ class Post(Command):
 
     def post_request(self, tool, repository_info, server_url, api_root,
                      changenum=None, diff_content=None,
-                     parent_diff_content=None, submit_as=None, retries=3):
+                     parent_diff_content=None, base_commit_id=None,
+                     submit_as=None, retries=3):
         """Creates or updates a review request, and uploads a diff.
 
         On success the review request id and url are returned.
@@ -344,12 +345,22 @@ class Post(Command):
         if (not repository_info.supports_changesets or
             not self.options.change_only):
             try:
-                basedir = (self.options.basedir or
-                           repository_info.base_path)
-                review_request.get_diffs().upload_diff(
-                    diff_content,
-                    parent_diff=parent_diff_content,
-                    base_dir=basedir)
+                diff_kwargs = {
+                    'parent_diff': parent_diff_content,
+                    'base_dir': self.options.basedir or
+                                repository_info.base_path,
+                }
+
+                if (base_commit_id and
+                    tool.capabilities.has_capability('diffs',
+                                                     'base_commit_ids')):
+                    # Both the Review Board server and SCMClient support
+                    # base commit IDs, so pass that along when creating
+                    # the diff.
+                    diff_kwargs['base_commit_id'] = base_commit_id
+
+                review_request.get_diffs().upload_diff(diff_content,
+                                                       **diff_kwargs)
             except APIError, e:
                 error_msg = [
                     'Error uploading diff\n\n',
@@ -450,6 +461,7 @@ class Post(Command):
 
         if self.options.diff_filename:
             parent_diff = None
+            base_commit_id = None
 
             if self.options.diff_filename == '-':
                 diff = sys.stdin.read()
@@ -463,12 +475,16 @@ class Post(Command):
                 except IOError, e:
                     raise CommandError("Unable to open diff filename: %s" % e)
         else:
-            diff, parent_diff = get_diff(
+            diff_info = get_diff(
                 tool,
                 repository_info,
                 revision_range=self.options.revision_range,
                 svn_changelist=self.options.svn_changelist,
                 files=args)
+
+            diff = diff_info['diff']
+            parent_diff = diff_info.get('parent_diff')
+            base_commit_id = diff_info.get('base_commit_id')
 
         if len(diff) == 0:
             raise CommandError("There don't seem to be any diffs!")
@@ -486,6 +502,7 @@ class Post(Command):
             changenum=changenum,
             diff_content=diff,
             parent_diff_content=parent_diff,
+            base_commit_id=base_commit_id,
             submit_as=self.options.submit_as)
 
         print "Review request #%s posted." % request_id
