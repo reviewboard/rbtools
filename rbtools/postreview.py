@@ -15,7 +15,7 @@ from urlparse import urljoin, urlparse
 
 from rbtools import get_package_version, get_version_string
 from rbtools.api.capabilities import Capabilities
-from rbtools.api.errors import APIError
+from rbtools.api.errors import APIError, create_api_error
 from rbtools.clients import print_clients, scan_usable_client
 from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.plastic import PlasticClient
@@ -651,8 +651,7 @@ class ReviewBoardServer(object):
             debug("Got API Error %d (HTTP code %d): %s" %
                   (rsp['err']['code'], http_status, rsp['err']['msg']))
             debug("Error data: %r" % rsp)
-            raise APIError(http_status, rsp['err']['code'], rsp,
-                           rsp['err']['msg'])
+            raise create_api_error(http_status, rsp['err']['code'], rsp)
         except ValueError:
             debug("Got HTTP error: %s: %s" % (http_status, data))
             raise APIError(http_status, None, None, data)

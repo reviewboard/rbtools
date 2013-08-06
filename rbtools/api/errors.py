@@ -21,6 +21,20 @@ class AuthorizationError(APIError):
     pass
 
 
+class BadRequestError(APIError):
+    def __str__(self):
+        lines = [
+            super(BadRequestError, self).__str__(),
+            ''
+        ]
+
+        if self.rsp and 'fields' in self.rsp:
+            for field, error in self.rsp['fields'].iteritems():
+                lines.append('    %s: %s' % (field, '; '.join(error)))
+
+        return '\n'.join(lines)
+
+
 class ServerInterfaceError(Exception):
     def __init__(self, msg, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
@@ -31,6 +45,7 @@ class ServerInterfaceError(Exception):
 
 
 API_ERROR_TYPE = {
+    400: BadRequestError,
     401: AuthorizationError,
 }
 
