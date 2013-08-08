@@ -99,7 +99,7 @@ def main():
                              ep.name)
             sys.exit(1)
         except Exception, e:
-            sys.stderr.write("Unexpexted error loading command %s: %s\n" %
+            sys.stderr.write("Unexpected error loading command %s: %s\n" %
                              (ep.name, e))
             sys.exit(1)
 
