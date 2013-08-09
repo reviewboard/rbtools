@@ -553,7 +553,14 @@ class PerforceClient(SCMClient):
                 # We have an old file, get p4 to take this old version from the
                 # depot and put it into a plain old temp file for us
                 old_depot_path = "%s#%s" % (depot_path, base_revision)
-                self._write_file(old_depot_path, tmp_diff_from_filename)
+
+                try:
+                    self._write_file(old_depot_path, tmp_diff_from_filename)
+                except ValueError, exc:
+                    logging.warning("Skipping file (%s): %s" %
+                                    (old_depot_path, exc))
+                    continue
+
                 old_file = tmp_diff_from_filename
 
                 # Also print out the new file into a tmpfile
@@ -571,20 +578,35 @@ class PerforceClient(SCMClient):
                 # temp file for us. No old file to worry about here.
                 if cl_is_pending:
                     new_file = self._depot_to_local(depot_path)
+
+                    if os.path.islink(new_file):
+                        logging.warning("Skipping symlink (%s)" % new_file)
+                        continue
                 else:
-                    new_depot_path = "%s#%s" % (depot_path, 1)
-                    self._write_file(new_depot_path, tmp_diff_to_filename)
-                    new_file = tmp_diff_to_filename
+                    try:
+                        new_depot_path = "%s#%s" % (depot_path, 1)
+                        self._write_file(new_depot_path, tmp_diff_to_filename)
+                        new_file = tmp_diff_to_filename
+                    except ValueError, exc:
+                        logging.warning("Skipping file (%s): %s" %
+                                        (new_depot_path, exc))
+                        continue
 
                 changetype_short = "A"
             elif (changetype == 'delete' or
                   (changetype == 'move/delete' and not supports_moves)):
                 # We've deleted a file, get p4 to put the deleted file into a
                 # temp file for us. The new file remains the empty file.
-                old_depot_path = "%s#%s" % (depot_path, base_revision)
-                self._write_file(old_depot_path, tmp_diff_from_filename)
-                old_file = tmp_diff_from_filename
-                changetype_short = "D"
+
+                try:
+                    old_depot_path = "%s#%s" % (depot_path, base_revision)
+                    self._write_file(old_depot_path, tmp_diff_from_filename)
+                    old_file = tmp_diff_from_filename
+                    changetype_short = "D"
+                except ValueError, exc:
+                    logging.warning("Skipping file (%s): %s" %
+                                    (old_depot_path, exc))
+                    continue
             elif changetype == 'move/add':
                 # The server supports move information. We can ignore this,
                 # though, since there should be a "move/delete" that's handled
@@ -602,9 +624,14 @@ class PerforceClient(SCMClient):
                     die('Unable to get necessary fstat information on %s' %
                         depot_path)
 
-                old_depot_path = '%s#%s' % (depot_path, base_revision)
-                self._write_file(old_depot_path, tmp_diff_from_filename)
-                old_file = tmp_diff_from_filename
+                try:
+                    old_depot_path = '%s#%s' % (depot_path, base_revision)
+                    self._write_file(old_depot_path, tmp_diff_from_filename)
+                    old_file = tmp_diff_from_filename
+                except ValueError, exc:
+                    logging.warning("Skipping file (%s): %s" %
+                                    (old_depot_path, exc))
+                    continue
 
                 # Get information on the new file.
                 moved_stat_info = self.p4.fstat(stat_info['movedFile'],
@@ -759,7 +786,22 @@ class PerforceClient(SCMClient):
         """
         logging.debug('Writing "%s" to "%s"' % (depot_path, tmpfile))
         self.p4.print_file(depot_path, out_file=tmpfile)
-        os.chmod(tmpfile, stat.S_IREAD | stat.S_IWRITE)
+
+        # The output of 'p4 print' will be a symlink if that's what version
+        # control contains. There's a few reasons to skip these files...
+        #
+        # * Relative symlinks will likely be broken, causing an unexpected
+        #   OSError.
+        # * File that's symlinked to isn't necessarily in version control.
+        # * Users expect that this will only process files under version
+        #   control. If I can replace a file they opened with a symlink to
+        #   private keys in '~/.ssh', then they'd probably be none too happy
+        #   when post-review uses their credentials to publish its contents.
+
+        if os.path.islink(tmpfile):
+            raise ValueError("'%s' is a symlink" % depot_path)
+        else:
+            os.chmod(tmpfile, stat.S_IREAD | stat.S_IWRITE)
 
     def _depot_to_local(self, depot_path):
         """
