@@ -299,6 +299,10 @@ class GitClient(SCMClient):
         """
         rev = execute([self.git, "svn", "find-rev", parent_branch]).strip()
 
+        if not rev and self.merge_base:
+            rev = execute([self.git, "svn", "find-rev",
+                           self.merge_base]).strip()
+
         if not rev:
             return None
 
