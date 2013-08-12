@@ -169,6 +169,11 @@ class Post(Command):
                default=None,
                help="the Perforce password or ticket of the user "
                     "in the P4USER environment variable"),
+        Option("--svn-show-copies-as-adds",
+               dest="svn_show_copies_as_adds",
+               metavar="y/n",
+               default=None,
+               help="don't diff copied or moved files with their source"),
         Option("--svn-changelist",
                dest="svn_changelist",
                default=None,

@@ -163,11 +163,33 @@ class SVNClient(SCMClient):
         Performs the actual diff operation, handling renames and converting
         paths to absolute.
         """
+
+        svn_show_copies_as_adds = getattr(
+            self.options, 'svn_show_copies_as_adds', None)
+        if self.history_scheduled_with_commit():
+            if svn_show_copies_as_adds is None:
+                sys.stderr.write("One or more files in your changeset has "
+                                 "history scheduled with commit. Please try "
+                                 "again with '--svn-show-copies-as-adds=y/n"
+                                 "'\n")
+                sys.exit(1)
+            else:
+                if svn_show_copies_as_adds in 'Yy':
+                    cmd.append("--show-copies-as-adds")
+
         diff = execute(cmd, split_lines=True)
         diff = self.handle_renames(diff)
         diff = self.convert_to_absolute_paths(diff, repository_info)
 
         return ''.join(diff)
+
+    def history_scheduled_with_commit(self):
+        """ Method to find if any file status has '+' in 4th column"""
+
+        for p in execute(["svn", "st"], split_lines=True):
+            if p.startswith('A  +'):
+                return True
+        return False
 
     def find_copyfrom(self, path):
         """

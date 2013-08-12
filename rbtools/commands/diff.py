@@ -30,6 +30,11 @@ class Diff(Command):
                metavar="TRACKING",
                help="Tracking branch from which your branch is derived "
                     "(git only, defaults to origin/master)"),
+        Option("--svn-show-copies-as-adds",
+               dest="svn_show_copies_as_adds",
+               metavar="y/n",
+               default=None,
+               help="don't diff copied or moved files with their source"),
         Option('--svn-changelist',
                dest='svn_changelist',
                default=None,
