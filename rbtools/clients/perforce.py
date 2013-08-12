@@ -726,7 +726,7 @@ class PerforceClient(SCMClient):
             dl = ['Binary files %s and %s differ\n' % (old_file, new_file)]
 
         if dl == [] or dl[0].startswith("Binary files "):
-            if dl == []:
+            if dl == [] and not is_move:
                 if ignore_unmodified:
                     return []
                 else:

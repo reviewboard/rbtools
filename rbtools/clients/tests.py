@@ -23,6 +23,8 @@ from rbtools.utils.testbase import RBTestBase
 
 class SCMClientTests(RBTestBase):
     def setUp(self):
+        super(SCMClientTests, self).setUp()
+
         self.options = OptionsStub()
 
 
@@ -613,13 +615,25 @@ class MercurialSubversionClientTests(MercurialTestBase):
         super(MercurialSubversionClientTests, self).setUp()
         self._hg_env = {'FOO': 'BAR'}
 
+        # Make sure hgsubversion is enabled.
+        #
+        # This will modify the .hgrc in the temp home directory created
+        # for these tests.
+        #
+        # The "hgsubversion =" tells Mercurial to check for hgsubversion
+        # in the default PYTHONPATH.
+        fp = open('%s/.hgrc' % os.environ['HOME'], 'w')
+        fp.write('[extensions]\n')
+        fp.write('hgsubversion =\n')
+        fp.close()
+
         for exe in self._required_exes:
             if not self.is_exe_in_path(exe):
                 raise SkipTest('missing svn stuff!  giving up!')
 
         if not self._has_hgsubversion():
             raise SkipTest('unable to use `hgsubversion` extension!  '
-                                'giving up!')
+                           'giving up!')
 
         if not self._tmpbase:
             self._tmpbase = self.create_tmp_dir()
@@ -648,11 +662,14 @@ class MercurialSubversionClientTests(MercurialTestBase):
 
         os.kill(self._svnserve_pid, 9)
 
-    def _svn_add_file_commit(self, filename, data, msg):
+    def _svn_add_file_commit(self, filename, data, msg, add_file=True):
         outfile = open(filename, 'w')
         outfile.write(data)
         outfile.close()
-        execute(['svn', 'add', filename])
+
+        if add_file:
+            execute(['svn', 'add', filename], ignore_errors=True)
+
         execute(['svn', 'commit', '-m', msg])
 
     def _create_svn_repo(self):
@@ -692,7 +709,8 @@ class MercurialSubversionClientTests(MercurialTestBase):
         os.chdir(os.path.join(self.svn_checkout, 'trunk'))
 
         for i, data in enumerate([FOO, FOO1, FOO2]):
-            self._svn_add_file_commit('foo.txt', data, 'foo commit %s' % i)
+            self._svn_add_file_commit('foo.txt', data, 'foo commit %s' % i,
+                                      add_file=(i == 0))
 
     def _get_testing_clone(self):
         self.clone_dir = os.path.join(self._tmpbase, 'checkout.hg')
@@ -1228,6 +1246,9 @@ class BazaarClientTests(SCMClientTests):
         if not self.is_exe_in_path("bzr"):
             raise SkipTest("bzr not found in path")
 
+        # Identify with bazaar so that the commands won't be sad.
+        execute(['bzr', 'whoami', 'Test User'])
+
         self.orig_dir = os.getcwd()
 
         self.original_branch = self.chdir_tmp()
@@ -1249,11 +1270,12 @@ class BazaarClientTests(SCMClientTests):
         """Test BazaarClient get_repository_info with original branch"""
         os.chdir(self.original_branch)
         ri = self.client.get_repository_info()
-        
+
         self.assert_(isinstance(ri, RepositoryInfo))
-        self.assertEqual(ri.path, self.original_branch)
+        self.assertEqual(os.path.realpath(ri.path),
+                         os.path.realpath(self.original_branch))
         self.assertTrue(ri.supports_parent_diffs)
-        
+
         self.assertEqual(ri.base_path, "/")
         self.assertFalse(ri.supports_changesets)
 
@@ -1261,11 +1283,12 @@ class BazaarClientTests(SCMClientTests):
         """Test BazaarClient get_repository_info with child branch"""
         os.chdir(self.child_branch)
         ri = self.client.get_repository_info()
-        
+
         self.assert_(isinstance(ri, RepositoryInfo))
-        self.assertEqual(ri.path, self.child_branch)
+        self.assertEqual(os.path.realpath(ri.path),
+                         os.path.realpath(self.child_branch))
         self.assertTrue(ri.supports_parent_diffs)
-        
+
         self.assertEqual(ri.base_path, "/")
         self.assertFalse(ri.supports_changesets)
 

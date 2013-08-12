@@ -23,12 +23,11 @@ class AuthorizationError(APIError):
 
 class BadRequestError(APIError):
     def __str__(self):
-        lines = [
-            super(BadRequestError, self).__str__(),
-            ''
-        ]
+        lines = [super(BadRequestError, self).__str__()]
 
         if self.rsp and 'fields' in self.rsp:
+            lines.append('')
+
             for field, error in self.rsp['fields'].iteritems():
                 lines.append('    %s: %s' % (field, '; '.join(error)))
 

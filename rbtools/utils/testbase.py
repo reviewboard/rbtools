@@ -2,14 +2,12 @@ import os
 import sys
 import unittest
 import uuid
-from tempfile import mkdtemp
-
 try:
     from cStringIO import StringIO
 except ImportError:
     from StringIO import StringIO
 
-from rbtools.utils.filesystem import cleanup_tempfiles
+from rbtools.utils.filesystem import cleanup_tempfiles, make_tempdir
 
 
 class RBTestBase(unittest.TestCase):
@@ -19,18 +17,20 @@ class RBTestBase(unittest.TestCase):
     run. This is because RBTools actively works with files and almost all
     tests employ file I/O operations."""
     def setUp(self):
+        self._old_cwd = os.getcwd()
         self.set_user_home_tmp()
 
     def tearDown(self):
+        os.chdir(self._old_cwd)
         cleanup_tempfiles()
 
     def create_tmp_dir(self):
-        """Creates and returnds tmp directory located in CWD."""
-        return mkdtemp(dir=os.getcwd())
+        """Creates and returns a temporary directory."""
+        return make_tempdir()
 
     def chdir_tmp(self, dir=None):
-        """Changes current directory to a temoprary directory."""
-        dirname = mkdtemp(dir=dir)
+        """Changes current directory to a temporary directory."""
+        dirname = make_tempdir(parent=dir)
         os.chdir(dirname)
         return dirname
 
@@ -75,7 +75,7 @@ class RBTestBase(unittest.TestCase):
 
     def set_user_home_tmp(self):
         """Set temporary directory as current user's home."""
-        self.set_user_home(mkdtemp())
+        self.set_user_home(make_tempdir())
 
     def catch_output(self, func):
         stdout = sys.stdout

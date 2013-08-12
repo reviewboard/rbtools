@@ -1,4 +1,5 @@
 import os
+import shutil
 import tempfile
 
 from rbtools.utils.process import die
@@ -7,6 +8,7 @@ from rbtools.utils.process import die
 CONFIG_FILE = '.reviewboardrc'
 
 tempfiles = []
+tempdirs = []
 builtin = {}
 
 
@@ -16,6 +18,9 @@ def cleanup_tempfiles():
             os.unlink(tmpfile)
         except:
             pass
+
+    for tmpdir in tempdirs:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 def get_config_value(configs, name, default=None):
@@ -75,6 +80,17 @@ def make_tempfile(content=None):
     os.close(fd)
     tempfiles.append(tmpfile)
     return tmpfile
+
+
+def make_tempdir(parent=None):
+    """Creates a temporary directory and returns the path.
+
+    The path is stored in an array for later cleanup.
+    """
+    tmpdir = tempfile.mkdtemp(dir=parent)
+    tempdirs.append(tmpdir)
+
+    return tmpdir
 
 
 def walk_parents(path):
