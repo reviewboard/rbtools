@@ -172,7 +172,9 @@ class MercurialClient(SCMClient):
         else:
             rs = '.'
 
-        return (execute(["hg", "diff", "--svn", rs]), None)
+        return {
+            'diff': execute(["hg", "diff", "--svn", rs]),
+        }
 
     def _get_outgoing_diff(self, files):
         """
@@ -232,9 +234,13 @@ class MercurialClient(SCMClient):
             full_command = ['hg', 'diff', '-r', str(bottom_rev), '-r',
                             str(top_rev)] + files
 
-            return (execute(full_command, env=self._hg_env), None)
+            diff = execute(full_command, env=self._hg_env)
         else:
-            return ("", None)
+            diff = ''
+
+        return {
+            'diff': diff,
+        }
 
     def _get_outgoing_changesets(self, current_branch, remote):
         """
@@ -320,8 +326,10 @@ class MercurialClient(SCMClient):
         if self.options.guess_description and not self.options.description:
             self.options.description = self.extract_description(r1, r2)
 
-        return (execute(["hg", "diff", "-r", r1, "-r", r2],
-                        env=self._hg_env), None)
+        return {
+            'diff': execute(["hg", "diff", "-r", r1, "-r", r2],
+                            env=self._hg_env),
+        }
 
     def scan_for_server(self, repository_info):
         # Scan first for dot files, since it's faster and will cover the

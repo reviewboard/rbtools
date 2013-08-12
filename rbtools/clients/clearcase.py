@@ -252,7 +252,7 @@ class ClearCaseClient(SCMClient):
         revision_range = revision_range.split(';')
         changeset = zip(revision_range[0::2], revision_range[1::2])
 
-        return (self.do_diff(changeset)[0], None)
+        return self.do_diff(changeset)
 
     def diff_files(self, old_file, new_file):
         """Return unified diff for file.
@@ -370,7 +370,9 @@ class ClearCaseClient(SCMClient):
             if dl:
                 diff.append(''.join(dl))
 
-        return (''.join(diff), None)
+        return {
+            'diff': ''.join(diff),
+        }
 
 
 class ClearCaseRepositoryInfo(RepositoryInfo):

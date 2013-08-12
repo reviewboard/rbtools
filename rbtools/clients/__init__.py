@@ -55,15 +55,30 @@ class SCMClient(object):
         Returns the generated diff and optional parent diff for this
         repository.
 
-        The returned tuple is (diff_string, parent_diff_string)
+        The return value must be a dictionary, and must have, at a minimum,
+        a 'diff' field. A 'parent_diff' can also be provided.
+
+        It may also return 'base_commit_id', representing the revision/ID of
+        the commit that the diff or parent diff is based on. This exists
+        because in some diff formats, this may different from what's provided
+        in the diff.
         """
-        return (None, None)
+        return {
+            'diff': None,
+            'parent_diff': None,
+            'base_commit_id': None,
+        }
 
     def diff_between_revisions(self, revision_range, args, repository_info):
+        """Returns the generated diff between revisions in the repository.
+
+        This has the same return values as diff.
         """
-        Returns the generated diff between revisions in the repository.
-        """
-        return (None, None)
+        return {
+            'diff': None,
+            'parent_diff': None,
+            'base_commit_id': None,
+        }
 
     def _get_server_from_config(self, config, repository_info):
         if 'REVIEWBOARD_URL' in config:

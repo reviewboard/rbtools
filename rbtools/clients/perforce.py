@@ -419,7 +419,10 @@ class PerforceClient(SCMClient):
         os.unlink(empty_filename)
         os.unlink(tmp_diff_from_filename)
         os.unlink(tmp_diff_to_filename)
-        return (''.join(diff_lines), None)
+
+        return {
+            'diff': ''.join(diff_lines),
+        }
 
     def sanitize_changenum(self, changenum):
         """
@@ -660,7 +663,10 @@ class PerforceClient(SCMClient):
         os.unlink(empty_filename)
         os.unlink(tmp_diff_from_filename)
         os.unlink(tmp_diff_to_filename)
-        return (''.join(diff_lines), None)
+
+        return {
+            'diff': ''.join(diff_lines),
+        }
 
     def _do_diff(self, old_file, new_file, depot_path, base_revision,
                  new_depot_path, changetype_short, ignore_unmodified=False):

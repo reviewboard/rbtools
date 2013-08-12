@@ -52,6 +52,9 @@ class GitClientTests(SCMClientTests):
         self._gitcmd(['add', file])
         self._gitcmd(['commit', '-m', msg])
 
+    def _git_get_head(self):
+        return self._gitcmd(['rev-parse', 'HEAD']).strip()
+
     def setUp(self):
         super(GitClientTests, self).setUp()
 
@@ -128,9 +131,19 @@ class GitClientTests(SCMClientTests):
                "-impulerit. Tantaene animis caelestibus irae?\n" \
                " \n"
         self.client.get_repository_info()
+        base_commit_id = self._git_get_head()
+
         self._git_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
 
-        self.assertEqual(self.client.diff(None), (diff, None))
+        result = self.client.diff(None)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 3)
+        self.assertTrue('diff' in result)
+        self.assertTrue('parent_diff' in result)
+        self.assertTrue('base_commit_id' in result)
+        self.assertEqual(result['diff'], diff)
+        self.assertEqual(result['parent_diff'], None)
+        self.assertEqual(result['base_commit_id'], base_commit_id)
 
     def test_diff_simple_multiple(self):
         """Test GitClient simple diff with multiple commits case"""
@@ -157,11 +170,21 @@ class GitClientTests(SCMClientTests):
                " \n"
         self.client.get_repository_info()
 
+        base_commit_id = self._git_get_head()
+
         self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
         self._git_add_file_commit('foo.txt', FOO2, 'commit 1')
         self._git_add_file_commit('foo.txt', FOO3, 'commit 1')
 
-        self.assertEqual(self.client.diff(None), (diff, None))
+        result = self.client.diff(None)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 3)
+        self.assertTrue('diff' in result)
+        self.assertTrue('parent_diff' in result)
+        self.assertTrue('base_commit_id' in result)
+        self.assertEqual(result['diff'], diff)
+        self.assertEqual(result['parent_diff'], None)
+        self.assertEqual(result['base_commit_id'], base_commit_id)
 
     def test_diff_branch_diverge(self):
         """Test GitClient diff with divergent branches"""
@@ -200,16 +223,36 @@ class GitClientTests(SCMClientTests):
                 "-insignem pietate virum, tot adire labores\n" \
                 "-impulerit. Tantaene animis caelestibus irae?\n" \
                 " \n"
+
         self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
         self._gitcmd(['checkout', '-b', 'mybranch', '--track',
                       'origin/master'])
+        base_commit_id = self._git_get_head()
         self._git_add_file_commit('foo.txt', FOO2, 'commit 2')
         self.client.get_repository_info()
-        self.assertEqual(self.client.diff(None), (diff1, None))
+
+        result = self.client.diff(None)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 3)
+        self.assertTrue('diff' in result)
+        self.assertTrue('parent_diff' in result)
+        self.assertTrue('base_commit_id' in result)
+        self.assertEqual(result['diff'], diff1)
+        self.assertEqual(result['parent_diff'], None)
+        self.assertEqual(result['base_commit_id'], base_commit_id)
 
         self._gitcmd(['checkout', 'master'])
         self.client.get_repository_info()
-        self.assertEqual(self.client.diff(None), (diff2, None))
+
+        result = self.client.diff(None)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 3)
+        self.assertTrue('diff' in result)
+        self.assertTrue('parent_diff' in result)
+        self.assertTrue('base_commit_id' in result)
+        self.assertEqual(result['diff'], diff2)
+        self.assertEqual(result['parent_diff'], None)
+        self.assertEqual(result['base_commit_id'], base_commit_id)
 
     def test_diff_tracking_no_origin(self):
         """Test GitClient diff with a tracking branch, but no origin remote"""
@@ -230,11 +273,21 @@ class GitClientTests(SCMClientTests):
         self._gitcmd(['remote', 'add', 'quux', self.git_dir])
         self._gitcmd(['fetch', 'quux'])
         self._gitcmd(['checkout', '-b', 'mybranch', '--track', 'quux/master'])
+
+        base_commit_id = self._git_get_head()
         self._git_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
 
         self.client.get_repository_info()
 
-        self.assertEqual(self.client.diff(None), (diff, None))
+        result = self.client.diff(None)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 3)
+        self.assertTrue('diff' in result)
+        self.assertTrue('parent_diff' in result)
+        self.assertTrue('base_commit_id' in result)
+        self.assertEqual(result['diff'], diff)
+        self.assertEqual(result['parent_diff'], None)
+        self.assertEqual(result['base_commit_id'], base_commit_id)
 
     def test_diff_local_tracking(self):
         """Test GitClient diff with a local tracking branch"""
@@ -259,13 +312,23 @@ class GitClientTests(SCMClientTests):
                "-insignem pietate virum, tot adire labores\n" \
                "-impulerit. Tantaene animis caelestibus irae?\n" \
                " \n"
+        base_commit_id = self._git_get_head()
         self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
 
         self._gitcmd(['checkout', '-b', 'mybranch', '--track', 'master'])
         self._git_add_file_commit('foo.txt', FOO2, 'commit 2')
 
         self.client.get_repository_info()
-        self.assertEqual(self.client.diff(None), (diff, None))
+
+        result = self.client.diff(None)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 3)
+        self.assertTrue('diff' in result)
+        self.assertTrue('parent_diff' in result)
+        self.assertTrue('base_commit_id' in result)
+        self.assertEqual(result['diff'], diff)
+        self.assertEqual(result['parent_diff'], None)
+        self.assertEqual(result['base_commit_id'], base_commit_id)
 
     def test_diff_tracking_override(self):
         """Test GitClient diff with option override for tracking branch"""
@@ -289,15 +352,23 @@ class GitClientTests(SCMClientTests):
         self._gitcmd(['fetch', 'bad'])
         self._gitcmd(['checkout', '-b', 'mybranch', '--track', 'bad/master'])
 
-        self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
+        base_commit_id = self._git_get_head()
 
+        self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
         self.client.get_repository_info()
-        self.assertEqual(self.client.diff(None), (diff, None))
+
+        result = self.client.diff(None)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 3)
+        self.assertTrue('diff' in result)
+        self.assertTrue('parent_diff' in result)
+        self.assertTrue('base_commit_id' in result)
+        self.assertEqual(result['diff'], diff)
+        self.assertEqual(result['parent_diff'], None)
+        self.assertEqual(result['base_commit_id'], base_commit_id)
 
     def test_diff_slash_tracking(self):
-        """
-        Test GitClient diff with tracking branch that has slash in its name.
-        """
+        """Test GitClient diff with tracking branch that has slash in its name."""
         diff = "diff --git a/foo.txt b/foo.txt\n" \
                "index 5e98e9540e1b741b5be24fcb33c40c1c8069c1fb..e619c1387f5f" \
                "eb91f0ca83194650bfe4f6c2e347 100644\n" \
@@ -318,14 +389,23 @@ class GitClientTests(SCMClientTests):
         self._gitcmd(['fetch', 'origin'])
         self._gitcmd(['checkout', '-b', 'my/branch', '--track',
                       'origin/not-master'])
+        base_commit_id = self._git_get_head()
         self._git_add_file_commit('foo.txt', FOO2, 'commit 2')
 
         self.client.get_repository_info()
-        self.assertEqual(self.client.diff(None), (diff, None))
+
+        result = self.client.diff(None)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 3)
+        self.assertTrue('diff' in result)
+        self.assertTrue('parent_diff' in result)
+        self.assertTrue('base_commit_id' in result)
+        self.assertEqual(result['diff'], diff)
+        self.assertEqual(result['parent_diff'], None)
+        self.assertEqual(result['base_commit_id'], base_commit_id)
 
 
 class MercurialTestBase(SCMClientTests):
-
     def setUp(self):
         super(MercurialTestBase, self).setUp()
         self._hg_env = {}
@@ -470,8 +550,11 @@ class MercurialClientTests(MercurialTestBase):
 
         self._hg_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
 
-        diff_result = self.client.diff(None)
-        self.assertEqual((EXPECTED_HG_DIFF_0, None), diff_result)
+        result = self.client.diff(None)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 1)
+        self.assertTrue('diff' in result)
+        self.assertEqual(result['diff'], EXPECTED_HG_DIFF_0)
 
     def testDiffSimpleMultiple(self):
         """Test MercurialClient diff with multiple commits"""
@@ -481,9 +564,11 @@ class MercurialClientTests(MercurialTestBase):
         self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
         self._hg_add_file_commit('foo.txt', FOO3, 'commit 3')
 
-        diff_result = self.client.diff(None)
-
-        self.assertEqual((EXPECTED_HG_DIFF_1, None), diff_result)
+        result = self.client.diff(None)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 1)
+        self.assertTrue('diff' in result)
+        self.assertEqual(result['diff'], EXPECTED_HG_DIFF_1)
 
     def testDiffBranchDiverge(self):
         """Test MercurialClient diff with diverged branch"""
@@ -493,12 +578,20 @@ class MercurialClientTests(MercurialTestBase):
         self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
         self.client.get_repository_info()
 
-        self.assertEqual((EXPECTED_HG_DIFF_2, None), self.client.diff(None))
+        result = self.client.diff(None)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 1)
+        self.assertTrue('diff' in result)
+        self.assertEqual(result['diff'], EXPECTED_HG_DIFF_2)
 
         self._hgcmd(['update', '-C', 'default'])
         self.client.get_repository_info()
 
-        self.assertEqual((EXPECTED_HG_DIFF_3, None), self.client.diff(None))
+        result = self.client.diff(None)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 1)
+        self.assertTrue('diff' in result)
+        self.assertEqual(result['diff'], EXPECTED_HG_DIFF_3)
 
 
 class MercurialSubversionClientTests(MercurialTestBase):
@@ -691,7 +784,11 @@ class MercurialSubversionClientTests(MercurialTestBase):
 
         self._hg_add_file_commit('foo.txt', FOO4, 'edit 4')
 
-        self.assertEqual(EXPECTED_HG_SVN_DIFF_0, self.client.diff(None)[0])
+        result = self.client.diff(None)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 1)
+        self.assertTrue('diff' in result)
+        self.assertEqual(result['diff'], EXPECTED_HG_SVN_DIFF_0)
 
     def testDiffSimpleMultiple(self):
         """Test MercurialClient (+svn) diff with multiple commits"""
@@ -701,7 +798,11 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self._hg_add_file_commit('foo.txt', FOO5, 'edit 5')
         self._hg_add_file_commit('foo.txt', FOO6, 'edit 6')
 
-        self.assertEqual(EXPECTED_HG_SVN_DIFF_1, self.client.diff(None)[0])
+        result = self.client.diff(None)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 1)
+        self.assertTrue('diff' in result)
+        self.assertEqual(result['diff'], EXPECTED_HG_SVN_DIFF_1)
 
     def testDiffOfRevision(self):
         """Test MercurialClient (+svn) diff specifying a revision."""
@@ -712,8 +813,17 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self._hg_add_file_commit('foo.txt', FOO6, 'edit 6', branch='b')
         self._hg_add_file_commit('foo.txt', FOO4, 'edit 7', branch='b')
 
-        self.assertEqual(EXPECTED_HG_SVN_DIFF_0, self.client.diff(['3'])[0])
-        self.assertEqual(EXPECTED_HG_SVN_DIFF_1, self.client.diff(['5'])[0])
+        result = self.client.diff(['3'])
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 1)
+        self.assertTrue('diff' in result)
+        self.assertEqual(result['diff'], EXPECTED_HG_SVN_DIFF_0)
+
+        result = self.client.diff(['5'])
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 1)
+        self.assertTrue('diff' in result)
+        self.assertEqual(result['diff'], EXPECTED_HG_SVN_DIFF_1)
 
 
 class SVNClientTests(SCMClientTests):
@@ -1065,14 +1175,15 @@ class PerforceClientTests(SCMClientTests):
         client.p4d_version = (2012, 2)
         return client
 
-    def _compare_diff(self, diff, expected_diff):
-        self.assertNotEqual(diff[0], None)
-        self.assertEqual(diff[1], None)
+    def _compare_diff(self, diff_info, expected_diff):
+        self.assertTrue(isinstance(diff_info, dict))
+        self.assertEqual(len(diff_info), 1)
+        self.assertTrue('diff' in diff_info)
+
         diff_content = re.sub('\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}',
                               '1970-01-01 00:00:00',
-                              diff[0])
+                              diff_info['diff'])
         self.assertEqual(diff_content, expected_diff)
-        self.assertEqual(diff[1], None)
 
 
 class BazaarClientTests(SCMClientTests):
@@ -1081,7 +1192,9 @@ class BazaarClientTests(SCMClientTests):
         
         full_command = ["bzr"] + command
 
-        return execute(full_command, *args, **kwargs)
+        result = execute(full_command, *args, **kwargs)
+
+        return result
 
     def _bzr_add_file_commit(self, file, data, msg):
         """
@@ -1093,7 +1206,7 @@ class BazaarClientTests(SCMClientTests):
         foo.write(data)
         foo.close()
         self._bzr_cmd(["add", file])
-        self._bzr_cmd(["commit", "-m", msg])
+        self._bzr_cmd(["commit", "-m", msg, '--author', 'Test User'])
     
     def _compare_diffs(self, filename, full_diff, expected_diff):
         """
@@ -1167,11 +1280,13 @@ class BazaarClientTests(SCMClientTests):
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
-        
-        outgoing_diff, parent_diff = self.client.diff(None)
-        
-        self._compare_diffs("foo.txt", outgoing_diff, EXPECTED_BZR_DIFF_0)
-        self.assertEqual(parent_diff, None)
+
+        result = self.client.diff(None)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 1)
+        self.assertTrue('diff' in result)
+
+        self._compare_diffs("foo.txt", result['diff'], EXPECTED_BZR_DIFF_0)
 
     def test_diff_specific_files(self):
         """Test BazaarClient diff with specific files"""
@@ -1179,12 +1294,14 @@ class BazaarClientTests(SCMClientTests):
 
         self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
         self._bzr_add_file_commit("bar.txt", "baz", "added bar")
-        
-        outgoing_diff, parent_diff = self.client.diff(["foo.txt"])
-        
-        self._compare_diffs("foo.txt", outgoing_diff, EXPECTED_BZR_DIFF_0)
-        self.assertEqual(parent_diff, None)
-    
+
+        result = self.client.diff(['foo.txt'])
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 1)
+        self.assertTrue('diff' in result)
+
+        self._compare_diffs("foo.txt", result['diff'], EXPECTED_BZR_DIFF_0)
+
     def test_diff_simple_multiple(self):
         """Test BazaarClient simple diff with multiple commits case"""
         os.chdir(self.child_branch)
@@ -1192,44 +1309,50 @@ class BazaarClientTests(SCMClientTests):
         self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
         self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
         self._bzr_add_file_commit("foo.txt", FOO3, "commit 3")
-        
-        outgoing_diff, parent_diff = self.client.diff(None)
-        
-        self._compare_diffs("foo.txt", outgoing_diff, EXPECTED_BZR_DIFF_1)
-        self.assertEqual(parent_diff, None)
+
+        result = self.client.diff(None)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 1)
+        self.assertTrue('diff' in result)
+
+        self._compare_diffs("foo.txt", result['diff'], EXPECTED_BZR_DIFF_1)
 
     def test_diff_parent(self):
         """Test BazaarClient diff with changes only in the parent branch"""
         os.chdir(self.child_branch)
         self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
-        
+
         grand_child_branch = mktemp()
         self._bzr_cmd(["branch", self.child_branch, grand_child_branch])
         os.chdir(grand_child_branch)
-        
-        outgoing_diff, parent_diff = self.client.diff(None)
-        
-        self.assertEqual(outgoing_diff, None)
-        self.assertEqual(parent_diff, None)
+
+        result = self.client.diff(None)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 1)
+        self.assertTrue('diff' in result)
+
+        self.assertEqual(result['diff'], None)
 
     def test_diff_grand_parent(self):
         """Test BazaarClient diff with changes between a 2nd level descendant"""
         os.chdir(self.child_branch)
         self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
-        
+
         grand_child_branch = mktemp()
         self._bzr_cmd(["branch", self.child_branch, grand_child_branch])
         os.chdir(grand_child_branch)
-        
+
         # Requesting the diff between the grand child branch and its grand
         # parent:
         self.options.parent_branch = self.original_branch
-        
-        outgoing_diff, parent_diff = self.client.diff(None)
-        
-        self._compare_diffs("foo.txt", outgoing_diff, EXPECTED_BZR_DIFF_0)
-        self.assertEqual(parent_diff, None)
-    
+
+        result = self.client.diff(None)
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 1)
+        self.assertTrue('diff' in result)
+
+        self._compare_diffs("foo.txt", result['diff'], EXPECTED_BZR_DIFF_0)
+
     def test_guessed_summary_and_description_in_diff(self):
         """Test BazaarClient diff with summary and description guessed"""
         os.chdir(self.child_branch)

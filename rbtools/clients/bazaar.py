@@ -69,8 +69,10 @@ class BazaarClient(SCMClient):
         diff = self._get_range_diff(revision_range, files)
         self._set_summary("-1")
         self._set_description(revision_range)
-        
-        return (diff, None)
+
+        return {
+            'diff': diff,
+        }
 
     def diff_between_revisions(self, revision_range, files, repository_info):
         """
@@ -84,8 +86,10 @@ class BazaarClient(SCMClient):
         last_revision = revision_range.split("..")[1]
         self._set_summary(last_revision)
         self._set_description(revision_range)
-        
-        return diff
+
+        return {
+            'diff': diff,
+        }
 
     def _get_range_diff(self, revision_range, files):
         """

@@ -102,18 +102,17 @@ class SVNClient(SCMClient):
         Performs a diff across all modified files in a Subversion repository.
 
         SVN repositories do not support branches of branches in a way that
-        makes parent diffs possible, so we never return a parent diff
-        (the second value in the tuple).
+        makes parent diffs possible, so we never return a parent diff.
         """
-        return (self.do_diff(["svn", "diff", "--diff-cmd=diff"] + files),
-                None)
+        return {
+            'diff': self.do_diff(["svn", "diff", "--diff-cmd=diff"] + files),
+        }
 
     def diff_changelist(self, changelist):
-        """
-        Performs a diff for a local changelist.
-        """
-        return (self.do_diff(["svn", "diff", "--changelist", changelist]),
-                None)
+        """Performs a diff for a local changelist."""
+        return {
+            'diff': self.do_diff(["svn", "diff", "--changelist", changelist]),
+        }
 
     def diff_between_revisions(self, revision_range, args, repository_info):
         """
@@ -149,14 +148,18 @@ class SVNClient(SCMClient):
 
             old_url = url + '@' + revisions[0]
 
-            return (self.do_diff(["svn", "diff", "--diff-cmd=diff", old_url,
-                                  new_url] + files,
-                                 repository_info), None)
-        # Otherwise, perform the revision range diff using a working copy
+            return {
+                'diff': self.do_diff(["svn", "diff", "--diff-cmd=diff",
+                                      old_url, new_url] + files,
+                                     repository_info),
+            }
         else:
-            return (self.do_diff(["svn", "diff", "--diff-cmd=diff", "-r",
-                                  revision_range],
-                                 repository_info), None)
+            # Otherwise, perform the revision range diff using a working copy
+            return {
+                'diff': self.do_diff(["svn", "diff", "--diff-cmd=diff", "-r",
+                                      revision_range],
+                                     repository_info),
+            }
 
     def do_diff(self, cmd, repository_info=None):
         """

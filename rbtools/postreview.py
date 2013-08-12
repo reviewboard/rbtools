@@ -19,6 +19,7 @@ from rbtools.api.errors import APIError, create_api_error
 from rbtools.clients import print_clients, scan_usable_client
 from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.plastic import PlasticClient
+from rbtools.utils.diffs import get_diff
 from rbtools.utils.filesystem import get_config_value, load_config_files
 from rbtools.utils.process import die
 
@@ -1310,12 +1311,7 @@ def main():
     else:
         changenum = None
 
-    if options.revision_range:
-        diff, parent_diff = tool.diff_between_revisions(options.revision_range, args,
-                                                        repository_info)
-    elif options.svn_changelist:
-        diff, parent_diff = tool.diff_changelist(options.svn_changelist)
-    elif options.diff_filename:
+    if options.diff_filename:
         parent_diff = None
 
         if options.diff_filename == '-':
@@ -1328,7 +1324,15 @@ def main():
             except IOError, e:
                 die("Unable to open diff filename: %s" % e)
     else:
-        diff, parent_diff = tool.diff(args)
+        diff_info = get_diff(
+            tool,
+            repository_info,
+            revision_range=options.revision_range,
+            svn_changelist=options.svn_changelist,
+            files=args)
+
+        diff = diff_info['diff']
+        parent_diff = diff_info.get('parent_diff')
 
     if len(diff) == 0:
         die("There don't seem to be any diffs!")

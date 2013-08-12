@@ -70,9 +70,13 @@ class PlasticClient(SCMClient):
         changenum = self.get_changenum(args)
 
         if changenum is None:
-            return self.branch_diff(args), None
+            diff = self.branch_diff(args)
         else:
-            return self.changenum_diff(changenum), None
+            diff = self.changenum_diff(changenum)
+
+        return {
+            'diff': diff,
+        }
 
     def diff_between_revisions(self, revision_range, args, repository_info):
         """
