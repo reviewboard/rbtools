@@ -44,12 +44,13 @@ class ClearCaseClient(SCMClient):
         if viewname.startswith('** NONE'):
             return None
 
-        # Now that we know it's ClearCase, make sure we have GNU diff installed,
-        # and error out if we don't.
+        # Now that we know it's ClearCase, make sure we have GNU diff
+        # installed, and error out if we don't.
         check_gnu_diff()
 
-        property_lines = execute(["cleartool", "lsview", "-full", "-properties",
-                                  "-cview"], split_lines=True)
+        property_lines = execute(
+            ["cleartool", "lsview", "-full", "-properties", "-cview"],
+            split_lines=True)
         for line in property_lines:
             properties = line.split(' ')
             if properties[0] == 'Properties:':
@@ -70,12 +71,12 @@ class ClearCaseClient(SCMClient):
 
         # Find current VOB's tag
         vobstag = execute(["cleartool", "describe", "-short", "vob:."],
-                            ignore_errors=True).strip()
+                          ignore_errors=True).strip()
         if "Error: " in vobstag:
             die("To generate diff run post-review inside vob.")
 
         root_path = execute(["cleartool", "pwv", "-root"],
-                              ignore_errors=True).strip()
+                            ignore_errors=True).strip()
         if "Error: " in root_path:
             die("To generate diff run post-review inside view.")
 
@@ -88,9 +89,9 @@ class ClearCaseClient(SCMClient):
         base_path = cwd[:len(root_path) + len(vobstag)]
 
         return ClearCaseRepositoryInfo(path=base_path,
-                              base_path=base_path,
-                              vobstag=vobstag,
-                              supports_parent_diffs=False)
+                                       base_path=base_path,
+                                       vobstag=vobstag,
+                                       supports_parent_diffs=False)
 
     def _determine_version(self, version_path):
         """Determine numeric version of revision.
@@ -157,7 +158,7 @@ class ClearCaseClient(SCMClient):
         for path, previous, current in changeset:
             changeranges.append(
                 (self._construct_extended_path(path, previous),
-                self._construct_extended_path(path, current))
+                 self._construct_extended_path(path, current))
             )
 
         return changeranges
@@ -216,16 +217,16 @@ class ClearCaseClient(SCMClient):
         else:
             CLEARCASE_XPN = '$CLEARCASE_XPN'
 
-        output = execute([
-            "cleartool",
-            "find",
-            "-all",
-            "-version",
-            "brtype(%s)" % branch,
-            "-exec",
-            'cleartool descr -fmt ' \
-            r'"%En\t%PVn\t%Vn\n" ' \
-            + CLEARCASE_XPN],
+        output = execute(
+            [
+                "cleartool",
+                "find",
+                "-all",
+                "-version",
+                "brtype(%s)" % branch,
+                "-exec",
+                'cleartool descr -fmt "%%En\t%%PVn\t%%Vn\n" %s' % CLEARCASE_XPN
+            ],
             extra_ignore_errors=(1,),
             with_errors=False)
 
@@ -412,8 +413,8 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
 
             logging.debug('Matching repository uuid:%s with path:%s' % (uuid,
                           info['repopath']))
-            return ClearCaseRepositoryInfo(info['repopath'],
-                    info['repopath'], uuid)
+            return ClearCaseRepositoryInfo(
+                info['repopath'], info['repopath'], uuid)
 
         # We didn't found uuid but if version is >= 1.5.3
         # we can try to use VOB's name hoping it is better
@@ -430,9 +431,9 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
 
         property_lines = execute(["cleartool", "lsvob", "-long", vobstag],
                                  split_lines=True)
-        for line  in property_lines:
+        for line in property_lines:
             if line.startswith('Vob family uuid:'):
-                return  line.split(' ')[-1].rstrip()
+                return line.split(' ')[-1].rstrip()
 
     def _get_repository_info(self, server, repository):
         try:

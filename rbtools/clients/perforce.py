@@ -148,7 +148,7 @@ class PerforceClient(SCMClient):
     name = 'Perforce'
 
     DATE_RE = re.compile(r'(\w+)\s+(\w+)\s+(\d+)\s+(\d\d:\d\d:\d\d)\s+'
-                          '(\d\d\d\d)')
+                         '(\d\d\d\d)')
     ENCODED_COUNTER_URL_RE = re.compile('reviewboard.url\.(\S+)')
 
     def __init__(self, p4_class=P4Wrapper, **kwargs):
@@ -291,12 +291,12 @@ class PerforceClient(SCMClient):
 
     def check_options(self):
         if self.options.revision_range:
-            sys.stderr.write("The --revision-range option is not supported "
-                             "for Perforce repositories.  Please use the "
-                             "Perforce range path syntax instead.\n\n"
-                             "See: "
-                             "http://www.reviewboard.org/docs/manual/dev/users/"
-                             "tools/post-review/#posting-paths")
+            sys.stderr.write(
+                "The --revision-range option is not supported for Perforce "
+                "repositories. Please use the Perforce range path syntax "
+                "instead.\n\n"
+                "See: http://www.reviewboard.org/docs/manual/dev/users/tools/"
+                "post-review/#posting-paths")
             sys.exit(1)
 
     def _path_diff(self, args):

@@ -142,8 +142,8 @@ class DeprecatedApiTests(MockHttpUnitTest):
             self.assertEqual(e.http_status, 200)
             self.assertEqual(e.error_code, 100)
             self.assertEqual(e.rsp['stat'], 'fail')
-            self.assertEqual(str(e),
-                             'This is a test failure (HTTP 200, API Error 100)')
+            self.assertEqual(
+                str(e), 'This is a test failure (HTTP 200, API Error 100)')
 
     def test_parse_post_error_http_200(self):
         self.http_response = self.SAMPLE_ERROR_STR
@@ -157,8 +157,8 @@ class DeprecatedApiTests(MockHttpUnitTest):
             self.assertEqual(e.http_status, 200)
             self.assertEqual(e.error_code, 100)
             self.assertEqual(e.rsp['stat'], 'fail')
-            self.assertEqual(str(e),
-                             'This is a test failure (HTTP 200, API Error 100)')
+            self.assertEqual(
+                str(e), 'This is a test failure (HTTP 200, API Error 100)')
 
     def test_parse_get_error_http_400(self):
         self.http_response = self._make_http_error('/foo/', 400,
@@ -173,8 +173,8 @@ class DeprecatedApiTests(MockHttpUnitTest):
             self.assertEqual(e.http_status, 400)
             self.assertEqual(e.error_code, 100)
             self.assertEqual(e.rsp['stat'], 'fail')
-            self.assertEqual(str(e),
-                             'This is a test failure (HTTP 400, API Error 100)')
+            self.assertEqual(
+                str(e), 'This is a test failure (HTTP 400, API Error 100)')
 
     def test_parse_post_error_http_400(self):
         self.http_response = self._make_http_error('/foo/', 400,
@@ -189,8 +189,8 @@ class DeprecatedApiTests(MockHttpUnitTest):
             self.assertEqual(e.http_status, 400)
             self.assertEqual(e.error_code, 100)
             self.assertEqual(e.rsp['stat'], 'fail')
-            self.assertEqual(str(e),
-                             'This is a test failure (HTTP 400, API Error 100)')
+            self.assertEqual(
+                str(e), 'This is a test failure (HTTP 400, API Error 100)')
 
     def _make_http_error(self, url, code, body):
         return urllib2.HTTPError(url, code, body, {}, StringIO(body))

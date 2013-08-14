@@ -1,7 +1,5 @@
-from rbtools.api.resource import CountResource, \
-                                 ItemResource, \
-                                 ListResource, \
-                                 RESOURCE_MAP
+from rbtools.api.resource import (CountResource, ItemResource,
+                                  ListResource, RESOURCE_MAP)
 from rbtools.api.utils import rem_mime_format
 
 

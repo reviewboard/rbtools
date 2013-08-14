@@ -413,8 +413,8 @@ class MercurialTestBase(SCMClientTests):
         self._hg_env = {}
 
     def _hgcmd(self, command, split_lines=False,
-                ignore_errors=False, extra_ignore_errors=(),
-                translate_newlines=True, hg_dir=None):
+               ignore_errors=False, extra_ignore_errors=(),
+               translate_newlines=True, hg_dir=None):
         if hg_dir:
             full_command = ['hg', '--cwd', hg_dir]
         else:
@@ -520,7 +520,7 @@ class MercurialClientTests(MercurialTestBase):
     def testScanForServerSimple(self):
         """Test MercurialClient scan_for_server, simple case"""
         os.rename(self.clone_hgrc_path,
-            os.path.join(self.clone_dir, '._disabled_hgrc'))
+                  os.path.join(self.clone_dir, '._disabled_hgrc'))
 
         self.client.hgrc = {}
         self.client._load_hgrc()
@@ -737,7 +737,7 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self.assertEqual('svn', self.client._type)
         self.assertEqual('/trunk', ri.base_path)
         self.assertEqual('svn://127.0.0.1:%s/svnrepo' % self._svnserve_port,
-                        ri.path)
+                         ri.path)
 
     def testCalculateRepositoryInfo(self):
         """
@@ -1066,7 +1066,8 @@ class PerforceClientTests(SCMClientTests):
         }
 
         diff = client.diff(['12345'])
-        self._compare_diff(diff,
+        self._compare_diff(
+            diff,
             '--- //mydepot/test/README\t//mydepot/test/README#2\n'
             '+++ //mydepot/test/README\t1970-01-01 00:00:00\n'
             '@@ -1 +1 @@\n'
@@ -1205,9 +1206,7 @@ class PerforceClientTests(SCMClientTests):
 
 
 class BazaarClientTests(SCMClientTests):
-    
     def _bzr_cmd(self, command, *args, **kwargs):
-        
         full_command = ["bzr"] + command
 
         result = execute(full_command, *args, **kwargs)
@@ -1218,28 +1217,26 @@ class BazaarClientTests(SCMClientTests):
         """
         Add a file to a Bazaar repository with the content of data and commit
         with msg.
-        
         """
         foo = open(file, "w")
         foo.write(data)
         foo.close()
         self._bzr_cmd(["add", file])
         self._bzr_cmd(["commit", "-m", msg, '--author', 'Test User'])
-    
+
     def _compare_diffs(self, filename, full_diff, expected_diff):
         """
         Test that the full_diff for ``filename`` matches the ``expected_diff``.
-        
         """
         diff_lines = full_diff.splitlines()
-        
+
         self.assertEqual("=== modified file %r" % filename, diff_lines[0])
         self.assert_(diff_lines[1].startswith("--- %s\t" % filename))
         self.assert_(diff_lines[2].startswith("+++ %s\t" % filename))
-        
+
         diff_body = "\n".join(diff_lines[3:])
         self.assertEqual(diff_body, expected_diff)
-    
+
     def setUp(self):
         super(BazaarClientTests, self).setUp()
 
@@ -1379,49 +1376,48 @@ class BazaarClientTests(SCMClientTests):
     def test_guessed_summary_and_description_in_diff(self):
         """Test BazaarClient diff with summary and description guessed"""
         os.chdir(self.child_branch)
-        
+
         self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
         self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
         self._bzr_add_file_commit("foo.txt", FOO3, "commit 3")
-        
+
         self.options.guess_summary = True
         self.options.guess_description = True
         self.client.diff(None)
-        
+
         self.assertEquals("commit 3", self.options.summary)
-        
+
         description = self.options.description
         self.assert_("commit 1" in description, description)
         self.assert_("commit 2" in description, description)
         self.assert_("commit 3" in description, description)
-    
+
     def test_guessed_summary_and_description_in_grand_parent_branch_diff(self):
         """
         Test BazaarClient diff with summary and description guessed for
         grand parent branch.
-        
         """
         os.chdir(self.child_branch)
-        
+
         self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
         self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
         self._bzr_add_file_commit("foo.txt", FOO3, "commit 3")
-        
+
         self.options.guess_summary = True
         self.options.guess_description = True
-        
+
         grand_child_branch = mktemp()
         self._bzr_cmd(["branch", self.child_branch, grand_child_branch])
         os.chdir(grand_child_branch)
-        
+
         # Requesting the diff between the grand child branch and its grand
         # parent:
         self.options.parent_branch = self.original_branch
-        
+
         self.client.diff(None)
-        
+
         self.assertEquals("commit 3", self.options.summary)
-        
+
         description = self.options.description
         self.assert_("commit 1" in description, description)
         self.assert_("commit 2" in description, description)

@@ -352,8 +352,8 @@ class Post(Command):
             try:
                 diff_kwargs = {
                     'parent_diff': parent_diff_content,
-                    'base_dir': self.options.basedir or
-                                repository_info.base_path,
+                    'base_dir': (self.options.basedir or
+                                 repository_info.base_path),
                 }
 
                 if (base_commit_id and
@@ -413,8 +413,8 @@ class Post(Command):
         if self.options.bugs_closed:
             # Append to the existing list of bugs.
             self.options.bugs_closed = self.options.bugs_closed.strip(", ")
-            bug_set = set(re.split("[, ]+", self.options.bugs_closed)) | \
-                      set(review_request.bugs_closed)
+            bug_set = (set(re.split("[, ]+", self.options.bugs_closed)) |
+                       set(review_request.bugs_closed))
             self.options.bugs_closed = ",".join(bug_set)
             update_fields['bugs_closed'] = self.options.bugs_closed
 

@@ -116,16 +116,15 @@ class GitClient(SCMClient):
                                   ignore_errors=True)
                 version_parts = re.search('version (\d+)\.(\d+)\.(\d+)',
                                           version)
-                svn_remote = execute([self.git, "config", "--get",
-                                      "svn-remote.svn.url"],
-                                      ignore_errors=True)
+                svn_remote = execute(
+                    [self.git, "config", "--get", "svn-remote.svn.url"],
+                    ignore_errors=True)
 
-                if (version_parts and
+                if (version_parts and svn_remote and
                     not self.is_valid_version((int(version_parts.group(1)),
                                                int(version_parts.group(2)),
                                                int(version_parts.group(3))),
-                                              (1, 5, 4)) and
-                    svn_remote):
+                                              (1, 5, 4))):
                     die("Your installation of git-svn must be upgraded to "
                         "version 1.5.4 or later")
 
@@ -152,7 +151,8 @@ class GitClient(SCMClient):
         url = None
         if getattr(self.options, 'repository_url', None):
             url = self.options.repository_url
-            self.upstream_branch = self.get_origin(self.upstream_branch, True)[0]
+            self.upstream_branch = self.get_origin(self.upstream_branch,
+                                                   True)[0]
         else:
             self.upstream_branch, origin_url = \
                 self.get_origin(self.upstream_branch, True)
@@ -186,9 +186,9 @@ class GitClient(SCMClient):
                            default_upstream_branch or
                            'origin/master')
         upstream_remote = upstream_branch.split('/')[0]
-        origin_url = execute([self.git, "config", "--get",
-                              "remote.%s.url" % upstream_remote],
-                              ignore_errors=True).rstrip("\n")
+        origin_url = execute(
+            [self.git, "config", "--get", "remote.%s.url" % upstream_remote],
+            ignore_errors=True).rstrip("\n")
         return (upstream_branch, origin_url)
 
     def is_valid_version(self, actual, expected):
@@ -251,7 +251,7 @@ class GitClient(SCMClient):
         if (getattr(self.options, 'guess_summary', None) and
             not getattr(self.options, 'summary', None)):
             s = execute([self.git, "log", "--pretty=format:%s", "HEAD^.."],
-                              ignore_errors=True)
+                        ignore_errors=True)
             self.options.summary = s.replace('\n', ' ').strip()
 
         if (getattr(self.options, 'guess_description', None) and

@@ -6,11 +6,11 @@ except ImportError:
     import simplejson as json
 
 from rbtools.api.errors import APIError
-from rbtools.commands import Command, \
-                             CommandError, \
-                             CommandExit,\
-                             Option, \
-                             ParseError
+from rbtools.commands import (Command,
+                              CommandError,
+                              CommandExit,
+                              Option,
+                              ParseError)
 
 
 class APIGet(Command):

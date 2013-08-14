@@ -94,7 +94,9 @@ class MercurialClient(SCMClient):
         root = _info(r'^Repository Root: (.+)$')
         url = _info(r'^URL: (.+)$')
 
-        if not (root and url): return None
+        if not (root and url):
+            return None
+
         scheme, netloc, path, _, _ = root
         root = urlunparse([scheme, root.netloc.split("@")[-1], path,
                            "", "", ""])
@@ -125,8 +127,9 @@ class MercurialClient(SCMClient):
         """
         Extracts the first line from the description of the given changeset.
         """
-        return execute(['hg', 'log', '-r%s' % revision, '--template',
-                        r'{desc|firstline}'], env=self._hg_env).replace('\n', ' ')
+        return execute(
+            ['hg', 'log', '-r%s' % revision, '--template', '{desc|firstline}'],
+            env=self._hg_env).replace('\n', ' ')
 
     def extract_description(self, rev1, rev2):
         """
@@ -215,7 +218,6 @@ class MercurialClient(SCMClient):
         outgoing_changesets = \
             self._get_outgoing_changesets(current_branch, remote)
 
-
         if outgoing_changesets:
             top_rev, bottom_rev = \
                 self._get_top_and_bottom_outgoing_revs(outgoing_changesets)
@@ -228,7 +230,7 @@ class MercurialClient(SCMClient):
 
         if self.options.guess_description and not self.options.description:
             self.options.description = self.extract_description(bottom_rev,
-                                                                 top_rev)
+                                                                top_rev)
 
         if bottom_rev is not None and top_rev is not None:
             full_command = ['hg', 'diff', '-r', str(bottom_rev), '-r',
@@ -283,9 +285,9 @@ class MercurialClient(SCMClient):
         bottom_rev = min(outgoing_changesets)
 
         for rev in reversed(outgoing_changesets):
-            parents = execute(["hg", "log", "-r", str(rev),
-                               "--template", "{parents}"],
-                               env=self._hg_env)
+            parents = execute(
+                ["hg", "log", "-r", str(rev), "--template", "{parents}"],
+                env=self._hg_env)
             parents = re.split(':[^\s]+\s*', parents)
             parents = [int(p) for p in parents if p != '']
 

@@ -9,8 +9,7 @@ from rbtools.api.capabilities import Capabilities
 from rbtools.api.client import RBClient
 from rbtools.api.errors import APIError, ServerInterfaceError
 from rbtools.clients import scan_usable_client
-from rbtools.utils.filesystem import cleanup_tempfiles, \
-                                     load_config
+from rbtools.utils.filesystem import cleanup_tempfiles, load_config
 from rbtools.utils.process import die
 
 

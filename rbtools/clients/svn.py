@@ -263,7 +263,7 @@ class SVNClient(SCMClient):
                 if copied_from is not None:
                     result.append(from_line.replace(to_file, copied_from))
                 else:
-                    result.append(from_line) #as is, no copy performed
+                    result.append(from_line)  # As is, no copy performed
 
             # We only mangle '---' lines. All others get added straight to
             # the output.
@@ -289,10 +289,10 @@ class SVNClient(SCMClient):
                 front, line = line.split(" ", 1)
 
             if front:
-                if line.startswith('/'): #already absolute
+                if line.startswith('/'):  # Already absolute
                     line = front + " " + line
                 else:
-                    # filename and rest of line (usually the revision
+                    # Filename and rest of line (usually the revision
                     # component)
                     file, rest = self.parse_filename_header(line)
 
@@ -307,7 +307,7 @@ class SVNClient(SCMClient):
                         if info is None:
                             result.append(orig_line)
                             continue
-                        url  = info["URL"]
+                        url = info["URL"]
                         root = info["Repository Root"]
                         path = urllib.unquote(url[len(root):])
 

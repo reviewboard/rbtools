@@ -4,12 +4,12 @@ import unittest
 from rbtools.api.capabilities import Capabilities
 from rbtools.api.factory import create_resource
 from rbtools.api.request import HttpRequest
-from rbtools.api.resource import CountResource, \
-                                 ItemResource, \
-                                 ListResource, \
-                                 ResourceDictField, \
-                                 ResourceLinkField, \
-                                 RootResource
+from rbtools.api.resource import (CountResource,
+                                  ItemResource,
+                                  ListResource,
+                                  ResourceDictField,
+                                  ResourceLinkField,
+                                  RootResource)
 from rbtools.api.transport import Transport
 
 

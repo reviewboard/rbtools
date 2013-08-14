@@ -34,8 +34,9 @@ except ImportError:
 options = None
 configs = []
 
-ADD_REPOSITORY_DOCS_URL = \
-    'http://www.reviewboard.org/docs/manual/dev/admin/configuration/repositories/'
+ADD_REPOSITORY_DOCS_URL = (
+    'http://www.reviewboard.org/docs/manual/dev/admin/configuration/'
+    'repositories/')
 
 
 class HTTPRequest(urllib2.Request):
@@ -57,7 +58,7 @@ class PresetHTTPAuthHandler(urllib2.BaseHandler):
 
     It will only do this once.
     """
-    handler_order = 480 # After Basic auth
+    handler_order = 480  # After Basic auth
 
     def __init__(self, url, password_mgr):
         self.url = url
@@ -150,8 +151,8 @@ class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
     See: http://bugs.python.org/issue974757
     """
     def __init__(self, reviewboard_url, rb_user=None, rb_pass=None):
-        self.passwd  = {}
-        self.rb_url  = reviewboard_url
+        self.passwd = {}
+        self.rb_url = reviewboard_url
         self.rb_user = rb_user
         self.rb_pass = rb_pass
 
@@ -197,7 +198,7 @@ class ReviewBoardServer(object):
         self.deprecated_api = False
         self.rb_version = "0.0.0.0"
         self.cookie_file = cookie_file
-        self.cookie_jar  = cookielib.MozillaCookieJar(self.cookie_file)
+        self.cookie_jar = cookielib.MozillaCookieJar(self.cookie_file)
         self.deprecated_api = False
         self.root_resource = None
 
@@ -211,7 +212,8 @@ class ReviewBoardServer(object):
         password_mgr = ReviewBoardHTTPPasswordMgr(self.url,
                                                   options.username,
                                                   options.password)
-        self.preset_auth_handler = PresetHTTPAuthHandler(self.url, password_mgr)
+        self.preset_auth_handler = PresetHTTPAuthHandler(self.url,
+                                                         password_mgr)
 
         handlers = []
 
@@ -228,7 +230,9 @@ class ReviewBoardServer(object):
         ]
 
         opener = urllib2.build_opener(*handlers)
-        opener.addheaders = [('User-agent', 'RBTools/' + get_package_version())]
+        opener.addheaders = [
+            ('User-agent', 'RBTools/' + get_package_version())
+        ]
         urllib2.install_opener(opener)
 
     def check_api_version(self):
@@ -342,8 +346,8 @@ class ReviewBoardServer(object):
             if '.' not in host:
                 host += '.local'
 
-            debug("Looking for '%s %s' cookie in %s" % \
-                  (host, path, self.cookie_file))
+            debug("Looking for '%s %s' cookie in %s"
+                  % (host, path, self.cookie_file))
 
             try:
                 cookie = self.cookie_jar._cookies[host][path]['rbsessionid']
@@ -433,7 +437,7 @@ class ReviewBoardServer(object):
                 review_request_href = links['review_requests']['href']
                 rsp = self.api_post(review_request_href, data)
         except APIError, e:
-            if e.error_code == 204: # Change number in use
+            if e.error_code == 204:  # Change number in use
                 rsp = e.rsp
 
                 if options.diff_only:
@@ -443,7 +447,7 @@ class ReviewBoardServer(object):
                     debug("Review request already exists. Updating it...")
                     self.update_review_request_from_changenum(
                         changenum, rsp['review_request'])
-            elif e.error_code == 206: # Invalid repository
+            elif e.error_code == 206:  # Invalid repository
                 sys.stderr.write('\n')
                 sys.stderr.write('There was an error creating this review '
                                  'request.\n')
@@ -546,8 +550,8 @@ class ReviewBoardServer(object):
         Saves a draft of a review request.
         """
         if self.deprecated_api:
-            self.api_post('api/json/reviewrequests/%s/draft/save/' % \
-                          review_request['id'])
+            self.api_post('api/json/reviewrequests/%s/draft/save/'
+                          % review_request['id'])
         else:
             self.api_put(review_request['links']['draft']['href'], {
                 'public': 1,
@@ -739,8 +743,8 @@ class ReviewBoardServer(object):
             except AttributeError:
                 pass
 
-            die("Unable to access %s. The host path may be invalid\n%s" % \
-                (url, e))
+            die("Unable to access %s. The host path may be invalid\n%s"
+                % (url, e))
 
     def http_put(self, path, fields):
         """
@@ -775,8 +779,8 @@ class ReviewBoardServer(object):
             except AttributeError:
                 pass
 
-            die("Unable to access %s. The host path may be invalid\n%s" % \
-                (url, e))
+            die("Unable to access %s. The host path may be invalid\n%s"
+                % (url, e))
 
     def http_delete(self, path):
         """
@@ -803,8 +807,8 @@ class ReviewBoardServer(object):
             except AttributeError:
                 pass
 
-            die("Unable to access %s. The host path may be invalid\n%s" % \
-                (url, e))
+            die("Unable to access %s. The host path may be invalid\n%s"
+                % (url, e))
 
     def api_post(self, path, fields=None, files=None):
         """
@@ -910,8 +914,8 @@ def tempt_fate(server, tool, changenum, diff_content=None,
 
         if options.bugs_closed:     # append to existing list
             options.bugs_closed = options.bugs_closed.strip(", ")
-            bug_set = set(re.split("[, ]+", options.bugs_closed)) | \
-                      set(review_request['bugs_closed'])
+            bug_set = (set(re.split("[, ]+", options.bugs_closed)) |
+                       set(review_request['bugs_closed']))
             options.bugs_closed = ",".join(bug_set)
             server.set_review_request_field(review_request, 'bugs_closed',
                                             options.bugs_closed)
@@ -925,10 +929,11 @@ def tempt_fate(server, tool, changenum, diff_content=None,
                                             options.testing_done)
 
         if options.change_description:
-            server.set_review_request_field(review_request, 'changedescription',
+            server.set_review_request_field(review_request,
+                                            'changedescription',
                                             options.change_description)
     except APIError, e:
-        if e.error_code == 103: # Not logged in
+        if e.error_code == 103:  # Not logged in
             retries = retries - 1
 
             # We had an odd issue where the server ended up a couple of
@@ -947,7 +952,6 @@ def tempt_fate(server, tool, changenum, diff_content=None,
         else:
             die("Error creating review request: %s" % e)
 
-
     if not server.info.supports_changesets or not options.change_only:
         try:
             server.upload_diff(review_request, diff_content,
@@ -958,7 +962,8 @@ def tempt_fate(server, tool, changenum, diff_content=None,
             sys.stderr.write('\n')
 
             if e.error_code == 101 and e.http_status == 403:
-                die('You do not have permissions to modify this review request\n')
+                die('You do not have permissions to modify this review '
+                    'request\n')
             elif e.error_code == 219:
                 sys.stderr.write('The generated diff file was empty. This '
                                  'usually means no files were\n')
@@ -1276,7 +1281,8 @@ def main():
     debug('Home = %s' % homepath)
     debug('Current Directory = %s' % os.getcwd())
 
-    debug('Checking the repository type. Errors shown below are mostly harmless.')
+    debug('Checking the repository type. Errors shown below are mostly '
+          'harmless.')
     repository_info, tool = scan_usable_client(
         options,
         client_name=options.repository_type)
@@ -1375,7 +1381,7 @@ def main():
             elif 'open_new' in dir(webbrowser):
                 webbrowser.open_new(review_url)
             else:
-                os.system( 'start %s' % review_url )
+                os.system('start %s' % review_url)
         except:
             print 'Error opening review URL: %s' % review_url
 

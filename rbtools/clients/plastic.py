@@ -30,8 +30,8 @@ class PlasticClient(SCMClient):
         logging.debug("Workspace is %s" % self.workspacedir)
 
         # Get the repository that the current directory is from
-        split = execute(["cm", "ls", self.workspacedir, "--format={8}"], split_lines=True,
-                        ignore_errors=True)
+        split = execute(["cm", "ls", self.workspacedir, "--format={8}"],
+                        split_lines=True, ignore_errors=True)
 
         # remove blank lines
         split = filter(None, split)
@@ -83,7 +83,8 @@ class PlasticClient(SCMClient):
         This doesn't make much sense in Plastic SCM 4.
         We'll only implement revisions for changests and branches
         """
-        die("This option is not supported. Only reviews of a changeset or branch are supported")
+        die("This option is not supported. Only reviews of a changeset or "
+            "branch are supported")
 
     def branch_diff(self, args):
         logging.debug("branch diff: %s" % (args))
@@ -97,25 +98,24 @@ class PlasticClient(SCMClient):
             self.options.branch = branch
 
         diff_entries = execute(["cm", "diff", branch,
-                         "--format={status} {path} "
-                         "rev:revid:{revid} rev:revid:{parentrevid} "
-                         "src:{srccmpath} "
-                         "dst:{dstcmpath}{newline}"],
-                         split_lines = True)
+                                "--format={status} {path} "
+                                "rev:revid:{revid} rev:revid:{parentrevid} "
+                                "src:{srccmpath} "
+                                "dst:{dstcmpath}{newline}"],
+                               split_lines=True)
 
         logging.debug("got files: %s" % (diff_entries))
         return self.process_diffs(diff_entries)
-
 
     def changenum_diff(self, changenum):
         logging.debug("changenum_diff: %s" % (changenum))
 
         diff_entries = execute(["cm", "diff", "cs:" + changenum,
-                         "--format={status} {path} "
-                         "rev:revid:{revid} rev:revid:{parentrevid} "
-                         "src:{srccmpath} "
-                         "dst:{dstcmpath}{newline}"],
-                         split_lines = True)
+                                "--format={status} {path} "
+                                "rev:revid:{revid} rev:revid:{parentrevid} "
+                                "src:{srccmpath} "
+                                "dst:{dstcmpath}{newline}"],
+                               split_lines=True)
 
         logging.debug("got files: %s" % (diff_entries))
         return self.process_diffs(diff_entries)
@@ -156,49 +156,47 @@ class PlasticClient(SCMClient):
 
                 self.write_file(oldfilename, oldspec, tmp_diff_from_filename)
                 dl = self.diff_files(tmp_diff_from_filename, empty_filename,
-                                    oldfilename, "rev:revid:-1", oldspec,
-                                    changetype)
+                                     oldfilename, "rev:revid:-1", oldspec,
+                                     changetype)
                 diff_lines += dl
 
                 self.write_file(newfilename, newspec, tmp_diff_to_filename)
                 dl = self.diff_files(empty_filename, tmp_diff_to_filename,
-                                    newfilename, newspec, "rev:revid:-1",
-                                    changetype)
+                                     newfilename, newspec, "rev:revid:-1",
+                                     changetype)
                 diff_lines += dl
 
             else:
                 newrevspec = m.group("revspec")
                 parentrevspec = m.group("parentrevspec")
 
-                logging.debug("Type %s File %s Old %s New %s" % (changetype,
-                                                         filename,
-                                                         parentrevspec,
-                                                         newrevspec))
+                logging.debug("Type %s File %s Old %s New %s"
+                              % (changetype, filename, parentrevspec,
+                                 newrevspec))
 
                 old_file = new_file = empty_filename
 
                 if (changetype in ['A'] or
-                    (changetype in ['C'] and
-                    parentrevspec == "rev:revid:-1")):
+                    (changetype in ['C'] and parentrevspec == "rev:revid:-1")):
                     # There's only one content to show
                     self.write_file(filename, newrevspec, tmp_diff_to_filename)
                     new_file = tmp_diff_to_filename
                 elif changetype in ['C']:
                     self.write_file(filename, parentrevspec,
-                                tmp_diff_from_filename)
+                                    tmp_diff_from_filename)
                     old_file = tmp_diff_from_filename
                     self.write_file(filename, newrevspec, tmp_diff_to_filename)
                     new_file = tmp_diff_to_filename
                 elif changetype in ['D']:
                     self.write_file(filename, parentrevspec,
-                                tmp_diff_from_filename)
+                                    tmp_diff_from_filename)
                     old_file = tmp_diff_from_filename
                 else:
                     die("Don't know how to handle change type '%s' for %s" %
                         (changetype, filename))
 
                 dl = self.diff_files(old_file, new_file, filename,
-                                 newrevspec, parentrevspec, changetype)
+                                     newrevspec, parentrevspec, changetype)
                 diff_lines += dl
 
         os.unlink(empty_filename)
@@ -226,7 +224,7 @@ class PlasticClient(SCMClient):
 
         diff_cmd = ["diff", "-urN", old_file, new_file]
         # Diff returns "1" if differences were found.
-        dl = execute(diff_cmd, extra_ignore_errors=(1,2),
+        dl = execute(diff_cmd, extra_ignore_errors=(1, 2),
                      translate_newlines = False)
 
         # If the input file has ^M characters at end of line, lets ignore them.
@@ -261,6 +259,6 @@ class PlasticClient(SCMClient):
 
     def write_file(self, filename, filespec, tmpfile):
         """ Grabs a file from Plastic and writes it to a temp file """
-        logging.debug("Writing '%s' (rev %s) to '%s'" % (filename, filespec, tmpfile))
+        logging.debug("Writing '%s' (rev %s) to '%s'"
+                      % (filename, filespec, tmpfile))
         execute(["cm", "cat", filespec, "--file=" + tmpfile])
-
