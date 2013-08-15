@@ -128,8 +128,18 @@ class GitClient(SCMClient):
                     die("Your installation of git-svn must be upgraded to "
                         "version 1.5.4 or later")
 
-        # Okay, maybe Perforce.
-        # TODO
+        # Okay, maybe Perforce (git-p4).
+        git_p4_ref = os.path.join(git_dir, 'refs', 'remotes', 'p4', 'master')
+        data = execute([self.git, 'config', '--get', 'git-p4.port'],
+                       ignore_errors=True)
+        m = re.search(r'(.+)', data)
+        if m and os.path.exists(git_p4_ref):
+            port = m.group(1)
+            self.type = 'perforce'
+            self.upstream_branch = 'remotes/p4/master'
+            return RepositoryInfo(path=port,
+                                  base_path='',
+                                  supports_parent_diffs=True)
 
         # Nope, it's git then.
         # Check for a tracking branch and determine merge-base
@@ -224,6 +234,11 @@ class GitClient(SCMClient):
 
             if prop:
                 return prop
+        elif self.type == 'perforce':
+            prop = PerforceClient().scan_for_server(repository_info)
+
+            if prop:
+                return prop
 
         return None
 
@@ -232,7 +247,11 @@ class GitClient(SCMClient):
         Performs a diff across all modified files in the branch, taking into
         account a parent branch.
         """
-        parent_branch = self.options.parent_branch
+        if self.type == 'perforce':
+            parent_branch = self.options.parent_branch or 'p4'
+        else:
+            parent_branch = self.options.parent_branch
+
         head_ref = "HEAD"
         if self.head_ref:
             head_ref = self.head_ref
@@ -282,6 +301,11 @@ class GitClient(SCMClient):
                                   rev_range],
                                  split_lines=True)
             return self.make_svn_diff(ancestor, diff_lines)
+        elif self.type == "perforce":
+            diff_lines = execute([self.git, "diff", "--no-color",
+                                  "--no-prefix", "-r", "-u", rev_range],
+                                 split_lines=True)
+            return self.make_perforce_diff(ancestor, diff_lines)
         elif self.type == "git":
             cmdline = [self.git, "diff", "--no-color", "--full-index",
                        "--no-ext-diff", "--ignore-submodules", "--no-renames",
@@ -350,6 +374,57 @@ class GitClient(SCMClient):
                 # added/changed.
                 diff_data += "Cannot display: file marked as a binary type.\n"
                 diff_data += "svn:mime-type = application/octet-stream\n"
+            else:
+                diff_data += line
+
+        return diff_data
+
+    def make_perforce_diff(self, parent_branch, diff_lines):
+        """Format the output of git diff to look more like perforce's."""
+        diff_data = ''
+        filename = ''
+        p4rev = ''
+        newfile = False
+
+        # Find which depot changelist we're based on
+        log = execute([self.git, 'log', parent_branch], ignore_errors=True)
+
+        for line in log:
+            m = re.search(r'repo-paths = "(.+)": change = (\d+)\]', log, re.M)
+            if m:
+                base_path = m.group(1).strip()
+                p4rev = m.group(2).strip()
+                break
+
+        for line in diff_lines:
+            if line.startswith('diff '):
+                # Grab the filename and then filter this out.
+                # This will be in the format of:
+                #    diff --git a/path/to/file b/path/to/file
+                filename = line.split(' ')[2].strip()
+            elif (line.startswith('index ') or
+                  line.startswith('new file mode ')):
+                # Filter this out
+                pass
+            elif line.startswith('--- '):
+                data = execute(
+                    ['p4', 'files', base_path + filename + '@' + p4rev],
+                    ignore_errors=True)
+                m = re.search(r'^%s%s#(\d+).*$' % (re.escape(base_path),
+                                                   re.escape(filename)),
+                              data, re.M)
+                if m:
+                    fileVersion = m.group(1).strip()
+                else:
+                    fileVersion = 1
+
+                diff_data += '--- %s%s\t%s%s#%s\n' % (base_path, filename,
+                                                      base_path, filename,
+                                                      fileVersion)
+            elif line.startswith('+++ '):
+                # TODO: add a real timestamp
+                diff_data += '+++ %s%s\t%s\n' % (base_path, filename,
+                                                 'TIMESTAMP')
             else:
                 diff_data += line
 
