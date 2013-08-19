@@ -269,9 +269,9 @@ class GitClient(SCMClient):
 
         if (getattr(self.options, 'guess_summary', None) and
             not getattr(self.options, 'summary', None)):
-            s = execute([self.git, "log", "--pretty=format:%s", "HEAD^.."],
-                        ignore_errors=True)
-            self.options.summary = s.replace('\n', ' ').strip()
+            self.options.summary = execute(
+                [self.git, "log", "--pretty=format:%s", "HEAD^!"],
+                ignore_errors=True).strip()
 
         if (getattr(self.options, 'guess_description', None) and
             not getattr(self.options, 'description', None)):
@@ -457,9 +457,9 @@ class GitClient(SCMClient):
                                                    revision_range)
 
             if self.options.guess_summary and not self.options.summary:
-                s = execute([self.git, "log", "--pretty=format:%s",
-                             revision_range + ".."], ignore_errors=True)
-                self.options.summary = s.replace('\n', ' ').strip()
+                self.options.summary = execute(
+                    [self.git, "log", "--pretty=format:%s", "HEAD^!"],
+                    ignore_errors=True).strip()
 
             if (self.options.guess_description and
                 not self.options.description):
@@ -481,9 +481,9 @@ class GitClient(SCMClient):
                 parent_diff_lines = self.make_diff(self.merge_base, r1)
 
             if self.options.guess_summary and not self.options.summary:
-                s = execute([self.git, "log", "--pretty=format:%s",
-                             "%s..%s" % (r1, r2)], ignore_errors=True)
-                self.options.summary = s.replace('\n', ' ').strip()
+                self.options.summary = execute(
+                    [self.git, "log", "--pretty=format:%s", "%s^!" % r2],
+                    ignore_errors=True).strip()
 
             if (self.options.guess_description and
                 not self.options.description):
