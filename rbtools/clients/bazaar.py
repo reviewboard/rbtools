@@ -22,8 +22,9 @@ class BazaarClient(SCMClient):
     # For branches with shared repositories, Bazaar reports
     # "repository branch: /foo", but for standalone branches it reports
     # "branch root: /foo".
-    BRANCH_REGEX = (r'\w*(repository branch|branch root|checkout root): '
-                    r'(?P<branch_path>.+)$')
+    BRANCH_REGEX = (
+        r'\w*(repository branch|branch root|checkout root|checkout of branch):'
+        r' (?P<branch_path>.+)$')
 
     def get_repository_info(self):
         """
