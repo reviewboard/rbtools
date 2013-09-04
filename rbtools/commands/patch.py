@@ -20,6 +20,11 @@ class Patch(Command):
                dest="px",
                default=None,
                help="numerical pX argument for patch"),
+        Option("--print",
+               dest="patch_stdout",
+               action="store_true",
+               default=False,
+               help="print patch to stdout instead of applying"),
         Option("--server",
                dest="server",
                metavar="SERVER",
@@ -100,6 +105,8 @@ class Patch(Command):
             self.options.diff_revision)
 
         tmp_patch_file = make_tempfile(diff_body)
-
-        self.apply_patch(repository_info, tool, request_id, diff_revision,
-                         tmp_patch_file, base_dir)
+        if self.options.patch_stdout:
+            print diff_body
+        else:
+            self.apply_patch(repository_info, tool, request_id, diff_revision,
+                             tmp_patch_file, base_dir)
