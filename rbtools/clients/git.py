@@ -444,55 +444,35 @@ class GitClient(SCMClient):
                                    head_ref]).strip()
 
         if ":" not in revision_range:
-            # only one revision is specified
+            # only one revision is specified, diff against its
+            # immediate parent
+            revision_range = revision_range + "^:" + revision_range
 
-            # Check if parent contains the first revision and make a
-            # parent diff if not:
-            pdiff_required = execute([self.git, "branch", "-r",
-                                      "--contains", revision_range])
-            parent_diff_lines = None
+        # Get revision 1 and 2 from the range.
+        r1, r2 = revision_range.split(":")
 
-            if not pdiff_required:
-                parent_diff_lines = self.make_diff(self.merge_base,
-                                                   revision_range)
+        # Check if parent contains the first revision and make a
+        # parent diff if not:
+        pdiff_required = execute([self.git, "branch", "-r",
+                                  "--contains", r1])
+        parent_diff_lines = None
 
-            if self.options.guess_summary and not self.options.summary:
-                self.options.summary = execute(
-                    [self.git, "log", "--pretty=format:%s", "HEAD^!"],
-                    ignore_errors=True).strip()
+        if not pdiff_required:
+            parent_diff_lines = self.make_diff(self.merge_base, r1)
 
-            if (self.options.guess_description and
-                not self.options.description):
-                self.options.description = execute(
-                    [self.git, "log", "--pretty=format:%s%n%n%b",
-                     revision_range + ".."],
-                    ignore_errors=True).strip()
+        if self.options.guess_summary and not self.options.summary:
+            self.options.summary = execute(
+                [self.git, "log", "--pretty=format:%s", "%s^!" % r2],
+                ignore_errors=True).strip()
 
-            diff_lines = self.make_diff(revision_range)
-        else:
-            r1, r2 = revision_range.split(":")
-            # Check if parent contains the first revision and make a
-            # parent diff if not:
-            pdiff_required = execute([self.git, "branch", "-r",
-                                      "--contains", r1])
-            parent_diff_lines = None
+        if (self.options.guess_description and
+            not self.options.description):
+            self.options.description = execute(
+                [self.git, "log", "--pretty=format:%s%n%n%b",
+                 "%s..%s" % (r1, r2)],
+                ignore_errors=True).strip()
 
-            if not pdiff_required:
-                parent_diff_lines = self.make_diff(self.merge_base, r1)
-
-            if self.options.guess_summary and not self.options.summary:
-                self.options.summary = execute(
-                    [self.git, "log", "--pretty=format:%s", "%s^!" % r2],
-                    ignore_errors=True).strip()
-
-            if (self.options.guess_description and
-                not self.options.description):
-                self.options.description = execute(
-                    [self.git, "log", "--pretty=format:%s%n%n%b",
-                     "%s..%s" % (r1, r2)],
-                    ignore_errors=True).strip()
-
-            diff_lines = self.make_diff(r1, r2)
+        diff_lines = self.make_diff(r1, r2)
 
         return {
             'diff': diff_lines,
