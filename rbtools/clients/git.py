@@ -390,7 +390,7 @@ class GitClient(SCMClient):
         log = execute([self.git, 'log', parent_branch], ignore_errors=True)
 
         for line in log:
-            m = re.search(r'repo-paths = "(.+)": change = (\d+)\]', log, re.M)
+            m = re.search(r'depot-paths = "(.+)": change = (\d+)\]', log, re.M)
             if m:
                 base_path = m.group(1).strip()
                 p4rev = m.group(2).strip()
