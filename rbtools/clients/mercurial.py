@@ -264,9 +264,14 @@ class MercurialClient(SCMClient):
 
             # Ignore warning messages that hg might put in, such as
             # "warning: certificate for foo can't be verified (Python too old)"
-            branch, rev = [l for l in pair.strip().split('\n')
-                           if not l.startswith('warning: ')]
+            parts = [l for l in pair.strip().split('\n')
+                     if not l.startswith('warning: ')]
 
+            if not parts:
+                # We only got warnings. Nothing useful.
+                continue
+
+            branch, rev = parts
             branch_name = branch[len('b:'):].strip()
             branch_name = branch_name or 'default'
             revno = rev[len('r:'):]
