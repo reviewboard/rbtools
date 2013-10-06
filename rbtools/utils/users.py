@@ -19,7 +19,7 @@ def get_user(api_client, api_root, auth_required=False):
         if not auth_required:
             return None
 
-        logging.warning('You are not authenticated with the Review Board'
+        logging.warning('You are not authenticated with the Review Board '
                         'server at %s, please login.' % api_client.url)
         sys.stderr.write('Username: ')
         username = raw_input()
