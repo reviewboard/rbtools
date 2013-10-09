@@ -32,8 +32,6 @@ except ImportError:
     use_setuptools()
     from setuptools import setup, find_packages
 
-from setuptools.command.test import test
-
 from rbtools import get_package_version, is_release, VERSION
 
 

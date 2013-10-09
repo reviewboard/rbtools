@@ -3,6 +3,7 @@ import re
 import sys
 
 from rbtools.clients import SCMClient, RepositoryInfo
+from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.svn import SVNClient, SVNRepositoryInfo
 from rbtools.utils.checks import check_install
 from rbtools.utils.process import die, execute
@@ -384,7 +385,6 @@ class GitClient(SCMClient):
         diff_data = ''
         filename = ''
         p4rev = ''
-        newfile = False
 
         # Find which depot changelist we're based on
         log = execute([self.git, 'log', parent_branch], ignore_errors=True)
