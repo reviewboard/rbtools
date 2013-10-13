@@ -87,12 +87,14 @@ class Diff(Command):
         api_client, api_root = self.get_api(server_url)
         self.setup_tool(tool, api_root=api_root)
 
-        diff, parent_diff = get_diff(
+        diff_info = get_diff(
             tool,
             repository_info,
             revision_range=self.options.revision_range,
             svn_changelist=self.options.svn_changelist,
             files=args)
+
+        diff = diff_info['diff']
 
         if diff:
             print diff
