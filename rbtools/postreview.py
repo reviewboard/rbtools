@@ -2,6 +2,7 @@
 import base64
 import cookielib
 import getpass
+import httplib
 import logging
 import mimetools
 import os
@@ -96,7 +97,7 @@ class ReviewBoardHTTPErrorProcessor(urllib2.HTTPErrorProcessor):
     anything in the 200 range is a success.
     """
     def http_response(self, request, response):
-        if not (200 <= response.code < 300):
+        if not (httplib.OK <= response.code < httplib.MULTIPLE_CHOICES):
             response = self.parent.error('http', request, response,
                                          response.code, response.msg,
                                          response.info())
@@ -131,7 +132,7 @@ class ReviewBoardHTTPBasicAuthHandler(urllib2.HTTPBasicAuthHandler):
             response = urllib2.HTTPBasicAuthHandler.retry_http_basic_auth(
                 self, *args, **kwargs)
 
-            if response.code != 401:
+            if response.code != httplib.UNAUTHORIZED:
                 self._retried = False
 
             return response
@@ -249,13 +250,13 @@ class ReviewBoardServer(object):
                 debug('Using the new web API')
                 return True
         except APIError, e:
-            if e.http_status not in (401, 404):
+            if e.http_status not in (httplib.UNAUTHORIZED, httplib.NOT_FOUND):
                 # We shouldn't reach this. If there's a permission denied
                 # from lack of logging in, then the basic auth handler
                 # should have hit it.
                 #
                 # However in some versions it wants you to be logged in
-                # and returns a 401 from the application after you've
+                # and returns an UNAUTHORIZED from the application after you've
                 # done your http basic auth
                 die("Unable to access the root /api/ URL on the server.")
 
@@ -961,7 +962,7 @@ def tempt_fate(server, tool, changenum, diff_content=None,
             sys.stderr.write('Error uploading diff\n')
             sys.stderr.write('\n')
 
-            if e.error_code == 101 and e.http_status == 403:
+            if e.error_code == 101 and e.http_status == httplib.FORBIDDEN:
                 die('You do not have permissions to modify this review '
                     'request\n')
             elif e.error_code == 219:
