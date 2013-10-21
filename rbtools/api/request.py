@@ -222,6 +222,7 @@ class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
     """
     def __init__(self, reviewboard_url, rb_user=None, rb_pass=None,
                  auth_callback=None):
+        urllib2.HTTPPasswordMgr.__init__(self)
         self.passwd = {}
         self.rb_url = reviewboard_url
         self.rb_user = rb_user

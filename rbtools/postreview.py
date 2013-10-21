@@ -152,6 +152,7 @@ class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
     See: http://bugs.python.org/issue974757
     """
     def __init__(self, reviewboard_url, rb_user=None, rb_pass=None):
+        urllib2.HTTPPasswordMgr.__init__(self)
         self.passwd = {}
         self.rb_url = reviewboard_url
         self.rb_user = rb_user
