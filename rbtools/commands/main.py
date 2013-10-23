@@ -1,5 +1,6 @@
 import os
 import pkg_resources
+import signal
 import subprocess
 import sys
 from optparse import OptionParser
@@ -66,6 +67,10 @@ def help(args, parser):
 
 def main():
     """Execute a command."""
+    def exit_on_int(sig, frame):
+        sys.exit(128 + sig)
+    signal.signal(signal.SIGINT, exit_on_int)
+
     parser = OptionParser(prog=RB_MAIN,
                           usage='%prog [--version] <command> [options]'
                                 ' [<args>]',

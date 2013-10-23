@@ -8,6 +8,7 @@ import mimetools
 import os
 import platform
 import re
+import signal
 import sys
 import urllib2
 from optparse import OptionParser
@@ -1258,6 +1259,10 @@ def parse_options(args):
 
 
 def main():
+    def exit_on_int(sig, frame):
+        sys.exit(128 + sig)
+    signal.signal(signal.SIGINT, exit_on_int)
+
     origcwd = os.path.abspath(os.getcwd())
 
     if 'APPDATA' in os.environ:
