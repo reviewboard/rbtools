@@ -231,9 +231,10 @@ class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
 
     def find_user_password(self, realm, uri):
         if realm == 'Web API':
-            if (self.auth_callback and (
-                self.rb_user is None or self.rb_pass is None)):
-                username, password = self.auth_callback(realm, uri)
+            if self.auth_callback:
+                username, password = self.auth_callback(realm, uri,
+                                                        username=self.rb_user,
+                                                        password=self.rb_pass)
                 self.rb_user = username
                 self.rb_pass = password
 

@@ -221,14 +221,20 @@ class Command(object):
             die('HTTP authentication is required, but cannot be '
                 'used with --diff-filename=-')
 
-        print "==> HTTP Authentication Required"
-        print 'Enter authorization information for "%s" at %s' % \
-            (realm, urlparse(uri)[1])
-        # getpass will write its prompt to stderr but raw_input
-        # writes to stdout. See bug 2831.
-        sys.stderr.write('Username: ')
-        username = raw_input()
-        password = getpass.getpass('Password: ')
+        username = getattr(self.options, 'username', None)
+        password = getattr(self.options, 'password', None)
+
+        if username is None or password is None:
+            print "==> HTTP Authentication Required"
+            print 'Enter authorization information for "%s" at %s' % \
+                (realm, urlparse(uri)[1])
+            # getpass will write its prompt to stderr but raw_input
+            # writes to stdout. See bug 2831.
+            if username is None:
+                sys.stderr.write('Username: ')
+                username = raw_input()
+            if password is None:
+                password = getpass.getpass('Password: ')
 
         return username, password
 
