@@ -84,7 +84,8 @@ class SVNClient(SCMClient):
 
     def scan_for_server_property(self, repository_info):
         def get_url_prop(path):
-            url = execute(["svn", "propget", "reviewboard:url", path]).strip()
+            url = execute(["svn", "propget", "reviewboard:url", path],
+                          with_errors=False).strip()
             return url or None
 
         for path in walk_parents(os.getcwd()):
