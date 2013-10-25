@@ -203,7 +203,7 @@ class ReviewBoardHTTPBasicAuthHandler(urllib2.HTTPBasicAuthHandler):
             response = urllib2.HTTPBasicAuthHandler.retry_http_basic_auth(
                 self, *args, **kwargs)
 
-            if response and response.code != 401:
+            if response and response.code != httplib.UNAUTHORIZED:
                 self._retried = False
 
             return response
