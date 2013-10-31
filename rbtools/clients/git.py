@@ -496,7 +496,7 @@ class GitClient(SCMClient):
 
         return {
             'diff': diff_lines,
-            'parent_diff_lines': parent_diff_lines,
+            'parent_diff': parent_diff_lines,
             'base_commit_id': self.merge_base,
         }
 

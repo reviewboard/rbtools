@@ -63,6 +63,12 @@ class GitClientTests(SCMClientTests):
         if not self.is_exe_in_path('git'):
             raise SkipTest('git not found in path')
 
+        gitconfig = open(os.path.join(self.get_user_home(), '.gitconfig'), 'w')
+        gitconfig.write("[user]\n")
+        gitconfig.write("\tname = test\n")
+        gitconfig.write("\temail = test@test.com\n")
+        gitconfig.close()
+
         self.git_dir = self.chdir_tmp()
         self._gitcmd(['init'], git_dir=self.git_dir)
         foo = open(os.path.join(self.git_dir, 'foo.txt'), 'w')
