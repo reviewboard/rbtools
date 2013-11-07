@@ -1,5 +1,6 @@
 import base64
 import cookielib
+import httplib
 import logging
 import mimetools
 import mimetypes
