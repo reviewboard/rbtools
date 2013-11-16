@@ -96,7 +96,7 @@ class Resource(object):
     _excluded_attrs = []
 
     def __init__(self, transport, payload, url, token=None, **kwargs):
-        self.url = url
+        self._url = url
         self._transport = transport
         self._token = token
         self._payload = payload
@@ -299,7 +299,7 @@ class ItemResource(Resource):
             self.__class__.__name__,
             self._transport,
             self._payload,
-            self.url,
+            self._url,
             self._token)
 
 
@@ -329,7 +329,7 @@ class CountResource(ItemResource):
         # RB treats the  argument being set to any value
         # as true.
         kwargs.update({'counts_only': False})
-        return HttpRequest(self.url, query_args=kwargs)
+        return HttpRequest(self._url, query_args=kwargs)
 
 
 class ListResource(Resource):
@@ -407,7 +407,7 @@ class ListResource(Resource):
     @request_method_decorator
     def get_item(self, pk, **kwargs):
         """Retrieve the item resource with the corresponding primary key."""
-        return HttpRequest(urlparse.urljoin(self.url, '%s/' % pk),
+        return HttpRequest(urlparse.urljoin(self._url, '%s/' % pk),
                            query_args=kwargs)
 
     def __repr__(self):
@@ -415,7 +415,7 @@ class ListResource(Resource):
                 'item_mime_type=%r)' % (self.__class__.__name__,
                                         self._transport,
                                         self._payload,
-                                        self.url,
+                                        self._url,
                                         self._token,
                                         self._item_mime_type))
 
@@ -482,7 +482,7 @@ class DiffListResource(ListResource):
         The diff and parent_diff arguments should be strings containing
         the diff output.
         """
-        request = HttpRequest(self.url, method='POST', query_args=kwargs)
+        request = HttpRequest(self._url, method='POST', query_args=kwargs)
         request.add_file('path', 'diff', diff)
 
         if parent_diff:
@@ -508,7 +508,7 @@ class DiffResource(ItemResource):
     @request_method_decorator
     def get_patch(self, **kwargs):
         """Retrieves the actual diff file contents."""
-        request = HttpRequest(self.url, query_args=kwargs)
+        request = HttpRequest(self._url, query_args=kwargs)
         request.headers['Accept'] = 'text/x-patch'
         return request
 
@@ -520,14 +520,14 @@ class FileDiffResource(ItemResource):
     @request_method_decorator
     def get_patch(self, **kwargs):
         """Retrieves the actual diff file contents."""
-        request = HttpRequest(self.url, query_args=kwargs)
+        request = HttpRequest(self._url, query_args=kwargs)
         request.headers['Accept'] = 'text/x-patch'
         return request
 
     @request_method_decorator
     def get_diff_data(self, **kwargs):
         """Retrieves the actual raw diff data for the file."""
-        request = HttpRequest(self.url, query_args=kwargs)
+        request = HttpRequest(self._url, query_args=kwargs)
         request.headers['Accept'] = \
             'application/vnd.reviewboard.org.diff.data+json'
         return request
@@ -544,7 +544,7 @@ class FileAttachmentListResource(ListResource):
         The content argument should contain the body of the file to be
         uploaded, in string format.
         """
-        request = HttpRequest(self.url, method='POST', query_args=kwargs)
+        request = HttpRequest(self._url, method='POST', query_args=kwargs)
         request.add_file('path', filename, content)
 
         if caption:
@@ -573,7 +573,7 @@ class ScreenshotListResource(ListResource):
         The content argument should contain the body of the screenshot
         to be uploaded, in string format.
         """
-        request = HttpRequest(self.url, method='POST', query_args=kwargs)
+        request = HttpRequest(self._url, method='POST', query_args=kwargs)
         request.add_file('path', filename, content)
 
         if caption:
