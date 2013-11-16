@@ -48,6 +48,10 @@ Options
 
    Numerical pX argument for patch.
 
+.. cmdoption:: -c, --commit
+
+   Commit using information fetched from the review request (Git only).
+
 .. cmdoption:: --server
 
    Specify a different Review Board server to use.

@@ -6,6 +6,7 @@ from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.svn import SVNClient, SVNRepositoryInfo
 from rbtools.utils.checks import check_install
+from rbtools.utils.console import edit_text
 from rbtools.utils.process import die, execute
 
 
@@ -503,6 +504,15 @@ class GitClient(SCMClient):
             'base_commit_id': self.merge_base,
         }
 
+    def has_pending_changes(self):
+        """Checks if there are changes waiting to be committed.
+
+        Returns True if the working directory has been modified or if changes
+        have been staged in the index, otherwise returns False.
+        """
+        status = execute(['git', 'status', '--porcelain'])
+        return status != ''
+
     def apply_patch(self, patch_file, base_path=None, base_dir=None, p=None):
         """
         Apply the patch patch_file and return True if the patch was
@@ -514,3 +524,9 @@ class GitClient(SCMClient):
             cmd = ['git', 'apply', patch_file]
 
         self._execute(cmd)
+
+    def create_commmit(self, message, author):
+        modified_message = edit_text(message)
+        execute(['git', 'add', '--all', ':/'])
+        execute(['git', 'commit', '-m', modified_message,
+                 '--author="%s <%s>"' % (author.fullname, author.email)])

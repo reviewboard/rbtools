@@ -596,6 +596,19 @@ RESOURCE_MAP['application/vnd.reviewboard.org.draft-screenshots'] = \
 class ReviewRequestResource(ItemResource):
     """The Review Request resource specific base class."""
 
+    @property
+    def absolute_url(self):
+        """Returns the absolute URL for the Review Request.
+
+        The value of absolute_url is returned if it's defined.
+        Otherwise the absolute URL is generated and returned.
+        """
+        if 'absolute_url' in self.fields:
+            return self.fields['absolute_url']
+        else:
+            base_url = self._url.split('/api/')[0]
+            return urlparse.urljoin(base_url, self.url)
+
     @request_method_decorator
     def submit(self, description=None, changenum=None):
         """Submit a review request"""

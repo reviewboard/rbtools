@@ -2,7 +2,6 @@ import logging
 import os
 import re
 import sys
-from urlparse import urljoin
 
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option
@@ -438,13 +437,7 @@ class Post(Command):
                 raise CommandError(
                     "Error updating review request draft: %s" % e)
 
-        request_url = 'r/%s/' % review_request.id
-        review_url = urljoin(server_url, request_url)
-
-        if not review_url.startswith('http'):
-            review_url = 'http://%s' % review_url
-
-        return review_request.id, review_url
+        return review_request.id, review_request.absolute_url
 
     def main(self, *args):
         """Create and update review requests."""

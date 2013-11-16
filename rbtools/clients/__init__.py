@@ -125,6 +125,14 @@ class SCMClient(object):
         print 'Results:\n' + res
         return res
 
+    def has_pending_changes(self):
+        """Checks if there are changes waiting to be committed.
+
+        Derived classes should override this method if they wish to support
+        checking for pending changes.
+        """
+        raise NotImplementedError
+
     def apply_patch(self, patch_file, base_path, base_dir, p=None):
         """
         Apply the patch patch_file and return True if the patch was
@@ -138,6 +146,14 @@ class SCMClient(object):
         else:
             cmd = ['patch', '-i', str(patch_file)]
         self._execute(cmd)
+
+    def create_commmit(self, message, author):
+        """Creates a commit based on the provided message and author.
+
+        Derived classes should override this method if they wish to support
+        committing changes to their repositories.
+        """
+        raise NotImplementedError
 
     def sanitize_changenum(self, changenum):
         """Return a "sanitized" change number.

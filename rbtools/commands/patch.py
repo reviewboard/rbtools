@@ -12,6 +12,12 @@ class Patch(Command):
     author = "The Review Board Project"
     args = "<review-request-id>"
     option_list = [
+        Option("-c", "--commit",
+               dest="commit",
+               action="store_true",
+               default=False,
+               help="Commit using information fetched "
+                    "from the review request (Git only)."),
         Option("--diff-revision",
                dest="diff_revision",
                default=None,
@@ -91,6 +97,33 @@ class Patch(Command):
         tool.apply_patch(diff_file_path, repository_info.base_path,
                          base_dir, self.options.px)
 
+    def _extract_commit_message(self, review_request):
+        """Returns a commit message based on the review request.
+
+        The commit message returned contains the Summary, Description, Bugs,
+        and Testing Done fields from the review request, if available.
+        """
+        info = []
+
+        summary = review_request.summary
+        description = review_request.description
+
+        if not description.startswith(summary):
+            info.append(summary)
+
+        info.append(description)
+
+        if review_request.testing_done:
+            info.append('Testing Done:\n%s' % review_request.testing_done)
+
+        if review_request.bugs_closed:
+            info.append('Bugs closed: %s'
+                        % ', '.join(review_request.bugs_closed))
+
+        info.append('Reviewed at %s' % review_request.absolute_url)
+
+        return '\n\n'.join(info)
+
     def main(self, request_id):
         """Run the command."""
         repository_info, tool = self.initialize_scm_tool(
@@ -108,5 +141,34 @@ class Patch(Command):
         if self.options.patch_stdout:
             print diff_body
         else:
+            try:
+                if tool.has_pending_changes():
+                    message = 'Working directory is not clean.'
+
+                    if not self.options.commit:
+                        print 'Warning: %s' % message
+                    else:
+                        raise CommandError(message)
+            except NotImplementedError:
+                pass
+
             self.apply_patch(repository_info, tool, request_id, diff_revision,
                              tmp_patch_file, base_dir)
+
+            if self.options.commit:
+                try:
+                    review_request = api_root.get_review_request(
+                        review_request_id=request_id)
+                except APIError, e:
+                    raise CommandError('Error getting review request %s: %s'
+                                       % (request_id, e))
+
+                message = self._extract_commit_message(review_request)
+                author = review_request.get_submitter()
+
+                try:
+                    tool.create_commmit(message, author)
+                    print('Changes committed to current branch.')
+                except NotImplementedError:
+                    raise CommandError('--commit is not supported with %s'
+                                       % tool.name)
