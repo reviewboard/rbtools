@@ -50,15 +50,17 @@ def help(args, parser):
 
     parser.print_help()
 
-    # TODO: For now we'll print every command found with an entry
-    # point. In the future this needs to be switched to printing
-    # a hard-coded list, so that we can include commands we create
-    # using shell scripts etc.
     commands = pkg_resources.get_entry_map('rbtools', 'rbtools_commands')
-    print "\nThe most commonly used commands are:"
+    common_commands = ['post', 'patch', 'close', 'diff']
 
-    for command in commands:
+    print "\nThe most commonly used commands are:"
+    for command in common_commands:
         print "  %s" % command
+
+    print "\nOther commands:"
+    for command in sorted(commands):
+        if command not in common_commands:
+            print "  %s" % command
 
     print ("See '%s help <command>' for more information "
            "on a specific command." % RB_MAIN)
