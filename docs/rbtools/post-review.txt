@@ -15,6 +15,11 @@ review request on an associated Review Board server. This saves a lot of time
 over the web UI, and for some types of code repositories (such as Perforce),
 it's actually required in order to produce a compatible diff.
 
+.. deprecated:: 0.5
+
+   The :command:`post-review` command is deprecated in favor of the new
+   :command:`rbt` suite of tools.
+
 
 Posting and Updating Review Requests
 ====================================

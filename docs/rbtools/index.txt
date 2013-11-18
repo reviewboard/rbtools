@@ -9,8 +9,8 @@ This consists of the following officially supported tools:
 .. toctree::
    :maxdepth: 1
 
-   post-review
    rbt/index
+   post-review
    api/index
 
 

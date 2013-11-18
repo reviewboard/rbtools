@@ -8,8 +8,8 @@ has the following usage::
 
    $ rbt [--version] <command> [options] [<args>]
 
-While :command:`rbt` is currently in beta, it will eventually replace
-:command:`post-review` completely. For built in help you may execute::
+The :command:`rbt` command obsoletes the old :command:`post-review` command.
+For built in help you may execute::
 
    $ rbt help
 
