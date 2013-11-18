@@ -123,19 +123,34 @@ class MercurialClient(SCMClient):
             key, value = line.split('=', 1)
             self.hgrc[key] = value.strip()
 
-    def extract_summary(self, revision):
+    def extract_summary(self, revision_range=None):
         """
         Extracts the first line from the description of the given changeset.
         """
+        if revision_range:
+            revision = self._extract_revisions(revision_range)[1]
+        elif self._type == 'svn':
+            revision = "."
+        else:
+            revision = self._get_bottom_and_top_outgoing_revs_for_remote()[1]
+
         return execute(
             ['hg', 'log', '-r%s' % revision, '--template', '{desc|firstline}'],
             env=self._hg_env).replace('\n', ' ')
 
-    def extract_description(self, rev1, rev2):
+    def extract_description(self, revision_range=None):
         """
         Extracts all descriptions in the given revision range and concatenates
         them, most recent ones going first.
         """
+        if revision_range:
+            rev1, rev2 = self._extract_revisions(revision_range)
+        elif self._type == 'svn':
+            rev1 = self._get_parent_for_hgsubversion()
+            rev2 = "."
+        else:
+            rev1, rev2 = self._get_bottom_and_top_outgoing_revs_for_remote()
+
         numrevs = len(execute([
             'hg', 'log', '-r%s:%s' % (rev2, rev1),
             '--follow', '--template', r'{rev}\n'], env=self._hg_env
@@ -157,18 +172,22 @@ class MercurialClient(SCMClient):
         else:
             return self._get_outgoing_diff(files)
 
+    def _get_parent_for_hgsubversion(self):
+        """Returns the parent Subversion branch.
+
+        Returns the parent branch defined in the command options if it exists,
+        otherwise returns the parent Subversion branch of the current
+        repository.
+        """
+        return (getattr(self.options, 'parent_branch', None) or
+                execute(['hg', 'parent', '--svn', '--template',
+                        '{node}\n']).strip())
+
     def _get_hgsubversion_diff(self, files):
-        parent = execute(['hg', 'parent', '--svn', '--template',
-                          '{node}\n']).strip()
+        self._set_summary()
+        self._set_description()
 
-        if self.options.parent_branch:
-            parent = self.options.parent_branch
-
-        if self.options.guess_summary and not self.options.summary:
-            self.options.summary = self.extract_summary(".")
-
-        if self.options.guess_description and not self.options.description:
-            self.options.description = self.extract_description(parent, ".")
+        parent = self._get_parent_for_hgsubversion()
 
         if len(files) == 1:
             rs = "-r%s:%s" % (parent, files[0])
@@ -178,6 +197,43 @@ class MercurialClient(SCMClient):
         return {
             'diff': execute(["hg", "diff", "--svn", rs]),
         }
+
+    def _get_remote_branch(self):
+        """Returns the remote branch assoicated with this repository.
+
+        If the remote branch is not defined, the parent branch of the
+        repository is returned.
+        """
+        remote = self._remote_path[0]
+
+        if not remote and self.options.parent_branch:
+            remote = self.options.parent_branch
+
+        return remote
+
+    def _get_current_branch(self):
+        """Returns the current branch of this repository."""
+        return execute(['hg', 'branch'], env=self._hg_env).strip()
+
+    def _get_bottom_and_top_outgoing_revs_for_remote(self):
+        """Returns the bottom and top outgoing revisions.
+
+        Returns the bottom and top outgoing revisions for the changesets
+        between the current branch and the remote branch.
+        """
+        remote = self._get_remote_branch()
+        current_branch = self._get_current_branch()
+        outgoing_changesets = \
+            self._get_outgoing_changesets(current_branch, remote)
+
+        if outgoing_changesets:
+            top_rev, bottom_rev = \
+                self._get_top_and_bottom_outgoing_revs(outgoing_changesets)
+        else:
+            top_rev = None
+            bottom_rev = None
+
+        return bottom_rev, top_rev
 
     def _get_outgoing_diff(self, files):
         """
@@ -207,30 +263,10 @@ class MercurialClient(SCMClient):
         can just punish developers for doing such nonsense :)
         """
         files = files or []
-
-        remote = self._remote_path[0]
-
-        if not remote and self.options.parent_branch:
-            remote = self.options.parent_branch
-
-        current_branch = execute(['hg', 'branch'], env=self._hg_env).strip()
-
-        outgoing_changesets = \
-            self._get_outgoing_changesets(current_branch, remote)
-
-        if outgoing_changesets:
-            top_rev, bottom_rev = \
-                self._get_top_and_bottom_outgoing_revs(outgoing_changesets)
-        else:
-            top_rev = None
-            bottom_rev = None
-
-        if self.options.guess_summary and not self.options.summary:
-            self.options.summary = self.extract_summary(top_rev)
-
-        if self.options.guess_description and not self.options.description:
-            self.options.description = self.extract_description(bottom_rev,
-                                                                top_rev)
+        self._set_summary()
+        self._set_description()
+        bottom_rev, top_rev = \
+            self._get_bottom_and_top_outgoing_revs_for_remote()
 
         if bottom_rev is not None and top_rev is not None:
             full_command = ['hg', 'diff', '-r', str(bottom_rev), '-r',
@@ -308,13 +344,8 @@ class MercurialClient(SCMClient):
 
         return top_rev, bottom_rev
 
-    def diff_between_revisions(self, revision_range, args, repository_info):
-        """
-        Performs a diff between 2 revisions of a Mercurial repository.
-        """
-        if self._type != 'hg':
-            raise NotImplementedError
-
+    def _extract_revisions(self, revision_range):
+        """Returns the revisions from the provided revision range."""
         if ':' in revision_range:
             r1, r2 = revision_range.split(':')
         else:
@@ -327,11 +358,35 @@ class MercurialClient(SCMClient):
             r1 = execute(["hg", "parents", "-r", r2,
                           "--template", "{rev}\n"]).split()[0]
 
-        if self.options.guess_summary and not self.options.summary:
-            self.options.summary = self.extract_summary(r2)
+        return r1, r2
 
+    def _set_summary(self, revision_range=None):
+        """Sets the summary based on the provided revision range.
+
+        Extracts and sets the summary if guessing is enabled and summary is not
+        yet set.
+        """
+        if self.options.guess_summary and not self.options.summary:
+            self.options.summary = self.extract_summary(revision_range)
+
+    def _set_description(self, revision_range=None):
+        """Sets the description based on the provided revision range.
+
+        Extracts and sets the description if guessing is enabled and
+        description is not yet set.
+        """
         if self.options.guess_description and not self.options.description:
-            self.options.description = self.extract_description(r1, r2)
+            self.options.description = self.extract_description(revision_range)
+
+    def diff_between_revisions(self, revision_range, args, repository_info):
+        """Performs a diff between 2 revisions of a Mercurial repository."""
+        if self._type != 'hg':
+            raise NotImplementedError
+
+        self._set_summary(revision_range)
+        self._set_description(revision_range)
+
+        r1, r2 = self._extract_revisions(revision_range)
 
         return {
             'diff': execute(["hg", "diff", "-r", r1, "-r", r2],

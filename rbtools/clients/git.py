@@ -244,23 +244,86 @@ class GitClient(SCMClient):
 
         return None
 
-    def diff(self, args):
+    def extract_summary(self, revision_range=None):
+        """Extracts the summary based on the provided revision range."""
+        if not revision_range or ":" not in revision_range:
+            command = [self.git, "log", "--pretty=format:%s", "HEAD^!"]
+        else:
+            r1, r2 = revision_range.split(":")
+            command = [self.git, "log", "--pretty=format:%s", "%s^!" % r2]
+
+        return execute(command, ignore_errors=True).strip()
+
+    def extract_description(self, revision_range=None):
+        """Extracts the description based on the provided revision range."""
+        if revision_range and ":" not in revision_range:
+            command = [self.git, "log", "--pretty=format:%s%n%n%b",
+                       revision_range + ".."]
+        elif revision_range:
+            r1, r2 = revision_range.split(":")
+            command = [self.git, "log", "--pretty=format:%s%n%n%b",
+                       "%s..%s" % (r1, r2)]
+        else:
+            parent_branch = self.get_parent_branch()
+            head_ref = self.get_head_ref()
+            merge_base = self.get_merge_base(head_ref)
+            command = [self.git, "log", "--pretty=format:%s%n%n%b",
+                       (parent_branch or merge_base) + ".."]
+
+        return execute(command, ignore_errors=True).strip()
+
+    def _set_summary(self, revision_range=None):
+        """Sets the summary based on the provided revision range.
+
+        Extracts and sets the summary if guessing is enabled and summary is not
+        yet set.
         """
-        Performs a diff across all modified files in the branch, taking into
-        account a parent branch.
+        if (getattr(self.options, 'guess_summary', None) and
+                not getattr(self.options, 'summary', None)):
+            self.options.summary = self.extract_summary(revision_range)
+
+    def _set_description(self, revision_range=None):
+        """Sets the description based on the provided revision range.
+
+        Extracts and sets the description if guessing is enabled and
+        description is not yet set.
         """
+        if (getattr(self.options, 'guess_description', None) and
+                not getattr(self.options, 'description', None)):
+            self.options.description = self.extract_description(revision_range)
+
+    def get_parent_branch(self):
+        """Returns the parent branch."""
         if self.type == 'perforce':
             parent_branch = self.options.parent_branch or 'p4'
         else:
             parent_branch = self.options.parent_branch
 
+        return parent_branch
+
+    def get_head_ref(self):
+        """Returns the HEAD reference."""
         head_ref = "HEAD"
+
         if self.head_ref:
             head_ref = self.head_ref
 
-        self.merge_base = execute([self.git, "merge-base",
-                                   self.upstream_branch,
-                                   head_ref]).strip()
+        return head_ref
+
+    def get_merge_base(self, head_ref):
+        """Returns the merge base."""
+        return execute([self.git, "merge-base",
+                        self.upstream_branch,
+                        head_ref]).strip()
+
+    def diff(self, args):
+        """Performs a diff across all modified files in the branch.
+
+        The diff takes into account of the parent branch.
+        """
+        parent_branch = self.get_parent_branch()
+        head_ref = self.get_head_ref()
+        self.merge_base = self.get_merge_base(head_ref)
 
         if parent_branch:
             diff_lines = self.make_diff(parent_branch)
@@ -269,18 +332,8 @@ class GitClient(SCMClient):
             diff_lines = self.make_diff(self.merge_base, head_ref)
             parent_diff_lines = None
 
-        if (getattr(self.options, 'guess_summary', None) and
-            not getattr(self.options, 'summary', None)):
-            self.options.summary = execute(
-                [self.git, "log", "--pretty=format:%s", "HEAD^!"],
-                ignore_errors=True).strip()
-
-        if (getattr(self.options, 'guess_description', None) and
-            not getattr(self.options, 'description', None)):
-            self.options.description = execute(
-                [self.git, "log", "--pretty=format:%s%n%n%b",
-                 (parent_branch or self.merge_base) + ".."],
-                ignore_errors=True).strip()
+        self._set_summary()
+        self._set_description()
 
         return {
             'diff': diff_lines,
@@ -289,9 +342,7 @@ class GitClient(SCMClient):
         }
 
     def make_diff(self, ancestor, commit=""):
-        """
-        Performs a diff on a particular branch range.
-        """
+        """Performs a diff on a particular branch range."""
         if commit:
             rev_range = "%s..%s" % (ancestor, commit)
         else:
@@ -310,15 +361,12 @@ class GitClient(SCMClient):
             return self.make_perforce_diff(ancestor, diff_lines)
         elif self.type == "git":
             cmdline = [self.git, "diff", "--no-color", "--full-index",
-                       "--no-ext-diff", "--ignore-submodules"]
+                       "--no-ext-diff", "--ignore-submodules", "--no-renames",
+                       rev_range]
 
             if (self.capabilities is not None and
                 self.capabilities.has_capability('diffs', 'moved_files')):
-                cmdline.append('--find-renames')
-            else:
-                cmdline.append('--no-renames')
-
-            cmdline.append(rev_range)
+                cmdline.append('-M')
 
             return execute(cmdline)
 
@@ -436,16 +484,11 @@ class GitClient(SCMClient):
 
     def diff_between_revisions(self, revision_range, args, repository_info):
         """Perform a diff between two arbitrary revisions"""
-
-        head_ref = "HEAD"
-        if self.head_ref:
-            head_ref = self.head_ref
+        head_ref = self.get_head_ref()
 
         # Make a parent diff to the first of the revisions so that we
         # never end up with broken patches:
-        self.merge_base = execute([self.git, "merge-base",
-                                   self.upstream_branch,
-                                   head_ref]).strip()
+        self.merge_base = self.get_merge_base(head_ref)
 
         if ":" not in revision_range:
             # only one revision is specified
@@ -460,18 +503,6 @@ class GitClient(SCMClient):
                 parent_diff_lines = self.make_diff(self.merge_base,
                                                    revision_range)
 
-            if self.options.guess_summary and not self.options.summary:
-                self.options.summary = execute(
-                    [self.git, "log", "--pretty=format:%s", "HEAD^!"],
-                    ignore_errors=True).strip()
-
-            if (self.options.guess_description and
-                not self.options.description):
-                self.options.description = execute(
-                    [self.git, "log", "--pretty=format:%s%n%n%b",
-                     revision_range + ".."],
-                    ignore_errors=True).strip()
-
             diff_lines = self.make_diff(revision_range)
         else:
             r1, r2 = revision_range.split(":")
@@ -484,19 +515,10 @@ class GitClient(SCMClient):
             if not pdiff_required:
                 parent_diff_lines = self.make_diff(self.merge_base, r1)
 
-            if self.options.guess_summary and not self.options.summary:
-                self.options.summary = execute(
-                    [self.git, "log", "--pretty=format:%s", "%s^!" % r2],
-                    ignore_errors=True).strip()
-
-            if (self.options.guess_description and
-                not self.options.description):
-                self.options.description = execute(
-                    [self.git, "log", "--pretty=format:%s%n%n%b",
-                     "%s..%s" % (r1, r2)],
-                    ignore_errors=True).strip()
-
             diff_lines = self.make_diff(r1, r2)
+
+        self._set_summary(revision_range)
+        self._set_description(revision_range)
 
         return {
             'diff': diff_lines,

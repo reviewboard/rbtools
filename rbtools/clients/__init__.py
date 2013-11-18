@@ -168,6 +168,28 @@ class SCMClient(object):
         """
         raise NotImplementedError
 
+    def extract_summary(self, revision_range=None):
+        """Returns the summary from the commits on the current branch.
+
+        Derived classes should override this method if they wish to support
+        summary guessing.
+
+        If a derived class is unable to guess the summary, ``None`` should be
+        returned.
+        """
+        raise NotImplementedError
+
+    def extract_description(self, revision_range=None):
+        """Returns the description based on commits on the current branch.
+
+        Derived classes should override this method if they wish to support
+        description guessing.
+
+        If a derived class is unable to guess the description, ``None`` should
+        be returned.
+        """
+        raise NotImplementedError
+
 
 class RepositoryInfo(object):
     """

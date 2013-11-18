@@ -54,21 +54,24 @@ class BazaarClient(SCMClient):
 
         return repository_info
 
+    def get_default_revision_range(self):
+        """Returns the revision range based on the parent branch."""
+        if self.options.parent_branch:
+            return "ancestor:%s.." % self.options.parent_branch
+        else:
+            return "submit:.."
+
     def diff(self, files):
-        """
-        Return the diff of this branch with respect to its parent and set
-        the summary and description is required.
+        """Returns the diff of this branch with respect to its parent.
+
+        Additionally sets the summary and description as required.
         """
         files = files or []
 
-        if self.options.parent_branch:
-            revision_range = "ancestor:%s.." % self.options.parent_branch
-        else:
-            revision_range = "submit:.."
-
+        revision_range = self.get_default_revision_range()
         # Getting the diff for the changes in the current branch:
         diff = self._get_range_diff(revision_range, files)
-        self._set_summary("-1")
+        self._set_summary()
         self._set_description(revision_range)
 
         return {
@@ -76,15 +79,15 @@ class BazaarClient(SCMClient):
         }
 
     def diff_between_revisions(self, revision_range, files, repository_info):
-        """
-        Return the diff for the two revisions in ``revision_range`` and set
-        the summary and description is required.
+        """Returns the diff for the provided revision range.
+
+        The diff is generated for the two revisions in the provided revision
+        range. The summary and description are set as required.
         """
         diff = self._get_range_diff(revision_range, files)
 
         # Revision ranges in Bazaar and separated with dots, not colons:
-        last_revision = revision_range.split("..")[1]
-        self._set_summary(last_revision)
+        self._set_summary(revision_range)
         self._set_description(revision_range)
 
         return {
@@ -101,24 +104,35 @@ class BazaarClient(SCMClient):
 
         return diff
 
-    def _set_summary(self, revision):
-        """
-        Set the summary to the message of ``revision`` if asked to guess it.
+    def _set_summary(self, revision_range=None):
+        """Set the summary based on the ``revision_range``.
+
+        Extracts and sets the summary if guessing is enabled and summary is not
+        yet set.
         """
         if self.options.guess_summary and not self.options.summary:
-            self.options.summary = self._extract_summary(revision)
+            self.options.summary = self.extract_summary(revision_range)
 
     def _set_description(self, revision_range=None):
-        """
-        Set the description to the changelog of ``revision_range`` if asked to
-        guess it.
+        """Set the description based on the ``revision_range``.
+
+        Extracts and sets the description if guessing is enabled and
+        description is not yet set.
         """
         if self.options.guess_description and not self.options.description:
-            self.options.description = self._extract_description(
-                revision_range)
+            self.options.description = self.extract_description(revision_range)
 
-    def _extract_summary(self, revision):
-        """Return the commit message for ``revision``."""
+    def extract_summary(self, revision_range=None):
+        """Return the last commit message in ``revision_range``.
+
+        If revision_range is ``None``, the commit message of the last revision
+        in the repository is returned.
+        """
+        if revision_range:
+            revision = revision_range.split("..")[1]
+        else:
+            revision = '-1'
+
         # `bzr log --line' returns the log in the format:
         #   {revision-number}: {committer-name} {commit-date} {commit-message}
         # So we should ignore everything after the date (YYYY-MM-DD).
@@ -131,15 +145,11 @@ class BazaarClient(SCMClient):
 
         return summary
 
-    def _extract_description(self, revision_range=None):
+    def extract_description(self, revision_range=None):
         command = ["bzr"]
 
-        # If there is no revision range specified, that means we need the logs
-        # of all the outgoing changes:
-        if revision_range:
-            command.extend(["log", "-r", revision_range])
-        else:
-            command.extend(["missing", "-q", "--mine-only"])
+        revision_range = revision_range or self.get_default_revision_range()
+        command.extend(["log", "-r", revision_range])
 
         # We want to use the "short" output format, where all the logs are
         # separated with hyphens:

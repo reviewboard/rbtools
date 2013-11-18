@@ -2,10 +2,27 @@ import logging
 import os
 import re
 import sys
+from difflib import SequenceMatcher
 
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option
+from rbtools.utils.console import confirm
 from rbtools.utils.diffs import get_diff
+from rbtools.utils.repository import get_repository_id
+from rbtools.utils.users import get_user
+
+
+class Score(object):
+    """Encapsulates ranking information for matching existing requests."""
+    EXACT_MATCH_SCORE = 1.0
+
+    def __init__(self, summary_score, description_score):
+        self.summary_score = summary_score
+        self.description_score = description_score
+
+    def is_exact_match(self):
+        return (self.summary_score == self.EXACT_MATCH_SCORE and
+                self.description_score == self.EXACT_MATCH_SCORE)
 
 
 class Post(Command):
@@ -20,6 +37,11 @@ class Post(Command):
                metavar="ID",
                default=None,
                help="existing review request ID to update"),
+        Option('-u', '--update',
+               dest="update",
+               action="store_true",
+               default=False,
+               help="determine existing review request to update"),
         Option("--server",
                dest="server",
                metavar="SERVER",
@@ -238,6 +260,9 @@ class Post(Command):
             self.options.guess_summary = True
             self.options.guess_description = True
 
+        if self.options.rid and self.options.update:
+            self.options.update = False
+
         if self.options.testing_done and self.options.testing_file:
             raise CommandError("The --testing-done and --testing-done-file "
                                "options are mutually exclusive.\n")
@@ -291,33 +316,150 @@ class Post(Command):
 
         return repository_info.path
 
+    def get_match_score(self, summary_pair, description_pair):
+        """Get a score based on a pair of summaries and a pair of descriptions.
+
+        The scores for summary and description pairs are calculated
+        independently using SequenceMatcher, and returned as part of a Score
+        object.
+        """
+        if not summary_pair or not description_pair:
+            return None
+
+        summary_score = SequenceMatcher(
+            None, summary_pair[0], summary_pair[1]).ratio()
+        description_score = SequenceMatcher(
+            None, description_pair[0], description_pair[1]).ratio()
+
+        return Score(summary_score, description_score)
+
+    def get_possible_matches(self, review_requests, summary, description,
+                             limit=5):
+        """Returns a sorted list of tuples of score and review request.
+
+        Each review request is given a score based on the summary and
+        description provided. The result is a sorted list of tuples containing
+        the score and the corresponding review request, sorted by the highest
+        scoring review request first.
+        """
+        candidates = []
+
+        # Get all potential matches.
+        try:
+            while True:
+                for review_request in review_requests:
+                    summary_pair = (review_request.summary, summary)
+                    description_pair = (review_request.description, description)
+                    score = self.get_match_score(
+                        summary_pair, description_pair)
+                    candidates.append((score, review_request))
+
+                review_requests = review_requests.get_next()
+        except StopIteration:
+            pass
+
+        # Sort by summary and description on descending rank.
+        sorted_candidates = sorted(
+            candidates,
+            key=lambda m: (m[0].summary_score, m[0].description_score),
+            reverse=True
+        )
+
+        return sorted_candidates[:limit]
+
+    def num_exact_matches(self, possible_matches):
+        """Returns the number of exact matches in the possible match list."""
+        count = 0
+
+        for score, request in possible_matches:
+            if score.is_exact_match():
+                count += 1
+
+        return count
+
+    def guess_existing_review_request_id(self, repository_info, api_root,
+                                         api_client, tool, revision_range):
+        """Try to guess the existing review request ID if it is available.
+
+        The existing review request is guessed by comparing the existing
+        summary and description to the current post's summary and description,
+        respectively. The current post's summary and description are guessed if
+        they are not provided.
+
+        If the summary and description exactly match those of an existing
+        review request, the ID for which is immediately returned. Otherwise,
+        the user is prompted to select from a list of potential matches,
+        sorted by the highest ranked match first.
+        """
+        user = get_user(api_client, api_root, auth_required=True)
+        repository_id = get_repository_id(
+            repository_info, api_root, self.options.repository_url)
+
+        try:
+            # Get only pending requests by the current user for this
+            # repository.
+            review_requests = api_root.get_review_requests(
+                repository=repository_id, from_user=user.username,
+                status='pending')
+
+            if not review_requests:
+                raise CommandError('No existing review requests to update for '
+                                   'user %s.'
+                                   % user.username)
+        except APIError, e:
+            raise CommandError('Error getting review requests for user '
+                               '%s: %s' % (user.name, e))
+
+        try:
+            summary = (getattr(self.options, 'summary', None) or
+                       tool.extract_summary(revision_range))
+            description = (getattr(self.options, 'description', None) or
+                           tool.extract_description(revision_range))
+        except NotImplementedError:
+            raise CommandError('--summary and --description are required.')
+
+        possible_matches = self.get_possible_matches(review_requests, summary,
+                                                     description)
+        exact_match_count = self.num_exact_matches(possible_matches)
+
+        for score, request in possible_matches:
+            # If the score is the only exact match, return the review request
+            # ID without confirmation, otherwise prompt.
+            if score.is_exact_match() and exact_match_count == 1:
+                return request.id
+            else:
+                question = ("Update Review Request #%s: '%s'? "
+                            % (request.id, request.summary))
+
+                if confirm(question):
+                    return request.id
+
+        return None
+
     def post_request(self, tool, repository_info, server_url, api_root,
-                     changenum=None, diff_content=None,
+                     review_request_id=None, changenum=None, diff_content=None,
                      parent_diff_content=None, base_commit_id=None,
                      submit_as=None, retries=3):
         """Creates or updates a review request, and uploads a diff.
 
         On success the review request id and url are returned.
         """
-        if self.options.rid:
-            # Retrieve the review request coresponding to the user
-            # provided id.
+        if review_request_id:
+            # Retrieve the review request corresponding to the provided id.
             try:
                 review_request = api_root.get_review_request(
-                    review_request_id=self.options.rid)
+                    review_request_id=review_request_id)
             except APIError, e:
-                raise CommandError("Error getting review request %s: %s" % (
-                    self.options.rid, e))
+                raise CommandError("Error getting review request %s: %s"
+                                   % (review_request_id, e))
 
             if review_request.status == 'submitted':
                 raise CommandError(
                     "Review request %s is marked as %s. In order to update "
-                    "it, please reopen the request and try again." % (
-                        self.options.rid,
-                        review_request.status))
+                    "it, please reopen the review request and try again."
+                    % (review_request_id, review_request.status))
         else:
-            # The user did not provide a request id, so we will create
-            # a new review request.
+            # No review_request_id, so we will create a new review request.
             try:
                 repository = (
                     self.options.repository_url or
@@ -492,11 +634,21 @@ class Post(Command):
         else:
             changenum = None
 
+        if self.options.update:
+            self.options.rid = self.guess_existing_review_request_id(
+                repository_info, api_root, api_client, tool,
+                self.options.revision_range)
+
+            if not self.options.rid:
+                raise CommandError('Could not determine the existing review '
+                                   'request to update.')
+
         request_id, review_url = self.post_request(
             tool,
             repository_info,
             server_url,
             api_root,
+            self.options.rid,
             changenum=changenum,
             diff_content=diff,
             parent_diff_content=parent_diff,

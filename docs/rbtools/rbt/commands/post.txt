@@ -140,6 +140,11 @@ type::
 
    $ rbt post -r 42
 
+You can also use the :option:`-u` parameter to automatically determine the
+existing review request based on the patch summary and description::
+
+    $ rbt post -u
+
 Additionally, :command:`rbt post` can generate a summary and description for
 your review request based on the commit messages from the involved commits.
 This is accomplished using the :option:`-g` parameter. To post a new review
@@ -344,6 +349,10 @@ Options
 .. cmdoption:: -r, --review-request-id
 
    Existing review request ID to update.
+
+.. cmdoption:: -u, --update
+
+   Determine the existing review request to update.
 
 .. cmdoption:: --server
 
