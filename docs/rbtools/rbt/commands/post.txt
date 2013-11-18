@@ -35,6 +35,36 @@ The following subsections will explain how :command:`rbt post` is used
 with different repository types.
 
 
+.. _automating-rbt-post:
+
+Automating rbt post
+===================
+
+It's possible to automate :command:`rbt post` on a user's behalf. This can
+be useful from a repository's :term:`post-commit hook` to automatically
+create or update a review request. This works through a combination of a
+special Review Board user and the :option:`--submit-as` option.
+
+To set this up, first register a new user. This user will be specific to
+your script, and will have special permissions, so make sure the password
+is protected. You'll then want to grant the
+:ref:`can-submit-as-user-permission` and
+:ref:`can-edit-review-request-permission` to the user. This will give this
+user to the ability to modify a review request as another user.
+
+You can then invoke :command:`rbt post` by doing the following::
+
+    $ rbt post --username=SPECIAL_USER --password=PASSWORD --submit-as=ANOTHER_USER
+
+Of course, you can pass any other values as you see fit.
+
+This will log in as ``SPECIAL_USER`` and perform operations as
+``ANOTHER_USER``.
+
+You can set the default for :option:`--submit-as` by setting ``SUBMIT_AS``
+in :file:`.reviewboardrc`.
+
+
 Perforce
 --------
 
@@ -449,7 +479,9 @@ Options
 .. cmdoption:: --submit-as
 
    Username to be recorded as the author of the review request, instead of the
-   logged in user.
+   logged in user. This is useful when used in a repository's post-commit
+   script to update or create review requests. See :ref:`automating-rbt-post`
+   for information on this use case..
 
    The default can be set in ``SUBMIT_AS`` in :file:`.reviewboardrc`.
 

@@ -4,14 +4,62 @@ RBTools Documentation
 
 RBTools is a set of client tools to use with Review Board.
 
-This consists of the following officially supported tools:
+
+Using RBTools
+=============
+
+.. _rbt:
+
+rbt
+---
+
+The recommended command-line interface is the :command:`rbt` tool. This tool
+runs on Windows, Linux, and MacOS X, and allows executing a number of useful
+sub-commands. :command:`rbt` has the following usage::
+
+   $ rbt [--version] <command> [options] [<args>]
+
+The :command:`rbt` command obsoletes the old :command:`post-review` command.
+For built in help you may execute::
+
+   $ rbt help
+
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
-   rbt/index
-   post-review
-   api/index
+   rbt/configuration
+   rbt/commands/index
+
+
+post-review
+-----------
+
+:command:`post-review` is an older tool which is now deprecated. See
+:ref:`post-review` for more information.
+
+
+.. _rbtools-api:
+
+Python API
+----------
+
+Included with RBTools is a Python client for interacting with the Review Board
+Web API.
+
+.. note::
+   This documentation assumes knowledge of the Review Board Web API. When
+   possible links will be provided to relevant sections of the Web API
+   documentation which can be found in the `Web API Guide`_.
+
+.. _`Web API Guide`: http://www.reviewboard.org/docs/manual/dev/webapi/
+
+.. toctree::
+   :maxdepth: 2
+
+   api/overview
+   api/tutorial
+   api/resource-specific
 
 
 Installation
