@@ -1,6 +1,17 @@
+import re
+
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option
 from rbtools.utils.filesystem import make_tempfile
+
+
+# MARKDOWN_ESCAPED_CHARS comes from markdown.Markdown.ESCAPED_CHARS. We don't
+# want to have a dependency on markdown for rbtools, so we just copy it into
+# here.
+MARKDOWN_ESCAPED_CHARS = ['\\', '`', '*', '_', '{', '}', '[', ']',
+                          '(', ')', '>', '#', '+', '-', '.', '!']
+MARKDOWN_SPECIAL_CHARS = re.escape(r''.join(MARKDOWN_ESCAPED_CHARS))
+UNESCAPE_CHARS_RE = re.compile(r'\\([%s])' % MARKDOWN_SPECIAL_CHARS)
 
 
 class Patch(Command):
@@ -97,6 +108,9 @@ class Patch(Command):
         tool.apply_patch(diff_file_path, repository_info.base_path,
                          base_dir, self.options.px)
 
+    def _unescape_markdown(self, text):
+        return UNESCAPE_CHARS_RE.sub(r'\1', text)
+
     def _extract_commit_message(self, review_request):
         """Returns a commit message based on the review request.
 
@@ -106,15 +120,22 @@ class Patch(Command):
         info = []
 
         summary = review_request.summary
+
         description = review_request.description
+        if review_request.rich_text:
+            description = self._unescape_markdown(description)
 
         if not description.startswith(summary):
             info.append(summary)
 
         info.append(description)
 
-        if review_request.testing_done:
-            info.append('Testing Done:\n%s' % review_request.testing_done)
+        testing_done = review_request.testing_done
+        if testing_done:
+            if review_request.rich_text:
+                testing_done = self._unescape_markdown(testing_done)
+
+            info.append('Testing Done:\n%s' % testing_done)
 
         if review_request.bugs_closed:
             info.append('Bugs closed: %s'
