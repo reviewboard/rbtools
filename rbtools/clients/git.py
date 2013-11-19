@@ -552,3 +552,8 @@ class GitClient(SCMClient):
         execute(['git', 'add', '--all', ':/'])
         execute(['git', 'commit', '-m', modified_message,
                  '--author="%s <%s>"' % (author.fullname, author.email)])
+
+    def get_current_branch(self):
+        """Returns the name of the current branch."""
+        return execute([self.git, "rev-parse", "--abbrev-ref", "HEAD"],
+                       ignore_errors=True).strip()

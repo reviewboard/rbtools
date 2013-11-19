@@ -190,6 +190,17 @@ class SCMClient(object):
         """
         raise NotImplementedError
 
+    def get_current_branch(self):
+        """Returns the repository branch name of the current directory.
+
+        Derived classes should override this method if they are able to
+        determine the current branch of the working directory.
+
+        If a derived class is unable to unable to determine the branch,
+        ``None`` should be returned.
+        """
+        raise NotImplementedError
+
 
 class RepositoryInfo(object):
     """
@@ -269,7 +280,7 @@ def scan_usable_client(options, client_name=None):
         if client_name:
             logging.error('The provided repository type was not detected '
                           'in the current directory.')
-        elif options.repository_url:
+        elif getattr(options, 'repository_url', None):
             logging.error('No supported repository could be accessed at '
                           'the supplied url.')
         else:
