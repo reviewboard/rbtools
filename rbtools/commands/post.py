@@ -333,6 +333,21 @@ class Post(Command):
 
         return Score(summary_score, description_score)
 
+    def get_draft_or_current_value(self, field_name, review_request):
+        """Returns the draft or current field value from a review request.
+
+        If a draft exists for the supplied review request, return the draft's
+        field value for the supplied field name, otherwise return the review
+        request's field value for the supplied field name.
+        """
+        try:
+            draft = review_request.get_draft()
+            return draft.fields.get(field_name)
+        except APIError:
+            pass
+
+        return review_request.fields.get(field_name)
+
     def get_possible_matches(self, review_requests, summary, description,
                              limit=5):
         """Returns a sorted list of tuples of score and review request.
@@ -348,8 +363,14 @@ class Post(Command):
         try:
             while True:
                 for review_request in review_requests:
-                    summary_pair = (review_request.summary, summary)
-                    description_pair = (review_request.description, description)
+                    summary_pair = (
+                        self.get_draft_or_current_value(
+                            'summary', review_request),
+                        summary)
+                    description_pair = (
+                        self.get_draft_or_current_value(
+                            'description', review_request),
+                        description)
                     score = self.get_match_score(
                         summary_pair, description_pair)
                     candidates.append((score, review_request))
@@ -422,17 +443,19 @@ class Post(Command):
                                                      description)
         exact_match_count = self.num_exact_matches(possible_matches)
 
-        for score, request in possible_matches:
+        for score, review_request in possible_matches:
             # If the score is the only exact match, return the review request
             # ID without confirmation, otherwise prompt.
             if score.is_exact_match() and exact_match_count == 1:
-                return request.id
+                return review_request.id
             else:
                 question = ("Update Review Request #%s: '%s'? "
-                            % (request.id, request.summary))
+                            % (review_request.id,
+                               self.get_draft_or_current_value(
+                                   'summary', review_request)))
 
                 if confirm(question):
-                    return request.id
+                    return review_request.id
 
         return None
 
