@@ -50,7 +50,11 @@ def help(args, parser):
 
     parser.print_help()
 
-    commands = pkg_resources.get_entry_map('rbtools', 'rbtools_commands')
+    # We cast to a set to de-dupe the list, since third-parties may
+    # try to override commands by using the same name, and then cast
+    # back to a list for easy sorting.
+    entrypoints = pkg_resources.iter_entry_points('rbtools_commands')
+    commands = list(set([ep.name for ep in entrypoints]))
     common_commands = ['post', 'patch', 'close', 'diff']
 
     print "\nThe most commonly used commands are:"
@@ -92,8 +96,11 @@ def main():
     elif opt.help or "--help" in args or '-h' in args:
         help(args, parser)
 
-    # Attempt to retrieve the command class from the entry points.
-    ep = pkg_resources.get_entry_info("rbtools", "rbtools_commands", args[0])
+    # Attempt to retrieve the command class from the entry points. We
+    # first look in rbtools for the commands, and failing that, we look
+    # for third-party commands.
+    ep = (pkg_resources.get_entry_info("rbtools", "rbtools_commands", args[0]) or
+          pkg_resources.iter_entry_points("rbtools_commands", args[0]).next())
 
     if ep:
         try:
