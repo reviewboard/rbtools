@@ -161,7 +161,12 @@ class PerforceClient(SCMClient):
 
         p4_info = self.p4.info()
 
-        repository_path = p4_info.get('Server address', None)
+        # For the repository path, we first prefer p4 brokers, then the
+        # upstream p4 server. If neither of those are found, just return None.
+	repository_path = p4_info.get('Broker address', None)
+
+        if repository_path is None:
+            repository_path = p4_info.get('Server address', None)
 
         if repository_path is None:
             return None
