@@ -366,7 +366,8 @@ class MercurialClient(SCMClient):
         Extracts and sets the summary if guessing is enabled and summary is not
         yet set.
         """
-        if self.options.guess_summary and not self.options.summary:
+        if (getattr(self.options, 'guess_summary', None) and
+                not getattr(self.options, 'summary', None)):
             self.options.summary = self.extract_summary(revision_range)
 
     def _set_description(self, revision_range=None):
@@ -375,7 +376,8 @@ class MercurialClient(SCMClient):
         Extracts and sets the description if guessing is enabled and
         description is not yet set.
         """
-        if self.options.guess_description and not self.options.description:
+        if (getattr(self.options, 'guess_description', None) and
+                not getattr(self.options, 'description', None)):
             self.options.description = self.extract_description(revision_range)
 
     def diff_between_revisions(self, revision_range, args, repository_info):
