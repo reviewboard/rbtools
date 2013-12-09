@@ -36,6 +36,30 @@ class MercurialClient(SCMClient):
         self._remote_path_candidates = ['reviewboard', 'origin', 'parent',
                                         'default']
 
+    @property
+    def hidden_changesets_supported(self):
+        """Whether the repository supports hidden changesets.
+
+        Mercurial 1.9 and above support hidden changesets. These are changesets
+        that have been hidden from regular repository view. They still exist
+        and are accessible, but only if the --hidden command argument is
+        specified.
+
+        Since we may encounter hidden changesets (e.g. the user specifies
+        hidden changesets as part of --revision-range), we need to be aware
+        of hidden changesets.
+        """
+        if not hasattr(self, '_hidden_changesets_supported'):
+            # The choice of command is arbitrary. parents for the initial
+            # revision should be fast.
+            result = execute(['hg', 'parents', '--hidden', '-r', '0'],
+                             ignore_errors=True,
+                             with_errors=False,
+                             none_on_ignored_error=True)
+            self._hidden_changesets_supported = result is not None
+
+        return self._hidden_changesets_supported
+
     def get_repository_info(self):
         if not check_install('hg --help'):
             return None
@@ -134,9 +158,9 @@ class MercurialClient(SCMClient):
         else:
             revision = self._get_bottom_and_top_outgoing_revs_for_remote()[1]
 
-        return execute(
-            ['hg', 'log', '-r%s' % revision, '--template', '{desc|firstline}'],
-            env=self._hg_env).replace('\n', ' ')
+        return self._execute(
+            ['hg', 'log', '--hidden', '-r%s' % revision, '--template',
+             '{desc|firstline}'], env=self._hg_env).replace('\n', ' ')
 
     def extract_description(self, revision_range=None):
         """
@@ -151,15 +175,17 @@ class MercurialClient(SCMClient):
         else:
             rev1, rev2 = self._get_bottom_and_top_outgoing_revs_for_remote()
 
-        numrevs = len(execute([
-            'hg', 'log', '-r%s:%s' % (rev2, rev1),
+        numrevs = len(self._execute([
+            'hg', 'log', '--hidden', '-r%s:%s' % (rev2, rev1),
             '--follow', '--template', r'{rev}\n'], env=self._hg_env
         ).strip().split('\n'))
 
-        return execute(['hg', 'log', '-r%s:%s' % (rev2, rev1),
-                        '--follow', '--template',
-                        r'{desc}\n\n', '--limit',
-                        str(numrevs - 1)], env=self._hg_env).strip()
+        return self._execute(['hg', 'log', '--hidden',
+                              '-r%s:%s' % (rev2, rev1),
+                              '--follow', '--template',
+                              r'{desc}\n\n', '--limit',
+                              str(numrevs - 1)],
+                              env=self._hg_env).strip()
 
     def diff(self, files):
         """
@@ -195,7 +221,7 @@ class MercurialClient(SCMClient):
             rs = '.'
 
         return {
-            'diff': execute(["hg", "diff", "--svn", rs]),
+            'diff': self._execute(["hg", "diff", "--hidden", "--svn", rs]),
         }
 
     def _get_remote_branch(self):
@@ -269,10 +295,10 @@ class MercurialClient(SCMClient):
             self._get_bottom_and_top_outgoing_revs_for_remote()
 
         if bottom_rev is not None and top_rev is not None:
-            full_command = ['hg', 'diff', '-r', str(bottom_rev), '-r',
-                            str(top_rev)] + files
+            full_command = ['hg', 'diff', '--hidden', '-r', str(bottom_rev),
+                            '-r', str(top_rev)] + files
 
-            diff = execute(full_command, env=self._hg_env)
+            diff = self._execute(full_command, env=self._hg_env)
         else:
             diff = ''
 
@@ -355,8 +381,8 @@ class MercurialClient(SCMClient):
             # We could also use "hg diff -c r1", but then we couldn't reuse the
             # code for extracting descriptions.
             r2 = revision_range
-            r1 = execute(["hg", "parents", "-r", r2,
-                          "--template", "{rev}\n"]).split()[0]
+            r1 = self._execute(["hg", "parents", "--hidden", "-r", r2,
+                                "--template", "{rev}\n"]).split()[0]
 
         return r1, r2
 
@@ -391,8 +417,9 @@ class MercurialClient(SCMClient):
         r1, r2 = self._extract_revisions(revision_range)
 
         return {
-            'diff': execute(["hg", "diff", "-r", r1, "-r", r2],
-                            env=self._hg_env),
+            'diff': self._execute(["hg", "diff", "--hidden", "-r", r1,
+                                  "-r", r2],
+                                  env=self._hg_env),
         }
 
     def scan_for_server(self, repository_info):
@@ -413,3 +440,9 @@ class MercurialClient(SCMClient):
                 return prop
 
         return server_url
+
+    def _execute(self, cmd, *args, **kwargs):
+        if not self.hidden_changesets_supported and '--hidden' in cmd:
+            cmd = [p for p in cmd if p != '--hidden']
+
+        return execute(cmd, *args, **kwargs)
