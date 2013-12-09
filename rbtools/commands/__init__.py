@@ -223,18 +223,50 @@ class Command(object):
                 'used with --diff-filename=-')
 
         if username is None or password is None:
+            print
             print "==> HTTP Authentication Required"
             print 'Enter authorization information for "%s" at %s' % \
                 (realm, urlparse(uri)[1])
+
             # getpass will write its prompt to stderr but raw_input
             # writes to stdout. See bug 2831.
             if username is None:
                 sys.stderr.write('Username: ')
                 username = raw_input()
+
             if password is None:
                 password = getpass.getpass('Password: ')
 
         return username, password
+
+    def otp_token_prompt(self, uri, token_method, *args, **kwargs):
+        """Prompt the user for a one-time password token.
+
+        Their account is configured with two-factor authentication. The
+        server will have sent a token to their configured mobile device
+        or application. The user will be prompted for this token.
+        """
+        if getattr(self.options, 'diff_filename', None) == '-':
+            die('A two-factor authentication token is required, but cannot '
+                'be used with --diff-filename=-')
+
+        print
+        print '==> Two-factor authentication token required'
+
+        if token_method == 'sms':
+            print ('You should be getting a text message with '
+                   'an authentication token.')
+            print 'Enter the token below.'
+        elif token_method == 'call':
+            print ('You should be getting an automated phone call with '
+                   'an authentication token.')
+            print 'Enter the token below.'
+        elif token_method == 'generator':
+            print 'Enter the token shown on your token generator app below.'
+
+        print
+
+        return getpass.getpass('Token: ')
 
     def _make_api_client(self, server_url):
         """Return an RBClient object for the server.
@@ -245,7 +277,8 @@ class Command(object):
         return RBClient(server_url,
                         username=self.options.username,
                         password=self.options.password,
-                        auth_callback=self.credentials_prompt)
+                        auth_callback=self.credentials_prompt,
+                        otp_token_callback=self.otp_token_prompt)
 
     def get_api(self, server_url):
         """Returns an RBClient instance and the associated root resource.

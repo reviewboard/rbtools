@@ -186,30 +186,90 @@ class ReviewBoardHTTPBasicAuthHandler(urllib2.HTTPBasicAuthHandler):
     useless. This subclass only retries once to make sure we've
     attempted with a valid username and password. It will then fail so
     we can use our own retry handler.
+
+    This also supports two-factor auth, for Review Board servers that
+    support it. When requested by the server, the client will be prompted
+    for a one-time password token, which would be sent generally through
+    a mobile device. In this case, the client will prompt up to a set
+    number of times until a valid token is entered.
     """
+    OTP_TOKEN_HEADER = 'X-ReviewBoard-OTP'
+    MAX_OTP_TOKEN_ATTEMPTS = 5
+
     def __init__(self, *args, **kwargs):
         urllib2.HTTPBasicAuthHandler.__init__(self, *args, **kwargs)
         self._retried = False
         self._lasturl = ""
+        self._needs_otp_token = False
+        self._otp_token_attempts = 0
 
-    def retry_http_basic_auth(self, *args, **kwargs):
-        if self._lasturl != args[0]:
+    def retry_http_basic_auth(self, host, request, realm, *args, **kwargs):
+        if self._lasturl != host:
             self._retried = False
 
-        self._lasturl = args[0]
+        self._lasturl = host
 
-        if not self._retried:
-            self._retried = True
-            self.retried = 0
-            response = urllib2.HTTPBasicAuthHandler.retry_http_basic_auth(
-                self, *args, **kwargs)
-
-            if response and response.code != httplib.UNAUTHORIZED:
-                self._retried = False
-
-            return response
-        else:
+        if self._retried:
             return None
+
+        self._retried = True
+
+        response = self._do_http_basic_auth(host, request, realm)
+
+        if response and response.code != httplib.UNAUTHORIZED:
+            self._retried = False
+
+        return response
+
+    def _do_http_basic_auth(self, host, request, realm):
+        user, password = self.passwd.find_user_password(realm, host)
+
+        if password is None:
+            return None
+
+        raw = "%s:%s" % (user, password)
+        auth = 'Basic %s' % base64.b64encode(raw).strip()
+
+        if (request.headers.get(self.auth_header, None) == auth and
+            (not self._needs_otp_token or
+             self._otp_token_attempts > self.MAX_OTP_TOKEN_ATTEMPTS)):
+            # We've already tried with these credentials. No point
+            # trying again.
+            return None
+
+        request.add_unredirected_header(self.auth_header, auth)
+
+        try:
+            response = self.parent.open(request, timeout=request.timeout)
+            return response
+        except urllib2.HTTPError, e:
+            if e.code == 401:
+                headers = e.info()
+                otp_header = headers.get(self.OTP_TOKEN_HEADER, '')
+
+                if otp_header.startswith('required'):
+                    self._needs_otp_token = True
+
+                    # The server has requested a one-time password token, sent
+                    # through an external channel (cell phone or application).
+                    # Request this token from the user.
+                    required, token_method = otp_header.split(';')
+
+                    token = self.passwd.get_otp_token(request.get_full_url(),
+                                                      token_method.strip())
+
+                    if not token:
+                        return None
+
+                    request.add_unredirected_header(self.OTP_TOKEN_HEADER,
+                                                    token)
+                    self._otp_token_attempts += 1
+
+                    return self._do_http_basic_auth(host, request, realm)
+
+            raise
+
+        return None
 
 
 class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
@@ -222,13 +282,14 @@ class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
     See: http://bugs.python.org/issue974757
     """
     def __init__(self, reviewboard_url, rb_user=None, rb_pass=None,
-                 auth_callback=None):
+                 auth_callback=None, otp_token_callback=None):
         urllib2.HTTPPasswordMgr.__init__(self)
         self.passwd = {}
         self.rb_url = reviewboard_url
         self.rb_user = rb_user
         self.rb_pass = rb_pass
         self.auth_callback = auth_callback
+        self.otp_token_callback = otp_token_callback
 
     def find_user_password(self, realm, uri):
         if realm == 'Web API':
@@ -244,6 +305,10 @@ class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
             # If this is an auth request for some other domain (since HTTP
             # handlers are global), fall back to standard password management.
             return urllib2.HTTPPasswordMgr.find_user_password(self, realm, uri)
+
+    def get_otp_token(self, uri, method):
+        if self.otp_token_callback:
+            return self.otp_token_callback(uri, method)
 
 
 def create_cookie_jar(cookie_file=None):
@@ -297,7 +362,7 @@ class ReviewBoardServer(object):
     """
     def __init__(self, url, cookie_file=None, username=None, password=None,
                  agent=None, session=None, disable_proxy=False,
-                 auth_callback=None):
+                 auth_callback=None, otp_token_callback=None):
         self.url = url
         if self.url[-1] != '/':
             self.url += '/'
@@ -344,7 +409,8 @@ class ReviewBoardServer(object):
         password_mgr = ReviewBoardHTTPPasswordMgr(self.url,
                                                   username,
                                                   password,
-                                                  auth_callback)
+                                                  auth_callback,
+                                                  otp_token_callback)
         self.preset_auth_handler = PresetHTTPAuthHandler(self.url,
                                                          password_mgr)
 
