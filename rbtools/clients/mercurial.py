@@ -25,9 +25,12 @@ class MercurialClient(SCMClient):
         self._hg_root = ''
         self._remote_path = ()
         self._hg_env = {
-            'HGRCPATH': os.devnull,
             'HGPLAIN': '1',
         }
+
+        self._hgext_path = os.path.normpath(os.path.join(
+            os.path.dirname(__file__),
+            '..', 'helpers', 'hgext.py'))
 
         # `self._remote_path_candidates` is an ordered set of hgrc
         # paths that are checked if `parent_branch` option is not given
@@ -444,5 +447,13 @@ class MercurialClient(SCMClient):
     def _execute(self, cmd, *args, **kwargs):
         if not self.hidden_changesets_supported and '--hidden' in cmd:
             cmd = [p for p in cmd if p != '--hidden']
+
+        # Add our extension which normalizes settings. This is the easiest
+        # way to normalize settings since it doesn't require us to chase
+        # a tail of diff-related config options.
+        cmd.extend([
+            '--config',
+            'extensions.rbtoolsnormalize=%s' % self._hgext_path
+        ])
 
         return execute(cmd, *args, **kwargs)
