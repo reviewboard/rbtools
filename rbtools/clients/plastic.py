@@ -50,10 +50,10 @@ class PlasticClient(SCMClient):
     def get_changenum(self, args):
         """ Extract the integer value from a changeset ID (cs:1234) """
         if len(args) == 1 and args[0].startswith("cs:"):
-                try:
-                    return str(int(args[0][3:]))
-                except ValueError:
-                    pass
+            try:
+                return str(int(args[0][3:]))
+            except ValueError:
+                pass
 
         return None
 
