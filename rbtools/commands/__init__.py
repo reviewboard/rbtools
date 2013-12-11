@@ -210,7 +210,8 @@ class Command(object):
 
         return server_url
 
-    def credentials_prompt(self, realm, uri, *args, **kwargs):
+    def credentials_prompt(self, realm, uri, username=None, password=None,
+                           *args, **kwargs):
         """Prompt the user for credentials using the command line.
 
         This will prompt the user, and then return the provided
@@ -220,9 +221,6 @@ class Command(object):
         if getattr(self.options, 'diff_filename', None) == '-':
             die('HTTP authentication is required, but cannot be '
                 'used with --diff-filename=-')
-
-        username = getattr(self.options, 'username', None)
-        password = getattr(self.options, 'password', None)
 
         if username is None or password is None:
             print "==> HTTP Authentication Required"
