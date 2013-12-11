@@ -64,7 +64,7 @@ class MercurialClient(SCMClient):
         return self._hidden_changesets_supported
 
     def get_repository_info(self):
-        if not check_install('hg --help'):
+        if not check_install(['hg', '--help']):
             return None
 
         self._load_hgrc()

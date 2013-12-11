@@ -19,7 +19,7 @@ class PlasticClient(SCMClient):
         super(PlasticClient, self).__init__(**kwargs)
 
     def get_repository_info(self):
-        if not check_install('cm version'):
+        if not check_install(['cm', 'version']):
             return None
 
         # Get the workspace directory, so we can strip it from the diff output

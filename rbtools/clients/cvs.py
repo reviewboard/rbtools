@@ -18,7 +18,7 @@ class CVSClient(SCMClient):
         super(CVSClient, self).__init__(**kwargs)
 
     def get_repository_info(self):
-        if not check_install("cvs"):
+        if not check_install(['cvs']):
             return None
 
         cvsroot_path = os.path.join("CVS", "Root")

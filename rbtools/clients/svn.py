@@ -25,7 +25,7 @@ class SVNClient(SCMClient):
         super(SVNClient, self).__init__(**kwargs)
 
     def get_repository_info(self):
-        if not check_install('svn help'):
+        if not check_install(['svn', 'help']):
             return None
 
         # Get the SVN repository path (either via a working copy or

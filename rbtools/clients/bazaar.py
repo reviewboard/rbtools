@@ -31,7 +31,7 @@ class BazaarClient(SCMClient):
         Find out information about the current Bazaar branch (if any) and
         return it.
         """
-        if not check_install("bzr help"):
+        if not check_install(['bzr', 'help']):
             return None
 
         bzr_info = execute(["bzr", "info"], ignore_errors=True)

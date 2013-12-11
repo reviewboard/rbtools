@@ -24,7 +24,7 @@ class P4Wrapper(object):
     COUNTERS_RE = re.compile('^([^ ]+) = (.+)$')
 
     def is_supported(self):
-        return check_install('p4 help')
+        return check_install(['p4', 'help'])
 
     def counters(self):
         lines = self.run_p4(['counters'],

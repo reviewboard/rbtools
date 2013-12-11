@@ -12,8 +12,8 @@ from rbtools.utils.testbase import RBTestBase
 class UtilitiesTest(RBTestBase):
     def test_check_install(self):
         """Test 'check_install' method."""
-        self.assertTrue(checks.check_install(sys.executable + ' --version'))
-        self.assertFalse(checks.check_install(self.gen_uuid()))
+        self.assertTrue(checks.check_install([sys.executable, ' --version']))
+        self.assertFalse(checks.check_install([self.gen_uuid()]))
 
     def test_make_tempfile(self):
         """Test 'make_tempfile' method."""

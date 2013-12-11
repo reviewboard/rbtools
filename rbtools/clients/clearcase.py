@@ -37,7 +37,7 @@ class ClearCaseClient(SCMClient):
         installed and in the path, and post-review was run
         from inside of the view.
         """
-        if not check_install('cleartool help'):
+        if not check_install(['cleartool', 'help']):
             return None
 
         viewname = execute(["cleartool", "pwv", "-short"]).strip()

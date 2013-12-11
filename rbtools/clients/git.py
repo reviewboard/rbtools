@@ -29,12 +29,12 @@ class GitClient(SCMClient):
         return re.sub(r'^refs/heads/', '', ref)
 
     def get_repository_info(self):
-        if not check_install('git --help'):
+        if not check_install(['git', '--help']):
             # CreateProcess (launched via subprocess, used by check_install)
             # does not automatically append .cmd for things it finds in PATH.
             # If we're on Windows, and this works, save it for further use.
             if (sys.platform.startswith('win') and
-                check_install('git.cmd --help')):
+                check_install(['git.cmd', '--help'])):
                 self.git = 'git.cmd'
             else:
                 return None
