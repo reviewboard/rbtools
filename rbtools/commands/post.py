@@ -340,13 +340,12 @@ class Post(Command):
         field value for the supplied field name, otherwise return the review
         request's field value for the supplied field name.
         """
-        try:
-            draft = review_request.get_draft()
-            return draft.fields.get(field_name)
-        except APIError:
-            pass
+        if review_request.draft:
+            fields = review_request.draft[0]
+        else:
+            fields = review_request
 
-        return review_request.fields.get(field_name)
+        return fields[field_name]
 
     def get_possible_matches(self, review_requests, summary, description,
                              limit=5):
@@ -421,7 +420,7 @@ class Post(Command):
             # repository.
             review_requests = api_root.get_review_requests(
                 repository=repository_id, from_user=user.username,
-                status='pending')
+                status='pending', expand='draft')
 
             if not review_requests:
                 raise CommandError('No existing review requests to update for '
@@ -429,7 +428,7 @@ class Post(Command):
                                    % user.username)
         except APIError, e:
             raise CommandError('Error getting review requests for user '
-                               '%s: %s' % (user.name, e))
+                               '%s: %s' % (user.username, e))
 
         try:
             summary = (getattr(self.options, 'summary', None) or
