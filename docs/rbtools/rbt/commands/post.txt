@@ -337,6 +337,8 @@ You can set the default for :option:`--submit-as` by setting ``SUBMIT_AS``
 in :file:`.reviewboardrc`.
 
 
+.. _rbt-post-default-options:
+
 Default Options
 ===============
 

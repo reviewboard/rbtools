@@ -11,8 +11,14 @@ a repository to point to a Review Board server, so that users can use
 Repository Configuration
 ========================
 
-Some repository types can have special metadata associated to point to a
-server. All repository types support per-directory dot files.
+All repository types support a :file:`.reviewboardrc` file, which is the
+recommended way to configure your repository. Through here, you can specify
+the URL to your Review Board server, the repository name, and provide some
+helpful defaults.
+
+Alternatively, some types of repositories can have special metadata associated
+that point to your server, but those don't support some of the more advanced
+features of :file:`.reviewboardrc`.
 
 
 .reviewboardrc
@@ -22,6 +28,90 @@ The :file:`.reviewboardrc` file is a generic place for configuring a
 repository. This must be in a directory in the user's checkout path to work.
 It must parse as a valid Python file, or you'll see an error when using
 :command:`rbt`.
+
+This is the recommended way of configuring your repository to talk to
+Review Board.
+
+You can generate this file automatically, starting with RBTools 0.5.3,
+by typing::
+
+    $ rbt setup-repo
+
+Just follow the instructions, and it will create your :file:`.reviewboardrc`.
+You should then commit this to your repository.
+
+The rest of this section covers some of the more common settings you may want
+for your :file:`.reviewboardrc`. You can find more in the documentation for
+many of the commands. For example, see
+:ref:`rbt post's default options <rbt-post-default-options>`.
+
+
+REPOSITORY
+~~~~~~~~~~
+
+Normally, the repository path is automatically determined and passed to
+Review Board, but on more complex setups you may need to tell
+:command:`rbt` and Review Board specifically which repository you
+want to use.
+
+You can use the ``REPOSITORY`` setting to specify the name of the
+repository to use. This is the same as on Review Board's New Review Request
+page. For example::
+
+    REPOSITORY = 'RBTools'
+
+
+REVIEWBOARD_URL
+~~~~~~~~~~~~~~~
+
+To specify the Review Board server to use, you can use the
+``REVIEWBOARD_URL`` setting. This takes the URL to the Review Board server
+as a value. For example::
+
+    REVIEWBOARD_URL = "https://reviewboard.example.com"
+
+
+TRACKING_BRANCH
+~~~~~~~~~~~~~~~
+
+When using Git or other DVCS repositories, RBTools makes an assumption about
+the upstream branch, which it needs to know in order to generate a diff.
+You can set the ``TRACKING_BRANCH`` setting to the branch name in order to
+force the usage of a specific branch. This is equivalent to providing the
+:option:`--tracking-branch` option.
+
+We recommend you set this for any :file:`.reviewboardrc` files on any
+long-running release or feature branches.
+
+For example::
+
+    TRACKING_BRANCH = "origin/release-2.0.x"
+
+
+BRANCH
+~~~~~~
+
+A review request's Branch field is a helpful way of seeing where a change is
+expected to be merged into. You can specify the default for all review
+requests on a branch by setting the ``BRANCH`` field. For example::
+
+    BRANCH = "release-2.0.x"
+
+Note that the intent is to show the destination branch, and not the feature
+branch that the code is being developed on.
+
+This also does not affect code generation. It's used solely to display to the
+reviewers where the code will land.
+
+
+ENABLE_PROXY
+~~~~~~~~~~~~
+
+By default, any configured HTTP/HTTPS proxy will be used for requests. If
+your server is within your own network, you may want to turn this off. You can
+do so by setting ``ENABLE_PROXY`` to ``False``::
+
+    ENABLE_PROXY = False
 
 
 Git Properties
@@ -71,62 +161,14 @@ To set the property on a directory, type::
     $ svn propset reviewboard:url http://reviewboard.example.com .
 
 
-REPOSITORY
-~~~~~~~~~~
-
-Normally, the repository path is automatically determined and passed to
-Review Board, but on more complex setups you may need to tell
-:command:`rbt` and Review Board specifically which repository you
-want to use.
-
-You can use the ``REPOSITORY`` setting to specify the path or the numeric
-ID of the repository to use. For example::
-
-    REPOSITORY = 'https://svn.example.com/'
-
-If using Review Board 1.5.3 or higher, you can also choose to specify the
-repository name. This is the same name as on Review Board's New Review Request
-page. For example::
-
-    REPOSITORY = 'RBTools'
-
-
-REVIEWBOARD_URL
-~~~~~~~~~~~~~~~
-
-To specify the Review Board server to use, you can use the
-``REVIEWBOARD_URL`` setting. This takes the URL to the Review Board server
-as a value. For example::
-
-    REVIEWBOARD_URL = "http://reviewboard.example.com"
-
-
 Custom User Configuration
 =========================
 
-If the repository isn't configured for :command:`rbt` and a
-custom script isn't provided, you can create a :file:`.reviewboardrc`
-file in your HOME directory (usually :file:`/home/{username}` on Linux,
+You can provide your own defaults for RBTools by creating a
+:file:`.reviewboardrc` file in your HOME directory (usually
+:file:`/home/{username}` on Linux,
 :file:`$USERPROFILE\\Local Settings\\Application Data` on Windows).
 
-In the simplest case with only one Review Board server you'll ever
-interact with, the file can simply contain::
-
-    REVIEWBOARD_URL = "http://reviewboard.example.com"
-
-
-A more complex setup for servers based on repository paths will look
-more like::
-
-    TREES = {
-        'http://svn.example.com': {
-            'REVIEWBOARD_URL': 'http://reviewboard.example.com',
-        },
-        'username@cvs.example.com:/cvsroot/cvs': {
-            'REVIEWBOARD_URL': 'http://reviewboard.example.com',
-        },
-    }
-
-
-Any number of repository paths can be specified. The repository path
-must match a repository configured in the Review Board server.
+You might use this to automatically open your browser when posting a
+review request (by setting ``OPEN_BROWSER = True``), or to disable your
+HTTP proxy (``ENABLE_PROXY = False``), for example.
