@@ -495,11 +495,11 @@ class GitClient(SCMClient):
 
             # Check if parent contains the first revision and make a
             # parent diff if not:
-            pdiff_required = execute([self.git, "branch", "-r",
-                                      "--contains", revision_range])
+            pdiff_required = not execute([self.git, "branch", "-r",
+                                          "--contains", revision_range])
             parent_diff_lines = None
 
-            if not pdiff_required:
+            if pdiff_required:
                 parent_diff_lines = self.make_diff(self.merge_base,
                                                    revision_range)
 
@@ -508,11 +508,11 @@ class GitClient(SCMClient):
             r1, r2 = revision_range.split(":")
             # Check if parent contains the first revision and make a
             # parent diff if not:
-            pdiff_required = execute([self.git, "branch", "-r",
-                                      "--contains", r1])
+            pdiff_required = not execute([self.git, "branch", "-r",
+                                          "--contains", r1])
             parent_diff_lines = None
 
-            if not pdiff_required:
+            if pdiff_required:
                 parent_diff_lines = self.make_diff(self.merge_base, r1)
 
             diff_lines = self.make_diff(r1, r2)
