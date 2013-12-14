@@ -407,7 +407,8 @@ class MercurialClientTests(MercurialTestBase):
         self.assertTrue(isinstance(result, dict))
         self.assertEqual(len(result), 1)
         self.assertTrue('diff' in result)
-        self.assertEqual(result['diff'], EXPECTED_HG_DIFF_0)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '68c2bdccf52a4f0baddd0ac9f2ecb7d2')
 
     def testDiffSimpleMultiple(self):
         """Testing MercurialClient diff with multiple commits"""
@@ -421,7 +422,8 @@ class MercurialClientTests(MercurialTestBase):
         self.assertTrue(isinstance(result, dict))
         self.assertEqual(len(result), 1)
         self.assertTrue('diff' in result)
-        self.assertEqual(result['diff'], EXPECTED_HG_DIFF_1)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '9c8796936646be5c7349973b0fceacbd')
 
     def testDiffBranchDiverge(self):
         """Testing MercurialClient diff with diverged branch"""
@@ -435,7 +437,8 @@ class MercurialClientTests(MercurialTestBase):
         self.assertTrue(isinstance(result, dict))
         self.assertEqual(len(result), 1)
         self.assertTrue('diff' in result)
-        self.assertEqual(result['diff'], EXPECTED_HG_DIFF_2)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '6b12723baab97f346aa938005bc4da4d')
 
         self._hgcmd(['update', '-C', 'default'])
         self.client.get_repository_info()
@@ -444,7 +447,8 @@ class MercurialClientTests(MercurialTestBase):
         self.assertTrue(isinstance(result, dict))
         self.assertEqual(len(result), 1)
         self.assertTrue('diff' in result)
-        self.assertEqual(result['diff'], EXPECTED_HG_DIFF_3)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '68c2bdccf52a4f0baddd0ac9f2ecb7d2')
 
 
 class MercurialSubversionClientTests(MercurialTestBase):
@@ -655,7 +659,8 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self.assertTrue(isinstance(result, dict))
         self.assertEqual(len(result), 1)
         self.assertTrue('diff' in result)
-        self.assertEqual(result['diff'], EXPECTED_HG_SVN_DIFF_0)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '2eb0a5f2149232c43a1745d90949fcd5')
 
     def testDiffSimpleMultiple(self):
         """Testing MercurialClient (+svn) diff with multiple commits"""
@@ -669,7 +674,8 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self.assertTrue(isinstance(result, dict))
         self.assertEqual(len(result), 1)
         self.assertTrue('diff' in result)
-        self.assertEqual(result['diff'], EXPECTED_HG_SVN_DIFF_1)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '3d007394de3831d61e477cbcfe60ece8')
 
     def testDiffOfRevision(self):
         """Testing MercurialClient (+svn) diff specifying a revision."""
@@ -684,13 +690,15 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self.assertTrue(isinstance(result, dict))
         self.assertEqual(len(result), 1)
         self.assertTrue('diff' in result)
-        self.assertEqual(result['diff'], EXPECTED_HG_SVN_DIFF_0)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '2eb0a5f2149232c43a1745d90949fcd5')
 
         result = self.client.diff(['5'])
         self.assertTrue(isinstance(result, dict))
         self.assertEqual(len(result), 1)
         self.assertTrue('diff' in result)
-        self.assertEqual(result['diff'], EXPECTED_HG_SVN_DIFF_1)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '3d007394de3831d61e477cbcfe60ece8')
 
 
 class SVNClientTests(SCMClientTests):
@@ -1368,107 +1376,6 @@ moenia Romae. Albanique patres, atque altae
 moenia Romae. Musa, mihi causas memora, quo numine laeso,
 
 """
-
-EXPECTED_HG_DIFF_0 = """\
-diff --git a/foo.txt b/foo.txt
---- a/foo.txt
-+++ b/foo.txt
-@@ -6,7 +6,4 @@
- inferretque deos Latio, genus unde Latinum,
- Albanique patres, atque altae moenia Romae.
- Musa, mihi causas memora, quo numine laeso,
--quidve dolens, regina deum tot volvere casus
--insignem pietate virum, tot adire labores
--impulerit. Tantaene animis caelestibus irae?
- \n"""
-
-EXPECTED_HG_DIFF_1 = """\
-diff --git a/foo.txt b/foo.txt
---- a/foo.txt
-+++ b/foo.txt
-@@ -1,12 +1,11 @@
-+ARMA virumque cano, Troiae qui primus ab oris
- ARMA virumque cano, Troiae qui primus ab oris
- Italiam, fato profugus, Laviniaque venit
- litora, multum ille et terris iactatus et alto
- vi superum saevae memorem Iunonis ob iram;
--multa quoque et bello passus, dum conderet urbem,
-+dum conderet urbem,
- inferretque deos Latio, genus unde Latinum,
- Albanique patres, atque altae moenia Romae.
-+Albanique patres, atque altae moenia Romae.
- Musa, mihi causas memora, quo numine laeso,
--quidve dolens, regina deum tot volvere casus
--insignem pietate virum, tot adire labores
--impulerit. Tantaene animis caelestibus irae?
- \n"""
-
-EXPECTED_HG_DIFF_2 = """\
-diff --git a/foo.txt b/foo.txt
---- a/foo.txt
-+++ b/foo.txt
-@@ -1,3 +1,5 @@
-+ARMA virumque cano, Troiae qui primus ab oris
-+ARMA virumque cano, Troiae qui primus ab oris
- ARMA virumque cano, Troiae qui primus ab oris
- Italiam, fato profugus, Laviniaque venit
- litora, multum ille et terris iactatus et alto
-"""
-
-EXPECTED_HG_DIFF_3 = """\
-diff --git a/foo.txt b/foo.txt
---- a/foo.txt
-+++ b/foo.txt
-@@ -6,7 +6,4 @@
- inferretque deos Latio, genus unde Latinum,
- Albanique patres, atque altae moenia Romae.
- Musa, mihi causas memora, quo numine laeso,
--quidve dolens, regina deum tot volvere casus
--insignem pietate virum, tot adire labores
--impulerit. Tantaene animis caelestibus irae?
- \n"""
-
-EXPECTED_HG_SVN_DIFF_0 = """\
-Index: foo.txt
-===================================================================
---- foo.txt\t(revision 4)
-+++ foo.txt\t(working copy)
-@@ -1,4 +1,1 @@
--ARMA virumque cano, Troiae qui primus ab oris
--ARMA virumque cano, Troiae qui primus ab oris
--ARMA virumque cano, Troiae qui primus ab oris
- Italiam, fato profugus, Laviniaque venit
-@@ -6,3 +3,8 @@
- vi superum saevae memorem Iunonis ob iram;
--multa quoque et bello passus, dum conderet urbem,
-+dum conderet urbem,
-+
-+
-+
-+
-+
- inferretque deos Latio, genus unde Latinum,
-"""
-
-EXPECTED_HG_SVN_DIFF_1 = """\
-Index: foo.txt
-===================================================================
---- foo.txt\t(revision 4)
-+++ foo.txt\t(working copy)
-@@ -1,2 +1,1 @@
--ARMA virumque cano, Troiae qui primus ab oris
- ARMA virumque cano, Troiae qui primus ab oris
-@@ -6,6 +5,6 @@
- vi superum saevae memorem Iunonis ob iram;
--multa quoque et bello passus, dum conderet urbem,
--inferretque deos Latio, genus unde Latinum,
--Albanique patres, atque altae moenia Romae.
--Musa, mihi causas memora, quo numine laeso,
-+dum conderet urbem, inferretque deos Latio, genus
-+unde Latinum, Albanique patres, atque altae
-+moenia Romae. Albanique patres, atque altae
-+moenia Romae. Musa, mihi causas memora, quo numine laeso,
- \n"""
 
 # Partial diff for Bazaar, excluding the initial comments because they contain
 # the time when it was generated:
