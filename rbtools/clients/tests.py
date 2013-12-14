@@ -922,34 +922,12 @@ class PerforceClientTests(SCMClientTests):
         }
 
         diff = client.diff(['12345'])
-        self._compare_diff(
-            diff,
-            '--- //mydepot/test/README\t//mydepot/test/README#2\n'
-            '+++ //mydepot/test/README\t1970-01-01 00:00:00\n'
-            '@@ -1 +1 @@\n'
-            '-This is a test.\n'
-            '+This is a mess.\n'
-            '--- //mydepot/test/COPYING\t//mydepot/test/COPYING#1\n'
-            '+++ //mydepot/test/COPYING\t1970-01-01 00:00:00\n'
-            '@@ -0,0 +1 @@\n'
-            '+Copyright 2013 Joe User.\n'
-            '--- //mydepot/test/Makefile\t//mydepot/test/Makefile#3\n'
-            '+++ //mydepot/test/Makefile\t1970-01-01 00:00:00\n'
-            '@@ -1 +0,0 @@\n'
-            '-all: all\n')
+        self._compare_diff(diff, '75c07955a503fc1a32efc671c18ff618')
 
     def test_diff_with_moved_files_cap_on(self):
         """Testing PerforceClient.diff with moved files and capability on"""
         self._test_diff_with_moved_files(
-            'Moved from: //mydepot/test/README\n'
-            'Moved to: //mydepot/test/README-new\n'
-            '--- //mydepot/test/README\t//mydepot/test/README#2\n'
-            '+++ //mydepot/test/README-new\t1970-01-01 00:00:00\n'
-            '@@ -1 +1 @@\n'
-            '-This is a test.\n'
-            '+This is a mess.\n'
-            '==== //mydepot/test/COPYING#2 ==MV== '
-            '//mydepot/test/COPYING-new ====\n\n',
+            '5926515eaf4cf6d8257a52f7d9f0e530',
             caps={
                 'scmtools': {
                     'perforce': {
@@ -960,25 +938,9 @@ class PerforceClientTests(SCMClientTests):
 
     def test_diff_with_moved_files_cap_off(self):
         """Testing PerforceClient.diff with moved files and capability off"""
-        self._test_diff_with_moved_files(
-            '--- //mydepot/test/README-new\t//mydepot/test/README-new#1\n'
-            '+++ //mydepot/test/README-new\t1970-01-01 00:00:00\n'
-            '@@ -0,0 +1 @@\n'
-            '+This is a mess.\n'
-            '--- //mydepot/test/README\t//mydepot/test/README#2\n'
-            '+++ //mydepot/test/README\t1970-01-01 00:00:00\n'
-            '@@ -1 +0,0 @@\n'
-            '-This is a test.\n'
-            '--- //mydepot/test/COPYING-new\t//mydepot/test/COPYING-new#1\n'
-            '+++ //mydepot/test/COPYING-new\t1970-01-01 00:00:00\n'
-            '@@ -0,0 +1 @@\n'
-            '+Copyright 2013 Joe User.\n'
-            '--- //mydepot/test/COPYING\t//mydepot/test/COPYING#2\n'
-            '+++ //mydepot/test/COPYING\t1970-01-01 00:00:00\n'
-            '@@ -1 +0,0 @@\n'
-            '-Copyright 2013 Joe User.\n')
+        self._test_diff_with_moved_files('2b9a7313c83ba21d90eadcc8408e437c')
 
-    def _test_diff_with_moved_files(self, expected_diff, caps={}):
+    def _test_diff_with_moved_files(self, expected_diff_hash, caps={}):
         client = self._build_client()
         client.capabilities = Capabilities(caps)
         client.p4.repo_files = {
@@ -1040,7 +1002,7 @@ class PerforceClientTests(SCMClientTests):
         }
 
         diff = client.diff(['12345'])
-        self._compare_diff(diff, expected_diff)
+        self._compare_diff(diff, expected_diff_hash)
 
     def _build_client(self):
         self.options.p4_client = 'myclient'
@@ -1050,7 +1012,7 @@ class PerforceClientTests(SCMClientTests):
         client.p4d_version = (2012, 2)
         return client
 
-    def _compare_diff(self, diff_info, expected_diff):
+    def _compare_diff(self, diff_info, expected_diff_hash):
         self.assertTrue(isinstance(diff_info, dict))
         self.assertEqual(len(diff_info), 1)
         self.assertTrue('diff' in diff_info)
@@ -1058,7 +1020,7 @@ class PerforceClientTests(SCMClientTests):
         diff_content = re.sub('\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}',
                               '1970-01-01 00:00:00',
                               diff_info['diff'])
-        self.assertEqual(diff_content, expected_diff)
+        self.assertEqual(md5(diff_content).hexdigest(), expected_diff_hash)
 
 
 class BazaarClientTests(SCMClientTests):
@@ -1080,7 +1042,7 @@ class BazaarClientTests(SCMClientTests):
         self._bzr_cmd(["add", file])
         self._bzr_cmd(["commit", "-m", msg, '--author', 'Test User'])
 
-    def _compare_diffs(self, filename, full_diff, expected_diff):
+    def _compare_diffs(self, filename, full_diff, expected_diff_digest):
         """
         Testing that the full_diff for ``filename`` matches the ``expected_diff``.
         """
@@ -1091,7 +1053,7 @@ class BazaarClientTests(SCMClientTests):
         self.assertTrue(diff_lines[2].startswith("+++ %s\t" % filename))
 
         diff_body = "\n".join(diff_lines[3:])
-        self.assertEqual(diff_body, expected_diff)
+        self.assertEqual(md5(diff_body).hexdigest(), expected_diff_digest)
 
     def setUp(self):
         super(BazaarClientTests, self).setUp()
@@ -1162,7 +1124,8 @@ class BazaarClientTests(SCMClientTests):
         self.assertEqual(len(result), 1)
         self.assertTrue('diff' in result)
 
-        self._compare_diffs("foo.txt", result['diff'], EXPECTED_BZR_DIFF_0)
+        self._compare_diffs('foo.txt', result['diff'],
+                            'a6326b53933f8b255a4b840485d8e210')
 
     def test_diff_specific_files(self):
         """Testing BazaarClient diff with specific files"""
@@ -1176,7 +1139,8 @@ class BazaarClientTests(SCMClientTests):
         self.assertEqual(len(result), 1)
         self.assertTrue('diff' in result)
 
-        self._compare_diffs("foo.txt", result['diff'], EXPECTED_BZR_DIFF_0)
+        self._compare_diffs('foo.txt', result['diff'],
+                            'a6326b53933f8b255a4b840485d8e210')
 
     def test_diff_simple_multiple(self):
         """Testing BazaarClient simple diff with multiple commits case"""
@@ -1191,7 +1155,8 @@ class BazaarClientTests(SCMClientTests):
         self.assertEqual(len(result), 1)
         self.assertTrue('diff' in result)
 
-        self._compare_diffs("foo.txt", result['diff'], EXPECTED_BZR_DIFF_1)
+        self._compare_diffs('foo.txt', result['diff'],
+                            '4109cc082dce22288c2f1baca9b107b6')
 
     def test_diff_parent(self):
         """Testing BazaarClient diff with changes only in the parent branch"""
@@ -1227,7 +1192,8 @@ class BazaarClientTests(SCMClientTests):
         self.assertEqual(len(result), 1)
         self.assertTrue('diff' in result)
 
-        self._compare_diffs("foo.txt", result['diff'], EXPECTED_BZR_DIFF_0)
+        self._compare_diffs("foo.txt", result['diff'],
+                            'a6326b53933f8b255a4b840485d8e210')
 
     def test_guessed_summary_and_description_in_diff(self):
         """Testing BazaarClient diff with summary and description guessed"""
@@ -1375,36 +1341,4 @@ unde Latinum, Albanique patres, atque altae
 moenia Romae. Albanique patres, atque altae
 moenia Romae. Musa, mihi causas memora, quo numine laeso,
 
-"""
-
-# Partial diff for Bazaar, excluding the initial comments because they contain
-# the time when it was generated:
-EXPECTED_BZR_DIFF_0 = """\
-@@ -6,7 +6,4 @@
- inferretque deos Latio, genus unde Latinum,
- Albanique patres, atque altae moenia Romae.
- Musa, mihi causas memora, quo numine laeso,
--quidve dolens, regina deum tot volvere casus
--insignem pietate virum, tot adire labores
--impulerit. Tantaene animis caelestibus irae?
- 
-"""
-
-EXPECTED_BZR_DIFF_1 = """\
-@@ -1,12 +1,11 @@
- ARMA virumque cano, Troiae qui primus ab oris
-+ARMA virumque cano, Troiae qui primus ab oris
- Italiam, fato profugus, Laviniaque venit
- litora, multum ille et terris iactatus et alto
- vi superum saevae memorem Iunonis ob iram;
--multa quoque et bello passus, dum conderet urbem,
-+dum conderet urbem,
- inferretque deos Latio, genus unde Latinum,
- Albanique patres, atque altae moenia Romae.
-+Albanique patres, atque altae moenia Romae.
- Musa, mihi causas memora, quo numine laeso,
--quidve dolens, regina deum tot volvere casus
--insignem pietate virum, tot adire labores
--impulerit. Tantaene animis caelestibus irae?
- 
 """
