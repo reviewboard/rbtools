@@ -30,6 +30,8 @@ class SCMClientTests(RBTestBase):
 
         self.options = OptionsStub()
 
+        self.clients_dir = os.path.dirname(__file__)
+
 
 class GitClientTests(SCMClientTests):
     TESTSERVER = "http://127.0.0.1:8080"
@@ -58,9 +60,8 @@ class GitClientTests(SCMClientTests):
         if not self.is_exe_in_path('git'):
             raise SkipTest('git not found in path')
 
-        thisdir = os.path.dirname(__file__)
-        self.set_user_home(os.path.join(thisdir, 'homedir'))
-        self.git_dir = os.path.join(thisdir, 'testdata', 'git-repo')
+        self.set_user_home(os.path.join(self.clients_dir, 'homedir'))
+        self.git_dir = os.path.join(self.clients_dir, 'testdata', 'git-repo')
 
         self.clone_dir = self.chdir_tmp()
         self._run_git(['clone', self.git_dir, self.clone_dir])
@@ -326,16 +327,9 @@ class MercurialClientTests(MercurialTestBase):
         if not self.is_exe_in_path('hg'):
             raise SkipTest('hg not found in path')
 
-        self.hg_dir = self.chdir_tmp()
-        self._hgcmd(['init'], hg_dir=self.hg_dir)
-        foo = open(os.path.join(self.hg_dir, 'foo.txt'), 'w')
-        foo.write(FOO)
-        foo.close()
+        self.hg_dir = os.path.join(self.clients_dir, 'testdata', 'hg-repo')
+        self.clone_dir = self.chdir_tmp()
 
-        self._hgcmd(['add', 'foo.txt'])
-        self._hgcmd(['commit', '-m', 'initial commit'])
-
-        self.clone_dir = self.chdir_tmp(self.hg_dir)
         self._hgcmd(['clone', self.hg_dir, self.clone_dir])
         self.client = MercurialClient(options=self.options)
 
@@ -357,10 +351,6 @@ class MercurialClientTests(MercurialTestBase):
     @property
     def clone_hgrc_path(self):
         return os.path.join(self.clone_dir, '.hg', 'hgrc')
-
-    @property
-    def hgrc_path(self):
-        return os.path.join(self.hg_dir, '.hg', 'hgrc')
 
     def testGetRepositoryInfoSimple(self):
         """Testing MercurialClient get_repository_info, simple case"""
