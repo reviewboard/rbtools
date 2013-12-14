@@ -3,6 +3,8 @@ import re
 import sys
 
 from rbtools.clients import SCMClient, RepositoryInfo
+from rbtools.clients.errors import (InvalidRevisionSpecError,
+                                    TooManyRevisionsError)
 from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.svn import SVNClient, SVNRepositoryInfo
 from rbtools.utils.checks import check_install
@@ -24,9 +26,106 @@ class GitClient(SCMClient):
         # default.
         self.git = 'git'
 
-    def _strip_heads_prefix(self, ref):
-        """ Strips prefix from ref name, if possible """
-        return re.sub(r'^refs/heads/', '', ref)
+    def parse_revision_spec(self, revisions=[]):
+        """Parses the given revision spec.
+
+        The 'revisions' argument is a list of revisions as specified by the
+        user. Items in the list do not necessary represent a single revision,
+        since the user can use SCM-native syntaxes such as "r1..r2" or "r1:r2".
+        SCMTool-specific overrides of this method are expected to deal with
+        such syntaxes.
+
+        This will return a dictionary with the following keys:
+            'base':        A revision to use as the base of the resulting diff.
+            'tip':         A revision to use as the tip of the resulting diff.
+            'parent_base': (optional) The revision to use as the base of a
+                           parent diff.
+
+        These will be used to generate the diffs to upload to Review Board (or
+        print). The diff for review will include the changes in (base, tip],
+        and the parent diff (if necessary) will include (parent_base, base].
+
+        If a single revision is passed in, this will return the parent of that
+        revision for 'base' and the passed-in revision for 'tip'.
+
+        If zero revisions are passed in, this will return the current HEAD as
+        'tip', and the upstream branch as 'base', taking into account parent
+        branches explicitly specified via --parent.
+        """
+        n_revs = len(revisions)
+        result = {}
+
+        if n_revs == 0:
+            # No revisions were passed in--start with HEAD, and find the
+            # tracking branch automatically.
+            parent_branch = self.get_parent_branch()
+            head_ref = self._rev_parse(self.get_head_ref())[0]
+            merge_base = self._rev_parse(
+                self._get_merge_base(head_ref, self.upstream_branch))[0]
+
+            result = {
+                'tip': head_ref,
+            }
+
+            if parent_branch:
+                result['base'] = self._rev_parse(parent_branch)[0]
+                result['parent_base'] = merge_base
+            else:
+                result['base'] = merge_base
+        elif n_revs == 1 or n_revs == 2:
+            # Let `git rev-parse` sort things out.
+            parsed = self._rev_parse(revisions)
+
+            n_parsed_revs = len(parsed)
+            assert n_parsed_revs <= 3
+
+            if n_parsed_revs == 1:
+                # Single revision. Extract the parent of that revision to use
+                # as the base.
+                parent = self._rev_parse('%s^' % parsed[0])[0]
+                result = {
+                    'base': parent,
+                    'tip': parsed[0],
+                }
+            elif n_parsed_revs == 2:
+                if parsed[1].startswith('^'):
+                    # Passed in revisions were probably formatted as
+                    # "base..tip". The rev-parse output includes all ancestors
+                    # of the first part, and none of the ancestors of the
+                    # second. Basically, the second part is the base (after
+                    # stripping the ^ prefix) and the first is the tip.
+                    result = {
+                        'base': parsed[1][1:],
+                        'tip': parsed[0],
+                    }
+                else:
+                    # First revision is base, second is tip
+                    result = {
+                        'base': parsed[0],
+                        'tip': parsed[1],
+                    }
+            elif n_parsed_revs == 3 and parsed[2].startswith('^'):
+                # Revision spec is diff-since-merge. Find the merge-base of the
+                # two revs to use as base.
+                merge_base = execute([self.git, 'merge-base', parsed[0],
+                                      parsed[1]]).strip()
+                result = {
+                    'base': merge_base,
+                    'tip': parsed[0],
+                }
+            else:
+                raise InvalidRevisionSpecError(
+                    'Unexpected result while parsing revision spec')
+
+            pdiff_required = not execute(
+                [self.git, 'branch', '-r', '--contains', result['base']])
+            if pdiff_required:
+                result['parent_base'] = self._get_merge_base(result['base'],
+                                                             self.upstream_branch)
+        else:
+            raise TooManyRevisionsError
+
+        return result
 
     def get_repository_info(self):
         if not check_install(['git', '--help']):
@@ -189,6 +288,10 @@ class GitClient(SCMClient):
 
         return None
 
+    def _strip_heads_prefix(self, ref):
+        """Strips prefix from ref name, if possible."""
+        return re.sub(r'^refs/heads/', '', ref)
+
     def get_origin(self, default_upstream_branch=None, ignore_errors=False):
         """Get upstream remote origin from options or parameters.
 
@@ -266,7 +369,7 @@ class GitClient(SCMClient):
         else:
             parent_branch = self.get_parent_branch()
             head_ref = self.get_head_ref()
-            merge_base = self.get_merge_base(head_ref)
+            merge_base = self._get_merge_base(head_ref, self.upstream_branch)
             command = [self.git, "log", "--pretty=format:%s%n%n%b",
                        (parent_branch or merge_base) + ".."]
 
@@ -310,36 +413,60 @@ class GitClient(SCMClient):
 
         return head_ref
 
-    def get_merge_base(self, head_ref):
+    def _get_merge_base(self, rev1, rev2):
         """Returns the merge base."""
-        return execute([self.git, "merge-base",
-                        self.upstream_branch,
-                        head_ref]).strip()
+        return execute([self.git, "merge-base", rev1, rev2]).strip()
 
-    def diff(self, args):
-        """Performs a diff across all modified files in the branch.
+    def _rev_parse(self, revisions):
+        """Runs `git rev-parse` and returns a list of revisions."""
+        if not isinstance(revisions, list):
+            revisions = [revisions]
 
-        The diff takes into account of the parent branch.
+        return execute([self.git, 'rev-parse'] + revisions).strip().split('\n')
+
+    def _diff(self, revisions):
         """
-        parent_branch = self.get_parent_branch()
-        head_ref = self.get_head_ref()
-        self.merge_base = self.get_merge_base(head_ref)
+        Handle the internals of generating a diff from the given revisions.
+        """
+        # TODO: this will get refactored yet again once all the SCMClients
+        # implement the revision parsing method and 'rbt post' and
+        # 'post-review' get changed to orchestrate the whole process.
+        revisions = self.parse_revision_spec(revisions)
 
-        if parent_branch:
-            diff_lines = self.make_diff(parent_branch)
-            parent_diff_lines = self.make_diff(self.merge_base, parent_branch)
+        diff_lines = self.make_diff(revisions['base'], revisions['tip'])
+
+        if 'parent_base' in revisions:
+            parent_diff_lines = self.make_diff(revisions['parent_base'],
+                                               revisions['base'])
+            base_commit_id = revisions['parent_base']
         else:
-            diff_lines = self.make_diff(self.merge_base, head_ref)
             parent_diff_lines = None
-
-        self._set_summary()
-        self._set_description()
+            base_commit_id = revisions['base']
 
         return {
             'diff': diff_lines,
             'parent_diff': parent_diff_lines,
-            'base_commit_id': self.merge_base,
+            'base_commit_id': base_commit_id,
         }
+
+    def diff(self, args):
+        """Performs a diff across all modified files in the branch.
+
+        The diff takes into account the parent branch.
+        """
+        # TODO: this should use the parsed revisions
+        self._set_summary()
+        self._set_description()
+
+        return self._diff([])
+
+    def diff_between_revisions(self, revision_range, args, repository_info):
+        """Perform a diff between two arbitrary revisions."""
+        # TODO: this should use the parsed revisions
+        self._set_summary(revision_range)
+        self._set_description(revision_range)
+
+        return self._diff([revision_range])
 
     def make_diff(self, ancestor, commit=""):
         """Performs a diff on a particular branch range."""
@@ -481,50 +608,6 @@ class GitClient(SCMClient):
                 diff_data += line
 
         return diff_data
-
-    def diff_between_revisions(self, revision_range, args, repository_info):
-        """Perform a diff between two arbitrary revisions"""
-        head_ref = self.get_head_ref()
-
-        # Make a parent diff to the first of the revisions so that we
-        # never end up with broken patches:
-        self.merge_base = self.get_merge_base(head_ref)
-
-        if ":" not in revision_range:
-            # only one revision is specified
-
-            # Check if parent contains the first revision and make a
-            # parent diff if not:
-            pdiff_required = not execute([self.git, "branch", "-r",
-                                          "--contains", revision_range])
-            parent_diff_lines = None
-
-            if pdiff_required:
-                parent_diff_lines = self.make_diff(self.merge_base,
-                                                   revision_range)
-
-            diff_lines = self.make_diff(revision_range)
-        else:
-            r1, r2 = revision_range.split(":")
-            # Check if parent contains the first revision and make a
-            # parent diff if not:
-            pdiff_required = not execute([self.git, "branch", "-r",
-                                          "--contains", r1])
-            parent_diff_lines = None
-
-            if pdiff_required:
-                parent_diff_lines = self.make_diff(self.merge_base, r1)
-
-            diff_lines = self.make_diff(r1, r2)
-
-        self._set_summary(revision_range)
-        self._set_description(revision_range)
-
-        return {
-            'diff': diff_lines,
-            'parent_diff': parent_diff_lines,
-            'base_commit_id': self.merge_base,
-        }
 
     def has_pending_changes(self):
         """Checks if there are changes waiting to be committed.

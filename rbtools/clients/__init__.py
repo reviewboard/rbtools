@@ -50,6 +50,38 @@ class SCMClient(object):
 
         return server_url
 
+    def parse_revision_spec(self, revisions=[]):
+        """Parses the given revision spec.
+
+        The 'revisions' argument is a list of revisions as specified by the
+        user. Items in the list do not necessary represent a single revision,
+        since the user can use SCM-native syntaxes such as "r1..r2" or "r1:r2".
+        SCMTool-specific overrides of this method are expected to deal with
+        such syntaxes.
+
+        This will return a dictionary with the following keys:
+            'base':        A revision to use as the base of the resulting diff.
+            'tip':         A revision to use as the tip of the resulting diff.
+            'parent_base': (optional) The revision to use as the base of a
+                           parent diff.
+
+        These will be used to generate the diffs to upload to Review Board (or
+        print). The diff for review will include the changes in (base, tip],
+        and the parent diff (if necessary) will include (parent, base].
+
+        If a single revision is passed in, this will return the parent of that
+        revision for 'base' and the passed-in revision for 'tip'.
+
+        If zero revisions are passed in, this will return revisions relevant
+        for the "current change". The exact definition of what "current" means
+        is specific to each SCMTool backend, and documented in the
+        implementation classes.
+        """
+        return {
+            'base': None,
+            'tip': None,
+        }
+
     def diff(self, args):
         """
         Returns the generated diff and optional parent diff for this
