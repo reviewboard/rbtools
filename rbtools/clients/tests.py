@@ -274,14 +274,7 @@ class MercurialTestBase(SCMClientTests):
         super(MercurialTestBase, self).setUp()
         self._hg_env = {}
 
-    def _hgcmd(self, command, split_lines=False,
-               ignore_errors=False, extra_ignore_errors=(),
-               translate_newlines=True, hg_dir=None):
-        if hg_dir:
-            full_command = ['hg', '--cwd', hg_dir]
-        else:
-            full_command = ['hg']
-
+    def _run_hg(self, command, ignore_errors=False, extra_ignore_errors=()):
         # We're *not* doing `env = env or {}` here because
         # we want the caller to be able to *enable* reading
         # of user and system-level hgrc configuration.
@@ -293,19 +286,19 @@ class MercurialTestBase(SCMClientTests):
                 'HGPLAIN': '1',
             }
 
-        full_command.extend(command)
-
-        return execute(full_command, env, split_lines, ignore_errors,
-                       extra_ignore_errors, translate_newlines)
+        return execute(['hg'] + command, env, split_lines=False,
+                       ignore_errors=ignore_errors,
+                       extra_ignore_errors=extra_ignore_errors,
+                       translate_newlines=True)
 
     def _hg_add_file_commit(self, filename, data, msg, branch=None):
         outfile = open(filename, 'w')
         outfile.write(data)
         outfile.close()
         if branch:
-            self._hgcmd(['branch', branch])
-        self._hgcmd(['add', filename])
-        self._hgcmd(['commit', '-m', msg])
+            self._run_hg(['branch', branch])
+        self._run_hg(['add', filename])
+        self._run_hg(['commit', '-m', msg])
 
 
 class MercurialClientTests(MercurialTestBase):
@@ -330,7 +323,7 @@ class MercurialClientTests(MercurialTestBase):
         self.hg_dir = os.path.join(self.clients_dir, 'testdata', 'hg-repo')
         self.clone_dir = self.chdir_tmp()
 
-        self._hgcmd(['clone', self.hg_dir, self.clone_dir])
+        self._run_hg(['clone', self.hg_dir, self.clone_dir])
         self.client = MercurialClient(options=self.options)
 
         clone_hgrc = open(self.clone_hgrc_path, 'wb')
@@ -429,7 +422,7 @@ class MercurialClientTests(MercurialTestBase):
         """Testing MercurialClient diff with diverged branch"""
         self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
 
-        self._hgcmd(['branch', 'diverged'])
+        self._run_hg(['branch', 'diverged'])
         self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
         self.client.get_repository_info()
 
@@ -440,7 +433,7 @@ class MercurialClientTests(MercurialTestBase):
         self.assertEqual(md5(result['diff']).hexdigest(),
                          '6b12723baab97f346aa938005bc4da4d')
 
-        self._hgcmd(['update', '-C', 'default'])
+        self._run_hg(['update', '-C', 'default'])
         self.client.get_repository_info()
 
         result = self.client.diff(None)
@@ -507,8 +500,8 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self._stub_in_config_and_options()
 
     def _has_hgsubversion(self):
-        output = self._hgcmd(['svn', '--help'],
-                             ignore_errors=True, extra_ignore_errors=(255))
+        output = self._run_hg(['svn', '--help'],
+                              ignore_errors=True, extra_ignore_errors=(255))
 
         return not re.search("unknown command ['\"]svn['\"]", output, re.I)
 
@@ -569,7 +562,7 @@ class MercurialSubversionClientTests(MercurialTestBase):
 
     def _get_testing_clone(self):
         self.clone_dir = os.path.join(self._tmpbase, 'checkout.hg')
-        self._hgcmd([
+        self._run_hg([
             'clone', 'svn://127.0.0.1:%s/svnrepo' % self._svnserve_port,
             self.clone_dir,
         ])
@@ -642,8 +635,8 @@ class MercurialSubversionClientTests(MercurialTestBase):
         execute(['svn', 'commit', '-m', 'adding reviewboard:url property'])
 
         os.chdir(self.clone_dir)
-        self._hgcmd(['pull'])
-        self._hgcmd(['update', '-C'])
+        self._run_hg(['pull'])
+        self._run_hg(['update', '-C'])
 
         ri = self.client.get_repository_info()
 
