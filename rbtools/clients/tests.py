@@ -2,11 +2,13 @@ import os
 import re
 import sys
 import time
-from nose import SkipTest
-from nose.tools import raises
+from hashlib import md5
 from random import randint
 from tempfile import mktemp
 from textwrap import dedent
+
+from nose import SkipTest
+from nose.tools import raises
 
 from rbtools.api.capabilities import Capabilities
 from rbtools.clients import RepositoryInfo
@@ -31,18 +33,10 @@ class SCMClientTests(RBTestBase):
 class GitClientTests(SCMClientTests):
     TESTSERVER = "http://127.0.0.1:8080"
 
-    def _gitcmd(self, command, env=None, split_lines=False,
-                ignore_errors=False, extra_ignore_errors=(),
-                translate_newlines=True, git_dir=None):
-        if git_dir:
-            full_command = ['git', '--git-dir=%s/.git' % git_dir]
-        else:
-            full_command = ['git']
-
-        full_command.extend(command)
-
-        return execute(full_command, env, split_lines, ignore_errors,
-                       extra_ignore_errors, translate_newlines)
+    def _run_git(self, command):
+        return execute(['git'] + command, env=None, split_lines=False,
+                       ignore_errors=False, extra_ignore_errors=(),
+                       translate_newlines=True)
 
     def _git_add_file_commit(self, file, data, msg):
         """Add a file to a git repository with the content of data
@@ -51,11 +45,11 @@ class GitClientTests(SCMClientTests):
         foo = open(file, 'w')
         foo.write(data)
         foo.close()
-        self._gitcmd(['add', file])
-        self._gitcmd(['commit', '-m', msg])
+        self._run_git(['add', file])
+        self._run_git(['commit', '-m', msg])
 
     def _git_get_head(self):
-        return self._gitcmd(['rev-parse', 'HEAD']).strip()
+        return self._run_git(['rev-parse', 'HEAD']).strip()
 
     def setUp(self):
         super(GitClientTests, self).setUp()
@@ -63,23 +57,12 @@ class GitClientTests(SCMClientTests):
         if not self.is_exe_in_path('git'):
             raise SkipTest('git not found in path')
 
-        gitconfig = open(os.path.join(self.get_user_home(), '.gitconfig'), 'w')
-        gitconfig.write("[user]\n")
-        gitconfig.write("\tname = test\n")
-        gitconfig.write("\temail = test@test.com\n")
-        gitconfig.close()
+        thisdir = os.path.dirname(__file__)
+        self.set_user_home(os.path.join(thisdir, 'homedir'))
+        self.git_dir = os.path.join(thisdir, 'testdata', 'git-repo')
 
-        self.git_dir = self.chdir_tmp()
-        self._gitcmd(['init'], git_dir=self.git_dir)
-        foo = open(os.path.join(self.git_dir, 'foo.txt'), 'w')
-        foo.write(FOO)
-        foo.close()
-
-        self._gitcmd(['add', 'foo.txt'])
-        self._gitcmd(['commit', '-m', 'initial commit'])
-
-        self.clone_dir = self.chdir_tmp(self.git_dir)
-        self._gitcmd(['clone', self.git_dir, self.clone_dir])
+        self.clone_dir = self.chdir_tmp()
+        self._run_git(['clone', self.git_dir, self.clone_dir])
         self.client = GitClient(options=self.options)
 
         self.user_config = {}
@@ -89,23 +72,23 @@ class GitClientTests(SCMClientTests):
         self.options.parent_branch = None
 
     def test_get_repository_info_simple(self):
-        """Test GitClient get_repository_info, simple case"""
+        """Testing GitClient get_repository_info, simple case"""
         ri = self.client.get_repository_info()
-        self.assert_(isinstance(ri, RepositoryInfo))
+        self.assertTrue(isinstance(ri, RepositoryInfo))
         self.assertEqual(ri.base_path, '')
         self.assertEqual(ri.path.rstrip("/.git"), self.git_dir)
         self.assertTrue(ri.supports_parent_diffs)
         self.assertFalse(ri.supports_changesets)
 
     def test_scan_for_server_simple(self):
-        """Test GitClient scan_for_server, simple case"""
+        """Testing GitClient scan_for_server, simple case"""
         ri = self.client.get_repository_info()
 
         server = self.client.scan_for_server(ri)
-        self.assert_(server is None)
+        self.assertTrue(server is None)
 
     def test_scan_for_server_reviewboardrc(self):
-        "Test GitClient scan_for_server, .reviewboardrc case"""
+        "Testing GitClient scan_for_server, .reviewboardrc case"""
         rc = open(os.path.join(self.clone_dir, '.reviewboardrc'), 'w')
         rc.write('REVIEWBOARD_URL = "%s"' % self.TESTSERVER)
         rc.close()
@@ -116,28 +99,14 @@ class GitClientTests(SCMClientTests):
         self.assertEqual(server, self.TESTSERVER)
 
     def test_scan_for_server_property(self):
-        """Test GitClient scan_for_server using repo property"""
-        self._gitcmd(['config', 'reviewboard.url', self.TESTSERVER])
+        """Testing GitClient scan_for_server using repo property"""
+        self._run_git(['config', 'reviewboard.url', self.TESTSERVER])
         ri = self.client.get_repository_info()
 
         self.assertEqual(self.client.scan_for_server(ri), self.TESTSERVER)
 
     def test_diff_simple(self):
-        """Test GitClient simple diff case"""
-        diff = "diff --git a/foo.txt b/foo.txt\n" \
-               "index 634b3e8ff85bada6f928841a9f2c505560840b3a..5e98e9540e1" \
-               "b741b5be24fcb33c40c1c8069c1fb 100644\n" \
-               "--- a/foo.txt\n" \
-               "+++ b/foo.txt\n" \
-               "@@ -6,7 +6,4 @@ multa quoque et bello passus, dum conderet u" \
-               "rbem,\n" \
-               " inferretque deos Latio, genus unde Latinum,\n" \
-               " Albanique patres, atque altae moenia Romae.\n" \
-               " Musa, mihi causas memora, quo numine laeso,\n" \
-               "-quidve dolens, regina deum tot volvere casus\n" \
-               "-insignem pietate virum, tot adire labores\n" \
-               "-impulerit. Tantaene animis caelestibus irae?\n" \
-               " \n"
+        """Testing GitClient simple diff case"""
         self.client.get_repository_info()
         base_commit_id = self._git_get_head()
 
@@ -149,33 +118,13 @@ class GitClientTests(SCMClientTests):
         self.assertTrue('diff' in result)
         self.assertTrue('parent_diff' in result)
         self.assertTrue('base_commit_id' in result)
-        self.assertEqual(result['diff'], diff)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '69d4616cf985f6b10571036db744e2d8')
         self.assertEqual(result['parent_diff'], None)
         self.assertEqual(result['base_commit_id'], base_commit_id)
 
     def test_diff_simple_multiple(self):
-        """Test GitClient simple diff with multiple commits case"""
-        diff = "diff --git a/foo.txt b/foo.txt\n" \
-               "index 634b3e8ff85bada6f928841a9f2c505560840b3a..63036ed3fca" \
-               "fe870d567a14dd5884f4fed70126c 100644\n" \
-               "--- a/foo.txt\n" \
-               "+++ b/foo.txt\n" \
-               "@@ -1,12 +1,11 @@\n" \
-               " ARMA virumque cano, Troiae qui primus ab oris\n" \
-               "+ARMA virumque cano, Troiae qui primus ab oris\n" \
-               " Italiam, fato profugus, Laviniaque venit\n" \
-               " litora, multum ille et terris iactatus et alto\n" \
-               " vi superum saevae memorem Iunonis ob iram;\n" \
-               "-multa quoque et bello passus, dum conderet urbem,\n" \
-               "+dum conderet urbem,\n" \
-               " inferretque deos Latio, genus unde Latinum,\n" \
-               " Albanique patres, atque altae moenia Romae.\n" \
-               "+Albanique patres, atque altae moenia Romae.\n" \
-               " Musa, mihi causas memora, quo numine laeso,\n" \
-               "-quidve dolens, regina deum tot volvere casus\n" \
-               "-insignem pietate virum, tot adire labores\n" \
-               "-impulerit. Tantaene animis caelestibus irae?\n" \
-               " \n"
+        """Testing GitClient simple diff with multiple commits case"""
         self.client.get_repository_info()
 
         base_commit_id = self._git_get_head()
@@ -190,50 +139,15 @@ class GitClientTests(SCMClientTests):
         self.assertTrue('diff' in result)
         self.assertTrue('parent_diff' in result)
         self.assertTrue('base_commit_id' in result)
-        self.assertEqual(result['diff'], diff)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         'c9a31264f773406edff57a8ed10d9acc')
         self.assertEqual(result['parent_diff'], None)
         self.assertEqual(result['base_commit_id'], base_commit_id)
 
     def test_diff_branch_diverge(self):
-        """Test GitClient diff with divergent branches"""
-        diff1 = "diff --git a/foo.txt b/foo.txt\n" \
-                "index 634b3e8ff85bada6f928841a9f2c505560840b3a..e619c1387f" \
-                "5feb91f0ca83194650bfe4f6c2e347 100644\n" \
-                "--- a/foo.txt\n" \
-                "+++ b/foo.txt\n" \
-                "@@ -1,4 +1,6 @@\n" \
-                " ARMA virumque cano, Troiae qui primus ab oris\n" \
-                "+ARMA virumque cano, Troiae qui primus ab oris\n" \
-                "+ARMA virumque cano, Troiae qui primus ab oris\n" \
-                " Italiam, fato profugus, Laviniaque venit\n" \
-                " litora, multum ille et terris iactatus et alto\n" \
-                " vi superum saevae memorem Iunonis ob iram;\n" \
-                "@@ -6,7 +8,4 @@ multa quoque et bello passus, dum conderet " \
-                "urbem,\n" \
-                " inferretque deos Latio, genus unde Latinum,\n" \
-                " Albanique patres, atque altae moenia Romae.\n" \
-                " Musa, mihi causas memora, quo numine laeso,\n" \
-                "-quidve dolens, regina deum tot volvere casus\n" \
-                "-insignem pietate virum, tot adire labores\n" \
-                "-impulerit. Tantaene animis caelestibus irae?\n" \
-                " \n"
-        diff2 = "diff --git a/foo.txt b/foo.txt\n" \
-                "index 634b3e8ff85bada6f928841a9f2c505560840b3a..5e98e9540e1" \
-                "b741b5be24fcb33c40c1c8069c1fb 100644\n" \
-                "--- a/foo.txt\n" \
-                "+++ b/foo.txt\n" \
-                "@@ -6,7 +6,4 @@ multa quoque et bello passus, dum conderet "\
-                "urbem,\n" \
-                " inferretque deos Latio, genus unde Latinum,\n" \
-                " Albanique patres, atque altae moenia Romae.\n" \
-                " Musa, mihi causas memora, quo numine laeso,\n" \
-                "-quidve dolens, regina deum tot volvere casus\n" \
-                "-insignem pietate virum, tot adire labores\n" \
-                "-impulerit. Tantaene animis caelestibus irae?\n" \
-                " \n"
-
+        """Testing GitClient diff with divergent branches"""
         self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
-        self._gitcmd(['checkout', '-b', 'mybranch', '--track',
+        self._run_git(['checkout', '-b', 'mybranch', '--track',
                       'origin/master'])
         base_commit_id = self._git_get_head()
         self._git_add_file_commit('foo.txt', FOO2, 'commit 2')
@@ -245,11 +159,12 @@ class GitClientTests(SCMClientTests):
         self.assertTrue('diff' in result)
         self.assertTrue('parent_diff' in result)
         self.assertTrue('base_commit_id' in result)
-        self.assertEqual(result['diff'], diff1)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         'cfb79a46f7a35b07e21765608a7852f7')
         self.assertEqual(result['parent_diff'], None)
         self.assertEqual(result['base_commit_id'], base_commit_id)
 
-        self._gitcmd(['checkout', 'master'])
+        self._run_git(['checkout', 'master'])
         self.client.get_repository_info()
 
         result = self.client.diff(None)
@@ -258,29 +173,16 @@ class GitClientTests(SCMClientTests):
         self.assertTrue('diff' in result)
         self.assertTrue('parent_diff' in result)
         self.assertTrue('base_commit_id' in result)
-        self.assertEqual(result['diff'], diff2)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '69d4616cf985f6b10571036db744e2d8')
         self.assertEqual(result['parent_diff'], None)
         self.assertEqual(result['base_commit_id'], base_commit_id)
 
     def test_diff_tracking_no_origin(self):
-        """Test GitClient diff with a tracking branch, but no origin remote"""
-        diff = "diff --git a/foo.txt b/foo.txt\n" \
-               "index 634b3e8ff85bada6f928841a9f2c505560840b3a..5e98e9540e1b" \
-               "741b5be24fcb33c40c1c8069c1fb 100644\n" \
-               "--- a/foo.txt\n" \
-               "+++ b/foo.txt\n" \
-               "@@ -6,7 +6,4 @@ multa quoque et bello passus, dum conderet " \
-               "urbem,\n" \
-               " inferretque deos Latio, genus unde Latinum,\n" \
-               " Albanique patres, atque altae moenia Romae.\n" \
-               " Musa, mihi causas memora, quo numine laeso,\n" \
-               "-quidve dolens, regina deum tot volvere casus\n" \
-               "-insignem pietate virum, tot adire labores\n" \
-               "-impulerit. Tantaene animis caelestibus irae?\n" \
-               " \n"
-        self._gitcmd(['remote', 'add', 'quux', self.git_dir])
-        self._gitcmd(['fetch', 'quux'])
-        self._gitcmd(['checkout', '-b', 'mybranch', '--track', 'quux/master'])
+        """Testing GitClient diff with a tracking branch, but no origin remote"""
+        self._run_git(['remote', 'add', 'quux', self.git_dir])
+        self._run_git(['fetch', 'quux'])
+        self._run_git(['checkout', '-b', 'mybranch', '--track', 'quux/master'])
 
         base_commit_id = self._git_get_head()
         self._git_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
@@ -293,37 +195,17 @@ class GitClientTests(SCMClientTests):
         self.assertTrue('diff' in result)
         self.assertTrue('parent_diff' in result)
         self.assertTrue('base_commit_id' in result)
-        self.assertEqual(result['diff'], diff)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '69d4616cf985f6b10571036db744e2d8')
         self.assertEqual(result['parent_diff'], None)
         self.assertEqual(result['base_commit_id'], base_commit_id)
 
     def test_diff_local_tracking(self):
-        """Test GitClient diff with a local tracking branch"""
-        diff = "diff --git a/foo.txt b/foo.txt\n" \
-               "index 634b3e8ff85bada6f928841a9f2c505560840b3a..e619c1387f5" \
-               "feb91f0ca83194650bfe4f6c2e347 100644\n" \
-               "--- a/foo.txt\n" \
-               "+++ b/foo.txt\n" \
-               "@@ -1,4 +1,6 @@\n" \
-               " ARMA virumque cano, Troiae qui primus ab oris\n" \
-               "+ARMA virumque cano, Troiae qui primus ab oris\n" \
-               "+ARMA virumque cano, Troiae qui primus ab oris\n" \
-               " Italiam, fato profugus, Laviniaque venit\n" \
-               " litora, multum ille et terris iactatus et alto\n" \
-               " vi superum saevae memorem Iunonis ob iram;\n" \
-               "@@ -6,7 +8,4 @@ multa quoque et bello passus, dum conderet " \
-               "urbem,\n" \
-               " inferretque deos Latio, genus unde Latinum,\n" \
-               " Albanique patres, atque altae moenia Romae.\n" \
-               " Musa, mihi causas memora, quo numine laeso,\n" \
-               "-quidve dolens, regina deum tot volvere casus\n" \
-               "-insignem pietate virum, tot adire labores\n" \
-               "-impulerit. Tantaene animis caelestibus irae?\n" \
-               " \n"
+        """Testing GitClient diff with a local tracking branch"""
         base_commit_id = self._git_get_head()
         self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
 
-        self._gitcmd(['checkout', '-b', 'mybranch', '--track', 'master'])
+        self._run_git(['checkout', '-b', 'mybranch', '--track', 'master'])
         self._git_add_file_commit('foo.txt', FOO2, 'commit 2')
 
         self.client.get_repository_info()
@@ -334,31 +216,18 @@ class GitClientTests(SCMClientTests):
         self.assertTrue('diff' in result)
         self.assertTrue('parent_diff' in result)
         self.assertTrue('base_commit_id' in result)
-        self.assertEqual(result['diff'], diff)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         'cfb79a46f7a35b07e21765608a7852f7')
         self.assertEqual(result['parent_diff'], None)
         self.assertEqual(result['base_commit_id'], base_commit_id)
 
     def test_diff_tracking_override(self):
-        """Test GitClient diff with option override for tracking branch"""
-        diff = "diff --git a/foo.txt b/foo.txt\n" \
-               "index 634b3e8ff85bada6f928841a9f2c505560840b3a..5e98e9540e1" \
-               "b741b5be24fcb33c40c1c8069c1fb 100644\n" \
-               "--- a/foo.txt\n" \
-               "+++ b/foo.txt\n" \
-               "@@ -6,7 +6,4 @@ multa quoque et bello passus, dum conderet " \
-               "urbem,\n" \
-               " inferretque deos Latio, genus unde Latinum,\n" \
-               " Albanique patres, atque altae moenia Romae.\n" \
-               " Musa, mihi causas memora, quo numine laeso,\n" \
-               "-quidve dolens, regina deum tot volvere casus\n" \
-               "-insignem pietate virum, tot adire labores\n" \
-               "-impulerit. Tantaene animis caelestibus irae?\n" \
-               " \n"
+        """Testing GitClient diff with option override for tracking branch"""
         self.options.tracking = 'origin/master'
 
-        self._gitcmd(['remote', 'add', 'bad', self.git_dir])
-        self._gitcmd(['fetch', 'bad'])
-        self._gitcmd(['checkout', '-b', 'mybranch', '--track', 'bad/master'])
+        self._run_git(['remote', 'add', 'bad', self.git_dir])
+        self._run_git(['fetch', 'bad'])
+        self._run_git(['checkout', '-b', 'mybranch', '--track', 'bad/master'])
 
         base_commit_id = self._git_get_head()
 
@@ -371,32 +240,16 @@ class GitClientTests(SCMClientTests):
         self.assertTrue('diff' in result)
         self.assertTrue('parent_diff' in result)
         self.assertTrue('base_commit_id' in result)
-        self.assertEqual(result['diff'], diff)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '69d4616cf985f6b10571036db744e2d8')
         self.assertEqual(result['parent_diff'], None)
         self.assertEqual(result['base_commit_id'], base_commit_id)
 
     def test_diff_slash_tracking(self):
-        """Test GitClient diff with tracking branch that has slash in its name."""
-        diff = "diff --git a/foo.txt b/foo.txt\n" \
-               "index 5e98e9540e1b741b5be24fcb33c40c1c8069c1fb..e619c1387f5f" \
-               "eb91f0ca83194650bfe4f6c2e347 100644\n" \
-               "--- a/foo.txt\n" \
-               "+++ b/foo.txt\n" \
-               "@@ -1,4 +1,6 @@\n" \
-               " ARMA virumque cano, Troiae qui primus ab oris\n" \
-               "+ARMA virumque cano, Troiae qui primus ab oris\n" \
-               "+ARMA virumque cano, Troiae qui primus ab oris\n" \
-               " Italiam, fato profugus, Laviniaque venit\n" \
-               " litora, multum ille et terris iactatus et alto\n" \
-               " vi superum saevae memorem Iunonis ob iram;\n"
-        os.chdir(self.git_dir)
-        self._gitcmd(['checkout', '-b', 'not-master'])
-        self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
-
-        os.chdir(self.clone_dir)
-        self._gitcmd(['fetch', 'origin'])
-        self._gitcmd(['checkout', '-b', 'my/branch', '--track',
-                      'origin/not-master'])
+        """Testing GitClient diff with tracking branch that has slash in its name."""
+        self._run_git(['fetch', 'origin'])
+        self._run_git(['checkout', '-b', 'my/branch', '--track',
+                       'origin/not-master'])
         base_commit_id = self._git_get_head()
         self._git_add_file_commit('foo.txt', FOO2, 'commit 2')
 
@@ -408,7 +261,8 @@ class GitClientTests(SCMClientTests):
         self.assertTrue('diff' in result)
         self.assertTrue('parent_diff' in result)
         self.assertTrue('base_commit_id' in result)
-        self.assertEqual(result['diff'], diff)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         'd2015ff5fd0297fd7f1210612f87b6b3')
         self.assertEqual(result['parent_diff'], None)
         self.assertEqual(result['base_commit_id'], base_commit_id)
 
@@ -508,7 +362,7 @@ class MercurialClientTests(MercurialTestBase):
         return os.path.join(self.hg_dir, '.hg', 'hgrc')
 
     def testGetRepositoryInfoSimple(self):
-        """Test MercurialClient get_repository_info, simple case"""
+        """Testing MercurialClient get_repository_info, simple case"""
         ri = self.client.get_repository_info()
 
         self.assertTrue(isinstance(ri, RepositoryInfo))
@@ -524,7 +378,7 @@ class MercurialClientTests(MercurialTestBase):
         self.assertFalse(ri.supports_changesets)
 
     def testScanForServerSimple(self):
-        """Test MercurialClient scan_for_server, simple case"""
+        """Testing MercurialClient scan_for_server, simple case"""
         os.rename(self.clone_hgrc_path,
                   os.path.join(self.clone_dir, '._disabled_hgrc'))
 
@@ -536,14 +390,14 @@ class MercurialClientTests(MercurialTestBase):
         self.assertTrue(server is None)
 
     def testScanForServerWhenPresentInHgrc(self):
-        """Test MercurialClient scan_for_server when present in hgrc"""
+        """Testing MercurialClient scan_for_server when present in hgrc"""
         ri = self.client.get_repository_info()
 
         server = self.client.scan_for_server(ri)
         self.assertEqual(self.TESTSERVER, server)
 
     def testScanForServerReviewboardrc(self):
-        """Test MercurialClient scan_for_server when in .reviewboardrc"""
+        """Testing MercurialClient scan_for_server when in .reviewboardrc"""
         rc = open(os.path.join(self.clone_dir, '.reviewboardrc'), 'w')
         rc.write('REVIEWBOARD_URL = "%s"' % self.TESTSERVER)
         rc.close()
@@ -553,7 +407,7 @@ class MercurialClientTests(MercurialTestBase):
         self.assertEqual(self.TESTSERVER, server)
 
     def testDiffSimple(self):
-        """Test MercurialClient diff, simple case"""
+        """Testing MercurialClient diff, simple case"""
         self.client.get_repository_info()
 
         self._hg_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
@@ -565,7 +419,7 @@ class MercurialClientTests(MercurialTestBase):
         self.assertEqual(result['diff'], EXPECTED_HG_DIFF_0)
 
     def testDiffSimpleMultiple(self):
-        """Test MercurialClient diff with multiple commits"""
+        """Testing MercurialClient diff with multiple commits"""
         self.client.get_repository_info()
 
         self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
@@ -579,7 +433,7 @@ class MercurialClientTests(MercurialTestBase):
         self.assertEqual(result['diff'], EXPECTED_HG_DIFF_1)
 
     def testDiffBranchDiverge(self):
-        """Test MercurialClient diff with diverged branch"""
+        """Testing MercurialClient diff with diverged branch"""
         self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
 
         self._hgcmd(['branch', 'diverged'])
@@ -737,7 +591,7 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self.options.parent_branch = None
 
     def testGetRepositoryInfoSimple(self):
-        """Test MercurialClient (+svn) get_repository_info, simple case"""
+        """Testing MercurialClient (+svn) get_repository_info, simple case"""
         ri = self.client.get_repository_info()
 
         self.assertEqual('svn', self.client._type)
@@ -747,9 +601,7 @@ class MercurialSubversionClientTests(MercurialTestBase):
 
     def testCalculateRepositoryInfo(self):
         """
-        Test MercurialClient (+svn) _calculate_hgsubversion_repository_info
-        properly determines repository and base paths.
-
+        Testing MercurialClient (+svn) _calculate_hgsubversion_repository_info properly determines repository and base paths.
         """
         info = (
             "URL: svn+ssh://testuser@svn.example.net/repo/trunk\n"
@@ -767,14 +619,14 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self.assertEqual(repo_info.base_path, "/trunk")
 
     def testScanForServerSimple(self):
-        """Test MercurialClient (+svn) scan_for_server, simple case"""
+        """Testing MercurialClient (+svn) scan_for_server, simple case"""
         ri = self.client.get_repository_info()
         server = self.client.scan_for_server(ri)
 
         self.assertTrue(server is None)
 
     def testScanForServerReviewboardrc(self):
-        """Test MercurialClient (+svn) scan_for_server in .reviewboardrc"""
+        """Testing MercurialClient (+svn) scan_for_server in .reviewboardrc"""
         rc_filename = os.path.join(self.clone_dir, '.reviewboardrc')
         rc = open(rc_filename, 'w')
         rc.write('REVIEWBOARD_URL = "%s"' % self.TESTSERVER)
@@ -787,7 +639,7 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self.assertEqual(self.TESTSERVER, server)
 
     def testScanForServerProperty(self):
-        """Test MercurialClient (+svn) scan_for_server in svn property"""
+        """Testing MercurialClient (+svn) scan_for_server in svn property"""
         os.chdir(self.svn_checkout)
         execute(['svn', 'update'])
         execute(['svn', 'propset', 'reviewboard:url', self.TESTSERVER,
@@ -803,7 +655,7 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self.assertEqual(self.TESTSERVER, self.client.scan_for_server(ri))
 
     def testDiffSimple(self):
-        """Test MercurialClient (+svn) diff, simple case"""
+        """Testing MercurialClient (+svn) diff, simple case"""
         self.client.get_repository_info()
 
         self._hg_add_file_commit('foo.txt', FOO4, 'edit 4')
@@ -815,7 +667,7 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self.assertEqual(result['diff'], EXPECTED_HG_SVN_DIFF_0)
 
     def testDiffSimpleMultiple(self):
-        """Test MercurialClient (+svn) diff with multiple commits"""
+        """Testing MercurialClient (+svn) diff with multiple commits"""
         self.client.get_repository_info()
 
         self._hg_add_file_commit('foo.txt', FOO4, 'edit 4')
@@ -829,7 +681,7 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self.assertEqual(result['diff'], EXPECTED_HG_SVN_DIFF_1)
 
     def testDiffOfRevision(self):
-        """Test MercurialClient (+svn) diff specifying a revision."""
+        """Testing MercurialClient (+svn) diff specifying a revision."""
         self.client.get_repository_info()
 
         self._hg_add_file_commit('foo.txt', FOO4, 'edit 4', branch='b')
@@ -1232,13 +1084,13 @@ class BazaarClientTests(SCMClientTests):
 
     def _compare_diffs(self, filename, full_diff, expected_diff):
         """
-        Test that the full_diff for ``filename`` matches the ``expected_diff``.
+        Testing that the full_diff for ``filename`` matches the ``expected_diff``.
         """
         diff_lines = full_diff.splitlines()
 
         self.assertEqual("=== modified file %r" % filename, diff_lines[0])
-        self.assert_(diff_lines[1].startswith("--- %s\t" % filename))
-        self.assert_(diff_lines[2].startswith("+++ %s\t" % filename))
+        self.assertTrue(diff_lines[1].startswith("--- %s\t" % filename))
+        self.assertTrue(diff_lines[2].startswith("+++ %s\t" % filename))
 
         diff_body = "\n".join(diff_lines[3:])
         self.assertEqual(diff_body, expected_diff)
@@ -1270,11 +1122,11 @@ class BazaarClientTests(SCMClientTests):
         self.options.parent_branch = None
 
     def test_get_repository_info_original_branch(self):
-        """Test BazaarClient get_repository_info with original branch"""
+        """Testing BazaarClient get_repository_info with original branch"""
         os.chdir(self.original_branch)
         ri = self.client.get_repository_info()
 
-        self.assert_(isinstance(ri, RepositoryInfo))
+        self.assertTrue(isinstance(ri, RepositoryInfo))
         self.assertEqual(os.path.realpath(ri.path),
                          os.path.realpath(self.original_branch))
         self.assertTrue(ri.supports_parent_diffs)
@@ -1283,11 +1135,11 @@ class BazaarClientTests(SCMClientTests):
         self.assertFalse(ri.supports_changesets)
 
     def test_get_repository_info_child_branch(self):
-        """Test BazaarClient get_repository_info with child branch"""
+        """Testing BazaarClient get_repository_info with child branch"""
         os.chdir(self.child_branch)
         ri = self.client.get_repository_info()
 
-        self.assert_(isinstance(ri, RepositoryInfo))
+        self.assertTrue(isinstance(ri, RepositoryInfo))
         self.assertEqual(os.path.realpath(ri.path),
                          os.path.realpath(self.child_branch))
         self.assertTrue(ri.supports_parent_diffs)
@@ -1296,13 +1148,13 @@ class BazaarClientTests(SCMClientTests):
         self.assertFalse(ri.supports_changesets)
 
     def test_get_repository_info_no_branch(self):
-        """Test BazaarClient get_repository_info, no branch"""
+        """Testing BazaarClient get_repository_info, no branch"""
         self.chdir_tmp()
         ri = self.client.get_repository_info()
         self.assertEqual(ri, None)
 
     def test_diff_simple(self):
-        """Test BazaarClient simple diff case"""
+        """Testing BazaarClient simple diff case"""
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
@@ -1315,7 +1167,7 @@ class BazaarClientTests(SCMClientTests):
         self._compare_diffs("foo.txt", result['diff'], EXPECTED_BZR_DIFF_0)
 
     def test_diff_specific_files(self):
-        """Test BazaarClient diff with specific files"""
+        """Testing BazaarClient diff with specific files"""
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
@@ -1329,7 +1181,7 @@ class BazaarClientTests(SCMClientTests):
         self._compare_diffs("foo.txt", result['diff'], EXPECTED_BZR_DIFF_0)
 
     def test_diff_simple_multiple(self):
-        """Test BazaarClient simple diff with multiple commits case"""
+        """Testing BazaarClient simple diff with multiple commits case"""
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
@@ -1344,7 +1196,7 @@ class BazaarClientTests(SCMClientTests):
         self._compare_diffs("foo.txt", result['diff'], EXPECTED_BZR_DIFF_1)
 
     def test_diff_parent(self):
-        """Test BazaarClient diff with changes only in the parent branch"""
+        """Testing BazaarClient diff with changes only in the parent branch"""
         os.chdir(self.child_branch)
         self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
 
@@ -1360,7 +1212,7 @@ class BazaarClientTests(SCMClientTests):
         self.assertEqual(result['diff'], None)
 
     def test_diff_grand_parent(self):
-        """Test BazaarClient diff with changes between a 2nd level descendant"""
+        """Testing BazaarClient diff with changes between a 2nd level descendant"""
         os.chdir(self.child_branch)
         self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
 
@@ -1380,7 +1232,7 @@ class BazaarClientTests(SCMClientTests):
         self._compare_diffs("foo.txt", result['diff'], EXPECTED_BZR_DIFF_0)
 
     def test_guessed_summary_and_description_in_diff(self):
-        """Test BazaarClient diff with summary and description guessed"""
+        """Testing BazaarClient diff with summary and description guessed"""
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
@@ -1394,14 +1246,13 @@ class BazaarClientTests(SCMClientTests):
         self.assertEquals("commit 3", self.options.summary)
 
         description = self.options.description
-        self.assert_("commit 1" in description, description)
-        self.assert_("commit 2" in description, description)
-        self.assert_("commit 3" in description, description)
+        self.assertTrue("commit 1" in description, description)
+        self.assertTrue("commit 2" in description, description)
+        self.assertTrue("commit 3" in description, description)
 
     def test_guessed_summary_and_description_in_grand_parent_branch_diff(self):
         """
-        Test BazaarClient diff with summary and description guessed for
-        grand parent branch.
+        Testing BazaarClient diff with summary and description guessed for grand parent branch.
         """
         os.chdir(self.child_branch)
 
@@ -1425,9 +1276,9 @@ class BazaarClientTests(SCMClientTests):
         self.assertEquals("commit 3", self.options.summary)
 
         description = self.options.description
-        self.assert_("commit 1" in description, description)
-        self.assert_("commit 2" in description, description)
-        self.assert_("commit 3" in description, description)
+        self.assertTrue("commit 1" in description, description)
+        self.assertTrue("commit 2" in description, description)
+        self.assertTrue("commit 3" in description, description)
 
 
 FOO = """\

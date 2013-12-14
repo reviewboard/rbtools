@@ -11,12 +11,12 @@ from rbtools.utils.testbase import RBTestBase
 
 class UtilitiesTest(RBTestBase):
     def test_check_install(self):
-        """Test 'check_install' method."""
+        """Testing 'check_install' method."""
         self.assertTrue(checks.check_install([sys.executable, ' --version']))
         self.assertFalse(checks.check_install([self.gen_uuid()]))
 
     def test_make_tempfile(self):
-        """Test 'make_tempfile' method."""
+        """Testing 'make_tempfile' method."""
         fname = filesystem.make_tempfile()
 
         self.assertTrue(os.path.isfile(fname))
@@ -24,10 +24,10 @@ class UtilitiesTest(RBTestBase):
         self.assertTrue(os.access(fname, os.R_OK | os.W_OK))
 
     def test_execute(self):
-        """Test 'execute' method."""
+        """Testing 'execute' method."""
         self.assertTrue(re.match('.*?%d.%d.%d' % sys.version_info[:3],
                         process.execute([sys.executable, '-V'])))
 
     def test_die(self):
-        """Test 'die' method."""
+        """Testing 'die' method."""
         self.assertRaises(SystemExit, process.die)
