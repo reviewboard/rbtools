@@ -9,6 +9,7 @@ from rbtools.api.capabilities import Capabilities
 from rbtools.api.client import RBClient
 from rbtools.api.errors import APIError, ServerInterfaceError
 from rbtools.clients import scan_usable_client
+from rbtools.clients.errors import OptionsCheckError
 from rbtools.utils.filesystem import cleanup_tempfiles, load_config
 from rbtools.utils.process import die
 
@@ -185,7 +186,13 @@ class Command(object):
                                                    client_name=client_name)
         tool.user_config = self.config
         tool.configs = [self.config]
-        tool.check_options()
+
+        try:
+            tool.check_options()
+        except OptionsCheckError, e:
+            sys.stderr.write('%s\n' % e)
+            sys.exit(1)
+
         return repository_info, tool
 
     def setup_tool(self, tool, api_root=None):

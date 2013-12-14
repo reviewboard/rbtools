@@ -1299,7 +1299,11 @@ def main():
     tool.configs = configs
 
     # Verify that options specific to an SCM Client have not been mis-used.
-    tool.check_options()
+    try:
+        tool.check_options()
+    except OptionsCheckError, e:
+        sys.stderr.write('%s\n' % e)
+        sys.exit(1)
 
     # Try to find a valid Review Board server to use.
     if options.server:

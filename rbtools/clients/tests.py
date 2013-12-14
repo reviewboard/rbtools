@@ -13,6 +13,7 @@ from nose.tools import raises
 from rbtools.api.capabilities import Capabilities
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.bazaar import BazaarClient
+from rbtools.clients.errors import OptionsCheckError
 from rbtools.clients.git import GitClient
 from rbtools.clients.mercurial import MercurialClient
 from rbtools.clients.perforce import PerforceClient, P4Wrapper
@@ -825,12 +826,11 @@ class PerforceClientTests(SCMClientTests):
         def run_p4(self, *args, **kwargs):
             assert False
 
-    @raises(SystemExit)
     def test_error_on_revision_range(self):
         """Testing PerforceClient with --revision-range causes an exit"""
         self.options.revision_range = "12345"
         client = PerforceClient(options=self.options)
-        client.check_options()
+        self.assertRaises(OptionsCheckError, client.check_options)
 
     def test_scan_for_server_counter_with_reviewboard_url(self):
         """Testing PerforceClient.scan_for_server_counter with reviewboard.url"""

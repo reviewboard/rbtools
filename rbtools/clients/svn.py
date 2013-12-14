@@ -5,6 +5,7 @@ import urllib
 
 from rbtools.api.errors import APIError
 from rbtools.clients import SCMClient, RepositoryInfo
+from rbtools.clients.errors import OptionsCheckError
 from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.filesystem import walk_parents
 from rbtools.utils.process import execute
@@ -68,10 +69,9 @@ class SVNClient(SCMClient):
         if (getattr(self.options, 'repository_url', None) and
             not getattr(self.options, 'revision_range', None) and
             not getattr(self.options, 'diff_filename', None)):
-            sys.stderr.write("The --repository-url option requires either the "
-                             "--revision-range option or the --diff-filename "
-                             "option.\n")
-            sys.exit(1)
+            raise OptionsCheckError(
+                "The --repository-url option requires either the "
+                "--revision-range option or the --diff-filename option")
 
     def scan_for_server(self, repository_info):
         # Scan first for dot files, since it's faster and will cover the
