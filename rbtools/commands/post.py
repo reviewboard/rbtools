@@ -2,27 +2,14 @@ import logging
 import os
 import re
 import sys
-from difflib import SequenceMatcher
 
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option
 from rbtools.utils.console import confirm
 from rbtools.utils.diffs import get_diff
+from rbtools.utils.match_score import Score
 from rbtools.utils.repository import get_repository_id
 from rbtools.utils.users import get_user
-
-
-class Score(object):
-    """Encapsulates ranking information for matching existing requests."""
-    EXACT_MATCH_SCORE = 1.0
-
-    def __init__(self, summary_score, description_score):
-        self.summary_score = summary_score
-        self.description_score = description_score
-
-    def is_exact_match(self):
-        return (self.summary_score == self.EXACT_MATCH_SCORE and
-                self.description_score == self.EXACT_MATCH_SCORE)
 
 
 class Post(Command):
@@ -242,10 +229,17 @@ class Post(Command):
     ]
 
     def post_process_options(self):
+        # -g implies --guess-summary and --guess-description
+        if self.options.guess_fields:
+            self.options.guess_summary = True
+            self.options.guess_description = True
+
+        # Only one of --description and --description-file can be used
         if self.options.description and self.options.description_file:
             raise CommandError("The --description and --description-file "
                                "options are mutually exclusive.\n")
 
+        # If --description-file is used, read that file
         if self.options.description_file:
             if os.path.exists(self.options.description_file):
                 fp = open(self.options.description_file, "r")
@@ -256,17 +250,12 @@ class Post(Command):
                     "The description file %s does not exist.\n" %
                     self.options.description_file)
 
-        if self.options.guess_fields:
-            self.options.guess_summary = True
-            self.options.guess_description = True
-
-        if self.options.rid and self.options.update:
-            self.options.update = False
-
+        # Only one of --testing-done and --testing-done-file can be used
         if self.options.testing_done and self.options.testing_file:
             raise CommandError("The --testing-done and --testing-done-file "
                                "options are mutually exclusive.\n")
 
+        # If --testing-done-file is used, read that file
         if self.options.testing_file:
             if os.path.exists(self.options.testing_file):
                 fp = open(self.options.testing_file, "r")
@@ -275,6 +264,16 @@ class Post(Command):
             else:
                 raise CommandError("The testing file %s does not exist.\n" %
                                    self.options.testing_file)
+
+        # If we have an explicitly specified description, override
+        # --guess-description
+        if self.options.guess_description and self.options.description:
+            self.options.guess_description = False
+
+        # If we have an explicitly specified review request ID, override
+        # --update
+        if self.options.rid and self.options.update:
+            self.options.update = False
 
     def get_repository_path(self, repository_info, api_root):
         """Get the repository path from the server.
@@ -316,23 +315,6 @@ class Post(Command):
 
         return repository_info.path
 
-    def get_match_score(self, summary_pair, description_pair):
-        """Get a score based on a pair of summaries and a pair of descriptions.
-
-        The scores for summary and description pairs are calculated
-        independently using SequenceMatcher, and returned as part of a Score
-        object.
-        """
-        if not summary_pair or not description_pair:
-            return None
-
-        summary_score = SequenceMatcher(
-            None, summary_pair[0], summary_pair[1]).ratio()
-        description_score = SequenceMatcher(
-            None, description_pair[0], description_pair[1]).ratio()
-
-        return Score(summary_score, description_score)
-
     def get_draft_or_current_value(self, field_name, review_request):
         """Returns the draft or current field value from a review request.
 
@@ -370,8 +352,7 @@ class Post(Command):
                         self.get_draft_or_current_value(
                             'description', review_request),
                         description)
-                    score = self.get_match_score(
-                        summary_pair, description_pair)
+                    score = Score.get_match(summary_pair, description_pair)
                     candidates.append((score, review_request))
 
                 review_requests = review_requests.get_next()
