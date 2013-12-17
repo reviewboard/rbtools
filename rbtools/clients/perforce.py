@@ -186,14 +186,25 @@ class PerforceClient(SCMClient):
 
             info = socket.gethostbyaddr(hostname)
 
+            # Build the list of repository paths we want to tr to look up.
+            servers = [hostname]
+
+            if info[0] != hostname:
+                servers.append(info[0])
+
             # If aliases exist for hostname, create a list of alias:port
             # strings for repository_path.
             if info[1]:
-                servers = [info[0]] + info[1]
-                repository_path = ["%s:%s" % (server, port)
-                                   for server in servers]
-            else:
-                repository_path = "%s:%s" % (info[0], port)
+                servers += info[1]
+
+            repository_path = ["%s:%s" % (server, port)
+                               for server in servers]
+
+            # If there's only one repository path found, then we don't
+            # need to do a more expensive lookup of all registered
+            # paths. We can look up just this path directly.
+            if len(repository_path) == 1:
+                repository_path = repository_path[0]
         except (socket.gaierror, socket.herror):
             pass
 
