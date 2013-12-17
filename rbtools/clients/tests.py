@@ -13,11 +13,11 @@ from nose.tools import raises
 from rbtools.api.capabilities import Capabilities
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.bazaar import BazaarClient
-from rbtools.clients.errors import OptionsCheckError
+from rbtools.clients.errors import OptionsCheckError, InvalidRevisionSpecError
 from rbtools.clients.git import GitClient
 from rbtools.clients.mercurial import MercurialClient
 from rbtools.clients.perforce import PerforceClient, P4Wrapper
-from rbtools.clients.svn import SVNRepositoryInfo
+from rbtools.clients.svn import SVNRepositoryInfo, SVNClient
 from rbtools.tests import OptionsStub
 from rbtools.utils.filesystem import load_config_files, make_tempfile
 from rbtools.utils.process import execute
@@ -828,6 +828,40 @@ class SVNClientTests(SCMClientTests):
     def setUp(self):
         super(SVNClientTests, self).setUp()
 
+        if not self.is_exe_in_path('svn'):
+            raise SkipTest('svn not found in path')
+
+        self.svn_dir = os.path.join(self.clients_dir, 'testdata', 'svn-repo')
+        self.clone_dir = self.chdir_tmp()
+        self._run_svn(['co', 'file://' + self.svn_dir, 'svn-repo'])
+        os.chdir(os.path.join(self.clone_dir, 'svn-repo'))
+
+        self.client = SVNClient(options=self.options)
+
+    def _run_svn(self, command):
+        return execute(['svn'] + command, env=None, split_lines=False,
+                       ignore_errors=False, extra_ignore_errors=(),
+                       translate_newlines=True)
+
+
+    def _svn_add_file(self, filename, data, changelist=None):
+        """Add a file to the test repo."""
+        is_new = not os.path.exists(filename)
+
+        f = open(filename, 'w')
+        f.write(data)
+        f.close()
+        if is_new:
+            self._run_svn(['add', filename])
+
+        if changelist:
+            self._run_svn(['changelist', changelist, filename])
+
+    def _svn_add_file_commit(self, filename, data, msg):
+        """Add a file to the test repo and commit with the given message."""
+        self._svn_add_file(filename, data)
+        self._run_svn(['commit', '-m', msg])
+
     def test_relative_paths(self):
         """Testing SVNRepositoryInfo._get_relative_path"""
         info = SVNRepositoryInfo('http://svn.example.com/svn/', '/', '')
@@ -845,6 +879,94 @@ class SVNClientTests(SCMClientTests):
         self.assertEqual(
             info._get_relative_path('/trunk/myproject', '/trunk/myproject'),
             '/')
+
+    def test_parse_revision_spec_no_args(self):
+        """Testing SVNClient.parse_revision_spec with no specified revisions"""
+        revisions = self.client.parse_revision_spec()
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(revisions['base'], 3)
+        self.assertEqual(revisions['tip'], '--rbtools-working-copy')
+
+    def test_parse_revision_spec_one_revision(self):
+        """Testing SVNClient.parse_revision_spec with one specified numeric revision"""
+        revisions = self.client.parse_revision_spec(['3'])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(revisions['base'], 2)
+        self.assertEqual(revisions['tip'], 3)
+
+    def test_parse_revision_spec_one_revision_changelist(self):
+        """Testing SVNClient.parse_revision_spec with one specified changelist revision"""
+        self._svn_add_file('foo.txt', FOO3, 'my-change')
+
+        revisions = self.client.parse_revision_spec(['my-change'])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(revisions['base'], 3)
+        self.assertEqual(revisions['tip'],
+                         SVNClient.REVISION_CHANGELIST_PREFIX + 'my-change')
+
+    def test_parse_revision_spec_one_revision_nonexistant_changelist(self):
+        """Testing SVNClient.parse_revision_spec with one specified invalid changelist revision"""
+        self._svn_add_file('foo.txt', FOO3, 'my-change')
+
+        self.assertRaises(
+            InvalidRevisionSpecError,
+            lambda: self.client.parse_revision_spec(['not-my-change']))
+
+    def test_parse_revision_spec_one_arg_two_revisions(self):
+        """Testing SVNClient.parse_revision_spec with R1:R2 syntax"""
+        revisions = self.client.parse_revision_spec(['1:3'])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(revisions['base'], 1)
+        self.assertEqual(revisions['tip'], 3)
+
+    def test_parse_revision_spec_two_arguments(self):
+        """Testing SVNClient.parse_revision_spec with two revisions"""
+        revisions = self.client.parse_revision_spec(['1', '3'])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(revisions['base'], 1)
+        self.assertEqual(revisions['tip'], 3)
+
+    def test_parse_revision_spec_one_revision_url(self):
+        """Testing SVNClient.parse_revision_spec with one revision and a repository URL"""
+        self.options.repository_url = \
+            'http://svn.apache.org/repos/asf/subversion/trunk'
+
+        revisions = self.client.parse_revision_spec(['1549823'])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(revisions['base'], 1549822)
+        self.assertEqual(revisions['tip'], 1549823)
+
+
+    def test_parse_revision_spec_two_revisions_url(self):
+        """Testing SVNClient.parse_revision_spec with R1:R2 syntax and a repository URL"""
+        self.options.repository_url = \
+            'http://svn.apache.org/repos/asf/subversion/trunk'
+
+        revisions = self.client.parse_revision_spec(['1549823:1550211'])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(revisions['base'], 1549823)
+        self.assertEqual(revisions['tip'], 1550211)
 
 
 class P4WrapperTests(RBTestBase):
