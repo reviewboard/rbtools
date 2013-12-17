@@ -99,8 +99,15 @@ def main():
     # Attempt to retrieve the command class from the entry points. We
     # first look in rbtools for the commands, and failing that, we look
     # for third-party commands.
-    ep = (pkg_resources.get_entry_info("rbtools", "rbtools_commands", args[0]) or
-          pkg_resources.iter_entry_points("rbtools_commands", args[0]).next())
+    ep = pkg_resources.get_entry_info("rbtools", "rbtools_commands", args[0])
+
+    if not ep:
+        try:
+            ep = pkg_resources.iter_entry_points('rbtools_commands',
+                                                 args[0]).next()
+        except StopIteration:
+            # There aren't any custom entry points defined.
+            pass
 
     if ep:
         try:
