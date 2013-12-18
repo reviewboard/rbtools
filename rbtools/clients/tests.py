@@ -857,11 +857,6 @@ class SVNClientTests(SCMClientTests):
         if changelist:
             self._run_svn(['changelist', changelist, filename])
 
-    def _svn_add_file_commit(self, filename, data, msg):
-        """Add a file to the test repo and commit with the given message."""
-        self._svn_add_file(filename, data)
-        self._run_svn(['commit', '-m', msg])
-
     def test_relative_paths(self):
         """Testing SVNRepositoryInfo._get_relative_path"""
         info = SVNRepositoryInfo('http://svn.example.com/svn/', '/', '')
