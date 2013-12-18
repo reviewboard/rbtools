@@ -164,7 +164,7 @@ class ResourceFactoryTests(TestWithPayloads):
     def test_token_guessing(self):
         """Testing guessing the resource's token."""
         r = create_resource(self.transport, self.item_payload, '')
-        self.assertTrue('resource_token' not in r.fields)
+        self.assertTrue('resource_token' not in r._fields)
 
         for field in self.item_payload['resource_token']:
             self.assertTrue(field in r)

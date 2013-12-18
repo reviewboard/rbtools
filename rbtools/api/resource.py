@@ -259,7 +259,7 @@ class ItemResource(Resource):
     def __init__(self, transport, payload, url, token=None, **kwargs):
         super(ItemResource, self).__init__(transport, payload, url,
                                            token=token, **kwargs)
-        self.fields = {}
+        self._fields = {}
 
         # Determine the body of the resource's data.
         if token is not None:
@@ -269,11 +269,11 @@ class ItemResource(Resource):
 
         for name, value in data.iteritems():
             if name not in self._excluded_attrs:
-                self.fields[name] = value
+                self._fields[name] = value
 
     def __getattr__(self, name):
-        if name in self.fields:
-            return self._wrap_field(self.fields[name])
+        if name in self._fields:
+            return self._wrap_field(self._fields[name])
         else:
             raise AttributeError
 
@@ -284,14 +284,14 @@ class ItemResource(Resource):
             raise KeyError
 
     def __contains__(self, key):
-        return key in self.fields
+        return key in self._fields
 
     def iterfields(self):
-        for key in self.fields:
+        for key in self._fields:
             yield key
 
     def iteritems(self):
-        for key, value in self.fields.iteritems():
+        for key, value in self._fields.iteritems():
             yield (key, self._wrap_field(value))
 
     def __repr__(self):
@@ -603,8 +603,8 @@ class ReviewRequestResource(ItemResource):
         The value of absolute_url is returned if it's defined.
         Otherwise the absolute URL is generated and returned.
         """
-        if 'absolute_url' in self.fields:
-            return self.fields['absolute_url']
+        if 'absolute_url' in self._fields:
+            return self._fields['absolute_url']
         else:
             base_url = self._url.split('/api/')[0]
             return urlparse.urljoin(base_url, self.url)
