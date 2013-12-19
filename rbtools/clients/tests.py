@@ -1493,7 +1493,7 @@ class BazaarClientTests(SCMClientTests):
         """Testing BazaarClient.parse_revision_spec with no specified revisions"""
         os.chdir(self.child_branch)
 
-        base_commit_id = self._bzr_get_revno('submit:')
+        base_commit_id = self._bzr_get_revno()
         self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
         tip_commit_id = self._bzr_get_revno()
 

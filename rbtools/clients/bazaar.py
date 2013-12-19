@@ -95,7 +95,7 @@ class BazaarClient(SCMClient):
             # No revisions were passed in--start with HEAD, and find the
             # submit branch automatically.
             result['tip'] = self._get_revno()
-            result['base'] = self._get_revno('submit:')
+            result['base'] = self._get_revno('ancestor:')
         elif n_revs == 1 or n_revs == 2:
             # If there's a single argument, try splitting it on '..'
             if n_revs == 1:
