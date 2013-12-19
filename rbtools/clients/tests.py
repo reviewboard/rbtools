@@ -12,7 +12,9 @@ from nose.tools import raises
 
 from rbtools.api.capabilities import Capabilities
 from rbtools.clients import RepositoryInfo
-from rbtools.clients.bazaar import BazaarClient
+from rbtools.clients.bazaar import (
+    BazaarClient,
+    USING_PARENT_PREFIX as BZR_USING_PARENT_PREFIX)
 from rbtools.clients.errors import OptionsCheckError, InvalidRevisionSpecError
 from rbtools.clients.git import GitClient
 from rbtools.clients.mercurial import MercurialClient
@@ -60,7 +62,7 @@ class GitClientTests(SCMClientTests):
         if not self.is_exe_in_path('git'):
             raise SkipTest('git not found in path')
 
-        self.set_user_home(os.path.join(self.clients_dir, 'homedir'))
+        self.set_user_home(os.path.join(self.clients_dir, 'testdata', 'homedir'))
         self.git_dir = os.path.join(self.clients_dir, 'testdata', 'git-repo')
 
         self.clone_dir = self.chdir_tmp()
@@ -1264,12 +1266,33 @@ class PerforceClientTests(SCMClientTests):
 
 
 class BazaarClientTests(SCMClientTests):
-    def _bzr_cmd(self, command, *args, **kwargs):
-        full_command = ["bzr"] + command
+    def setUp(self):
+        super(BazaarClientTests, self).setUp()
 
-        result = execute(full_command, *args, **kwargs)
+        if not self.is_exe_in_path("bzr"):
+            raise SkipTest("bzr not found in path")
 
-        return result
+        self.set_user_home(os.path.join(self.clients_dir, 'testdata', 'homedir'))
+
+        self.orig_dir = os.getcwd()
+
+        self.original_branch = self.chdir_tmp()
+        self._run_bzr(["init", "."])
+        self._bzr_add_file_commit("foo.txt", FOO, "initial commit")
+
+        self.child_branch = mktemp()
+        self._run_bzr(["branch", self.original_branch, self.child_branch])
+        self.client = BazaarClient(options=self.options)
+        os.chdir(self.orig_dir)
+
+        self.user_config = {}
+        self.configs = []
+        self.client.user_config = self.user_config
+        self.client.configs = self.configs
+        self.options.parent_branch = None
+
+    def _run_bzr(self, command, *args, **kwargs):
+        return execute(['bzr'] + command, *args, **kwargs)
 
     def _bzr_add_file_commit(self, file, data, msg):
         """
@@ -1279,8 +1302,21 @@ class BazaarClientTests(SCMClientTests):
         foo = open(file, "w")
         foo.write(data)
         foo.close()
-        self._bzr_cmd(["add", file])
-        self._bzr_cmd(["commit", "-m", msg, '--author', 'Test User'])
+        self._run_bzr(["add", file])
+        self._run_bzr(["commit", "-m", msg, '--author', 'Test User'])
+
+    def _bzr_get_revno(self, revision_spec=None):
+        command = ['revno']
+        if revision_spec:
+            command += ['-r', revision_spec]
+
+        result = self._run_bzr(command).strip().split('\n')
+
+        if len(result) == 1:
+            return 'revno:' + result[0]
+        elif len(result) == 2 and result[0].startswith(BZR_USING_PARENT_PREFIX):
+            branch = result[0][len(BZR_USING_PARENT_PREFIX):]
+            return 'revno:%s:%s' % (result[1], branch)
 
     def _compare_diffs(self, filename, full_diff, expected_diff_digest):
         """
@@ -1294,32 +1330,6 @@ class BazaarClientTests(SCMClientTests):
 
         diff_body = "\n".join(diff_lines[3:])
         self.assertEqual(md5(diff_body).hexdigest(), expected_diff_digest)
-
-    def setUp(self):
-        super(BazaarClientTests, self).setUp()
-
-        if not self.is_exe_in_path("bzr"):
-            raise SkipTest("bzr not found in path")
-
-        # Identify with bazaar so that the commands won't be sad.
-        execute(['bzr', 'whoami', 'Test User'])
-
-        self.orig_dir = os.getcwd()
-
-        self.original_branch = self.chdir_tmp()
-        self._bzr_cmd(["init", "."])
-        self._bzr_add_file_commit("foo.txt", FOO, "initial commit")
-
-        self.child_branch = mktemp()
-        self._bzr_cmd(["branch", self.original_branch, self.child_branch])
-        self.client = BazaarClient(options=self.options)
-        os.chdir(self.orig_dir)
-
-        self.user_config = {}
-        self.configs = []
-        self.client.user_config = self.user_config
-        self.client.configs = self.configs
-        self.options.parent_branch = None
 
     def test_get_repository_info_original_branch(self):
         """Testing BazaarClient get_repository_info with original branch"""
@@ -1361,7 +1371,6 @@ class BazaarClientTests(SCMClientTests):
 
         result = self.client.diff(None)
         self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 1)
         self.assertTrue('diff' in result)
 
         self._compare_diffs('foo.txt', result['diff'],
@@ -1376,7 +1385,6 @@ class BazaarClientTests(SCMClientTests):
 
         result = self.client.diff(['foo.txt'])
         self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 1)
         self.assertTrue('diff' in result)
 
         self._compare_diffs('foo.txt', result['diff'],
@@ -1392,7 +1400,6 @@ class BazaarClientTests(SCMClientTests):
 
         result = self.client.diff(None)
         self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 1)
         self.assertTrue('diff' in result)
 
         self._compare_diffs('foo.txt', result['diff'],
@@ -1404,12 +1411,11 @@ class BazaarClientTests(SCMClientTests):
         self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
 
         grand_child_branch = mktemp()
-        self._bzr_cmd(["branch", self.child_branch, grand_child_branch])
+        self._run_bzr(["branch", self.child_branch, grand_child_branch])
         os.chdir(grand_child_branch)
 
         result = self.client.diff(None)
         self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 1)
         self.assertTrue('diff' in result)
 
         self.assertEqual(result['diff'], None)
@@ -1420,7 +1426,7 @@ class BazaarClientTests(SCMClientTests):
         self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
 
         grand_child_branch = mktemp()
-        self._bzr_cmd(["branch", self.child_branch, grand_child_branch])
+        self._run_bzr(["branch", self.child_branch, grand_child_branch])
         os.chdir(grand_child_branch)
 
         # Requesting the diff between the grand child branch and its grand
@@ -1429,7 +1435,6 @@ class BazaarClientTests(SCMClientTests):
 
         result = self.client.diff(None)
         self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 1)
         self.assertTrue('diff' in result)
 
         self._compare_diffs("foo.txt", result['diff'],
@@ -1468,7 +1473,7 @@ class BazaarClientTests(SCMClientTests):
         self.options.guess_description = True
 
         grand_child_branch = mktemp()
-        self._bzr_cmd(["branch", self.child_branch, grand_child_branch])
+        self._run_bzr(["branch", self.child_branch, grand_child_branch])
         os.chdir(grand_child_branch)
 
         # Requesting the diff between the grand child branch and its grand
@@ -1483,6 +1488,100 @@ class BazaarClientTests(SCMClientTests):
         self.assertTrue("commit 1" in description, description)
         self.assertTrue("commit 2" in description, description)
         self.assertTrue("commit 3" in description, description)
+
+    def test_parse_revision_spec_no_args(self):
+        """Testing BazaarClient.parse_revision_spec with no specified revisions"""
+        os.chdir(self.child_branch)
+
+        base_commit_id = self._bzr_get_revno('submit:')
+        self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
+        tip_commit_id = self._bzr_get_revno()
+
+        revisions = self.client.parse_revision_spec()
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(revisions['base'], base_commit_id)
+        self.assertEqual(revisions['tip'], tip_commit_id)
+
+    def test_parse_revision_spec_one_arg(self):
+        """Testing BazaarClient.parse_revision_spec with one specified revision"""
+        os.chdir(self.child_branch)
+
+        base_commit_id = self._bzr_get_revno()
+        self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
+        tip_commit_id = self._bzr_get_revno()
+
+        revisions = self.client.parse_revision_spec([tip_commit_id])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(revisions['base'], base_commit_id)
+        self.assertEqual(revisions['tip'], tip_commit_id)
+
+    def test_parse_revision_spec_one_arg_parent(self):
+        """Testing BazaarClient.parse_revision_spec with one specified revision and a parent diff"""
+        os.chdir(self.original_branch)
+        parent_base_commit_id = self._bzr_get_revno()
+
+        grand_child_branch = mktemp()
+        self._run_bzr(["branch", self.child_branch, grand_child_branch])
+        os.chdir(grand_child_branch)
+
+        base_commit_id = self._bzr_get_revno()
+        self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
+        tip_commit_id = self._bzr_get_revno()
+
+        self.options.parent_branch = self.child_branch
+
+        revisions = self.client.parse_revision_spec([tip_commit_id])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('parent_base' in revisions)
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertEqual(revisions['parent_base'], parent_base_commit_id)
+        self.assertEqual(revisions['base'], base_commit_id)
+        self.assertEqual(revisions['tip'], tip_commit_id)
+
+    def test_parse_revision_spec_one_arg_split(self):
+        """Testing BazaarClient.parse_revision_spec with R1..R2 syntax"""
+        os.chdir(self.child_branch)
+
+        parent_base_commit_id = self._bzr_get_revno()
+        self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
+        base_commit_id = self._bzr_get_revno()
+        self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
+        tip_commit_id = self._bzr_get_revno()
+
+        revisions = self.client.parse_revision_spec(
+            ['%s..%s' % (base_commit_id, tip_commit_id)])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('parent_base' not in revisions)
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertEqual(revisions['base'], base_commit_id)
+        self.assertEqual(revisions['tip'], tip_commit_id)
+
+    def test_parse_revision_spec_two_args(self):
+        """Testing BazaarClient.parse_revision_spec with two revisions"""
+        os.chdir(self.child_branch)
+
+        parent_base_commit_id = self._bzr_get_revno()
+        self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
+        base_commit_id = self._bzr_get_revno()
+        self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
+        tip_commit_id = self._bzr_get_revno()
+
+        revisions = self.client.parse_revision_spec(
+            [base_commit_id, tip_commit_id])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('parent_base' not in revisions)
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertEqual(revisions['base'], base_commit_id)
+        self.assertEqual(revisions['tip'], tip_commit_id)
 
 
 FOO = """\

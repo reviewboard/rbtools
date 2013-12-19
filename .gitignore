@@ -24,3 +24,5 @@ pickle
 temp
 .idea
 bak
+
+rbtools/clients/testdata/homedir/.bzr.log
