@@ -83,8 +83,7 @@ class SVNClient(SCMClient):
             'tip':         A revision to use as the tip of the resulting diff.
 
         These will be used to generate the diffs to upload to Review Board (or
-        print). The diff for review will include the changes in (base, tip],
-        and the parent diff (if necessary) will include (parent, base].
+        print). The diff for review will include the changes in (base, tip].
 
         If a single revision is passed in, this will return the parent of that
         revision for 'base' and the passed-in revision for 'tip'.
