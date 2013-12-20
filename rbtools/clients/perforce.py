@@ -7,7 +7,9 @@ import stat
 import subprocess
 
 from rbtools.clients import SCMClient, RepositoryInfo
-from rbtools.clients.errors import OptionsCheckError
+from rbtools.clients.errors import (InvalidRevisionSpecError,
+                                    OptionsCheckError,
+                                    TooManyRevisionsError)
 from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import die, execute
@@ -27,20 +29,17 @@ class P4Wrapper(object):
         return check_install(['p4', 'help'])
 
     def counters(self):
-        lines = self.run_p4(['counters'],
-                            split_lines=True)
-
+        lines = self.run_p4(['counters'], split_lines=True)
         return self._parse_keyval_lines(lines, self.COUNTERS_RE)
 
+    def change(self, changenum, password=None):
+        return self.run_p4(['change', '-o', str(changenum)],
+                           password=password, split_lines=True,
+                           ignore_errors=True, none_on_ignored_error=True)
+
     def describe(self, changenum, password=None):
-        cmd = []
-
-        if password is not None:
-            cmd += ['-P', password]
-
-        cmd += ['describe', '-s', str(changenum)]
-
-        return self.run_p4(cmd, split_lines=True)
+        return self.run_p4(['describe', '-s', str(changenum)],
+                           split_lines=True, password=password)
 
     def files(self, path):
         return self.run_p4(['files', path], marshalled=True)
@@ -89,13 +88,17 @@ class P4Wrapper(object):
     def where(self, depot_path):
         return self.run_p4(['where', depot_path], marshalled=True)
 
-    def run_p4(self, p4_args, marshalled=False, *args, **kwargs):
+    def run_p4(self, p4_args, marshalled=False, password=None,
+               *args, **kwargs):
         cmd = ['p4']
 
         if marshalled:
             cmd += ['-G']
 
         cmd += p4_args
+
+        if password is not None:
+            cmd += ['-P', password]
 
         if marshalled:
             p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
@@ -151,6 +154,11 @@ class PerforceClient(SCMClient):
                          '(\d\d\d\d)')
     ENCODED_COUNTER_URL_RE = re.compile('reviewboard.url\.(\S+)')
 
+    REVISION_CURRENT_SYNC = '--rbtools-current-sync'
+    REVISION_SHELVE_PARENT = '--rbtools-shelved-cln-parent'
+    REVISION_SHELVED_CLN_PREFIX = '--rbtools-shelved-cln:'
+    REVISION_PENDING_CLN_PREFIX = '--rbtools-pending-cln:'
+
     def __init__(self, p4_class=P4Wrapper, **kwargs):
         super(PerforceClient, self).__init__(**kwargs)
         self.p4 = p4_class()
@@ -163,7 +171,7 @@ class PerforceClient(SCMClient):
 
         # For the repository path, we first prefer p4 brokers, then the
         # upstream p4 server. If neither of those are found, just return None.
-	repository_path = p4_info.get('Broker address', None)
+        repository_path = p4_info.get('Broker address', None)
 
         if repository_path is None:
             repository_path = p4_info.get('Server address', None)
@@ -215,6 +223,111 @@ class PerforceClient(SCMClient):
         check_gnu_diff()
 
         return RepositoryInfo(path=repository_path, supports_changesets=True)
+
+    def parse_revision_spec(self, revisions=[]):
+        """Parses the given revision spec.
+
+        The 'revisions' argument is a list of revisions as specified by the
+        user. Items in the list do not necessary represent a single revision,
+        since the user can use SCM-native syntaxes such as "r1..r2" or "r1:r2".
+        SCMTool-specific overrides of this method are expected to deal with
+        such syntaxes.
+
+        This will return a dictionary with the following keys:
+            'base':        A revision to use as the base of the resulting diff.
+            'tip':         A revision to use as the tip of the resulting diff.
+
+        These will be used to generate the diffs to upload to Review Board (or
+        print). The diff for review will include the changes in (base, tip].
+
+        If a single revision is passed in, this will return the parent of that
+        revision for 'base' and the passed-in revision for 'tip'.
+
+        If zero revisions are passed in, this will return the 'default'
+        changelist.
+        """
+        n_revs = len(revisions)
+
+        if n_revs == 0:
+            return {
+                'base': self.REVISION_CURRENT_SYNC,
+                'tip': self.REVISION_PENDING_CLN_PREFIX + 'default',
+            }
+        elif n_revs == 1:
+            # A single specified CLN can be any of submitted, pending, or
+            # shelved. These are stored with special prefixes and/or names
+            # because the way that we get the contents of the files changes
+            # based on which of these is in effect.
+            status = self._get_changelist_status(revisions[0])
+
+            if status == 'pending':
+                return {
+                    'base': self.REVISION_CURRENT_SYNC,
+                    'tip': self.REVISION_PENDING_CLN_PREFIX + revisions[0],
+                }
+            elif status == 'submitted':
+                try:
+                    cln = int(revisions[0])
+
+                    return {
+                        'base': str(cln - 1),
+                        'tip': str(cln),
+                    }
+                except ValueError:
+                    raise InvalidRevisionSpecError(
+                        '%s does not appear to be a valid changelist' %
+                        revisions[0])
+            elif status == 'shelved':
+                return {
+                    'base': self.REVISION_SHELVE_PARENT,
+                    'tip': self.REVISION_SHELVED_CLN_PREFIX + revisions[0],
+                }
+            else:
+                raise InvalidRevisionSpecError(
+                    '%s does not appear to be a valid changelist' %
+                    revisions[0])
+        elif n_revs == 2:
+            result = {}
+
+            # The base revision must be a submitted CLN
+            status = self._get_changelist_status(revisions[0])
+            if status == 'submitted':
+                result['base'] = revisions[0]
+            elif status in ('pending', 'shelved'):
+                raise InvalidRevisionSpecError(
+                    '%s cannot be used as the base CLN for a diff because '
+                    'it is %s.' % (revisions[0], status))
+            else:
+                raise InvalidRevisionSpecError(
+                    '%s does not appear to be a valid changelist' %
+                    revisions[0])
+
+            # Tip revision can be any of submitted, pending, or shelved CLNs
+            status = self._get_changelist_status(revisions[1])
+            if status == 'pending':
+                result['tip'] = \
+                    self.REVISION_PENDING_CLN_PREFIX + revisions[1]
+            elif status == 'submitted':
+                result['tip'] = revisions[1]
+            elif status == 'shelved':
+                result['tip'] = \
+                    self.REVISION_SHELVED_CLN_PREFIX + revisions[1]
+            else:
+                raise InvalidRevisionSpecError(
+                    '%s does not appear to be a valid changelist' %
+                    revisions[1])
+
+            return result
+        else:
+            raise TooManyRevisionsError
+
+    def _get_changelist_status(self, changelist):
+        change = self.p4.change(changelist).split('\n')
+        for line in change:
+            if line.startswith('Status:'):
+                return line[7:].strip()
+
+        return None
 
     def scan_for_server(self, repository_info):
         # Scan first for dot files, since it's faster and will cover the

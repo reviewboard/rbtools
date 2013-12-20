@@ -1264,6 +1264,175 @@ class PerforceClientTests(SCMClientTests):
                               diff_info['diff'])
         self.assertEqual(md5(diff_content).hexdigest(), expected_diff_hash)
 
+    def test_parse_revision_spec_no_args(self):
+        """Testing PerforceClient.parse_revision_spec with no specified revisions"""
+        client = self._build_client()
+
+        revisions = client.parse_revision_spec()
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertEqual(
+            revisions['base'], PerforceClient.REVISION_CURRENT_SYNC)
+        self.assertEqual(
+            revisions['tip'],
+            PerforceClient.REVISION_PENDING_CLN_PREFIX + 'default')
+
+    def test_parse_revision_spec_pending_cln(self):
+        """Testing PerforceClient.parse_revision_spec with a pending changelist"""
+        class TestWrapper(P4Wrapper):
+            def change(self, changelist):
+                return '\n'.join([
+                    'Change: 12345',
+                    '',
+                    'Date: 2013/12/19 11:32:45',
+                    '',
+                    'User: example',
+                    ''
+                    'Status: pending',
+                    ''
+                    'Description:',
+                    '\tMy change description',
+                    ])
+        client = PerforceClient(TestWrapper)
+
+        revisions = client.parse_revision_spec(['12345'])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(
+            revisions['base'], PerforceClient.REVISION_CURRENT_SYNC)
+        self.assertEqual(
+            revisions['tip'],
+            PerforceClient.REVISION_PENDING_CLN_PREFIX + '12345')
+
+    def test_parse_revision_spec_submitted_cln(self):
+        """Testing PerforceClient.parse_revision_spec with a submitted changelist"""
+        class TestWrapper(P4Wrapper):
+            def change(self, changelist):
+                return '\n'.join([
+                    'Change: 12345',
+                    '',
+                    'Date: 2013/12/19 11:32:45',
+                    '',
+                    'User: example',
+                    ''
+                    'Status: submitted',
+                    ''
+                    'Description:',
+                    '\tMy change description',
+                    ])
+        client = PerforceClient(TestWrapper)
+
+        revisions = client.parse_revision_spec(['12345'])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(revisions['base'], '12344')
+        self.assertEqual(revisions['tip'], '12345')
+
+    def test_parse_revision_spec_submitted_cln(self):
+        """Testing PerforceClient.parse_revision_spec with a shelved changelist"""
+        class TestWrapper(P4Wrapper):
+            def change(self, changelist):
+                return '\n'.join([
+                    'Change: 12345',
+                    '',
+                    'Date: 2013/12/19 11:32:45',
+                    '',
+                    'User: example',
+                    ''
+                    'Status: shelved',
+                    ''
+                    'Description:',
+                    '\tMy change description',
+                    ])
+        client = PerforceClient(TestWrapper)
+
+        revisions = client.parse_revision_spec(['12345'])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(
+            revisions['base'], PerforceClient.REVISION_SHELVE_PARENT)
+        self.assertEqual(
+            revisions['tip'],
+            PerforceClient.REVISION_SHELVED_CLN_PREFIX + '12345')
+
+    def test_parse_revision_spec_two_args(self):
+        class TestWrapper(P4Wrapper):
+            def change(self, changelist):
+                change_fmt = '\n'.join([
+                    'Change: %(change)s',
+                    '',
+                    'Date: 2013/12/19 11:32:45',
+                    '',
+                    'User: example',
+                    ''
+                    'Status: %(status)s',
+                    ''
+                    'Description:',
+                    '\tMy change description',
+                    ])
+
+                if changelist == '99' or changelist == '100':
+                    return change_fmt % {
+                        'change': changelist,
+                        'status': 'submitted',
+                    }
+                elif changelist == '101':
+                    return change_fmt % {
+                        'change': changelist,
+                        'status': 'pending',
+                    }
+                elif changelist == '102':
+                    return change_fmt % {
+                        'change': changelist,
+                        'status': 'shelved',
+                    }
+                else:
+                    return None
+
+        client = PerforceClient(TestWrapper)
+
+        revisions = client.parse_revision_spec(['99', '100'])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(revisions['base'], '99')
+        self.assertEqual(revisions['tip'], '100')
+
+        revisions = client.parse_revision_spec(['99', '101'])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(revisions['base'], '99')
+        self.assertEqual(
+            revisions['tip'],
+            PerforceClient.REVISION_PENDING_CLN_PREFIX + '101')
+
+        revisions = client.parse_revision_spec(['99', '102'])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(revisions['base'], '99')
+        self.assertEqual(
+            revisions['tip'],
+            PerforceClient.REVISION_SHELVED_CLN_PREFIX + '102')
+
+        self.assertRaises(InvalidRevisionSpecError,
+                          lambda: client.parse_revision_spec(['101', '100']))
+        self.assertRaises(InvalidRevisionSpecError,
+                          lambda: client.parse_revision_spec(['102', '100']))
+        self.assertRaises(InvalidRevisionSpecError,
+                          lambda: client.parse_revision_spec(['102', '10284']))
+
 
 class BazaarClientTests(SCMClientTests):
     def setUp(self):
