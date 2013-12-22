@@ -66,7 +66,7 @@ class BazaarClient(SCMClient):
         """Parses the given revision spec.
 
         The 'revisions' argument is a list of revisions as specified by the
-        user. Items in the list do not necessary represent a single revision,
+        user. Items in the list do not necessarily represent a single revision,
         since the user can use SCM-native syntaxes such as "r1..r2" or "r1:r2".
         SCMTool-specific overrides of this method are expected to deal with
         such syntaxes.

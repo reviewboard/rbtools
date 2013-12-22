@@ -3,6 +3,8 @@ import os
 import re
 
 from rbtools.clients import SCMClient, RepositoryInfo
+from rbtools.clients.errors import (InvalidRevisionSpecError,
+                                    TooManyRevisionsError)
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import die, execute
@@ -56,6 +58,38 @@ class PlasticClient(SCMClient):
                 pass
 
         return None
+
+    def parse_revision_spec(self, revisions=[]):
+        """Parses the given revision spec.
+
+        The 'revisions' argument is a list of revisions as specified by the
+        user. Items in the list do not necessarily represent a single revision,
+        since the user can use SCM-native syntaxes such as "r1..r2" or "r1:r2".
+        SCMTool-specific overrides of this method are expected to deal with
+        such syntaxes.
+
+        This will return a dictionary with the following keys:
+            'base': Always None.
+            'tip':  A revision string representing either a changeset or a
+                    branch.
+
+        These will be used to generate the diffs to upload to Review Board (or
+        print). The Plastic implementation requires that one and only one
+        revision is passed in. The diff for review will include the changes in
+        the given changeset or branch.
+        """
+        n_revisions = len(revisions)
+
+        if n_revisions == 0:
+            raise InvalidRevisionSpecError(
+                'Either a changeset or a branch must be specified')
+        elif n_revisions == 1:
+            return {
+                'base': None,
+                'tip': revisions[0],
+            }
+        else:
+            raise TooManyRevisionsError
 
     def sanitize_changenum(self, changenum):
         """ Return a "sanitized" change number.  Currently a no-op """
