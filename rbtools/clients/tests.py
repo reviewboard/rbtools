@@ -472,11 +472,14 @@ class MercurialClientTests(MercurialTestBase):
         self.client.configs = self.configs
         self.options.parent_branch = None
 
+    def _hg_get_tip(self):
+        return self._run_hg(['identify']).split()[0]
+
     @property
     def clone_hgrc_path(self):
         return os.path.join(self.clone_dir, '.hg', 'hgrc')
 
-    def testGetRepositoryInfoSimple(self):
+    def test_get_repository_info_simple(self):
         """Testing MercurialClient get_repository_info, simple case"""
         ri = self.client.get_repository_info()
 
@@ -492,7 +495,7 @@ class MercurialClientTests(MercurialTestBase):
         self.assertTrue(ri.supports_parent_diffs)
         self.assertFalse(ri.supports_changesets)
 
-    def testScanForServerSimple(self):
+    def test_scan_for_server_simple(self):
         """Testing MercurialClient scan_for_server, simple case"""
         os.rename(self.clone_hgrc_path,
                   os.path.join(self.clone_dir, '._disabled_hgrc'))
@@ -504,14 +507,14 @@ class MercurialClientTests(MercurialTestBase):
         server = self.client.scan_for_server(ri)
         self.assertTrue(server is None)
 
-    def testScanForServerWhenPresentInHgrc(self):
+    def test_scan_for_server_when_present_in_hgrc(self):
         """Testing MercurialClient scan_for_server when present in hgrc"""
         ri = self.client.get_repository_info()
 
         server = self.client.scan_for_server(ri)
         self.assertEqual(self.TESTSERVER, server)
 
-    def testScanForServerReviewboardrc(self):
+    def test_scan_for_server_reviewboardrc(self):
         """Testing MercurialClient scan_for_server when in .reviewboardrc"""
         rc = open(os.path.join(self.clone_dir, '.reviewboardrc'), 'w')
         rc.write('REVIEWBOARD_URL = "%s"' % self.TESTSERVER)
@@ -521,18 +524,17 @@ class MercurialClientTests(MercurialTestBase):
         server = self.client.scan_for_server(ri)
         self.assertEqual(self.TESTSERVER, server)
 
-    def testDiffSimple(self):
+    def test_diff_simple(self):
         """Testing MercurialClient diff, simple case"""
         self._hg_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
 
         result = self.client.diff(None)
         self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 1)
         self.assertTrue('diff' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
                          '68c2bdccf52a4f0baddd0ac9f2ecb7d2')
 
-    def testDiffSimpleMultiple(self):
+    def test_diff_simple_multiple(self):
         """Testing MercurialClient diff with multiple commits"""
         self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
         self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
@@ -540,12 +542,12 @@ class MercurialClientTests(MercurialTestBase):
 
         result = self.client.diff(None)
         self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 1)
         self.assertTrue('diff' in result)
+        print result['diff']
         self.assertEqual(md5(result['diff']).hexdigest(),
                          '9c8796936646be5c7349973b0fceacbd')
 
-    def testDiffBranchDiverge(self):
+    def test_diff_branch_diverge(self):
         """Testing MercurialClient diff with diverged branch"""
         self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
 
@@ -554,7 +556,6 @@ class MercurialClientTests(MercurialTestBase):
 
         result = self.client.diff(None)
         self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 1)
         self.assertTrue('diff' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
                          '6b12723baab97f346aa938005bc4da4d')
@@ -563,10 +564,82 @@ class MercurialClientTests(MercurialTestBase):
 
         result = self.client.diff(None)
         self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 1)
         self.assertTrue('diff' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
                          '68c2bdccf52a4f0baddd0ac9f2ecb7d2')
+
+    def test_parse_revision_spec_no_args(self):
+        """Testing MercurialClient.parse_revision_spec with no arguments"""
+        base = self._hg_get_tip()
+        self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
+        tip = self._hg_get_tip()
+
+        revisions = self.client.parse_revision_spec([])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(revisions['base'], base)
+        self.assertEqual(revisions['tip'], tip)
+
+    def test_parse_revision_spec_one_arg_periods(self):
+        """Testing MercurialClient.parse_revision_spec with r1..r2 syntax"""
+        base = self._hg_get_tip()
+        self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
+        tip = self._hg_get_tip()
+
+        revisions = self.client.parse_revision_spec(['0..1'])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(revisions['base'], base)
+        self.assertEqual(revisions['tip'], tip)
+
+    def test_parse_revision_spec_one_arg_colons(self):
+        """Testing MercurialClient.parse_revision_spec with r1::r2 syntax"""
+        base = self._hg_get_tip()
+        self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
+        tip = self._hg_get_tip()
+
+        revisions = self.client.parse_revision_spec(['0..1'])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(revisions['base'], base)
+        self.assertEqual(revisions['tip'], tip)
+
+    def test_parse_revision_spec_one_arg(self):
+        """Testing MercurialClient.parse_revision_spec with one revision"""
+        base = self._hg_get_tip()
+        self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
+        tip = self._hg_get_tip()
+        self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
+
+        revisions = self.client.parse_revision_spec(['1'])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(revisions['base'], base)
+        self.assertEqual(revisions['tip'], tip)
+
+    def test_parse_revision_spec_two_args(self):
+        """Testing MercurialClient.parse_revision_spec with two revisions"""
+        base = self._hg_get_tip()
+        self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
+        tip = self._hg_get_tip()
+
+        revisions = self.client.parse_revision_spec(['0', '2'])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(revisions['base'], base)
+        self.assertEqual(revisions['tip'], tip)
 
 
 class MercurialSubversionClientTests(MercurialTestBase):

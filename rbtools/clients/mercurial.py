@@ -5,6 +5,8 @@ import re
 from urlparse import urlsplit, urlunparse
 
 from rbtools.clients import SCMClient, RepositoryInfo
+from rbtools.clients.errors import (InvalidRevisionSpecError,
+                                    TooManyRevisionsError)
 from rbtools.clients.svn import SVNClient
 from rbtools.utils.checks import check_install
 from rbtools.utils.process import execute
@@ -131,6 +133,96 @@ class MercurialClient(SCMClient):
 
             return RepositoryInfo(path=path, base_path=base_path,
                                   supports_parent_diffs=True)
+
+    def parse_revision_spec(self, revisions=[]):
+        """Parses the given revision spec.
+
+        The 'revisions' argument is a list of revisions as specified by the
+        user. Items in the list do not necessarily represent a single revision,
+        since the user can use SCM-native syntaxes such as "r1..r2" or "r1:r2".
+        SCMTool-specific overrides of this method are expected to deal with
+        such syntaxes.
+
+        This will return a dictionary with the following keys:
+            'base':        A revision to use as the base of the resulting diff.
+            'tip':         A revision to use as the tip of the resulting diff.
+            'parent_base': (optional) The revision to use as the base of a
+                           parent diff.
+
+        These will be used to generate the diffs to upload to Review Board (or
+        print). The diff for review will include the changes in (base, tip],
+        and the parent diff (if necessary) will include (parent, base].
+
+        If a single revision is passed in, this will return the parent of that
+        revision for 'base' and the passed-in revision for 'tip'.
+
+        If zero revisions are passed in, this will return the outgoing changes.
+
+        In the one- or two-revision cases, this will automatically determine
+        whether or not a parent diff is required.
+        """
+        self._init()
+
+        n_revisions = len(revisions)
+
+        if n_revisions == 1:
+            # If there's a single revision, try splitting it based on hg's
+            # revision range syntax (either :: or ..). If this splits, then
+            # it's handled as two revisions below.
+            revisions = re.split(r'\.\.|::', revisions[0])
+            n_revisions = len(revisions)
+
+        result = {}
+        if n_revisions == 0:
+            # No revisions: Find the outgoing changes.
+            outgoing = self._get_bottom_and_top_outgoing_revs_for_remote()
+            if outgoing[0] is None or outgoing[1] is None:
+                raise InvalidRevisionSpecError(
+                    'There are no outgoing changes')
+            result['base'] = self._identify_revision(outgoing[0])
+            result['tip'] = self._identify_revision(outgoing[1])
+
+            # XXX: self.options.parent_branch is currently used for specifying
+            # the upstream (remote) branch in case none of the candidate paths
+            # matches. This means we can't use it for its intended purpose,
+            # specifying an intermediate branch name to use to create a parent
+            # diff. Once we fix that, we can uncomment the below:
+
+            #if self.options.parent_branch:
+            #    result['parent_base'] = result['base']
+            #    result['base'] = self._identify_revision(
+            #        self.options.parent_branch)
+        elif n_revisions == 1:
+            # One revision: Use the given revision for tip, and find its parent
+            # for base.
+            result['tip'] = self._identify_revision(revisions[0])
+            result['base'] = self._execute(
+                ['hg', 'parents', '--hidden', '-r', result['tip'],
+                 '--template', '{node|short}']).split()[0]
+        elif n_revisions == 2:
+            # Two revisions: Just use the given revisions
+            result['base'] = self._identify_revision(revisions[0])
+            result['tip'] = self._identify_revision(revisions[1])
+        else:
+            raise TooManyRevisionsError
+
+        # TODO: determine if a parent diff is necessary
+        if 'base' in result and 'tip' in result:
+            return result
+
+        raise InvalidRevisionSpecError(
+            '"%s" does not appear to be a valid revision spec' % revisions)
+
+    def _identify_revision(self, revision):
+        identify = self._execute(
+            ['hg', 'identify', '-i', '--hidden', '-r', str(revision)],
+            ignore_errors=True, none_on_ignored_error=True)
+
+        if identify is None:
+            raise InvalidRevisionSpecError(
+                '"%s" does not appear to be a valid revision' % revision)
+        else:
+            return identify.split()[0]
 
     def _calculate_hgsubversion_repository_info(self, svn_info):
         def _info(r):
@@ -309,20 +401,9 @@ class MercurialClient(SCMClient):
         files = files or []
         self._set_summary()
         self._set_description()
-        bottom_rev, top_rev = \
-            self._get_bottom_and_top_outgoing_revs_for_remote()
 
-        if bottom_rev is not None and top_rev is not None:
-            full_command = ['hg', 'diff', '--hidden', '-r', str(bottom_rev),
-                            '-r', str(top_rev)] + files
-
-            diff = self._execute(full_command, env=self._hg_env)
-        else:
-            diff = ''
-
-        return {
-            'diff': diff,
-        }
+        revisions = self.parse_revision_spec()
+        return self._diff(revisions, files)
 
     def _get_outgoing_changesets(self, current_branch, remote):
         """
@@ -424,21 +505,39 @@ class MercurialClient(SCMClient):
                 not getattr(self.options, 'description', None)):
             self.options.description = self.extract_description(revision_range)
 
-    def diff_between_revisions(self, revision_range, args, repository_info):
-        """Performs a diff between 2 revisions of a Mercurial repository."""
+    def _diff(self, revisions, files=[]):
+        """Get the diff between two given revisions."""
         if self._type != 'hg':
             raise NotImplementedError
 
+        diff_cmd = ['hg', 'diff', '--hidden'] + files
+
+        diff = self._execute(
+            diff_cmd + ['-r', revisions['base'], '-r', revisions['tip']],
+            env=self._hg_env)
+
+        if 'parent_base' in revisions:
+            base_commit_id = revisions['parent_base']
+            parent_diff = self._execute(
+                diff_cmd + ['-r', base_commit_id, '-r', revisions['base']],
+                env=self._hg_env)
+        else:
+            base_commit_id = revisions['base']
+            parent_diff = None
+
+        return {
+            'diff': diff,
+            'parent_diff': parent_diff,
+            'base_commit_id': base_commit_id,
+        }
+
+    def diff_between_revisions(self, revision_range, args, repository_info):
+        """Performs a diff between 2 revisions of a Mercurial repository."""
         self._set_summary(revision_range)
         self._set_description(revision_range)
 
-        r1, r2 = self._extract_revisions(revision_range)
-
-        return {
-            'diff': self._execute(["hg", "diff", "--hidden", "-r", r1,
-                                  "-r", r2],
-                                  env=self._hg_env),
-        }
+        revisions = self.parse_revision_spec([revision_range])
+        return self._diff(revisions)
 
     def scan_for_server(self, repository_info):
         # Scan first for dot files, since it's faster and will cover the
