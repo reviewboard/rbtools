@@ -466,7 +466,6 @@ class MercurialClientTests(MercurialTestBase):
         })
         clone_hgrc.close()
 
-        self.client.get_repository_info()
         self.user_config = {}
         self.configs = []
         self.client.user_config = self.user_config
@@ -524,8 +523,6 @@ class MercurialClientTests(MercurialTestBase):
 
     def testDiffSimple(self):
         """Testing MercurialClient diff, simple case"""
-        self.client.get_repository_info()
-
         self._hg_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
 
         result = self.client.diff(None)
@@ -537,8 +534,6 @@ class MercurialClientTests(MercurialTestBase):
 
     def testDiffSimpleMultiple(self):
         """Testing MercurialClient diff with multiple commits"""
-        self.client.get_repository_info()
-
         self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
         self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
         self._hg_add_file_commit('foo.txt', FOO3, 'commit 3')
@@ -556,7 +551,6 @@ class MercurialClientTests(MercurialTestBase):
 
         self._run_hg(['branch', 'diverged'])
         self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
-        self.client.get_repository_info()
 
         result = self.client.diff(None)
         self.assertTrue(isinstance(result, dict))
@@ -566,7 +560,6 @@ class MercurialClientTests(MercurialTestBase):
                          '6b12723baab97f346aa938005bc4da4d')
 
         self._run_hg(['update', '-C', 'default'])
-        self.client.get_repository_info()
 
         result = self.client.diff(None)
         self.assertTrue(isinstance(result, dict))

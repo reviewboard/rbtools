@@ -22,8 +22,8 @@ class MercurialClient(SCMClient):
 
         self.hgrc = {}
         self._type = 'hg'
-        self._hg_root = ''
         self._remote_path = ()
+        self._initted = False
         self._hg_env = {
             'HGPLAIN': '1',
         }
@@ -63,49 +63,74 @@ class MercurialClient(SCMClient):
 
         return self._hidden_changesets_supported
 
+    @property
+    def hg_root(self):
+        """The root of the working directory.
+
+        This will return the root directory of the current repository. If the
+        current working directory is not inside a mercurial repository, this
+        returns None.
+        """
+        if not hasattr(self, '_hg_root'):
+            root = execute(['hg', 'root'], env=self._hg_env,
+                           ignore_errors=True)
+
+            if not root.startswith('abort:'):
+                self._hg_root = root.strip()
+            else:
+                self._hg_root = None
+
+        return self._hg_root
+
+    def _init(self):
+        """Initialize the client."""
+        if self._initted or not self.hg_root:
+            return
+
+        self._load_hgrc()
+
+        svn_info = execute(["hg", "svn", "info"], ignore_errors=True)
+        if (not svn_info.startswith('abort:') and
+                not svn_info.startswith("hg: unknown command") and
+                not svn_info.lower().startswith('not a child of')):
+            self._type = 'svn'
+            self._svn_info = svn_info
+        else:
+            self._type = 'hg'
+
+            for candidate in self._remote_path_candidates:
+                rc_key = 'paths.%s' % candidate
+
+                if rc_key in self.hgrc:
+                    self._remote_path = (candidate, self.hgrc[rc_key])
+                    logging.debug('Using candidate path %r: %r' %
+                                  self._remote_path)
+                    break
+
+        self._initted = True
+
     def get_repository_info(self):
         if not check_install(['hg', '--help']):
             return None
 
-        self._load_hgrc()
+        self._init()
 
         if not self.hg_root:
             # hg aborted => no mercurial repository here.
             return None
 
-        svn_info = execute(["hg", "svn", "info"], ignore_errors=True)
-
-        if (not svn_info.startswith('abort:') and
-            not svn_info.startswith("hg: unknown command") and
-            not svn_info.lower().startswith('not a child of')):
-            return self._calculate_hgsubversion_repository_info(svn_info)
-
-        self._type = 'hg'
-
-        path = self.hg_root
-        base_path = '/'
-
-        if self.hgrc:
-            self._calculate_remote_path()
+        if self._type == 'svn':
+            return self._calculate_hgsubversion_repository_info(self._svn_info)
+        else:
+            path = self.hg_root
+            base_path = '/'
 
             if self._remote_path:
                 path = self._remote_path[1]
                 base_path = ''
 
-        return RepositoryInfo(path=path, base_path=base_path,
-                              supports_parent_diffs=True)
-
-    def _calculate_remote_path(self):
-        for candidate in self._remote_path_candidates:
-
-            rc_key = 'paths.%s' % candidate
-
-            if (not self._remote_path and self.hgrc.get(rc_key)):
-                self._remote_path = (candidate, self.hgrc.get(rc_key))
-                logging.debug('Using candidate path %r: %r' %
-                              self._remote_path)
-
-                return
+            return RepositoryInfo(path=path, base_path=base_path,
+                                  supports_parent_diffs=True)
 
     def _calculate_hgsubversion_repository_info(self, svn_info):
         def _info(r):
@@ -132,18 +157,6 @@ class MercurialClient(SCMClient):
         return RepositoryInfo(path=root, base_path=base_path,
                               supports_parent_diffs=True)
 
-    @property
-    def hg_root(self):
-        if not self._hg_root:
-            root = execute(['hg', 'root'], env=self._hg_env,
-                           ignore_errors=True)
-
-            if not root.startswith('abort:'):
-                self._hg_root = root.strip()
-            else:
-                return None
-
-        return self._hg_root
 
     def _load_hgrc(self):
         for line in execute(['hg', 'showconfig'], split_lines=True):
@@ -291,6 +304,8 @@ class MercurialClient(SCMClient):
         having multiple diverged branches which share partial history -- or we
         can just punish developers for doing such nonsense :)
         """
+        self._init()
+
         files = files or []
         self._set_summary()
         self._set_description()
