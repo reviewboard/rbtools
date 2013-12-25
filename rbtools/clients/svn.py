@@ -206,72 +206,72 @@ class SVNClient(SCMClient):
         SVN repositories do not support branches of branches in a way that
         makes parent diffs possible, so we never return a parent diff.
         """
-        return {
-            'diff': self.do_diff(["svn", "diff", "--diff-cmd=diff"] + files),
-        }
+        return self._diff([], files)
 
     def diff_changelist(self, changelist):
         """Performs a diff for a local changelist."""
-        return {
-            'diff': self.do_diff(["svn", "diff", "--changelist", changelist]),
-        }
+        return self._diff([changelist], [])
 
-    def diff_between_revisions(self, revision_range, args, repository_info):
+    def diff_between_revisions(self, revision_range, files, repository_info):
         """
         Performs a diff between 2 revisions of a Subversion repository.
         """
-        if self.options.repository_url:
-            revisions = revision_range.split(':')
-            if len(revisions) < 1:
-                return None
-            elif len(revisions) == 1:
-                revisions.append('HEAD')
+        return self._diff([revision_range], files)
 
-            # if a new path was supplied at the command line, set it
-            files = []
-            if len(args) == 1:
-                repository_info.set_base_path(args[0])
-            elif len(args) > 1:
-                files = args
+    def _diff(self, revision_spec, files):
+        revisions = self.parse_revision_spec(revision_spec)
+        base = revisions['base']
+        tip = revisions['tip']
 
-            url = repository_info.path + repository_info.base_path
+        repository_info = self.get_repository_info()
 
-            new_url = url + '@' + revisions[1]
+        diff_cmd = ['svn', 'diff', '--diff-cmd=diff']
 
-            # When the source revision is zero, assume the user wants to
-            # upload a diff containing all the files in ``base_path`` as new
-            # files. If the base path within the repository is added to both
-            # the old and new URLs, the ``svn diff`` command will error out
-            # since the base_path didn't exist at revision zero. To avoid
-            # that error, use the repository's root URL as the source for
-            # the diff.
-            if revisions[0] == "0":
-                url = repository_info.path
-
-            old_url = url + '@' + revisions[0]
-
-            return {
-                'diff': self.do_diff(["svn", "diff", "--diff-cmd=diff",
-                                      old_url, new_url] + files,
-                                     repository_info),
-            }
+        if tip == self.REVISION_WORKING_COPY:
+            # Posting the working copy
+            diff_cmd.extend(['-r', base])
+        elif tip.startswith(self.REVISION_CHANGELIST_PREFIX):
+            # Posting a changelist
+            cl = tip[len(self.REVISION_CHANGELIST_PREFIX):]
+            diff_cmd.extend(['--changelist', cl])
         else:
-            # Otherwise, perform the revision range diff using a working copy
-            return {
-                'diff': self.do_diff(["svn", "diff", "--diff-cmd=diff", "-r",
-                                      revision_range],
-                                     repository_info),
-            }
+            # Diff between two separate revisions. Behavior depends on whether
+            # or not there's a working copy
+            if self.options.repository_url:
+                # No working copy--create 'old' and 'new' URLs
+                if len(files) == 1:
+                    # If there's a single file or directory passed in, we use
+                    # that as part of the URL instead of as a separate
+                    # filename.
+                    repository_info.set_base_path(files[0])
+                    files = []
 
-    def do_diff(self, cmd, repository_info=None):
-        """
-        Performs the actual diff operation, handling renames and converting
-        paths to absolute.
-        """
+                new_url = (repository_info.path + repository_info.base_path +
+                           '@' + tip)
 
-        svn_show_copies_as_adds = getattr(
-            self.options, 'svn_show_copies_as_adds', None)
+                # When the source revision is '0', assume the user wants to
+                # upload a diff containing all the files in 'base_path' as
+                # new files. If the base path within the repository is added to
+                # both the old and new URLs, `svn diff` will error out, since
+                # the base_path didn't exist at revision 0. To avoid that
+                # error, use the repository's root URL as the source for the
+                # diff.
+                if base == '0':
+                    old_url = repository_info.path + '@' + base
+                else:
+                    old_url = (repository_info.path + repository_info.base_path +
+                               '@' + base)
+
+                diff_cmd.extend([old_url, new_url])
+            else:
+                # Working copy--do a normal range diff
+                diff_cmd.extend(['-r', '%s:%s' % (base, tip)])
+
+            diff_cmd.extend(files)
+
         if self.history_scheduled_with_commit():
+            svn_show_copies_as_adds = getattr(
+                self.options, 'svn_show_copies_as_adds', None)
             if svn_show_copies_as_adds is None:
                 sys.stderr.write("One or more files in your changeset has "
                                  "history scheduled with commit. Please try "
@@ -286,7 +286,9 @@ class SVNClient(SCMClient):
         diff = self.handle_renames(diff)
         diff = self.convert_to_absolute_paths(diff, repository_info)
 
-        return ''.join(diff)
+        return {
+            'diff': ''.join(diff),
+        }
 
     def history_scheduled_with_commit(self):
         """ Method to find if any file status has '+' in 4th column"""
