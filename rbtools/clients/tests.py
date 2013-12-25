@@ -1082,21 +1082,6 @@ class PerforceClientTests(SCMClientTests):
         def __init__(self):
             self._timestamp = time.mktime(time.gmtime(0))
 
-        def describe(self, changenum, password):
-            return [
-                'Change 12345 by joe@example on 2013/01/02 22:33:44 '
-                '*pending*\n',
-                '\n',
-                '\tThis is a test.\n',
-                '\n',
-                'Affected files ...\n',
-                '\n',
-            ] + [
-                '... %s %s\n' % (depot_path, info['action'])
-                for depot_path, info in self.repo_files.iteritems()
-                if info['change'] == changenum
-            ]
-
         def fstat(self, depot_path, fields=[]):
             assert depot_path in self.fstat_files
 
@@ -1108,25 +1093,32 @@ class PerforceClientTests(SCMClientTests):
             return fstat_info
 
         def opened(self, changenum):
-            return [
-                '%s - %s change %s (text)\n'
-                % (depot_path, info['action'], changenum)
-                for depot_path, info in self.repo_files.iteritems()
-                if info['change'] == changenum
-            ]
+            return [info for info in self.repo_files
+                    if info['change'] == changenum]
 
         def print_file(self, depot_path, out_file):
-            assert depot_path in self.repo_files
-
-            fp = open(out_file, 'w')
-            fp.write(self.repo_files[depot_path]['text'])
-            fp.close()
+            for info in self.repo_files:
+                if depot_path == '%s#%s' % (info['depotFile'], info['rev']):
+                    fp = open(out_file, 'w')
+                    fp.write(info['text'])
+                    fp.close()
+                    return
+            assert False
 
         def where(self, depot_path):
             assert depot_path in self.where_files
 
             return [{
                 'path': self.where_files[depot_path],
+            }]
+
+        def change(self, changenum):
+            return [{
+                'Change': str(changenum),
+                'Date': '2013/01/02 22:33:44',
+                'User': 'joe@example.com',
+                'Status': 'pending',
+                'Description': 'This is a test.\n',
             }]
 
         def run_p4(self, *args, **kwargs):
@@ -1196,28 +1188,36 @@ class PerforceClientTests(SCMClientTests):
     def test_diff_with_changenum(self):
         """Testing PerforceClient.diff with changenums"""
         client = self._build_client()
-        client.p4.repo_files = {
-            '//mydepot/test/README#2': {
+        client.p4.repo_files = [
+            {
+                'depotFile': '//mydepot/test/README',
+                'rev': '2',
                 'action': 'edit',
                 'change': '12345',
                 'text': 'This is a test.\n',
             },
-            '//mydepot/test/README#3': {
+            {
+                'depotFile': '//mydepot/test/README',
+                'rev': '3',
                 'action': 'edit',
                 'change': '',
                 'text': 'This is a mess.\n',
             },
-            '//mydepot/test/COPYING#1': {
+            {
+                'depotFile': '//mydepot/test/COPYING',
+                'rev': '1',
                 'action': 'add',
                 'change': '12345',
                 'text': 'Copyright 2013 Joe User.\n',
             },
-            '//mydepot/test/Makefile#3': {
+            {
+                'depotFile': '//mydepot/test/Makefile',
+                'rev': '3',
                 'action': 'delete',
                 'change': '12345',
                 'text': 'all: all\n',
             },
-        }
+        ]
 
         readme_file = make_tempfile()
         copying_file = make_tempfile()
@@ -1246,33 +1246,41 @@ class PerforceClientTests(SCMClientTests):
 
     def test_diff_with_moved_files_cap_off(self):
         """Testing PerforceClient.diff with moved files and capability off"""
-        self._test_diff_with_moved_files('2b9a7313c83ba21d90eadcc8408e437c')
+        self._test_diff_with_moved_files('c59676330166ee883a6a6bcf08885f99')
 
     def _test_diff_with_moved_files(self, expected_diff_hash, caps={}):
         client = self._build_client()
         client.capabilities = Capabilities(caps)
-        client.p4.repo_files = {
-            '//mydepot/test/README#2': {
+        client.p4.repo_files = [
+            {
+                'depotFile': '//mydepot/test/README',
+                'rev': '2',
                 'action': 'move/delete',
                 'change': '12345',
                 'text': 'This is a test.\n',
             },
-            '//mydepot/test/README-new#1': {
+            {
+                'depotFile': '//mydepot/test/README-new',
+                'rev': '1',
                 'action': 'move/add',
                 'change': '12345',
                 'text': 'This is a mess.\n',
             },
-            '//mydepot/test/COPYING#2': {
+            {
+                'depotFile': '//mydepot/test/COPYING',
+                'rev': '2',
                 'action': 'move/delete',
                 'change': '12345',
                 'text': 'Copyright 2013 Joe User.\n',
             },
-            '//mydepot/test/COPYING-new#1': {
+            {
+                'depotFile': '//mydepot/test/COPYING-new',
+                'rev': '1',
                 'action': 'move/add',
                 'change': '12345',
                 'text': 'Copyright 2013 Joe User.\n',
             },
-        }
+        ]
 
         readme_file = make_tempfile()
         copying_file = make_tempfile()
@@ -1328,6 +1336,7 @@ class PerforceClientTests(SCMClientTests):
         diff_content = re.sub('\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}',
                               '1970-01-01 00:00:00',
                               diff_info['diff'])
+        print diff_content
         self.assertEqual(md5(diff_content).hexdigest(), expected_diff_hash)
 
     def test_parse_revision_spec_no_args(self):
@@ -1348,18 +1357,13 @@ class PerforceClientTests(SCMClientTests):
         """Testing PerforceClient.parse_revision_spec with a pending changelist"""
         class TestWrapper(P4Wrapper):
             def change(self, changelist):
-                return '\n'.join([
-                    'Change: 12345',
-                    '',
-                    'Date: 2013/12/19 11:32:45',
-                    '',
-                    'User: example',
-                    ''
-                    'Status: pending',
-                    ''
-                    'Description:',
-                    '\tMy change description',
-                    ])
+                return [{
+                    'Change': '12345',
+                    'Date': '2013/12/19 11:32:45',
+                    'User': 'example',
+                    'Status': 'pending',
+                    'Description': 'My change description\n',
+                }]
         client = PerforceClient(TestWrapper)
 
         revisions = client.parse_revision_spec(['12345'])
@@ -1377,18 +1381,14 @@ class PerforceClientTests(SCMClientTests):
         """Testing PerforceClient.parse_revision_spec with a submitted changelist"""
         class TestWrapper(P4Wrapper):
             def change(self, changelist):
-                return '\n'.join([
-                    'Change: 12345',
-                    '',
-                    'Date: 2013/12/19 11:32:45',
-                    '',
-                    'User: example',
-                    ''
-                    'Status: submitted',
-                    ''
-                    'Description:',
-                    '\tMy change description',
-                    ])
+                return [{
+                    'Change': '12345',
+                    'Date': '2013/12/19 11:32:45',
+                    'User': 'example',
+                    'Status': 'submitted',
+                    'Description': 'My change description\n',
+                }]
+
         client = PerforceClient(TestWrapper)
 
         revisions = client.parse_revision_spec(['12345'])
@@ -1403,18 +1403,13 @@ class PerforceClientTests(SCMClientTests):
         """Testing PerforceClient.parse_revision_spec with a shelved changelist"""
         class TestWrapper(P4Wrapper):
             def change(self, changelist):
-                return '\n'.join([
-                    'Change: 12345',
-                    '',
-                    'Date: 2013/12/19 11:32:45',
-                    '',
-                    'User: example',
-                    ''
-                    'Status: shelved',
-                    ''
-                    'Description:',
-                    '\tMy change description',
-                    ])
+                return [{
+                    'Change': '12345',
+                    'Date': '2013/12/19 11:32:45',
+                    'User': 'example',
+                    'Status': 'shelved',
+                    'Description': 'My change description\n',
+                }]
         client = PerforceClient(TestWrapper)
 
         revisions = client.parse_revision_spec(['12345'])
@@ -1431,36 +1426,23 @@ class PerforceClientTests(SCMClientTests):
     def test_parse_revision_spec_two_args(self):
         class TestWrapper(P4Wrapper):
             def change(self, changelist):
-                change_fmt = '\n'.join([
-                    'Change: %(change)s',
-                    '',
-                    'Date: 2013/12/19 11:32:45',
-                    '',
-                    'User: example',
-                    ''
-                    'Status: %(status)s',
-                    ''
-                    'Description:',
-                    '\tMy change description',
-                    ])
+                change = {
+                    'Change': str(changelist),
+                    'Date': '2013/12/19 11:32:45',
+                    'User': 'example',
+                    'Description': 'My change description\n',
+                }
 
                 if changelist == '99' or changelist == '100':
-                    return change_fmt % {
-                        'change': changelist,
-                        'status': 'submitted',
-                    }
+                    change['Status'] = 'submitted'
                 elif changelist == '101':
-                    return change_fmt % {
-                        'change': changelist,
-                        'status': 'pending',
-                    }
+                    change['Status'] = 'pending'
                 elif changelist == '102':
-                    return change_fmt % {
-                        'change': changelist,
-                        'status': 'shelved',
-                    }
+                    change['Status'] = 'shelved'
                 else:
-                    return None
+                    assert False
+
+                return [change]
 
         client = PerforceClient(TestWrapper)
 
@@ -1472,26 +1454,10 @@ class PerforceClientTests(SCMClientTests):
         self.assertEqual(revisions['base'], '99')
         self.assertEqual(revisions['tip'], '100')
 
-        revisions = client.parse_revision_spec(['99', '101'])
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' not in revisions)
-        self.assertEqual(revisions['base'], '99')
-        self.assertEqual(
-            revisions['tip'],
-            PerforceClient.REVISION_PENDING_CLN_PREFIX + '101')
-
-        revisions = client.parse_revision_spec(['99', '102'])
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' not in revisions)
-        self.assertEqual(revisions['base'], '99')
-        self.assertEqual(
-            revisions['tip'],
-            PerforceClient.REVISION_SHELVED_CLN_PREFIX + '102')
-
+        self.assertRaises(InvalidRevisionSpecError,
+                          lambda: client.parse_revision_spec(['99', '101']))
+        self.assertRaises(InvalidRevisionSpecError,
+                          lambda: client.parse_revision_spec(['99', '102']))
         self.assertRaises(InvalidRevisionSpecError,
                           lambda: client.parse_revision_spec(['101', '100']))
         self.assertRaises(InvalidRevisionSpecError,

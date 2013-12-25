@@ -34,12 +34,9 @@ class P4Wrapper(object):
 
     def change(self, changenum, password=None):
         return self.run_p4(['change', '-o', str(changenum)],
-                           password=password, split_lines=True,
-                           ignore_errors=True, none_on_ignored_error=True)
-
-    def describe(self, changenum, password=None):
-        return self.run_p4(['describe', '-s', str(changenum)],
-                           split_lines=True, password=password)
+                           password=password, ignore_errors=True,
+                           none_on_ignored_error=True,
+                           marshalled=True)
 
     def files(self, path):
         return self.run_p4(['files', path], marshalled=True)
@@ -73,15 +70,13 @@ class P4Wrapper(object):
 
     def opened(self, changenum):
         return self.run_p4(['opened', '-c', str(changenum)],
-                           split_lines=True)
+                           marshalled=True)
 
     def print_file(self, depot_path, out_file=None):
-        cmd = ['print']
+        cmd = ['print', '-q', depot_path]
 
         if out_file:
             cmd += ['-o', out_file]
-
-        cmd += ['-q', depot_path]
 
         return self.run_p4(cmd)
 
@@ -240,11 +235,16 @@ class PerforceClient(SCMClient):
         These will be used to generate the diffs to upload to Review Board (or
         print). The diff for review will include the changes in (base, tip].
 
-        If a single revision is passed in, this will return the parent of that
-        revision for 'base' and the passed-in revision for 'tip'.
-
         If zero revisions are passed in, this will return the 'default'
         changelist.
+
+        If a single revision is passed in, this will return the parent of that
+        revision for 'base' and the passed-in revision for 'tip'. The result
+        may have special internal revisions or prefixes based on whether the
+        changeset is submitted, pending, or shelved.
+
+        If two revisions are passed in, they need to both be submitted
+        changesets.
         """
         n_revs = len(revisions)
 
@@ -304,14 +304,12 @@ class PerforceClient(SCMClient):
 
             # Tip revision can be any of submitted, pending, or shelved CLNs
             status = self._get_changelist_status(revisions[1])
-            if status == 'pending':
-                result['tip'] = \
-                    self.REVISION_PENDING_CLN_PREFIX + revisions[1]
-            elif status == 'submitted':
+            if status == 'submitted':
                 result['tip'] = revisions[1]
-            elif status == 'shelved':
-                result['tip'] = \
-                    self.REVISION_SHELVED_CLN_PREFIX + revisions[1]
+            elif status in ('pending', 'shelved'):
+                raise InvalidRevisionSpecError(
+                    '%s cannot be used for a revision range diff because it '
+                    'is %s' % (revisions[1], status))
             else:
                 raise InvalidRevisionSpecError(
                     '%s does not appear to be a valid changelist' %
@@ -322,10 +320,13 @@ class PerforceClient(SCMClient):
             raise TooManyRevisionsError
 
     def _get_changelist_status(self, changelist):
-        change = self.p4.change(changelist).split('\n')
-        for line in change:
-            if line.startswith('Status:'):
-                return line[7:].strip()
+        if changelist == 'default':
+            return 'pending'
+        else:
+            change = self.p4.change(changelist)
+            assert len(change) == 1
+            if 'Status' in change[0]:
+                return change[0]['Status']
 
         return None
 
@@ -401,11 +402,153 @@ class PerforceClient(SCMClient):
         if self.options.p4_passwd:
             os.environ['P4PASSWD'] = self.options.p4_passwd
 
-        changenum = self.get_changenum(args)
-        if changenum is None:
+        try:
+            revisions = self.parse_revision_spec(args)
+        except InvalidRevisionSpecError:
             return self._path_diff(args)
+
+        base = revisions['base']
+        tip = revisions['tip']
+        if tip.startswith(self.REVISION_PENDING_CLN_PREFIX):
+            # Post a pending changeset
+            return self._diff_pending(
+                tip[len(self.REVISION_PENDING_CLN_PREFIX):])
+        elif tip.startswith(self.REVISION_SHELVED_CLN_PREFIX):
+            # Post a shelved changeset
+            pass
         else:
-            return self._changenum_diff(changenum)
+            # Post a diff between two submitted changesets.
+            pass
+
+    def _diff_pending(self, changenum):
+        logging.info('Generating diff for pending changeset %s' % changenum)
+
+        opened_files = self.p4.opened(changenum)
+
+        if not opened_files:
+            die("Couldn't find any affected files for this change.")
+
+        diff_lines = []
+
+        action_mapping = {
+            'edit': 'M',
+            'integrate': 'M',
+            'add': 'A',
+            'branch': 'A',
+            'delete': 'D',
+        }
+
+        if (self.capabilities and
+            self.capabilities.has_capability('scmtools', 'perforce',
+                                             'moved_files')):
+            action_mapping['move/add'] = 'MV-a'
+            action_mapping['move/delete'] = 'MV'
+        else:
+            # The Review Board server doesn't support moved files for
+            # perforce--create a diff that shows moved files as adds and
+            # deletes.
+            action_mapping['move/add'] = 'A'
+            action_mapping['move/delete'] = 'D'
+
+        for f in opened_files:
+            depot_path = f['depotFile']
+            new_depot_path = ''
+            try:
+                base_revision = int(f['rev'])
+            except ValueError:
+                # For actions like deletes, there won't be any "current
+                # revision". Just pass through whatever was there before
+                base_revision = f['rev']
+            action = f['action']
+
+            empty_file = make_tempfile()
+            old_file = make_tempfile()
+
+            logging.debug('Processing %s of %s', action, depot_path)
+
+            try:
+                changetype_short = action_mapping[action]
+            except KeyError:
+                die('Unknown action type "%s" for %s' % (action, depot_path))
+
+            if changetype_short == 'M':
+                # Get the old version out of perforce and stick it in
+                # 'old_file'
+                try:
+                    old_depot_path = '%s#%s' % (depot_path, base_revision)
+                    self._write_file(old_depot_path, old_file)
+                except ValueError, e:
+                    logging.warning('Skipping file %s: %s', old_depot_path, e)
+                    continue
+
+                # Just reference the file within the client view for the new
+                # file
+                new_file = self._depot_to_local(depot_path)
+            elif changetype_short == 'A':
+                # Just reference the file within the client view for the new
+                # file
+                new_file = self._depot_to_local(depot_path)
+
+                if os.path.islink(new_file):
+                    logging.warning('Skipping symlink %s', new_file)
+                    continue
+            elif changetype_short == 'D':
+                # Get the old version out of perforce and stick it in
+                # 'old_file'
+                try:
+                    old_depot_path = '%s#%s' % (depot_path, base_revision)
+                    self._write_file(old_depot_path, old_file)
+                except ValueError, e:
+                    logging.warning('Skipping file %s#%s: %s', old_depot_path, e)
+                    continue
+
+                # Use a completely empty file for the new one
+                new_file = empty_file
+            elif changetype_short == 'MV-a':
+                # The server supports move information. We ignore this
+                # particular entry, and handle the moves within the equivalent
+                # 'move/delete' entry.
+                continue
+            elif changetype_short == 'MV':
+                # A moved file. Figure out where it moved to and represent that
+                # information.
+                stat_info = self.p4.fstat(depot_path,
+                                          ['clientFile', 'movedFile'])
+                if ('clientFile' not in stat_info or
+                    'movedFile' not in stat_info):
+                    die('Unable to get moved file information for %s' %
+                        depot_path)
+
+                try:
+                    old_depot_path = '%s#%s' % (depot_path, base_revision)
+                    self._write_file(old_depot_path, old_file)
+                except ValueError, e:
+                    logging.warning('Skipping file %s#%s: %s', old_depot_path, e)
+                    continue
+
+                # Get information on the new file
+                moved_stat_info = self.p4.fstat(stat_info['movedFile'],
+                                                ['clientFile', 'depotFile'])
+                if ('clientFile' not in moved_stat_info or
+                    'depotFile' not in moved_stat_info):
+                    die('Unable to get moved file information for %s' %
+                        stat_info['movedFile'])
+
+                # Access the new file directly in the client view
+                new_file = moved_stat_info['clientFile']
+                new_depot_path = moved_stat_info['depotFile']
+
+            dl = self._do_diff(old_file, new_file, depot_path, base_revision,
+                               new_depot_path, changetype_short,
+                               ignore_unmodified=True)
+            diff_lines += dl
+
+            os.unlink(old_file)
+            os.unlink(empty_file)
+
+        return {
+            'diff': ''.join(diff_lines),
+        }
 
     def check_options(self):
         if self.options.revision_range:
@@ -418,8 +561,8 @@ class PerforceClient(SCMClient):
 
     def _path_diff(self, args):
         """
-        Process a path-style diff.  See _changenum_diff for the alternate
-        version that handles specific change numbers.
+        Process a path-style diff. This allows people to post individual files
+        in various ways.
 
         Multiple paths may be specified in `args`.  The path styles supported
         are:
@@ -498,14 +641,14 @@ class PerforceClient(SCMClient):
             for depot_path, (first_record, second_record) in files.items():
                 old_file = new_file = empty_filename
                 if first_record is None:
-                    self._write_file(depot_path + '#' + second_record['rev'],
-                                     tmp_diff_to_filename)
+                    new_path = '%s#%s' % (depot_path, second_record['rev'])
+                    self._write_file(new_path, tmp_diff_to_filename)
                     new_file = tmp_diff_to_filename
                     changetype_short = 'A'
                     base_revision = 0
                 elif second_record is None:
-                    self._write_file(depot_path + '#' + first_record['rev'],
-                                     tmp_diff_from_filename)
+                    old_path = '%s#%s' % (depot_path, first_record['rev'])
+                    self._write_file(new_path, tmp_diff_from_filename)
                     old_file = tmp_diff_from_filename
                     changetype_short = 'D'
                     base_revision = int(first_record['rev'])
@@ -515,10 +658,10 @@ class PerforceClient(SCMClient):
                     # diffs quite a bit.
                     continue
                 else:
-                    self._write_file(depot_path + '#' + first_record['rev'],
-                                     tmp_diff_from_filename)
-                    self._write_file(depot_path + '#' + second_record['rev'],
-                                     tmp_diff_to_filename)
+                    old_path = '%s#%s' % (depot_path, first_record['rev'])
+                    new_path = '%s#%s' % (depot_path, second_record['rev'])
+                    self._write_file(old_path, tmp_diff_from_filename)
+                    self._write_file(new_path, tmp_diff_to_filename)
                     new_file = tmp_diff_to_filename
                     old_file = tmp_diff_from_filename
                     changetype_short = 'M'
@@ -567,223 +710,6 @@ class PerforceClient(SCMClient):
                     return None
 
         return changenum
-
-    def _changenum_diff(self, changenum):
-        """
-        Process a diff for a particular change number.  This handles both
-        pending and submitted changelists.
-
-        See _path_diff for the alternate version that does diffs of depot
-        paths.
-        """
-        # TODO: It might be a good idea to enhance PerforceDiffParser to
-        # understand that newFile could include a revision tag for post-submit
-        # reviewing.
-        cl_is_pending = False
-
-        logging.info("Generating diff for changenum %s" % changenum)
-
-        description = []
-
-        if changenum == "default":
-            cl_is_pending = True
-        else:
-            description = self.p4.describe(changenum=changenum,
-                                           password=self.options.p4_passwd)
-
-            if re.search("no such changelist", description[0]):
-                die("CLN %s does not exist." % changenum)
-
-            # Some P4 wrappers are addding an extra line before the description
-            if '*pending*' in description[0] or '*pending*' in description[1]:
-                cl_is_pending = True
-
-        v = self.p4d_version
-
-        if cl_is_pending and (v[0] < 2002 or (v[0] == "2002" and v[1] < 2)
-                              or changenum == "default"):
-            # Pre-2002.2 doesn't give file list in pending changelists,
-            # or we don't have a description for a default changeset,
-            # so we have to get it a different way.
-            info = self.p4.opened(changenum)
-
-            if (len(info) == 1 and
-                info[0].startswith("File(s) not opened on this client.")):
-                die("Couldn't find any affected files for this change.")
-
-            for line in info:
-                data = line.split(" ")
-                description.append("... %s %s" % (data[0], data[2]))
-
-        else:
-            # Get the file list
-            for line_num, line in enumerate(description):
-                if 'Affected files ...' in line:
-                    break
-            else:
-                # Got to the end of all the description lines and didn't find
-                # what we were looking for.
-                die("Couldn't find any affected files for this change.")
-
-            description = description[line_num + 2:]
-
-        diff_lines = []
-
-        empty_filename = make_tempfile()
-        tmp_diff_from_filename = make_tempfile()
-        tmp_diff_to_filename = make_tempfile()
-
-        for line in description:
-            line = line.strip()
-            if not line:
-                continue
-
-            m = re.search(r'\.\.\. ([^#]+)#(\d+) '
-                          r'(add|edit|delete|integrate|branch|move/add'
-                          r'|move/delete)',
-                          line)
-            if not m:
-                die("Unsupported line from p4 opened: %s" % line)
-
-            depot_path = m.group(1)
-            base_revision = int(m.group(2))
-            if not cl_is_pending:
-                # If the changelist is pending our base revision is the one
-                # that's currently in the depot. If we're not pending the base
-                # revision is actually the revision prior to this one.
-                base_revision -= 1
-
-            changetype = m.group(3)
-
-            logging.debug('Processing %s of %s' % (changetype, depot_path))
-
-            old_file = new_file = empty_filename
-            old_depot_path = new_depot_path = None
-            new_depot_path = ''
-            changetype_short = None
-            supports_moves = (
-                self.capabilities and
-                self.capabilities.has_capability('scmtools', 'perforce',
-                                                 'moved_files'))
-
-            if changetype in ['edit', 'integrate']:
-                # A big assumption
-                new_revision = base_revision + 1
-
-                # We have an old file, get p4 to take this old version from the
-                # depot and put it into a plain old temp file for us
-                old_depot_path = "%s#%s" % (depot_path, base_revision)
-
-                try:
-                    self._write_file(old_depot_path, tmp_diff_from_filename)
-                except ValueError, exc:
-                    logging.warning("Skipping file (%s): %s" %
-                                    (old_depot_path, exc))
-                    continue
-
-                old_file = tmp_diff_from_filename
-
-                # Also print out the new file into a tmpfile
-                if cl_is_pending:
-                    new_file = self._depot_to_local(depot_path)
-                else:
-                    new_depot_path = "%s#%s" % (depot_path, new_revision)
-                    self._write_file(new_depot_path, tmp_diff_to_filename)
-                    new_file = tmp_diff_to_filename
-
-                changetype_short = "M"
-            elif (changetype in ('add', 'branch') or
-                  (changetype == 'move/add' and not supports_moves)):
-                # We have a new file, get p4 to put this new file into a pretty
-                # temp file for us. No old file to worry about here.
-                if cl_is_pending:
-                    new_file = self._depot_to_local(depot_path)
-
-                    if os.path.islink(new_file):
-                        logging.warning("Skipping symlink (%s)" % new_file)
-                        continue
-                else:
-                    try:
-                        new_depot_path = "%s#%s" % (depot_path, 1)
-                        self._write_file(new_depot_path, tmp_diff_to_filename)
-                        new_file = tmp_diff_to_filename
-                    except ValueError, exc:
-                        logging.warning("Skipping file (%s): %s" %
-                                        (new_depot_path, exc))
-                        continue
-
-                changetype_short = "A"
-            elif (changetype == 'delete' or
-                  (changetype == 'move/delete' and not supports_moves)):
-                # We've deleted a file, get p4 to put the deleted file into a
-                # temp file for us. The new file remains the empty file.
-
-                try:
-                    old_depot_path = "%s#%s" % (depot_path, base_revision)
-                    self._write_file(old_depot_path, tmp_diff_from_filename)
-                    old_file = tmp_diff_from_filename
-                    changetype_short = "D"
-                except ValueError, exc:
-                    logging.warning("Skipping file (%s): %s" %
-                                    (old_depot_path, exc))
-                    continue
-            elif changetype == 'move/add':
-                # The server supports move information. We can ignore this,
-                # though, since there should be a "move/delete" that's handled
-                # at some point.
-                continue
-            elif changetype == 'move/delete':
-                # The server supports move information, and we found a moved
-                # file. We'll figure out where we moved to and represent
-                # that information.
-                stat_info = self.p4.fstat(depot_path,
-                                          ['clientFile', 'movedFile'])
-
-                if ('clientFile' not in stat_info or
-                    'movedFile' not in stat_info):
-                    die('Unable to get necessary fstat information on %s' %
-                        depot_path)
-
-                try:
-                    old_depot_path = '%s#%s' % (depot_path, base_revision)
-                    self._write_file(old_depot_path, tmp_diff_from_filename)
-                    old_file = tmp_diff_from_filename
-                except ValueError, exc:
-                    logging.warning("Skipping file (%s): %s" %
-                                    (old_depot_path, exc))
-                    continue
-
-                # Get information on the new file.
-                moved_stat_info = self.p4.fstat(stat_info['movedFile'],
-                                                ['clientFile', 'depotFile'])
-
-                if ('clientFile' not in moved_stat_info or
-                    'depotFile' not in moved_stat_info):
-                    die('Unable to get necessary fstat information on %s' %
-                        stat_info['movedFile'])
-
-                # This is a new file and we can just access it directly.
-                # There's no revision 1 like with an add.
-                new_file = moved_stat_info['clientFile']
-                new_depot_path = moved_stat_info['depotFile']
-
-                changetype_short = 'MV'
-            else:
-                die("Unknown change type '%s' for %s" % (changetype,
-                                                         depot_path))
-
-            dl = self._do_diff(old_file, new_file, depot_path, base_revision,
-                               new_depot_path, changetype_short,
-                               ignore_unmodified=True)
-            diff_lines += dl
-
-        os.unlink(empty_filename)
-        os.unlink(tmp_diff_from_filename)
-        os.unlink(tmp_diff_to_filename)
-
-        return {
-            'diff': ''.join(diff_lines),
-        }
 
     def _do_diff(self, old_file, new_file, depot_path, base_revision,
                  new_depot_path, changetype_short, ignore_unmodified=False):
