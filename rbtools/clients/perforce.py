@@ -152,8 +152,6 @@ class PerforceClient(SCMClient):
     ENCODED_COUNTER_URL_RE = re.compile('reviewboard.url\.(\S+)')
 
     REVISION_CURRENT_SYNC = '--rbtools-current-sync'
-    REVISION_SHELVE_PARENT = '--rbtools-shelved-cln-parent'
-    REVISION_SHELVED_CLN_PREFIX = '--rbtools-shelved-cln:'
     REVISION_PENDING_CLN_PREFIX = '--rbtools-pending-cln:'
 
     def __init__(self, p4_class=P4Wrapper, **kwargs):
@@ -273,7 +271,21 @@ class PerforceClient(SCMClient):
             # based on which of these is in effect.
             status = self._get_changelist_status(revisions[0])
 
-            if status == 'pending':
+            # Both pending and shelved changes are treated as "pending",
+            # through the same code path. This is because the documentation for
+            # 'p4 change' tells a filthy lie, saying that shelved changes will
+            # have their status listed as shelved. In fact, when you shelve
+            # changes, it sticks the data up on the server, but leaves your
+            # working copy intact, and the change is still marked as pending.
+            # Even after reverting the working copy, the change won't have its
+            # status as "shelved". That said, there's perhaps a way that it
+            # could (perhaps from other clients?), so it's still handled in
+            # this conditional.
+            #
+            # The diff routine will first look for opened files in the client,
+            # and if that fails, it will then do the diff against the shelved
+            # copy.
+            if status in ('pending', 'shelved'):
                 return {
                     'base': self.REVISION_CURRENT_SYNC,
                     'tip': self.REVISION_PENDING_CLN_PREFIX + revisions[0],
@@ -290,11 +302,6 @@ class PerforceClient(SCMClient):
                     raise InvalidRevisionSpecError(
                         '%s does not appear to be a valid changelist' %
                         revisions[0])
-            elif status == 'shelved':
-                return {
-                    'base': self.REVISION_SHELVE_PARENT,
-                    'tip': self.REVISION_SHELVED_CLN_PREFIX + revisions[0],
-                }
             else:
                 raise InvalidRevisionSpecError(
                     '%s does not appear to be a valid changelist' %
@@ -420,26 +427,36 @@ class PerforceClient(SCMClient):
         except InvalidRevisionSpecError:
             return self._path_diff(args)
 
+        return self._diff(revisions)
+
+    def _diff(self, revisions):
         base = revisions['base']
         tip = revisions['tip']
-        if tip.startswith(self.REVISION_PENDING_CLN_PREFIX):
-            # Post a pending changeset
-            return self._diff_pending(
-                tip[len(self.REVISION_PENDING_CLN_PREFIX):])
-        elif tip.startswith(self.REVISION_SHELVED_CLN_PREFIX):
-            # Post a shelved changeset
-            pass
+
+        cl_is_pending = tip.startswith(self.REVISION_PENDING_CLN_PREFIX)
+        cl_is_shelved = False
+
+        if cl_is_pending:
+            # Strip off the prefix
+            tip = tip[len(self.REVISION_PENDING_CLN_PREFIX):]
+
+            # Try to get the files out of the working directory first. If that
+            # doesn't work, look at shelved files.
+            opened_files = self.p4.opened(tip)
+            if not opened_files:
+                opened_files = self.p4.files('//...@=%s' % tip)
+                cl_is_shelved = True
+
+            if not opened_files:
+                die("Couldn't find any affected files for this change.")
+
+            if cl_is_shelved:
+                logging.info('Generating diff for shelved changeset %s' % tip)
+            else:
+                logging.info('Generating diff for pending changeset %s' % tip)
         else:
-            # Post a diff between two submitted changesets.
-            pass
-
-    def _diff_pending(self, changenum):
-        logging.info('Generating diff for pending changeset %s' % changenum)
-
-        opened_files = self.p4.opened(changenum)
-
-        if not opened_files:
-            die("Couldn't find any affected files for this change.")
+            # TODO: diff between submitted revisions
+            return {}
 
         diff_lines = []
 
@@ -451,9 +468,16 @@ class PerforceClient(SCMClient):
             'delete': 'D',
         }
 
+        # XXX: Theoretically, shelved files should handle moves just fine--you
+        # can shelve and unshelve changes containing moves. Unfortunately,
+        # there doesn't seem to be any way to match up the added and removed
+        # files when the changeset is shelved, because none of the usual
+        # methods (fstat, filelog) provide the source move information when the
+        # changeset is shelved.
         if (self.capabilities and
             self.capabilities.has_capability('scmtools', 'perforce',
-                                             'moved_files')):
+                                             'moved_files') and
+            not cl_is_shelved):
             action_mapping['move/add'] = 'MV-a'
             action_mapping['move/delete'] = 'MV'
         else:
@@ -464,104 +488,183 @@ class PerforceClient(SCMClient):
             action_mapping['move/delete'] = 'D'
 
         for f in opened_files:
-            depot_path = f['depotFile']
-            new_depot_path = ''
+            depot_file = f['depotFile']
+            new_depot_file = ''
             try:
                 base_revision = int(f['rev'])
             except ValueError:
                 # For actions like deletes, there won't be any "current
-                # revision". Just pass through whatever was there before
+                # revision". Just pass through whatever was there before.
                 base_revision = f['rev']
             action = f['action']
 
-            empty_file = make_tempfile()
-            old_file = make_tempfile()
+            old_file = ''
+            new_file = ''
 
-            logging.debug('Processing %s of %s', action, depot_path)
+            logging.debug('Processing %s of %s', action, depot_file)
 
             try:
                 changetype_short = action_mapping[action]
             except KeyError:
-                die('Unknown action type "%s" for %s' % (action, depot_path))
+                die('Unknown action type "%s" for %s' % (action, depot_file))
 
             if changetype_short == 'M':
-                # Get the old version out of perforce and stick it in
-                # 'old_file'
                 try:
-                    old_depot_path = '%s#%s' % (depot_path, base_revision)
-                    self._write_file(old_depot_path, old_file)
+                    old_file, new_file = self._extract_edit_files(
+                        depot_file, tip, base_revision, cl_is_shelved)
                 except ValueError, e:
-                    logging.warning('Skipping file %s: %s', old_depot_path, e)
+                    logging.warning('Skipping file %s: %s', depot_file, e)
                     continue
-
-                # Just reference the file within the client view for the new
-                # file
-                new_file = self._depot_to_local(depot_path)
             elif changetype_short == 'A':
-                # Just reference the file within the client view for the new
-                # file
-                new_file = self._depot_to_local(depot_path)
+                # Perforce has a charming quirk where the revision listed for
+                # a file is '1' in both the first submitted revision, as well
+                # as before it's added. On the Review Board side, when we parse
+                # the diff, we'll check to see if that revision exists, but
+                # that only works for pending changes. If the change is shelved
+                # or submitted, revision 1 will exist, which causes the
+                # displayed diff to contain revision 1 twice.
+                #
+                # Setting the revision in the diff file to be '0' will avoid
+                # problems with patches that add files.
+                base_revision = 0
+
+                try:
+                    old_file, new_file = self._extract_add_files(
+                        depot_file, tip, cl_is_shelved)
+                except ValueError, e:
+                    logging.warning('Skipping file %s: %s', depot_file, e)
+                    continue
 
                 if os.path.islink(new_file):
                     logging.warning('Skipping symlink %s', new_file)
                     continue
             elif changetype_short == 'D':
-                # Get the old version out of perforce and stick it in
-                # 'old_file'
                 try:
-                    old_depot_path = '%s#%s' % (depot_path, base_revision)
-                    self._write_file(old_depot_path, old_file)
+                    old_file, new_file = self._extract_delete_files(
+                        depot_file, base_revision, cl_is_shelved)
                 except ValueError, e:
-                    logging.warning('Skipping file %s#%s: %s', old_depot_path, e)
+                    logging.warning('Skipping file %s#%s: %s', depot_file, e)
                     continue
-
-                # Use a completely empty file for the new one
-                new_file = empty_file
             elif changetype_short == 'MV-a':
                 # The server supports move information. We ignore this
                 # particular entry, and handle the moves within the equivalent
                 # 'move/delete' entry.
                 continue
             elif changetype_short == 'MV':
-                # A moved file. Figure out where it moved to and represent that
-                # information.
-                stat_info = self.p4.fstat(depot_path,
-                                          ['clientFile', 'movedFile'])
-                if ('clientFile' not in stat_info or
-                    'movedFile' not in stat_info):
-                    die('Unable to get moved file information for %s' %
-                        depot_path)
-
                 try:
-                    old_depot_path = '%s#%s' % (depot_path, base_revision)
-                    self._write_file(old_depot_path, old_file)
+                    old_file, new_file, new_depot_file = \
+                        self._extract_move_files(
+                            depot_file, tip, base_revision, cl_is_shelved)
                 except ValueError, e:
-                    logging.warning('Skipping file %s#%s: %s', old_depot_path, e)
+                    logging.warning('Skipping file %s: %s', depot_file, e)
                     continue
 
-                # Get information on the new file
-                moved_stat_info = self.p4.fstat(stat_info['movedFile'],
-                                                ['clientFile', 'depotFile'])
-                if ('clientFile' not in moved_stat_info or
-                    'depotFile' not in moved_stat_info):
-                    die('Unable to get moved file information for %s' %
-                        stat_info['movedFile'])
-
-                # Access the new file directly in the client view
-                new_file = moved_stat_info['clientFile']
-                new_depot_path = moved_stat_info['depotFile']
-
-            dl = self._do_diff(old_file, new_file, depot_path, base_revision,
-                               new_depot_path, changetype_short,
+            dl = self._do_diff(old_file, new_file, depot_file, base_revision,
+                               new_depot_file, changetype_short,
                                ignore_unmodified=True)
             diff_lines += dl
-
-            os.unlink(old_file)
-            os.unlink(empty_file)
 
         return {
             'diff': ''.join(diff_lines),
         }
+
+    def _extract_edit_files(self, depot_file, tip, base_revision,
+                            cl_is_shelved):
+        """Extract the 'old' and 'new' files for an edit operation.
+
+        Returns a tuple of (old filename, new filename). This can raise a
+        ValueError if the extraction fails.
+        """
+        # Get the old version out of perforce
+        old_filename = make_tempfile()
+        self._write_file('%s#%s' % (depot_file, base_revision), old_filename)
+
+        if cl_is_shelved:
+            new_filename = make_tempfile()
+            self._write_file('%s@=%s' % (depot_file, tip), new_filename)
+        else:
+            # Just reference the file within the client view
+            new_filename = self._depot_to_local(depot_file)
+
+        return old_filename, new_filename
+
+    def _extract_add_files(self, depot_file, revision, cl_is_shelved):
+        """Extract the 'old' and 'new' files for an add operation.
+
+        Returns a tuple of (old filename, new filename). This can raise a
+        ValueError if the extraction fails.
+        """
+        # Make an empty tempfile for the old file
+        old_filename = make_tempfile()
+
+        if cl_is_shelved:
+            new_filename = make_tempfile()
+            self._write_file('%s@=%s' % (depot_file, revision), new_filename)
+        else:
+            # Just reference the file within the client view
+            new_filename = self._depot_to_local(depot_file)
+
+        return old_filename, new_filename
+
+    def _extract_delete_files(self, depot_file, revision, cl_is_shelved):
+        """Extract the 'old' and 'new' files for a delete operation.
+
+        Returns a tuple of (old filename, new filename). This can raise a
+        ValueError if extraction fails.
+        """
+        # Get the old version out of perforce
+        old_filename = make_tempfile()
+        self._write_file('%s#%s' % (depot_file, revision), old_filename)
+
+        # Make an empty tempfile for the new file
+        new_filename = make_tempfile()
+
+        return old_filename, new_filename
+
+    def _extract_move_files(self, old_depot_file, tip, base_revision,
+                            cl_is_shelved):
+        """Extract the 'old' and 'new' files for a move operation.
+
+        Returns a tuple of (old filename, new filename, new depot path). This
+        can raise a ValueError if extraction fails.
+        """
+        # XXX: fstat *ought* to work, but perforce doesn't supply the movedFile
+        # field in fstat (or apparently anywhere else) when a change is
+        # shelved. For now, _diff_pending will avoid calling this method at all
+        # for shelved changes, and instead treat them as deletes and adds.
+        assert not cl_is_shelved
+
+        # if cl_is_shelved:
+        #     fstat_path = '%s@=%s' % (depot_file, tip)
+        # else:
+        fstat_path = old_depot_file
+
+        stat_info = self.p4.fstat(fstat_path,
+                                  ['clientFile', 'movedFile'])
+        if 'clientFile' not in stat_info or 'movedFile' not in stat_info:
+            raise ValueError('Unable to get moved file information')
+
+        old_filename = make_tempfile()
+        self._write_file('%s#%s' % (old_depot_file, base_revision),
+                         old_filename)
+
+        # if cl_is_shelved:
+        #     fstat_path = '%s@=%s' % (stat_info['movedFile'], tip)
+        # else:
+        fstat_path = stat_info['movedFile']
+
+        stat_info = self.p4.fstat(fstat_path,
+                                  ['clientFile', 'depotFile'])
+        if 'clientFile' not in stat_info or 'depotFile' not in stat_info:
+            raise ValueError('Unable to get moved file information')
+
+        # Grab the new depot path (to include in the diff index)
+        new_depot_file = stat_info['depotFile']
+
+        # Reference the new file directly in the client view
+        new_filename = stat_info['clientFile']
+
+        return old_filename, new_filename, new_depot_file
 
     def check_options(self):
         if self.options.revision_range:
@@ -680,7 +783,7 @@ class PerforceClient(SCMClient):
                     changetype_short = 'M'
                     base_revision = int(first_record['rev'])
 
-                # TODO: We're passing new_depot_path='' here just to make
+                # TODO: We're passing new_depot_file='' here just to make
                 # things work like they did before the moved file change was
                 # added (58ccae27). This section of code needs to be updated
                 # to properly work with moved files.
@@ -724,17 +827,17 @@ class PerforceClient(SCMClient):
 
         return changenum
 
-    def _do_diff(self, old_file, new_file, depot_path, base_revision,
-                 new_depot_path, changetype_short, ignore_unmodified=False):
+    def _do_diff(self, old_file, new_file, depot_file, base_revision,
+                 new_depot_file, changetype_short, ignore_unmodified=False):
         """
         Do the work of producing a diff for Perforce.
 
         old_file - The absolute path to the "old" file.
         new_file - The absolute path to the "new" file.
-        depot_path - The depot path in Perforce for this file.
+        depot_file - The depot path in Perforce for this file.
         base_revision - The base perforce revision number of the old file as
             an integer.
-        new_depot_path - Location of the new file. Only used for moved files.
+        new_depot_file - Location of the new file. Only used for moved files.
         changetype_short - The change type as a short string.
         ignore_unmodified - If True, will return an empty list if the file
             is not changed.
@@ -756,18 +859,18 @@ class PerforceClient(SCMClient):
 
         cwd = os.getcwd()
 
-        if depot_path.startswith(cwd):
-            local_path = depot_path[len(cwd) + 1:]
+        if depot_file.startswith(cwd):
+            local_path = depot_file[len(cwd) + 1:]
         else:
-            local_path = depot_path
+            local_path = depot_file
 
         if changetype_short == 'MV':
             is_move = True
 
-            if new_depot_path.startswith(cwd):
-                new_local_path = new_depot_path[len(cwd) + 1:]
+            if new_depot_file.startswith(cwd):
+                new_local_path = new_depot_file[len(cwd) + 1:]
             else:
-                new_local_path = new_depot_path
+                new_local_path = new_depot_file
         else:
             is_move = False
             new_local_path = local_path
@@ -790,7 +893,7 @@ class PerforceClient(SCMClient):
                           local_path
 
             dl.insert(0, "==== %s#%s ==%s== %s ====\n" %
-                      (depot_path, base_revision, changetype_short,
+                      (depot_file, base_revision, changetype_short,
                        new_local_path))
             dl.append('\n')
         elif len(dl) > 1:
@@ -824,12 +927,12 @@ class PerforceClient(SCMClient):
 
                 timestamp = "%s-%s-%s %s" % (year, month, day, timestamp)
 
-            dl[0] = "--- %s\t%s#%s\n" % (local_path, depot_path, base_revision)
+            dl[0] = "--- %s\t%s#%s\n" % (local_path, depot_file, base_revision)
             dl[1] = "+++ %s\t%s\n" % (new_local_path, timestamp)
 
             if is_move:
-                dl.insert(0, 'Moved to: %s\n' % new_depot_path)
-                dl.insert(0, 'Moved from: %s\n' % depot_path)
+                dl.insert(0, 'Moved to: %s\n' % new_depot_file)
+                dl.insert(0, 'Moved from: %s\n' % depot_file)
 
             # Not everybody has files that end in a newline (ugh). This ensures
             # that the resulting diff file isn't broken.

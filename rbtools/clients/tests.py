@@ -1230,7 +1230,7 @@ class PerforceClientTests(SCMClientTests):
         }
 
         diff = client.diff(['12345'])
-        self._compare_diff(diff, '75c07955a503fc1a32efc671c18ff618')
+        self._compare_diff(diff, '07aa18ff67f9aa615fcda7ecddcb354e')
 
     def test_diff_with_moved_files_cap_on(self):
         """Testing PerforceClient.diff with moved files and capability on"""
@@ -1246,7 +1246,7 @@ class PerforceClientTests(SCMClientTests):
 
     def test_diff_with_moved_files_cap_off(self):
         """Testing PerforceClient.diff with moved files and capability off"""
-        self._test_diff_with_moved_files('c59676330166ee883a6a6bcf08885f99')
+        self._test_diff_with_moved_files('20e5ab395e170dce1b062a796e6c2c13')
 
     def _test_diff_with_moved_files(self, expected_diff_hash, caps={}):
         client = self._build_client()
@@ -1418,10 +1418,10 @@ class PerforceClientTests(SCMClientTests):
         self.assertTrue('tip' in revisions)
         self.assertTrue('parent_base' not in revisions)
         self.assertEqual(
-            revisions['base'], PerforceClient.REVISION_SHELVE_PARENT)
+            revisions['base'], PerforceClient.REVISION_CURRENT_SYNC)
         self.assertEqual(
             revisions['tip'],
-            PerforceClient.REVISION_SHELVED_CLN_PREFIX + '12345')
+            PerforceClient.REVISION_PENDING_CLN_PREFIX + '12345')
 
     def test_parse_revision_spec_two_args(self):
         class TestWrapper(P4Wrapper):

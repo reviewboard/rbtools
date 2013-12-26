@@ -81,7 +81,14 @@ review request for that change, type::
 
     $ rbt post CHANGENUM
 
-Where ``CHANGENUM`` is the changeset number in Perforce.
+Where ``CHANGENUM`` is a pending or shelved changeset number in Perforce.
+
+.. note::
+
+    When ``CHANGENUM`` refers to a shelved changeset which does not have opened
+    files in the client, any moved files within the change will be shown as a
+    deleted file and an added file. This is due to limitations in Perforce's
+    interface for shelved changesets.
 
 The diff will be generated and uploaded to Review Board, and the review
 request information will be updated based on the changeset description.
