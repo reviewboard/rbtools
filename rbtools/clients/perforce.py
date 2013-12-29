@@ -73,10 +73,12 @@ class P4Wrapper(object):
                            marshalled=True)
 
     def print_file(self, depot_path, out_file=None):
-        cmd = ['print', '-q', depot_path]
+        cmd = ['print']
 
         if out_file:
             cmd += ['-o', out_file]
+
+        cmd += ['-q', depot_path]
 
         return self.run_p4(cmd)
 
