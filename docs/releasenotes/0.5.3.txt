@@ -169,7 +169,7 @@ Commands
 rbt diff
 ~~~~~~~~
 
-* Fixed a crash when :command:`rbt diff`. Patch by Jose Pereira.
+* Fixed a crash when using :command:`rbt diff`. Patch by Jose Pereira.
 
 
 SCM Support
