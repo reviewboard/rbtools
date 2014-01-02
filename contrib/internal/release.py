@@ -26,9 +26,9 @@ LATEST_PY_VERSION = PY_VERSIONS[-1]
 PACKAGE_NAME = 'RBTools'
 
 RELEASES_BUCKET_NAME = 'downloads.reviewboard.org'
-RELEASES_BUCKET_KEY = '/%s/%s.%s/' % (PACKAGE_NAME,
-                                      __version_info__[0],
-                                      __version_info__[1])
+RELEASES_BUCKET_KEY = '/releases/%s/%s.%s/' % (PACKAGE_NAME,
+                                               __version_info__[0],
+                                               __version_info__[1])
 
 RBWEBSITE_API_URL = 'http://www.reviewboard.org/api/'
 RELEASES_API_URL = '%sproducts/rbtools/releases/' % RBWEBSITE_API_URL
