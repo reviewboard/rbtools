@@ -1,0 +1,253 @@
+===========================
+RBTools 0.5.3 Release Notes
+===========================
+
+**Release date**: January 1, 2014
+
+
+New Features
+============
+
+General
+-------
+
+* Improved the output of ``rbt --help``.
+
+  The help output now lists the most commonly used commands first, followed
+  by all other commands registered with RBTools.
+
+* Added support for RBCommons 2 factor authentication.
+
+  RBCommons is soon getting 2 factor authentication support, enabling
+  tighter security of accounts by requiring a verification code sent to
+  a mobile device.
+
+  This release is needed for those enabling 2 factor authentication on
+  RBCommons.
+
+
+Commands
+--------
+
+
+rbt patch
+~~~~~~~~~
+
+* Added a :option:`--print` option for printing the patch instead of
+  applying it to the tree.
+
+  Patch by Sudhir Sangappa.
+
+* Added a :option:`--commit` (or :option:`-c`) option to automaticaly
+  create a commit on the local branch with the summary, description,
+  bugs, testing, author information, and diff contents from the review
+  request.
+
+  This is currently only supported for Git.
+
+  Patch by Edward Lee.
+
+
+rbt post
+~~~~~~~~
+
+* Added a :option:`-u` option for automatically determining the review
+  request to update.
+
+  Running ``rbt post -u`` will now look for an existing review request
+  that best matches the latest commit (or last commit in a revision range)
+  to update. If it can guarantee a match, it will update the review
+  request. Otherwise, if it's unsure, it will prompt for confirmation.
+
+  This is a nicer alternative than running ``rbt post -r <ID>``.
+
+  Patch by Edward Lee.
+
+* On Git, posting with a dirty working directory now results in a warning.
+
+  This helps solve a common problem where users will try to post a change
+  without committing all modified files. (:bug:`3120`)
+
+
+
+rbt setup-repo
+~~~~~~~~~~~~~~
+
+* Added a new :command:`rbt setup-repo` command for creating a
+  :file:`.reviewboardrc` file.
+
+  This is used when first setting up a repository. It will prompt for the
+  Review Board server URL and will then try to find the appropriate
+  repository matching the local checkout. If not found, it will prompt
+  for this as well.
+
+  Patch by Edward Lee.
+
+
+SCM Support
+-----------
+
+Mercurial
+~~~~~~~~~
+
+* Added support for hidden changesets.
+
+  The Mercurial support now allows hidden changesets to be specified
+  when using :option:`--revision-range` or any other time a revision is
+  needed. RBTools now passes :option:`--hidden` to all Mercurial
+  commands.
+
+  Patch by Gregory Szorc.
+
+
+Perforce
+~~~~~~~~
+
+* Added support for Perforce brokers. (:bug:`2568`)
+
+  If :command:`p4 info` reports a ``Broker address:`` field, it will be
+  used instead of the ``Server address:``.
+
+  Patch by Jeffrey Markham.
+
+* Fixed looking up Perforce servers using a separate hostname.
+
+  When looking up a Perforce server, RBTools will look for aliases and
+  the real hostname for the server. If the repository was registered with
+  some other hostname, it would fail. We now include the requested hostname
+  when looking up the repository.
+
+
+API Changes
+===========
+
+* Added a function for getting the repository ID from the server for the
+  provided repository info.
+
+  This introduces ``rbtools.utils.repository.get_repository_id``, which
+  will fetch the repository ID from the server based on the repository
+  information passed to it.
+
+  Patch by Edward Lee.
+
+* ``url`` attributes provided by resources can now be properly accessed.
+  They were previously being overridden to point to the API resource URL.
+
+  Patch by Edward Lee.
+
+* The ``fields`` attribute has been made private. Callers should access
+  the fields directory as attributes, rather than going through this.
+
+
+Bug Fixes
+=========
+
+General
+-------
+
+* Fixed a missing space in the "You are not authenticated" string when
+  prompting to log in.
+
+* Pressing Control-C now exits cleanly, instead of showing an exception.
+  Patch by Garrett Cooper.
+
+* Passing :option:`--username` and :option:`--password` on the command line
+  now properly prevents RBTools from prompting for a username/password
+  when logging in. (:bug:`3114`)
+
+  Patch by Garrett Cooper.
+
+* Fixed problems with loading third-party RBTools commands.
+
+  Third-party RBTools commands are now properly loaded, invoked, and shown
+  in :option:`--help` output.
+
+
+Commands
+--------
+
+rbt diff
+~~~~~~~~
+
+* Fixed a crash when :command:`rbt diff`. Patch by Jose Pereira.
+
+
+SCM Support
+-----------
+
+Bazaar
+~~~~~~
+
+* Bazaar support now supports the "checkout of branch" string in
+  :command:`bzr info`. (:bug:`2960`)
+
+
+Git
+~~~
+
+* Fixed a crash when attempting to diff with :command:`git-p4`.
+  Patch by Edward Lee.
+
+* Only the top commit is used now when guessing the summary and description.
+  Patch by Damian Johnson.
+
+* Fixed calculating the parent diff when using :option:`--revision-range`.
+  (:bug:`3125`)
+
+  Patch by Adar Dembo.
+
+* Fixed compatibility with :command:`git-p4`. (:bug:`3169`)
+
+  Patch by Dan Porter.
+
+
+Mercurial
+~~~~~~~~~
+
+* Fixed a crash when trying to post without any outgoing changes when
+  warnings were displayed.
+
+* Fixed a crash when running ``rbt diff --revision-range``.
+  Patch by Gregory Szorc.
+
+* :file:`hgrc` files are no longer ignored. (:bug:`3034`)
+
+  Previously, :file:`hgrc` files were being ignored in order to prevent
+  certain options from interfering with diff generation. That ended up
+  causing more problems than it solved.
+
+  We now filter out those diff options specifically, allowing us to
+  load :file:`hgrc` files again.
+
+  Patch by Gregory Szorc.
+
+
+Subversion
+~~~~~~~~~~
+
+* Warnings (such as for unsupported locales) generated when fetching the
+  ``reviewboard:url`` property are no longer shown.
+
+  Patch by Tzafrir Cohen.
+
+
+Contributors
+============
+
+* Adar Dembo
+* Christian Hammond
+* Damian Johnson
+* Dan Porter
+* David Trowbridge
+* Edward Lee
+* Garrett Cooper
+* Gregory Szorc
+* Mike Conley
+* Jeffrey Markham
+* Jose Pereira
+* Steven MacLeod
+* Sudhir Sangappa
+* Tzafrir Cohen
+
+
+.. comment: vim: ft=rst et
