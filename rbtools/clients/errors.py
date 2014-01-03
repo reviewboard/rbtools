@@ -17,3 +17,9 @@ class TooManyRevisionsError(InvalidRevisionSpecError):
     def __init__(self):
         super(TooManyRevisionsError, self).__init__(
             'Too many revisions specified')
+
+
+class EmptyChangeError(Exception):
+    def __init__(self):
+        super(EmptyChangeError, self).__init(
+            "Couldn't find any affected files for this change.")

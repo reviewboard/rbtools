@@ -7,7 +7,8 @@ import stat
 import subprocess
 
 from rbtools.clients import SCMClient, RepositoryInfo
-from rbtools.clients.errors import (InvalidRevisionSpecError,
+from rbtools.clients.errors import (EmptyChangeError,
+                                    InvalidRevisionSpecError,
                                     OptionsCheckError,
                                     TooManyRevisionsError)
 from rbtools.utils.checks import check_gnu_diff, check_install
@@ -40,6 +41,9 @@ class P4Wrapper(object):
 
     def files(self, path):
         return self.run_p4(['files', path], marshalled=True)
+
+    def filelog(self, path):
+        return self.run_p4(['filelog', path], marshalled=True)
 
     def fstat(self, depot_path, fields=[]):
         args = ['fstat']
@@ -436,27 +440,30 @@ class PerforceClient(SCMClient):
         cl_is_pending = tip.startswith(self.REVISION_PENDING_CLN_PREFIX)
         cl_is_shelved = False
 
-        if cl_is_pending:
-            # Strip off the prefix
-            tip = tip[len(self.REVISION_PENDING_CLN_PREFIX):]
+        if not cl_is_pending:
+            # Submitted changes are handled by a different method
+            logging.info('Generating diff for range of submitted changes: %s '
+                         'to %s',
+                         base, tip)
+            return self._compute_range_changes(base, tip)
 
-            # Try to get the files out of the working directory first. If that
-            # doesn't work, look at shelved files.
-            opened_files = self.p4.opened(tip)
-            if not opened_files:
-                opened_files = self.p4.files('//...@=%s' % tip)
-                cl_is_shelved = True
+        # Strip off the prefix
+        tip = tip[len(self.REVISION_PENDING_CLN_PREFIX):]
 
-            if not opened_files:
-                die("Couldn't find any affected files for this change.")
+        # Try to get the files out of the working directory first. If that
+        # doesn't work, look at shelved files.
+        opened_files = self.p4.opened(tip)
+        if not opened_files:
+            opened_files = self.p4.files('//...@=%s' % tip)
+            cl_is_shelved = True
 
-            if cl_is_shelved:
-                logging.info('Generating diff for shelved changeset %s' % tip)
-            else:
-                logging.info('Generating diff for pending changeset %s' % tip)
+        if not opened_files:
+            raise EmptyChangeError
+
+        if cl_is_shelved:
+            logging.info('Generating diff for shelved changeset %s' % tip)
         else:
-            # TODO: diff between submitted revisions
-            return {}
+            logging.info('Generating diff for pending changeset %s' % tip)
 
         diff_lines = []
 
@@ -474,10 +481,7 @@ class PerforceClient(SCMClient):
         # files when the changeset is shelved, because none of the usual
         # methods (fstat, filelog) provide the source move information when the
         # changeset is shelved.
-        if (self.capabilities and
-            self.capabilities.has_capability('scmtools', 'perforce',
-                                             'moved_files') and
-            not cl_is_shelved):
+        if self._supports_moves() and not cl_is_shelved:
             action_mapping['move/add'] = 'MV-a'
             action_mapping['move/delete'] = 'MV'
         else:
@@ -506,12 +510,12 @@ class PerforceClient(SCMClient):
             try:
                 changetype_short = action_mapping[action]
             except KeyError:
-                die('Unknown action type "%s" for %s' % (action, depot_file))
+                die('Unsupported action type "%s" for %s' % (action, depot_file))
 
             if changetype_short == 'M':
                 try:
                     old_file, new_file = self._extract_edit_files(
-                        depot_file, tip, base_revision, cl_is_shelved)
+                        depot_file, base_revision, tip, cl_is_shelved, False)
                 except ValueError, e:
                     logging.warning('Skipping file %s: %s', depot_file, e)
                     continue
@@ -530,7 +534,7 @@ class PerforceClient(SCMClient):
 
                 try:
                     old_file, new_file = self._extract_add_files(
-                        depot_file, tip, cl_is_shelved)
+                        depot_file, tip, cl_is_shelved, cl_is_pending)
                 except ValueError, e:
                     logging.warning('Skipping file %s: %s', depot_file, e)
                     continue
@@ -541,7 +545,7 @@ class PerforceClient(SCMClient):
             elif changetype_short == 'D':
                 try:
                     old_file, new_file = self._extract_delete_files(
-                        depot_file, base_revision, cl_is_shelved)
+                        depot_file, base_revision)
                 except ValueError, e:
                     logging.warning('Skipping file %s#%s: %s', depot_file, e)
                     continue
@@ -568,8 +572,224 @@ class PerforceClient(SCMClient):
             'diff': ''.join(diff_lines),
         }
 
-    def _extract_edit_files(self, depot_file, tip, base_revision,
-                            cl_is_shelved):
+    def _compute_range_changes(self, base, tip):
+        """Compute the changes across files given a revision range.
+
+        This will look at the history of all changes within the given range and
+        compute the full set of changes contained therein. Just looking at the
+        two trees isn't enough, since files may have moved around and we want
+        to include that information.
+        """
+        # Start by looking at the filelog to get a history of all the changes
+        # within the changeset range. This processing step is done because in
+        # marshalled mode, the filelog doesn't sort its entries at all, and can
+        # also include duplicate information, especially when files have moved
+        # around.
+        changesets = {}
+        for file_entry in self.p4.filelog('//...@%s,%s' % (base, tip)):
+            cid = 0
+            while True:
+                change_key = 'change%d' % cid
+                if change_key not in file_entry:
+                    break
+
+                action = file_entry['action%d' % cid]
+                depot_file = file_entry['depotFile']
+
+                try:
+                    cln = int(file_entry[change_key])
+                except ValueError:
+                    logging.warning('Skipping file %s: unable to parse '
+                                    'change number "%s"',
+                                    depot_file, file_entry[change_key])
+                    break
+
+                if action not in ('edit', 'integrate', 'add', 'delete',
+                                  'move/add', 'move/delete'):
+                    raise Exception('Unsupported action type "%s" for %s' %
+                                    (action, depot_file))
+
+                if action == 'integrate':
+                    action = 'edit'
+                elif action == 'branch':
+                    action = 'add'
+
+                try:
+                    rev_key = 'rev%d' % cid
+                    rev = int(file_entry[rev_key])
+                except ValueError:
+                    logging.warning('Skipping file %s: unable to parse '
+                                    'revision number "%s"',
+                                    depot_file, file_entry[rev_key])
+                    break
+
+                change = {
+                    'rev': rev,
+                    'action': action,
+                }
+
+                if action == 'move/add':
+                    change['oldFilename'] = file_entry['file0,%d' % cid]
+                elif action == 'move/delete':
+                    change['newFilename'] = file_entry['file1,%d' % cid]
+
+                cid += 1
+
+                changesets.setdefault(cln, {}).set(depot_file, change)
+
+        # Now run through the changesets in order and compute a change journal
+        # for each file.
+        files = []
+        for cln in sorted(changesets.keys()):
+            changeset = changesets[cln]
+            for depot_file, change in changeset.iteritems():
+                action = change['action']
+
+                # Moves will be handled in the 'move/delete' entry
+                if action == 'move/add':
+                    continue
+
+                file_entry = None
+                for f in files:
+                    if f['depotFile'] == depot_file:
+                        file_entry = f
+                        break
+
+                if file_entry is None:
+                    file_entry = {
+                        'initialDepotFile': depot_file,
+                        'initialRev': change['rev'],
+                        'newFile': action == 'add',
+                        'rev': change['rev'],
+                        'action': 'none',
+                    }
+                    files.append(file_entry)
+
+                self._accumulate_range_change(file_entry, change)
+
+        if not files:
+            raise EmptyChangeError
+
+        # Now generate the diff
+        supports_moves = self._supports_moves()
+        diff_lines = []
+        for f in files:
+            action = f['action']
+            depot_file = f['depotFile']
+            rev = f['rev']
+            initial_depot_file = f['initialDepotFile']
+            initial_rev = f['initialRev']
+
+            if action == 'add':
+                try:
+                    old_file, new_file = self._extract_add_files(
+                        depot_file, rev, False, False)
+                except ValueError, e:
+                    logging.warning('Skipping file %s: %s', depot_file, e)
+                    continue
+
+                diff_lines += self._do_diff(
+                    old_file, new_file, depot_file, 0, '', 'A',
+                    ignore_unmodified=True)
+            elif action == 'delete':
+                try:
+                    old_file, new_file = self._extract_delete_files(
+                        initial_depot_file, initial_rev)
+                except ValueError:
+                    logging.warning('Skipping file %s: %s', depot_file, e)
+                    continue
+
+                diff_lines += self._do_diff(
+                    old_file, new_file, initial_depot_file, initial_rev,
+                    depot_file, 'D', ignore_unmodified=True)
+            elif action == 'edit':
+                try:
+                    old_file, new_file = self._extract_edit_files(
+                        depot_file, initial_rev, rev, False, True)
+                except ValueError:
+                    logging.warning('Skipping file %s: %s', depot_file, e)
+                    continue
+            elif action == 'move':
+                try:
+                    old_file_a, new_file_a = self._extract_add_files(
+                        depot_file, rev, False, False)
+                    old_file_b, new_file_b = self._extract_delete_files(
+                        initial_depot_file, initial_rev)
+                except ValueError:
+                    logging.warning('Skipping file %s: %s', depot_file, e)
+                    continue
+
+                if supports_moves:
+                    # Show the change as a move
+                    diff_lines += self._do_diff(
+                        old_file_a, new_file_b, initial_depot_file,
+                        initial_rev, depot_file, 'MV', ignore_unmodified=True)
+                else:
+                    # Show the change as add and delete
+                    diff_lines += self._do_diff(
+                        old_file_a, new_file_a, depot_file, 0, '', 'A',
+                        ignore_unmodified=True)
+                    diff_lines += self._do_diff(
+                        old_file_b, new_file_b, initial_depot_file, initial_rev,
+                        depot_file, 'D', ignore_unmodified=True)
+            elif action == 'skip':
+                continue
+            else:
+                # We should never get here. The results of
+                # self._accumulate_range_change should never be anything other
+                # than add, delete, move, or edit.
+                assert False
+
+        return {
+            'diff': ''.join(diff_lines)
+        }
+
+    def _accumulate_range_change(self, file_entry, change):
+        """Compute the effects of a given change on a given file"""
+        old_action = file_entry['action']
+        current_action = change['action']
+
+        if old_action == 'none':
+            # This is the first entry for this file.
+            new_action = current_action
+            file_entry['depotFile'] = file_entry['initialDepotFile']
+
+            # If the first action was an edit, then the initial revision
+            # (that we'll use to generate the diff) is n-1
+            if current_action == 'edit':
+                file_entry['initialRev'] -= 1
+        elif current_action == 'add':
+            # If we're adding a file that existed in the base changeset, it
+            # means it was previously deleted and then added back. We
+            # therefore want the operation to look like an edit. If it
+            # didn't exist, then we added, deleted, and are now adding
+            # again.
+            if old_action == 'skip':
+                new_action = 'add'
+            else:
+                new_action = 'edit'
+        elif current_action == 'edit':
+            # Edits don't affect the previous type of change
+            # (edit+edit=edit, move+edit=move, add+edit=add).
+            new_action = old_action
+        elif current_action == 'delete':
+            # If we're deleting a file which did not exist in the base
+            # changeset, then we want to just skip it entirely (since it
+            # means it's been added and then deleted). Otherwise, it's a
+            # real delete.
+            if file_entry['newFile']:
+                new_action = 'skip'
+            else:
+                new_action = 'delete'
+        elif current_action == 'move/delete':
+            new_action = 'move'
+            file_entry['depotFile'] = change['newFilename']
+
+        file_entry['rev'] = change['rev']
+        file_entry['action'] = new_action
+
+    def _extract_edit_files(self, depot_file, rev_a, rev_b,
+                            cl_is_shelved, cl_is_submitted):
         """Extract the 'old' and 'new' files for an edit operation.
 
         Returns a tuple of (old filename, new filename). This can raise a
@@ -577,18 +797,22 @@ class PerforceClient(SCMClient):
         """
         # Get the old version out of perforce
         old_filename = make_tempfile()
-        self._write_file('%s#%s' % (depot_file, base_revision), old_filename)
+        self._write_file('%s#%s' % (depot_file, rev_a), old_filename)
 
         if cl_is_shelved:
             new_filename = make_tempfile()
-            self._write_file('%s@=%s' % (depot_file, tip), new_filename)
+            self._write_file('%s@=%s' % (depot_file, rev_b), new_filename)
+        elif cl_is_submitted:
+            new_filename = make_tempfile()
+            self._write_file('%s#%s' % (depot_file, rev_b), new_filename)
         else:
             # Just reference the file within the client view
             new_filename = self._depot_to_local(depot_file)
 
         return old_filename, new_filename
 
-    def _extract_add_files(self, depot_file, revision, cl_is_shelved):
+    def _extract_add_files(self, depot_file, revision, cl_is_shelved,
+                           cl_is_pending):
         """Extract the 'old' and 'new' files for an add operation.
 
         Returns a tuple of (old filename, new filename). This can raise a
@@ -600,13 +824,16 @@ class PerforceClient(SCMClient):
         if cl_is_shelved:
             new_filename = make_tempfile()
             self._write_file('%s@=%s' % (depot_file, revision), new_filename)
-        else:
+        elif cl_is_pending:
             # Just reference the file within the client view
             new_filename = self._depot_to_local(depot_file)
+        else:
+            new_filename = make_tempfile()
+            self._write_file('%s#%s' % (depot_file, revision), new_filename)
 
         return old_filename, new_filename
 
-    def _extract_delete_files(self, depot_file, revision, cl_is_shelved):
+    def _extract_delete_files(self, depot_file, revision):
         """Extract the 'old' and 'new' files for a delete operation.
 
         Returns a tuple of (old filename, new filename). This can raise a
@@ -981,3 +1208,8 @@ class PerforceClient(SCMClient):
         except:
             # XXX: This breaks on filenames with spaces.
             return where_output[-1]['data'].split(' ')[2].strip()
+
+    def _supports_moves(self):
+        return (self.capabilities and
+                self.capabilities.has_capability('scmtools', 'perforce',
+                                                 'moved_files'))
