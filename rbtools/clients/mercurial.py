@@ -174,8 +174,12 @@ class MercurialClient(SCMClient):
 
         result = {}
         if n_revisions == 0:
-            # No revisions: Find the outgoing changes.
-            outgoing = self._get_bottom_and_top_outgoing_revs_for_remote()
+            # No revisions: Find the outgoing changes. Only consider the
+            # working copy revision and ancestors because that makes sense.
+            # If a user wishes to include other changesets, they can run
+            # `hg up` or specify explicit revisions as command arguments.
+            outgoing = \
+                self._get_bottom_and_top_outgoing_revs_for_remote(rev='.')
             if outgoing[0] is None or outgoing[1] is None:
                 raise InvalidRevisionSpecError(
                     'There are no outgoing changes')
@@ -349,7 +353,7 @@ class MercurialClient(SCMClient):
         """Returns the current branch of this repository."""
         return execute(['hg', 'branch'], env=self._hg_env).strip()
 
-    def _get_bottom_and_top_outgoing_revs_for_remote(self):
+    def _get_bottom_and_top_outgoing_revs_for_remote(self, rev=None):
         """Returns the bottom and top outgoing revisions.
 
         Returns the bottom and top outgoing revisions for the changesets
@@ -358,7 +362,7 @@ class MercurialClient(SCMClient):
         remote = self._get_remote_branch()
         current_branch = self._get_current_branch()
         outgoing_changesets = \
-            self._get_outgoing_changesets(current_branch, remote)
+            self._get_outgoing_changesets(current_branch, remote, rev=rev)
 
         if outgoing_changesets:
             top_rev, bottom_rev = \
@@ -405,17 +409,25 @@ class MercurialClient(SCMClient):
         revisions = self.parse_revision_spec()
         return self._diff(revisions, files)
 
-    def _get_outgoing_changesets(self, current_branch, remote):
+    def _get_outgoing_changesets(self, current_branch, remote, rev=None):
         """
-        Given the current branch name and a remote path, return a list
-        of outgoing changeset numbers.
+        Given the current branch name, a remote path, and optional base
+        revision, return a list of outgoing changeset revisions.
+
+        If the revision is not specified, all changesets not in the remote
+        will be returned. If the revision is specified, only missing
+        ancestors of that revision and the revision itself will be considered.
         """
+
+        outgoing_changesets = []
+        args = ['hg', '-q', 'outgoing', '--template',
+                'b:{branches}\nr:{rev}\n\n', remote]
+        if rev:
+            args.extend(['-r', rev])
 
         # We must handle the special case where there are no outgoing commits
         # as mercurial has a non-zero return value in this case.
-        outgoing_changesets = []
-        raw_outgoing = execute(['hg', '-q', 'outgoing', '--template',
-                                'b:{branches}\nr:{rev}\n\n', remote],
+        raw_outgoing = execute(args,
                                env=self._hg_env,
                                extra_ignore_errors=(1,))
 
