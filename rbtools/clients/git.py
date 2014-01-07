@@ -628,24 +628,31 @@ class GitClient(SCMClient):
         Returns True if the working directory has been modified or if changes
         have been staged in the index, otherwise returns False.
         """
-        status = execute(['git', 'status', '--porcelain'])
+        status = execute(['git', 'status', '--porcelain',
+                          '--untracked-files=no'])
         return status != ''
 
     def apply_patch(self, patch_file, base_path=None, base_dir=None, p=None):
-        """
-        Apply the patch patch_file and return True if the patch was
-        successful, otherwise return False.
+        """Apply the given patch to index.
+
+        This will take the given patch file and apply it to the index,
+        scheduling all changes for commit.
         """
         if p:
-            cmd = ['git', 'apply', '-p', p, patch_file]
+            cmd = ['git', 'apply', '--index', '-p', p, patch_file]
         else:
-            cmd = ['git', 'apply', patch_file]
+            cmd = ['git', 'apply', '--index', patch_file]
 
         self._execute(cmd)
 
-    def create_commmit(self, message, author):
+    def create_commit(self, message, author, files=[], all_files=False):
         modified_message = edit_text(message)
-        execute(['git', 'add', '--all', ':/'])
+
+        if all_files:
+            execute(['git', 'add', '--all', ':/'])
+        elif files:
+            execute(['git', 'add'] + files)
+
         execute(['git', 'commit', '-m', modified_message,
                  '--author="%s <%s>"' % (author.fullname, author.email)])
 
