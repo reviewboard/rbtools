@@ -26,11 +26,11 @@ def edit_text(content):
     The environment's default text editor is used if available, otherwise
     vim is used.
     """
-    tempfile = make_tempfile(content)
+    tempfile = make_tempfile(content.encode('utf8'))
     editor = os.environ.get('EDITOR', 'vim')
     subprocess.call([editor, tempfile])
     f = open(tempfile)
     result = f.read()
     f.close()
 
-    return result
+    return result.decode('utf8')
