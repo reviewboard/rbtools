@@ -53,6 +53,17 @@ except ImportError:
     install_requires.append('simplejson')
 
 
+# Make sure this is a version of Python we are compatible with. This should
+# prevent people on older versions from unintentionally trying to install
+# the source tarball, and failing.
+if sys.hexversion < 0x02050000:
+    sys.stderr.write(
+        'RBTools %s is incompatible with your version of Python.\n'
+        'Please install RBTools 0.5.x or upgrade Python to at least '
+        '2.5.x (preferably 2.7).\n' % get_package_version())
+    sys.exit(1)
+
+
 rb_commands = [
     'api-get = rbtools.commands.api_get:APIGet',
     'attach = rbtools.commands.attach:Attach',
