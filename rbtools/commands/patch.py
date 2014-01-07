@@ -108,9 +108,6 @@ class Patch(Command):
         tool.apply_patch(diff_file_path, repository_info.base_path,
                          base_dir, self.options.px)
 
-    def _unescape_markdown(self, text):
-        return UNESCAPE_CHARS_RE.sub(r'\1', text)
-
     def _extract_commit_message(self, review_request):
         """Returns a commit message based on the review request.
 
@@ -120,21 +117,15 @@ class Patch(Command):
         info = []
 
         summary = review_request.summary
-
         description = review_request.description
-        if review_request.rich_text:
-            description = self._unescape_markdown(description)
+        testing_done = review_request.testing_done
 
         if not description.startswith(summary):
             info.append(summary)
 
         info.append(description)
 
-        testing_done = review_request.testing_done
         if testing_done:
-            if review_request.rich_text:
-                testing_done = self._unescape_markdown(testing_done)
-
             info.append('Testing Done:\n%s' % testing_done)
 
         if review_request.bugs_closed:
@@ -158,7 +149,6 @@ class Patch(Command):
             api_root,
             self.options.diff_revision)
 
-        tmp_patch_file = make_tempfile(diff_body)
         if self.options.patch_stdout:
             print diff_body
         else:
@@ -173,13 +163,15 @@ class Patch(Command):
             except NotImplementedError:
                 pass
 
+            tmp_patch_file = make_tempfile(diff_body)
             self.apply_patch(repository_info, tool, request_id, diff_revision,
                              tmp_patch_file, base_dir)
 
             if self.options.commit:
                 try:
                     review_request = api_root.get_review_request(
-                        review_request_id=request_id)
+                        review_request_id=request_id,
+                        force_text_type='plain')
                 except APIError, e:
                     raise CommandError('Error getting review request %s: %s'
                                        % (request_id, e))
@@ -188,7 +180,7 @@ class Patch(Command):
                 author = review_request.get_submitter()
 
                 try:
-                    tool.create_commmit(message, author)
+                    tool.create_commit(message, author)
                     print('Changes committed to current branch.')
                 except NotImplementedError:
                     raise CommandError('--commit is not supported with %s'

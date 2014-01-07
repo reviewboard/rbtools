@@ -176,7 +176,7 @@ class SCMClient(object):
             cmd = ['patch', '-i', str(patch_file)]
         self._execute(cmd)
 
-    def create_commmit(self, message, author):
+    def create_commit(self, message, author, files=[], all_files=False):
         """Creates a commit based on the provided message and author.
 
         Derived classes should override this method if they wish to support
