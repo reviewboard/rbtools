@@ -152,10 +152,7 @@ class SCMClient(object):
         Prints the results of the executed command and returns
         the data result from execute.
         """
-        print 'Command:\n' + str(cmd)
-        res = execute(cmd, ignore_errors=True)
-        print 'Results:\n' + res
-        return res
+        return execute(cmd, ignore_errors=True)
 
     def has_pending_changes(self):
         """Checks if there are changes waiting to be committed.
