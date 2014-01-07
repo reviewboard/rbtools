@@ -1272,6 +1272,10 @@ def main():
     else:
         homepath = ''
 
+    sys.stderr.write('The "post-review" tool is deprecated in favor of the'
+                     '"rbt" suite of commands. post-review will go away in '
+                     'RBTools 0.6.x.\n\n\n')
+
     # If we end up creating a cookie file, make sure it's only readable by the
     # user.
     os.umask(0077)
