@@ -146,6 +146,13 @@ class Post(Command):
                help="updates info from changelist, but does "
                     "not upload a new diff (only available if your "
                     "repository supports changesets)"),
+        Option("--markdown",
+               dest="markdown",
+               action="store_true",
+               config_key="MARKDOWN",
+               default=False,
+               help="whether the commit message should be interpreted as "
+                    "Markdown-formatted text (Review Board 2.0+ only)"),
         Option("--parent",
                dest="parent_branch",
                metavar="PARENT_BRANCH",
@@ -579,6 +586,13 @@ class Post(Command):
 
         if self.options.testing_done:
             update_fields['testing_done'] = self.options.testing_done
+
+        if ((self.options.description or self.options.testing_done) and
+            self.options.markdown and
+            tool.capabilities.has_capability('text', 'markdown')):
+            # The user specified that their Description/Testing Done are
+            # valid Markdown, so tell the server so it won't escape the text.
+            update_fields['text_type'] = 'markdown'
 
         if self.options.change_description:
             update_fields['changedescription'] = \

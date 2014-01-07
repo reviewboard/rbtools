@@ -366,6 +366,7 @@ The options include:
 * ``GUESS_DESCRIPTION`` (:option:`--guess-description`)
 * ``GUESS_FIELDS`` (:option:`-g`)
 * ``GUESS_SUMMARY`` (:option:`--guess-summary`)
+* ``MARKDOWN`` (:option:`--markdown`)
 * ``OPEN_BROWSER`` (:option:`-o`)
 * ``P4_CLIENT`` (:option:`--p4-client`)
 * ``P4_PASSWD`` (:option:`--p4-passwd`)
@@ -409,6 +410,15 @@ Options
    Prevents requests from going through a proxy server.
 
    The default can be set in ``ENABLE_PROXY`` in :file:`.reviewboardrc`.
+
+.. cmdoption:: --markdown
+
+   Tells Review Board that the guessed description is valid Markdown
+   and shouldn't be escaped.
+
+   This only works for Review Board 2.0+.
+
+   The default can be set in ``MARKDOWN`` in :file:`.reviewboardrc`.
 
 .. cmdoption:: -p, --publish
 
