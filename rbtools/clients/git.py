@@ -56,6 +56,10 @@ class GitClient(SCMClient):
         n_revs = len(revisions)
         result = {}
 
+        if n_revs == 1 and ':' in revisions[0]:
+            revisions = revisions[0].split(':')
+            n_revs = len(revisions)
+
         if n_revs == 0:
             # No revisions were passed in--start with HEAD, and find the
             # tracking branch automatically.
