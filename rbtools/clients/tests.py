@@ -400,6 +400,23 @@ class GitClientTests(SCMClientTests):
         self.assertEqual(revisions['base'], base_commit_id)
         self.assertEqual(revisions['tip'], tip_commit_id)
 
+    def test_parse_revision_spec_one_arg_two_revisions(self):
+        """Testing GitClient.parse_revision_spec with R1:R2 syntax"""
+        base_commit_id = self._git_get_head()
+        self._run_git(['checkout', '-b', 'topic-branch'])
+        self._git_add_file_commit('foo.txt', FOO2, 'Commit 2')
+        tip_commit_id = self._git_get_head()
+
+        self.client.get_repository_info()
+
+        revisions = self.client.parse_revision_spec(['master:topic-branch'])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(revisions['base'], base_commit_id)
+        self.assertEqual(revisions['tip'], tip_commit_id)
+
 
 class MercurialTestBase(SCMClientTests):
     def setUp(self):
