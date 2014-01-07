@@ -19,7 +19,7 @@ sub-commands. :command:`rbt` has the following usage::
 
    $ rbt [--version] <command> [options] [<args>]
 
-The :command:`rbt` command obsoletes the old :command:`post-review` command.
+The :command:`rbt` command obsoletes the old "post-review" command.
 For built in help you may execute::
 
    $ rbt help
@@ -30,13 +30,6 @@ For built in help you may execute::
 
    rbt/configuration
    rbt/commands/index
-
-
-post-review
------------
-
-:command:`post-review` is an older tool which is now deprecated. See
-:ref:`post-review` for more information.
 
 
 .. _rbtools-api:

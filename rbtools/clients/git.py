@@ -155,7 +155,7 @@ class GitClient(SCMClient):
         self.bare = execute([self.git, "config",
                              "core.bare"]).strip() == 'true'
 
-        # post-review in directories other than the top level of
+        # Running in directories other than the top level of
         # of a work-tree would result in broken diffs on the server
         if not self.bare:
             git_top = execute([self.git, "rev-parse", "--show-toplevel"],
@@ -438,8 +438,8 @@ class GitClient(SCMClient):
         Handle the internals of generating a diff from the given revisions.
         """
         # TODO: this will get refactored yet again once all the SCMClients
-        # implement the revision parsing method and 'rbt post' and
-        # 'post-review' get changed to orchestrate the whole process.
+        # implement the revision parsing method and 'rbt post' gets changed
+        # to orchestrate the whole process.
         revisions = self.parse_revision_spec(revisions)
 
         diff_lines = self.make_diff(revisions['base'], revisions['tip'])

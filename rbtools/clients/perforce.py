@@ -672,8 +672,8 @@ class PerforceClient(SCMClient):
                 "The --revision-range option is not supported for Perforce "
                 "repositories. Please use the Perforce range path syntax "
                 "instead.\n\n"
-                "See: http://www.reviewboard.org/docs/manual/dev/users/tools/"
-                "post-review/#posting-paths")
+                "See: http://www.reviewboard.org/docs/rbtools/dev/rbt/"
+                "commands/post/#posting-paths\n")
 
     def _path_diff(self, args):
         """
@@ -961,7 +961,7 @@ class PerforceClient(SCMClient):
         # * Users expect that this will only process files under version
         #   control. If I can replace a file they opened with a symlink to
         #   private keys in '~/.ssh', then they'd probably be none too happy
-        #   when post-review uses their credentials to publish its contents.
+        #   when rbt uses their credentials to publish its contents.
 
         if os.path.islink(tmpfile):
             raise ValueError("'%s' is a symlink" % depot_path)

@@ -83,7 +83,6 @@ setup(name=PACKAGE_NAME,
       description="Command line tools for use with Review Board",
       entry_points={
           'console_scripts': [
-              'post-review = rbtools.postreview:main',
               'rbt = rbtools.commands.main:main',
           ],
           'rbtools_commands': rb_commands,

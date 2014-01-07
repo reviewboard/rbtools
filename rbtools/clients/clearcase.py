@@ -33,9 +33,8 @@ class ClearCaseClient(SCMClient):
     def get_repository_info(self):
         """Returns information on the Clear Case repository.
 
-        This will first check if the cleartool command is
-        installed and in the path, and post-review was run
-        from inside of the view.
+        This will first check if the cleartool command is installed and in the
+        path, and that the current working directory is inside of the view.
         """
         if not check_install(['cleartool', 'help']):
             return None
@@ -60,8 +59,8 @@ class ClearCaseClient(SCMClient):
                 # because webview types also list the 'snapshot'
                 # entry in properties.
                 if 'webview' in properties:
-                    die("Webviews are not supported. You can use post-review"
-                        " only in dynamic or snapshot view.")
+                    die("Webviews are not supported. You can use rbt commands"
+                        " only in dynamic or snapshot views.")
                 if 'dynamic' in properties:
                     self.viewtype = 'dynamic'
                 else:
@@ -73,12 +72,12 @@ class ClearCaseClient(SCMClient):
         vobstag = execute(["cleartool", "describe", "-short", "vob:."],
                           ignore_errors=True).strip()
         if "Error: " in vobstag:
-            die("To generate diff run post-review inside vob.")
+            die("To generate diff run rbt inside vob.")
 
         root_path = execute(["cleartool", "pwv", "-root"],
                             ignore_errors=True).strip()
         if "Error: " in root_path:
-            die("To generate diff run post-review inside view.")
+            die("To generate diff run rbt inside view.")
 
         # From current working directory cut path to VOB.
         # VOB's tag contain backslash character before VOB's name.
