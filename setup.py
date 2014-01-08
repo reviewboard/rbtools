@@ -23,6 +23,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+import sys
+
 # Attempt to use currently-installed setuptools first
 try:
     from setuptools import setup, find_packages
