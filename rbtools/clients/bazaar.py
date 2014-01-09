@@ -148,13 +148,10 @@ class BazaarClient(SCMClient):
 
         Additionally sets the summary and description as required.
         """
-        files = files or []
-
         revisions = self.parse_revision_spec()
-
-        rev_log = '%s..%s' % (revisions['base'], revisions['tip'])
-        self._set_summary(rev_log)
-        self._set_description(rev_log)
+        files = files or []
+        self._set_summary(revisions)
+        self._set_description(revisions)
 
         return self._get_diff(revisions, files)
 
@@ -164,12 +161,10 @@ class BazaarClient(SCMClient):
         The diff is generated for the two revisions in the provided revision
         range. The summary and description are set as required.
         """
-
         revisions = self.parse_revision_spec(revision_range)
-
-        rev_log = '%s..%s' % (revisions['base'], revisions['tip'])
-        self._set_summary(rev_log)
-        self._set_description(rev_log)
+        files = files or []
+        self._set_summary(revisions)
+        self._set_description(revisions)
 
         return self._get_diff(revisions, files)
 
@@ -194,47 +189,43 @@ class BazaarClient(SCMClient):
         diff = execute(diff_cmd, ignore_errors=True)
         return diff or None
 
-    def _set_summary(self, revision_range=None):
-        """Set the summary based on the ``revision_range``.
+    def _set_summary(self, revisions):
+        """Set the summary based on the given revisions.
 
         Extracts and sets the summary if guessing is enabled and summary is not
         yet set.
         """
         if self.options.guess_summary and not self.options.summary:
-            self.options.summary = self.extract_summary(revision_range)
+            self.options.summary = self.extract_summary(revisions)
 
-    def _set_description(self, revision_range=None):
-        """Set the description based on the ``revision_range``.
+    def _set_description(self, revisions):
+        """Set the description based on the given revisions.
 
         Extracts and sets the description if guessing is enabled and
         description is not yet set.
         """
         if self.options.guess_description and not self.options.description:
-            self.options.description = self.extract_description(revision_range)
+            self.options.description = self.extract_description(revisions)
 
-    def extract_summary(self, revision_range=None):
-        """Return the last commit message in ``revision_range``.
+    def extract_summary(self, revisions):
+        """Return the last commit message in ``revisions``.
 
         If revision_range is ``None``, the commit message of the last revision
         in the repository is returned.
         """
-        if revision_range:
-            revision = revision_range.split("..")[1]
-        else:
-            revision = '-1'
-
         # `bzr log --line' returns the log in the format:
         #   {revision-number}: {committer-name} {commit-date} {commit-message}
         # So we should ignore everything after the date (YYYY-MM-DD).
         log_message = execute(
-            ["bzr", "log", "-r", revision, "--line"]).rstrip()
+            ["bzr", "log", "-r", revisions['tip'], "--line"]).rstrip()
         log_message_match = re.search(r"\d{4}-\d{2}-\d{2}", log_message)
         truncated_characters = log_message_match.end() + 1
 
-        summary = log_message[truncated_characters:]
+        return log_message[truncated_characters:]
 
-        return summary
-
-    def extract_description(self, revision_range=None):
-        command = ['bzr', 'log', '-r', revision_range, '--short']
-        return execute(command, ignore_errors=True).rstrip()
+    def extract_description(self, revisions):
+        return execute(
+            ['bzr', 'log', '-r',
+             '%s..%s' % (revisions['base'], revisions['tip']),
+             '--short'],
+            ignore_errors=True).rstrip()

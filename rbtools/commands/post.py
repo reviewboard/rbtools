@@ -412,10 +412,15 @@ class Post(Command):
                                '%s: %s' % (user.username, e))
 
         try:
+            if revision_range:
+                revisions = tool.parse_revision_spec([revision_range])
+            else:
+                revisions = tool.parse_revision_spec()
+
             summary = (getattr(self.options, 'summary', None) or
-                       tool.extract_summary(revision_range))
+                       tool.extract_summary(revisions))
             description = (getattr(self.options, 'description', None) or
-                           tool.extract_description(revision_range))
+                           tool.extract_description(revisions))
         except NotImplementedError:
             raise CommandError('--summary and --description are required.')
 

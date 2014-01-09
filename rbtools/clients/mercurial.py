@@ -259,16 +259,12 @@ class MercurialClient(SCMClient):
             key, value = line.split('=', 1)
             self.hgrc[key] = value.strip()
 
-    def extract_summary(self, revision_range=None):
-        """
-        Extracts the first line from the description of the given changeset.
-        """
-        if revision_range:
-            revision = self._extract_revisions(revision_range)[1]
-        elif self._type == 'svn':
-            revision = "."
+    def extract_summary(self, revisions):
+        """Extracts the first line from the description the 'tip' revision."""
+        if self._type == 'svn':
+            revision = '.'
         else:
-            revision = self._get_bottom_and_top_outgoing_revs_for_remote()[1]
+            revision = revisions['tip']
 
         return self._execute(
             ['hg', 'log', '--hidden', '-r%s' % revision, '--template',
@@ -279,13 +275,12 @@ class MercurialClient(SCMClient):
         Extracts all descriptions in the given revision range and concatenates
         them, most recent ones going first.
         """
-        if revision_range:
-            rev1, rev2 = self._extract_revisions(revision_range)
-        elif self._type == 'svn':
+        if self._type == 'svn':
             rev1 = self._get_parent_for_hgsubversion()
             rev2 = "."
         else:
-            rev1, rev2 = self._get_bottom_and_top_outgoing_revs_for_remote()
+            rev1 = revisions['base']
+            rev2 = revisions['tip']
 
         numrevs = len(self._execute([
             'hg', 'log', '--hidden', '-r%s:%s' % (rev2, rev1),
@@ -322,8 +317,8 @@ class MercurialClient(SCMClient):
                         '{node}\n']).strip())
 
     def _get_hgsubversion_diff(self, files):
-        self._set_summary()
-        self._set_description()
+        self._set_summary(None)
+        self._set_description(None)
 
         parent = self._get_parent_for_hgsubversion()
 
@@ -402,11 +397,11 @@ class MercurialClient(SCMClient):
         """
         self._init()
 
-        files = files or []
-        self._set_summary()
-        self._set_description()
-
         revisions = self.parse_revision_spec()
+        files = files or []
+        self._set_summary(revisions)
+        self._set_description(revisions)
+
         return self._diff(revisions, files)
 
     def _get_outgoing_changesets(self, current_branch, remote, rev=None):
@@ -497,25 +492,25 @@ class MercurialClient(SCMClient):
 
         return r1, r2
 
-    def _set_summary(self, revision_range=None):
-        """Sets the summary based on the provided revision range.
+    def _set_summary(self, revisions):
+        """Sets the summary based on the provided revisions.
 
         Extracts and sets the summary if guessing is enabled and summary is not
         yet set.
         """
         if (getattr(self.options, 'guess_summary', None) and
                 not getattr(self.options, 'summary', None)):
-            self.options.summary = self.extract_summary(revision_range)
+            self.options.summary = self.extract_summary(revisions)
 
-    def _set_description(self, revision_range=None):
-        """Sets the description based on the provided revision range.
+    def _set_description(self, revisions):
+        """Sets the description based on the provided revisions.
 
         Extracts and sets the description if guessing is enabled and
         description is not yet set.
         """
         if (getattr(self.options, 'guess_description', None) and
                 not getattr(self.options, 'description', None)):
-            self.options.description = self.extract_description(revision_range)
+            self.options.description = self.extract_description(revisions)
 
     def _diff(self, revisions, files=[]):
         """Get the diff between two given revisions."""
@@ -545,10 +540,9 @@ class MercurialClient(SCMClient):
 
     def diff_between_revisions(self, revision_range, args, repository_info):
         """Performs a diff between 2 revisions of a Mercurial repository."""
-        self._set_summary(revision_range)
-        self._set_description(revision_range)
-
         revisions = self.parse_revision_spec([revision_range])
+        self._set_summary(revisions)
+        self._set_description(revisions)
         return self._diff(revisions)
 
     def scan_for_server(self, repository_info):

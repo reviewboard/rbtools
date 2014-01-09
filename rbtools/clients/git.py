@@ -356,53 +356,38 @@ class GitClient(SCMClient):
 
         return None
 
-    def extract_summary(self, revision_range=None):
-        """Extracts the summary based on the provided revision range."""
-        if not revision_range or ":" not in revision_range:
-            command = [self.git, "log", "--pretty=format:%s", "HEAD^!"]
-        else:
-            r1, r2 = revision_range.split(":")
-            command = [self.git, "log", "--pretty=format:%s", "%s^!" % r2]
+    def extract_summary(self, revisions):
+        """Extracts the summary based on the provided revisions."""
+        return execute(
+            [self.git, 'log', '--pretty=format:%s', '%s^!' % revisions['tip']],
+            ignore_errors=True).strip()
 
-        return execute(command, ignore_errors=True).strip()
-
-    def extract_description(self, revision_range=None):
+    def extract_description(self, revisions):
         """Extracts the description based on the provided revision range."""
-        if revision_range and ":" not in revision_range:
-            command = [self.git, "log", "--pretty=format:%s%n%n%b",
-                       revision_range + ".."]
-        elif revision_range:
-            r1, r2 = revision_range.split(":")
-            command = [self.git, "log", "--pretty=format:%s%n%n%b",
-                       "%s..%s" % (r1, r2)]
-        else:
-            parent_branch = self.get_parent_branch()
-            head_ref = self.get_head_ref()
-            merge_base = self._get_merge_base(head_ref, self.upstream_branch)
-            command = [self.git, "log", "--pretty=format:%s%n%n%b",
-                       (parent_branch or merge_base) + ".."]
+        return execute(
+            [self.git, 'log', '--pretty=format:%s%n%n%b',
+             '^%s' % revisions['base'], revisions['tip']],
+            ignore_errors=True).strip()
 
-        return execute(command, ignore_errors=True).strip()
-
-    def _set_summary(self, revision_range=None):
-        """Sets the summary based on the provided revision range.
+    def _set_summary(self, revisions):
+        """Sets the summary based on the provided revisions.
 
         Extracts and sets the summary if guessing is enabled and summary is not
         yet set.
         """
         if (getattr(self.options, 'guess_summary', None) and
                 not getattr(self.options, 'summary', None)):
-            self.options.summary = self.extract_summary(revision_range)
+            self.options.summary = self.extract_summary(revisions)
 
-    def _set_description(self, revision_range=None):
-        """Sets the description based on the provided revision range.
+    def _set_description(self, revisions):
+        """Sets the description based on the provided revisions.
 
         Extracts and sets the description if guessing is enabled and
         description is not yet set.
         """
         if (getattr(self.options, 'guess_description', None) and
                 not getattr(self.options, 'description', None)):
-            self.options.description = self.extract_description(revision_range)
+            self.options.description = self.extract_description(revisions)
 
     def get_parent_branch(self):
         """Returns the parent branch."""
@@ -433,14 +418,27 @@ class GitClient(SCMClient):
 
         return execute([self.git, 'rev-parse'] + revisions).strip().split('\n')
 
-    def _diff(self, revisions):
+    def diff(self, args):
+        """Performs a diff across all modified files in the branch.
+
+        The diff takes into account the parent branch.
+        """
+        return self._diff([])
+
+    def diff_between_revisions(self, revision_range, args, repository_info):
+        """Perform a diff between two arbitrary revisions."""
+        return self._diff([revision_range])
+
+    def _diff(self, revision_spec):
         """
         Handle the internals of generating a diff from the given revisions.
         """
         # TODO: this will get refactored yet again once all the SCMClients
         # implement the revision parsing method and 'rbt post' gets changed
         # to orchestrate the whole process.
-        revisions = self.parse_revision_spec(revisions)
+        revisions = self.parse_revision_spec(revision_spec)
+        self._set_summary(revisions)
+        self._set_description(revisions)
 
         diff_lines = self.make_diff(revisions['base'], revisions['tip'])
 
@@ -457,25 +455,6 @@ class GitClient(SCMClient):
             'parent_diff': parent_diff_lines,
             'base_commit_id': base_commit_id,
         }
-
-    def diff(self, args):
-        """Performs a diff across all modified files in the branch.
-
-        The diff takes into account the parent branch.
-        """
-        # TODO: this should use the parsed revisions
-        self._set_summary()
-        self._set_description()
-
-        return self._diff([])
-
-    def diff_between_revisions(self, revision_range, args, repository_info):
-        """Perform a diff between two arbitrary revisions."""
-        # TODO: this should use the parsed revisions
-        self._set_summary(revision_range)
-        self._set_description(revision_range)
-
-        return self._diff([revision_range])
 
     def make_diff(self, ancestor, commit=""):
         """Performs a diff on a particular branch range."""
