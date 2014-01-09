@@ -1,4 +1,4 @@
-from rbtools.commands import Command, Option
+from rbtools.commands import Command, CommandError, Option
 from rbtools.utils.diffs import get_diff
 
 
@@ -19,6 +19,11 @@ class Diff(Command):
                default=None,
                help="generate the diff for review based on given "
                     "revision range"),
+        Option('-I', '--include',
+               dest='include_files',
+               action='append',
+               help='include only the given file in the diff (can be used '
+                    'multiple times)'),
         Option("--parent",
                dest="parent_branch",
                metavar="PARENT_BRANCH",
@@ -103,6 +108,12 @@ class Diff(Command):
         # SCM Clients code. See comment in post.
         args = list(args)
 
+        if self.options.svn_changelist:
+            raise CommandError(
+                'The --svn-changelist argument has been removed. To use a '
+                'Subversion changelist, pass the changelist name as an '
+                'additional argument after the command.')
+
         repository_info, tool = self.initialize_scm_tool(
             client_name=self.options.repository_type)
         server_url = self.get_server_url(repository_info, tool)
@@ -112,9 +123,10 @@ class Diff(Command):
         diff_info = get_diff(
             tool,
             repository_info,
+            revision_spec=args,
             revision_range=self.options.revision_range,
-            svn_changelist=self.options.svn_changelist,
-            files=args)
+            old_files_list=args,
+            files=self.options.include_files)
 
         diff = diff_info['diff']
 

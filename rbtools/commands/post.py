@@ -120,6 +120,11 @@ class Post(Command):
                default=None,
                help="generate the diff for review based on given "
                     "revision range"),
+        Option('-I', '--include',
+               dest='include_files',
+               action='append',
+               help='include only the given file in the diff (can be used '
+                    'multiple times)'),
         Option("--submit-as",
                dest="submit_as",
                metavar="USERNAME",
@@ -246,6 +251,12 @@ class Post(Command):
         if self.options.guess_fields:
             self.options.guess_summary = True
             self.options.guess_description = True
+
+        if self.options.svn_changelist:
+            raise CommandError(
+                'The --svn-changelist argument has been removed. To use a '
+                'Subversion changelist, pass the changelist name as an '
+                'additional argument after the command.')
 
         # Only one of --description and --description-file can be used
         if self.options.description and self.options.description_file:
@@ -647,9 +658,10 @@ class Post(Command):
             diff_info = get_diff(
                 tool,
                 repository_info,
+                revision_spec=args,
                 revision_range=self.options.revision_range,
-                svn_changelist=self.options.svn_changelist,
-                files=args)
+                old_files_list=args,
+                files=self.options.include_files)
 
             diff = diff_info['diff']
             parent_diff = diff_info.get('parent_diff')
@@ -658,8 +670,8 @@ class Post(Command):
         if len(diff) == 0:
             raise CommandError("There don't seem to be any diffs!")
 
-        if repository_info.supports_changesets:
-            changenum = tool.sanitize_changenum(tool.get_changenum(args))
+        if repository_info.supports_changesets and 'changenum' in diff_info:
+            changenum = diff_info['changenum']
         else:
             changenum = None
 

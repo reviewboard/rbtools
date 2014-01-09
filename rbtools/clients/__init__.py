@@ -16,6 +16,8 @@ class SCMClient(object):
     """
     name = None
 
+    supports_new_diff_api = False
+
     def __init__(self, user_config=None, configs=[], options=None,
                  capabilities=None):
         self.user_config = user_config
@@ -181,19 +183,6 @@ class SCMClient(object):
 
         Derived classes should override this method if they wish to support
         committing changes to their repositories.
-        """
-        raise NotImplementedError
-
-    def sanitize_changenum(self, changenum):
-        """Return a "sanitized" change number.
-
-        Dervied classes should override this method if they
-        support change numbers. It will be called before
-        uploading the change number to the Review Board
-        server.
-
-        TODO: Possibly refactor this into get_changenum
-        once post-review is deprecated.
         """
         raise NotImplementedError
 

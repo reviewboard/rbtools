@@ -27,6 +27,8 @@ class SVNClient(SCMClient):
     REVISION_WORKING_COPY = '--rbtools-working-copy'
     REVISION_CHANGELIST_PREFIX = '--rbtools-changelist:'
 
+    supports_new_diff_api = True
+
     def __init__(self, **kwargs):
         super(SVNClient, self).__init__(**kwargs)
 
@@ -199,26 +201,19 @@ class SVNClient(SCMClient):
 
         return get_url_prop(repository_info.path)
 
-    def diff(self, files):
+    def diff(self, revision_spec, files):
         """
-        Performs a diff across all modified files in a Subversion repository.
+        Performs a diff in a Subversion repository.
+
+        If the given revision spec is empty, this will do a diff of the
+        modified files in the working directory. If the spec is a changelist,
+        it will do a diff of the modified files in that changelist. If the spec
+        is a single revision, it will show the changes in that revision. If the
+        spec is two revisions, this will do a diff between the two revisions.
 
         SVN repositories do not support branches of branches in a way that
         makes parent diffs possible, so we never return a parent diff.
         """
-        return self._diff([], files)
-
-    def diff_changelist(self, changelist):
-        """Performs a diff for a local changelist."""
-        return self._diff([changelist], [])
-
-    def diff_between_revisions(self, revision_range, files, repository_info):
-        """
-        Performs a diff between 2 revisions of a Subversion repository.
-        """
-        return self._diff([revision_range], files)
-
-    def _diff(self, revision_spec, files):
         revisions = self.parse_revision_spec(revision_spec)
         base = revisions['base']
         tip = revisions['tip']
@@ -230,7 +225,8 @@ class SVNClient(SCMClient):
         if tip == self.REVISION_WORKING_COPY:
             # Posting the working copy
             diff_cmd.extend(['-r', base])
-        elif tip.startswith(self.REVISION_CHANGELIST_PREFIX):
+        elif (isinstance(tip, str) and
+              tip.startswith(self.REVISION_CHANGELIST_PREFIX)):
             # Posting a changelist
             cl = tip[len(self.REVISION_CHANGELIST_PREFIX):]
             diff_cmd.extend(['--changelist', cl])
@@ -282,7 +278,7 @@ class SVNClient(SCMClient):
                 if svn_show_copies_as_adds in 'Yy':
                     cmd.append("--show-copies-as-adds")
 
-        diff = execute(cmd, split_lines=True)
+        diff = execute(diff_cmd, split_lines=True)
         diff = self.handle_renames(diff)
         diff = self.convert_to_absolute_paths(diff, repository_info)
 

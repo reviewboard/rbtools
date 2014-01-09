@@ -21,6 +21,8 @@ class GitClient(SCMClient):
     """
     name = 'Git'
 
+    supports_new_diff_api = True
+
     def __init__(self, **kwargs):
         super(GitClient, self).__init__(**kwargs)
         # Store the 'correct' way to invoke git, just plain old 'git' by
@@ -423,33 +425,29 @@ class GitClient(SCMClient):
 
         return execute([self.git, 'rev-parse'] + revisions).strip().split('\n')
 
-    def diff(self, args):
-        """Performs a diff across all modified files in the branch.
+    def diff(self, revision_spec, files):
+        """Perform a diff using the given revisions.
 
-        The diff takes into account the parent branch.
-        """
-        return self._diff([])
+        If no revisions are specified, this will do a diff of the contents of
+        the current branch since the tracking branch (which defaults to
+        'master'). If one revision is specified, this will get the diff of that
+        specific change. If two revisions are specified, this will do a diff
+        between those two revisions.
 
-    def diff_between_revisions(self, revision_range, args, repository_info):
-        """Perform a diff between two arbitrary revisions."""
-        return self._diff([revision_range])
-
-    def _diff(self, revision_spec):
+        If a parent branch is specified via the command-line options, or would
+        make sense given the requested revisions and the tracking branch, this
+        will also return a parent diff.
         """
-        Handle the internals of generating a diff from the given revisions.
-        """
-        # TODO: this will get refactored yet again once all the SCMClients
-        # implement the revision parsing method and 'rbt post' gets changed
-        # to orchestrate the whole process.
         revisions = self.parse_revision_spec(revision_spec)
         self._set_summary(revisions)
         self._set_description(revisions)
 
-        diff_lines = self.make_diff(revisions['base'], revisions['tip'])
+        diff_lines = self.make_diff(revisions['base'], revisions['tip'], files)
 
         if 'parent_base' in revisions:
             parent_diff_lines = self.make_diff(revisions['parent_base'],
-                                               revisions['base'])
+                                               revisions['base'],
+                                               files)
             base_commit_id = revisions['parent_base']
         else:
             parent_diff_lines = None
@@ -461,28 +459,29 @@ class GitClient(SCMClient):
             'base_commit_id': base_commit_id,
         }
 
-    def make_diff(self, ancestor, commit=""):
+    def make_diff(self, base, tip, files):
         """Performs a diff on a particular branch range."""
-        if commit:
-            rev_range = "%s..%s" % (ancestor, commit)
-        else:
-            rev_range = ancestor
+        rev_range = "%s..%s" % (base, tip)
+
+        if files:
+            files = ['--'] + files
 
         if self.type == "svn":
             diff_lines = execute([self.git, "diff", "--no-color",
                                   "--no-prefix", "--no-ext-diff", "-r", "-u",
-                                  rev_range],
+                                  rev_range] + files,
                                  split_lines=True)
-            return self.make_svn_diff(ancestor, diff_lines)
+            return self.make_svn_diff(base, diff_lines)
         elif self.type == "perforce":
             diff_lines = execute([self.git, "diff", "--no-color",
-                                  "--no-prefix", "-r", "-u", rev_range],
+                                  "--no-prefix", "-r", "-u",
+                                  rev_range] + files,
                                  split_lines=True)
-            return self.make_perforce_diff(ancestor, diff_lines)
+            return self.make_perforce_diff(base, diff_lines)
         elif self.type == "git":
             cmdline = [self.git, "diff", "--no-color", "--full-index",
                        "--no-ext-diff", "--ignore-submodules", "--no-renames",
-                       rev_range]
+                       rev_range] + files
 
             if (self.capabilities is not None and
                 self.capabilities.has_capability('diffs', 'moved_files')):

@@ -18,8 +18,9 @@ class BazaarClient(SCMClient):
     The :class:`RepositoryInfo` object reports whether the repository supports
     parent diffs (every branch with a parent supports them).
     """
-
     name = 'Bazaar'
+
+    supports_new_diff_api = True
 
     # Regular expression that matches the path to the current branch.
     #
@@ -143,32 +144,22 @@ class BazaarClient(SCMClient):
             branch = result[0][len(USING_PARENT_PREFIX):]
             return 'revno:%s:%s' % (result[1], branch)
 
-    def diff(self, files):
-        """Returns the diff of this branch with respect to its parent.
+    def diff(self, revision_spec, files):
+        """Returns the diff for the given revision spec.
 
-        Additionally sets the summary and description as required.
+        If the revision spec is empty, this returns the diff of the current
+        branch with respect to its parent. If a single revision is passed in,
+        this returns the diff of the change introduced in that revision. If two
+        revisions are passed in, this will do a diff between those two
+        revisions.
+
+        The summary and description are set if guessing is enabled.
         """
-        revisions = self.parse_revision_spec()
-        files = files or []
+        revisions = self.parse_revision_spec(revision_spec)
+
         self._set_summary(revisions)
         self._set_description(revisions)
 
-        return self._get_diff(revisions, files)
-
-    def diff_between_revisions(self, revision_range, files, repository_info):
-        """Returns the diff for the provided revision range.
-
-        The diff is generated for the two revisions in the provided revision
-        range. The summary and description are set as required.
-        """
-        revisions = self.parse_revision_spec(revision_range)
-        files = files or []
-        self._set_summary(revisions)
-        self._set_description(revisions)
-
-        return self._get_diff(revisions, files)
-
-    def _get_diff(self, revisions, files):
         diff = self._get_range_diff(revisions['base'], revisions['tip'], files)
 
         if 'parent_base' in revisions:

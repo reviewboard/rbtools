@@ -17,6 +17,8 @@ class PlasticClient(SCMClient):
     """
     name = 'Plastic'
 
+    supports_new_diff_api = True
+
     def __init__(self, **kwargs):
         super(PlasticClient, self).__init__(**kwargs)
 
@@ -48,16 +50,6 @@ class PlasticClient(SCMClient):
         return RepositoryInfo(path,
                               supports_changesets=True,
                               supports_parent_diffs=False)
-
-    def get_changenum(self, args):
-        """ Extract the integer value from a changeset ID (cs:1234) """
-        if len(args) == 1 and args[0].startswith("cs:"):
-            try:
-                return str(int(args[0][3:]))
-            except ValueError:
-                pass
-
-        return None
 
     def parse_revision_spec(self, revisions=[]):
         """Parses the given revision spec.
@@ -91,21 +83,24 @@ class PlasticClient(SCMClient):
         else:
             raise TooManyRevisionsError
 
-    def sanitize_changenum(self, changenum):
-        """ Return a "sanitized" change number.  Currently a no-op """
-        return changenum
-
-    def diff(self, args):
+    def diff(self, revision_spec, files):
         """
         Performs a diff across all modified files in a Plastic workspace
 
         Parent diffs are not supported (the second value in the tuple).
         """
-        revisions = self.parse_revision_spec(args)
+        # TODO: use 'files'
+        revisions = self.parse_revision_spec(revision_spec)
 
+        changenum = None
         tip = revisions['tip']
         if tip.startswith(self.REVISION_CHANGESET_PREFIX):
             logging.debug('Doing a diff against changeset %s', tip)
+            try:
+                changenum = str(int(
+                    tip[len(self.REVISION_CHANGESET_PREFIX):]))
+            except ValueError:
+                pass
         else:
             logging.debug('Doing a diff against branch %s', tip)
             if not getattr(self.options, 'branch', None):
@@ -122,15 +117,8 @@ class PlasticClient(SCMClient):
 
         return {
             'diff': diff,
+            'changenum': changenum,
         }
-
-    def diff_between_revisions(self, revision_range, args, repository_info):
-        """
-        This doesn't make much sense in Plastic SCM 4.
-        We'll only implement revisions for changests and branches
-        """
-        die("This option is not supported. Only reviews of a changeset or "
-            "branch are supported")
 
     def _process_diffs(self, my_diff_entries):
         # Diff generation based on perforce client

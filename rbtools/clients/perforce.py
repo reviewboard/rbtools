@@ -158,6 +158,8 @@ class PerforceClient(SCMClient):
     REVISION_CURRENT_SYNC = '--rbtools-current-sync'
     REVISION_PENDING_CLN_PREFIX = '--rbtools-pending-cln:'
 
+    supports_new_diff_api = True
+
     def __init__(self, p4_class=P4Wrapper, **kwargs):
         super(PerforceClient, self).__init__(**kwargs)
         self.p4 = p4_class()
@@ -394,23 +396,7 @@ class PerforceClient(SCMClient):
 
         return None
 
-    def get_changenum(self, args):
-        if len(args) == 0:
-            return "default"
-        elif len(args) == 1:
-            if args[0] == "default":
-                return "default"
-
-            try:
-                return str(int(args[0]))
-            except ValueError:
-                # (if it isn't a number, it can't be a cln)
-                return None
-        # there are multiple args (not a cln)
-        else:
-            return None
-
-    def diff(self, args):
+    def diff(self, revision_spec, include_files):
         """
         Goes through the hard work of generating a diff on Perforce in order
         to take into account adds/deletes and to provide the necessary
@@ -427,13 +413,26 @@ class PerforceClient(SCMClient):
             os.environ['P4PASSWD'] = self.options.p4_passwd
 
         try:
-            revisions = self.parse_revision_spec(args)
+            revisions = self.parse_revision_spec(revision_spec)
         except InvalidRevisionSpecError:
+            # The "path posting" is still interesting enough to keep around. If
+            # the given arguments don't parse as valid changelists, fall back
+            # on that behavior.
             return self._path_diff(args)
 
-        return self._diff(revisions)
+        # Support both //depot/... paths and local filenames. For the moment,
+        # this does *not* support any of perforce's traversal literals like ...
+        depot_include_files = []
+        local_include_files = []
+        for filename in include_files:
+            if filename.startswith('//'):
+                depot_include_files.append(filename)
+            else:
+                # The way we determine files to include or not is via
+                # 'p4 where', which gives us absolute paths.
+                local_include_files.append(
+                    os.path.realpath(os.path.abspath(filename)))
 
-    def _diff(self, revisions):
         base = revisions['base']
         tip = revisions['tip']
 
@@ -445,7 +444,8 @@ class PerforceClient(SCMClient):
             logging.info('Generating diff for range of submitted changes: %s '
                          'to %s',
                          base, tip)
-            return self._compute_range_changes(base, tip)
+            return self._compute_range_changes(
+                base, tip, depot_include_files, local_include_files)
 
         # Strip off the prefix
         tip = tip[len(self.REVISION_PENDING_CLN_PREFIX):]
@@ -493,6 +493,7 @@ class PerforceClient(SCMClient):
 
         for f in opened_files:
             depot_file = f['depotFile']
+            local_file = self._depot_to_local(depot_file)
             new_depot_file = ''
             try:
                 base_revision = int(f['rev'])
@@ -501,6 +502,12 @@ class PerforceClient(SCMClient):
                 # revision". Just pass through whatever was there before.
                 base_revision = f['rev']
             action = f['action']
+
+            if ((depot_include_files and
+                 depot_file not in depot_include_files) or
+                (local_include_files and
+                 local_file not in local_include_files)):
+                continue
 
             old_file = ''
             new_file = ''
@@ -515,7 +522,8 @@ class PerforceClient(SCMClient):
             if changetype_short == 'M':
                 try:
                     old_file, new_file = self._extract_edit_files(
-                        depot_file, base_revision, tip, cl_is_shelved, False)
+                        depot_file, local_file, base_revision, tip,
+                        cl_is_shelved, False)
                 except ValueError, e:
                     logging.warning('Skipping file %s: %s', depot_file, e)
                     continue
@@ -534,7 +542,8 @@ class PerforceClient(SCMClient):
 
                 try:
                     old_file, new_file = self._extract_add_files(
-                        depot_file, tip, cl_is_shelved, cl_is_pending)
+                        depot_file, local_file, tip, cl_is_shelved,
+                        cl_is_pending)
                 except ValueError, e:
                     logging.warning('Skipping file %s: %s', depot_file, e)
                     continue
@@ -568,11 +577,23 @@ class PerforceClient(SCMClient):
                                ignore_unmodified=True)
             diff_lines += dl
 
+        # For pending changesets, report the change number to the reviewboard
+        # server when posting. This is used to extract the changeset
+        # description server-side. Ideally we'd change this to remove the
+        # server-side implementation and just implement --guess-summary and
+        # --guess-description, but that would create a lot of unhappy users.
+        if cl_is_pending and tip != 'default':
+            changenum = str(tip)
+        else:
+            changenum = None
+
         return {
             'diff': ''.join(diff_lines),
+            'changenum': changenum,
         }
 
-    def _compute_range_changes(self, base, tip):
+    def _compute_range_changes(self, base, tip, depot_include_files,
+                               local_include_files):
         """Compute the changes across files given a revision range.
 
         This will look at the history of all changes within the given range and
@@ -635,7 +656,7 @@ class PerforceClient(SCMClient):
 
                 cid += 1
 
-                changesets.setdefault(cln, {}).set(depot_file, change)
+                changesets.setdefault(cln, {})[depot_file] = change
 
         # Now run through the changesets in order and compute a change journal
         # for each file.
@@ -676,14 +697,21 @@ class PerforceClient(SCMClient):
         for f in files:
             action = f['action']
             depot_file = f['depotFile']
+            local_file = self._depot_to_local(depot_file)
             rev = f['rev']
             initial_depot_file = f['initialDepotFile']
             initial_rev = f['initialRev']
 
+            if ((depot_include_files and
+                 depot_file not in depot_include_files) or
+                (local_include_files and
+                 local_file not in local_include_files)):
+                continue
+
             if action == 'add':
                 try:
                     old_file, new_file = self._extract_add_files(
-                        depot_file, rev, False, False)
+                        depot_file, local_file, rev, False, False)
                 except ValueError, e:
                     logging.warning('Skipping file %s: %s', depot_file, e)
                     continue
@@ -705,14 +733,14 @@ class PerforceClient(SCMClient):
             elif action == 'edit':
                 try:
                     old_file, new_file = self._extract_edit_files(
-                        depot_file, initial_rev, rev, False, True)
+                        depot_file, local_file, initial_rev, rev, False, True)
                 except ValueError:
                     logging.warning('Skipping file %s: %s', depot_file, e)
                     continue
             elif action == 'move':
                 try:
                     old_file_a, new_file_a = self._extract_add_files(
-                        depot_file, rev, False, False)
+                        depot_file, local_file, rev, False, False)
                     old_file_b, new_file_b = self._extract_delete_files(
                         initial_depot_file, initial_rev)
                 except ValueError:
@@ -788,7 +816,7 @@ class PerforceClient(SCMClient):
         file_entry['rev'] = change['rev']
         file_entry['action'] = new_action
 
-    def _extract_edit_files(self, depot_file, rev_a, rev_b,
+    def _extract_edit_files(self, depot_file, local_file, rev_a, rev_b,
                             cl_is_shelved, cl_is_submitted):
         """Extract the 'old' and 'new' files for an edit operation.
 
@@ -807,12 +835,12 @@ class PerforceClient(SCMClient):
             self._write_file('%s#%s' % (depot_file, rev_b), new_filename)
         else:
             # Just reference the file within the client view
-            new_filename = self._depot_to_local(depot_file)
+            new_filename = local_file
 
         return old_filename, new_filename
 
-    def _extract_add_files(self, depot_file, revision, cl_is_shelved,
-                           cl_is_pending):
+    def _extract_add_files(self, depot_file, local_file, revision,
+                           cl_is_shelved, cl_is_pending):
         """Extract the 'old' and 'new' files for an add operation.
 
         Returns a tuple of (old filename, new filename). This can raise a
@@ -826,7 +854,7 @@ class PerforceClient(SCMClient):
             self._write_file('%s@=%s' % (depot_file, revision), new_filename)
         elif cl_is_pending:
             # Just reference the file within the client view
-            new_filename = self._depot_to_local(depot_file)
+            new_filename = local_file
         else:
             new_filename = make_tempfile()
             self._write_file('%s#%s' % (depot_file, revision), new_filename)
@@ -1026,33 +1054,6 @@ class PerforceClient(SCMClient):
         return {
             'diff': ''.join(diff_lines),
         }
-
-    def sanitize_changenum(self, changenum):
-        """
-        Return a "sanitized" change number for submission to the Review Board
-        server. For default changelists, this is always None. Otherwise, use
-        the changelist number for submitted changelists, or if the p4d is
-        2002.2 or newer.
-
-        This is because p4d < 2002.2 does not return enough information about
-        pending changelists in 'p4 describe' for Review Board to make use of
-        them (specifically, the list of files is missing). This would result
-        in the diffs being rejected.
-        """
-        if changenum == "default":
-            return None
-        else:
-            v = self.p4d_version
-
-            if v[0] < 2002 or (v[0] == "2002" and v[1] < 2):
-                description = self.p4.description(
-                    changenum=changenum,
-                    password=self.options.p4_passwd)
-
-                if '*pending*' in description[0]:
-                    return None
-
-        return changenum
 
     def _do_diff(self, old_file, new_file, depot_file, base_revision,
                  new_depot_file, changetype_short, ignore_unmodified=False):

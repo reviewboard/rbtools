@@ -20,6 +20,8 @@ class MercurialClient(SCMClient):
     """
     name = 'Mercurial'
 
+    supports_new_diff_api = True
+
     def __init__(self, **kwargs):
         super(MercurialClient, self).__init__(**kwargs)
 
@@ -179,24 +181,55 @@ class MercurialClient(SCMClient):
             # working copy revision and ancestors because that makes sense.
             # If a user wishes to include other changesets, they can run
             # `hg up` or specify explicit revisions as command arguments.
-            outgoing = \
-                self._get_bottom_and_top_outgoing_revs_for_remote(rev='.')
-            if outgoing[0] is None or outgoing[1] is None:
-                raise InvalidRevisionSpecError(
-                    'There are no outgoing changes')
-            result['base'] = self._identify_revision(outgoing[0])
-            result['tip'] = self._identify_revision(outgoing[1])
+            if self._type == 'svn':
+                result['base'] = self._get_parent_for_hgsubversion()
+                result['tip'] = '.'
+            else:
+                # Ideally, generating a diff for outgoing changes would be as
+                # simple as just running `hg outgoing --patch <remote>`, but
+                # there are a couple problems with this. For one, the
+                # server-side diff parser isn't equipped to filter out diff
+                # headers such as "comparing with..." and
+                # "changeset: <rev>:<hash>". Another problem is that the output
+                # of `hg outgoing` potentially includes changesets across
+                # multiple branches.
+                #
+                # In order to provide the most accurate comparison between
+                # one's local clone and a given remote (something akin to git's
+                # diff command syntax `git diff <treeish>..<treeish>`), we have
+                # to do the following:
+                #
+                # - Get the name of the current branch
+                # - Get a list of outgoing changesets, specifying a custom
+                #   format
+                # - Filter outgoing changesets by the current branch name
+                # - Get the "top" and "bottom" outgoing changesets
+                #
+                # These changesets are then used as arguments to
+                # `hg diff -r <rev> -r <rev>`.
+                #
+                # Future modifications may need to be made to account for odd
+                # cases like having multiple diverged branches which share
+                # partial history--or we can just punish developers for doing
+                # such nonsense :)
+                outgoing = \
+                    self._get_bottom_and_top_outgoing_revs_for_remote(rev='.')
+                if outgoing[0] is None or outgoing[1] is None:
+                    raise InvalidRevisionSpecError(
+                        'There are no outgoing changes')
+                result['base'] = self._identify_revision(outgoing[0])
+                result['tip'] = self._identify_revision(outgoing[1])
 
-            # XXX: self.options.parent_branch is currently used for specifying
-            # the upstream (remote) branch in case none of the candidate paths
-            # matches. This means we can't use it for its intended purpose,
-            # specifying an intermediate branch name to use to create a parent
-            # diff. Once we fix that, we can uncomment the below:
+                # XXX: self.options.parent_branch is currently used for specifying
+                # the upstream (remote) branch in case none of the candidate paths
+                # matches. This means we can't use it for its intended purpose,
+                # specifying an intermediate branch name to use to create a parent
+                # diff. Once we fix that, we can uncomment the below:
 
-            #if self.options.parent_branch:
-            #    result['parent_base'] = result['base']
-            #    result['base'] = self._identify_revision(
-            #        self.options.parent_branch)
+                #if self.options.parent_branch:
+                #    result['parent_base'] = result['base']
+                #    result['base'] = self._identify_revision(
+                #        self.options.parent_branch)
         elif n_revisions == 1:
             # One revision: Use the given revision for tip, and find its parent
             # for base.
@@ -262,26 +295,17 @@ class MercurialClient(SCMClient):
 
     def extract_summary(self, revisions):
         """Extracts the first line from the description the 'tip' revision."""
-        if self._type == 'svn':
-            revision = '.'
-        else:
-            revision = revisions['tip']
-
         return self._execute(
-            ['hg', 'log', '--hidden', '-r%s' % revision, '--template',
+            ['hg', 'log', '--hidden', '-r', revisions['tip'], '--template',
              '{desc|firstline}'], env=self._hg_env).replace('\n', ' ')
 
-    def extract_description(self, revisions=None):
+    def extract_description(self, revisions):
         """
         Extracts all descriptions in the given revision range and concatenates
         them, most recent ones going first.
         """
-        if self._type == 'svn':
-            rev1 = self._get_parent_for_hgsubversion()
-            rev2 = "."
-        else:
-            rev1 = revisions['base']
-            rev2 = revisions['tip']
+        rev1 = revisions['base']
+        rev2 = revisions['tip']
 
         delim = str(uuid.uuid1())
         descs = self._execute([
@@ -294,16 +318,41 @@ class MercurialClient(SCMClient):
 
         return '\n\n'.join([desc.strip() for desc in descs])
 
-    def diff(self, files):
+    def diff(self, revision_spec, files):
         """
         Performs a diff across all modified files in a Mercurial repository.
         """
-        files = files or []
+        self._init()
+        revisions = self.parse_revision_spec(revision_spec)
+
+        self._set_summary(revisions)
+        self._set_description(revisions)
+
+        diff_cmd = ['hg', 'diff', '--hidden']
 
         if self._type == 'svn':
-            return self._get_hgsubversion_diff(files)
+            diff_cmd.append('--svn')
+
+        diff_cmd += files
+
+        diff = self._execute(
+            diff_cmd + ['-r', revisions['base'], '-r', revisions['tip']],
+            env=self._hg_env)
+
+        if 'parent_base' in revisions:
+            base_commit_id = revisions['parent_base']
+            parent_diff = self._execute(
+                diff_cmd + ['-r', base_commit_id, '-r', revisions['base']],
+                env=self._hg_env)
         else:
-            return self._get_outgoing_diff(files)
+            base_commit_id = revisions['base']
+            parent_diff = None
+
+        return {
+            'diff': diff,
+            'parent_diff': parent_diff,
+            'base_commit_id': base_commit_id,
+        }
 
     def _get_parent_for_hgsubversion(self):
         """Returns the parent Subversion branch.
@@ -315,21 +364,6 @@ class MercurialClient(SCMClient):
         return (getattr(self.options, 'parent_branch', None) or
                 execute(['hg', 'parent', '--svn', '--template',
                         '{node}\n']).strip())
-
-    def _get_hgsubversion_diff(self, files):
-        self._set_summary(None)
-        self._set_description(None)
-
-        parent = self._get_parent_for_hgsubversion()
-
-        if len(files) == 1:
-            rs = "-r%s:%s" % (parent, files[0])
-        else:
-            rs = '.'
-
-        return {
-            'diff': self._execute(["hg", "diff", "--hidden", "--svn", rs]),
-        }
 
     def _get_remote_branch(self):
         """Returns the remote branch assoicated with this repository.
@@ -367,42 +401,6 @@ class MercurialClient(SCMClient):
             bottom_rev = None
 
         return bottom_rev, top_rev
-
-    def _get_outgoing_diff(self, files):
-        """
-        When working with a clone of a Mercurial remote, we need to find
-        out what the outgoing revisions are for a given branch.  It would
-        be nice if we could just do `hg outgoing --patch <remote>`, but
-        there are a couple of problems with this.
-
-        For one, the server-side diff parser isn't yet equipped to filter out
-        diff headers such as "comparing with..." and "changeset: <rev>:<hash>".
-        Another problem is that the output of `outgoing` potentially includes
-        changesets across multiple branches.
-
-        In order to provide the most accurate comparison between one's local
-        clone and a given remote -- something akin to git's diff command syntax
-        `git diff <treeish>..<treeish>` -- we have to do the following:
-
-            - get the name of the current branch
-            - get a list of outgoing changesets, specifying a custom format
-            - filter outgoing changesets by the current branch name
-            - get the "top" and "bottom" outgoing changesets
-            - use these changesets as arguments to `hg diff -r <rev> -r <rev>`
-
-
-        Future modifications may need to be made to account for odd cases like
-        having multiple diverged branches which share partial history -- or we
-        can just punish developers for doing such nonsense :)
-        """
-        self._init()
-
-        revisions = self.parse_revision_spec()
-        files = files or []
-        self._set_summary(revisions)
-        self._set_description(revisions)
-
-        return self._diff(revisions, files)
 
     def _get_outgoing_changesets(self, current_branch, remote, rev=None):
         """
@@ -511,39 +509,6 @@ class MercurialClient(SCMClient):
         if (getattr(self.options, 'guess_description', None) and
                 not getattr(self.options, 'description', None)):
             self.options.description = self.extract_description(revisions)
-
-    def _diff(self, revisions, files=[]):
-        """Get the diff between two given revisions."""
-        if self._type != 'hg':
-            raise NotImplementedError
-
-        diff_cmd = ['hg', 'diff', '--hidden'] + files
-
-        diff = self._execute(
-            diff_cmd + ['-r', revisions['base'], '-r', revisions['tip']],
-            env=self._hg_env)
-
-        if 'parent_base' in revisions:
-            base_commit_id = revisions['parent_base']
-            parent_diff = self._execute(
-                diff_cmd + ['-r', base_commit_id, '-r', revisions['base']],
-                env=self._hg_env)
-        else:
-            base_commit_id = revisions['base']
-            parent_diff = None
-
-        return {
-            'diff': diff,
-            'parent_diff': parent_diff,
-            'base_commit_id': base_commit_id,
-        }
-
-    def diff_between_revisions(self, revision_range, args, repository_info):
-        """Performs a diff between 2 revisions of a Mercurial repository."""
-        revisions = self.parse_revision_spec([revision_range])
-        self._set_summary(revisions)
-        self._set_description(revisions)
-        return self._diff(revisions)
 
     def scan_for_server(self, repository_info):
         # Scan first for dot files, since it's faster and will cover the
