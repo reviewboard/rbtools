@@ -391,7 +391,7 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
         The point of this function is to find a repository on the server that
         matches self, even if the paths aren't the same. (For example, if self
         uses an 'http' path, but the server uses a 'file' path for the same
-        repository.) It does this by comparing VOB's name. If the
+        repository.) It does this by comparing VOB's name and uuid. If the
         repositories use the same path, you'll get back self, otherwise you'll
         get a different ClearCaseRepositoryInfo object (with a different path).
         """
@@ -401,19 +401,52 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
         logging.debug("Repository's %s uuid is %r" % (self.vobstag, uuid))
 
         repositories = server.get_repositories()
+
+        # To reduce HTTP requests (_get_repository_info call), we build an
+        # ordered list of ClearCase repositories starting with the ones that
+        # have a matching vobstag.
+        repository_scan_order = []
+
         for repository in repositories:
+            # Ignore non-ClearCase repositories
             if repository['tool'] != 'ClearCase':
                 continue
 
-            info = self._get_repository_info(server, repository)
+            # Add repos where the vobstag matches at the beginning and others
+            # at the end.
+            if repository['name'] == self.vobstag:
+                repository_scan_order.insert(0, repository)
+            else:
+                repository_scan_order.append(repository)
+
+        # Now try to find a matching uuid
+        for repository in repository_scan_order:
+            repo_name = repository['name']
+            try:
+                info = self._get_repository_info(server, repository)
+            except APIError, e:
+                # If the current repository is not publicly accessible and the
+                # current user has no explicit access to it, the server will
+                # return error_code 101 and http_status 403.
+                if not (e.error_code == 101 and e.http_status == 403):
+                    # We can safely ignore this repository unless the VOB tag
+                    # matches.
+                    if repo_name == self.vobstag:
+                        die('You do not have permission to access this '
+                            'repository.')
+
+                    continue
+                else:
+                    # Bubble up any other errors
+                    raise e
 
             if not info or uuid != info['uuid']:
                 continue
 
-            logging.debug('Matching repository uuid:%s with path:%s' % (uuid,
-                          info['repopath']))
-            return ClearCaseRepositoryInfo(
-                info['repopath'], info['repopath'], uuid)
+            path = info['repopath']
+            logging.debug('Matching repository uuid:%s with path:%s',
+                          uuid, path)
+            return ClearCaseRepositoryInfo(path, path, uuid)
 
         # We didn't found uuid but if version is >= 1.5.3
         # we can try to use VOB's name hoping it is better
