@@ -250,7 +250,12 @@ If you collect changesets, for example, using ClearCase/ClearQuest
 integration, you can pass the changeset using :option:`--revision-range`.
 Repository will be determined based on your current VOB's UUID or name::
 
-    $ rbt post --revision-range="/vobs/proj/file.c@@/main/0:/vobs/proj/file.c@@/main/1"
+    $ rbt post --revision-range="/vobs/proj/file.c@@/main/0;/vobs/proj/file.c@@/main/1"
+
+Multiple files can be posted by adding additional file/revision pairs, all
+separated by semicolons::
+
+    $ rbt post --revision-range="/vobs/proj/file.c@@/main/0;/vobs/proj/file.c@@/main/1;/vobs/proj/file.h@@/main/0;/vobs/proj/file.h@@/main/1"
 
 Another way for post-commit review is send changes developed on branch by
 :option:`--tracking` option::
