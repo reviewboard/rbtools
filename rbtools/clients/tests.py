@@ -543,7 +543,6 @@ class MercurialClientTests(MercurialTestBase):
         result = self.client.diff(None)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
-        print result['diff']
         self.assertEqual(md5(result['diff']).hexdigest(),
                          '9c8796936646be5c7349973b0fceacbd')
 

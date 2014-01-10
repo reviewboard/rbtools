@@ -283,12 +283,12 @@ class MercurialClient(SCMClient):
             rev2 = revisions['tip']
 
         numrevs = len(self._execute([
-            'hg', 'log', '--hidden', '-r%s:%s' % (rev2, rev1),
+            'hg', 'log', '--hidden', '-r%s::%s' % (rev2, rev1),
             '--follow', '--template', r'{rev}\n'], env=self._hg_env
         ).strip().split('\n'))
 
         return self._execute(['hg', 'log', '--hidden',
-                              '-r%s:%s' % (rev2, rev1),
+                              '-r%s::%s' % (rev2, rev1),
                               '--follow', '--template',
                               r'{desc}\n\n', '--limit',
                               str(numrevs - 1)],
