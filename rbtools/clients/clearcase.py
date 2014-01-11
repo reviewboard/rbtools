@@ -165,10 +165,22 @@ class ClearCaseClient(SCMClient):
     def _directory_content(self, path):
         """Return directory content ready for saving to tempfile."""
 
+        # Get the absolute path of each element located in path, but only
+        # clearcase elements => -vob_only
+        output = execute(["cleartool", "ls", "-short", "-nxname", "-vob_only",
+                          path])
+        lines = output.splitlines(True)
+
+        content = []
+        # The previous command returns absolute file paths but only file names
+        # are required.
+        for absolute_path in lines:
+            short_path = os.path.basename(absolute_path.strip())
+            content.append(short_path)
+
         return ''.join([
             '%s\n' % s
-            for s in sorted(os.listdir(path))
-        ])
+            for s in sorted(content)])
 
     def _construct_changeset(self, output):
         return [
@@ -183,8 +195,8 @@ class ClearCaseClient(SCMClient):
         previews and current file version.
         """
         changeset = []
-        # We ignore return code 1 in order to
-        # omit files that Clear Case can't read.
+        # We ignore return code 1 in order to omit files that Clear Case can't
+        # read.
         output = execute([
             "cleartool",
             "lscheckout",
@@ -209,8 +221,8 @@ class ClearCaseClient(SCMClient):
         """
         changeset = []
 
-        # We ignore return code 1 in order to
-        # omit files that Clear Case can't read.
+        # We ignore return code 1 in order to omit files that Clear Case can't
+        # read.
         if sys.platform.startswith('win'):
             CLEARCASE_XPN = '%CLEARCASE_XPN%'
         else:
@@ -260,15 +272,15 @@ class ClearCaseClient(SCMClient):
         Most effective and reliable way is use gnu diff.
         """
 
-        # in snapshot view, diff can't access history clearcase file version
+        # In snapshot view, diff can't access history clearcase file version
         # so copy cc files to tempdir by 'cleartool get -to dest-pname pname',
-        # and compare diff with the new temp ones
+        # and compare diff with the new temp ones.
         if self.viewtype == 'snapshot':
             # create temporary file first
             tmp_old_file = make_tempfile()
             tmp_new_file = make_tempfile()
 
-            # delete so cleartool can write to them
+            # Delete so cleartool can write to them.
             try:
                 os.remove(tmp_old_file)
             except OSError:
@@ -288,7 +300,7 @@ class ClearCaseClient(SCMClient):
         dl = execute(diff_cmd, extra_ignore_errors=(1, 2),
                      translate_newlines=False)
 
-        # replace temporary file name in diff with the one in snapshot view
+        # Replace temporary file name in diff with the one in snapshot view.
         if self.viewtype == "snapshot":
             dl = dl.replace(tmp_old_file, old_file)
             dl = dl.replace(tmp_new_file, new_file)
@@ -358,7 +370,20 @@ class ClearCaseClient(SCMClient):
         diff = []
         for old_file, new_file in changeset:
             dl = []
-            if cpath.isdir(new_file):
+
+            # cpath.isdir does not work for snapshot views but this
+            # information can be found using `cleartool describe`.
+            if self.viewtype == 'snapshot':
+                # ClearCase object path is file path + @@
+                object_path = new_file.split('@@')[0] + '@@'
+                output = execute(["cleartool", "describe", "-fmt", "%m",
+                                  object_path])
+                object_kind = output.strip()
+                isdir = object_kind == 'directory element'
+            else:
+                isdir = cpath.isdir(new_file)
+
+            if isdir:
                 dl = self.diff_directories(old_file, new_file)
             elif cpath.exists(new_file) or self.viewtype == 'snapshot':
                 dl = self.diff_files(old_file, new_file)
