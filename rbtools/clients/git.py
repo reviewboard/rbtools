@@ -240,16 +240,21 @@ class GitClient(SCMClient):
 
         # Okay, maybe Perforce (git-p4).
         git_p4_ref = os.path.join(git_dir, 'refs', 'remotes', 'p4', 'master')
-        data = execute([self.git, 'config', '--get', 'git-p4.port'],
-                       ignore_errors=True)
-        m = re.search(r'(.+)', data)
-        if m and os.path.exists(git_p4_ref):
-            port = m.group(1)
-            self.type = 'perforce'
-            self.upstream_branch = 'remotes/p4/master'
-            return RepositoryInfo(path=port,
-                                  base_path='',
-                                  supports_parent_diffs=True)
+        if os.path.exists(git_p4_ref):
+            data = execute([self.git, 'config', '--get', 'git-p4.port'],
+                           ignore_errors=True)
+            m = re.search(r'(.+)', data)
+            if m:
+                port = m.group(1)
+            else:
+                port = os.getenv('P4PORT')
+
+            if port:
+                self.type = 'perforce'
+                self.upstream_branch = 'remotes/p4/master'
+                return RepositoryInfo(path=port,
+                                      base_path='',
+                                      supports_parent_diffs=True)
 
         # Nope, it's git then.
         # Check for a tracking branch and determine merge-base
