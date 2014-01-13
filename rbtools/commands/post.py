@@ -187,9 +187,15 @@ class Post(Command):
                default=None,
                help="generate the diff for review based on a local SVN "
                     "changelist"),
+        Option("--repository",
+               dest="repository_name",
+               config_key="REPOSITORY",
+               default=None,
+               help="the name of the repository configured on Review Board "
+                    "that matches the local repository"),
         Option("--repository-url",
                dest="repository_url",
-               config_key="REPOSITORY",
+               config_key="REPOSITORY_URL",
                default=None,
                help="the url for a repository for creating a diff "
                     "outside of a working copy (currently only "
@@ -394,7 +400,7 @@ class Post(Command):
         """
         user = get_user(api_client, api_root, auth_required=True)
         repository_id = get_repository_id(
-            repository_info, api_root, self.options.repository_url)
+            repository_info, api_root, self.options.repository_name)
 
         try:
             # Get only pending requests by the current user for this
@@ -471,6 +477,7 @@ class Post(Command):
             try:
                 repository = (
                     self.options.repository_url or
+                    self.options.repository_name or
                     self.get_repository_path(repository_info, api_root))
                 request_data = {
                     'repository': repository

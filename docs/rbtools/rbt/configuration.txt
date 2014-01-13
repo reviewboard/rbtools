@@ -49,10 +49,9 @@ many of the commands. For example, see
 REPOSITORY
 ~~~~~~~~~~
 
-Normally, the repository path is automatically determined and passed to
-Review Board, but on more complex setups you may need to tell
-:command:`rbt` and Review Board specifically which repository you
-want to use.
+By default, RBTools will try to determine the repository path and pass that to
+Review Board. This won't always work in all setups, particularly when
+different people are checking out the repository with different URLs.
 
 You can use the ``REPOSITORY`` setting to specify the name of the
 repository to use. This is the same as on Review Board's New Review Request

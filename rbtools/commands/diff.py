@@ -40,6 +40,12 @@ class Diff(Command):
                default=None,
                help='generate the diff for review based on a local SVN '
                     'changelist'),
+        Option("--repository",
+               dest="repository_name",
+               config_key="REPOSITORY",
+               default=None,
+               help="the name of the repository configured on Review Board "
+                    "that matches the local repository"),
         Option("--repository-url",
                dest="repository_url",
                help="the url for a repository for creating a diff "

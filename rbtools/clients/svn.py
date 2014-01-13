@@ -154,7 +154,7 @@ class SVNClient(SCMClient):
 
     def _convert_symbolic_revision(self, revision):
         command = ['svn', 'log', '-r', revision, '-l', '1', '--xml']
-        if self.options.repository_url:
+        if getattr(self.options, 'repository_url', None):
             command.append(self.options.repository_url)
         log = execute(command, ignore_errors=True, none_on_ignored_error=True)
 

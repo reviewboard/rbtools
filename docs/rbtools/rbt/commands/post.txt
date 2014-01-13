@@ -553,6 +553,14 @@ Options
 
    Generate the diff for review based on a local SVN changelist.
 
+.. cmdoption:: --repository
+
+   The name of the repository to look up when posting the change. This is
+   the same name shown on the New Review Request page or in the repository
+   configuration page.
+
+   The default can be set in ``REPOSITORY`` in :file:`.reviewboardrc`.
+
 .. cmdoption:: --repository-url
 
    The url for a repository for creating a diff outside of a working copy
@@ -561,7 +569,13 @@ Options
    view). For Git, this specifies the origin url of the current repository,
    overriding the origin url supplied by the Git client.
 
-   The default can be set in ``REPOSITORY`` in :file:`.reviewboardrc`.
+   The default can be set in ``REPOSITORY_URL`` in :file:`.reviewboardrc`.
+
+   Note that versions of RBTools prior to 0.6 used the ``REPOSITORY``
+   setting in :file:`.reviewboardrc`, and allowed a repository name to be
+   passed to :option:`--repository-url`. This is no longer supported in
+   0.6 and higher. You may need to update your configuration and scripts
+   appropriately.
 
 .. cmdoption:: --diff-filename
 
