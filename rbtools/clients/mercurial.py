@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import uuid
 
 from urlparse import urlsplit, urlunparse
 
@@ -270,7 +271,7 @@ class MercurialClient(SCMClient):
             ['hg', 'log', '--hidden', '-r%s' % revision, '--template',
              '{desc|firstline}'], env=self._hg_env).replace('\n', ' ')
 
-    def extract_description(self, revision_range=None):
+    def extract_description(self, revisions=None):
         """
         Extracts all descriptions in the given revision range and concatenates
         them, most recent ones going first.
@@ -282,17 +283,16 @@ class MercurialClient(SCMClient):
             rev1 = revisions['base']
             rev2 = revisions['tip']
 
-        numrevs = len(self._execute([
-            'hg', 'log', '--hidden', '-r%s::%s' % (rev2, rev1),
-            '--follow', '--template', r'{rev}\n'], env=self._hg_env
-        ).strip().split('\n'))
+        delim = str(uuid.uuid1())
+        descs = self._execute([
+            'hg', 'log', '--hidden', '-r', '%s::%s' % (rev1, rev2),
+            '--template', '{desc}%s' % delim], env=self._hg_env)
+        # This initial element in the base changeset, which we don't
+        # care about. The last element is always empty due to the string
+        # ending with <delim>.
+        descs = descs.split(delim)[1:-1]
 
-        return self._execute(['hg', 'log', '--hidden',
-                              '-r%s::%s' % (rev2, rev1),
-                              '--follow', '--template',
-                              r'{desc}\n\n', '--limit',
-                              str(numrevs - 1)],
-                              env=self._hg_env).strip()
+        return '\n\n'.join([desc.strip() for desc in descs])
 
     def diff(self, files):
         """

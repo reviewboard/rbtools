@@ -640,6 +640,63 @@ class MercurialClientTests(MercurialTestBase):
         self.assertEqual(revisions['base'], base)
         self.assertEqual(revisions['tip'], tip)
 
+    def test_guess_summary_description_one(self):
+        """Testing MercurialClient guess summary & description 1 commit."""
+        self.options.guess_summary = True
+        self.options.guess_description = True
+
+        self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
+
+        self.client.diff(None)
+
+        self.assertEquals(self.options.summary, 'commit 1')
+
+    def test_guess_summary_description_two(self):
+        """Testing MercurialClient guess summary & description 2 commits."""
+        self.options.guess_summary = True
+        self.options.guess_description = True
+
+        self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
+
+        self.client.diff(None)
+
+        self.assertEquals(self.options.summary, 'commit 2')
+        self.assertEquals(self.options.description, 'commit 1\n\ncommit 2')
+
+    def test_guess_summary_description_three(self):
+        """Testing MercurialClient guess summary & description 3 commits."""
+        self.options.guess_summary = True
+        self.options.guess_description = True
+
+        self._hg_add_file_commit('foo.txt', FOO1, 'commit 1\n\ndesc1')
+        self._hg_add_file_commit('foo.txt', FOO2, 'commit 2\n\ndesc2')
+        self._hg_add_file_commit('foo.txt', FOO3, 'commit 3\n\ndesc3')
+
+        self.client.diff(None)
+
+        self.assertEquals(self.options.summary, 'commit 3')
+        self.assertEquals(self.options.description,
+            'commit 1\n\ndesc1\n\ncommit 2\n\ndesc2\n\ncommit 3\n\ndesc3')
+
+    def test_guess_summary_description_one_middle(self):
+        """Testing MercurialClient guess summary & description middle commit
+        commit."""
+        self.options.guess_summary = True
+        self.options.guess_description = True
+
+        self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
+        tip = self._hg_get_tip()
+        self._hg_add_file_commit('foo.txt', FOO3, 'commit 3')
+
+        self.options.revision_range = tip
+
+        self.client.diff_between_revisions(tip, [], None)
+
+        self.assertEquals(self.options.summary, 'commit 2')
+        self.assertEquals(self.options.description, 'commit 2')
+
 
 class MercurialSubversionClientTests(MercurialTestBase):
     TESTSERVER = "http://127.0.0.1:8080"
