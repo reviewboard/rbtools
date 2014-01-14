@@ -99,7 +99,7 @@ class SetupRepo(Command):
             outfile.close()
         except IOError as e:
             raise CommandError('I/O error generating config file (%s): %s'
-                               % e.errno, e.strerror)
+                               % (e.errno, e.strerror))
 
         print "Config written to %s" % file_path
 

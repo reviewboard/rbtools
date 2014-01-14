@@ -1,0 +1,49 @@
+===========================
+RBTools 0.5.4 Release Notes
+===========================
+
+**Release date**: January 14, 2014
+
+
+Deprecation
+===========
+
+* :command:`post-review` is deprecated (and has been for a while). It now
+  shows a deprecation warning in order to remind me to use
+  :command:`rbt post`.
+
+
+Bug Fixes
+=========
+
+rbt patch
+---------
+
+* rbt patch no longer fails to commit on Git if there are untracked files.
+
+* Fixed committing changes when the description has unicode characters.
+
+* Fixed compatibility with Review Board 2.0 beta.
+
+
+rbt post
+--------
+
+* Fixed R1:R2 syntax for :option:`--revision-range` for Git repositories.
+  (:bug:`3182`)
+
+
+rbt setup-repo
+--------------
+
+* Fixed error output when failing to write the :file:`.reviewboardrc` file.
+
+
+Contributors
+============
+
+* Christian Hammond
+* David Trowbridge
+
+
+.. comment: vim: ft=rst et
