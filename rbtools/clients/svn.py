@@ -24,6 +24,8 @@ class SVNClient(SCMClient):
     DIFF_ORIG_FILE_LINE_RE = re.compile(r'^---\s+.*\s+\(.*\)')
     DIFF_NEW_FILE_LINE_RE = re.compile(r'^\+\+\+\s+.*\s+\(.*\)')
 
+    SVN_URL_RE = re.compile(r'^(https?|svn|svn+ssh|file):')
+
     REVISION_WORKING_COPY = '--rbtools-working-copy'
     REVISION_CHANGELIST_PREFIX = '--rbtools-changelist:'
 
@@ -38,8 +40,10 @@ class SVNClient(SCMClient):
         # a supplied URI)
         svn_info_params = ["svn", "info"]
 
-        if getattr(self.options, 'repository_url', None):
-            svn_info_params.append(self.options.repository_url)
+        repository_url = getattr(self.options, 'repository_url', None)
+
+        if self._is_svn_url(repository_url):
+            svn_info_params.append(repository_url)
 
         # Add --non-interactive so that this command will not hang
         #  when used  on a https repository path
@@ -124,7 +128,7 @@ class SVNClient(SCMClient):
             except ValueError:
                 # It's not a revision--let's try a changelist. This only makes
                 # sense if we have a working copy.
-                if not self.options.repository_url:
+                if not self._is_svn_url(self.options.repository_url):
                     status = execute(['svn', 'status', '--cl', revision,
                                       '--xml'])
                     cl = ElementTree.fromstring(status).find('changelist')
@@ -155,8 +159,12 @@ class SVNClient(SCMClient):
 
     def _convert_symbolic_revision(self, revision):
         command = ['svn', 'log', '-r', revision, '-l', '1', '--xml']
-        if self.options.repository_url:
-            command.append(self.options.repository_url)
+
+        repository_url = getattr(self.options, 'repository_url', None)
+
+        if self._is_svn_url(repository_url):
+            command.append(repository_url)
+
         log = execute(command, ignore_errors=True, none_on_ignored_error=True)
 
         if log is not None:
@@ -169,6 +177,7 @@ class SVNClient(SCMClient):
 
     def check_options(self):
         if (getattr(self.options, 'repository_url', None) and
+            self._is_svn_url(self.options.repository_url) and
             not getattr(self.options, 'revision_range', None) and
             not getattr(self.options, 'diff_filename', None)):
             raise OptionsCheckError(
@@ -221,7 +230,7 @@ class SVNClient(SCMClient):
         """
         Performs a diff between 2 revisions of a Subversion repository.
         """
-        if self.options.repository_url:
+        if self._is_svn_url(self.options.repository_url):
             revisions = revision_range.split(':')
             if len(revisions) < 1:
                 return None
@@ -348,7 +357,7 @@ class SVNClient(SCMClient):
         # svn diff against a repository URL on two revisions appears to
         # handle moved files properly, so only adjust the diff file names
         # if they were created using a working copy.
-        if self.options.repository_url:
+        if self._is_svn_url(self.options.repository_url):
             return diff_content
 
         result = []
@@ -402,7 +411,7 @@ class SVNClient(SCMClient):
                     # If working with a diff generated outside of a working
                     # copy, then file paths are already absolute, so just
                     # add initial slash.
-                    if self.options.repository_url:
+                    if self._is_svn_url(self.options.repository_url):
                         path = urllib.unquote(
                             "%s/%s" % (repository_info.base_path, file))
                     else:
@@ -461,6 +470,19 @@ class SVNClient(SCMClient):
 
         # strip off ending newline, and return it as the second component
         return [s.split('\n')[0], '\n']
+
+    def _is_svn_url(self, url_or_name):
+        """Returns whether a string is a valid SVN URL.
+
+        This is used when determining if a user has provided a repository
+        name (in which case this returns False) or a valid SVN URL (True)
+        in the REPOSITORY setting or --repository-url= command line
+        argument.
+
+        This is intended only as a stop-gap until these settings can be
+        properly split up in RBTools 0.6.
+        """
+        return url_or_name and self.SVN_URL_RE.match(url_or_name)
 
 
 class SVNRepositoryInfo(RepositoryInfo):
