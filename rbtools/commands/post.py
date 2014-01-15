@@ -17,7 +17,7 @@ class Post(Command):
     name = "post"
     author = "The Review Board Project"
     description = "Uploads diffs to create and update review requests."
-    args = "[changenum]"
+    args = "[revisions]"
     option_list = [
         Option("-r", "--review-request-id",
                dest="rid",
@@ -115,11 +115,11 @@ class Post(Command):
                default=None,
                help="description of what changed in this revision of "
                     "the review request when updating an existing request"),
-        Option("--revision-range",
-               dest="revision_range",
+        Option('--revision-range',
+               dest='revision_range',
                default=None,
-               help="generate the diff for review based on given "
-                    "revision range"),
+               help='generate a diff with the given revision range '
+                    '(DEPRECATED'),
         Option('-I', '--include',
                dest='include_files',
                action='append',
@@ -211,7 +211,7 @@ class Post(Command):
                default=None,
                help="the url for a repository for creating a diff "
                     "outside of a working copy (currently only "
-                    "supported by Subversion with --revision-range or "
+                    "supported by Subversion with specific revisions or "
                     "--diff-filename and ClearCase with relative "
                     "paths outside the view). For git, this specifies"
                     "the origin url of the current repository, "
@@ -251,6 +251,13 @@ class Post(Command):
         if self.options.guess_fields:
             self.options.guess_summary = True
             self.options.guess_description = True
+
+        if self.options.revision_range:
+            raise CommandError(
+                'The --revision-range argument has been removed. To post a '
+                'diff for one or more specific revisions, pass those '
+                'revisions as arguments. For more information, see the '
+                'RBTools 0.6 Release Notes.')
 
         if self.options.svn_changelist:
             raise CommandError(
@@ -403,7 +410,7 @@ class Post(Command):
         return count
 
     def guess_existing_review_request_id(self, repository_info, api_root,
-                                         api_client, tool, revision_range):
+                                         api_client, tool, revision_spec=[]):
         """Try to guess the existing review request ID if it is available.
 
         The existing review request is guessed by comparing the existing
@@ -436,10 +443,7 @@ class Post(Command):
                                '%s: %s' % (user.username, e))
 
         try:
-            if revision_range:
-                revisions = tool.parse_revision_spec([revision_range])
-            else:
-                revisions = tool.parse_revision_spec()
+            revisions = tool.parse_revision_spec(revision_spec)
 
             summary = (getattr(self.options, 'summary', None) or
                        tool.extract_summary(revisions))
@@ -659,8 +663,6 @@ class Post(Command):
                 tool,
                 repository_info,
                 revision_spec=args,
-                revision_range=self.options.revision_range,
-                old_files_list=args,
                 files=self.options.include_files)
 
             diff = diff_info['diff']
@@ -677,8 +679,7 @@ class Post(Command):
 
         if self.options.update:
             self.options.rid = self.guess_existing_review_request_id(
-                repository_info, api_root, api_client, tool,
-                self.options.revision_range)
+                repository_info, api_root, api_client, tool, args)
 
             if not self.options.rid:
                 raise CommandError('Could not determine the existing review '

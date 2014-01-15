@@ -5,6 +5,7 @@ from pkg_resources import parse_version
 
 from rbtools.api.errors import APIError
 from rbtools.clients import SCMClient, RepositoryInfo
+from rbtools.clients.errors import InvalidRevisionSpecError
 from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import die, execute
@@ -26,6 +27,11 @@ class ClearCaseClient(SCMClient):
     """
     name = 'ClearCase'
     viewtype = None
+
+    REVISION_BRANCH_PREFIX = 'brtype:'
+    REVISION_CHECKEDOUT_BASE = '--rbtools-checkedout-base'
+    REVISION_CHECKEDOUT_CHANGESET = '--rbtools-checkedout-changeset'
+    REVISION_FILES = '--rbtools-files'
 
     def __init__(self, **kwargs):
         super(ClearCaseClient, self).__init__(**kwargs)
@@ -116,6 +122,70 @@ class ClearCaseClient(SCMClient):
 
         return "%s@@%s" % (path, version)
 
+    def parse_revision_spec(self, revisions):
+        """Parses the given revision spec.
+
+        The 'revisions' argument is a list of revisions as specified by the
+        user. Items in the list do not necessarily represent a single revision,
+        since the user can use SCM-native syntaxes such as "r1..r2" or "r1:r2".
+        SCMTool-specific overrides of this method are expected to deal with
+        such syntaxes.
+
+        This will return a dictionary with the following keys:
+            'base':        A revision to use as the base of the resulting diff.
+            'tip':         A revision to use as the tip of the resulting diff.
+
+        These will be used to generate the diffs to upload to Review Board (or
+        print).
+
+        There are many different ways to generate diffs for clearcase, because
+        there are so many different workflows. This method serves more as a way
+        to validate the passed-in arguments than actually parsing them in the
+        way that other clients do.
+        """
+        n_revs = len(revisions)
+
+        if n_revs == 0:
+            return {
+                'base': self.REVISION_CHECKEDOUT_BASE,
+                'tip': self.REVISION_CHECKEDOUT_CHANGESET,
+            }
+        elif n_revs == 1:
+            if revisions[0].startswith(self.REVISION_BRANCH_PREFIX):
+                return {
+                    'base': self.REVISION_BRANCH_BASE,
+                    'tip': revisions[0][len(self.REVISION_BRANCH_PREFIX):],
+                }
+            # TODO:
+            # activity:activity[@pvob] => review changes in this UCM activity
+            # lbtype:label1            => review changes between this label
+            #                             and the working directory
+            # stream:streamname[@pvob] => review changes in this UCM stream
+            #                             (UCM "branch")
+            # baseline:baseline[@pvob] => review changes between this baseline
+            #                             and the working directory
+        elif n_revs == 2:
+            # TODO:
+            # lbtype:label1 lbtype:label2 => review changes between these two
+            #                                labels
+            # baseline:baseline1[@pvob] baseline:baseline2[@pvob]
+            #                             => review changes between these two
+            #                                baselines
+            pass
+
+        pairs = []
+        for r in revisions:
+            p = r.split(':')
+            if len(p) != 2:
+                raise InvalidRevisionSpecError(
+                    '"%s" is not a valid file@revision pair' % r)
+            pairs.append(p)
+
+        return {
+            'base': self.REVISION_FILES,
+            'tip': pairs,
+        }
+
     def _sanitize_branch_changeset(self, changeset):
         """Return changeset containing non-binary, branched file versions.
 
@@ -188,7 +258,7 @@ class ClearCaseClient(SCMClient):
             for info in output.strip().split('\n')
         ]
 
-    def get_checkedout_changeset(self):
+    def _get_checkedout_changeset(self):
         """Return information about the checked out changeset.
 
         This function returns: kind of element, path to file,
@@ -213,7 +283,7 @@ class ClearCaseClient(SCMClient):
 
         return self._sanitize_checkedout_changeset(changeset)
 
-    def get_branch_changeset(self, branch):
+    def _get_branch_changeset(self, branch):
         """Returns information about the versions changed on a branch.
 
         This takes into account the changes on the branch owned by the
@@ -246,27 +316,28 @@ class ClearCaseClient(SCMClient):
 
         return self._sanitize_branch_changeset(changeset)
 
-    def diff(self, files):
-        """Performs a diff of the specified file and its previous version."""
+    def diff(self, revision_spec, files):
+        if files:
+            raise Exception(
+                'The ClearCase backend does not currently support the '
+                '-I/--include parameter. To diff for specific files, pass in '
+                'file@revision1:file@revision2 pairs as arguments')
 
-        if self.options.tracking:
-            changeset = self.get_branch_changeset(self.options.tracking)
+        revisions = self.parse_revision_spec(revision_spec)
+
+        if revisions['tip'] == self.REVISION_CHECKEDOUT_CHANGESET:
+            changeset = self._get_checkedout_changeset()
+            return self._do_diff(changeset)
+        elif revisions['base'] == self.REVISION_BRANCH_BASE:
+            changeset = self._get_branch_changeset(revisions['tip'])
+            return self._do_diff(changeset)
+        elif revisions['base'] == self.REVISION_FILES:
+            files = revisions['tip']
+            return self._do_diff(files)
         else:
-            changeset = self.get_checkedout_changeset()
+            assert False
 
-        return self.do_diff(changeset)
-
-    def diff_between_revisions(self, revision_range, args, repository_info):
-        """Performs a diff between passed revisions or branch."""
-
-        # Convert revision range to list of:
-        # (previous version, current version) tuples
-        revision_range = revision_range.split(';')
-        changeset = zip(revision_range[0::2], revision_range[1::2])
-
-        return self.do_diff(changeset)
-
-    def diff_files(self, old_file, new_file):
+    def _diff_files(self, old_file, new_file):
         """Return unified diff for file.
 
         Most effective and reliable way is use gnu diff.
@@ -333,7 +404,7 @@ class ClearCaseClient(SCMClient):
 
         return dl
 
-    def diff_directories(self, old_dir, new_dir):
+    def _diff_directories(self, old_dir, new_dir):
         """Return uniffied diff between two directories content.
 
         Function save two version's content of directory to temp
@@ -364,9 +435,8 @@ class ClearCaseClient(SCMClient):
 
         return dl
 
-    def do_diff(self, changeset):
+    def _do_diff(self, changeset):
         """Generates a unified diff for all files in the changeset."""
-
         diff = []
         for old_file, new_file in changeset:
             dl = []
@@ -384,9 +454,9 @@ class ClearCaseClient(SCMClient):
                 isdir = cpath.isdir(new_file)
 
             if isdir:
-                dl = self.diff_directories(old_file, new_file)
+                dl = self._diff_directories(old_file, new_file)
             elif cpath.exists(new_file) or self.viewtype == 'snapshot':
-                dl = self.diff_files(old_file, new_file)
+                dl = self._diff_files(old_file, new_file)
             else:
                 logging.error("File %s does not exist or access is denied."
                               % new_file)

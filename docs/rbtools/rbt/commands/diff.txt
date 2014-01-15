@@ -11,7 +11,7 @@ for it.
 
 Usage::
 
-   $ rbt diff [options] [changenum | [<file> ...]]
+   $ rbt diff [options] [revisions]
 
 
 Default Options
@@ -45,14 +45,16 @@ Options
 
    The default can be set in ``REVIEWBOARD_URL`` in :file:`.reviewboardrc`.
 
-.. cmdoption:: --revision-range
-
-   Generate the diff for review based on given revision range.
-
 .. cmdoption:: --parent
 
    The parent branch this diff should be against (only available if your
    repository supports parent diffs).
+
+.. cmdoption:: -I <file>, --include <file>
+
+   Include only the specified file in the diff. This argument can be passed in
+   multiple times to include multiple files. This is only available with some
+   SCM backends (Bazaar, CVS, Git, Mercurial, Perforce, and SVN).
 
 .. cmdoption:: --tracking-branch
 
@@ -74,7 +76,7 @@ Options
 .. cmdoption:: --repository-url
 
    The url for a repository for creating a diff outside of a working copy
-   (currently only supported by Subversion with :option:`--revision-range` or
+   (currently only supported by Subversion with specific revisions or
    :option:`--diff-filename` and ClearCase with relative paths outside the
    view). For Git, this specifies the origin url of the current repository,
    overriding the origin url supplied by the Git client.

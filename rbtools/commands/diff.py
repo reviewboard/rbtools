@@ -6,7 +6,7 @@ class Diff(Command):
     """Prints a diff to the terminal."""
     name = "diff"
     author = "The Review Board Project"
-    args = "[changenum]"
+    args = "[revisions]"
     option_list = [
         Option("--server",
                dest="server",
@@ -14,11 +14,11 @@ class Diff(Command):
                config_key="REVIEWBOARD_URL",
                default=None,
                help="specify a different Review Board server to use"),
-        Option("--revision-range",
-               dest="revision_range",
+        Option('--revision-range',
+               dest='revision_range',
                default=None,
-               help="generate the diff for review based on given "
-                    "revision range"),
+               help='generate a diff with the given revision range '
+                    '(DEPRECATED'),
         Option('-I', '--include',
                dest='include_files',
                action='append',
@@ -55,7 +55,7 @@ class Diff(Command):
                dest="repository_url",
                help="the url for a repository for creating a diff "
                     "outside of a working copy (currently only "
-                    "supported by Subversion with --revision-range or "
+                    "supported by Subversion with specific revisions or "
                     "--diff-filename and ClearCase with relative "
                     "paths outside the view). For git, this specifies"
                     "the origin url of the current repository, "
@@ -108,6 +108,13 @@ class Diff(Command):
         # SCM Clients code. See comment in post.
         args = list(args)
 
+        if self.options.revision_range:
+            raise CommandError(
+                'The --revision-range argument has been removed. To create a '
+                'diff for one or more specific revisions, pass those '
+                'revisions as arguments. For more information, see the '
+                'RBTools 0.6 Release Notes.')
+
         if self.options.svn_changelist:
             raise CommandError(
                 'The --svn-changelist argument has been removed. To use a '
@@ -124,8 +131,6 @@ class Diff(Command):
             tool,
             repository_info,
             revision_spec=args,
-            revision_range=self.options.revision_range,
-            old_files_list=args,
             files=self.options.include_files)
 
         diff = diff_info['diff']

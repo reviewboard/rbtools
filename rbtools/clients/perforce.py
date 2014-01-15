@@ -158,8 +158,6 @@ class PerforceClient(SCMClient):
     REVISION_CURRENT_SYNC = '--rbtools-current-sync'
     REVISION_PENDING_CLN_PREFIX = '--rbtools-pending-cln:'
 
-    supports_new_diff_api = True
-
     def __init__(self, p4_class=P4Wrapper, **kwargs):
         super(PerforceClient, self).__init__(**kwargs)
         self.p4 = p4_class()
@@ -931,15 +929,6 @@ class PerforceClient(SCMClient):
         new_filename = stat_info['clientFile']
 
         return old_filename, new_filename, new_depot_file
-
-    def check_options(self):
-        if getattr(self.options, 'revision_range', None):
-            raise OptionsCheckError(
-                "The --revision-range option is not supported for Perforce "
-                "repositories. Please use the Perforce range path syntax "
-                "instead.\n\n"
-                "See: http://www.reviewboard.org/docs/rbtools/dev/rbt/"
-                "commands/post/#posting-paths\n")
 
     def _path_diff(self, args):
         """

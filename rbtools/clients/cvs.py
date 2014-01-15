@@ -16,8 +16,6 @@ class CVSClient(SCMClient):
     """
     name = 'CVS'
 
-    supports_new_diff_api = True
-
     REVISION_WORKING_COPY = '--rbtools-working-copy'
 
     def __init__(self, **kwargs):

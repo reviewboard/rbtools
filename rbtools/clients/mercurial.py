@@ -20,8 +20,6 @@ class MercurialClient(SCMClient):
     """
     name = 'Mercurial'
 
-    supports_new_diff_api = True
-
     def __init__(self, **kwargs):
         super(MercurialClient, self).__init__(**kwargs)
 
@@ -54,7 +52,7 @@ class MercurialClient(SCMClient):
         specified.
 
         Since we may encounter hidden changesets (e.g. the user specifies
-        hidden changesets as part of --revision-range), we need to be aware
+        hidden changesets as part of the revision spec), we need to be aware
         of hidden changesets.
         """
         if not hasattr(self, '_hidden_changesets_supported'):
@@ -494,22 +492,6 @@ class MercurialClient(SCMClient):
         bottom_rev = max(0, bottom_rev)
 
         return top_rev, bottom_rev
-
-    def _extract_revisions(self, revision_range):
-        """Returns the revisions from the provided revision range."""
-        if ':' in revision_range:
-            r1, r2 = revision_range.split(':')
-        else:
-            # If only 1 revision is given, we find the first parent and use
-            # that as the second revision.
-            #
-            # We could also use "hg diff -c r1", but then we couldn't reuse the
-            # code for extracting descriptions.
-            r2 = revision_range
-            r1 = self._execute(["hg", "parents", "--hidden", "-r", r2,
-                                "--template", "{rev}\n"]).split()[0]
-
-        return r1, r2
 
     def _set_summary(self, revisions):
         """Sets the summary based on the provided revisions.

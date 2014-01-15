@@ -20,8 +20,6 @@ class BazaarClient(SCMClient):
     """
     name = 'Bazaar'
 
-    supports_new_diff_api = True
-
     # Regular expression that matches the path to the current branch.
     #
     # For branches with shared repositories, Bazaar reports
@@ -199,11 +197,7 @@ class BazaarClient(SCMClient):
             self.options.description = self.extract_description(revisions)
 
     def extract_summary(self, revisions):
-        """Return the last commit message in ``revisions``.
-
-        If revision_range is ``None``, the commit message of the last revision
-        in the repository is returned.
-        """
+        """Return the last commit message in ``revisions``."""
         # `bzr log --line' returns the log in the format:
         #   {revision-number}: {committer-name} {commit-date} {commit-message}
         # So we should ignore everything after the date (YYYY-MM-DD).

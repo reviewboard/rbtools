@@ -17,8 +17,6 @@ class PlasticClient(SCMClient):
     """
     name = 'Plastic'
 
-    supports_new_diff_api = True
-
     def __init__(self, **kwargs):
         super(PlasticClient, self).__init__(**kwargs)
 

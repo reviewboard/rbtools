@@ -744,8 +744,6 @@ class MercurialClientTests(MercurialTestBase):
         tip = self._hg_get_tip()
         self._hg_add_file_commit('foo.txt', FOO3, 'commit 3')
 
-        self.options.revision_range = tip
-
         self.client.diff([tip], [])
 
         self.assertEquals(self.options.summary, 'commit 2')
@@ -1226,12 +1224,6 @@ class PerforceClientTests(SCMClientTests):
 
         def run_p4(self, *args, **kwargs):
             assert False
-
-    def test_error_on_revision_range(self):
-        """Testing PerforceClient with --revision-range causes an exit"""
-        self.options.revision_range = "12345"
-        client = PerforceClient(options=self.options)
-        self.assertRaises(OptionsCheckError, client.check_options)
 
     def test_scan_for_server_counter_with_reviewboard_url(self):
         """Testing PerforceClient.scan_for_server_counter with reviewboard.url"""

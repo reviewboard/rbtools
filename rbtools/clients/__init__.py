@@ -16,8 +16,6 @@ class SCMClient(object):
     """
     name = None
 
-    supports_new_diff_api = False
-
     def __init__(self, user_config=None, configs=[], options=None,
                  capabilities=None):
         self.user_config = user_config
@@ -84,7 +82,7 @@ class SCMClient(object):
             'tip': None,
         }
 
-    def diff(self, args):
+    def diff(self, revision_spec, files):
         """
         Returns the generated diff and optional parent diff for this
         repository.
@@ -96,17 +94,6 @@ class SCMClient(object):
         the commit that the diff or parent diff is based on. This exists
         because in some diff formats, this may different from what's provided
         in the diff.
-        """
-        return {
-            'diff': None,
-            'parent_diff': None,
-            'base_commit_id': None,
-        }
-
-    def diff_between_revisions(self, revision_range, args, repository_info):
-        """Returns the generated diff between revisions in the repository.
-
-        This has the same return values as diff.
         """
         return {
             'diff': None,

@@ -35,36 +35,6 @@ The following subsections will explain how :command:`rbt post` is used
 with different repository types.
 
 
-.. _automating-rbt-post:
-
-Automating rbt post
-===================
-
-It's possible to automate :command:`rbt post` on a user's behalf. This can
-be useful from a repository's :term:`post-commit hook` to automatically
-create or update a review request. This works through a combination of a
-special Review Board user and the :option:`--submit-as` option.
-
-To set this up, first register a new user. This user will be specific to
-your script, and will have special permissions, so make sure the password
-is protected. You'll then want to grant the
-:ref:`can-submit-as-user-permission` and
-:ref:`can-edit-review-request-permission` to the user. This will give this
-user to the ability to modify a review request as another user.
-
-You can then invoke :command:`rbt post` by doing the following::
-
-    $ rbt post --username=SPECIAL_USER --password=PASSWORD --submit-as=ANOTHER_USER
-
-Of course, you can pass any other values as you see fit.
-
-This will log in as ``SPECIAL_USER`` and perform operations as
-``ANOTHER_USER``.
-
-You can set the default for :option:`--submit-as` by setting ``SUBMIT_AS``
-in :file:`.reviewboardrc`.
-
-
 Perforce
 --------
 
@@ -240,34 +210,40 @@ which specifies the remote branch name. For example::
 ClearCase
 ---------
 
+.. versionchanged:: 0.6
+   ClearCase support used to use the :option:`--tracking-branch` and
+   :option:`--revision-range` options for specifying branches and manual
+   changesets, respectively. As of version 0.6, these are just passed in as
+   arguments.
+
 :command:`rbt post` provides basic support for posting ClearCase reviews.
 If you want to post a review of all currently checked out files in your view
 simply run::
 
      rbt post
 
-If you collect changesets, for example, using ClearCase/ClearQuest
-integration, you can pass the changeset using :option:`--revision-range`.
-Repository will be determined based on your current VOB's UUID or name::
+If you collect changesets, for example, using ClearCase/ClearQuest integration,
+you can pass the changeset in as arguments. Each argument will be an
+``file@@revision1:file@@revision2`` pair::
 
-    $ rbt post --revision-range="/vobs/proj/file.c@@/main/0;/vobs/proj/file.c@@/main/1"
+    $ rbt post /vobs/proj/file.c@@/main/0:/vobs/proj/file.c@@/main/1
 
-Multiple files can be posted by adding additional file/revision pairs, all
-separated by semicolons::
+Multiple files can be posted by adding additional file/revision pairs::
 
-    $ rbt post --revision-range="/vobs/proj/file.c@@/main/0;/vobs/proj/file.c@@/main/1;/vobs/proj/file.h@@/main/0;/vobs/proj/file.h@@/main/1"
+    $ rbt post /vobs/proj/file.c@@/main/0:/vobs/proj/file.c@@/main/1 /vobs/proj/file.h@@/main/0:/vobs/proj/file.h@@/main/1
 
 Another way for post-commit review is send changes developed on branch by
-:option:`--tracking` option::
+specifying the branch name with a ``brtype:`` prefix::
 
-    $ rbt post --tracking my_dev_branch
+    $ rbt post brtype:my_dev_branch
 
 .. note::
 
-   :command:`rbt post` trying match reviewboard's repository based on
-   VOB's UUID. In case of problems Your VOB's name will be used.
-   Remember. You can always overwrite this behavior using
-   :file:`.reviewboardrc `file or passing :option:`--repository-url`.
+   :command:`rbt post` tries to match Review Board's repository based on
+   the VOB's UUID. If this doesn't work, the VOB's name will be used.
+   If you need to override this behavior, you can use the ``REPOSITORY``
+   or ``REPOSITORY_URL`` settings in :file:`.reviewboardrc` or pass the
+   :option:`--repository` or :option:`--repository-url` command-line options.
 
 
 .. index:: post-commit review
@@ -281,20 +257,25 @@ code. This is called a :term:`pre-commit review`. However, it's sometimes
 useful to post code that has already been committed to a repository, such
 as in an experimental branch. This is a :term:`post-commit review`.
 
-In order to do this, you can use the :option:`--revision-range` parameter,
-which will generate a diff based on a range of committed revisions.
-This allows a single review request to show a diff representing the entire
-history of a branch, if desired.
+In order to do this, you can pass in revisions as arguments, which will
+generate a diff based on a range of committed revisions. This allows a single
+review request to show a diff representing the entire history of a branch, if
+desired.
 
 Usage is easy. Simply type::
 
-    $ rbt post --revision-range=STARTREV:STOPREV
+    $ rbt post STARTREV STOPREV
 
 Where ``STARTREV`` is the beginning revision in the range, and
 ``STOPREV`` is the ending revision, inclusive. If you only need to post
 a single revision, you can type::
 
-    $ rbt post --revision-range=REVISION
+    $ rbt post REVISION
+
+The syntax for revisions and revision ranges is as close to possible as the
+native syntax for the underlying revision control system. You can therefore
+pass in ranges either as separate arguments, or using a native range syntax
+(such as ``R1:R2`` for SVN or ``R1..R2`` for Git).
 
 
 .. _posting-existing-diffs:
@@ -496,10 +477,6 @@ Options
    Description of what changed in this revision of the review request when
    updating an existing request.
 
-.. cmdoption:: --revision-range
-
-   Generate the diff for review based on given revision range.
-
 .. cmdoption:: --submit-as
 
    Username to be recorded as the author of the review request, instead of the
@@ -532,6 +509,12 @@ Options
    repository supports parent diffs).
 
    The default can be set in ``PARENT_BRANCH`` in :file:`.reviewboardrc`.
+
+.. cmdoption:: -I <file>, --include=<file>
+
+   Include only the specified file in the diff. This argument can be passed in
+   multiple times to include multiple files. This is only available with some
+   SCM backends (Bazaar, CVS, Git, Mercurial, Perforce, and SVN).
 
 .. cmdoption:: --tracking-branch
 
@@ -574,7 +557,7 @@ Options
 .. cmdoption:: --repository-url
 
    The url for a repository for creating a diff outside of a working copy
-   (currently only supported by Subversion with :option:`--revision-range` or
+   (currently only supported by Subversion with specific revisions or
    :option:`--diff-filename` and ClearCase with relative paths outside the
    view). For Git, this specifies the origin url of the current repository,
    overriding the origin url supplied by the Git client.

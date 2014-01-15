@@ -21,8 +21,6 @@ class GitClient(SCMClient):
     """
     name = 'Git'
 
-    supports_new_diff_api = True
-
     def __init__(self, **kwargs):
         super(GitClient, self).__init__(**kwargs)
         # Store the 'correct' way to invoke git, just plain old 'git' by

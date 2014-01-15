@@ -27,8 +27,6 @@ class SVNClient(SCMClient):
     REVISION_WORKING_COPY = '--rbtools-working-copy'
     REVISION_CHANGELIST_PREFIX = '--rbtools-changelist:'
 
-    supports_new_diff_api = True
-
     def __init__(self, **kwargs):
         super(SVNClient, self).__init__(**kwargs)
 
@@ -167,14 +165,6 @@ class SVNClient(SCMClient):
                 return int(logentry.attrib['revision'])
 
         raise ValueError
-
-    def check_options(self):
-        if (getattr(self.options, 'repository_url', None) and
-            not getattr(self.options, 'revision_range', None) and
-            not getattr(self.options, 'diff_filename', None)):
-            raise OptionsCheckError(
-                "The --repository-url option requires either the "
-                "--revision-range option or the --diff-filename option")
 
     def scan_for_server(self, repository_info):
         # Scan first for dot files, since it's faster and will cover the
