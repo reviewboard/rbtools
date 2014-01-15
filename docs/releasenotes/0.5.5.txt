@@ -1,0 +1,33 @@
+===========================
+RBTools 0.5.5 Release Notes
+===========================
+
+**Release date**: January 14, 2014
+
+
+Bug Fixes
+=========
+
+rbt post
+--------
+
+* Fixed name-based lookups for repositories with Subversion.
+
+  This was supposed to be included in 0.5.4, but was unintentionally left
+  out of the release.
+
+
+post-review
+-----------
+
+* Added :option:`--svn-show-copies-as-adds` to post-review.
+
+
+Contributors
+============
+
+* Christian Hammond
+* David Trowbrige
+
+
+.. comment: vim: ft=rst et
