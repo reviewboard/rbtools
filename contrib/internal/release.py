@@ -154,7 +154,7 @@ def tag_release():
 
 
 def register_release():
-    if __version_info__[3] == 'final':
+    if __version_info__[4] == 'final':
         run_setup("register")
 
     scm_revision = execute(['git rev-parse', 'release-%s' % __version__])
@@ -163,8 +163,9 @@ def register_release():
         'major_version': __version_info__[0],
         'minor_version': __version_info__[1],
         'micro_version': __version_info__[2],
-        'release_type': __version_info__[3],
-        'release_num': __version_info__[4],
+        'patch_version': __version_info__[3],
+        'release_type': __version_info__[4],
+        'release_num': __version_info__[5],
         'scm_revision': scm_revision,
     }
 
