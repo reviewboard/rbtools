@@ -1145,6 +1145,12 @@ def parse_options(args):
                       default=get_config_value(configs, 'P4_PASSWD'),
                       help="the Perforce password or ticket of the user "
                            "in the P4USER environment variable")
+    parser.add_option('--svn-show-copies-as-adds',
+                      dest='svn_show_copies_as_adds',
+                      metavar='y/n',
+                      default=None,
+                      help="don't show copied or moved files with their "
+                           "source")
     parser.add_option('--svn-changelist', dest='svn_changelist', default=None,
                       help='generate the diff for review based on a local SVN '
                            'changelist')
