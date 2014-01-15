@@ -136,6 +136,9 @@ class Command(object):
         parser = self.create_parser(self.config)
         options, args = parser.parse_args(argv[2:])
         self.options = options
+        # 'args' can sometimes contain an empty string. This will confuse
+        # tools if we pass it around
+        args.remove('')
 
         # Check that the proper number of arguments have been provided.
         argspec = inspect.getargspec(self.main)
