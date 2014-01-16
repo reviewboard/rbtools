@@ -36,7 +36,7 @@ class MercurialClient(SCMClient):
             '..', 'helpers', 'hgext.py'))
 
         # `self._remote_path_candidates` is an ordered set of hgrc
-        # paths that are checked if `parent_branch` option is not given
+        # paths that are checked if `tracking` option is not given
         # explicitly.  The first candidate found to exist will be used,
         # falling back to `default` (the last member.)
         self._remote_path_candidates = ['reviewboard', 'origin', 'parent',
@@ -223,16 +223,10 @@ class MercurialClient(SCMClient):
                 result['base'] = self._identify_revision(outgoing[0])
                 result['tip'] = self._identify_revision(outgoing[1])
 
-                # XXX: self.options.parent_branch is currently used for specifying
-                # the upstream (remote) branch in case none of the candidate paths
-                # matches. This means we can't use it for its intended purpose,
-                # specifying an intermediate branch name to use to create a parent
-                # diff. Once we fix that, we can uncomment the below:
-
-                #if self.options.parent_branch:
-                #    result['parent_base'] = result['base']
-                #    result['base'] = self._identify_revision(
-                #        self.options.parent_branch)
+            if self.options.parent_branch:
+                result['parent_base'] = result['base']
+                result['base'] = self._identify_revision(
+                    self.options.parent_branch)
         elif n_revisions == 1:
             # One revision: Use the given revision for tip, and find its parent
             # for base.
@@ -251,7 +245,7 @@ class MercurialClient(SCMClient):
             raise InvalidRevisionSpecError(
                 '"%s" does not appear to be a valid revision spec' % revisions)
 
-        if self._type == 'hg':
+        if self._type == 'hg' and 'parent_base' not in result:
             # If there are missing changesets between base and the remote, we
             # need to generate a parent diff.
             outgoing = self._get_outgoing_changesets(self._get_remote_branch(),
@@ -380,7 +374,7 @@ class MercurialClient(SCMClient):
         otherwise returns the parent Subversion branch of the current
         repository.
         """
-        return (getattr(self.options, 'parent_branch', None) or
+        return (getattr(self.options, 'tracking', None) or
                 execute(['hg', 'parent', '--svn', '--template',
                         '{node}\n']).strip())
 
@@ -391,9 +385,10 @@ class MercurialClient(SCMClient):
         repository is returned.
         """
         remote = self._remote_path[0]
+        tracking = getattr(self.options, 'tracking', None)
 
-        if not remote and self.options.parent_branch:
-            remote = self.options.parent_branch
+        if not remote and tracking:
+            remote = tracking
 
         return remote
 

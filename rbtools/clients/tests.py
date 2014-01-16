@@ -598,6 +598,24 @@ class MercurialClientTests(MercurialTestBase):
         self.assertEqual(md5(result['parent_diff']).hexdigest(),
                          '5cacbd79800a9145f982dcc0908b6068')
 
+    def test_diff_parent_diff_simple_with_arg(self):
+        """Testing MercurialClient parent diffs with a diverged branch and --parent option"""
+        # This test is very similar to test_diff_parent_diff_simple except
+        # we use the --parent option to post without explicit revisions
+        self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
+        self._hg_add_file_commit('foo.txt', FOO3, 'commit 3')
+
+        self.options.parent_branch = '2'
+
+        result = self.client.diff([], [])
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('parent_diff' in result)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '7a897f68a9dc034fc1e42fe7a33bb808')
+        self.assertEqual(md5(result['parent_diff']).hexdigest(),
+                         '5cacbd79800a9145f982dcc0908b6068')
+
     def test_parse_revision_spec_no_args(self):
         """Testing MercurialClient.parse_revision_spec with no arguments"""
         base = self._hg_get_tip()
