@@ -922,7 +922,7 @@ class PerforceClient(SCMClient):
         return old_filename, new_filename, new_depot_file
 
     def check_options(self):
-        if self.options.revision_range:
+        if getattr(self.options, 'revision_range', None):
             raise OptionsCheckError(
                 "The --revision-range option is not supported for Perforce "
                 "repositories. Please use the Perforce range path syntax "

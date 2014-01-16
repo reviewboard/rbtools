@@ -97,7 +97,7 @@ class SetupRepo(Command):
             output = self._get_output(config)
             outfile.write(output)
             outfile.close()
-        except IOError as e:
+        except IOError, e:
             raise CommandError('I/O error generating config file (%s): %s'
                                % (e.errno, e.strerror))
 
