@@ -156,13 +156,18 @@ class MercurialClient(SCMClient):
         print). The diff for review will include the changes in (base, tip],
         and the parent diff (if necessary) will include (parent, base].
 
+        If zero revisions are passed in, this will return the outgoing changes
+        from the parent of the working directory.
+
         If a single revision is passed in, this will return the parent of that
-        revision for 'base' and the passed-in revision for 'tip'.
+        revision for 'base' and the passed-in revision for 'tip'. This will
+        result in generating a diff for the changeset specified.
 
-        If zero revisions are passed in, this will return the outgoing changes.
+        If two revisions are passed in, they will be used for the 'base'
+        and 'tip' revisions, respectively.
 
-        In the one- or two-revision cases, this will automatically determine
-        whether or not a parent diff is required.
+        In all cases, a parent base will be calculated automatically from
+        changesets not present on the remote.
         """
         self._init()
 
@@ -244,12 +249,28 @@ class MercurialClient(SCMClient):
         else:
             raise TooManyRevisionsError
 
-        # TODO: determine if a parent diff is necessary
-        if 'base' in result and 'tip' in result:
-            return result
+        if 'base' not in result or 'tip' not in result:
+            raise InvalidRevisionSpecError(
+                '"%s" does not appear to be a valid revision spec' % revisions)
 
-        raise InvalidRevisionSpecError(
-            '"%s" does not appear to be a valid revision spec' % revisions)
+        if self._type == 'hg':
+            # If there are missing changesets between base and the remote, we
+            # need to generate a parent diff.
+            outgoing = self._get_outgoing_changesets(self._get_remote_branch(),
+                                                 rev=result['base'])
+
+            logging.debug('%d outgoing changesets between remote and base.',
+                          len(outgoing))
+
+            if not outgoing:
+                return result
+
+            result['parent_base'] = self._execute(
+                ['hg', 'parents', '--hidden', '-r', outgoing[0][1],
+                 '--template', '{node|short}']).split()[0]
+            logging.debug('Identified %s as parent base', result['parent_base'])
+
+        return result
 
     def _identify_revision(self, revision):
         identify = self._execute(
@@ -390,31 +411,35 @@ class MercurialClient(SCMClient):
         """
         remote = self._get_remote_branch()
         current_branch = self._get_current_branch()
-        outgoing_changesets = \
-            self._get_outgoing_changesets(current_branch, remote, rev=rev)
 
-        if outgoing_changesets:
+        outgoing = [o for o in self._get_outgoing_changesets(remote, rev=rev)
+                    if current_branch == o[2]]
+
+        if outgoing:
             top_rev, bottom_rev = \
-                self._get_top_and_bottom_outgoing_revs(outgoing_changesets)
+                self._get_top_and_bottom_outgoing_revs(outgoing)
         else:
             top_rev = None
             bottom_rev = None
 
         return bottom_rev, top_rev
 
-    def _get_outgoing_changesets(self, current_branch, remote, rev=None):
+    def _get_outgoing_changesets(self, remote, rev=None):
         """
-        Given the current branch name, a remote path, and optional base
-        revision, return a list of outgoing changeset revisions.
+        Return the outgoing changesets between us and a remote.
 
-        If the revision is not specified, all changesets not in the remote
-        will be returned. If the revision is specified, only missing
-        ancestors of that revision and the revision itself will be considered.
+        This will return a list of tuples of (rev, node, branch) for
+        each outgoing changeset. The list will be sorted in revision order.
+
+        If rev is specified, we will limit the changesets to ancestors of
+        the specified revision. Otherwise, all changesets not in the remote
+        will be returned.
         """
 
         outgoing_changesets = []
         args = ['hg', '-q', 'outgoing', '--template',
-                'b:{branches}\nr:{rev}\n\n', remote]
+                "{rev}\\t{node|short}\\t{branch}\\n",
+                remote]
         if rev:
             args.extend(['-r', rev])
 
@@ -424,38 +449,34 @@ class MercurialClient(SCMClient):
                                env=self._hg_env,
                                extra_ignore_errors=(1,))
 
-        for pair in raw_outgoing.split('\n\n'):
-            if not pair.strip():
+        for line in raw_outgoing.splitlines():
+            if not line:
                 continue
 
             # Ignore warning messages that hg might put in, such as
             # "warning: certificate for foo can't be verified (Python too old)"
-            parts = [l for l in pair.strip().split('\n')
-                     if not l.startswith('warning: ')]
-
-            if not parts:
-                # We only got warnings. Nothing useful.
+            if line.startswith('warning: '):
                 continue
 
-            branch, rev = parts
-            branch_name = branch[len('b:'):].strip()
-            branch_name = branch_name or 'default'
-            revno = rev[len('r:'):]
+            rev, node, branch = [f.strip() for f in line.split('\t')]
+            branch = branch or 'default'
 
-            if branch_name == current_branch and revno.isdigit():
-                logging.debug('Found outgoing changeset %s for branch %r'
-                              % (revno, branch_name))
-                outgoing_changesets.append(int(revno))
+            if not rev.isdigit():
+                raise Exception('Unexpected output from hg: %s' % line)
+
+            logging.debug('Found outgoing changeset %s:%s' % (rev, node))
+
+            outgoing_changesets.append((int(rev), node, branch))
 
         return outgoing_changesets
 
     def _get_top_and_bottom_outgoing_revs(self, outgoing_changesets):
-        # This is a classmethod rather than a func mostly just to keep the
-        # module namespace clean.  Pylint told me to do it.
-        top_rev = max(outgoing_changesets)
-        bottom_rev = min(outgoing_changesets)
+        revs = set(t[0] for t in outgoing_changesets)
 
-        for rev in reversed(outgoing_changesets):
+        top_rev = max(revs)
+        bottom_rev = min(revs)
+
+        for rev, node, branch in reversed(outgoing_changesets):
             parents = execute(
                 ["hg", "log", "-r", str(rev), "--template", "{parents}"],
                 env=self._hg_env)

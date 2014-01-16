@@ -567,6 +567,37 @@ class MercurialClientTests(MercurialTestBase):
         self.assertEqual(md5(result['diff']).hexdigest(),
                          '68c2bdccf52a4f0baddd0ac9f2ecb7d2')
 
+    def test_diff_parent_diff_simple(self):
+        """Testing MercurialClient parent diffs with a simple case"""
+        self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
+        self._hg_add_file_commit('foo.txt', FOO3, 'commit 3')
+
+        result = self.client.diff(['2', '3'], [])
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('parent_diff' in result)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '7a897f68a9dc034fc1e42fe7a33bb808')
+        self.assertEqual(md5(result['parent_diff']).hexdigest(),
+                         '5cacbd79800a9145f982dcc0908b6068')
+
+    def test_diff_parent_diff_branch_diverge(self):
+        """Testing MercurialClient parent diffs with a diverged branch"""
+
+        # This test is very similar to test_diff_parent_diff_simple except
+        # we throw a branch into the mix.
+        self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._run_hg(['branch', 'diverged'])
+        self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
+        self._hg_add_file_commit('foo.txt', FOO3, 'commit 3')
+
+        result = self.client.diff(['2', '3'], [])
+        self.assertTrue('parent_diff' in result)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '7a897f68a9dc034fc1e42fe7a33bb808')
+        self.assertEqual(md5(result['parent_diff']).hexdigest(),
+                         '5cacbd79800a9145f982dcc0908b6068')
+
     def test_parse_revision_spec_no_args(self):
         """Testing MercurialClient.parse_revision_spec with no arguments"""
         base = self._hg_get_tip()
@@ -639,6 +670,29 @@ class MercurialClientTests(MercurialTestBase):
         self.assertTrue('parent_base' not in revisions)
         self.assertEqual(revisions['base'], base)
         self.assertEqual(revisions['tip'], tip)
+
+    def test_parse_revision_spec_parent_base(self):
+        """Testing MercurialClient.parse_revision_spec with parent base"""
+        start_base = self._hg_get_tip()
+        self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
+        commit1 = self._hg_get_tip()
+        self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
+        commit2 = self._hg_get_tip()
+        self._hg_add_file_commit('foo.txt', FOO3, 'commit 3')
+        commit3 = self._hg_get_tip()
+        self._hg_add_file_commit('foo.txt', FOO4, 'commit 4')
+        commit4 = self._hg_get_tip()
+        self._hg_add_file_commit('foo.txt', FOO5, 'commit 5')
+        commit5 = self._hg_get_tip()
+
+        self.assertEqual(self.client.parse_revision_spec(['1', '2']),
+            dict(base=commit1, tip=commit2, parent_base=start_base))
+
+        self.assertEqual(self.client.parse_revision_spec(['4']),
+            dict(base=commit3, tip=commit4, parent_base=start_base))
+
+        self.assertEqual(self.client.parse_revision_spec(['2', '4']),
+            dict(base=commit2, tip=commit4, parent_base=start_base))
 
     def test_guess_summary_description_one(self):
         """Testing MercurialClient guess summary & description 1 commit."""
