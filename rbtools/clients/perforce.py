@@ -306,7 +306,7 @@ class PerforceClient(SCMClient):
             return self._changenum_diff(changenum)
 
     def check_options(self):
-        if self.options.revision_range:
+        if getattr(self.options, 'revision_range', None):
             raise OptionsCheckError(
                 "The --revision-range option is not supported for Perforce "
                 "repositories. Please use the Perforce range path syntax "
