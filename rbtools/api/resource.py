@@ -25,9 +25,9 @@ def _create(resource, data=None, query_args={}, *args, **kwargs):
     if data is None:
         data = {}
 
-    data.update(kwargs)
+    kwargs.update(data)
 
-    for name, value in data.iteritems():
+    for name, value in kwargs.iteritems():
         request.add_field(name, value)
 
     return request
@@ -59,9 +59,10 @@ def _update(resource, data=None, query_args={}, *args, **kwargs):
 
     if data is None:
         data = {}
-    data.update(kwargs)
 
-    for name, value in data.iteritems():
+    kwargs.update(data)
+
+    for name, value in kwargs.iteritems():
         request.add_field(name, value)
 
     return request
