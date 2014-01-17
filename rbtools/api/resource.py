@@ -12,7 +12,7 @@ _EXCLUDE_ATTRS = [LINKS_TOK, 'stat']
 
 
 @request_method_decorator
-def _create(resource, data={}, query_args={}, *args, **kwargs):
+def _create(resource, data=None, query_args={}, *args, **kwargs):
     """Generate a POST request on a resource.
 
     Unlike other methods, any additional query args must be passed in
@@ -21,6 +21,9 @@ def _create(resource, data={}, query_args={}, *args, **kwargs):
     """
     request = HttpRequest(resource._links['create']['href'], method='POST',
                           query_args=query_args)
+
+    if data is None:
+        data = {}
 
     data.update(kwargs)
 
@@ -44,7 +47,7 @@ def _get_self(resource, *args, **kwargs):
 
 
 @request_method_decorator
-def _update(resource, data={}, query_args={}, *args, **kwargs):
+def _update(resource, data=None, query_args={}, *args, **kwargs):
     """Generate a PUT request on a resource.
 
     Unlike other methods, any additional query args must be passed in
@@ -54,6 +57,8 @@ def _update(resource, data={}, query_args={}, *args, **kwargs):
     request = HttpRequest(resource._links['update']['href'], method='PUT',
                           query_args=query_args)
 
+    if data is None:
+        data = {}
     data.update(kwargs)
 
     for name, value in data.iteritems():
