@@ -172,12 +172,23 @@ class PerforceClient(SCMClient):
 
         # For the repository path, we first prefer p4 brokers, then the
         # upstream p4 server. If neither of those are found, just return None.
-        repository_path = p4_info.get('Broker address', None)
+        repository_path = (p4_info.get('Broker address') or
+                           p4_info.get('Server address'))
 
         if repository_path is None:
-            repository_path = p4_info.get('Server address', None)
+            return None
 
-        if repository_path is None:
+        client_root = p4_info.get('Client root')
+
+        if client_root is None:
+            return None
+
+        norm_cwd = os.path.realpath(os.getcwd()) + os.path.pathsep
+        norm_client_root = os.path.realpath(client_root) + os.path.pathsep
+
+        # Don't accept the repository if the current directory is outside the
+        # root of the Perforce client.
+        if not norm_cwd.startswith(norm_client_root):
             return None
 
         try:

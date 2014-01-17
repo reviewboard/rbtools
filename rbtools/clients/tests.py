@@ -1259,6 +1259,7 @@ class PerforceClientTests(SCMClientTests):
 
             def info(self):
                 return {
+                    'Client root': os.getcwd(),
                     'Server address': SERVER_PATH,
                     'Server version': 'P4D/FREEBSD60X86_64/2012.2/525804 '
                                       '(2012/09/18)',
@@ -1270,6 +1271,27 @@ class PerforceClientTests(SCMClientTests):
         self.assertNotEqual(info, None)
         self.assertEqual(info.path, SERVER_PATH)
         self.assertEqual(client.p4d_version, (2012, 2))
+
+    def test_repository_info_outside_client_root(self):
+        """Testing PerforceClient.get_repository_info outside client root"""
+        SERVER_PATH = 'perforce.example.com:1666'
+
+        class TestWrapper(P4Wrapper):
+            def is_supported(self):
+                return True
+
+            def info(self):
+                return {
+                    'Client root': '/',
+                    'Server address': SERVER_PATH,
+                    'Server version': 'P4D/FREEBSD60X86_64/2012.2/525804 '
+                                      '(2012/09/18)',
+                }
+
+        client = PerforceClient(TestWrapper)
+        info = client.get_repository_info()
+
+        self.assertEqual(info, None)
 
     def test_scan_for_server_counter_with_reviewboard_url_encoded(self):
         """Testing PerforceClient.scan_for_server_counter with encoded reviewboard.url.http:||"""
