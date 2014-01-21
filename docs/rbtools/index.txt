@@ -140,6 +140,10 @@ directories to your system path.
 5. Add ``;C:\Python27;C:\Python27\Scripts`` (substitute your Python
    directory if it's not ``C:\Python27``) to the end of the list.
 
+Depending on your version control system, you may also need to install the
+command-line version of the client. Graphical clients like TortoiseCVS or
+TortoiseSVN are not sufficient, and a ``cvs`` or ``svn`` binary is required.
+
 .. _`Python setuptools Installer`: http://pypi.python.org/pypi/setuptools#windows
 
 
