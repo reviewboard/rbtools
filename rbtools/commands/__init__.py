@@ -307,6 +307,10 @@ class Command(object):
 
     def get_capabilities(self, api_root):
         """Retrieve Capabilities from the server and return them."""
+        if 'capabilities' in api_root:
+            # Review Board 2.0+ provides capabilities in the root resource.
+            return Capabilities(api_root.capabilities)
+
         info = api_root.get_info()
 
         if 'capabilities' in info:
