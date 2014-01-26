@@ -17,6 +17,8 @@ class PlasticClient(SCMClient):
     """
     name = 'Plastic'
 
+    REVISION_CHANGESET_PREFIX = 'cs:'
+
     def __init__(self, **kwargs):
         super(PlasticClient, self).__init__(**kwargs)
 
