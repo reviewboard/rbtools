@@ -152,8 +152,12 @@ class GitClient(SCMClient):
 
         if git_dir.startswith("fatal:") or not os.path.isdir(git_dir):
             return None
-        self.bare = execute([self.git, "config",
-                             "core.bare"]).strip() == 'true'
+
+        # Sometimes core.bare is not set, and generates an error, so ignore
+        # errors. Valid values are 'true' or '1'.
+        bare = execute([self.git, 'config', 'core.bare'],
+                       ignore_errors=True).strip()
+        self.bare = bare in ('true', '1')
 
         # Running in directories other than the top level of
         # of a work-tree would result in broken diffs on the server
