@@ -368,13 +368,15 @@ class GitClient(SCMClient):
     def extract_summary(self, revisions):
         """Extracts the summary based on the provided revisions."""
         return execute(
-            [self.git, 'log', '--pretty=format:%s', '%s^!' % revisions['tip']],
-            ignore_errors=True).strip()
+            [self.git, 'log', '--reverse', '--pretty=format:%s',
+             '^%s' % revisions['base'], revisions['tip']],
+            ignore_errors=True,
+            split_lines=True)[0].strip()
 
     def extract_description(self, revisions):
         """Extracts the description based on the provided revision range."""
         return execute(
-            [self.git, 'log', '--pretty=format:%s%n%n%b',
+            [self.git, 'log', '--reverse', '--pretty=format:%s%n%n%b',
              '^%s' % revisions['base'], revisions['tip']],
             ignore_errors=True).strip()
 
