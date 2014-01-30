@@ -232,6 +232,42 @@ class ClearCaseClient(SCMClient):
 
         return changeranges
 
+    def _sanitize_version_0_file(self, file_revision):
+        """Replace file version with Predecessor version when
+        version is 0 except for /main/0."""
+
+        # There is no predecessor for @@/main/0, so keep current revision.
+        if file_revision.endswith("@@/main/0"):
+            return file_revision
+
+        if file_revision.endswith("/0"):
+            logging.debug("Found file %s with version 0", file_revision)
+            file_revision = execute(["cleartool",
+                                     "describe",
+                                     "-fmt", "%En@@%PSn",
+                                     file_revision])
+            logging.debug("Sanitized with predecessor, new file: %s",
+                          file_revision)
+
+        return file_revision
+
+    def _sanitize_version_0_changeset(self, changeset):
+        """Return changeset sanitized of its <branch>/0 version.
+
+        Indeed this predecessor (equal to <branch>/0) should already be
+        available from previous vob synchro in multi-site context.
+        """
+
+        sanitized_changeset = []
+        for old_file, new_file in changeset:
+            # This should not happen for new file but it is safer to sanitize
+            # both file revisions.
+            sanitized_changeset.append(
+                (self._sanitize_version_0_file(old_file),
+                 self._sanitize_version_0_file(new_file)))
+
+        return sanitized_changeset
+
     def _directory_content(self, path):
         """Return directory content ready for saving to tempfile."""
 
@@ -347,7 +383,7 @@ class ClearCaseClient(SCMClient):
         # so copy cc files to tempdir by 'cleartool get -to dest-pname pname',
         # and compare diff with the new temp ones.
         if self.viewtype == 'snapshot':
-            # create temporary file first
+            # Create temporary file first.
             tmp_old_file = make_tempfile()
             tmp_new_file = make_tempfile()
 
@@ -422,8 +458,7 @@ class ClearCaseClient(SCMClient):
                      translate_newlines=False,
                      split_lines=True)
 
-        # Replacing temporary filenames to
-        # real directory names and add ids
+        # Replace temporary filenames with real directory names and add ids
         if dl:
             dl[0] = dl[0].replace(old_tmp, old_dir)
             dl[1] = dl[1].replace(new_tmp, new_dir)
@@ -437,6 +472,9 @@ class ClearCaseClient(SCMClient):
 
     def _do_diff(self, changeset):
         """Generates a unified diff for all files in the changeset."""
+        # Sanitize all changesets of version 0 before processing
+        changeset = self._sanitize_version_0_changeset(changeset)
+
         diff = []
         for old_file, new_file in changeset:
             dl = []
