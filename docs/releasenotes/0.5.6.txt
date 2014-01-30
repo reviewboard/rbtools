@@ -1,0 +1,70 @@
+===========================
+RBTools 0.5.6 Release Notes
+===========================
+
+**Release date**: January 29, 2014
+
+
+Bug Fixes
+=========
+
+rbt diff
+--------
+
+* Added missing ``--p4-*`` arguments.
+
+  This includes :option:`--p4-client`, :option:`--p4-port`, and
+  :option:`--p4-passwd`.
+
+
+rbt post
+--------
+
+* Perforce repositories are no longer matched when outside of the checkout.
+  (:bug:`3171`)
+
+  Previously, if ``p4 info`` showed a valid repository, ``rbt post`` would
+  assume it matched the current directory, and try to post with it. This
+  would cause problems if the Perforce repository check occurred before
+  the check for the type of repository in the current directory.
+
+  We now validate that the result of ``p4 info`` matches the current
+  directory before assuming it's correct.
+
+* Fixed a crash when using ``rbt post -u CLN``. (:bug:`3197`)
+
+rbt setup-repo
+--------------
+
+* Fixed a Python 2.4 compatibility issue. (:bug:`3193`)
+
+  Patch by Dan Porter.
+
+
+rbt status
+----------
+
+* No longer crashes with Perforce repositories. (:bug:`3184`)
+
+* Added missing ``--p4-*`` arguments.
+
+  This includes :option:`--p4-client`, :option:`--p4-port`, and
+  :option:`--p4-passwd`.
+
+
+API
+---
+
+* Fixed issues with successive calls to ``.create()`` or ``.update()``
+  on resources. (:bug:`3197`)
+
+
+Contributors
+============
+
+* Christian Hammond
+* Dan Porter
+* David Trowbrige
+
+
+.. comment: vim: ft=rst et
