@@ -978,7 +978,7 @@ class P4WrapperTests(RBTestBase):
                     'c = 3\n',
                 ]
 
-        p4 = TestWrapper()
+        p4 = TestWrapper(None)
         info = p4.counters()
 
         self.assertEqual(len(info), 3)
@@ -998,7 +998,7 @@ class P4WrapperTests(RBTestBase):
                     'Server uptime: 111:43:38\n',
                 ]
 
-        p4 = TestWrapper()
+        p4 = TestWrapper(None)
         info = p4.info()
 
         self.assertEqual(len(info), 5)
@@ -1011,7 +1011,9 @@ class P4WrapperTests(RBTestBase):
 
 class PerforceClientTests(SCMClientTests):
     class P4DiffTestWrapper(P4Wrapper):
-        def __init__(self):
+        def __init__(self, options):
+            super(PerforceClientTests.P4DiffTestWrapper, self).__init__(options)
+
             self._timestamp = time.mktime(time.gmtime(0))
 
         def describe(self, changenum, password):

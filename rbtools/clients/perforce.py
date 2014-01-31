@@ -23,6 +23,9 @@ class P4Wrapper(object):
     KEYVAL_RE = re.compile('^([^:]+): (.+)$')
     COUNTERS_RE = re.compile('^([^ ]+) = (.+)$')
 
+    def __init__(self, options):
+        self.options = options
+
     def is_supported(self):
         return check_install(['p4', 'help'])
 
@@ -95,6 +98,15 @@ class P4Wrapper(object):
         if marshalled:
             cmd += ['-G']
 
+        if self.options.p4_client:
+            cmd += ['-c', self.options.p4_client]
+
+        if self.options.p4_port:
+            cmd += ['-p', self.options.p4_port]
+
+        if self.options.p4_passwd:
+            cmd += ['-P', self.options.p4_passwd]
+
         cmd += p4_args
 
         if marshalled:
@@ -153,7 +165,7 @@ class PerforceClient(SCMClient):
 
     def __init__(self, p4_class=P4Wrapper, **kwargs):
         super(PerforceClient, self).__init__(**kwargs)
-        self.p4 = p4_class()
+        self.p4 = p4_class(self.options)
 
     def get_repository_info(self):
         if not self.p4.is_supported():
@@ -302,16 +314,6 @@ class PerforceClient(SCMClient):
         to take into account adds/deletes and to provide the necessary
         revision information.
         """
-        # set the P4 enviroment:
-        if self.options.p4_client:
-            os.environ['P4CLIENT'] = self.options.p4_client
-
-        if self.options.p4_port:
-            os.environ['P4PORT'] = self.options.p4_port
-
-        if self.options.p4_passwd:
-            os.environ['P4PASSWD'] = self.options.p4_passwd
-
         changenum = self.get_changenum(args)
         if changenum is None:
             return self._path_diff(args)
