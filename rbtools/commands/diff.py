@@ -100,22 +100,6 @@ class Diff(Command):
                     'option to select the proper type. Valid '
                     'values include bazaar, clearcase, cvs, git, '
                     'mercurial, perforce, plastic, and svn.'),
-        Option("--p4-client",
-               dest="p4_client",
-               config_key="P4_CLIENT",
-               default=None,
-               help="the Perforce client name that the review is in"),
-        Option("--p4-port",
-               dest="p4_port",
-               config_key="P4_PORT",
-               default=None,
-               help="the Perforce servers IP address that the review is on"),
-        Option("--p4-passwd",
-               dest="p4_passwd",
-               config_key="P4_PASSWD",
-               default=None,
-               help="the Perforce password or ticket of the user "
-                    "in the P4USER environment variable"),
     ]
 
     def main(self, *args):
