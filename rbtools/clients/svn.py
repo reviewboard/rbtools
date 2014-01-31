@@ -124,7 +124,7 @@ class SVNClient(SCMClient):
                 # It's not a revision--let's try a changelist. This only makes
                 # sense if we have a working copy.
                 if not self.options.repository_url:
-                    status = execute(['svn', 'status', '--cl', revision,
+                    status = execute(['svn', 'status', '--cl', str(revision),
                                       '--xml'])
                     cl = ElementTree.fromstring(status).find('changelist')
                     if cl is not None:
@@ -153,7 +153,7 @@ class SVNClient(SCMClient):
             raise TooManyRevisionsError
 
     def _convert_symbolic_revision(self, revision):
-        command = ['svn', 'log', '-r', revision, '-l', '1', '--xml']
+        command = ['svn', 'log', '-r', str(revision), '-l', '1', '--xml']
         if getattr(self.options, 'repository_url', None):
             command.append(self.options.repository_url)
         log = execute(command, ignore_errors=True, none_on_ignored_error=True)
@@ -205,8 +205,8 @@ class SVNClient(SCMClient):
         makes parent diffs possible, so we never return a parent diff.
         """
         revisions = self.parse_revision_spec(revision_spec)
-        base = revisions['base']
-        tip = revisions['tip']
+        base = str(revisions['base'])
+        tip = str(revisions['tip'])
 
         repository_info = self.get_repository_info()
 
@@ -215,8 +215,7 @@ class SVNClient(SCMClient):
         if tip == self.REVISION_WORKING_COPY:
             # Posting the working copy
             diff_cmd.extend(['-r', base])
-        elif (isinstance(tip, str) and
-              tip.startswith(self.REVISION_CHANGELIST_PREFIX)):
+        elif tip.startswith(self.REVISION_CHANGELIST_PREFIX):
             # Posting a changelist
             cl = tip[len(self.REVISION_CHANGELIST_PREFIX):]
             diff_cmd.extend(['--changelist', cl])
