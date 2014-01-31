@@ -470,30 +470,37 @@ class GitClient(SCMClient):
         if files:
             files = ['--'] + files
 
-        if self.type == "svn":
-            diff_lines = execute([self.git, "diff", "--no-color",
-                                  "--no-prefix", "--no-ext-diff", "-r", "-u",
-                                  rev_range] + files,
-                                 split_lines=True)
-            return self.make_svn_diff(base, diff_lines)
-        elif self.type == "perforce":
-            diff_lines = execute([self.git, "diff", "--no-color",
-                                  "--no-prefix", "-r", "-u",
-                                  rev_range] + files,
-                                 split_lines=True)
-            return self.make_perforce_diff(base, diff_lines)
+        if self.type in ('svn', 'perforce'):
+            diff_cmd = [self.git, 'diff', '--no-color', '--no-prefix', '-r',
+                        '-u', rev_range]
         elif self.type == "git":
-            cmdline = [self.git, "diff", "--no-color", "--full-index",
-                       "--no-ext-diff", "--ignore-submodules", "--no-renames",
-                       rev_range] + files
+            diff_cmd = [self.git, 'diff', '--no-color', '--full-index',
+                        '--ignore-submodules', '--no-renames', rev_range]
 
             if (self.capabilities is not None and
                 self.capabilities.has_capability('diffs', 'moved_files')):
-                cmdline.append('-M')
+                diff_cmd.append('-M')
+        else:
+            return None
 
-            return execute(cmdline)
+        # By default, don't allow using external diff commands. This prevents
+        # things from breaking horribly if someone configures a graphical diff
+        # viewer like p4merge or kaleidoscope. This can be overridden by
+        # setting GIT_USE_EXT_DIFF = True in ~/.reviewboardrc
+        if self.user_config.get('GIT_USE_EXT_DIFF', False):
+            diff_cmd.append('--no-ext-diff')
 
-        return None
+        diff_lines = execute(diff_cmd + files,
+                             split_lines=True,
+                             ignore_errors=True,
+                             none_on_ignored_error=True)
+
+        if self.type == 'svn':
+            return self.make_svn_diff(base, diff_lines)
+        elif self.type == 'perforce':
+            return self.make_perforce_diff(base, diff_lines)
+        else:
+            return ''.join(diff_lines)
 
     def make_svn_diff(self, parent_branch, diff_lines):
         """
