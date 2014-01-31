@@ -76,6 +76,12 @@ installed, you will need to install the appropriate package. Please refer to
 your package manager for the appropriate version.
 
 
+Mac OS X
+~~~~~~~~
+
+Python 2.x comes pre-installed on Mac OS X.
+
+
 Windows
 ~~~~~~~
 
@@ -89,8 +95,8 @@ for 64-bit.
 Installing setuptools
 ---------------------
 
-Linux
-~~~~~
+Linux and Mac OS X
+~~~~~~~~~~~~~~~~~~
 
 To install setuptools on Debian_, Ubuntu_, or another Debian-based
 distribution, type::
@@ -161,6 +167,16 @@ typing::
 .. _`RedHat Enterprise`: http://www.redhat.com/
 .. _Fedora: http://fedoraproject.org/
 .. _CentOS: http://www.centos.org/
+
+
+Installing GNU Diff
+-------------------
+
+Depending on your version control system, you may also need to install GNU
+diff. Linux and Mac OS X should come with GNU diff pre-installed. On Windows,
+you can use the `GNU Diffutils Installer`_
+
+.. _`GNU Diffutils Installer`: http://gnuwin32.sourceforge.net/packages/diffutils.htm
 
 
 Indices, glossary and tables
