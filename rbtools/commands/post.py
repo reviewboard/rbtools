@@ -224,6 +224,7 @@ class Post(Command):
                     "generating a new diff"),
         Option("--basedir",
                dest="basedir",
+               config_key="BASEDIR",
                default=None,
                help="the absolute path in the repository the diff was "
                     "generated in. Will override the detected path."),
