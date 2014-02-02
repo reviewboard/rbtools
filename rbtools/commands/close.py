@@ -85,7 +85,7 @@ class Close(Command):
         request = self.get_review_request(request_id, api_root)
 
         if request.status == close_type:
-            raise CommandError("Request request #%s is already %s." % (
+            raise CommandError("Review request #%s is already %s." % (
                 request_id, close_type))
 
         if self.options.description:
