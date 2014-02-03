@@ -193,8 +193,8 @@ class PerforceClient(SCMClient):
         if client_root is None:
             return None
 
-        norm_cwd = os.path.realpath(os.getcwd()) + os.path.pathsep
-        norm_client_root = os.path.realpath(client_root) + os.path.pathsep
+        norm_cwd = os.path.realpath(os.getcwd()) + os.path.sep
+        norm_client_root = os.path.realpath(client_root) + os.path.sep
 
         # Don't accept the repository if the current directory is outside the
         # root of the Perforce client.
