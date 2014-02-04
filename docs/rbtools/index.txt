@@ -179,7 +179,16 @@ you can use the `GNU Diffutils Installer`_
 .. _`GNU Diffutils Installer`: http://gnuwin32.sourceforge.net/packages/diffutils.htm
 
 
-Indices, glossary and tables
+Special Files
+=============
+
+The :command:`rbt` command stores its login session in a file called
+``~/.rbtools-cookies``. It can also read this information from a file called
+``~/.post-review-cookies.txt``, which was used by the deprecated
+``post-review`` command.
+
+
+Indices, Glossary and Tables
 ============================
 
 * :ref:`glossary`
