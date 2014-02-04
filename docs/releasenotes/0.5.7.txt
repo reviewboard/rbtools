@@ -1,0 +1,25 @@
+===========================
+RBTools 0.5.6 Release Notes
+===========================
+
+**Release date**: February 3, 2014
+
+
+Bug Fixes
+=========
+
+* Fixed RBTools commands running in a subdirectory of a Perforce checkout.
+  (:bug:`3218`)
+
+  In 0.5.6, RBTools commands could only be run in the top-level of a
+  Perforce checkout, due to a bug. They can be run anywhere within the
+  checkout now.
+
+
+Contributors
+============
+
+* David Trowbrige
+
+
+.. comment: vim: ft=rst et
