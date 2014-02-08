@@ -698,9 +698,12 @@ class Post(Command):
             base_commit_id=base_commit_id,
             submit_as=self.options.submit_as)
 
+        diff_review_url = review_url + 'diff/'
+
         print "Review request #%s posted." % request_id
         print
-        print review_url
+        print "Review request: " + review_url
+        print "Diff: " + diff_review_url
 
         # Load the review up in the browser if requested to.
         if self.options.open_browser:
