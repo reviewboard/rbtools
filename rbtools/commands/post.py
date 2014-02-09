@@ -475,12 +475,16 @@ class Post(Command):
 
     def post_request(self, tool, repository_info, server_url, api_root,
                      review_request_id=None, changenum=None, diff_content=None,
-                     parent_diff_content=None, base_commit_id=None,
+                     parent_diff_content=None, commit_id=None,
+                     base_commit_id=None,
                      submit_as=None, retries=3):
         """Creates or updates a review request, and uploads a diff.
 
         On success the review request id and url are returned.
         """
+        supports_posting_commit_ids = \
+            tool.capabilities.has_capability('review_requests', 'commit_ids')
+
         if review_request_id:
             # Retrieve the review request corresponding to the provided id.
             try:
@@ -508,6 +512,8 @@ class Post(Command):
 
                 if changenum:
                     request_data['changenum'] = changenum
+                elif commit_id and supports_posting_commit_ids:
+                    request_data['commit_id'] = commit_id
 
                 if submit_as:
                     request_data['submit_as'] = submit_as
@@ -617,6 +623,9 @@ class Post(Command):
         if self.options.publish:
             update_fields['public'] = True
 
+        if supports_posting_commit_ids and commit_id != draft.commit_id:
+            update_fields['commit_id'] = commit_id or ''
+
         if update_fields:
             try:
                 draft = draft.update(**update_fields)
@@ -647,6 +656,7 @@ class Post(Command):
         if self.options.diff_filename:
             parent_diff = None
             base_commit_id = None
+            commit_id = None
 
             if self.options.diff_filename == '-':
                 diff = sys.stdin.read()
@@ -669,12 +679,14 @@ class Post(Command):
             diff = diff_info['diff']
             parent_diff = diff_info.get('parent_diff')
             base_commit_id = diff_info.get('base_commit_id')
+            commit_id = diff_info.get('commit_id')
 
         if len(diff) == 0:
             raise CommandError("There don't seem to be any diffs!")
 
         if repository_info.supports_changesets and 'changenum' in diff_info:
             changenum = diff_info['changenum']
+            commit_id = changenum
         else:
             changenum = None
 
@@ -695,6 +707,7 @@ class Post(Command):
             changenum=changenum,
             diff_content=diff,
             parent_diff_content=parent_diff,
+            commit_id=commit_id,
             base_commit_id=base_commit_id,
             submit_as=self.options.submit_as)
 

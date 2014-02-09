@@ -41,6 +41,8 @@ class GitClient(SCMClient):
             'tip':         A revision to use as the tip of the resulting diff.
             'parent_base': (optional) The revision to use as the base of a
                            parent diff.
+            'commit_id':   (optional) The ID of the single commit being posted,
+                           if not using a range.
 
         These will be used to generate the diffs to upload to Review Board (or
         print). The diff for review will include the changes in (base, tip],
@@ -66,6 +68,7 @@ class GitClient(SCMClient):
 
             result = {
                 'tip': head_ref,
+                'commit_id': head_ref,
             }
 
             if parent_branch:
@@ -95,6 +98,7 @@ class GitClient(SCMClient):
                 result = {
                     'base': parent,
                     'tip': parsed[0],
+                    'commit_id': parsed[0],
                 }
             elif n_parsed_revs == 2:
                 if parsed[1].startswith('^'):
@@ -460,6 +464,7 @@ class GitClient(SCMClient):
         return {
             'diff': diff_lines,
             'parent_diff': parent_diff_lines,
+            'commit_id': revisions.get('commit_id'),
             'base_commit_id': base_commit_id,
         }
 

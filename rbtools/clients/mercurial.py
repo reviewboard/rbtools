@@ -149,6 +149,8 @@ class MercurialClient(SCMClient):
             'tip':         A revision to use as the tip of the resulting diff.
             'parent_base': (optional) The revision to use as the base of a
                            parent diff.
+            'commit_id':   (optional) The ID of the single commit being posted,
+                           if not using a range.
 
         These will be used to generate the diffs to upload to Review Board (or
         print). The diff for review will include the changes in (base, tip],
@@ -222,6 +224,7 @@ class MercurialClient(SCMClient):
                         'There are no outgoing changes')
                 result['base'] = self._identify_revision(outgoing[0])
                 result['tip'] = self._identify_revision(outgoing[1])
+                result['commit_id'] = result['tip']
 
             if self.options.parent_branch:
                 result['parent_base'] = result['base']
@@ -231,6 +234,7 @@ class MercurialClient(SCMClient):
             # One revision: Use the given revision for tip, and find its parent
             # for base.
             result['tip'] = self._identify_revision(revisions[0])
+            result['commit_id'] = result['tip']
             result['base'] = self._execute(
                 ['hg', 'parents', '--hidden', '-r', result['tip'],
                  '--template', '{node|short}']).split()[0]
@@ -364,6 +368,7 @@ class MercurialClient(SCMClient):
         return {
             'diff': diff,
             'parent_diff': parent_diff,
+            'commit_id': revisions.get('commit_id'),
             'base_commit_id': base_commit_id,
         }
 
