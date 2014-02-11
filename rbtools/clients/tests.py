@@ -8,14 +8,13 @@ from tempfile import mktemp
 from textwrap import dedent
 
 from nose import SkipTest
-from nose.tools import raises
 
 from rbtools.api.capabilities import Capabilities
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.bazaar import (
     BazaarClient,
     USING_PARENT_PREFIX as BZR_USING_PARENT_PREFIX)
-from rbtools.clients.errors import OptionsCheckError, InvalidRevisionSpecError
+from rbtools.clients.errors import InvalidRevisionSpecError
 from rbtools.clients.git import GitClient
 from rbtools.clients.mercurial import MercurialClient
 from rbtools.clients.perforce import PerforceClient, P4Wrapper
@@ -726,7 +725,6 @@ class MercurialClientTests(MercurialTestBase):
         self._hg_add_file_commit('foo.txt', FOO4, 'commit 4')
         commit4 = self._hg_get_tip()
         self._hg_add_file_commit('foo.txt', FOO5, 'commit 5')
-        commit5 = self._hg_get_tip()
 
         self.assertEqual(self.client.parse_revision_spec(['1', '2']),
             dict(base=commit1, tip=commit2, parent_base=start_base))
@@ -1564,7 +1562,7 @@ class PerforceClientTests(SCMClientTests):
         self.assertEqual(revisions['base'], '12344')
         self.assertEqual(revisions['tip'], '12345')
 
-    def test_parse_revision_spec_submitted_cln(self):
+    def test_parse_revision_spec_shelved_cln(self):
         """Testing PerforceClient.parse_revision_spec with a shelved changelist"""
         class TestWrapper(P4Wrapper):
             def change(self, changelist):
@@ -1915,7 +1913,6 @@ class BazaarClientTests(SCMClientTests):
         """Testing BazaarClient.parse_revision_spec with R1..R2 syntax"""
         os.chdir(self.child_branch)
 
-        parent_base_commit_id = self._bzr_get_revno()
         self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
         base_commit_id = self._bzr_get_revno()
         self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
@@ -1934,7 +1931,6 @@ class BazaarClientTests(SCMClientTests):
         """Testing BazaarClient.parse_revision_spec with two revisions"""
         os.chdir(self.child_branch)
 
-        parent_base_commit_id = self._bzr_get_revno()
         self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
         base_commit_id = self._bzr_get_revno()
         self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")

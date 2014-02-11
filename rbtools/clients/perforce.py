@@ -9,7 +9,6 @@ import subprocess
 from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.clients.errors import (EmptyChangeError,
                                     InvalidRevisionSpecError,
-                                    OptionsCheckError,
                                     TooManyRevisionsError)
 from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.filesystem import make_tempfile
@@ -429,7 +428,7 @@ class PerforceClient(SCMClient):
             # The "path posting" is still interesting enough to keep around. If
             # the given arguments don't parse as valid changelists, fall back
             # on that behavior.
-            return self._path_diff(args)
+            return self._path_diff(revision_spec)
 
         # Support both //depot/... paths and local filenames. For the moment,
         # this does *not* support any of perforce's traversal literals like ...

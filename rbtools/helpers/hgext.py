@@ -8,8 +8,6 @@ ALLOWED_PARAMS  = ['git', 'svn']
 def reposetup(ui, repo):
     for section in ['diff']:
         for k, v in ui.configitems(section):
-            source = ui.configsource(section, k)
-
             # Setting value to None is effectively unsetting the value since
             # None is the stand-in value for "not set."
             if k not in ALLOWED_PARAMS:

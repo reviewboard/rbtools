@@ -7,7 +7,7 @@ from xml.etree import ElementTree
 from rbtools.api.errors import APIError
 from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.clients.errors import (InvalidRevisionSpecError,
-                                    OptionsCheckError, TooManyRevisionsError)
+                                    TooManyRevisionsError)
 from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.filesystem import walk_parents
 from rbtools.utils.process import execute
@@ -265,7 +265,7 @@ class SVNClient(SCMClient):
                 sys.exit(1)
             else:
                 if svn_show_copies_as_adds in 'Yy':
-                    cmd.append("--show-copies-as-adds")
+                    diff_cmd.append("--show-copies-as-adds")
 
         diff = execute(diff_cmd, split_lines=True)
         diff = self.handle_renames(diff)

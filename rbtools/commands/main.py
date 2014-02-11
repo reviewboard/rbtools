@@ -54,7 +54,7 @@ def help(args, parser):
     # try to override commands by using the same name, and then cast
     # back to a list for easy sorting.
     entrypoints = pkg_resources.iter_entry_points('rbtools_commands')
-    commands = list(set([ep.name for ep in entrypoints]))
+    commands = list(set([entrypoint.name for entrypoint in entrypoints]))
     common_commands = ['post', 'patch', 'close', 'diff']
 
     print "\nThe most commonly used commands are:"
