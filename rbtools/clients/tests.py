@@ -115,17 +115,20 @@ class GitClientTests(SCMClientTests):
         base_commit_id = self._git_get_head()
 
         self._git_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
+        commit_id = self._git_get_head()
 
         result = self.client.diff([], [])
         self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 3)
+        self.assertEqual(len(result), 4)
         self.assertTrue('diff' in result)
         self.assertTrue('parent_diff' in result)
         self.assertTrue('base_commit_id' in result)
+        self.assertTrue('commit_id' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
                          '69d4616cf985f6b10571036db744e2d8')
         self.assertEqual(result['parent_diff'], None)
         self.assertEqual(result['base_commit_id'], base_commit_id)
+        self.assertEqual(result['commit_id'], commit_id)
 
     def test_diff_simple_multiple(self):
         """Testing GitClient simple diff with multiple commits case"""
@@ -136,17 +139,20 @@ class GitClientTests(SCMClientTests):
         self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
         self._git_add_file_commit('foo.txt', FOO2, 'commit 1')
         self._git_add_file_commit('foo.txt', FOO3, 'commit 1')
+        commit_id = self._git_get_head()
 
         result = self.client.diff([], [])
         self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 3)
+        self.assertEqual(len(result), 4)
         self.assertTrue('diff' in result)
         self.assertTrue('parent_diff' in result)
         self.assertTrue('base_commit_id' in result)
+        self.assertTrue('commit_id' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
                          'c9a31264f773406edff57a8ed10d9acc')
         self.assertEqual(result['parent_diff'], None)
         self.assertEqual(result['base_commit_id'], base_commit_id)
+        self.assertEqual(result['commit_id'], commit_id)
 
     def test_diff_branch_diverge(self):
         """Testing GitClient diff with divergent branches"""
@@ -155,32 +161,38 @@ class GitClientTests(SCMClientTests):
                       'origin/master'])
         base_commit_id = self._git_get_head()
         self._git_add_file_commit('foo.txt', FOO2, 'commit 2')
+        commit_id = self._git_get_head()
         self.client.get_repository_info()
 
         result = self.client.diff([], [])
         self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 3)
+        self.assertEqual(len(result), 4)
         self.assertTrue('diff' in result)
         self.assertTrue('parent_diff' in result)
         self.assertTrue('base_commit_id' in result)
+        self.assertTrue('commit_id' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
                          'cfb79a46f7a35b07e21765608a7852f7')
         self.assertEqual(result['parent_diff'], None)
         self.assertEqual(result['base_commit_id'], base_commit_id)
+        self.assertEqual(result['commit_id'], commit_id)
 
         self._run_git(['checkout', 'master'])
         self.client.get_repository_info()
+        commit_id = self._git_get_head()
 
         result = self.client.diff([], [])
         self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 3)
+        self.assertEqual(len(result), 4)
         self.assertTrue('diff' in result)
         self.assertTrue('parent_diff' in result)
         self.assertTrue('base_commit_id' in result)
+        self.assertTrue('commit_id' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
                          '69d4616cf985f6b10571036db744e2d8')
         self.assertEqual(result['parent_diff'], None)
         self.assertEqual(result['base_commit_id'], base_commit_id)
+        self.assertEqual(result['commit_id'], commit_id)
 
     def test_diff_tracking_no_origin(self):
         """Testing GitClient diff with a tracking branch, but no origin remote"""
@@ -190,19 +202,22 @@ class GitClientTests(SCMClientTests):
 
         base_commit_id = self._git_get_head()
         self._git_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
+        commit_id = self._git_get_head()
 
         self.client.get_repository_info()
 
         result = self.client.diff([], [])
         self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 3)
+        self.assertEqual(len(result), 4)
         self.assertTrue('diff' in result)
         self.assertTrue('parent_diff' in result)
         self.assertTrue('base_commit_id' in result)
+        self.assertTrue('commit_id' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
                          '69d4616cf985f6b10571036db744e2d8')
         self.assertEqual(result['parent_diff'], None)
         self.assertEqual(result['base_commit_id'], base_commit_id)
+        self.assertEqual(result['commit_id'], commit_id)
 
     def test_diff_local_tracking(self):
         """Testing GitClient diff with a local tracking branch"""
@@ -211,19 +226,22 @@ class GitClientTests(SCMClientTests):
 
         self._run_git(['checkout', '-b', 'mybranch', '--track', 'master'])
         self._git_add_file_commit('foo.txt', FOO2, 'commit 2')
+        commit_id = self._git_get_head()
 
         self.client.get_repository_info()
 
         result = self.client.diff([], [])
         self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 3)
+        self.assertEqual(len(result), 4)
         self.assertTrue('diff' in result)
         self.assertTrue('parent_diff' in result)
         self.assertTrue('base_commit_id' in result)
+        self.assertTrue('commit_id' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
                          'cfb79a46f7a35b07e21765608a7852f7')
         self.assertEqual(result['parent_diff'], None)
         self.assertEqual(result['base_commit_id'], base_commit_id)
+        self.assertEqual(result['commit_id'], commit_id)
 
     def test_diff_tracking_override(self):
         """Testing GitClient diff with option override for tracking branch"""
@@ -236,18 +254,22 @@ class GitClientTests(SCMClientTests):
         base_commit_id = self._git_get_head()
 
         self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
+        commit_id = self._git_get_head()
+
         self.client.get_repository_info()
 
         result = self.client.diff([], [])
         self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 3)
+        self.assertEqual(len(result), 4)
         self.assertTrue('diff' in result)
         self.assertTrue('parent_diff' in result)
         self.assertTrue('base_commit_id' in result)
+        self.assertTrue('commit_id' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
                          '69d4616cf985f6b10571036db744e2d8')
         self.assertEqual(result['parent_diff'], None)
         self.assertEqual(result['base_commit_id'], base_commit_id)
+        self.assertEqual(result['commit_id'], commit_id)
 
     def test_diff_slash_tracking(self):
         """Testing GitClient diff with tracking branch that has slash in its name."""
@@ -256,19 +278,22 @@ class GitClientTests(SCMClientTests):
                        'origin/not-master'])
         base_commit_id = self._git_get_head()
         self._git_add_file_commit('foo.txt', FOO2, 'commit 2')
+        commit_id = self._git_get_head()
 
         self.client.get_repository_info()
 
         result = self.client.diff([], [])
         self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 3)
+        self.assertEqual(len(result), 4)
         self.assertTrue('diff' in result)
         self.assertTrue('parent_diff' in result)
         self.assertTrue('base_commit_id' in result)
+        self.assertTrue('commit_id' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
                          'd2015ff5fd0297fd7f1210612f87b6b3')
         self.assertEqual(result['parent_diff'], None)
         self.assertEqual(result['base_commit_id'], base_commit_id)
+        self.assertEqual(result['commit_id'], commit_id)
 
     def test_parse_revision_spec_no_args(self):
         """Testing GitClient.parse_revision_spec with no specified revisions"""
@@ -707,7 +732,8 @@ class MercurialClientTests(MercurialTestBase):
             dict(base=commit1, tip=commit2, parent_base=start_base))
 
         self.assertEqual(self.client.parse_revision_spec(['4']),
-            dict(base=commit3, tip=commit4, parent_base=start_base))
+            dict(base=commit3, tip=commit4, parent_base=start_base,
+                 commit_id=commit4))
 
         self.assertEqual(self.client.parse_revision_spec(['2', '4']),
             dict(base=commit2, tip=commit4, parent_base=start_base))
