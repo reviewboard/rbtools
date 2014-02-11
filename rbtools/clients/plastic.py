@@ -83,15 +83,13 @@ class PlasticClient(SCMClient):
         else:
             raise TooManyRevisionsError
 
-    def diff(self, revision_spec, files):
+    def diff(self, revisions, files=[], extra_args=[]):
         """
         Performs a diff across all modified files in a Plastic workspace
 
         Parent diffs are not supported (the second value in the tuple).
         """
         # TODO: use 'files'
-        revisions = self.parse_revision_spec(revision_spec)
-
         changenum = None
         tip = revisions['tip']
         if tip.startswith(self.REVISION_CHANGESET_PREFIX):

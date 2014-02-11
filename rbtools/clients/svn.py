@@ -191,7 +191,7 @@ class SVNClient(SCMClient):
 
         return get_url_prop(repository_info.path)
 
-    def diff(self, revision_spec, files):
+    def diff(self, revisions, files=[], extra_args=[]):
         """
         Performs a diff in a Subversion repository.
 
@@ -204,7 +204,6 @@ class SVNClient(SCMClient):
         SVN repositories do not support branches of branches in a way that
         makes parent diffs possible, so we never return a parent diff.
         """
-        revisions = self.parse_revision_spec(revision_spec)
         base = str(revisions['base'])
         tip = str(revisions['tip'])
 

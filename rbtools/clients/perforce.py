@@ -162,6 +162,8 @@ class PerforceClient(SCMClient):
     """
     name = 'Perforce'
 
+    supports_diff_extra_args = True
+
     DATE_RE = re.compile(r'(\w+)\s+(\w+)\s+(\d+)\s+(\d\d:\d\d:\d\d)\s+'
                          '(\d\d\d\d)')
     ENCODED_COUNTER_URL_RE = re.compile('reviewboard.url\.(\S+)')
@@ -416,25 +418,23 @@ class PerforceClient(SCMClient):
 
         return None
 
-    def diff(self, revision_spec, include_files):
+    def diff(self, revisions, files=[], extra_args=[]):
         """
         Goes through the hard work of generating a diff on Perforce in order
         to take into account adds/deletes and to provide the necessary
         revision information.
         """
-        try:
-            revisions = self.parse_revision_spec(revision_spec)
-        except InvalidRevisionSpecError:
+        if not revisions:
             # The "path posting" is still interesting enough to keep around. If
             # the given arguments don't parse as valid changelists, fall back
             # on that behavior.
-            return self._path_diff(revision_spec)
+            return self._path_diff(extra_args)
 
         # Support both //depot/... paths and local filenames. For the moment,
         # this does *not* support any of perforce's traversal literals like ...
         depot_include_files = []
         local_include_files = []
-        for filename in include_files:
+        for filename in files:
             if filename.startswith('//'):
                 depot_include_files.append(filename)
             else:

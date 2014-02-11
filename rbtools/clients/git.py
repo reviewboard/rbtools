@@ -369,40 +369,12 @@ class GitClient(SCMClient):
 
         return None
 
-    def extract_summary(self, revisions):
-        """Extracts the summary based on the provided revisions."""
-        return execute(
-            [self.git, 'log', '--reverse', '--pretty=format:%s',
-             '^%s' % revisions['base'], revisions['tip']],
-            ignore_errors=True,
-            split_lines=True)[0].strip()
-
-    def extract_description(self, revisions):
-        """Extracts the description based on the provided revision range."""
+    def get_raw_commit_message(self, revisions):
+        """Extracts the commit message based on the provided revision range."""
         return execute(
             [self.git, 'log', '--reverse', '--pretty=format:%s%n%n%b',
              '^%s' % revisions['base'], revisions['tip']],
             ignore_errors=True).strip()
-
-    def _set_summary(self, revisions):
-        """Sets the summary based on the provided revisions.
-
-        Extracts and sets the summary if guessing is enabled and summary is not
-        yet set.
-        """
-        if (getattr(self.options, 'guess_summary', None) and
-                not getattr(self.options, 'summary', None)):
-            self.options.summary = self.extract_summary(revisions)
-
-    def _set_description(self, revisions):
-        """Sets the description based on the provided revisions.
-
-        Extracts and sets the description if guessing is enabled and
-        description is not yet set.
-        """
-        if (getattr(self.options, 'guess_description', None) and
-                not getattr(self.options, 'description', None)):
-            self.options.description = self.extract_description(revisions)
 
     def get_parent_branch(self):
         """Returns the parent branch."""
@@ -433,7 +405,7 @@ class GitClient(SCMClient):
 
         return execute([self.git, 'rev-parse'] + revisions).strip().split('\n')
 
-    def diff(self, revision_spec, files):
+    def diff(self, revisions, files=[], extra_args=[]):
         """Perform a diff using the given revisions.
 
         If no revisions are specified, this will do a diff of the contents of
@@ -446,10 +418,6 @@ class GitClient(SCMClient):
         make sense given the requested revisions and the tracking branch, this
         will also return a parent diff.
         """
-        revisions = self.parse_revision_spec(revision_spec)
-        self._set_summary(revisions)
-        self._set_description(revisions)
-
         diff_lines = self.make_diff(revisions['base'], revisions['tip'], files)
 
         if 'parent_base' in revisions:

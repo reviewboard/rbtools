@@ -310,13 +310,7 @@ class MercurialClient(SCMClient):
             key, value = line.split('=', 1)
             self.hgrc[key] = value.strip()
 
-    def extract_summary(self, revisions):
-        """Extracts the first line from the description the 'tip' revision."""
-        return self._execute(
-            ['hg', 'log', '--hidden', '-r', revisions['tip'], '--template',
-             '{desc|firstline}'], env=self._hg_env).replace('\n', ' ')
-
-    def extract_description(self, revisions):
+    def get_raw_commit_message(self, revisions):
         """
         Extracts all descriptions in the given revision range and concatenates
         them, most recent ones going first.
@@ -335,15 +329,11 @@ class MercurialClient(SCMClient):
 
         return '\n\n'.join([desc.strip() for desc in descs])
 
-    def diff(self, revision_spec, files):
+    def diff(self, revisions, files=[], extra_args=[]):
         """
         Performs a diff across all modified files in a Mercurial repository.
         """
         self._init()
-        revisions = self.parse_revision_spec(revision_spec)
-
-        self._set_summary(revisions)
-        self._set_description(revisions)
 
         diff_cmd = ['hg', 'diff', '--hidden']
 
@@ -492,26 +482,6 @@ class MercurialClient(SCMClient):
         bottom_rev = max(0, bottom_rev)
 
         return top_rev, bottom_rev
-
-    def _set_summary(self, revisions):
-        """Sets the summary based on the provided revisions.
-
-        Extracts and sets the summary if guessing is enabled and summary is not
-        yet set.
-        """
-        if (getattr(self.options, 'guess_summary', None) and
-                not getattr(self.options, 'summary', None)):
-            self.options.summary = self.extract_summary(revisions)
-
-    def _set_description(self, revisions):
-        """Sets the description based on the provided revisions.
-
-        Extracts and sets the description if guessing is enabled and
-        description is not yet set.
-        """
-        if (getattr(self.options, 'guess_description', None) and
-                not getattr(self.options, 'description', None)):
-            self.options.description = self.extract_description(revisions)
 
     def scan_for_server(self, repository_info):
         # Scan first for dot files, since it's faster and will cover the

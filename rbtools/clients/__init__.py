@@ -16,6 +16,8 @@ class SCMClient(object):
     """
     name = None
 
+    supports_diff_extra_args = False
+
     def __init__(self, user_config=None, configs=[], options=None,
                  capabilities=None):
         self.user_config = user_config
@@ -82,7 +84,7 @@ class SCMClient(object):
             'tip': None,
         }
 
-    def diff(self, revision_spec, files):
+    def diff(self, revisions, files=[], extra_args=[]):
         """
         Returns the generated diff and optional parent diff for this
         repository.
@@ -173,25 +175,42 @@ class SCMClient(object):
         """
         raise NotImplementedError
 
-    def extract_summary(self, revisions):
-        """Returns the summary from the commits in the given revisions.
+    def get_commit_message(self, revisions):
+        """Returns the commit message from the commits in the given revisions.
 
-        Derived classes should override this method if they wish to support
-        summary guessing.
-
-        If a derived class is unable to guess the summary, ``None`` should be
-        returned.
+        This pulls out the first line from the commit messages of the
+        given revisions. That is then used as the summary.
         """
-        raise NotImplementedError
+        commit_message = self.get_raw_commit_message(revisions)
+        lines = commit_message.splitlines()
 
-    def extract_description(self, revisions):
-        """Returns the description based on the commits in the given revisions.
+        if not lines:
+            return None
 
-        Derived classes should override this method if they wish to support
-        description guessing.
+        result = {
+            'summary': lines[0],
+        }
 
-        If a derived class is unable to guess the description, ``None`` should
+        # Try to pull the body of the commit out of the full commit
+        # description, so that we can skip the summary.
+        if len(lines) >= 3 and lines[0] and not lines[1]:
+            result['description'] = '\n'.join(lines[2:]).strip()
+        else:
+            result['description'] = commit_message
+
+        return result
+
+    def get_raw_commit_message(self, revisions):
+        """Extracts the commit messages on the commits in the given revisions.
+
+        Derived classes should override this method in order to allow callers
+        to fetch commit messages. This is needed for description guessing.
+
+        If a derived class is unable to fetch the description, ``None`` should
         be returned.
+
+        Callers that need to differentiate the summary from the description
+        should instead use get_commit_message().
         """
         raise NotImplementedError
 

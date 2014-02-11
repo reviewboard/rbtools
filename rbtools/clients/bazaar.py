@@ -142,7 +142,7 @@ class BazaarClient(SCMClient):
             branch = result[0][len(USING_PARENT_PREFIX):]
             return 'revno:%s:%s' % (result[1], branch)
 
-    def diff(self, revision_spec, files):
+    def diff(self, revisions, files=[], extra_args=[]):
         """Returns the diff for the given revision spec.
 
         If the revision spec is empty, this returns the diff of the current
@@ -153,11 +153,6 @@ class BazaarClient(SCMClient):
 
         The summary and description are set if guessing is enabled.
         """
-        revisions = self.parse_revision_spec(revision_spec)
-
-        self._set_summary(revisions)
-        self._set_description(revisions)
-
         diff = self._get_range_diff(revisions['base'], revisions['tip'], files)
 
         if 'parent_base' in revisions:
@@ -178,39 +173,33 @@ class BazaarClient(SCMClient):
         diff = execute(diff_cmd, ignore_errors=True)
         return diff or None
 
-    def _set_summary(self, revisions):
-        """Set the summary based on the given revisions.
-
-        Extracts and sets the summary if guessing is enabled and summary is not
-        yet set.
-        """
-        if self.options.guess_summary and not self.options.summary:
-            self.options.summary = self.extract_summary(revisions)
-
-    def _set_description(self, revisions):
-        """Set the description based on the given revisions.
-
-        Extracts and sets the description if guessing is enabled and
-        description is not yet set.
-        """
-        if self.options.guess_description and not self.options.description:
-            self.options.description = self.extract_description(revisions)
-
-    def extract_summary(self, revisions):
-        """Return the last commit message in ``revisions``."""
-        # `bzr log --line' returns the log in the format:
-        #   {revision-number}: {committer-name} {commit-date} {commit-message}
-        # So we should ignore everything after the date (YYYY-MM-DD).
-        log_message = execute(
-            ["bzr", "log", "-r", revisions['tip'], "--line"]).rstrip()
-        log_message_match = re.search(r"\d{4}-\d{2}-\d{2}", log_message)
-        truncated_characters = log_message_match.end() + 1
-
-        return log_message[truncated_characters:]
-
-    def extract_description(self, revisions):
-        return execute(
+    def get_raw_commit_message(self, revisions):
+        # The result is content in the form of:
+        #
+        # 2014-01-02  First Name  <email@address>
+        #
+        # <tab>line 1
+        # <tab>line 2
+        # <tab>...
+        #
+        # 2014-01-02  First Name  <email@address>
+        #
+        # ...
+        lines = execute(
             ['bzr', 'log', '-r',
              '%s..%s' % (revisions['base'], revisions['tip']),
-             '--short'],
-            ignore_errors=True).rstrip()
+             '--gnu-changelog'],
+            ignore_errors=True,
+            split_lines=True)
+
+        message = []
+
+        for line in lines:
+            # We only care about lines that start with a tab (commit message
+            # lines) or blank lines.
+            if line.startswith('\t'):
+                message.append(line[1:])
+            elif not line.strip():
+                message.append(line)
+
+        return ''.join(message).strip()

@@ -109,14 +109,13 @@ class CVSClient(SCMClient):
             'tip': None,
         }
 
-    def diff(self, revision_spec, files):
+    def diff(self, revisions, files=[], extra_args=[]):
         """Get the diff for the given revisions.
 
         If revision_spec is empty, this will return the diff for the modified
         files in the working directory. If it's not empty and contains two
         revisions, this will do a diff between those revisions.
         """
-        revisions = self.parse_revision_spec(revision_spec)
         files = files or []
 
         # Diff returns "1" if differences were found.

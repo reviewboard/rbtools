@@ -116,7 +116,8 @@ class GitClientTests(SCMClientTests):
         self._git_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
         commit_id = self._git_get_head()
 
-        result = self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertEqual(len(result), 4)
         self.assertTrue('diff' in result)
@@ -140,7 +141,8 @@ class GitClientTests(SCMClientTests):
         self._git_add_file_commit('foo.txt', FOO3, 'commit 1')
         commit_id = self._git_get_head()
 
-        result = self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertEqual(len(result), 4)
         self.assertTrue('diff' in result)
@@ -163,7 +165,8 @@ class GitClientTests(SCMClientTests):
         commit_id = self._git_get_head()
         self.client.get_repository_info()
 
-        result = self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertEqual(len(result), 4)
         self.assertTrue('diff' in result)
@@ -180,7 +183,8 @@ class GitClientTests(SCMClientTests):
         self.client.get_repository_info()
         commit_id = self._git_get_head()
 
-        result = self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertEqual(len(result), 4)
         self.assertTrue('diff' in result)
@@ -205,7 +209,8 @@ class GitClientTests(SCMClientTests):
 
         self.client.get_repository_info()
 
-        result = self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertEqual(len(result), 4)
         self.assertTrue('diff' in result)
@@ -229,7 +234,8 @@ class GitClientTests(SCMClientTests):
 
         self.client.get_repository_info()
 
-        result = self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertEqual(len(result), 4)
         self.assertTrue('diff' in result)
@@ -257,7 +263,8 @@ class GitClientTests(SCMClientTests):
 
         self.client.get_repository_info()
 
-        result = self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertEqual(len(result), 4)
         self.assertTrue('diff' in result)
@@ -281,7 +288,8 @@ class GitClientTests(SCMClientTests):
 
         self.client.get_repository_info()
 
-        result = self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertEqual(len(result), 4)
         self.assertTrue('diff' in result)
@@ -552,7 +560,8 @@ class MercurialClientTests(MercurialTestBase):
         """Testing MercurialClient diff, simple case"""
         self._hg_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
 
-        result = self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
@@ -564,7 +573,8 @@ class MercurialClientTests(MercurialTestBase):
         self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
         self._hg_add_file_commit('foo.txt', FOO3, 'commit 3')
 
-        result = self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
@@ -577,7 +587,8 @@ class MercurialClientTests(MercurialTestBase):
         self._run_hg(['branch', 'diverged'])
         self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
 
-        result = self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
@@ -585,7 +596,8 @@ class MercurialClientTests(MercurialTestBase):
 
         self._run_hg(['update', '-C', 'default'])
 
-        result = self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
@@ -597,7 +609,8 @@ class MercurialClientTests(MercurialTestBase):
         self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
         self._hg_add_file_commit('foo.txt', FOO3, 'commit 3')
 
-        result = self.client.diff(['2', '3'], [])
+        revisions = self.client.parse_revision_spec(['2', '3'])
+        result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('parent_diff' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
@@ -615,7 +628,8 @@ class MercurialClientTests(MercurialTestBase):
         self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
         self._hg_add_file_commit('foo.txt', FOO3, 'commit 3')
 
-        result = self.client.diff(['2', '3'], [])
+        revisions = self.client.parse_revision_spec(['2', '3'])
+        result = self.client.diff(revisions)
         self.assertTrue('parent_diff' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
                          '7a897f68a9dc034fc1e42fe7a33bb808')
@@ -632,7 +646,8 @@ class MercurialClientTests(MercurialTestBase):
 
         self.options.parent_branch = '2'
 
-        result = self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('parent_diff' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
@@ -743,22 +758,25 @@ class MercurialClientTests(MercurialTestBase):
 
         self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
 
-        self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        commit_message = self.client.get_commit_message(revisions)
 
-        self.assertEquals(self.options.summary, 'commit 1')
+        self.assertEquals(commit_message['summary'], 'commit 1')
 
     def test_guess_summary_description_two(self):
         """Testing MercurialClient guess summary & description 2 commits."""
         self.options.guess_summary = True
         self.options.guess_description = True
 
-        self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
-        self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
+        self._hg_add_file_commit('foo.txt', FOO1, 'summary 1\n\nbody 1')
+        self._hg_add_file_commit('foo.txt', FOO2, 'summary 2\n\nbody 2')
 
-        self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        commit_message = self.client.get_commit_message(revisions)
 
-        self.assertEquals(self.options.summary, 'commit 2')
-        self.assertEquals(self.options.description, 'commit 1\n\ncommit 2')
+        self.assertEquals(commit_message['summary'], 'summary 1')
+        self.assertEquals(commit_message['description'],
+                          'body 1\n\nsummary 2\n\nbody 2')
 
     def test_guess_summary_description_three(self):
         """Testing MercurialClient guess summary & description 3 commits."""
@@ -769,11 +787,12 @@ class MercurialClientTests(MercurialTestBase):
         self._hg_add_file_commit('foo.txt', FOO2, 'commit 2\n\ndesc2')
         self._hg_add_file_commit('foo.txt', FOO3, 'commit 3\n\ndesc3')
 
-        self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        commit_message = self.client.get_commit_message(revisions)
 
-        self.assertEquals(self.options.summary, 'commit 3')
-        self.assertEquals(self.options.description,
-            'commit 1\n\ndesc1\n\ncommit 2\n\ndesc2\n\ncommit 3\n\ndesc3')
+        self.assertEquals(commit_message['summary'], 'commit 1')
+        self.assertEquals(commit_message['description'],
+                          'desc1\n\ncommit 2\n\ndesc2\n\ncommit 3\n\ndesc3')
 
     def test_guess_summary_description_one_middle(self):
         """Testing MercurialClient guess summary & description middle commit
@@ -781,15 +800,16 @@ class MercurialClientTests(MercurialTestBase):
         self.options.guess_summary = True
         self.options.guess_description = True
 
-        self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
-        self._hg_add_file_commit('foo.txt', FOO2, 'commit 2')
+        self._hg_add_file_commit('foo.txt', FOO1, 'commit 1\n\ndesc1')
+        self._hg_add_file_commit('foo.txt', FOO2, 'commit 2\n\ndesc2')
         tip = self._hg_get_tip()
-        self._hg_add_file_commit('foo.txt', FOO3, 'commit 3')
+        self._hg_add_file_commit('foo.txt', FOO3, 'commit 3\n\ndesc3')
 
-        self.client.diff([tip], [])
+        revisions = self.client.parse_revision_spec([tip])
+        commit_message = self.client.get_commit_message(revisions)
 
-        self.assertEquals(self.options.summary, 'commit 2')
-        self.assertEquals(self.options.description, 'commit 2')
+        self.assertEquals(commit_message['summary'], 'commit 2')
+        self.assertEquals(commit_message['description'], 'desc2')
 
 
 class MercurialSubversionClientTests(MercurialTestBase):
@@ -996,7 +1016,8 @@ class MercurialSubversionClientTests(MercurialTestBase):
 
         self._hg_add_file_commit('foo.txt', FOO4, 'edit 4')
 
-        result = self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
@@ -1011,7 +1032,8 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self._hg_add_file_commit('foo.txt', FOO5, 'edit 5')
         self._hg_add_file_commit('foo.txt', FOO6, 'edit 6')
 
-        result = self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
@@ -1027,7 +1049,8 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self._hg_add_file_commit('foo.txt', FOO6, 'edit 6', branch='b')
         self._hg_add_file_commit('foo.txt', FOO4, 'edit 7', branch='b')
 
-        result = self.client.diff(['3'], [])
+        revisions = self.client.parse_revision_spec(['3'])
+        result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
@@ -1392,7 +1415,8 @@ class PerforceClientTests(SCMClientTests):
             '//mydepot/test/Makefile': makefile_file,
         }
 
-        diff = client.diff(['12345'], [])
+        revisions = client.parse_revision_spec(['12345'])
+        diff = client.diff(revisions)
         self._compare_diff(diff, '07aa18ff67f9aa615fcda7ecddcb354e')
 
     def test_diff_with_moved_files_cap_on(self):
@@ -1480,7 +1504,8 @@ class PerforceClientTests(SCMClientTests):
             },
         }
 
-        diff = client.diff(['12345'], [])
+        revisions = client.parse_revision_spec(['12345'])
+        diff = client.diff(revisions)
         self._compare_diff(diff, expected_diff_hash)
 
     def _build_client(self):
@@ -1733,7 +1758,8 @@ class BazaarClientTests(SCMClientTests):
 
         self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
 
-        result = self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
 
@@ -1747,7 +1773,8 @@ class BazaarClientTests(SCMClientTests):
         self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
         self._bzr_add_file_commit("bar.txt", "baz", "added bar")
 
-        result = self.client.diff([], ['foo.txt'])
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions, ['foo.txt'])
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
 
@@ -1762,7 +1789,8 @@ class BazaarClientTests(SCMClientTests):
         self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
         self._bzr_add_file_commit("foo.txt", FOO3, "commit 3")
 
-        result = self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
 
@@ -1778,7 +1806,8 @@ class BazaarClientTests(SCMClientTests):
         self._run_bzr(["branch", self.child_branch, grand_child_branch])
         os.chdir(grand_child_branch)
 
-        result = self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
 
@@ -1797,7 +1826,8 @@ class BazaarClientTests(SCMClientTests):
         # parent:
         self.options.parent_branch = self.original_branch
 
-        result = self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
 
@@ -1814,14 +1844,15 @@ class BazaarClientTests(SCMClientTests):
 
         self.options.guess_summary = True
         self.options.guess_description = True
-        self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        commit_message = self.client.get_commit_message(revisions)
 
-        self.assertEquals("commit 3", self.options.summary)
+        self.assertEquals("commit 3", commit_message['summary'])
 
-        description = self.options.description
-        self.assertTrue("commit 1" in description, description)
-        self.assertTrue("commit 2" in description, description)
-        self.assertTrue("commit 3" in description, description)
+        description = commit_message['description']
+        self.assertTrue("commit 1" in description)
+        self.assertTrue("commit 2" in description)
+        self.assertFalse("commit 3" in description)
 
     def test_guessed_summary_and_description_in_grand_parent_branch_diff(self):
         """
@@ -1844,14 +1875,15 @@ class BazaarClientTests(SCMClientTests):
         # parent:
         self.options.parent_branch = self.original_branch
 
-        self.client.diff([], [])
+        revisions = self.client.parse_revision_spec([])
+        commit_message = self.client.get_commit_message(revisions)
 
-        self.assertEquals("commit 3", self.options.summary)
+        self.assertEquals("commit 3", commit_message['summary'])
 
-        description = self.options.description
-        self.assertTrue("commit 1" in description, description)
-        self.assertTrue("commit 2" in description, description)
-        self.assertTrue("commit 3" in description, description)
+        description = commit_message['description']
+        self.assertTrue("commit 1" in description)
+        self.assertTrue("commit 2" in description)
+        self.assertFalse("commit 3" in description)
 
     def test_parse_revision_spec_no_args(self):
         """Testing BazaarClient.parse_revision_spec with no specified revisions"""

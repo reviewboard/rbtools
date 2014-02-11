@@ -4,9 +4,9 @@ import re
 import sys
 
 from rbtools.api.errors import APIError
+from rbtools.clients.errors import InvalidRevisionSpecError
 from rbtools.commands import Command, CommandError, Option, OptionGroup
 from rbtools.utils.console import confirm
-from rbtools.utils.diffs import get_diff
 from rbtools.utils.match_score import Score
 from rbtools.utils.repository import get_repository_id
 from rbtools.utils.users import get_user
@@ -492,7 +492,7 @@ class Post(Command):
         return count
 
     def guess_existing_review_request_id(self, repository_info, api_root,
-                                         api_client, tool, revision_spec=[]):
+                                         api_client):
         """Try to guess the existing review request ID if it is available.
 
         The existing review request is guessed by comparing the existing
@@ -524,15 +524,21 @@ class Post(Command):
             raise CommandError('Error getting review requests for user '
                                '%s: %s' % (user.username, e))
 
-        try:
-            revisions = tool.parse_revision_spec(revision_spec)
+        summary = self.options.summary
+        description = self.options.description
 
-            summary = (getattr(self.options, 'summary', None) or
-                       tool.extract_summary(revisions))
-            description = (getattr(self.options, 'description', None) or
-                           tool.extract_description(revisions))
-        except NotImplementedError:
-            raise CommandError('--summary and --description are required.')
+        if not summary or not description:
+            try:
+                commit_message = self.get_commit_message()
+
+                if commit_message:
+                    if not summary:
+                        summary = commit_message['summary']
+
+                    if not description:
+                        description = commit_message['description']
+            except NotImplementedError:
+                raise CommandError('--summary and --description are required.')
 
         possible_matches = self.get_possible_matches(review_requests, summary,
                                                      description)
@@ -554,7 +560,7 @@ class Post(Command):
 
         return None
 
-    def post_request(self, tool, repository_info, server_url, api_root,
+    def post_request(self, repository_info, server_url, api_root,
                      review_request_id=None, changenum=None, diff_content=None,
                      parent_diff_content=None, commit_id=None,
                      base_commit_id=None,
@@ -564,7 +570,8 @@ class Post(Command):
         On success the review request id and url are returned.
         """
         supports_posting_commit_ids = \
-            tool.capabilities.has_capability('review_requests', 'commit_ids')
+            self.tool.capabilities.has_capability('review_requests',
+                                                  'commit_ids')
 
         if review_request_id:
             # Retrieve the review request corresponding to the provided id.
@@ -623,8 +630,8 @@ class Post(Command):
                 }
 
                 if (base_commit_id and
-                    tool.capabilities.has_capability('diffs',
-                                                     'base_commit_ids')):
+                    self.tool.capabilities.has_capability('diffs',
+                                                          'base_commit_ids')):
                     # Both the Review Board server and SCMClient support
                     # base commit IDs, so pass that along when creating
                     # the diff.
@@ -692,7 +699,7 @@ class Post(Command):
 
         if ((self.options.description or self.options.testing_done) and
             self.options.markdown and
-            tool.capabilities.has_capability('text', 'markdown')):
+            self.tool.capabilities.has_capability('text', 'markdown')):
             # The user specified that their Description/Testing Done are
             # valid Markdown, so tell the server so it won't escape the text.
             update_fields['text_type'] = 'markdown'
@@ -716,6 +723,73 @@ class Post(Command):
 
         return review_request.id, review_request.absolute_url
 
+    def get_revisions(self):
+        """Returns the parsed revisions from the command line arguments.
+
+        These revisions are used for diff generation and commit message
+        extraction. They will be cached for future calls.
+        """
+        # Parse the provided revisions from the command line and generate
+        # a spec or set of specialized extra arguments that the SCMClient
+        # can use for diffing and commit lookups.
+        if not hasattr(self, '_revisions'):
+            try:
+                self._revisions = self.tool.parse_revision_spec(self.cmd_args)
+            except InvalidRevisionSpecError:
+                if not self.tool.supports_diff_extra_args:
+                    raise
+
+                self._revisions = None
+
+        return self._revisions
+
+    def check_guess_fields(self):
+        """Checks and handles field guesses for the review request.
+
+        This will attempt to guess the values for the summary and
+        description fields, based on the contents of the commit message
+        at the provided revisions, if requested by the caller.
+
+        If the backend doesn't support guessing, or if guessing isn't
+        requested, or if explicit values were set in the options, nothing
+        will be set for the fields.
+        """
+        guess_summary = (self.options.guess_summary and
+                         not self.options.summary)
+        guess_description = (self.options.guess_description and
+                             not self.options.description)
+
+        if guess_summary or guess_description:
+            try:
+                commit_message = self.get_commit_message()
+
+                if commit_message:
+                    if guess_summary:
+                        self.options.summary = commit_message['summary']
+
+                    if guess_description:
+                        self.options.description = \
+                            commit_message['description']
+            except NotImplementedError:
+                # The SCMClient doesn't support getting commit messages,
+                # so we can't provide the guessed versions.
+                pass
+
+    def get_commit_message(self):
+        """Returns the commit message for the parsed revisions.
+
+        If the SCMClient supports getting a commit message, this will fetch
+        and store the message for future lookups.
+
+        This is used for guessing the summary and description fields, and
+        updating exising review requests using -u.
+        """
+        if not hasattr(self, '_commit_message'):
+            self._commit_message = \
+                self.tool.get_commit_message(self.get_revisions())
+
+        return self._commit_message
+
     def main(self, *args):
         """Create and update review requests."""
         # The 'args' tuple must be made into a list for some of the
@@ -724,15 +798,15 @@ class Post(Command):
         # the code base try and concatenate args to the end of
         # other lists. Until the client code is restructured and
         # cleaned up we will satisfy the assumption here.
-        args = list(args)
+        self.cmd_args = list(args)
 
         self.post_process_options()
         origcwd = os.path.abspath(os.getcwd())
-        repository_info, tool = self.initialize_scm_tool(
+        repository_info, self.tool = self.initialize_scm_tool(
             client_name=self.options.repository_type)
-        server_url = self.get_server_url(repository_info, tool)
+        server_url = self.get_server_url(repository_info, self.tool)
         api_client, api_root = self.get_api(server_url)
-        self.setup_tool(tool, api_root=api_root)
+        self.setup_tool(self.tool, api_root=api_root)
 
         if self.options.diff_filename:
             parent_diff = None
@@ -751,11 +825,19 @@ class Post(Command):
                 except IOError, e:
                     raise CommandError("Unable to open diff filename: %s" % e)
         else:
-            diff_info = get_diff(
-                tool,
-                repository_info,
-                revision_spec=args,
-                files=self.options.include_files)
+            revisions = self.get_revisions()
+
+            if revisions:
+                extra_args = None
+            else:
+                extra_args = self.cmd_args
+
+            # Generate a diff against the revisions or arguments, filtering
+            # by the requested files if provided.
+            diff_info = self.tool.diff(
+                revisions=revisions,
+                files=self.options.include_files or [],
+                extra_args=extra_args)
 
             diff = diff_info['diff']
             parent_diff = diff_info.get('parent_diff')
@@ -771,16 +853,21 @@ class Post(Command):
         else:
             changenum = None
 
+        if not self.options.diff_filename:
+            # If the user has requested to guess the summary or description,
+            # get the commit message and override the summary and description
+            # options.
+            self.check_guess_fields()
+
         if self.options.update:
             self.options.rid = self.guess_existing_review_request_id(
-                repository_info, api_root, api_client, tool, args)
+                repository_info, api_root, api_client)
 
             if not self.options.rid:
                 raise CommandError('Could not determine the existing review '
                                    'request to update.')
 
         request_id, review_url = self.post_request(
-            tool,
             repository_info,
             server_url,
             api_root,

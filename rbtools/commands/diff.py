@@ -1,5 +1,5 @@
+from rbtools.clients.errors import InvalidRevisionSpecError
 from rbtools.commands import Command, CommandError, Option
-from rbtools.utils.diffs import get_diff
 
 
 class Diff(Command):
@@ -127,11 +127,20 @@ class Diff(Command):
         api_client, api_root = self.get_api(server_url)
         self.setup_tool(tool, api_root=api_root)
 
-        diff_info = get_diff(
-            tool,
-            repository_info,
-            revision_spec=args,
-            files=self.options.include_files)
+        try:
+            revisions = tool.parse_revision_spec(args)
+            extra_args = None
+        except InvalidRevisionSpecError:
+            if not tool.supports_diff_extra_args:
+                raise
+
+            revisions = None
+            extra_args = args
+
+        diff_info = tool.diff(
+            revisions=revisions,
+            files=self.options.include_files or [],
+            extra_args=extra_args)
 
         diff = diff_info['diff']
 
