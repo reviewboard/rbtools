@@ -45,27 +45,47 @@ class Option(object):
     to specify defaults which will be grabbed from the configuration
     after it is loaded.
     """
-    def __init__(self, *args, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
+    def __init__(self, *opts, **attrs):
+        self.opts = opts
+        self.attrs = attrs
 
-    def make_option(self, config):
+    def make_option(self, config, argv=[]):
         """Return an optparse option.
 
         Check the loaded configuration for a provided default and
         return an optparse option using it as the default.
         """
-        if 'config_key' in self.kwargs:
-            if self.kwargs['config_key'] in config:
-                self.kwargs['default'] = config[self.kwargs['config_key']]
+        if 'config_key' in self.attrs:
+            if self.attrs['config_key'] in config:
+                self.attrs['default'] = config[self.attrs['config_key']]
 
-            del self.kwargs['config_key']
+            del self.attrs['config_key']
 
-        return make_option(*self.args, **self.kwargs)
+        if self.attrs.get('value_optional', False):
+            # Check if the argument is in sys.argv without an explicit
+            # value assigned (using --opt=value or -ovalue).
+            #
+            # If found, we're going to want to assign it the default value
+            # from the 'empty_default' attribute.
+            assert 'empty_default' in self.attrs
 
-    def add_to(self, parent, config):
+            for opt in self.opts:
+                for i, arg in enumerate(argv):
+                    if arg == opt:
+                        if opt.startswith('--'):
+                            argv[i] += '='
+
+                        argv[i] += self.attrs['empty_default']
+                        break
+
+            del self.attrs['empty_default']
+            del self.attrs['value_optional']
+
+        return make_option(*self.opts, **self.attrs)
+
+    def add_to(self, parent, config, argv):
         """Adds the option to the parent parser or group."""
-        parent.add_option(self.make_option(config))
+        parent.add_option(self.make_option(config, argv))
 
 
 class OptionGroup(object):
@@ -83,12 +103,12 @@ class OptionGroup(object):
         self.description = description
         self.option_list = option_list
 
-    def add_to(self, parser, config):
+    def add_to(self, parser, config, argv):
         """Adds the group and all its contained options to the parser."""
         group = BaseOptionGroup(parser, self.name, self.description)
 
         for option in self.option_list:
-            option.add_to(group, config)
+            option.add_to(group, config, argv)
 
         parser.add_option_group(group)
 
@@ -303,7 +323,7 @@ class Command(object):
     def __init__(self):
         self.log = logging.getLogger('rb.%s' % self.name)
 
-    def create_parser(self, config):
+    def create_parser(self, config, argv=[]):
         """Create and return the ``OptionParser`` which will be used to
         parse the arguments to this command.
         """
@@ -312,10 +332,10 @@ class Command(object):
                               add_help_option=False)
 
         for option in self.option_list:
-            option.add_to(parser, config)
+            option.add_to(parser, config, argv)
 
         for option in self._global_options:
-            option.add_to(parser, config)
+            option.add_to(parser, config, argv)
 
         return parser
 
@@ -336,7 +356,7 @@ class Command(object):
         be called.
         """
         self.config = load_config()
-        parser = self.create_parser(self.config)
+        parser = self.create_parser(self.config, argv)
         options, args = parser.parse_args(argv[2:])
         self.options = options
 

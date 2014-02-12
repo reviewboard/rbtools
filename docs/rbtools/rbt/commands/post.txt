@@ -300,6 +300,93 @@ Using STDIN will require either a valid cookie, or the :option:`--username`
 and :option:`--password` options.
 
 
+.. _guessing-fields:
+
+Auto-Setting Summary and Description
+====================================
+
+The summary and description of a review request can be automatically
+set ("guessed") based on the posted commit by using the
+:option:`-g/--guess-fields <-g>`, :option:`--guess-summary`, or
+:option:`--guess-description` options.
+
+This saves some time when creating a review request by allowing you to write
+a thorough summary and description only once in the commit, and reusing it for
+the review request.
+
+This feature only works for SCMs where you're posting commits, instead of
+changes from a working directory. For example, Git, Mercurial and Bazaar.
+
+.. tip::
+
+   :option:`-g/--guess-fields <-g>` implies :option:`--guess-summary` and
+   :option:`--guess-description`. Generally, you'll want to use it instead
+   of the more specific options.
+
+
+.. _guessing-behavior:
+
+Controlling Guessing Behavior
+-----------------------------
+
+.. versionadded:: 0.6
+
+The guessing options can each take a value to control when guessing is done:
+
+* ``yes`` --
+  Guessing will be used when creating or updating the review request.
+
+* ``no`` --
+  Guessing will not be used. This is useful for overriding a default
+  (see :ref:`configuring-guessing-defaults`).
+
+* ``auto`` --
+  Guessing will be used only if creating a new review request,
+  and not when updating.
+
+You can specify a value when using either short-form or long-form arguments.
+For example::
+
+    $ rbt post --guess-fields=no
+
+By default, if no guessing options are specified, ``--guess-fields=auto`` will
+be implied. This allows you to run the following and have it automatically
+fill in the summary and description::
+
+    $ rbt post
+
+If specifying a guessing argument without a value, ``yes`` will be implied
+instead, forcing the fields to be updated, regardless of the default. For
+example::
+
+    $ rbt post -g
+
+
+.. _configuring-guessing-defaults:
+
+Configuring Defaults
+--------------------
+
+.. versionchanged:: 0.6
+
+Projects that want to change the default guess behavior can set the
+``GUESS_FIELDS``, ``GUESS_SUMMARY``, and ``GUESS_DESCRIPTION`` settings
+in :file:`.reviewboardrc`. These accept ``'yes'``, ``'no'``, and ``'auto'``
+values.
+
+On RBTools 0.6 or higher, the default is ``'auto'``. On older versions,
+the default was ``False`` (equivalent to ``'no'``).
+
+Setting ``GUESS_FIELDS`` will imply setting ``GUESS_SUMMARY`` and
+``GUESS_DESCRIPTION``. Rarely will you need to set anything but
+``GUESS_FIELDS``.
+
+For example, to default to guessing fields for review requests that are either
+newly created or being updated, you can use::
+
+    GUESS_FIELDS = 'yes'
+
+
 .. _automating-rbt-post:
 
 Automating rbt post
@@ -437,7 +524,11 @@ Options
 
 .. cmdoption:: -g, --guess-fields
 
-   Equivalent to --guess-summary --guess-description.
+   Equivalent to setting both the :option:`--guess-summary` and
+   :option:`--guess-description` flags.
+
+   This can optionally take a value to control the guessing behavior.
+   See :ref:`guessing-behavior` for more information.
 
    The default can be set in ``GUESS_FIELDS`` in :file:`.reviewboardrc`.
 
@@ -445,12 +536,18 @@ Options
 
    Guess summary from the latest commit (bzr/Git/hg/hgsubversion only).
 
+   This can optionally take a value to control the guessing behavior.
+   See :ref:`guessing-behavior` for more information.
+
    The default can be set in ``GUESS_SUMMARY`` in :file:`.reviewboardrc`.
 
 .. cmdoption:: --guess-description
 
    Guess description based on commits on this branch (bzr/Git/hg/hgsubversion
    only).
+
+   This can optionally take a value to control the guessing behavior.
+   See :ref:`guessing-behavior` for more information.
 
    The default can be set in ``GUESS_DESCRIPTION`` in :file:`.reviewboardrc`.
 
@@ -482,7 +579,7 @@ Options
    Username to be recorded as the author of the review request, instead of the
    logged in user. This is useful when used in a repository's post-commit
    script to update or create review requests. See :ref:`automating-rbt-post`
-   for information on this use case..
+   for information on this use case.
 
    The default can be set in ``SUBMIT_AS`` in :file:`.reviewboardrc`.
 

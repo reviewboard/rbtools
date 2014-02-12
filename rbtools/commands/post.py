@@ -18,6 +18,14 @@ class Post(Command):
     author = "The Review Board Project"
     description = "Uploads diffs to create and update review requests."
     args = "[revisions]"
+
+    GUESS_AUTO = 'auto'
+    GUESS_YES = 'yes'
+    GUESS_NO = 'no'
+    GUESS_YES_INPUT_VALUES = (True, 'yes', 1, '1')
+    GUESS_NO_INPUT_VALUES = (False, 'no', 0, '0')
+    GUESS_CHOICES = (GUESS_AUTO, GUESS_YES, GUESS_NO)
+
     option_list = [
         OptionGroup(
             name='Posting Options',
@@ -83,23 +91,35 @@ class Post(Command):
             option_list=[
                 Option('-g', '--guess-fields',
                        dest='guess_fields',
-                       action='store_true',
+                       action='store',
                        config_key='GUESS_FIELDS',
-                       default=False,
+                       value_optional=True,
+                       default=GUESS_AUTO,
+                       empty_default=GUESS_YES,
+                       choices=GUESS_CHOICES,
+                       metavar='[yes|no|auto]',
                        help='Short-hand for --guess-summary '
                             '--guess-description.'),
                 Option('--guess-summary',
                        dest='guess_summary',
-                       action='store_true',
+                       action='store',
                        config_key='GUESS_SUMMARY',
-                       default=False,
+                       value_optional=True,
+                       default=GUESS_AUTO,
+                       empty_default=GUESS_YES,
+                       choices=GUESS_CHOICES,
+                       metavar='[yes|no|auto]',
                        help='Generates the Summary field based on the '
                             'commit messages (Bazaar/Git/Mercurial only).'),
                 Option('--guess-description',
                        dest='guess_description',
-                       action='store_true',
+                       action='store',
                        config_key='GUESS_DESCRIPTION',
-                       default=False,
+                       value_optional=True,
+                       default=GUESS_AUTO,
+                       empty_default=GUESS_YES,
+                       choices=GUESS_CHOICES,
+                       metavar='[yes|no|auto]',
                        help='Generates the Description field based on the '
                             'commit messages (Bazaar/Git/Mercurial only).'),
                 Option('--change-description',
@@ -171,8 +191,11 @@ class Post(Command):
     def post_process_options(self):
         # -g implies --guess-summary and --guess-description
         if self.options.guess_fields:
-            self.options.guess_summary = True
-            self.options.guess_description = True
+            self.options.guess_fields = self.normalize_guess_value(
+                self.options.guess_fields, '--guess-fields')
+
+            self.options.guess_summary = self.options.guess_fields
+            self.options.guess_description = self.options.guess_fields
 
         if self.options.revision_range:
             raise CommandError(
@@ -218,15 +241,37 @@ class Post(Command):
                 raise CommandError("The testing file %s does not exist.\n" %
                                    self.options.testing_file)
 
+        # If we have an explicitly specified summary, override
+        # --guess-summary
+        if self.options.summary:
+            self.options.guess_summary = self.GUESS_NO
+        else:
+            self.options.guess_summary = self.normalize_guess_value(
+                self.options.guess_summary, '--guess-summary')
+
         # If we have an explicitly specified description, override
         # --guess-description
-        if self.options.guess_description and self.options.description:
-            self.options.guess_description = False
+        if self.options.description:
+            self.options.guess_description = self.GUESS_NO
+        else:
+            self.options.guess_description = self.normalize_guess_value(
+                self.options.guess_description, '--guess-description')
 
         # If we have an explicitly specified review request ID, override
         # --update
         if self.options.rid and self.options.update:
             self.options.update = False
+
+    def normalize_guess_value(self, guess, arg_name):
+        if guess in self.GUESS_YES_INPUT_VALUES:
+            return self.GUESS_YES
+        elif guess in self.GUESS_NO_INPUT_VALUES:
+            return self.GUESS_NO
+        elif guess == self.GUESS_AUTO:
+            return guess
+        else:
+            raise CommandError('Invalid value "%s" for argument "%s"'
+                               % (guess, arg_name))
 
     def get_repository_path(self, repository_info, api_root):
         """Get the repository path from the server.
@@ -594,10 +639,17 @@ class Post(Command):
         requested, or if explicit values were set in the options, nothing
         will be set for the fields.
         """
-        guess_summary = (self.options.guess_summary and
-                         not self.options.summary)
-        guess_description = (self.options.guess_description and
-                             not self.options.description)
+        is_new_review_request = (not self.options.rid and
+                                 not self.options.update)
+
+        guess_summary = (
+            self.options.guess_summary == self.GUESS_YES or
+            (self.options.guess_summary == self.GUESS_AUTO and
+             is_new_review_request))
+        guess_description = (
+            self.options.guess_description == self.GUESS_YES or
+            (self.options.guess_description == self.GUESS_AUTO and
+             is_new_review_request))
 
         if guess_summary or guess_description:
             try:
