@@ -2,7 +2,7 @@ import getpass
 import inspect
 import logging
 import sys
-from optparse import make_option, OptionParser
+from optparse import make_option, OptionParser, OptionGroup as BaseOptionGroup
 from urlparse import urlparse
 
 from rbtools.api.capabilities import Capabilities
@@ -37,7 +37,7 @@ class Option(object):
     The arguments to the constructor should be treated like those
     to optparse.make_option, with the exception that the keyword
     argument 'config_key' is also valid. If config_key is provided
-    it will be used to retreive the config value as a default if the
+    it will be used to retrieve the config value as a default if the
     option is not specified. This will take precedence over the
     default argument.
 
@@ -62,6 +62,35 @@ class Option(object):
             del self.kwargs['config_key']
 
         return make_option(*self.args, **self.kwargs)
+
+    def add_to(self, parent, config):
+        """Adds the option to the parent parser or group."""
+        parent.add_option(self.make_option(config))
+
+
+class OptionGroup(object):
+    """Represents a named group of options.
+
+    Each group has a name, an optional description, and a list of options.
+    It serves as a way to organize related options, making it easier for
+    users to scan for the options they want.
+
+    This works like optparse's OptionGroup, but is designed to work with
+    our special Option class.
+    """
+    def __init__(self, name=None, description=None, option_list=[]):
+        self.name = name
+        self.description = description
+        self.option_list = option_list
+
+    def add_to(self, parser, config):
+        """Adds the group and all its contained options to the parser."""
+        group = BaseOptionGroup(parser, self.name, self.description)
+
+        for option in self.option_list:
+            option.add_to(group, config)
+
+        parser.add_option_group(group)
 
 
 class Command(object):
@@ -105,16 +134,17 @@ class Command(object):
         """Create and return the ``OptionParser`` which will be used to
         parse the arguments to this command.
         """
-        option_list = [
-            opt.make_option(config) for opt in self.option_list
-        ] + [
-            opt.make_option(config) for opt in self._global_options
-        ]
+        parser = OptionParser(prog=RB_MAIN,
+                              usage=self.usage(),
+                              add_help_option=False)
 
-        return OptionParser(prog=RB_MAIN,
-                            usage=self.usage(),
-                            option_list=option_list,
-                            add_help_option=False)
+        for option in self.option_list:
+            option.add_to(parser, config)
+
+        for option in self._global_options:
+            option.add_to(parser, config)
+
+        return parser
 
     def usage(self):
         """Return a usage string for the command."""

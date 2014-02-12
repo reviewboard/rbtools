@@ -4,7 +4,7 @@ import re
 import sys
 
 from rbtools.api.errors import APIError
-from rbtools.commands import Command, CommandError, Option
+from rbtools.commands import Command, CommandError, Option, OptionGroup
 from rbtools.utils.console import confirm
 from rbtools.utils.diffs import get_diff
 from rbtools.utils.match_score import Score
@@ -19,232 +19,313 @@ class Post(Command):
     description = "Uploads diffs to create and update review requests."
     args = "[revisions]"
     option_list = [
-        Option("-r", "--review-request-id",
-               dest="rid",
-               metavar="ID",
-               default=None,
-               help="existing review request ID to update"),
-        Option('-u', '--update',
-               dest="update",
-               action="store_true",
-               default=False,
-               help="determine existing review request to update"),
-        Option("--server",
-               dest="server",
-               metavar="SERVER",
-               config_key="REVIEWBOARD_URL",
-               default=None,
-               help="specify a different Review Board server to use"),
-        Option("--disable-proxy",
-               action='store_false',
-               dest='enable_proxy',
-               config_key="ENABLE_PROXY",
-               default=True,
-               help="prevents requests from going through a proxy server"),
-        Option('-p', '--publish',
-               dest="publish",
-               action="store_true",
-               default=False,
-               help="publish the review request immediately after submitting"),
-        Option("-o", "--open",
-               dest="open_browser",
-               action="store_true",
-               config_key='OPEN_BROWSER',
-               default=False,
-               help="open a web browser to the review request page"),
-        Option("--target-groups",
-               dest="target_groups",
-               config_key="TARGET_GROUPS",
-               default=None,
-               help="names of the groups who will perform the review"),
-        Option("--target-people",
-               dest="target_people",
-               config_key="TARGET_PEOPLE",
-               default=None,
-               help="names of the people who will perform the review"),
-        Option("--summary",
-               dest="summary",
-               default=None,
-               help="summary of the review "),
-        Option("--description",
-               dest="description",
-               default=None,
-               help="description of the review "),
-        Option("--description-file",
-               dest="description_file",
-               default=None,
-               help="text file containing a description of the review"),
-        Option('-g', '--guess-fields',
-               dest="guess_fields",
-               action="store_true",
-               config_key="GUESS_FIELDS",
-               default=False,
-               help="equivalent to --guess-summary --guess-description"),
-        Option("--guess-summary",
-               dest="guess_summary",
-               action="store_true",
-               config_key="GUESS_SUMMARY",
-               default=False,
-               help="guess summary from the latest commit "
-                    "(bzr/git/hg/hgsubversion only)"),
-        Option("--guess-description",
-               dest="guess_description",
-               action="store_true",
-               config_key="GUESS_DESCRIPTION",
-               default=False,
-               help="guess description based on commits on this branch "
-                    "(bzr/git/hg/hgsubversion only)"),
-        Option("--testing-done",
-               dest="testing_done",
-               default=None,
-               help="details of testing done "),
-        Option("--testing-done-file",
-               dest="testing_file",
-               default=None,
-               help="text file containing details of testing done "),
-        Option("--branch",
-               dest="branch",
-               config_key="BRANCH",
-               default=None,
-               help="affected branch "),
-        Option("--bugs-closed",
-               dest="bugs_closed",
-               default=None,
-               help="list of bugs closed "),
-        Option("--change-description",
-               default=None,
-               help="description of what changed in this revision of "
-                    "the review request when updating an existing request"),
-        Option('--revision-range',
-               dest='revision_range',
-               default=None,
-               help='generate a diff with the given revision range '
-                    '(DEPRECATED'),
-        Option('-I', '--include',
-               dest='include_files',
-               action='append',
-               help='include only the given file in the diff (can be used '
-                    'multiple times)'),
-        Option("--submit-as",
-               dest="submit_as",
-               metavar="USERNAME",
-               config_key="SUBMIT_AS",
-               default=None,
-               help="user name to be recorded as the author of the "
-                    "review request, instead of the logged in user"),
-        Option("--username",
-               dest="username",
-               metavar="USERNAME",
-               config_key="USERNAME",
-               default=None,
-               help="user name to be supplied to the Review Board server"),
-        Option("--password",
-               dest="password",
-               metavar="PASSWORD",
-               config_key="PASSWORD",
-               default=None,
-               help="password to be supplied to the Review Board server"),
-        Option("--change-only",
-               dest="change_only",
-               action="store_true",
-               default=False,
-               help="updates info from changelist, but does "
-                    "not upload a new diff (only available if your "
-                    "repository supports changesets)"),
-        Option("--markdown",
-               dest="markdown",
-               action="store_true",
-               config_key="MARKDOWN",
-               default=False,
-               help="whether the commit message should be interpreted as "
-                    "Markdown-formatted text (Review Board 2.0+ only)"),
-        Option("--parent",
-               dest="parent_branch",
-               metavar="PARENT_BRANCH",
-               config_key="PARENT_BRANCH",
-               default=None,
-               help="the parent branch this diff should be against "
-                    "(only available if your repository supports "
-                    "parent diffs)"),
-        Option("--tracking-branch",
-               dest="tracking",
-               metavar="TRACKING",
-               config_key="TRACKING_BRANCH",
-               default=None,
-               help="Tracking branch from which your branch is derived "
-                    "(git only, defaults to origin/master)"),
-        Option("--p4-client",
-               dest="p4_client",
-               config_key="P4_CLIENT",
-               default=None,
-               help="the Perforce client name that the review is in"),
-        Option("--p4-port",
-               dest="p4_port",
-               config_key="P4_PORT",
-               default=None,
-               help="the Perforce servers IP address that the review is on"),
-        Option("--p4-passwd",
-               dest="p4_passwd",
-               config_key="P4_PASSWD",
-               default=None,
-               help="the Perforce password or ticket of the user "
-                    "in the P4USER environment variable"),
-        Option("--svn-show-copies-as-adds",
-               dest="svn_show_copies_as_adds",
-               metavar="y/n",
-               default=None,
-               help="don't diff copied or moved files with their source"),
-        Option("--svn-changelist",
-               dest="svn_changelist",
-               default=None,
-               help="generate the diff for review based on a local SVN "
-                    "changelist"),
-        Option("--repository",
-               dest="repository_name",
-               config_key="REPOSITORY",
-               default=None,
-               help="the name of the repository configured on Review Board "
-                    "that matches the local repository"),
-        Option("--repository-url",
-               dest="repository_url",
-               config_key="REPOSITORY_URL",
-               default=None,
-               help="the url for a repository for creating a diff "
-                    "outside of a working copy (currently only "
-                    "supported by Subversion with specific revisions or "
-                    "--diff-filename and ClearCase with relative "
-                    "paths outside the view). For git, this specifies"
-                    "the origin url of the current repository, "
-                    "overriding the origin url supplied by the git "
-                    "client."),
-        Option("--diff-filename",
-               dest="diff_filename",
-               default=None,
-               help="upload an existing diff file, instead of "
-                    "generating a new diff"),
-        Option("--basedir",
-               dest="basedir",
-               config_key="BASEDIR",
-               default=None,
-               help="the absolute path in the repository the diff was "
-                    "generated in. Will override the detected path."),
-        Option("--diff-only",
-               dest="diff_only",
-               action="store_true",
-               default=False,
-               help="uploads a new diff, but does not update info from "
-                    "the changelist."),
-        Option('--repository-type',
-               dest='repository_type',
-               config_key="REPOSITORY_TYPE",
-               default=None,
-               help='the type of repository in the current directory. '
-                    'In most cases this should be detected '
-                    'automatically, but some directory structures '
-                    'containing multiple repositories require this '
-                    'option to select the proper type. The '
-                    '``rbt list-repo-types`` command can be used to list '
-                    'the supported values.'),
+        OptionGroup(
+            name='Posting Options',
+            description='Controls the behavior of a post, including what '
+                        'review request gets posted and how, and what '
+                        'happens after it is posted.',
+            option_list=[
+                Option('-r', '--review-request-id',
+                       dest='rid',
+                       metavar='ID',
+                       default=None,
+                       help='Specifies the existing review request ID to '
+                            'update.'),
+                Option('-u', '--update',
+                       dest='update',
+                       action='store_true',
+                       default=False,
+                       help='Automatically determines the existing review '
+                            'request to update.'),
+                Option('-p', '--publish',
+                       dest='publish',
+                       action='store_true',
+                       default=False,
+                       help='Immediately publishes the review request after '
+                            'posting.'),
+                Option('-o', '--open',
+                       dest='open_browser',
+                       action='store_true',
+                       config_key='OPEN_BROWSER',
+                       default=False,
+                       help='Opens a web browser to the review request '
+                            'after posting.'),
+                Option('--submit-as',
+                       dest='submit_as',
+                       metavar='USERNAME',
+                       config_key='SUBMIT_AS',
+                       default=None,
+                       help='The user name to use as the author of the '
+                            'review request, instead of the logged in user.'),
+                Option('--change-only',
+                       dest='change_only',
+                       action='store_true',
+                       default=False,
+                       help='Updates fields from the change description, '
+                            'but does not upload a new diff '
+                            '(Perforce/Plastic only).'),
+                Option('--diff-only',
+                       dest='diff_only',
+                       action='store_true',
+                       default=False,
+                       help='Uploads a new diff, but does not update '
+                            'fields from the change description '
+                            '(Perforce/Plastic only).'),
+            ]
+        ),
+        OptionGroup(
+            name='Review Board Server Options',
+            description='Options necessary to communicate and authenticate '
+                        'with a Review Board server.',
+            option_list=[
+                Option('--server',
+                       dest='server',
+                       metavar='SERVER',
+                       config_key='REVIEWBOARD_URL',
+                       default=None,
+                       help='Specifies the Review Board server to use.'),
+                Option('--disable-proxy',
+                       action='store_false',
+                       dest='enable_proxy',
+                       config_key='ENABLE_PROXY',
+                       default=True,
+                       help='Prevents requests from going through a proxy '
+                            'server.'),
+                Option('--username',
+                       dest='username',
+                       metavar='USERNAME',
+                       config_key='USERNAME',
+                       default=None,
+                       help='The user name to be supplied to the Review Board '
+                            'server.'),
+                Option('--password',
+                       dest='password',
+                       metavar='PASSWORD',
+                       config_key='PASSWORD',
+                       default=None,
+                       help='The password to be supplied to the Review Board '
+                            'server.'),
+            ]
+        ),
+        OptionGroup(
+            name='Repository Options',
+            option_list=[
+                Option('--repository',
+                       dest='repository_name',
+                       config_key='REPOSITORY',
+                       default=None,
+                       help='The name of the repository configured on '
+                            'Review Board that matches the local repository.'),
+                Option('--repository-url',
+                       dest='repository_url',
+                       config_key='REPOSITORY_URL',
+                       default=None,
+                       help='The URL for a repository, used for creating '
+                            'a diff outside of a working copy (currently only '
+                            'supported by Subversion with specific revisions '
+                            'or --diff-filename and ClearCase with relative '
+                            'paths outside the view). For git, this specifies '
+                            'the origin url of the current repository, '
+                            'overriding the origin URL supplied by the git '
+                            'client.'),
+                Option('--repository-type',
+                       dest='repository_type',
+                       config_key='REPOSITORY_TYPE',
+                       default=None,
+                       help='The type of repository in the current directory. '
+                            'In most cases this should be detected '
+                            'automatically, but some directory structures '
+                            'containing multiple repositories require this '
+                            'option to select the proper type. The '
+                            '`rbt list-repo-types` command can be used to '
+                            'list the supported values.'),
+            ]
+        ),
+        OptionGroup(
+            name='Review Request Field Options',
+            description='Options for setting the contents of fields in the '
+                        'review request.',
+            option_list=[
+                Option('-g', '--guess-fields',
+                       dest='guess_fields',
+                       action='store_true',
+                       config_key='GUESS_FIELDS',
+                       default=False,
+                       help='Short-hand for --guess-summary '
+                            '--guess-description.'),
+                Option('--guess-summary',
+                       dest='guess_summary',
+                       action='store_true',
+                       config_key='GUESS_SUMMARY',
+                       default=False,
+                       help='Generates the Summary field based on the '
+                            'commit messages (Bazaar/Git/Mercurial only).'),
+                Option('--guess-description',
+                       dest='guess_description',
+                       action='store_true',
+                       config_key='GUESS_DESCRIPTION',
+                       default=False,
+                       help='Generates the Description field based on the '
+                            'commit messages (Bazaar/Git/Mercurial only).'),
+                Option('--change-description',
+                       default=None,
+                       help='A description of what changed in this update '
+                            'of the review request. This is ignored for new '
+                            'review requests.'),
+                Option('--summary',
+                       dest='summary',
+                       default=None,
+                       help='The new contents for the Summary field.'),
+                Option('--description',
+                       dest='description',
+                       default=None,
+                       help='The new contents for the Description field.'),
+                Option('--description-file',
+                       dest='description_file',
+                       default=None,
+                       metavar='FILENAME',
+                       help='A text file containing the new contents for the '
+                            'Description field.'),
+                Option('--testing-done',
+                       dest='testing_done',
+                       default=None,
+                       help='The new contents for the Testing Done field.'),
+                Option('--testing-done-file',
+                       dest='testing_file',
+                       default=None,
+                       metavar='FILENAME',
+                       help='A text file containing the new contents for the '
+                            'Testing Done field.'),
+                Option('--branch',
+                       dest='branch',
+                       config_key='BRANCH',
+                       default=None,
+                       help='The branch the change will be committed on.'),
+                Option('--bugs-closed',
+                       dest='bugs_closed',
+                       default=None,
+                       help='The comma-separated list of bug IDs closed.'),
+                Option('--target-groups',
+                       dest='target_groups',
+                       config_key='TARGET_GROUPS',
+                       default=None,
+                       help='The names of the groups that should perform the '
+                            'review.'),
+                Option('--target-people',
+                       dest='target_people',
+                       config_key='TARGET_PEOPLE',
+                       default=None,
+                       help='The usernames of the people who should perform '
+                            'the review.'),
+                Option('--markdown',
+                       dest='markdown',
+                       action='store_true',
+                       config_key='MARKDOWN',
+                       default=False,
+                       help='Specifies if the summary and description should '
+                            'be interpreted as Markdown-formatted text '
+                            '(Review Board 2.0+ only).'),
+            ]
+        ),
+        OptionGroup(
+            name='Diff Generation Options',
+            description='Options for choosing what gets included in a diff, '
+                        'and how the diff is generated.',
+            option_list=[
+                Option('--revision-range',
+                       dest='revision_range',
+                       default=None,
+                       help='Generates a diff for the given revision range. '
+                            '[DEPRECATED]'),
+                Option('-I', '--include',
+                       dest='include_files',
+                       action='append',
+                       help='Includes only the given file in the diff. '
+                            'This can be used multiple times to specify '
+                            'multiple files.'),
+                Option('--parent',
+                       dest='parent_branch',
+                       metavar='BRANCH',
+                       config_key='PARENT_BRANCH',
+                       default=None,
+                       help='The parent branch this diff should be generated '
+                            'against (Bazaar/Git/Mercurial only).'),
+                Option('--diff-filename',
+                       dest='diff_filename',
+                       default=None,
+                       metavar='FILENAME',
+                       help='Uploads an existing diff file, instead of '
+                            'generating a new diff.'),
+            ]
+        ),
+        OptionGroup(
+            name='Git Options',
+            description='Git-specific options for selecting revisions for '
+                        'diff generation.',
+            option_list=[
+                Option('--tracking-branch',
+                       dest='tracking',
+                       metavar='BRANCH',
+                       config_key='TRACKING_BRANCH',
+                       default=None,
+                       help='The remote tracking branch from which your '
+                            'local branch is derived '
+                            '(defaults to origin/master).'),
+            ]
+        ),
+        OptionGroup(
+            name='Perforce Options',
+            description='Perforce-specific options for selecting the '
+                        'Perforce client and communicating with the '
+                        'repository.',
+            option_list=[
+                Option('--p4-client',
+                       dest='p4_client',
+                       config_key='P4_CLIENT',
+                       default=None,
+                       metavar='CLIENT_NAME',
+                       help='The Perforce client name for the repository.'),
+                Option('--p4-port',
+                       dest='p4_port',
+                       config_key='P4_PORT',
+                       default=None,
+                       metavar='PORT',
+                       help='The IP address for the Perforce server.'),
+                Option('--p4-passwd',
+                       dest='p4_passwd',
+                       config_key='P4_PASSWD',
+                       default=None,
+                       metavar='PASSWORD',
+                       help='The Perforce password or ticket of the user '
+                            'in the P4USER environment variable.'),
+            ]
+        ),
+        OptionGroup(
+            name='Subversion Options',
+            description='Subversion-specific options for controlling diff '
+                        'generation.',
+            option_list=[
+                Option('--basedir',
+                       dest='basedir',
+                       config_key='BASEDIR',
+                       default=None,
+                       metavar='PATH',
+                       help='The path within the repository where the diff '
+                            'was generated. This overrides the detected path. '
+                            'Often used when passing --diff-filename.'),
+                Option('--svn-show-copies-as-adds',
+                       dest='svn_show_copies_as_adds',
+                       metavar='y/n',
+                       default=None,
+                       help='Treat copied or moved files as new files.'),
+                Option('--svn-changelist',
+                       dest='svn_changelist',
+                       default=None,
+                       metavar='ID',
+                       help='Generates the diff for review based on a '
+                            'local changelist. [DEPRECATED]'),
+            ]
+        ),
     ]
 
     def post_process_options(self):
