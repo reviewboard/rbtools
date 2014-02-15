@@ -108,7 +108,7 @@ class SVNClient(SCMClient):
             # TODO: this should warn about mixed-revision working copies that
             # affect the list of files changed (see bug 2392).
             return {
-                'base': self._convert_symbolic_revision('BASE'),
+                'base': 'BASE',
                 'tip': self.REVISION_WORKING_COPY,
             }
         elif n_revisions == 1:
@@ -132,7 +132,7 @@ class SVNClient(SCMClient):
                         # copies that affect the list of files changed (see
                         # bug 2392).
                         return {
-                            'base': self._convert_symbolic_revision('BASE'),
+                            'base': 'BASE',
                             'tip': self.REVISION_CHANGELIST_PREFIX + revision
                         }
 
