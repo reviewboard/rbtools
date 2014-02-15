@@ -211,14 +211,15 @@ class SVNClient(SCMClient):
         repository_info = self.get_repository_info()
 
         diff_cmd = ['svn', 'diff', '--diff-cmd=diff']
+        changelist = None
 
         if tip == self.REVISION_WORKING_COPY:
             # Posting the working copy
             diff_cmd.extend(['-r', base])
         elif tip.startswith(self.REVISION_CHANGELIST_PREFIX):
             # Posting a changelist
-            cl = tip[len(self.REVISION_CHANGELIST_PREFIX):]
-            diff_cmd.extend(['--changelist', cl])
+            changelist = tip[len(self.REVISION_CHANGELIST_PREFIX):]
+            diff_cmd.extend(['--changelist', changelist])
         else:
             # Diff between two separate revisions. Behavior depends on whether
             # or not there's a working copy
@@ -254,7 +255,7 @@ class SVNClient(SCMClient):
 
             diff_cmd.extend(files)
 
-        if self.history_scheduled_with_commit():
+        if self.history_scheduled_with_commit(changelist):
             svn_show_copies_as_adds = getattr(
                 self.options, 'svn_show_copies_as_adds', None)
             if svn_show_copies_as_adds is None:
@@ -275,10 +276,14 @@ class SVNClient(SCMClient):
             'diff': ''.join(diff),
         }
 
-    def history_scheduled_with_commit(self):
+    def history_scheduled_with_commit(self, changelist):
         """ Method to find if any file status has '+' in 4th column"""
+        status_cmd = ['svn', 'st']
 
-        for p in execute(["svn", "st"], split_lines=True):
+        if changelist:
+            status_cmd.extend(['--changelist', changelist])
+
+        for p in execute(status_cmd, split_lines=True):
             if p.startswith('A  +'):
                 return True
         return False
