@@ -413,6 +413,14 @@ class SVNClient(SCMClient):
     def svn_info(self, path, ignore_errors=False):
         """Return a dict which is the result of 'svn info' at a given path."""
         svninfo = {}
+
+        # SVN's internal path recognizers think that any file path that
+        # includes an '@' character will be path@rev, and skips everything that
+        # comes after the '@'. This makes it hard to do operations on files
+        # which include '@' in the name (such as image@2x.png).
+        if '@' in path and not path[-1] == '@':
+            path += '@'
+
         result = execute(["svn", "info", path],
                          split_lines=True,
                          ignore_errors=ignore_errors,
