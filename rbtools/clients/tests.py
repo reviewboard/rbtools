@@ -1834,8 +1834,8 @@ class BazaarClientTests(SCMClientTests):
         self._compare_diffs("foo.txt", result['diff'],
                             'a6326b53933f8b255a4b840485d8e210')
 
-    def test_guessed_summary_and_description_in_diff(self):
-        """Testing BazaarClient diff with summary and description guessed"""
+    def test_guessed_summary_and_description(self):
+        """Testing BazaarClient guessing summary and description"""
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
@@ -1854,9 +1854,9 @@ class BazaarClientTests(SCMClientTests):
         self.assertTrue("commit 2" in description)
         self.assertFalse("commit 3" in description)
 
-    def test_guessed_summary_and_description_in_grand_parent_branch_diff(self):
+    def test_guessed_summary_and_description_in_grand_parent_branch(self):
         """
-        Testing BazaarClient diff with summary and description guessed for grand parent branch.
+        Testing BazaarClient guessing summary and description for grand parent branch.
         """
         os.chdir(self.child_branch)
 
@@ -1884,6 +1884,23 @@ class BazaarClientTests(SCMClientTests):
         self.assertTrue("commit 1" in description)
         self.assertTrue("commit 2" in description)
         self.assertFalse("commit 3" in description)
+
+    def test_guessed_summary_and_description_with_revision_range(self):
+        """Testing BazaarClient guessing summary and description with a revision range."""
+        os.chdir(self.child_branch)
+
+        self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
+        self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
+        self._bzr_add_file_commit("foo.txt", FOO3, "commit 3")
+
+        self.options.guess_summary = True
+        self.options.guess_description = True
+        revisions = self.client.parse_revision_spec(['2..3'])
+        commit_message = self.client.get_commit_message(revisions)
+        print commit_message
+
+        self.assertEquals("commit 2", commit_message['summary'])
+        self.assertEquals("commit 2", commit_message['description'])
 
     def test_parse_revision_spec_no_args(self):
         """Testing BazaarClient.parse_revision_spec with no specified revisions"""

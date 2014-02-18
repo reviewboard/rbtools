@@ -185,12 +185,18 @@ class BazaarClient(SCMClient):
         # 2014-01-02  First Name  <email@address>
         #
         # ...
-        lines = execute(
-            ['bzr', 'log', '-r',
-             '%s..%s' % (revisions['base'], revisions['tip']),
-             '--gnu-changelog'],
-            ignore_errors=True,
-            split_lines=True)
+        log_cmd = ['bzr', 'log', '-r',
+                   '%s..%s' % (revisions['base'], revisions['tip'])]
+
+        # Find out how many commits there are, then log limiting to one fewer.
+        # This is because diff treats the range as (r1, r2] while log treats
+        # the lange as [r1, r2].
+        lines = execute(log_cmd + ['--line'],
+                        ignore_errors=True, split_lines=True)
+        n_revs = len(lines) - 1
+
+        lines = execute(log_cmd + ['--gnu-changelog', '-l', str(n_revs)],
+                        ignore_errors=True, split_lines=True)
 
         message = []
 
