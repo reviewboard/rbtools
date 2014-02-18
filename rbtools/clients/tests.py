@@ -1116,7 +1116,7 @@ class SVNClientTests(SCMClientTests):
         self.assertTrue('base' in revisions)
         self.assertTrue('tip' in revisions)
         self.assertTrue('parent_base' not in revisions)
-        self.assertEqual(revisions['base'], 3)
+        self.assertEqual(revisions['base'], 'BASE')
         self.assertEqual(revisions['tip'], '--rbtools-working-copy')
 
     def test_parse_revision_spec_one_revision(self):
@@ -1138,7 +1138,7 @@ class SVNClientTests(SCMClientTests):
         self.assertTrue('base' in revisions)
         self.assertTrue('tip' in revisions)
         self.assertTrue('parent_base' not in revisions)
-        self.assertEqual(revisions['base'], 3)
+        self.assertEqual(revisions['base'], 'BASE')
         self.assertEqual(revisions['tip'],
                          SVNClient.REVISION_CHANGELIST_PREFIX + 'my-change')
 
