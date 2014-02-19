@@ -125,7 +125,7 @@ class SVNClient(SCMClient):
                 # sense if we have a working copy.
                 if not self.options.repository_url:
                     status = execute(['svn', 'status', '--cl', str(revision),
-                                      '--xml'])
+                                      '--ignore-externals', '--xml'])
                     cl = ElementTree.fromstring(status).find('changelist')
                     if cl is not None:
                         # TODO: this should warn about mixed-revision working
@@ -277,7 +277,7 @@ class SVNClient(SCMClient):
 
     def history_scheduled_with_commit(self, changelist):
         """ Method to find if any file status has '+' in 4th column"""
-        status_cmd = ['svn', 'st']
+        status_cmd = ['svn', 'status', '--ignore-externals']
 
         if changelist:
             status_cmd.extend(['--changelist', changelist])
