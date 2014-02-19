@@ -27,24 +27,7 @@ class SetupRepo(Command):
                    % CONFIG_FILE)
     args = ""
     option_list = [
-        Option("--server",
-               dest="server",
-               metavar="SERVER",
-               config_key="REVIEWBOARD_URL",
-               default=None,
-               help="specify a different Review Board server to use"),
-        Option("--username",
-               dest="username",
-               metavar="USERNAME",
-               config_key="USERNAME",
-               default=None,
-               help="user name to be supplied to the Review Board server"),
-        Option("--password",
-               dest="password",
-               metavar="PASSWORD",
-               config_key="PASSWORD",
-               default=None,
-               help="password to be supplied to the Review Board server"),
+        Command.server_options,
     ]
 
     def prompt_rb_repository(self, tool_name, repository_info, api_root):

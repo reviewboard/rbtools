@@ -73,74 +73,8 @@ class Post(Command):
                             '(Perforce/Plastic only).'),
             ]
         ),
-        OptionGroup(
-            name='Review Board Server Options',
-            description='Options necessary to communicate and authenticate '
-                        'with a Review Board server.',
-            option_list=[
-                Option('--server',
-                       dest='server',
-                       metavar='SERVER',
-                       config_key='REVIEWBOARD_URL',
-                       default=None,
-                       help='Specifies the Review Board server to use.'),
-                Option('--disable-proxy',
-                       action='store_false',
-                       dest='enable_proxy',
-                       config_key='ENABLE_PROXY',
-                       default=True,
-                       help='Prevents requests from going through a proxy '
-                            'server.'),
-                Option('--username',
-                       dest='username',
-                       metavar='USERNAME',
-                       config_key='USERNAME',
-                       default=None,
-                       help='The user name to be supplied to the Review Board '
-                            'server.'),
-                Option('--password',
-                       dest='password',
-                       metavar='PASSWORD',
-                       config_key='PASSWORD',
-                       default=None,
-                       help='The password to be supplied to the Review Board '
-                            'server.'),
-            ]
-        ),
-        OptionGroup(
-            name='Repository Options',
-            option_list=[
-                Option('--repository',
-                       dest='repository_name',
-                       config_key='REPOSITORY',
-                       default=None,
-                       help='The name of the repository configured on '
-                            'Review Board that matches the local repository.'),
-                Option('--repository-url',
-                       dest='repository_url',
-                       config_key='REPOSITORY_URL',
-                       default=None,
-                       help='The URL for a repository, used for creating '
-                            'a diff outside of a working copy (currently only '
-                            'supported by Subversion with specific revisions '
-                            'or --diff-filename and ClearCase with relative '
-                            'paths outside the view). For git, this specifies '
-                            'the origin url of the current repository, '
-                            'overriding the origin URL supplied by the git '
-                            'client.'),
-                Option('--repository-type',
-                       dest='repository_type',
-                       config_key='REPOSITORY_TYPE',
-                       default=None,
-                       help='The type of repository in the current directory. '
-                            'In most cases this should be detected '
-                            'automatically, but some directory structures '
-                            'containing multiple repositories require this '
-                            'option to select the proper type. The '
-                            '`rbt list-repo-types` command can be used to '
-                            'list the supported values.'),
-            ]
-        ),
+        Command.server_options,
+        Command.repository_options,
         OptionGroup(
             name='Review Request Field Options',
             description='Options for setting the contents of fields in the '
@@ -227,105 +161,10 @@ class Post(Command):
                             '(Review Board 2.0+ only).'),
             ]
         ),
-        OptionGroup(
-            name='Diff Generation Options',
-            description='Options for choosing what gets included in a diff, '
-                        'and how the diff is generated.',
-            option_list=[
-                Option('--revision-range',
-                       dest='revision_range',
-                       default=None,
-                       help='Generates a diff for the given revision range. '
-                            '[DEPRECATED]'),
-                Option('-I', '--include',
-                       dest='include_files',
-                       action='append',
-                       help='Includes only the given file in the diff. '
-                            'This can be used multiple times to specify '
-                            'multiple files.'),
-                Option('--parent',
-                       dest='parent_branch',
-                       metavar='BRANCH',
-                       config_key='PARENT_BRANCH',
-                       default=None,
-                       help='The parent branch this diff should be generated '
-                            'against (Bazaar/Git/Mercurial only).'),
-                Option('--diff-filename',
-                       dest='diff_filename',
-                       default=None,
-                       metavar='FILENAME',
-                       help='Uploads an existing diff file, instead of '
-                            'generating a new diff.'),
-            ]
-        ),
-        OptionGroup(
-            name='Git Options',
-            description='Git-specific options for selecting revisions for '
-                        'diff generation.',
-            option_list=[
-                Option('--tracking-branch',
-                       dest='tracking',
-                       metavar='BRANCH',
-                       config_key='TRACKING_BRANCH',
-                       default=None,
-                       help='The remote tracking branch from which your '
-                            'local branch is derived '
-                            '(defaults to origin/master).'),
-            ]
-        ),
-        OptionGroup(
-            name='Perforce Options',
-            description='Perforce-specific options for selecting the '
-                        'Perforce client and communicating with the '
-                        'repository.',
-            option_list=[
-                Option('--p4-client',
-                       dest='p4_client',
-                       config_key='P4_CLIENT',
-                       default=None,
-                       metavar='CLIENT_NAME',
-                       help='The Perforce client name for the repository.'),
-                Option('--p4-port',
-                       dest='p4_port',
-                       config_key='P4_PORT',
-                       default=None,
-                       metavar='PORT',
-                       help='The IP address for the Perforce server.'),
-                Option('--p4-passwd',
-                       dest='p4_passwd',
-                       config_key='P4_PASSWD',
-                       default=None,
-                       metavar='PASSWORD',
-                       help='The Perforce password or ticket of the user '
-                            'in the P4USER environment variable.'),
-            ]
-        ),
-        OptionGroup(
-            name='Subversion Options',
-            description='Subversion-specific options for controlling diff '
-                        'generation.',
-            option_list=[
-                Option('--basedir',
-                       dest='basedir',
-                       config_key='BASEDIR',
-                       default=None,
-                       metavar='PATH',
-                       help='The path within the repository where the diff '
-                            'was generated. This overrides the detected path. '
-                            'Often used when passing --diff-filename.'),
-                Option('--svn-show-copies-as-adds',
-                       dest='svn_show_copies_as_adds',
-                       metavar='y/n',
-                       default=None,
-                       help='Treat copied or moved files as new files.'),
-                Option('--svn-changelist',
-                       dest='svn_changelist',
-                       default=None,
-                       metavar='ID',
-                       help='Generates the diff for review based on a '
-                            'local changelist. [DEPRECATED]'),
-            ]
-        ),
+        Command.diff_options,
+        Command.git_options,
+        Command.perforce_options,
+        Command.subversion_options,
     ]
 
     def post_process_options(self):

@@ -8,35 +8,8 @@ class Publish(Command):
     author = "The Review Board Project"
     args = "<review-request-id>"
     option_list = [
-        Option("--server",
-               dest="server",
-               metavar="SERVER",
-               config_key="REVIEWBOARD_URL",
-               default=None,
-               help="specify a different Review Board server to use"),
-        Option("--username",
-               dest="username",
-               metavar="USERNAME",
-               config_key="USERNAME",
-               default=None,
-               help="user name to be supplied to the Review Board server"),
-        Option("--password",
-               dest="password",
-               metavar="PASSWORD",
-               config_key="PASSWORD",
-               default=None,
-               help="password to be supplied to the Review Board server"),
-        Option('--repository-type',
-               dest='repository_type',
-               config_key="REPOSITORY_TYPE",
-               default=None,
-               help='the type of repository in the current directory. '
-                    'In most cases this should be detected '
-                    'automatically but some directory structures '
-                    'containing multiple repositories require this '
-                    'option to select the proper type. Valid '
-                    'values include bazaar, clearcase, cvs, git, '
-                    'mercurial, perforce, plastic, and svn.'),
+        Command.server_options,
+        Command.repository_options,
     ]
 
     def get_review_request(self, request_id, api_root):

@@ -8,98 +8,12 @@ class Diff(Command):
     author = "The Review Board Project"
     args = "[revisions]"
     option_list = [
-        Option("--server",
-               dest="server",
-               metavar="SERVER",
-               config_key="REVIEWBOARD_URL",
-               default=None,
-               help="specify a different Review Board server to use"),
-        Option('--revision-range',
-               dest='revision_range',
-               default=None,
-               help='generate a diff with the given revision range '
-                    '(DEPRECATED'),
-        Option('-I', '--include',
-               dest='include_files',
-               action='append',
-               help='include only the given file in the diff (can be used '
-                    'multiple times)'),
-        Option("--parent",
-               dest="parent_branch",
-               metavar="PARENT_BRANCH",
-               help="the parent branch this diff should be against "
-                    "(only available if your repository supports "
-                    "parent diffs)"),
-        Option("--tracking-branch",
-               dest="tracking",
-               metavar="TRACKING",
-               help="Tracking branch from which your branch is derived "
-                    "(git only, defaults to origin/master)"),
-        Option("--p4-client",
-               dest="p4_client",
-               config_key="P4_CLIENT",
-               default=None,
-               help="the Perforce client name that the review is in"),
-        Option("--p4-port",
-               dest="p4_port",
-               config_key="P4_PORT",
-               default=None,
-               help="the Perforce servers IP address that the review is on"),
-        Option("--p4-passwd",
-               dest="p4_passwd",
-               config_key="P4_PASSWD",
-               default=None,
-               help="the Perforce password or ticket of the user "
-                    "in the P4USER environment variable"),
-        Option("--svn-show-copies-as-adds",
-               dest="svn_show_copies_as_adds",
-               metavar="y/n",
-               default=None,
-               help="don't diff copied or moved files with their source"),
-        Option('--svn-changelist',
-               dest='svn_changelist',
-               default=None,
-               help='generate the diff for review based on a local SVN '
-                    'changelist'),
-        Option("--repository",
-               dest="repository_name",
-               config_key="REPOSITORY",
-               default=None,
-               help="the name of the repository configured on Review Board "
-                    "that matches the local repository"),
-        Option("--repository-url",
-               dest="repository_url",
-               help="the url for a repository for creating a diff "
-                    "outside of a working copy (currently only "
-                    "supported by Subversion with specific revisions or "
-                    "--diff-filename and ClearCase with relative "
-                    "paths outside the view). For git, this specifies"
-                    "the origin url of the current repository, "
-                    "overriding the origin url supplied by the git "
-                    "client."),
-        Option("--username",
-               dest="username",
-               metavar="USERNAME",
-               config_key="USERNAME",
-               default=None,
-               help="user name to be supplied to the Review Board server"),
-        Option("--password",
-               dest="password",
-               metavar="PASSWORD",
-               config_key="PASSWORD",
-               default=None,
-               help="password to be supplied to the Review Board server"),
-        Option('--repository-type',
-               dest='repository_type',
-               config_key="REPOSITORY_TYPE",
-               default=None,
-               help='the type of repository in the current directory. '
-                    'In most cases this should be detected '
-                    'automatically but some directory structures '
-                    'containing multiple repositories require this '
-                    'option to select the proper type. Valid '
-                    'values include bazaar, clearcase, cvs, git, '
-                    'mercurial, perforce, plastic, and svn.'),
+        Command.server_options,
+        Command.diff_options,
+        Command.repository_options,
+        Command.git_options,
+        Command.perforce_options,
+        Command.subversion_options,
     ]
 
     def main(self, *args):

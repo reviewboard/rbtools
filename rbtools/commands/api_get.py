@@ -19,30 +19,13 @@ class APIGet(Command):
     description = 'Retrieve raw API resource payloads.'
     args = '<path> [-- [--<query-arg>=<value> ...]]'
     option_list = [
-        Option("--server",
-               dest="server",
-               metavar="SERVER",
-               config_key="REVIEWBOARD_URL",
-               default=None,
-               help="Specify a different Review Board server to use"),
-        Option("--username",
-               dest="username",
-               metavar="USERNAME",
-               config_key="USERNAME",
-               default=None,
-               help="Username to be supplied to the Review Board server"),
-        Option("--password",
-               dest="password",
-               metavar="PASSWORD",
-               config_key="PASSWORD",
-               default=None,
-               help="Password to be supplied to the Review Board server"),
         Option("--pretty",
                action="store_true",
                dest="pretty_print",
                config_key="API_GET_PRETTY_PRINT",
                default=False,
                help="Pretty print output"),
+        Command.server_options,
     ]
 
     def _dumps(self, payload):

@@ -12,57 +12,15 @@ class Status(Command):
     description = "Output a list of your pending review requests."
     args = ""
     option_list = [
-        Option("--server",
-               dest="server",
-               metavar="SERVER",
-               config_key="REVIEWBOARD_URL",
-               default=None,
-               help="specify a different Review Board server to use"),
-        Option("--username",
-               dest="username",
-               metavar="USERNAME",
-               config_key="USERNAME",
-               default=None,
-               help="user name to be supplied to the Review Board server"),
-        Option("--password",
-               dest="password",
-               metavar="PASSWORD",
-               config_key="PASSWORD",
-               default=None,
-               help="password to be supplied to the Review Board server"),
         Option("--all",
                dest="all_repositories",
                action="store_true",
                default=False,
                help="Show review requests for all repositories instead "
                     "of the detected repository."),
-        Option('--repository-type',
-               dest='repository_type',
-               config_key="REPOSITORY_TYPE",
-               default=None,
-               help='the type of repository in the current directory. '
-                    'In most cases this should be detected '
-                    'automatically but some directory structures '
-                    'containing multiple repositories require this '
-                    'option to select the proper type. Valid '
-                    'values include bazaar, clearcase, cvs, git, '
-                    'mercurial, perforce, plastic, and svn.'),
-        Option("--p4-client",
-               dest="p4_client",
-               config_key="P4_CLIENT",
-               default=None,
-               help="the Perforce client name that the review is in"),
-        Option("--p4-port",
-               dest="p4_port",
-               config_key="P4_PORT",
-               default=None,
-               help="the Perforce servers IP address that the review is on"),
-        Option("--p4-passwd",
-               dest="p4_passwd",
-               config_key="P4_PASSWD",
-               default=None,
-               help="the Perforce password or ticket of the user "
-                    "in the P4USER environment variable"),
+        Command.server_options,
+        Command.repository_options,
+        Command.perforce_options,
     ]
 
     def output_request(self, request):
