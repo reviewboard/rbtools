@@ -40,8 +40,8 @@ def execute(command,
     else:
         env = os.environ.copy()
 
-    env['LC_ALL'] = 'en_US.UTF-8'
-    env['LANGUAGE'] = 'en_US.UTF-8'
+    env['LC_ALL'] = 'C'
+    env['LANGUAGE'] = 'C'
 
     if with_errors:
         errors_output = subprocess.STDOUT
