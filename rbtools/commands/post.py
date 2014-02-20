@@ -722,10 +722,8 @@ class Post(Command):
 
         print "Review request #%s posted." % request_id
         print
-        print "Review request: " + review_url
-        print
-        print "Diff:           " + diff_review_url
-        print
+        print review_url
+        print diff_review_url
 
         # Load the review up in the browser if requested to.
         if self.options.open_browser:
