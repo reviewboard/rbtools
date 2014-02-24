@@ -37,6 +37,13 @@ class Post(Command):
                        default=False,
                        help='Automatically determines the existing review '
                             'request to update.'),
+                Option('-U', '--post-or-update',
+                       dest='auto_update',
+                       action='store_true',
+                       default=False,
+                       help='Automatically determines the existing review '
+                            'request to update.  If one cannot be found, '
+                            'create a new request.'),
                 Option('-p', '--publish',
                        dest='publish',
                        action='store_true',
@@ -173,6 +180,10 @@ class Post(Command):
             self.options.guess_summary = True
             self.options.guess_description = True
 
+        # auto-update implies update
+        if self.options.auto_update:
+            self.options.update = True
+            
         if self.options.revision_range:
             raise CommandError(
                 'The --revision-range argument has been removed. To post a '
@@ -363,6 +374,10 @@ class Post(Command):
             raise CommandError('Error getting review requests for user '
                                '%s: %s' % (user.username, e))
 
+        review_request = self.tool.match_existing_review_request(review_requests, self.get_revisions())
+        if review_request:
+            return review_request.id
+            
         summary = self.options.summary
         description = self.options.description
 
@@ -377,7 +392,9 @@ class Post(Command):
                     if not description:
                         description = commit_message['description']
             except NotImplementedError:
-                raise CommandError('--summary and --description are required.')
+                if not self.tool.supports_update_without_summary_and_description:
+                    raise CommandError('--summary and --description are required.')
+                return None
 
         possible_matches = self.get_possible_matches(review_requests, summary,
                                                      description)
@@ -702,7 +719,7 @@ class Post(Command):
             self.options.rid = self.guess_existing_review_request_id(
                 repository_info, api_root, api_client)
 
-            if not self.options.rid:
+            if not self.options.rid and not self.options.auto_update:
                 raise CommandError('Could not determine the existing review '
                                    'request to update.')
 

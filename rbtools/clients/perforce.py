@@ -163,6 +163,7 @@ class PerforceClient(SCMClient):
     name = 'Perforce'
 
     supports_diff_extra_args = True
+    supports_update_without_summary_and_description = True
 
     DATE_RE = re.compile(r'(\w+)\s+(\w+)\s+(\d+)\s+(\d\d:\d\d:\d\d)\s+'
                          '(\d\d\d\d)')
@@ -378,6 +379,18 @@ class PerforceClient(SCMClient):
             if 'Status' in change[0]:
                 return change[0]['Status']
 
+        return None
+        
+    def match_existing_review_request(self, review_requests, revisions):
+        """Scan the given review_requests for one that matches the given 
+        revisions and return it.  If an exact match is not found, return 
+        ``None``.
+        """
+        tip = revisions['tip']
+        changenum = int(tip.replace(self.REVISION_PENDING_CLN_PREFIX, ''))
+        for review_request in review_requests:
+            if changenum == review_request.changenum:
+                return review_request
         return None
 
     def scan_for_server(self, repository_info):

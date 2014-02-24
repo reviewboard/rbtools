@@ -17,6 +17,7 @@ class SCMClient(object):
     name = None
 
     supports_diff_extra_args = False
+    supports_update_without_summary_and_description = False
 
     def __init__(self, user_config=None, configs=[], options=None,
                  capabilities=None):
@@ -224,6 +225,16 @@ class SCMClient(object):
         ``None`` should be returned.
         """
         raise NotImplementedError
+
+    def match_existing_review_request(self, review_requests, revisions):
+        """Scan the given review_requests for one that matches the given 
+        revisions and return it.  If an exact match is not found, return 
+        ``None``.
+
+        Derived classes should override this method if they are able to
+        uniquely match existing reviews to particular revisions.
+        """
+        return None
 
 
 class RepositoryInfo(object):
