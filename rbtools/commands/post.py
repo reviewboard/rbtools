@@ -44,6 +44,7 @@ class Post(Command):
         Option('-p', '--publish',
                dest="publish",
                action="store_true",
+               config_key="PUBLISH",
                default=False,
                help="publish the review request immediately after submitting"),
         Option("-o", "--open",
