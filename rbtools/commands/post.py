@@ -41,6 +41,7 @@ class Post(Command):
                        dest='publish',
                        action='store_true',
                        default=False,
+                       config_key='PUBLISH',
                        help='Immediately publishes the review request after '
                             'posting.'),
                 Option('-o', '--open',
