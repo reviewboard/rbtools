@@ -449,7 +449,7 @@ class Post(Command):
                 review_request = api_root.get_review_requests().create(
                     **request_data)
             except APIError, e:
-                if e.error_code == 204:  # Change number in use.
+                if e.error_code == 204 and changenum:  # Change number in use.
                     rid = e.rsp['review_request']['id']
                     review_request = api_root.get_review_request(
                         review_request_id=rid)
