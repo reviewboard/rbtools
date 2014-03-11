@@ -441,19 +441,11 @@ Options
 
    The default can be set in ``GUESS_FIELDS`` in :file:`.reviewboardrc`.
 
-.. cmdoption:: --no-guess-fields
-
-   This is used to override GUESS_FIELDS=True in :file:`.reviewboardrc`.
-
 .. cmdoption:: --guess-summary
 
    Guess summary from the latest commit (bzr/Git/hg/hgsubversion only).
 
    The default can be set in ``GUESS_SUMMARY`` in :file:`.reviewboardrc`.
-
-.. cmdoption:: --no-guess-summary
-
-   This is used to override GUESS_SUMMARY=True in :file:`.reviewboardrc`.
 
 .. cmdoption:: --guess-description
 
@@ -461,10 +453,6 @@ Options
    only).
 
    The default can be set in ``GUESS_DESCRIPTION`` in :file:`.reviewboardrc`.
-
-.. cmdoption:: --no-guess-description
-
-   This is used to override GUESS_DESCRIPTION=True in :file:`.reviewboardrc`.
 
 .. cmdoption:: --testing-done
 
