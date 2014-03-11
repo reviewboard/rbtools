@@ -88,6 +88,10 @@ class Post(Command):
                        default=False,
                        help='Short-hand for --guess-summary '
                             '--guess-description.'),
+                Option('--no-guess-fields',
+                       dest='guess_fields',
+                       action='store_false',
+                       help='Override GUESS_FIELDS from a .reviewboardrc'),
                 Option('--guess-summary',
                        dest='guess_summary',
                        action='store_true',
@@ -95,6 +99,10 @@ class Post(Command):
                        default=False,
                        help='Generates the Summary field based on the '
                             'commit messages (Bazaar/Git/Mercurial only).'),
+                Option('--no-guess-summary',
+                       dest='guess_summary',
+                       action='store_false',
+                       help='Override GUESS_SUMMARY from a .reviewboardrc'),
                 Option('--guess-description',
                        dest='guess_description',
                        action='store_true',
@@ -102,6 +110,10 @@ class Post(Command):
                        default=False,
                        help='Generates the Description field based on the '
                             'commit messages (Bazaar/Git/Mercurial only).'),
+                Option('--no-guess-description',
+                       dest='guess_description',
+                       action='store_false',
+                       help='Override GUESS_DESCRIPTION from a .reviewboardrc'),
                 Option('--change-description',
                        default=None,
                        help='A description of what changed in this update '
