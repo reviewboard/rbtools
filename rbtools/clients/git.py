@@ -465,6 +465,7 @@ class GitClient(SCMClient):
 
         diff_lines = execute(diff_cmd + files,
                              split_lines=True,
+                             with_errors=False,
                              ignore_errors=True,
                              none_on_ignored_error=True)
 
