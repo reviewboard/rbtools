@@ -493,12 +493,14 @@ class GitClient(SCMClient):
             diff_lines = execute([self.git, "diff", "--no-color",
                                   "--no-prefix", "--no-ext-diff", "-r", "-u",
                                   rev_range],
-                                 split_lines=True)
+                                 split_lines=True,
+                                 with_errors=False)
             return self.make_svn_diff(ancestor, diff_lines)
         elif self.type == "perforce":
             diff_lines = execute([self.git, "diff", "--no-color",
                                   "--no-prefix", "-r", "-u", rev_range],
-                                 split_lines=True)
+                                 split_lines=True,
+                                 with_errors=False)
             return self.make_perforce_diff(ancestor, diff_lines)
         elif self.type == "git":
             cmdline = [self.git, "diff", "--no-color", "--full-index",
@@ -509,7 +511,7 @@ class GitClient(SCMClient):
                 self.capabilities.has_capability('diffs', 'moved_files')):
                 cmdline.append('-M')
 
-            return execute(cmdline)
+            return execute(cmdline, with_errors=False)
 
         return None
 
