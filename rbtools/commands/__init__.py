@@ -1,16 +1,20 @@
 import getpass
 import inspect
 import logging
+import platform
+import os
 import sys
 from optparse import make_option, OptionParser, OptionGroup as BaseOptionGroup
 from urlparse import urlparse
 
+from rbtools import get_version_string
 from rbtools.api.capabilities import Capabilities
 from rbtools.api.client import RBClient
 from rbtools.api.errors import APIError, ServerInterfaceError
 from rbtools.clients import scan_usable_client
 from rbtools.clients.errors import OptionsCheckError
-from rbtools.utils.filesystem import cleanup_tempfiles, load_config
+from rbtools.utils.filesystem import (cleanup_tempfiles, get_home_path,
+                                      load_config)
 from rbtools.utils.process import die
 
 
@@ -111,6 +115,20 @@ class OptionGroup(object):
             option.add_to(group, config, argv)
 
         parser.add_option_group(group)
+
+
+class LogLevelFilter(logging.Filter):
+    """Filters log messages of a given level.
+
+    Only log messages that have the specified level will be allowed by
+    this filter. This prevents propagation of higher level types to lower
+    log handlers.
+    """
+    def __init__(self, level):
+        self.level = level
+
+    def filter(self, record):
+        return record.levelno == self.level
 
 
 class Command(object):
@@ -348,6 +366,54 @@ class Command(object):
         else:
             return usage
 
+    def init_logging(self):
+        """Initializes logging for the command.
+
+        This will set up different log handlers based on the formatting we want
+        for the given levels.
+
+        The INFO log handler will just show the text, like a print statement.
+
+        WARNING and higher will show the level name as a prefix, in the form of
+        "LEVEL: message".
+
+        If debugging is enabled, a debug log handler will be set up showing
+        debug messages in the form of ">>> message", making it easier to
+        distinguish between debugging and other messages.
+        """
+        root = logging.getLogger()
+
+        if self.options.debug:
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter('>>> %(message)s'))
+            handler.setLevel(logging.DEBUG)
+            handler.addFilter(LogLevelFilter(logging.DEBUG))
+            root.addHandler(handler)
+
+            root.setLevel(logging.DEBUG)
+        else:
+            root.setLevel(logging.INFO)
+
+        # Handler for info messages. We'll treat these like prints.
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter('%(message)s'))
+        handler.setLevel(logging.INFO)
+        handler.addFilter(LogLevelFilter(logging.INFO))
+        root.addHandler(handler)
+
+        # Handler for warnings, errors, and criticals. They'll show the
+        # level prefix and the message.
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+        handler.setLevel(logging.WARNING)
+        root.addHandler(handler)
+
+        logging.debug('RBTools %s', get_version_string())
+        logging.debug('Python %s', sys.version)
+        logging.debug('Running on %s', platform.platform())
+        logging.debug('Home = %s', get_home_path())
+        logging.debug('Current directory = %s', os.getcwd())
+
     def run_from_argv(self, argv):
         """Execute the command using the provided arguments.
 
@@ -374,8 +440,7 @@ class Command(object):
             parser.error("Invalid number of arguments provided")
             sys.exit(1)
 
-        if self.options.debug:
-            logging.getLogger().setLevel(logging.DEBUG)
+        self.init_logging()
 
         try:
             exit_code = self.main(*args) or 0
