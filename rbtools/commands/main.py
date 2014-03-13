@@ -1,9 +1,9 @@
+import argparse
 import os
 import pkg_resources
 import signal
 import subprocess
 import sys
-from optparse import OptionParser
 
 try:
     from cStringIO import StringIO
@@ -15,10 +15,17 @@ from rbtools.commands import Option, RB_MAIN
 
 
 GLOBAL_OPTIONS = [
+    Option('-v', '--version',
+           action='version',
+           version='RBTools %s' % get_version_string()),
     Option('-h', '--help',
            action='store_true',
            dest='help',
-           default=False).make_option({})
+           default=False),
+    Option('command',
+           nargs=argparse.REMAINDER,
+           help='The RBTools command to execute, and any arguments. '
+                '(See below)'),
 ]
 
 
@@ -26,11 +33,8 @@ def build_help_text(command_class):
     """Generate help text from a command class."""
     command = command_class()
     parser = command.create_parser({})
-    help_file = StringIO()
-    parser.print_help(help_file)
-    help_text = help_file.getvalue()
-    help_file.close()
-    return help_text
+
+    return parser.format_help()
 
 
 def help(args, parser):
@@ -77,34 +81,37 @@ def main():
         sys.exit(128 + sig)
     signal.signal(signal.SIGINT, exit_on_int)
 
-    parser = OptionParser(prog=RB_MAIN,
-                          usage='%prog [--version] <command> [options]'
-                                ' [<args>]',
-                          option_list=GLOBAL_OPTIONS,
-                          add_help_option=False,
-                          version='RBTools %s' % get_version_string())
-    parser.disable_interspersed_args()
-    opt, args = parser.parse_args()
+    parser = argparse.ArgumentParser(
+        prog=RB_MAIN,
+        usage='%(prog)s [--version] <command> [options] [<args>]',
+        add_help=False)
 
-    if not args:
+    for option in GLOBAL_OPTIONS:
+        option.add_to(parser)
+
+    opt = parser.parse_args()
+
+    if not opt.command:
         help([], parser)
 
-    command_name = args[0]
+    command_name = opt.command[0]
+    args = opt.command[1:]
 
     if command_name == "help":
-        help(args[1:], parser)
-    elif opt.help or "--help" in args or '-h' in args:
         help(args, parser)
+    elif opt.help or "--help" in args or '-h' in args:
+        help(opt.command, parser)
 
     # Attempt to retrieve the command class from the entry points. We
     # first look in rbtools for the commands, and failing that, we look
     # for third-party commands.
-    ep = pkg_resources.get_entry_info("rbtools", "rbtools_commands", args[0])
+    ep = pkg_resources.get_entry_info("rbtools", "rbtools_commands",
+                                      command_name)
 
     if not ep:
         try:
             ep = pkg_resources.iter_entry_points('rbtools_commands',
-                                                 args[0]).next()
+                                                 command_name).next()
         except StopIteration:
             # There aren't any custom entry points defined.
             pass
@@ -124,11 +131,11 @@ def main():
                              (ep.name, e))
             sys.exit(1)
 
-        command.run_from_argv([RB_MAIN] + args)
+        command.run_from_argv([RB_MAIN, command_name] + args)
     else:
         # A command class could not be found, so try and execute
         # the "rb-<command>" on the system.
-        args[0] = "%s-%s" % (RB_MAIN, args[0])
+        args = ['%s-%s' % (RB_MAIN, command_name)] + args
 
         try:
             sys.exit(subprocess.call(args,

@@ -1,10 +1,10 @@
+import argparse
 import getpass
 import inspect
 import logging
 import platform
 import os
 import sys
-from optparse import make_option, OptionParser, OptionGroup as BaseOptionGroup
 from urlparse import urlparse
 
 from rbtools import get_version_string
@@ -39,13 +39,13 @@ class Option(object):
     """Represents an option for a command.
 
     The arguments to the constructor should be treated like those
-    to optparse.make_option, with the exception that the keyword
+    to argparse's add_argument, with the exception that the keyword
     argument 'config_key' is also valid. If config_key is provided
     it will be used to retrieve the config value as a default if the
     option is not specified. This will take precedence over the
     default argument.
 
-    Serves as a wrapper around the OptionParser options, allowing us
+    Serves as a wrapper around the ArgumentParser options, allowing us
     to specify defaults which will be grabbed from the configuration
     after it is loaded.
     """
@@ -53,11 +53,14 @@ class Option(object):
         self.opts = opts
         self.attrs = attrs
 
-    def make_option(self, config, argv=[]):
-        """Return an optparse option.
+    def add_to(self, parent, config={}, argv=[]):
+        """Adds the option to the parent parser or group.
 
-        Check the loaded configuration for a provided default and
-        return an optparse option using it as the default.
+        If the option maps to a configuration key, this will handle figuring
+        out the correct default.
+
+        Once we've determined the right set of flags, the option will be
+        added to the parser.
         """
         if 'config_key' in self.attrs:
             if self.attrs['config_key'] in config:
@@ -65,31 +68,7 @@ class Option(object):
 
             del self.attrs['config_key']
 
-        if self.attrs.get('value_optional', False):
-            # Check if the argument is in sys.argv without an explicit
-            # value assigned (using --opt=value or -ovalue).
-            #
-            # If found, we're going to want to assign it the default value
-            # from the 'empty_default' attribute.
-            assert 'empty_default' in self.attrs
-
-            for opt in self.opts:
-                for i, arg in enumerate(argv):
-                    if arg == opt:
-                        if opt.startswith('--'):
-                            argv[i] += '='
-
-                        argv[i] += self.attrs['empty_default']
-                        break
-
-            del self.attrs['empty_default']
-            del self.attrs['value_optional']
-
-        return make_option(*self.opts, **self.attrs)
-
-    def add_to(self, parent, config, argv):
-        """Adds the option to the parent parser or group."""
-        parent.add_option(self.make_option(config, argv))
+        parent.add_argument(*self.opts, **self.attrs)
 
 
 class OptionGroup(object):
@@ -99,7 +78,7 @@ class OptionGroup(object):
     It serves as a way to organize related options, making it easier for
     users to scan for the options they want.
 
-    This works like optparse's OptionGroup, but is designed to work with
+    This works like argparse's argument groups, but is designed to work with
     our special Option class.
     """
     def __init__(self, name=None, description=None, option_list=[]):
@@ -107,14 +86,12 @@ class OptionGroup(object):
         self.description = description
         self.option_list = option_list
 
-    def add_to(self, parser, config, argv):
+    def add_to(self, parser, config={}, argv=[]):
         """Adds the group and all its contained options to the parser."""
-        group = BaseOptionGroup(parser, self.name, self.description)
+        group = parser.add_argument_group(self.name, self.description)
 
         for option in self.option_list:
             option.add_to(group, config, argv)
-
-        parser.add_option_group(group)
 
 
 class LogLevelFilter(logging.Filter):
@@ -148,8 +125,7 @@ class Command(object):
     command takes.
 
     ``option_list`` is a list of command line options for the command.
-    Each list entry should be an option created using the optparse.make_option
-    function.
+    Each list entry should be an Option or OptionGroup instance.
     """
     name = ""
     author = ""
@@ -342,12 +318,10 @@ class Command(object):
         self.log = logging.getLogger('rb.%s' % self.name)
 
     def create_parser(self, config, argv=[]):
-        """Create and return the ``OptionParser`` which will be used to
-        parse the arguments to this command.
-        """
-        parser = OptionParser(prog=RB_MAIN,
-                              usage=self.usage(),
-                              add_help_option=False)
+        """Create and return the argument parser for this command."""
+        parser = argparse.ArgumentParser(prog=RB_MAIN,
+                                         usage=self.usage(),
+                                         add_help=False)
 
         for option in self.option_list:
             option.add_to(parser, config, argv)
@@ -359,7 +333,7 @@ class Command(object):
 
     def usage(self):
         """Return a usage string for the command."""
-        usage = '%%prog %s [options] %s' % (self.name, self.args)
+        usage = '%%(prog)s %s [options] %s' % (self.name, self.args)
 
         if self.description:
             return '%s\n\n%s' % (usage, self.description)
@@ -422,9 +396,12 @@ class Command(object):
         be called.
         """
         self.config = load_config()
+
         parser = self.create_parser(self.config, argv)
-        options, args = parser.parse_args(argv[2:])
-        self.options = options
+        parser.add_argument('args', nargs=argparse.REMAINDER)
+
+        self.options = parser.parse_args(argv[2:])
+        args = self.options.args
 
         # Check that the proper number of arguments have been provided.
         argspec = inspect.getargspec(self.main)
@@ -436,7 +413,6 @@ class Command(object):
 
         if len(args) < minargs or (maxargs is not None and
                                    len(args) > maxargs):
-
             parser.error("Invalid number of arguments provided")
             sys.exit(1)
 
