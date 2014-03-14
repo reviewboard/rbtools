@@ -149,6 +149,8 @@ class GitClient(SCMClient):
                 check_install(['git.cmd', '--help'])):
                 self.git = 'git.cmd'
             else:
+                logging.debug('Unable to execute "git --help" or "git.cmd '
+                              '--help": skipping Git')
                 return None
 
         git_dir = execute([self.git, "rev-parse", "--git-dir"],

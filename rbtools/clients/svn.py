@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import sys
@@ -32,6 +33,7 @@ class SVNClient(SCMClient):
 
     def get_repository_info(self):
         if not check_install(['svn', 'help']):
+            logging.debug('Unable to execute "svn help": skipping SVN')
             return None
 
         # Get the SVN repository path (either via a working copy or

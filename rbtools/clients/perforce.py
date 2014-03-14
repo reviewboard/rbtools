@@ -177,6 +177,7 @@ class PerforceClient(SCMClient):
 
     def get_repository_info(self):
         if not self.p4.is_supported():
+            logging.debug('Unable to execute "p4 help": skipping Perforce')
             return None
 
         p4_info = self.p4.info()

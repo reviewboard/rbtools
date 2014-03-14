@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 
@@ -39,6 +40,7 @@ class BazaarClient(SCMClient):
         return it.
         """
         if not check_install(['bzr', 'help']):
+            logging.debug('Unable to execute "bzr help": skipping Bazaar')
             return None
 
         bzr_info = execute(["bzr", "info"], ignore_errors=True)

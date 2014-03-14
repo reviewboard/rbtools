@@ -24,6 +24,7 @@ class PlasticClient(SCMClient):
 
     def get_repository_info(self):
         if not check_install(['cm', 'version']):
+            logging.debug('Unable to execute "cm version": skipping Plastic')
             return None
 
         # Get the workspace directory, so we can strip it from the diff output

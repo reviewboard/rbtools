@@ -23,6 +23,7 @@ class CVSClient(SCMClient):
 
     def get_repository_info(self):
         if not check_install(['cvs']):
+            logging.debug('Unable to execute "cvs": skipping CVS')
             return None
 
         cvsroot_path = os.path.join("CVS", "Root")

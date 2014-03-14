@@ -114,6 +114,7 @@ class MercurialClient(SCMClient):
 
     def get_repository_info(self):
         if not check_install(['hg', '--help']):
+            logging.debug('Unable to execute "hg --help": skipping Mercurial')
             return None
 
         self._init()

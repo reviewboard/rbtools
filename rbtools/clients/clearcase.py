@@ -43,6 +43,8 @@ class ClearCaseClient(SCMClient):
         path, and that the current working directory is inside of the view.
         """
         if not check_install(['cleartool', 'help']):
+            logging.debug('Unable to execute "cleartool help": skipping '
+                          'ClearCase')
             return None
 
         viewname = execute(["cleartool", "pwv", "-short"]).strip()
