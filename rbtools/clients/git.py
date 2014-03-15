@@ -207,8 +207,8 @@ class GitClient(SCMClient):
                         self.type = "svn"
 
                         # Get SVN tracking branch
-                        if getattr(self.options, 'parent_branch', None):
-                            self.upstream_branch = self.options.parent_branch
+                        if getattr(self.options, 'tracking', None):
+                            self.upstream_branch = self.options.tracking
                         else:
                             data = execute([self.git, "svn", "rebase", "-n"],
                                            ignore_errors=True)
@@ -420,10 +420,19 @@ class GitClient(SCMClient):
         make sense given the requested revisions and the tracking branch, this
         will also return a parent diff.
         """
-        diff_lines = self.make_diff(revisions['base'], revisions['tip'], files)
+        try:
+            merge_base = revisions['parent_base']
+        except KeyError:
+            merge_base = revisions['base']
+
+        diff_lines = self.make_diff(merge_base,
+                                    revisions['base'],
+                                    revisions['tip'],
+                                    files)
 
         if 'parent_base' in revisions:
-            parent_diff_lines = self.make_diff(revisions['parent_base'],
+            parent_diff_lines = self.make_diff(merge_base,
+                                               revisions['parent_base'],
                                                revisions['base'],
                                                files)
             base_commit_id = revisions['parent_base']
@@ -438,7 +447,7 @@ class GitClient(SCMClient):
             'base_commit_id': base_commit_id,
         }
 
-    def make_diff(self, base, tip, files):
+    def make_diff(self, merge_base, base, tip, files):
         """Performs a diff on a particular branch range."""
         rev_range = "%s..%s" % (base, tip)
 
@@ -472,23 +481,19 @@ class GitClient(SCMClient):
                              none_on_ignored_error=True)
 
         if self.type == 'svn':
-            return self.make_svn_diff(base, diff_lines)
+            return self.make_svn_diff(merge_base, diff_lines)
         elif self.type == 'perforce':
-            return self.make_perforce_diff(base, diff_lines)
+            return self.make_perforce_diff(merge_base, diff_lines)
         else:
             return ''.join(diff_lines)
 
-    def make_svn_diff(self, parent_branch, diff_lines):
+    def make_svn_diff(self, merge_base, diff_lines):
         """
         Formats the output of git diff such that it's in a form that
         svn diff would generate. This is needed so the SVNTool in Review
         Board can properly parse this diff.
         """
-        rev = execute([self.git, "svn", "find-rev", parent_branch]).strip()
-
-        if not rev and self.merge_base:
-            rev = execute([self.git, "svn", "find-rev",
-                           self.merge_base]).strip()
+        rev = execute([self.git, "svn", "find-rev", merge_base]).strip()
 
         if not rev:
             return None
@@ -538,14 +543,14 @@ class GitClient(SCMClient):
 
         return diff_data
 
-    def make_perforce_diff(self, parent_branch, diff_lines):
+    def make_perforce_diff(self, merge_base, diff_lines):
         """Format the output of git diff to look more like perforce's."""
         diff_data = ''
         filename = ''
         p4rev = ''
 
         # Find which depot changelist we're based on
-        log = execute([self.git, 'log', parent_branch], ignore_errors=True)
+        log = execute([self.git, 'log', merge_base], ignore_errors=True)
 
         for line in log:
             m = re.search(r'[rd]epo.-paths = "(.+)": change = (\d+).*\]', log, re.M)
