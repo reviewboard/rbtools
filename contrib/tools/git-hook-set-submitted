@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+#
+# This is a Git post-receive hook script that automatically closes review
+# requests as "submitted" after a push.
+#
+# To determine which review request should be closed, it scans through each
+# commit's commit message for the following strings (case-insensitive):
+# "Reviewed at <REVIEWBOARD_URL>/r/<id>" or "Review request #<id>".
+#
+# To install this hook, put this file in the "hooks" subdirectory of your bare
+# Git repository. Rename this file to "post-receive", and make sure it is
+# executable.
+
+import logging
+import re
+import sys
+
+from rbtools.hooks.common import close_review_request, initialize_logging
+from rbtools.hooks.git import get_review_id_to_commits_map
+
+
+# The Review Board server URL.
+REVIEWBOARD_URL = 'http://reviewboard.example.com'
+
+# The username and password to be supplied to the Review Board server. This
+# user must have the "can_change_status" permission granted.
+USERNAME = 'special_user'
+PASSWORD = 'password'
+
+# The regular expression and flags used to match review request IDs, which
+# can be customized if a different format is required.
+REGEX = r'(?:Reviewed at %s/r/|Review request #)(?P<id>\d+)' % REVIEWBOARD_URL
+REGEX_FLAGS = re.IGNORECASE
+
+
+def main():
+    initialize_logging()
+    lines = sys.stdin.readlines()
+    compiled_regex = re.compile(REGEX, REGEX_FLAGS)
+    review_id_to_commits = get_review_id_to_commits_map(lines, compiled_regex)
+
+    # Close each review request in the dictionary as submitted.
+    for review_request_id in review_id_to_commits:
+        if not review_request_id:
+            logging.debug('No matching review request ID found for commits: ' +
+                          ', '.join(review_id_to_commits[review_request_id]))
+            continue
+
+        description = ('Pushed to ' +
+                       ', '.join(review_id_to_commits[review_request_id]))
+        close_review_request(REVIEWBOARD_URL, USERNAME, PASSWORD,
+                             review_request_id, description)
+
+
+if __name__ == '__main__':
+    main()

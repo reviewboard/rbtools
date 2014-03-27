@@ -1,0 +1,79 @@
+#!/usr/bin/env python
+#
+# This is a Git pre-receive hook script that checks if each review request
+# corresponding to a commit has been approved. A commit that has no
+# corresponding review request is marked as being unapproved (optional). If any
+# of the checked commits is unapproved, it declines the push (optional).
+#
+# To determine which review requests should be checked, it scans through each
+# commit's commit message for the following strings (case-insensitive):
+# "Reviewed at <REVIEWBOARD_URL>/r/<id>" or "Review request #<id>".
+#
+# To install this hook, put this file in the "hooks" subdirectory of your bare
+# Git repository. Rename this file to "pre-receive", and make sure it is
+# executable.
+
+import logging
+import re
+import sys
+
+from rbtools.hooks.common import (get_review_request_approval,
+                                  initialize_logging)
+from rbtools.hooks.git import get_review_id_to_commits_map
+
+
+# The Review Board server URL.
+REVIEWBOARD_URL = 'http://reviewboard.example.com'
+
+# The username and password to be supplied to the Review Board server.
+USERNAME = 'special_user'
+PASSWORD = 'password'
+
+# The regular expression and flags used to match review request IDs, which
+# can be customized if a different format is required.
+REGEX = r'(?:Reviewed at %s/r/|Review request #)(?P<id>\d+)' % REVIEWBOARD_URL
+REGEX_FLAGS = re.IGNORECASE
+
+# Option to require that every single commit references a review request.
+REQUIRE_REVIEW_REQUESTS = True
+
+# Option to decline a push if it contains any unapproved commits.
+DECLINE_UNAPPROVED_PUSH = True
+
+
+def main():
+    initialize_logging()
+    lines = sys.stdin.readlines()
+    compiled_regex = re.compile(REGEX, REGEX_FLAGS)
+    review_id_to_commits = get_review_id_to_commits_map(lines, compiled_regex)
+
+    is_push_approved = True
+
+    # Check if each review request in the dictionary is approved.
+    for review_request_id in review_id_to_commits:
+        if review_request_id:
+            is_approved, approval_failure = \
+                get_review_request_approval(REVIEWBOARD_URL, USERNAME, PASSWORD,
+                                            review_request_id)
+
+            if not is_approved:
+                is_push_approved = False
+                commits = ', '.join(review_id_to_commits[review_request_id])
+                logging.warning('Review request #%s for %s is not approved: %s',
+                                review_request_id, commits, approval_failure)
+        elif not review_request_id and REQUIRE_REVIEW_REQUESTS:
+            is_push_approved = False
+            commits = ', '.join(review_id_to_commits[review_request_id])
+            logging.warning('A review request has not been created for %s',
+                            commits)
+
+    if DECLINE_UNAPPROVED_PUSH and not is_push_approved:
+        logging.warning('Declining the push - there are 1 or more unapproved '
+                        'commits.')
+        sys.exit(1)
+    else:
+        sys.exit(0)
+
+
+if __name__ == '__main__':
+    main()
