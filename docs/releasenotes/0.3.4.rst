@@ -45,6 +45,3 @@ Contributors
 * David Trowbridge
 * Nathan Dimmock
 * Severin Gehwolf
-
-
-.. comment: vim: ft=rst et

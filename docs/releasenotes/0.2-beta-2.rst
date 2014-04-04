@@ -115,6 +115,3 @@ Contributors
 * Matthew Woehlke
 * Raghu Kaippully
 * Steven Russell
-
-
-.. comment: vim: ft=rst et

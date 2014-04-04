@@ -20,6 +20,3 @@ Contributors
 ============
 
 * David Trowbrige
-
-
-.. comment: vim: ft=rst et

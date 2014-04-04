@@ -158,6 +158,3 @@ Contributors
 * Damian Johnson
 * Stephen Gallagher
 * Steven MacLeod
-
-
-.. comment: vim: ft=rst et

@@ -89,6 +89,3 @@ Contributors
 * Steven MacLeod
 * Steven Walter
 * Sudhir Sangappa
-
-
-.. comment: vim: ft=rst et

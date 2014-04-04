@@ -159,6 +159,3 @@ Contributors
 * Mark Catley
 * Mike Conley
 * Vaclav Slavik
-
-
-.. comment: vim: ft=rst et

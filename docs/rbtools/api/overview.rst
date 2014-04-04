@@ -171,5 +171,3 @@ Resource Specific Details
 The API provides additional functionality for a number of resources.
 Specific information can be found in
 :ref:`python-api-resource-specific-functionality`.
-
-.. comment: vim: ft=rst et ts=3

@@ -172,6 +172,3 @@ Contributors
 * Steven MacLeod
 * Tao Zhou
 * Tom Masterson
-
-
-.. comment: vim: ft=rst et

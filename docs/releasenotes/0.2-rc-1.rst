@@ -167,7 +167,3 @@ Contributors
 * Stefan Ring
 * Thilo-Alexander Ginkel
 * Tom Saeger
-
-
-
-.. comment: vim: ft=rst et

@@ -182,6 +182,3 @@ Contributors
 * Peter Ward
 * Steven Ihde
 * Vikram Oberoi
-
-
-.. comment: vim: ft=rst et

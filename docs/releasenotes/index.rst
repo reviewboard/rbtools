@@ -28,6 +28,3 @@ RBTools Release Notes
    0.2-rc-1
    0.2-beta-2
    0.2-beta-1
-
-
-.. comment: vim: ft=rst et

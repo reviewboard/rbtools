@@ -192,7 +192,3 @@ Indices, Glossary and Tables
 ============================
 
 * :ref:`glossary`
-
-
-.. comment: vim: ft=rst et
-

@@ -207,6 +207,3 @@ Contributors
 * Noah Kantrowitz
 * Petr Novák
 * Ryan Shelley
-
-
-.. comment: vim: ft=rst et

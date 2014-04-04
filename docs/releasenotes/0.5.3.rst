@@ -248,6 +248,3 @@ Contributors
 * Steven MacLeod
 * Sudhir Sangappa
 * Tzafrir Cohen
-
-
-.. comment: vim: ft=rst et

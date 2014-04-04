@@ -116,6 +116,3 @@ Contributors
 * Nicolas Morey
 * Nicolas Morey
 * Tomasz Moń
-
-
-.. comment: vim: ft=rst et

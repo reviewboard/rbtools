@@ -15,5 +15,3 @@ rbt Commands
    publish
    setup-repo
    status
-
-.. comment: vim: ft=rst et ts=3

@@ -44,6 +44,3 @@ Contributors
 
 * Christian Hammond
 * David Trowbridge
-
-
-.. comment: vim: ft=rst et
