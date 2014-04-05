@@ -1,0 +1,374 @@
+=========================
+RBTools 0.6 Release Notes
+=========================
+
+**Release date**: TBD
+
+
+Compatibility Notes
+===================
+
+RBTools now requires Python 2.5 at a minimum.
+
+We advise everyone to upgrade to Python 2.7. We will be deprecating Python
+releases over the next few major RBTools releases.
+
+
+New Features
+============
+
+Easier Posting of Revisions
+---------------------------
+
+We have completely redone how you specify revisions when posting using
+:command:`rbt post` or diffing using :command:`rbt diff`.
+
+Previously, posting individual commits (on systems like Git or Mercurial)
+required the use of :option:`--revision-range` and :option:`--parent`, often
+leading to verbose command line arguments. This has all changed in 0.6.
+
+Now, to specify a revision or a range of revisions, just pass the native
+revision or revision range syntax for your type of repository on the command
+line. You don't need to use :option:`--revision-range` or :option:`--parent`
+anymore.
+
+For example, when using Git::
+
+    $ rbt post HEAD
+    $ rbt post 1c83ba9
+    $ rbt post main-dev..feature-branch
+
+Or Subversion::
+
+    $ rbt post 123:126
+
+Specifying a single revision will upload that commit's changes to
+Review Board, generating a parent diff if necessary. It's all behind the
+scenes now. Likewise, specifying a revision range will take care of generating
+any parent diffs that may be needed. :option:`--parent` is still available,
+though, and works as it did before.
+
+Extra arguments passed used to be interpreted as files to include in the diff,
+instead of revisions. This behavior has been replaced with the new
+:option:`-I` arguments described in the section below.
+
+
+Filtering of Files When Posting
+-------------------------------
+
+:command:`rbt post` and :command:`rbt diff` now support :option:`-I` (or
+:option:`--include`) arguments to specify exactly which files should be
+included when posting or diffing the change.
+
+This argument can be specified multiple times. For example::
+
+    $ rbt post -I README -I setup.py
+
+
+Automatic Guessing of Fields
+----------------------------
+
+It's no longer necessary to pass :option:`-g` (or :option:`--guess-fields`) to
+:command:`rbt post` in order to automatically fill in the Summary and
+Description fields. This is now done automatically for brand new review
+requests.
+
+By default, new review requests will have the Summary and Description fields
+filled in, and updating an existing review request will leave your existing
+fields as-is. You can force the fields to be updated by passing :option:`-g`
+on the command line. You can also disable guessing entirely for a post by
+using ``--guess-fields=no``.
+
+Furthermore, you can set the default behavior to never guess, always guess, or
+guess only for new review requests through the ``GUESS_FIELDS`` setting in
+:file:`.reviewboardrc`.
+
+See the `documentation on guessing`_ for more information.
+
+.. _`documentation on guessing`:
+   http://www.reviewboard.org/docs/rbtools/0.6/rbt/commands/post/#auto-setting-summary-and-description
+
+
+Better Guessed Fields
+---------------------
+
+We made a couple changes to improve the guessing of fields.
+
+* The order of commit descriptions has been reversed. (:bug:`3163`)
+
+  When we will be using a range of commits, the first (oldest) commit in the
+  range is now used for the summary and the top part of the description.
+  This helps when updating a branch of commits that are just fixing up
+  things in the first commit.
+
+* The summary is no longer included in the Description field.
+
+  We no longer duplicate this text, reducing what users have to read.
+
+
+Improved Mercurial Support
+--------------------------
+
+Our support for Mercurial has greatly improved in this release, thanks to the
+efforts of Gregory Szorc.
+
+* Added support for :option:`--parent` and :option:`--tracking-branch`.
+  (:bug:`3067`)
+
+* It's now faster to post changes against a Mercurial repository, particularly
+  in large repositories.
+
+* Fixed several issues with guessing the summary and description from commits.
+
+
+Perforce Shelved Changes Support
+--------------------------------
+
+Users can now post changes from a Perforce shelf without first having to
+unshelve those changes. Likewise, you can diff changes using
+:command:`rbt diff`.
+
+:bug:`2044`
+
+
+Commit ID Fields
+----------------
+
+Review Board 2.0 has a new field for showing the ID of the commit that has
+been posted.
+
+Now, when posting against a Git or Mercurial repository, this field will
+reflect the ID of the commit that was posted.
+
+
+Posting with Markdown Content
+-----------------------------
+
+Review Board 2.0 supports Markdown-formatted review request descriptions. By
+default, any commit descriptions posted will be automatically escaped, so that
+they won't be unintentionally interpreted as Markdown.
+
+If you happen to write your commit messages using Markdown, you can pass
+:option:`--markdown`` (or set ``MARKDOWN = True`` in :file:`.reviewboardrc`)
+to prevent the text from being escaped.
+
+
+Repository Hook Scripts
+-----------------------
+
+RBTools now bundles a couple of hook scripts for Git for improving workflows
+and interaction between Git repositories and Review Board.
+
+The :file:`git-hook-set-submitted` hook is a pre-receive hook that will
+automatically close review requests when commits that reference them are
+pushed.
+
+The :file:`git-hook-check-approval` hook can block pushing code if the
+commit is not reviewed or doesn't yet have approval. This works with the new
+"approval" feature in Review Board 2.0 to allow companies to decide under
+what conditions a change is allowed to go in.
+
+Hooks for Mercurial and other types of repositories will be coming in future
+releases. Much of the functionality is now part of the RBTools Python API (in
+:py:mod:`rbtools.hooks`), and can be used to more easily implement custom
+hooks.
+
+Patch by Anselina Chia.
+
+
+New Configuration Changes
+-------------------------
+
+* Removed the dual-meaning of the :option:`--repository-url` and
+  ``REPOSITORY`` settings.
+
+  Previously, these two settings could be used both for looking up repository
+  names against Review Board, and for specifying the remote repository URL to
+  perform operations against (such as in the case of Subversion).
+
+  Now, there's two sets of options:
+  :option:`--repository-url`/``REPOSITORY_URL`` (for specifying the URL to
+  communicate with for operations), and
+  :option:`--repository`/``REPOSITORY`` (for specifying the repository on
+  Review Board to match against).
+
+  If you were using one of these flags in a script, you may need to update
+  your script.
+
+* Added a ``BASEDIR`` setting to configure the default base directory for
+  Subversion.
+
+  Patch by Dieter Tschanz.
+
+* Added a ``GIT_USE_EXT_DIFF`` setting to allow external diff commands to
+  be used with Git. (:bug:`1524`)
+
+* Added a ``PUBLISH`` setting to control whether :option:`-p` is implied.
+  (:bug:`3271`)
+
+
+Other Changes
+-------------
+
+* Organized the help output, to make it easier to see what various options are
+  used for.
+
+* Improved the usefulness and readability of log output when using
+  :option:`--debug`.
+
+* :command:`rbt post` now shows the URL to the posted diff. (:bug:`2929`)
+
+  Patch by Iines Piesala.
+
+
+Removed Features
+================
+
+* Removed :command:`post-review`.
+
+  :command:`post-review` has been deprecated for a while, and now, it's
+  finally gone. Everybody should be using :command:`rbt post` to post
+  new changes to Review Board now. This is better designed, maintained, and
+  has a number of usability improvements over :command:`post-review`.
+
+* Removed :option:`--revision-range` in favor of the new revision syntax.
+
+
+Performance Improvements
+========================
+
+* Fewer API calls are needed when posting against Review Board 2.0 servers,
+  speeding up most commands.
+
+* Sped up posting changes against large Mercurial repositories.
+
+  Patch by Gregory Szorc.
+
+* Optimized guessing of summary and description on Mercurial repositories.
+
+  Patch by Gregory Szorc.
+
+* Optimized checking vob UUIDs on ClearCase repositories. (:bug:`3177`)
+
+  Patch by Nicolas Dély.
+
+
+Bug Fixes
+=========
+
+General
+-------
+
+* The commands no longer silently ignore failures for repository types if
+  the command line tools aren't installed. Instead, it logs debug
+  information. (:bug:`3187`)
+
+* Fixed locale issues when running external commands. (:bug:`3253`)
+
+
+rbt close
+---------
+
+* Fixed a typo when attempting to close an already closed review request.
+
+  Patch by Anselina Chia.
+
+* :command:`rbt close` no longer requires a working directory with a
+  :file:`.reviewboardrc` file if passing :option:`--server` on the
+  command line. (:bug:`3249`)
+
+  Patch by Thom Gerdes.
+
+
+rbt post
+--------
+
+* Using :option:`-u` wasn't working if the repository was being matched
+  based on a configured Mirror Path.
+
+  Patch by Bradley Baetz.
+
+
+Bazaar
+------
+
+* Fixed the wrong text appearing in the Description field when guessing
+  commit descriptions. (:bug:`2959`)
+
+
+ClearCase
+---------
+
+* Private files are no longer included when posting changes. (:bug:`3178`)
+
+  Patch by Nicolas Dély.
+
+* Fixed issues in multi-site mode. (:bug:`3183`)
+
+  Patch by Nicolas Dély.
+
+
+Git
+---
+
+* Fixed issues when ``core.bare`` wasn't set, or was set to ``1``.
+  (:bug:`3213`)
+
+  Patch by Nicolas Dély.
+
+* Fixed issues with parent diffs with git-svn and git-perforce. (:bug:`3273`)
+
+
+Mercurial
+---------
+
+* Fixed issues with guessing the description from commits.
+  Patch by Gregory Szorc.
+
+
+Perforce
+--------
+
+* git-p4 support now respects the :env:`P4PORT` environment variable.
+
+* Fixed conflicts in Perforce settings when using a :file:`.p4config` file
+  and passing :option:`--p4-port` or other Perforce-specific options.
+  (:bug:`2712`)
+
+* Perforce file path names are now normalized in order to work better on
+  Windows. (:bug:`3221`)
+
+
+Subversion
+----------
+
+* :command:`rbt post` no longer incorrectly detects copied files when
+  posting changelists containing only modified files. (:bug:`3248`)
+
+  Patch by Vlad Romascanu.
+
+* Fixed posting filenames containing ``@2x`` in the name (for Retina images).
+  (:bug:`2702`)
+
+* Fixed issues with directories brought in using ``svn:externals``.
+  (:bug:`2545`)
+
+* Fixed issues with posting fully replaced files, where a file is removed
+  and a new file with the same name is added.
+
+  Patch by Alexey Neyman.
+
+
+Contributors
+============
+
+* Alexey Neyman
+* Anselina Chia
+* Christian Hammond
+* David Trowbrige
+* Dieter Tschanz
+* Gregory Szorc
+* Iines Piesala
+* Nicolas Dély
+* Thom Gerdes
+* Vlad Romascanu
