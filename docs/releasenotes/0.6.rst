@@ -318,6 +318,10 @@ Git
 
 * Fixed issues with parent diffs with git-svn and git-perforce. (:bug:`3273`)
 
+* Error messages during diff generation are no longer included in the diff.
+
+  Patch by Chris Eagan.
+
 
 Mercurial
 ---------
@@ -364,6 +368,8 @@ Contributors
 
 * Alexey Neyman
 * Anselina Chia
+* Bradley Baetz
+* Chris Eagan
 * Christian Hammond
 * David Trowbrige
 * Dieter Tschanz
