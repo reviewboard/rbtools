@@ -1,3 +1,4 @@
 REVIEWBOARD_URL = "https://reviews.reviewboard.org"
 REPOSITORY = "RBTools"
 BRANCH = "release-0.6.x"
+TRACKING_BRANCH = "origin/release-0.6.x"
