@@ -47,7 +47,7 @@ class Status(Command):
             repo_id = get_repository_id(
                 repository_info,
                 api_root,
-                repository_name=self.config.get('REPOSITORY', None))
+                repository_name=self.options.repository_name)
 
             if repo_id:
                 query_args['repository'] = repo_id
