@@ -255,7 +255,7 @@ class SVNClient(SCMClient):
                 # Working copy--do a normal range diff
                 diff_cmd.extend(['-r', '%s:%s' % (base, tip)])
 
-            diff_cmd.extend(files)
+        diff_cmd.extend(files)
 
         if self.history_scheduled_with_commit(changelist):
             svn_show_copies_as_adds = getattr(

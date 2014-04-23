@@ -13,7 +13,7 @@ Perforce), it's actually required in order to produce a compatible diff.
 
 Usage::
 
-   $ rbt post [options] [changenum | [<file> ...]]
+   $ rbt post [options] [revisions]
 
 
 Posting and Updating Review Requests
@@ -126,7 +126,7 @@ review request #42, type::
 If you need to post specific files, leaving other uncommitted files out of
 the review request, you can include them on the command line, like so::
 
-    $ rbt post src/foo.c data/bar.png
+    $ rbt post -I src/foo.c -I data/bar.png
 
 
 .. _DVCS:
