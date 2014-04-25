@@ -1,8 +1,9 @@
 import os
 
-from rbtools.commands import Command, CommandError, Option
+from rbtools.commands import Command, CommandError
 from rbtools.utils.console import confirm
 from rbtools.utils.filesystem import CONFIG_FILE
+import difflib
 
 
 class SetupRepo(Command):
@@ -28,6 +29,7 @@ class SetupRepo(Command):
     args = ""
     option_list = [
         Command.server_options,
+        Command.perforce_options,
     ]
 
     def prompt_rb_repository(self, tool_name, repository_info, api_root):
@@ -42,19 +44,27 @@ class SetupRepo(Command):
         # selection is made, immediately return the selected repo.
         try:
             while True:
-                for repo in repositories:
-                    is_match = (
-                        tool_name == repo.tool and
-                        repository_info.path in
-                        (repo['path'], getattr(repo, 'mirror_path', '')))
+                repo_paths = {}
+                for repository in repositories:
+                    if repository.tool != tool_name:
+                        continue
 
-                    if is_match:
-                        question = (
-                            "Use the %s repository '%s' (%s)?"
-                            % (tool_name, repo['name'], repo['path']))
+                    repo_paths[repository['path']] = repository
+                    if 'mirror_path' in repository:
+                        repo_paths[repository['mirror_path']] = repository
 
-                        if confirm(question):
-                            return repo
+                closest_path = difflib.get_close_matches(repository_info.path,
+                                                         repo_paths.keys(),
+                                                         n=1)
+
+                for path in closest_path:
+                    repo = repo_paths[path]
+                    question = (
+                        "Use the %s repository '%s' (%s)?"
+                        % (tool_name, repo['name'], repo['path']))
+
+                    if confirm(question):
+                        return repo
 
                 repositories = repositories.get_next()
         except StopIteration:
