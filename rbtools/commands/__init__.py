@@ -549,7 +549,8 @@ class Command(object):
                         username=self.options.username,
                         password=self.options.password,
                         auth_callback=self.credentials_prompt,
-                        otp_token_callback=self.otp_token_prompt)
+                        otp_token_callback=self.otp_token_prompt,
+                        disable_proxy=not self.options.enable_proxy)
 
     def get_api(self, server_url):
         """Returns an RBClient instance and the associated root resource.
