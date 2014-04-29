@@ -308,7 +308,13 @@ class MercurialClient(SCMClient):
 
     def _load_hgrc(self):
         for line in execute(['hg', 'showconfig'], split_lines=True):
-            key, value = line.split('=', 1)
+            line = line.split('=', 1)
+            if len(line) == 2:
+                key, value = line
+            else:
+                key = line[0]
+                value = ''
+
             self.hgrc[key] = value.strip()
 
     def get_raw_commit_message(self, revisions):
