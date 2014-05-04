@@ -301,6 +301,16 @@ class Command(object):
                    help='The path within the repository where the diff '
                         'was generated. This overrides the detected path. '
                         'Often used when passing --diff-filename.'),
+            Option('--svn-username',
+                   dest='svn_username',
+                   default=None,
+                   metavar='SVN_USERNAME',
+                   help='The username for the SVN repository.'),
+            Option('--svn-password',
+                   dest='svn_password',
+                   default=None,
+                   metavar='SVN_PASSWORD',
+                   help='The password for the SVN repository.'),
             Option('--svn-show-copies-as-adds',
                    dest='svn_show_copies_as_adds',
                    metavar='y/n',

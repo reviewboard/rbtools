@@ -643,6 +643,20 @@ Options
 
    The default can be set in ``P4_PASSWD`` in :file:`.reviewboardrc`.
 
+.. cmdoption:: --svn-username
+
+   The username for the SVN repository (in the case where the checkout does not
+   cache the credentials).
+
+   The default can be set in ``SVN_USERNAME`` in :file:`.reviewboardrc`.
+
+.. cmdoption:: --svn-password
+
+   The password for the SVN repository (in the case where the checkout does not
+   cache the credentials).
+
+   The default can be set in ``SVN_PASSWORD`` in :file:`.reviewboardrc`.
+
 .. cmdoption:: --svn-changelist
 
    Generate the diff for review based on a local SVN changelist.
