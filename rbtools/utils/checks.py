@@ -30,7 +30,12 @@ def check_gnu_diff():
     has_gnu_diff = False
 
     try:
-        result = execute(['diff', '--version'], ignore_errors=True)
+        if hasattr(os, 'uname') and os.uname()[0] == 'SunOS':
+            diff_cmd = 'gdiff'
+        else:
+            diff_cmd = 'diff'
+
+        result = execute([diff_cmd, '--version'], ignore_errors=True)
         has_gnu_diff = 'GNU diffutils' in result
     except OSError:
         pass
