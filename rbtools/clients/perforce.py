@@ -92,7 +92,7 @@ class P4Wrapper(object):
         return self.run_p4(['where', depot_path], marshalled=True)
 
     def run_p4(self, p4_args, marshalled=False, password=None,
-               *args, **kwargs):
+               ignore_errors=False, *args, **kwargs):
         cmd = ['p4']
 
         if marshalled:
@@ -129,7 +129,7 @@ class P4Wrapper(object):
 
             rc = p.wait()
 
-            if rc or has_error:
+            if not ignore_errors and (rc or has_error):
                 for record in result:
                     if 'data' in record:
                         print record['data']
@@ -137,7 +137,7 @@ class P4Wrapper(object):
 
             return result
         else:
-            result = execute(cmd, *args, **kwargs)
+            result = execute(cmd, ignore_errors=ignore_errors, *args, **kwargs)
 
         return result
 
@@ -375,8 +375,7 @@ class PerforceClient(SCMClient):
             return 'pending'
         else:
             change = self.p4.change(changelist)
-            assert len(change) == 1
-            if 'Status' in change[0]:
+            if len(change) == 1 and 'Status' in change[0]:
                 return change[0]['Status']
 
         return None
