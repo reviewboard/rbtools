@@ -750,6 +750,10 @@ class PerforceClient(SCMClient):
                 except ValueError:
                     logging.warning('Skipping file %s: %s', depot_file, e)
                     continue
+
+                diff_lines += self._do_diff(
+                    old_file, new_file, initial_depot_file, initial_rev,
+                    depot_file, 'M', ignore_unmodified=True)
             elif action == 'move':
                 try:
                     old_file_a, new_file_a = self._extract_add_files(
