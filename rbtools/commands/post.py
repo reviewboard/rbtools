@@ -169,6 +169,11 @@ class Post(Command):
                        default=None,
                        help='The usernames of the people who should perform '
                             'the review.'),
+                Option('--depends-on',
+                       dest='depends_on',
+                       config_key='DEPENDS_ON',
+                       default=None,
+                       help='The new contents for the Depends On field.'),
                 Option('--markdown',
                        dest='markdown',
                        action='store_true',
@@ -558,6 +563,9 @@ class Post(Command):
 
         if self.options.target_people:
             update_fields['target_people'] = self.options.target_people
+
+        if self.options.depends_on:
+            update_fields['depends_on'] = self.options.depends_on
 
         if self.options.summary:
             update_fields['summary'] = self.options.summary

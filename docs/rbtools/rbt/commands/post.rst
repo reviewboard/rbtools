@@ -522,6 +522,10 @@ Options
 
    Text file containing a description of the review.
 
+.. cmdoption:: --depends-on
+
+   IDs of the reviews depended on by the review.
+
 .. cmdoption:: -g, --guess-fields
 
    Equivalent to setting both the :option:`--guess-summary` and
