@@ -547,6 +547,8 @@ class Post(Command):
                     'Your review request still exists, but the diff is '
                     'not attached.\n')
 
+                error_msg.append('%s\n' % review_request.absolute_url)
+
                 raise CommandError('\n'.join(error_msg))
 
         try:
