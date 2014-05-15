@@ -130,11 +130,10 @@ class GitClient(SCMClient):
                 raise InvalidRevisionSpecError(
                     'Unexpected result while parsing revision spec')
 
-            pdiff_required = not execute(
-                [self.git, 'branch', '-r', '--contains', result['base']])
-            if pdiff_required:
-                result['parent_base'] = self._get_merge_base(result['base'],
-                                                             self.upstream_branch)
+            parent_base = self._get_merge_base(result['base'],
+                                               self.upstream_branch)
+            if parent_base != result['base']:
+                result['parent_base'] = parent_base
         else:
             raise TooManyRevisionsError
 
