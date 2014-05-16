@@ -1026,7 +1026,7 @@ class PerforceClient(SCMClient):
                     base_revision = 0
                 elif second_record is None:
                     old_path = '%s#%s' % (depot_path, first_record['rev'])
-                    self._write_file(new_path, tmp_diff_from_filename)
+                    self._write_file(old_path, tmp_diff_from_filename)
                     old_file = tmp_diff_from_filename
                     changetype_short = 'D'
                     base_revision = int(first_record['rev'])
