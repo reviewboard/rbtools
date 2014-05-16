@@ -15,9 +15,9 @@ def get_repository_id(repository_info, api_root, repository_name=None):
     try:
         while True:
             for repo in repositories:
-                if (repo.path in detected_paths or
-                    repo.mirror_path in detected_paths or
-                    repo.name == repository_name):
+                if getattr(repo, 'path', None) in detected_paths or \
+                        getattr(repo, 'mirror_path', None) in detected_paths or \
+                        getattr(repo, 'name', None) == repository_name:
                     return repo.id
 
             repositories = repositories.get_next()

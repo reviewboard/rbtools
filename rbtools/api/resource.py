@@ -612,8 +612,7 @@ class ReviewRequestResource(ItemResource):
         if 'absolute_url' in self._fields:
             return self._fields['absolute_url']
         else:
-            base_url = self._url.split('/api/')[0]
-            return urlparse.urljoin(base_url, self.url)
+            return self._url.split('/api/')[0] + "/" + str(self.id) + "/"
 
     @request_method_decorator
     def submit(self, description=None, changenum=None):
