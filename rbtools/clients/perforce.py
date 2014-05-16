@@ -619,7 +619,12 @@ class PerforceClient(SCMClient):
         # also include duplicate information, especially when files have moved
         # around.
         changesets = {}
-        for file_entry in self.p4.filelog('//...@%s,%s' % (base, tip)):
+
+        # We expect to generate a diff for (base, tip], but filelog gives us
+        # [base, tip]. Increment the base to avoid this.
+        real_base = str(int(base) + 1)
+
+        for file_entry in self.p4.filelog('//...@%s,%s' % (real_base, tip)):
             cid = 0
             while True:
                 change_key = 'change%d' % cid
