@@ -172,7 +172,8 @@ class GitClient(SCMClient):
 
             # Top level might not work on old git version se we use git dir
             # to find it.
-            if git_top.startswith("fatal:") or not os.path.isdir(git_dir):
+            if git_top.startswith("fatal:") or not os.path.isdir(git_dir) or \
+               git_top.startswith("/cygdrive"):
                 git_top = git_dir
 
             os.chdir(os.path.abspath(git_top))
