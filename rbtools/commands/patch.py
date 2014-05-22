@@ -67,7 +67,7 @@ class Patch(Command):
         try:
             diff = diffs.get_item(diff_revision)
             diff_body = diff.get_patch().data
-            base_dir = diff.basedir
+            base_dir = getattr(diff, 'basedir', None) or ''
         except APIError:
             raise CommandError('The specified diff revision does not exist.')
 

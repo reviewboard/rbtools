@@ -133,7 +133,7 @@ class SCMClient(object):
         Returns the appropriate int used for patch -pX argument,
         where x is the aforementioned int.
         """
-        if (base_dir.startswith(base_path)):
+        if base_path and base_dir.startswith(base_path):
             return base_path.count('/') + 1
         else:
             return -1
