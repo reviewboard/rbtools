@@ -152,6 +152,16 @@ class Resource(object):
         else:
             return field
 
+    @property
+    def links(self):
+        """Get the resource's links.
+
+        This is a special property which allows direct access to the links
+        dictionary for a resource. Unlike other properties which come from the
+        resource fields, this one is only accessible as a property, and not
+        using array syntax."""
+        return ResourceDictField(self, self._links)
+
     @request_method_decorator
     def _get_url(self, url, **kwargs):
         return HttpRequest(url, query_args=kwargs)

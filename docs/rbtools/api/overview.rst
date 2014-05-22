@@ -47,6 +47,11 @@ with ``get_self``, ``create``, and ``get_some_sub_resource`` methods.
         "some_sub_resource": {
           "href": "/path/to/whatever/some-sub-resource",
           "method": "GET"
+        },
+        "user": {
+          "href": "/path/to/joe",
+          "method": GET,
+          "title": "joe"
         }
       }
     }
@@ -71,6 +76,11 @@ draft::
 
    # Publish the draft.
    draft = draft.update(public=True)
+
+The links are also directly accessible via a ``links`` property on the
+resource. This allows pulling out the URLs or other data about the links::
+
+   username = resource.links.user.title
 
 
 .. _hyperlinks: http://www.reviewboard.org/docs/manual/dev/webapi/2.0/overview/#hyperlinks

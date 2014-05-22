@@ -2,7 +2,7 @@ import logging
 
 from rbtools.commands import Command, Option
 from rbtools.utils.repository import get_repository_id
-from rbtools.utils.users import get_user
+from rbtools.utils.users import get_username
 
 
 class Status(Command):
@@ -35,10 +35,10 @@ class Status(Command):
         server_url = self.get_server_url(repository_info, tool)
         api_client, api_root = self.get_api(server_url)
         self.setup_tool(tool, api_root=api_root)
-        user = get_user(api_client, api_root, auth_required=True)
+        username = get_username(api_client, api_root, auth_required=True)
 
         query_args = {
-            'from_user': user.username,
+            'from_user': username,
             'status': 'pending',
             'expand': 'draft',
         }
