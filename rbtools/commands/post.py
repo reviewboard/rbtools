@@ -766,6 +766,12 @@ class Post(Command):
                 raise CommandError('Could not determine the existing review '
                                    'request to update.')
 
+        # If only certain files within a commit are being submitted for review,
+        # do not include the commit id. This prevents conflicts if mutliple
+        # files from the same commit are posted for review separately.
+        if self.options.include_files:
+            commit_id = None
+
         request_id, review_url = self.post_request(
             repository_info,
             server_url,
