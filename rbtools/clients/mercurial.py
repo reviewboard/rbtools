@@ -20,6 +20,9 @@ class MercurialClient(SCMClient):
     """
     name = 'Mercurial'
 
+    PRE_CREATION = '/dev/null'
+    PRE_CREATION_DATE = 'Thu Jan 01 00:00:00 1970 +0000'
+
     def __init__(self, **kwargs):
         super(MercurialClient, self).__init__(**kwargs)
 
@@ -353,11 +356,20 @@ class MercurialClient(SCMClient):
             diff_cmd + ['-r', revisions['base'], '-r', revisions['tip']],
             env=self._hg_env)
 
+        if self._supports_empty_files():
+            diff = self._handle_empty_files(diff, revisions['base'],
+                                            revisions['tip'])
+
         if 'parent_base' in revisions:
             base_commit_id = revisions['parent_base']
             parent_diff = self._execute(
                 diff_cmd + ['-r', base_commit_id, '-r', revisions['base']],
                 env=self._hg_env)
+
+            if self._supports_empty_files():
+                parent_diff = self._handle_empty_files(parent_diff,
+                                                       base_commit_id,
+                                                       revisions['base'])
         else:
             base_commit_id = revisions['base']
             parent_diff = None
@@ -368,6 +380,66 @@ class MercurialClient(SCMClient):
             'commit_id': revisions.get('commit_id'),
             'base_commit_id': base_commit_id,
         }
+
+    def _handle_empty_files(self, diff, base, tip):
+        """Adds added and deleted 0-length files to the diff output.
+
+        Since the diff output from hg diff does not give any information on
+        0-length files, we manually add this extra information to the patch.
+        """
+        # If the files in the base and tip changesets are the same, no files
+        # (empty or otherwise) were added or deleted.
+        base_files = self._get_files_in_changeset(base)
+        tip_files = self._get_files_in_changeset(tip)
+
+        if base_files == tip_files:
+            return diff
+
+        tip_empty_files = self._get_files_in_changeset(tip, get_empty=True)
+        added_empty_files = tip_empty_files - base_files
+
+        base_empty_files = self._get_files_in_changeset(base, get_empty=True)
+        deleted_empty_files = base_empty_files - tip_files
+
+        if not (added_empty_files or deleted_empty_files):
+            return diff
+
+        base_date, tip_date = execute(['hg', 'log', '-r', base, '-r', tip,
+                                       '--template', '{date|date}\\t'],
+                                      env=self._hg_env).strip().split('\t')
+
+        for filename in added_empty_files:
+            diff += ('diff -r %s -r %s %s\n'
+                     '--- %s\t%s\n'
+                     '+++ b/%s\t%s\n'
+                     % (base, tip, filename,
+                        self.PRE_CREATION, self.PRE_CREATION_DATE,
+                        filename, tip_date))
+
+        for filename in deleted_empty_files:
+            diff += ('diff -r %s -r %s %s\n'
+                     '--- a/%s\t%s\n'
+                     '+++ %s\t%s\n'
+                     % (base, tip, filename,
+                        filename, base_date,
+                        self.PRE_CREATION, self.PRE_CREATION_DATE))
+
+        return diff
+
+    def _get_files_in_changeset(self, rev, get_empty=False):
+        """Returns a set of all files in the specified changeset.
+
+        If get_empty is True, we return only 0-length files in the changeset.
+        """
+        cmd = ['hg', 'locate', '-r', rev]
+
+        if get_empty:
+            cmd.append('set:size(0)')
+
+        files = execute(cmd, env=self._hg_env, ignore_errors=True,
+                        none_on_ignored_error=True)
+
+        return (files and set(files.splitlines())) or set()
 
     def _get_parent_for_hgsubversion(self):
         """Returns the parent Subversion branch.
@@ -522,3 +594,9 @@ class MercurialClient(SCMClient):
         ])
 
         return execute(cmd, *args, **kwargs)
+
+    def _supports_empty_files(self):
+        """Checks if the RB server supports added/deleted empty files."""
+        return (self.capabilities and
+                self.capabilities.has_capability('scmtools', 'mercurial',
+                                                 'empty_files'))

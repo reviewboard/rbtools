@@ -1125,17 +1125,20 @@ class PerforceClient(SCMClient):
             dl = ['Binary files %s and %s differ\n' % (old_file, new_file)]
 
         if dl == [] or dl[0].startswith("Binary files "):
-            if dl == [] and not is_move:
+            is_empty_and_changed = (self._supports_empty_files() and
+                                    changetype_short in ('A', 'D'))
+
+            if dl == [] and (is_move or is_empty_and_changed):
+                dl.insert(0, "==== %s#%s ==%s== %s ====\n" %
+                          (depot_file, base_revision, changetype_short,
+                           new_local_path))
+                dl.append('\n')
+            else:
                 if ignore_unmodified:
                     return []
                 else:
                     print "Warning: %s in your changeset is unmodified" % \
                           local_path
-
-            dl.insert(0, "==== %s#%s ==%s== %s ====\n" %
-                      (depot_file, base_revision, changetype_short,
-                       new_local_path))
-            dl.append('\n')
         elif len(dl) > 1:
             m = re.search(r'(\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d)', dl[1])
             if m:
@@ -1226,3 +1229,9 @@ class PerforceClient(SCMClient):
         return (self.capabilities and
                 self.capabilities.has_capability('scmtools', 'perforce',
                                                  'moved_files'))
+
+    def _supports_empty_files(self):
+        """Checks if the RB server supports added/deleted empty files."""
+        return (self.capabilities and
+                self.capabilities.has_capability('scmtools', 'perforce',
+                                                 'empty_files'))
