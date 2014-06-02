@@ -190,63 +190,9 @@ class GitClient(SCMClient):
 
         if (not getattr(self.options, 'repository_url', None) and
             os.path.isdir(git_svn_dir) and len(os.listdir(git_svn_dir)) > 0):
-            data = execute([self.git, "svn", "info"], ignore_errors=True)
-
-            m = re.search(r'^Repository Root: (.+)$', data, re.M)
-
-            if m:
-                path = m.group(1)
-                m = re.search(r'^URL: (.+)$', data, re.M)
-
-                if m:
-                    base_path = m.group(1)[len(path):] or "/"
-                    m = re.search(r'^Repository UUID: (.+)$', data, re.M)
-
-                    if m:
-                        uuid = m.group(1)
-                        self.type = "svn"
-
-                        # Get SVN tracking branch
-                        if getattr(self.options, 'tracking', None):
-                            self.upstream_branch = self.options.tracking
-                        else:
-                            data = execute([self.git, "svn", "rebase", "-n"],
-                                           ignore_errors=True)
-                            m = re.search(r'^Remote Branch:\s*(.+)$', data,
-                                          re.M)
-
-                            if m:
-                                self.upstream_branch = m.group(1)
-                            else:
-                                sys.stderr.write('Failed to determine SVN '
-                                                 'tracking branch. Defaulting'
-                                                 'to "master"\n')
-                                self.upstream_branch = 'master'
-
-                        return SVNRepositoryInfo(path=path,
-                                                 base_path=base_path,
-                                                 uuid=uuid,
-                                                 supports_parent_diffs=True)
-            else:
-                # Versions of git-svn before 1.5.4 don't (appear to) support
-                # 'git svn info'.  If we fail because of an older git install,
-                # here, figure out what version of git is installed and give
-                # the user a hint about what to do next.
-                version = execute([self.git, "svn", "--version"],
-                                  ignore_errors=True)
-                version_parts = re.search('version (\d+)\.(\d+)\.(\d+)',
-                                          version)
-                svn_remote = execute(
-                    [self.git, "config", "--get", "svn-remote.svn.url"],
-                    ignore_errors=True)
-
-                if (version_parts and svn_remote and
-                    not self.is_valid_version((int(version_parts.group(1)),
-                                               int(version_parts.group(2)),
-                                               int(version_parts.group(3))),
-                                              (1, 5, 4))):
-                    die("Your installation of git-svn must be upgraded to "
-                        "version 1.5.4 or later")
+            return self._get_git_svn_info(git_svn_dir)
+        elif self._is_subgit_configured():
+            return self._get_subgit_info()
 
         # Okay, maybe Perforce (git-p4).
         git_p4_ref = os.path.join(git_dir, 'refs', 'remotes', 'p4', 'master')
@@ -268,7 +214,16 @@ class GitClient(SCMClient):
 
         # Nope, it's git then.
         # Check for a tracking branch and determine merge-base
-        self.upstream_branch = ''
+        self.upstream_branch, url = self._get_git_remote_tracking_info()
+        if url:
+            self.type = "git"
+            return RepositoryInfo(path=url, base_path='',
+                                  supports_parent_diffs=True)
+
+        return None
+        
+    def _get_git_remote_tracking_info(self):
+        upstream_branch = ''
         if self.head_ref:
             short_head = self._strip_heads_prefix(self.head_ref)
             merge = execute([self.git, 'config', '--get',
@@ -281,19 +236,19 @@ class GitClient(SCMClient):
             merge = self._strip_heads_prefix(merge)
 
             if remote and remote != '.' and merge:
-                self.upstream_branch = '%s/%s' % (remote, merge)
+                upstream_branch = '%s/%s' % (remote, merge)
 
         url = None
         if getattr(self.options, 'repository_url', None):
             url = self.options.repository_url
-            self.upstream_branch = self.get_origin(self.upstream_branch,
-                                                   True)[0]
+            upstream_branch = self.get_origin(upstream_branch,
+                                              True)[0]
         else:
-            self.upstream_branch, origin_url = \
-                self.get_origin(self.upstream_branch, True)
+            upstream_branch, origin_url = \
+                self.get_origin(upstream_branch, True)
 
             if not origin_url or origin_url.startswith("fatal:"):
-                self.upstream_branch, origin_url = self.get_origin()
+                upstream_branch, origin_url = self.get_origin()
 
             url = origin_url.rstrip('/')
 
@@ -303,14 +258,95 @@ class GitClient(SCMClient):
                 url = os.path.abspath(git_dir)
 
                 # There is no remote, so skip this part of upstream_branch.
-                self.upstream_branch = self.upstream_branch.split('/')[-1]
+                upstream_branch = upstream_branch.split('/')[-1]
+                
+        return upstream_branch, url
 
-        if url:
-            self.type = "git"
-            return RepositoryInfo(path=url, base_path='',
-                                  supports_parent_diffs=True)
+        
+    def _get_git_svn_info(self):
+        data = execute([self.git, "svn", "rebase", "-n"],
+                        ignore_errors=True)
+        m = re.search(r'^Remote Branch:\s*(.+)$', data,
+                      re.M)
+        if m:
+            upstream_branch = m.group(1)
+        else:
+            sys.stderr.write('Failed to determine SVN '
+                             'tracking branch. Defaulting'
+                             'to "master"\n')
+            upstream_branch = 'master'
 
+        svn_info = execute([self.git, "svn", "info"], ignore_errors=True)
+        return self._parse_svn_info(svn_info, upstream_branch)
+    
+    def _parse_svn_info(self, svn_info):
+        m = re.search(r'^Repository Root: (.+)$', svn_info, re.M)
+        if m:
+            path = m.group(1)
+            m = re.search(r'^URL: (.+)$', svn_info, re.M)
+            if m:
+                base_path = m.group(1)[len(path):] or "/"
+                m = re.search(r'^Repository UUID: (.+)$', svn_info, re.M)
+                if m:
+                    uuid = m.group(1)
+                    self.type = "svn"
+                    # Get SVN tracking branch
+                    if getattr(self.options, 'tracking', None):
+                        self.upstream_branch = self.options.tracking
+                    else:
+                        # already discovered from git-svn or subgit info
+                        self.upstream_branch = upstream_branch
+                        
+                    return SVNRepositoryInfo(path=path,
+                                             base_path=base_path,
+                                             uuid=uuid,
+                                             supports_parent_diffs=True)
+        else:
+            # Versions of git-svn before 1.5.4 don't (appear to) support
+            # 'git svn info'.  If we fail because of an older git install,
+            # here, figure out what version of git is installed and give
+            # the user a hint about what to do next.
+            version = execute([self.git, "svn", "--version"],
+                              ignore_errors=True)
+            version_parts = re.search('version (\d+)\.(\d+)\.(\d+)',
+                                      version)
+            svn_remote = execute(
+                [self.git, "config", "--get", "svn-remote.svn.url"],
+                ignore_errors=True)
+            if (version_parts and svn_remote and
+                not self.is_valid_version((int(version_parts.group(1)),
+                                           int(version_parts.group(2)),
+                                           int(version_parts.group(3))),
+                                          (1, 5, 4))):
+                die("Your installation of git-svn must be upgraded to "
+                    "version 1.5.4 or later")
+        
         return None
+
+    def _is_subgit_configured(self):
+        svn_remote_url = self._get_subgit_svn_url()
+        return (svn_remote_url is not None)
+        
+    def _get_subgit_svn_url(self):
+        git_url = execute([self.git, "config", "--get", "remote.origin.url"])
+        match = re.search('([A-Za-z0-9@:]+):(/.+)', git_url)
+        if not match:
+            return None
+        server, path = match.groups(1, 2)
+        
+        remote_cmd = "git config -f %s/subgit/config --get svn.url" % path
+        svn_remote_url = execute(['ssh', server, remote_cmd])
+        if not svn_remote_url:
+            return None
+        svn_remote_url = svn_remote_url.replace("file://", "svn+ssh://%s" % server)
+        return svn_remote_url
+
+    def _get_subgit_info(self):
+        svn_remote = self._get_subgit_svn_url()
+        svn_info = execute(['ssh', server, "svn info %s" % svn_remote])
+        
+        upstream_branch, url = self._get_git_remote_tracking_info()
+        return self._parse_svn_info(svn_info, upstream_branch)
 
     def _strip_heads_prefix(self, ref):
         """Strips prefix from ref name, if possible."""
