@@ -305,8 +305,14 @@ class SVNClient(SCMClient):
             status_cmd.extend(['--changelist', changelist])
 
         for p in execute(status_cmd, split_lines=True):
-            if p[3] == '+':
-                return True
+            try:
+                if p[3] == '+':
+                    return True
+            except IndexError:
+                # This may be some other output, or just doesn't have the
+                # data we're looking for. Move along.
+                pass
+
         return False
 
     def find_copyfrom(self, path):
