@@ -185,7 +185,6 @@ class Post(Command):
             ]
         ),
         Command.diff_options,
-        Command.git_options,
         Command.perforce_options,
         Command.subversion_options,
     ]

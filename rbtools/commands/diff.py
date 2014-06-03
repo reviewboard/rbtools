@@ -1,5 +1,5 @@
 from rbtools.clients.errors import InvalidRevisionSpecError
-from rbtools.commands import Command, CommandError, Option
+from rbtools.commands import Command, CommandError
 
 
 class Diff(Command):
@@ -11,7 +11,6 @@ class Diff(Command):
         Command.server_options,
         Command.diff_options,
         Command.repository_options,
-        Command.git_options,
         Command.perforce_options,
         Command.subversion_options,
     ]

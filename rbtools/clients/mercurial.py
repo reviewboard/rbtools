@@ -10,7 +10,7 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError)
 from rbtools.clients.svn import SVNClient
 from rbtools.utils.checks import check_install
-from rbtools.utils.process import execute
+from rbtools.utils.process import die, execute
 
 
 class MercurialClient(SCMClient):
@@ -458,11 +458,19 @@ class MercurialClient(SCMClient):
         If the remote branch is not defined, the parent branch of the
         repository is returned.
         """
-        remote = self._remote_path[0]
+        try:
+            remote = self._remote_path[0]
+        except IndexError:
+            remote = None
+
         tracking = getattr(self.options, 'tracking', None)
 
         if not remote and tracking:
             remote = tracking
+
+        if not remote:
+            die('Could not determine remote branch to use for diff creation. '
+                'Specify --tracking-branch to continue.')
 
         return remote
 

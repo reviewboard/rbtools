@@ -240,22 +240,16 @@ class Command(object):
                    metavar='FILENAME',
                    help='Uploads an existing diff file, instead of '
                         'generating a new diff.'),
-        ]
-    )
-
-    git_options = OptionGroup(
-        name='Git Options',
-        description='Git-specific options for selecting revisions for '
-                    'diff generation.',
-        option_list=[
             Option('--tracking-branch',
                    dest='tracking',
                    metavar='BRANCH',
                    config_key='TRACKING_BRANCH',
                    default=None,
-                   help='The remote tracking branch from which your '
-                        'local branch is derived '
-                        '(defaults to origin/master).'),
+                   help='The remote tracking branch from which your local '
+                        'branch is derived (Git/Mercurial only). Defaults '
+                        'are "origin/master" for Git and one of '
+                        '"reviewboard", "origin", "parent", or "default" for '
+                        'Mercurial.'),
         ]
     )
 
