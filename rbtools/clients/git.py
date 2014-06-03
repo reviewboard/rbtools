@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import sys
+import functools
 
 from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.clients.errors import (InvalidRevisionSpecError,
@@ -12,6 +13,17 @@ from rbtools.utils.checks import check_install
 from rbtools.utils.console import edit_text
 from rbtools.utils.process import die, execute
 
+# https://wiki.python.org/moin/PythonDecoratorLibrary
+# ignores kwargs
+def memoize(obj):
+    cache = obj.cache = {}
+
+    @functools.wraps(obj)
+    def memoizer(*args, **kwargs):
+        if args not in cache:
+            cache[args] = obj(*args, **kwargs)
+        return cache[args]
+    return memoizer
 
 class GitClient(SCMClient):
     """
@@ -190,7 +202,7 @@ class GitClient(SCMClient):
 
         if (not getattr(self.options, 'repository_url', None) and
             os.path.isdir(git_svn_dir) and len(os.listdir(git_svn_dir)) > 0):
-            return self._get_git_svn_info(git_svn_dir)
+            return self._get_git_svn_info()
         elif self._is_subgit_configured():
             return self._get_subgit_info()
 
@@ -279,7 +291,7 @@ class GitClient(SCMClient):
         svn_info = execute([self.git, "svn", "info"], ignore_errors=True)
         return self._parse_svn_info(svn_info, upstream_branch)
     
-    def _parse_svn_info(self, svn_info):
+    def _parse_svn_info(self, svn_info, upstream_branch):
         m = re.search(r'^Repository Root: (.+)$', svn_info, re.M)
         if m:
             path = m.group(1)
@@ -327,23 +339,46 @@ class GitClient(SCMClient):
         svn_remote_url = self._get_subgit_svn_url()
         return (svn_remote_url is not None)
         
-    def _get_subgit_svn_url(self):
+    def _get_git_remote_server_info(self):
         git_url = execute([self.git, "config", "--get", "remote.origin.url"])
-        match = re.search('([A-Za-z0-9@:]+):(/.+)', git_url)
-        if not match:
+        git_url = git_url.strip()
+        ssh_url_regexes = [
+            '(?:git\+)?ssh://([A-Za-z0-9@:.]+?)(/.+)', # ssh://host.com/path/to/repo
+            '([A-Za-z0-9@:.]+):(.+)', # host.com:path/to/repo
+        ]
+        logging.debug("Parsing remote git URL: %s" % git_url)
+
+        server, path = None, None
+        for regex in ssh_url_regexes:
+            match = re.search(regex, git_url)
+            if match:
+                server, path = match.groups([1, 2])
+                break
+        if server is None:
+            logging.debug("Failed to parse git remote URL")
             return None
-        server, path = match.groups(1, 2)
+        logging.debug("Got git remote server,path: %s,%s" % (server, path))
+        return server, path
+
+    @memoize
+    def _get_subgit_svn_url(self):
+        server, path = self._get_git_remote_server_info()
         
         remote_cmd = "git config -f %s/subgit/config --get svn.url" % path
         svn_remote_url = execute(['ssh', server, remote_cmd])
         if not svn_remote_url:
+            logging.debug("Failed to retrieve SVN url from remote Subgit configuration")
             return None
+
         svn_remote_url = svn_remote_url.replace("file://", "svn+ssh://%s" % server)
+        svn_remote_url = svn_remote_url.strip()
+        logging.debug("Got remote SVN url from Subgit: %s" % svn_remote_url)
         return svn_remote_url
 
     def _get_subgit_info(self):
         svn_remote = self._get_subgit_svn_url()
-        svn_info = execute(['ssh', server, "svn info %s" % svn_remote])
+        server, path = self._get_git_remote_server_info()
+        svn_info = execute(["svn", "info", svn_remote])
         
         upstream_branch, url = self._get_git_remote_tracking_info()
         return self._parse_svn_info(svn_info, upstream_branch)
@@ -523,13 +558,33 @@ class GitClient(SCMClient):
         else:
             return ''.join(diff_lines)
 
+    def _get_svn_revision(self, merge_base):
+        if self._is_subgit_configured():
+            line = execute([self.git, 'notes', 'show', merge_base],
+                           ignore_errors=True,
+                           none_on_ignored_error=True)
+            if line:
+                return re.search("^r([0-9]+)", line).group(1)
+            else:
+                logging.error("subgit configured, but couldn't find svn revision for git ref")
+                logging.error("You may need to add this line to .git/config:")
+                logging.error("-----------")
+                logging.error("[remote \"origin\"]")
+                logging.error("    ...")
+                logging.error("    fetch = +refs/svn/map:refs/notes/commits")
+                logging.error("-----------")
+                logging.error("and then run 'git fetch', then try again.")
+                die("Failed to get svn revision for git ref")
+        else:
+            return execute([self.git, "svn", "find-rev", merge_base]).strip()
+
     def make_svn_diff(self, merge_base, diff_lines):
         """
         Formats the output of git diff such that it's in a form that
         svn diff would generate. This is needed so the SVNTool in Review
         Board can properly parse this diff.
         """
-        rev = execute([self.git, "svn", "find-rev", merge_base]).strip()
+        rev = self._get_svn_revision(merge_base)
 
         if not rev:
             return None
