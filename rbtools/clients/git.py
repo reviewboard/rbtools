@@ -356,14 +356,16 @@ class GitClient(SCMClient):
                 break
         if server is None:
             logging.debug("Failed to parse git remote URL")
-            return None
+            return None, None
         logging.debug("Got git remote server,path: %s,%s" % (server, path))
         return server, path
 
     @memoize
     def _get_subgit_svn_url(self):
         server, path = self._get_git_remote_server_info()
-        
+        if server is None:
+            return None
+
         remote_cmd = "git config -f %s/subgit/config --get svn.url" % path
         svn_remote_url = execute(['ssh', server, remote_cmd])
         if not svn_remote_url:
