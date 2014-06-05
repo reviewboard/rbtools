@@ -64,4 +64,4 @@ Contributors
 
 * Christian Hammond
 * Dan Porter
-* David Trowbrige
+* David Trowbridge

@@ -78,7 +78,7 @@ Bugs Fixed
 
 * We now properly support excess tabs in diff file headers from Subversion
   diffs. Some tools would generate these excess tabs, which broke our
-  parser. Patchby Nathan Heijermans.
+  parser. Patch by Nathan Heijermans.
 
 * We no longer error out during diff generation for Perforce when there's
   an error reading the diff. Patch by Laurent Nicolas.

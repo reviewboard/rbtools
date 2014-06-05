@@ -19,4 +19,4 @@ Bug Fixes
 Contributors
 ============
 
-* David Trowbrige
+* David Trowbridge

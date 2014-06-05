@@ -108,7 +108,7 @@ General
   option. We now report the errors properly. Patch by Eric Huss.
 
 * There were issues with uploading diffs containing non-ASCII characters.
-  The ``Content-Length`` header was calculated bsaed on the length of
+  The ``Content-Length`` header was calculated based on the length of
   the diff in characters instead of bytes, possibly truncating some files.
   We now ensure that this is properly calculated. Patch by
   Thilo-Alexander Ginkel.

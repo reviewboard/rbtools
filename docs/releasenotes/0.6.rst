@@ -371,7 +371,7 @@ Contributors
 * Bradley Baetz
 * Chris Eagan
 * Christian Hammond
-* David Trowbrige
+* David Trowbridge
 * Dieter Tschanz
 * Gregory Szorc
 * Iines Piesala

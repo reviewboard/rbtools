@@ -38,7 +38,7 @@ rbt patch
 
   Patch by Sudhir Sangappa.
 
-* Added a :option:`--commit` (or :option:`-c`) option to automaticaly
+* Added a :option:`--commit` (or :option:`-c`) option to automatically
   create a commit on the local branch with the summary, description,
   bugs, testing, author information, and diff contents from the review
   request.

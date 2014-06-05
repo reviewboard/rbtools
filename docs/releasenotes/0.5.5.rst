@@ -27,4 +27,4 @@ Contributors
 ============
 
 * Christian Hammond
-* David Trowbrige
+* David Trowbridge

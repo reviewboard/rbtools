@@ -31,7 +31,7 @@ provides access to useful sub-commands which interact with local
 source code repositories and Review Board. This tool will eventually
 replace post-review, but is currently considered beta.
 
-There are a number of bulit in sub-commands.
+There are a number of built in sub-commands.
 
 
 rbt attach
