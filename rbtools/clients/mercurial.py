@@ -242,6 +242,10 @@ class MercurialClient(SCMClient):
             result['base'] = self._execute(
                 ['hg', 'parents', '--hidden', '-r', result['tip'],
                  '--template', '{node|short}']).split()[0]
+            if len(result['base']) != 12:
+                raise InvalidRevisionSpecError(
+                    "Can't determine parent revision"
+                )
         elif n_revisions == 2:
             # Two revisions: Just use the given revisions
             result['base'] = self._identify_revision(revisions[0])
