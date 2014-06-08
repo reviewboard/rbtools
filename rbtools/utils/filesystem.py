@@ -1,3 +1,6 @@
+from __future__ import with_statement
+
+import logging
 import os
 import shutil
 import tempfile
@@ -91,6 +94,26 @@ def make_tempdir(parent=None):
     tempdirs.append(tmpdir)
 
     return tmpdir
+
+
+def make_empty_files(files):
+    """Creates each file in the given list and any intermediate directories."""
+    for f in files:
+        path = os.path.dirname(f)
+
+        if path and not os.path.exists(path):
+            try:
+                os.makedirs(path)
+            except OSError, e:
+                logging.error('Unable to create directory %s: %s', path, e)
+                continue
+
+        try:
+            with open(f, 'w'):
+                # Set the file access and modified times to the current time.
+                os.utime(f, None)
+        except IOError, e:
+            logging.error('Unable to create empty file %s: %s', f, e)
 
 
 def walk_parents(path):

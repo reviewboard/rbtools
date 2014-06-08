@@ -1,5 +1,8 @@
+from __future__ import with_statement
+
 import logging
 import pkg_resources
+import re
 import sys
 
 from rbtools.utils.process import die, execute
@@ -138,6 +141,18 @@ class SCMClient(object):
         else:
             return -1
 
+    def _strip_p_num_slashes(self, files, p_num):
+        """Strips the smallest prefix containing p_num slashes from file names.
+
+        To match the behavior of the patch -pX option, adjacent slashes are
+        counted as a single slash.
+        """
+        if p_num > 0:
+            regex = re.compile(r'[^/]*/+')
+            return [regex.sub('', f, p_num) for f in files]
+        else:
+            return files
+
     def _execute(self, cmd):
         """
         Prints the results of the executed command and returns
@@ -166,7 +181,35 @@ class SCMClient(object):
         else:
             cmd = ['patch', '-i', str(patch_file)]
 
-        execute(cmd)
+        # Ignore return code 2 in case the patch file consists of only empty
+        # files, which 'patch' can't handle. Other 'patch' errors also give
+        # return code 2, so we must check the command output.
+        patch_output = execute(cmd, extra_ignore_errors=(2,))
+        only_garbage_in_patch = ('patch: **** Only garbage was found in the '
+                                 'patch input.\n')
+
+        if (patch_output and patch_output.startswith('patch: **** ') and
+            patch_output != only_garbage_in_patch):
+            die('Failed to execute command: %s\n%s' % (cmd, patch_output))
+
+        # Check the patch for any added/deleted empty files to handle.
+        if self._supports_empty_files():
+            try:
+                with open(patch_file, 'r') as f:
+                    patch = f.read()
+            except IOError, e:
+                logging.error('Unable to read file %s: %s', patch_file, e)
+                patched_empty_files = False
+                return
+
+            patched_empty_files = self._apply_patch_for_empty_files(patch,
+                                                                    p_num)
+
+            # If there are no empty files in a "garbage-only" patch, the patch
+            # is probably malformed.
+            if (patch_output == only_garbage_in_patch and
+                not patched_empty_files):
+                die('Failed to execute command: %s\n%s' % (cmd, patch_output))
 
     def create_commit(self, message, author, files=[], all_files=False):
         """Creates a commit based on the provided message and author.

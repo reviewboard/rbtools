@@ -11,7 +11,7 @@ from rbtools.clients.errors import (EmptyChangeError,
                                     InvalidRevisionSpecError,
                                     TooManyRevisionsError)
 from rbtools.utils.checks import check_gnu_diff, check_install
-from rbtools.utils.filesystem import make_tempfile
+from rbtools.utils.filesystem import make_empty_files, make_tempfile
 from rbtools.utils.process import die, execute
 
 
@@ -1224,6 +1224,47 @@ class PerforceClient(SCMClient):
         except:
             # XXX: This breaks on filenames with spaces.
             return where_output[-1]['data'].split(' ')[2].strip()
+
+    def _apply_patch_for_empty_files(self, patch, p_num):
+        """Returns True if any empty files in the patch are applied.
+
+        If there are no empty files in the patch or if an error occurs while
+        applying the patch, we return False.
+        """
+        patched_empty_files = False
+        added_files = re.findall(r'^==== //depot/(\S+)#\d+ ==A== \S+ ====$',
+                                 patch, re.M)
+        deleted_files = re.findall(r'^==== //depot/(\S+)#\d+ ==D== \S+ ====$',
+                                   patch, re.M)
+
+        # Prepend the root of the Perforce client to each file name.
+        p4_info = self.p4.info()
+        client_root = p4_info.get('Client root')
+        added_files = ['%s/%s' % (client_root, f) for f in added_files]
+        deleted_files = ['%s/%s' % (client_root, f) for f in deleted_files]
+
+        if added_files:
+            make_empty_files(added_files)
+            result = execute(['p4', 'add'] + added_files, ignore_errors=True,
+                             none_on_ignored_error=True)
+
+            if result is None:
+                logging.error('Unable to execute "p4 add" on: %s',
+                              ', '.join(added_files))
+            else:
+                patched_empty_files = True
+
+        if deleted_files:
+            result = execute(['p4', 'delete'] + deleted_files,
+                             ignore_errors=True, none_on_ignored_error=True)
+
+            if result is None:
+                logging.error('Unable to execute "p4 delete" on: %s',
+                              ', '.join(deleted_files))
+            else:
+                patched_empty_files = True
+
+        return patched_empty_files
 
     def _supports_moves(self):
         return (self.capabilities and

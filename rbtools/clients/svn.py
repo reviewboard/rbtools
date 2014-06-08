@@ -10,7 +10,7 @@ from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError)
 from rbtools.utils.checks import check_gnu_diff, check_install
-from rbtools.utils.filesystem import walk_parents
+from rbtools.utils.filesystem import make_empty_files, walk_parents
 from rbtools.utils.process import execute
 
 
@@ -585,6 +585,43 @@ class SVNClient(SCMClient):
 
         # strip off ending newline, and return it as the second component
         return [s.split('\n')[0], '\n']
+
+    def _apply_patch_for_empty_files(self, patch, p_num):
+        """Returns True if any empty files in the patch are applied.
+
+        If there are no empty files in the patch or if an error occurs while
+        applying the patch, we return False.
+        """
+        patched_empty_files = False
+        added_files = re.findall(r'^Index:\s+(\S+)\t\(added\)$', patch, re.M)
+        deleted_files = re.findall(r'^Index:\s+(\S+)\t\(deleted\)$', patch,
+                                   re.M)
+
+        if added_files:
+            added_files = self._strip_p_num_slashes(added_files, int(p_num))
+            make_empty_files(added_files)
+            result = execute(['svn', 'add'] + added_files, ignore_errors=True,
+                             none_on_ignored_error=True)
+
+            if result is None:
+                logging.error('Unable to execute "svn add" on: %s',
+                              ', '.join(added_files))
+            else:
+                patched_empty_files = True
+
+        if deleted_files:
+            deleted_files = self._strip_p_num_slashes(deleted_files,
+                                                      int(p_num))
+            result = execute(['svn', 'delete'] + deleted_files,
+                             ignore_errors=True, none_on_ignored_error=True)
+
+            if result is None:
+                logging.error('Unable to execute "svn delete" on: %s',
+                              ', '.join(deleted_files))
+            else:
+                patched_empty_files = True
+
+        return patched_empty_files
 
     def _supports_empty_files(self):
         """Checks if the RB server supports added/deleted empty files."""

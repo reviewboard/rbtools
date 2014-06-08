@@ -115,6 +115,7 @@ class Patch(Command):
             client_name=self.options.repository_type)
         server_url = self.get_server_url(repository_info, tool)
         api_client, api_root = self.get_api(server_url)
+        self.setup_tool(tool, api_root=api_root)
 
         # Get the patch, the used patch ID and base dir for the diff
         diff_body, diff_revision, base_dir = self.get_patch(

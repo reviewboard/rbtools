@@ -10,6 +10,7 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError)
 from rbtools.clients.svn import SVNClient
 from rbtools.utils.checks import check_install
+from rbtools.utils.filesystem import make_empty_files
 from rbtools.utils.process import die, execute
 
 
@@ -606,6 +607,51 @@ class MercurialClient(SCMClient):
         ])
 
         return execute(cmd, *args, **kwargs)
+
+    def _apply_patch_for_empty_files(self, patch, p_num):
+        """Returns True if any empty files in the patch are applied.
+
+        If there are no empty files in the patch or if an error occurs while
+        applying the patch, we return False.
+        """
+        patched_empty_files = False
+        added_files = re.findall(r'--- %s\t%s\n'
+                                 r'\+\+\+ b/(\S+)\t[^\r\n\t\f]+\n'
+                                 r'(?:[^@]|$)'
+                                 % (self.PRE_CREATION,
+                                    re.escape(self.PRE_CREATION_DATE)), patch)
+        deleted_files = re.findall(r'--- a/(\S+)\t[^\r\n\t\f]+\n'
+                                   r'\+\+\+ %s\t%s\n'
+                                   r'(?:[^@]|$)'
+                                   % (self.PRE_CREATION,
+                                      re.escape(self.PRE_CREATION_DATE)),
+                                   patch)
+
+        if added_files:
+            added_files = self._strip_p_num_slashes(added_files, int(p_num))
+            make_empty_files(added_files)
+            result = execute(['hg', 'add'] + added_files, ignore_errors=True,
+                             none_on_ignored_error=True)
+
+            if result is None:
+                logging.error('Unable to execute "hg add" on: %s',
+                              ', '.join(added_files))
+            else:
+                patched_empty_files = True
+
+        if deleted_files:
+            deleted_files = self._strip_p_num_slashes(deleted_files,
+                                                      int(p_num))
+            result = execute(['hg', 'remove'] + deleted_files,
+                             ignore_errors=True, none_on_ignored_error=True)
+
+            if result is None:
+                logging.error('Unable to execute "hg remove" on: %s',
+                              ', '.join(deleted_files))
+            else:
+                patched_empty_files = True
+
+        return patched_empty_files
 
     def _supports_empty_files(self):
         """Checks if the RB server supports added/deleted empty files."""
