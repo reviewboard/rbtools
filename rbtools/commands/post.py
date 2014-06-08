@@ -527,28 +527,28 @@ class Post(Command):
                                                        **diff_kwargs)
             except APIError, e:
                 error_msg = [
-                    'Error uploading diff\n\n',
+                    u'Error uploading diff\n\n',
                 ]
 
                 if e.error_code == 101 and e.http_status == 403:
                     error_msg.append(
-                        'You do not have permissions to modify '
-                        'this review request\n')
+                        u'You do not have permissions to modify '
+                        u'this review request\n')
                 elif e.error_code == 219:
                     error_msg.append(
-                        'The generated diff file was empty. This '
-                        'usually means no files were\n'
-                        'modified in this change.\n')
+                        u'The generated diff file was empty. This '
+                        u'usually means no files were\n'
+                        u'modified in this change.\n')
                 else:
-                    error_msg.append(e.decode('utf-8') + '\n')
+                    error_msg.append(e.decode('utf-8') + u'\n')
 
                 error_msg.append(
-                    'Your review request still exists, but the diff is '
-                    'not attached.\n')
+                    u'Your review request still exists, but the diff is '
+                    u'not attached.\n')
 
-                error_msg.append('%s\n' % review_request.absolute_url)
+                error_msg.append(u'%s\n' % review_request.absolute_url)
 
-                raise CommandError('\n'.join(error_msg))
+                raise CommandError(u'\n'.join(error_msg))
 
         try:
             draft = review_request.get_draft()
