@@ -477,8 +477,8 @@ class Post(Command):
             # No review_request_id, so we will create a new review request.
             try:
                 repository = (
-                    self.options.repository_url or
                     self.options.repository_name or
+                    self.options.repository_url or
                     self.get_repository_path(repository_info, api_root))
                 request_data = {
                     'repository': repository
