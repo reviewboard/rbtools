@@ -1,6 +1,5 @@
 import os
 import sys
-import unittest
 import uuid
 try:
     from cStringIO import StringIO
@@ -8,9 +7,10 @@ except ImportError:
     from StringIO import StringIO
 
 from rbtools.utils.filesystem import cleanup_tempfiles, make_tempdir
+from rbtools.testing import TestCase
 
 
-class RBTestBase(unittest.TestCase):
+class RBTestBase(TestCase):
     """Base class for RBTools tests.
 
     Its side effect in that it change home directory before test suit will
