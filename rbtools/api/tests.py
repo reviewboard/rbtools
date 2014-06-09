@@ -8,6 +8,7 @@ from rbtools.api.resource import (CountResource,
                                   ListResource,
                                   ResourceDictField,
                                   ResourceLinkField,
+                                  ReviewRequestResource,
                                   RootResource)
 from rbtools.api.transport import Transport
 from rbtools.testing import TestCase
@@ -393,3 +394,65 @@ class HttpRequestTests(TestCase):
             d[m.group(1)] = v
 
         self.assertEquals(d, {'foo': 'bar', 'bar': '42', 'name': 'somestring'})
+
+
+class ReviewRequestResourceTests(TestCase):
+    def setUp(self):
+        self.transport = MockTransport()
+
+    def test_absolute_url_with_absolute_url_field(self):
+        """Testing ReviewRequestResource.absolute_url with 'absolute_url'
+        field
+        """
+        payload = {
+            'review_request': {
+                'id': 123,
+                'absolute_url': 'https://example.com/r/123/',
+            },
+            'stat': 'ok',
+        }
+
+        r = create_resource(
+            transport=self.transport,
+            payload=payload,
+            url='https://api.example.com/',
+            mime_type='application/vnd.reviewboard.org.review-request')
+        self.assertTrue(isinstance(r, ReviewRequestResource))
+        self.assertEqual(r.absolute_url, 'https://example.com/r/123/')
+
+    def test_absolute_url_with_url_field(self):
+        """Testing ReviewRequestResource.absolute_url with 'url' field"""
+        payload = {
+            'review_request': {
+                'id': 123,
+                'url': '/r/123/',
+            },
+            'stat': 'ok',
+        }
+
+        r = create_resource(
+            transport=self.transport,
+            payload=payload,
+            url='https://example.com/',
+            mime_type='application/vnd.reviewboard.org.review-request')
+        self.assertTrue(isinstance(r, ReviewRequestResource))
+        self.assertEqual(r.absolute_url, 'https://example.com/r/123/')
+
+    def test_absolute_url_with_fallback(self):
+        """Testing ReviewRequestResource.absolute_url with
+        generated fallback URL
+        """
+        payload = {
+            'review_request': {
+                'id': 123,
+            },
+            'stat': 'ok',
+        }
+
+        r = create_resource(
+            transport=self.transport,
+            payload=payload,
+            url='https://example.com/',
+            mime_type='application/vnd.reviewboard.org.review-request')
+        self.assertTrue(isinstance(r, ReviewRequestResource))
+        self.assertEqual(r.absolute_url, 'https://example.com/r/123/')

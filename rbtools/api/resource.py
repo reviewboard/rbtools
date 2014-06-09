@@ -625,6 +625,18 @@ class ReviewRequestResource(ItemResource):
             base_url = self._url.split('/api/')[0]
             return urlparse.urljoin(base_url, self.url)
 
+    @property
+    def url(self):
+        """Returns the relative URL to the Review Request.
+
+        The value of 'url' is returned if it's defined. Otherwise, a relative
+        URL is generated and returned.
+
+        This provides compatibility with versions of Review Board older
+        than 1.7.8, which do not have a 'url' field.
+        """
+        return self._fields.get('url', '/r/%s/' % self.id)
+
     @request_method_decorator
     def submit(self, description=None, changenum=None):
         """Submit a review request"""
