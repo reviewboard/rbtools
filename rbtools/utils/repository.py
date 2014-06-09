@@ -15,9 +15,12 @@ def get_repository_id(repository_info, api_root, repository_name=None):
     try:
         while True:
             for repo in repositories:
-                if (repo.path in detected_paths or
-                    repo.mirror_path in detected_paths or
-                    repo.name == repository_name):
+                # NOTE: Versions of Review Board prior to 1.7.19 didn't
+                #       include a 'mirror_path' parameter, so we have to
+                #       conditionally fetch it.
+                if (repo.name == repository_name or
+                    repo.path in detected_paths or
+                    getattr(repo, 'mirror_path', None) in detected_paths):
                     return repo.id
 
             repositories = repositories.get_next()
