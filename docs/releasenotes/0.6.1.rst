@@ -1,0 +1,208 @@
+===========================
+RBTools 0.6.1 Release Notes
+===========================
+
+**Release date**: June 9, 2014
+
+
+New Features
+============
+
+General
+-------
+
+* Added compatibility with GNU diff on Solaris. (:bug:`3334`)
+
+
+rbt patch
+---------
+
+* Empty added or deleted files are now properly added to or removed from
+  the repository when using Mercurial, Perforce, or Subversion. (:bug:`3390`)
+
+  This requires a change coming in Review Board 2.1.
+
+  Patch by Anselina Chia.
+
+
+rbt post
+--------
+
+* Added a :option:`--depends-on` option for populating the Depends On field.
+  (:bug:`3074`)
+
+  Patch by Matthew Maclean.
+
+* The posted review request URL is now shown in the event of failure.
+
+  If there's an error while posting a review request, the URL of the
+  review request will be shown. In the past, the user was left guessing.
+
+  Patch by Alois Mahdal.
+
+* Empty files on Mercurial, Perforce, and Subversion repositories can now
+  be posted to Review Board.
+
+  Many types of diffs don't actually represent empty files in any useful
+  way. RBTools now handles these cases, providing Review Board with
+  suitable information to show those files.
+
+  This requires a change coming in Review Board 2.1.
+
+  Patch by Anselina Chia.
+
+
+rbt setup-repo
+--------------
+
+* Improved matching of repository paths that vary slightly.
+
+  The :command:`rbt setup-repo` command now performs a fuzzy match against
+  repositories, in order to match when the paths contain slight differences
+  (such as trailing slashes or user credentials in the path).
+
+  Patch by Georgy Dyuldin.
+
+
+Bug Fixes
+=========
+
+General
+-------
+
+* Fixed support for :option:`--disable-proxy`.
+
+  We had a command line flag and configuration option (``ENABLE_PROXY``)
+  for disabling the usage of a configured HTTP(s) proxy server, but it was
+  being ignored in RBTools 0.6.
+
+* The :option:`--tracking-branch` option is no longer listed as Git-only.
+  It can be used for Mercurial as well.
+
+* Fixed handling API errors that contain Unicode content. (:bug:`3376`)
+
+  This was often the result of server errors sent when parsing a diff
+  failed.
+
+
+rbt patch
+---------
+
+* Fixed crashes when patching files using certain versions of Review Board
+  or types of repositories. (:bug:`3360`, :bug:`3365`)
+
+* Fixed crashes against Mercurial repositories.
+
+  Patch by Anselina Chia.
+
+
+rb post
+-------
+
+* Fixed compatibility issues with older versions of Review Board.
+  (:bug:`3348`)
+
+  Versions of Review Board prior to 1.7.19 had issues when posting review
+  requests, due to fields that didn't exist in the API in those versions.
+  We now have extra logic to work around these.
+
+* Repository names take precedence over repository URLs when looking up
+  repositories, fixing issues with Subversion. (:bug:`3277`)
+
+* The commit ID is no longer set on a review request if using
+  :option:`--include`/:option:`-I`. (:bug:`3328`)
+
+  It's only set if posting a full commit. This helps to resolve conflicts
+  in commit IDs when posting multiple review requests containing subsets of
+  a commit.
+
+  Patch by Matthew Maclean.
+
+
+rbt status
+----------
+
+* Fixed specifying repository names using the :option:`--repository` option.
+
+  Patch by Maciej Borzecki.
+
+* Fixed issues with public Local Sites, such as public teams on
+  RBCommons_. (:bug:`3350`)
+
+.. _RBCommons: https://rbcommons.com
+
+* Fixed a crash against Subversion when receiving an unexpected line when
+  running :command:`svn status`.
+
+
+Git
+---
+
+* Parent diffs are now properly generated with multiple remotes.
+
+  If a user has multiple remotes, and pushes commits to a remote which is
+  different from the one Review Board uses, RBTools would think that a parent
+  diff isn't required when it really is.
+
+  It's now much smarter and will generate a suitable parent diff.
+
+  Patch by Stephen Gallagher.
+
+* Fixed compatibility issues with Git on Cygwin.
+
+
+Mercurial
+---------
+
+* Fixed problems working with Mercurial repositories when a configured
+  :file:`hgrc` file contains empty ``key=`` lines.
+
+* Fixed crashes with confusing errors when RBTools is unable to find a
+  remote branch for the repository.
+
+* Fixed a crash when calling :command:`rbt post` with a merge revision ID
+  as a single parameter.
+
+  Now a proper error is displayed in this case.
+
+  Patch by Georgy Dyuldin.
+
+
+Perforce
+--------
+
+* Fixed running several commands against Perforce repositories.
+
+  Due to some bad assumptions about the existence of certain arguments,
+  some commands would break against Perforce repositories.
+
+* Fixed diffing submitted Perforce changelists. (:bug:`3335`)
+
+* Fixed posting submitted Perforce changelists. (:bug:`3347`)
+
+* Fixed issues interpreting changeset results when posting Perforce depot
+  paths. (:bug:`3336`)
+
+* Fixed crashes when posting Perforce paths with deleted files.
+
+  Patch by Anselina Chia.
+
+
+Subversion
+----------
+
+* The :option:`-I` option was being ignored for Subversion repositories on
+  :command:`rbt post` and :command:`rbt diff`.
+
+
+Contributors
+============
+
+* Alois Mahdal
+* Anselina Chia
+* Christian Hammond
+* David Trowbridge
+* Georgy Dyuldin
+* Maciej Borzecki
+* Matthew Maclean
+* Stephen Gallagher
