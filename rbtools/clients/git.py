@@ -459,11 +459,13 @@ class GitClient(SCMClient):
                         '-u', rev_range]
         elif self.type == "git":
             diff_cmd = [self.git, 'diff', '--no-color', '--full-index',
-                        '--ignore-submodules', '--no-renames', rev_range]
+                        '--ignore-submodules', rev_range]
 
             if (self.capabilities is not None and
                 self.capabilities.has_capability('diffs', 'moved_files')):
                 diff_cmd.append('-M')
+            else:
+                diff_cmd.append('--no-renames')
         else:
             return None
 
