@@ -642,15 +642,15 @@ class PerforceClient(SCMClient):
                                     depot_file, file_entry[change_key])
                     break
 
-                if action not in ('edit', 'integrate', 'add', 'delete',
-                                  'move/add', 'move/delete'):
-                    raise Exception('Unsupported action type "%s" for %s' %
-                                    (action, depot_file))
-
                 if action == 'integrate':
                     action = 'edit'
                 elif action == 'branch':
                     action = 'add'
+
+                if action not in ('edit', 'add', 'delete',
+                                  'move/add', 'move/delete'):
+                    raise Exception('Unsupported action type "%s" for %s' %
+                                    (action, depot_file))
 
                 try:
                     rev_key = 'rev%d' % cid
