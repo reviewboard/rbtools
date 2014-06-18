@@ -540,7 +540,7 @@ class Post(Command):
                         u'usually means no files were\n'
                         u'modified in this change.\n')
                 else:
-                    error_msg.append(e.decode('utf-8') + u'\n')
+                    error_msg.append(str(e).decode('utf-8') + u'\n')
 
                 error_msg.append(
                     u'Your review request still exists, but the diff is '
