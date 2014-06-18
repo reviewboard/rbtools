@@ -24,11 +24,16 @@ def edit_text(content):
     """Allows a user to edit a block of text and returns the saved result.
 
     The environment's default text editor is used if available, otherwise
-    vim is used.
+    vi is used.
     """
     tempfile = make_tempfile(content.encode('utf8'))
-    editor = os.environ.get('EDITOR', 'vim')
-    subprocess.call([editor, tempfile])
+    editor = os.environ.get('VISUAL') or os.environ.get('EDITOR') or 'vi'
+    try:
+        subprocess.call([editor, tempfile])
+    except OSError:
+        print 'No editor found. Set EDITOR environment variable or install vi.'
+        raise
+
     f = open(tempfile)
     result = f.read()
     f.close()
