@@ -71,11 +71,17 @@ class SyncTransport(Transport):
         info = rsp.info()
         mime_type = info['Content-Type']
         item_content_type = info.get('Item-Content-Type', None)
-        payload = rsp.read()
-        payload = decode_response(payload, mime_type)
 
-        return create_resource(self, payload, request.url, mime_type=mime_type,
-                               item_mime_type=item_content_type)
+        if request.method == 'DELETE':
+            # DELETE calls don't return any data. Everything else should.
+            return None
+        else:
+            payload = rsp.read()
+            payload = decode_response(payload, mime_type)
+
+            return create_resource(self, payload, request.url,
+                                   mime_type=mime_type,
+                                   item_mime_type=item_content_type)
 
     def __repr__(self):
         return '<%s(url=%r, cookie_file=%r, agent=%r)>' % (
