@@ -28,6 +28,7 @@ class ClearCaseClient(SCMClient):
     name = 'ClearCase'
     viewtype = None
 
+    REVISION_BRANCH_BASE = '--rbtools-branch-base'
     REVISION_BRANCH_PREFIX = 'brtype:'
     REVISION_CHECKEDOUT_BASE = '--rbtools-checkedout-base'
     REVISION_CHECKEDOUT_CHANGESET = '--rbtools-checkedout-changeset'
