@@ -1,0 +1,58 @@
+===========================
+RBTools 0.6.2 Release Notes
+===========================
+
+**Release date**: July 6, 2014
+
+
+Bug Fixes
+=========
+
+rbt patch
+---------
+
+* Fixed issues when patching against a Mercurial repository.
+
+  Patch by Bruce Cran.
+
+* When creating a commit, :command:`rbt patch` now shows a proper message if
+  there's no default editor available (as specified by :envvar:`$EDITOR`).
+
+  Patch by John Ioannidis.
+
+
+rbt post
+--------
+
+* Fixed encoding issues when displaying errors from the server.
+
+
+ClearCase
+---------
+
+* Fixed an issue when posting changes against ClearCase repositories.
+  (:bug:`3439`)
+
+
+Git
+---
+
+* Fixed inconsistent command line arguments to :command:`git diff` when
+  posting against a Review Board server with moved file support.
+
+
+Perforce
+--------
+
+* Fixed posting of committed changes containing "branch" operations.
+  (:bug:`3410`)
+
+
+
+Contributors
+============
+
+* Bruce Cran
+* Christian Hammond
+* David Trowbridge
+* John Ioannidis
