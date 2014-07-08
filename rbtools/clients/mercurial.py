@@ -230,6 +230,13 @@ class MercurialClient(SCMClient):
                 result['base'] = self._identify_revision(outgoing[0])
                 result['tip'] = self._identify_revision(outgoing[1])
                 result['commit_id'] = result['tip']
+                # Since the user asked us to operate on tip, warn them about a
+                # dirty working directory
+                if self.has_pending_changes():
+                    logging.warning('Your working directory is not clean. Any '
+                                    'changes which have not been committed '
+                                    'to a branch will not be included in your '
+                                    'review request.')
 
             if self.options.parent_branch:
                 result['parent_base'] = result['base']
@@ -607,6 +614,16 @@ class MercurialClient(SCMClient):
         ])
 
         return execute(cmd, *args, **kwargs)
+
+    def has_pending_changes(self):
+        """Checks if there are changes waiting to be committed.
+
+        Returns True if the working directory has been modified,
+        otherwise returns False.
+        """
+        status = execute(['hg', 'status', '--modified', '--added',
+                          '--removed', '--deleted'])
+        return status != ''
 
     def apply_patch(self, patch_file, base_path=None, base_dir=None, p=None):
         """Import the given patch.
