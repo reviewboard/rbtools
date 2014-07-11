@@ -28,7 +28,7 @@ class Patch(Command):
                action="store_true",
                default=False,
                help="Commit using information fetched "
-                    "from the review request (Git only)."),
+                    "from the review request (Git/Mercurial only)."),
         Option("--diff-revision",
                dest="diff_revision",
                default=None,
