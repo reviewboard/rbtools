@@ -11,6 +11,7 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
 from rbtools.clients.svn import SVNClient
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_empty_files
+from rbtools.utils.console import edit_text
 from rbtools.utils.process import die, execute
 
 
@@ -485,6 +486,20 @@ class MercurialClient(SCMClient):
                 'Specify --tracking-branch to continue.')
 
         return remote
+
+    def create_commit(self, message, author, files=[], all_files=False):
+        """Commits the given modified files.
+
+        This is expected to be called after applying a patch. This commits the
+        patch using information from the review request, opening the commit
+        message in $EDITOR to allow the user to update it.
+        """
+        modified_message = edit_text(message)
+
+        hg_command = ['hg', 'commit', '-m', modified_message,
+                      '-u %s <%s>' % (author.fullname, author.email)]
+
+        execute(hg_command + files)
 
     def _get_current_branch(self):
         """Returns the current branch of this repository."""
