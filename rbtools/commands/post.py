@@ -609,8 +609,12 @@ class Post(Command):
             try:
                 draft = draft.update(**update_fields)
             except APIError, e:
-                raise CommandError(
-                    "Error updating review request draft: %s" % e)
+                raise CommandError(u'\n'.join([
+                    u'Error updating review request draft: %s\n' % e,
+                    u'Your review request still exists, but the diff is '
+                    u'not attached.\n',
+                    u'%s\n' % review_request.absolute_url,
+                ]))
 
         return review_request.id, review_request.absolute_url
 
