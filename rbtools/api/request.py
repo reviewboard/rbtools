@@ -134,6 +134,8 @@ class PresetHTTPAuthHandler(urllib2.BaseHandler):
     """urllib2 handler that presets the use of HTTP Basic Auth."""
     handler_order = 480  # After Basic auth
 
+    AUTH_HEADER = 'Authorization'
+
     def __init__(self, url, password_mgr):
         self.url = url
         self.password_mgr = password_mgr
@@ -145,16 +147,20 @@ class PresetHTTPAuthHandler(urllib2.BaseHandler):
         self.used = False
 
     def http_request(self, request):
-        if not self.used and self.password_mgr.rb_user:
-            # Note that we call password_mgr.find_user_password to get the
-            # username and password we're working with.
-            username, password = \
-                self.password_mgr.find_user_password('Web API', self.url)
-            raw = '%s:%s' % (username, password)
-            request.add_header(
-                urllib2.HTTPBasicAuthHandler.auth_header,
-                'Basic %s' % base64.b64encode(raw).strip())
-            self.used = True
+        if not self.used:
+            if self.password_mgr.api_token:
+                request.add_header(self.AUTH_HEADER,
+                                   'token %s' % self.password_mgr.api_token)
+                self.used = True
+            elif self.password_mgr.rb_user:
+                # Note that we call password_mgr.find_user_password to get the
+                # username and password we're working with.
+                username, password = \
+                    self.password_mgr.find_user_password('Web API', self.url)
+                raw = '%s:%s' % (username, password)
+                request.add_header(self.AUTH_HEADER,
+                                   'Basic %s' % base64.b64encode(raw).strip())
+                self.used = True
 
         return request
 
@@ -282,12 +288,13 @@ class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
     See: http://bugs.python.org/issue974757
     """
     def __init__(self, reviewboard_url, rb_user=None, rb_pass=None,
-                 auth_callback=None, otp_token_callback=None):
+                 api_token=None, auth_callback=None, otp_token_callback=None):
         urllib2.HTTPPasswordMgr.__init__(self)
         self.passwd = {}
         self.rb_url = reviewboard_url
         self.rb_user = rb_user
         self.rb_pass = rb_pass
+        self.api_token = api_token
         self.auth_callback = auth_callback
         self.otp_token_callback = otp_token_callback
 
@@ -361,7 +368,7 @@ class ReviewBoardServer(object):
     for their credentials using this mechanism.
     """
     def __init__(self, url, cookie_file=None, username=None, password=None,
-                 agent=None, session=None, disable_proxy=False,
+                 api_token=None, agent=None, session=None, disable_proxy=False,
                  auth_callback=None, otp_token_callback=None):
         self.url = url
         if self.url[-1] != '/':
@@ -409,6 +416,7 @@ class ReviewBoardServer(object):
         password_mgr = ReviewBoardHTTPPasswordMgr(self.url,
                                                   username,
                                                   password,
+                                                  api_token,
                                                   auth_callback,
                                                   otp_token_callback)
         self.preset_auth_handler = PresetHTTPAuthHandler(self.url,
