@@ -391,6 +391,10 @@ class Command(object):
         """
         self.config = load_config()
 
+        # Injected system arguments parameter from .reviewboardrc
+        # Now its time to update argv
+        argv = sys.argv
+
         parser = self.create_parser(self.config, argv)
         parser.add_argument('args', nargs=argparse.REMAINDER)
 
