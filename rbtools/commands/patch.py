@@ -29,6 +29,14 @@ class Patch(Command):
                default=False,
                help="Commit using information fetched "
                     "from the review request (Git/Mercurial only)."),
+        Option("-C", "--commit-no-edit",
+               dest="commit_no_edit",
+               action="store_true",
+               default=False,
+               help="Commit using information fetched "
+                    "from the review request (Git/Mercurial only). "
+                    "This differs from -c by not invoking the editor "
+                    "to modify the commit message."),
         Option("--diff-revision",
                dest="diff_revision",
                default=None,
@@ -141,7 +149,7 @@ class Patch(Command):
             self.apply_patch(repository_info, tool, request_id, diff_revision,
                              tmp_patch_file, base_dir)
 
-            if self.options.commit:
+            if self.options.commit or self.options.commit_no_edit:
                 try:
                     review_request = api_root.get_review_request(
                         review_request_id=request_id,
@@ -154,7 +162,8 @@ class Patch(Command):
                 author = review_request.get_submitter()
 
                 try:
-                    tool.create_commit(message, author)
+                    tool.create_commit(message, author,
+                                       not self.options.commit_no_edit)
                     print('Changes committed to current branch.')
                 except NotImplementedError:
                     raise CommandError('--commit is not supported with %s'

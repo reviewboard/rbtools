@@ -211,7 +211,8 @@ class SCMClient(object):
                 not patched_empty_files):
                 die('Failed to execute command: %s\n%s' % (cmd, patch_output))
 
-    def create_commit(self, message, author, files=[], all_files=False):
+    def create_commit(self, message, author, run_editor,
+                      files=[], all_files=False):
         """Creates a commit based on the provided message and author.
 
         Derived classes should override this method if they wish to support

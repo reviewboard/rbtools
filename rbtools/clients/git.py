@@ -622,14 +622,18 @@ class GitClient(SCMClient):
 
         self._execute(cmd)
 
-    def create_commit(self, message, author, files=[], all_files=False):
+    def create_commit(self, message, author, run_editor,
+                      files=[], all_files=False):
         """Commits the given modified files.
 
         This is expected to be called after applying a patch. This commits the
         patch using information from the review request, opening the commit
         message in $EDITOR to allow the user to update it.
         """
-        modified_message = edit_text(message)
+        if run_editor:
+            modified_message = edit_text(message)
+        else:
+            modified_message = message
 
         if all_files:
             execute(['git', 'add', '--all', ':/'])
