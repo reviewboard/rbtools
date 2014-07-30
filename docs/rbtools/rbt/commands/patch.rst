@@ -50,7 +50,14 @@ Options
 
 .. cmdoption:: -c, --commit
 
-   Commit using information fetched from the review request (Git only).
+   Commit using information fetched from the review request (Git/Mercurial
+   only).
+
+.. cmdoption:: -C, --commit-no-edit
+
+   Commit using information fetched from the review request (Git/Mercurial
+   only). This differs from -c by not invoking the editor to modify the commit
+   message.
 
 .. cmdoption:: --server
 
