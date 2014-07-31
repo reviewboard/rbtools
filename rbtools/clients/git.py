@@ -233,7 +233,7 @@ class GitClient(SCMClient):
                                   supports_parent_diffs=True)
 
         return None
-        
+
     def _get_git_remote_tracking_info(self):
         upstream_branch = ''
         if self.head_ref:
@@ -271,10 +271,10 @@ class GitClient(SCMClient):
 
                 # There is no remote, so skip this part of upstream_branch.
                 upstream_branch = upstream_branch.split('/')[-1]
-                
+
         return upstream_branch, url
 
-        
+
     def _get_git_svn_info(self):
         data = execute([self.git, "svn", "rebase", "-n"],
                         ignore_errors=True)
@@ -290,7 +290,7 @@ class GitClient(SCMClient):
 
         svn_info = execute([self.git, "svn", "info"], ignore_errors=True)
         return self._parse_svn_info(svn_info, upstream_branch)
-    
+
     def _parse_svn_info(self, svn_info, upstream_branch):
         m = re.search(r'^Repository Root: (.+)$', svn_info, re.M)
         if m:
@@ -308,7 +308,7 @@ class GitClient(SCMClient):
                     else:
                         # already discovered from git-svn or subgit info
                         self.upstream_branch = upstream_branch
-                        
+
                     return SVNRepositoryInfo(path=path,
                                              base_path=base_path,
                                              uuid=uuid,
@@ -332,15 +332,18 @@ class GitClient(SCMClient):
                                           (1, 5, 4))):
                 die("Your installation of git-svn must be upgraded to "
                     "version 1.5.4 or later")
-        
+
         return None
 
     def _is_subgit_configured(self):
         svn_remote_url = self._get_subgit_svn_url()
         return (svn_remote_url is not None)
-        
+
     def _get_git_remote_server_info(self):
-        git_url = execute([self.git, "config", "--get", "remote.origin.url"])
+        git_url = execute([self.git, "config", "--get", "remote.origin.url"],
+                          ignore_errors=True)
+        if git_url is None:
+            return None, None
         git_url = git_url.strip()
         ssh_url_regexes = [
             '(?:git\+)?ssh://([A-Za-z0-9@:.]+?)(/.+)', # ssh://host.com/path/to/repo
@@ -381,7 +384,7 @@ class GitClient(SCMClient):
         svn_remote = self._get_subgit_svn_url()
         server, path = self._get_git_remote_server_info()
         svn_info = execute(["svn", "info", svn_remote])
-        
+
         upstream_branch, url = self._get_git_remote_tracking_info()
         return self._parse_svn_info(svn_info, upstream_branch)
 
