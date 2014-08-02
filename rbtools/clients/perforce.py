@@ -803,9 +803,9 @@ class PerforceClient(SCMClient):
             new_action = current_action
             file_entry['depotFile'] = file_entry['initialDepotFile']
 
-            # If the first action was an edit, then the initial revision
-            # (that we'll use to generate the diff) is n-1
-            if current_action == 'edit':
+            # If the first action was an edit or a delete, then the initial
+            # revision (that we'll use to generate the diff) is n-1
+            if current_action in ('edit', 'delete'):
                 file_entry['initialRev'] -= 1
         elif current_action == 'add':
             # If we're adding a file that existed in the base changeset, it
