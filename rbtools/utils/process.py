@@ -26,7 +26,8 @@ def execute(command,
             extra_ignore_errors=(),
             translate_newlines=True,
             with_errors=True,
-            none_on_ignored_error=False):
+            none_on_ignored_error=False,
+            return_error_code=False):
     """
     Utility function to execute a command and return the output.
     """
@@ -82,6 +83,9 @@ def execute(command,
                       % (rc, command, data))
 
     if rc and none_on_ignored_error:
-        return None
+        data = None
 
-    return data
+    if return_error_code:
+        return rc, data
+    else:
+        return data
