@@ -28,6 +28,8 @@ class ClearCaseClient(SCMClient):
     name = 'ClearCase'
     viewtype = None
 
+    REVISION_ACTIVITY_BASE = '--rbtools-activity-base'
+    REVISION_ACTIVITY_PREFIX = 'activity:'
     REVISION_BRANCH_BASE = '--rbtools-branch-base'
     REVISION_BRANCH_PREFIX = 'brtype:'
     REVISION_CHECKEDOUT_BASE = '--rbtools-checkedout-base'
@@ -101,6 +103,12 @@ class ClearCaseClient(SCMClient):
                                        vobstag=vobstag,
                                        supports_parent_diffs=False)
 
+    def _determine_branch_path(self, version_path):
+        """Determine branch path of revision.
+        """
+        branch_path, number = cpath.split(version_path)
+        return branch_path
+
     def _determine_version(self, version_path):
         """Determine numeric version of revision.
 
@@ -124,6 +132,10 @@ class ClearCaseClient(SCMClient):
             return path
 
         return "%s@@%s" % (path, version)
+
+    def _construct_revision(self, branch_path, version_number):
+        """Combine revision from branch_path and version_number."""
+        return cpath.join(branch_path, version_number)
 
     def parse_revision_spec(self, revisions):
         """Parses the given revision spec.
@@ -154,13 +166,17 @@ class ClearCaseClient(SCMClient):
                 'tip': self.REVISION_CHECKEDOUT_CHANGESET,
             }
         elif n_revs == 1:
+            if revisions[0].startswith(self.REVISION_ACTIVITY_PREFIX):
+                return {
+                    'base': self.REVISION_ACTIVITY_BASE,
+                    'tip': revisions[0][len(self.REVISION_ACTIVITY_PREFIX):],
+                }
             if revisions[0].startswith(self.REVISION_BRANCH_PREFIX):
                 return {
                     'base': self.REVISION_BRANCH_BASE,
                     'tip': revisions[0][len(self.REVISION_BRANCH_PREFIX):],
                 }
             # TODO:
-            # activity:activity[@pvob] => review changes in this UCM activity
             # lbtype:label1            => review changes between this label
             #                             and the working directory
             # stream:streamname[@pvob] => review changes in this UCM stream
@@ -188,6 +204,71 @@ class ClearCaseClient(SCMClient):
             'base': self.REVISION_FILES,
             'tip': pairs,
         }
+
+    def _sanitize_activity_changeset(self, changeset):
+        """Return changeset containing non-binary, branched file versions.
+
+        A UCM activity changeset contains all file revisions created/touched
+        during this activity. File revisions are ordered earlier versions first
+        in the format:
+        changelist = [
+        <path>@@<branch_path>/<version_number>, ...,
+        <path>@@<branch_path>/<version_number>
+        ]
+
+        <path> is relative path to file
+        <branch_path> is clearcase specific branch path to file revision
+        <version number> is the version number of the file in <branch_path>.
+
+        A UCM activity changeset can contain changes from different vobs,
+        however reviewboard supports only changes from a single repo at the same
+        time, so changes made outside of the current vobstag will be ignored.
+        """
+        changelist = {}
+        # Maybe we should be able to access repository_info without calling
+        # cleartool again.
+        repository_info = self.get_repository_info()
+
+        for change in changeset:
+            path, current = change.split('@@')
+
+            # If a file isn't in the correct vob, then ignore it.
+            if path.find("%s/" % (repository_info.vobstag,)) == -1:
+                logging.debug("Vobstag does not match, so ignore changes on %s"
+                              % path)
+                continue
+
+            version_number = self._determine_version(current)
+            if path not in changelist:
+                changelist[path] = {
+                    'highest': version_number,
+                    'lowest': version_number,
+                    'current': current,
+                }
+
+            if version_number == 0:
+                die("Unexepected version_number=0 in activity changeset")
+            elif version_number > changelist[path]['highest']:
+                changelist[path]['highest'] = version_number
+                changelist[path]['current'] = current
+            elif version_number < changelist[path]['lowest']:
+                changelist[path]['lowest'] = version_number
+
+        # Convert to list
+        changeranges = []
+        for path, version in changelist.iteritems():
+            # Previous version is predecessor of lowest ie its version number
+            # decreased by 1.
+            branch_path = self._determine_branch_path(version['current'])
+            prev_version_number = str(int(version['lowest']) - 1)
+            version['previous'] = self._construct_revision(branch_path,
+                                                           prev_version_number)
+            changeranges.append(
+                (self._construct_extended_path(path, version['previous']),
+                 self._construct_extended_path(path, version['current']))
+            )
+
+        return changeranges
 
     def _sanitize_branch_changeset(self, changeset):
         """Return changeset containing non-binary, branched file versions.
@@ -304,23 +385,47 @@ class ClearCaseClient(SCMClient):
         previews and current file version.
         """
         changeset = []
-        # We ignore return code 1 in order to omit files that Clear Case can't
+        # We ignore return code 1 in order to omit files thatClear Case can't
         # read.
-        output = execute([
-            "cleartool",
-            "lscheckout",
-            "-all",
-            "-cview",
-            "-me",
-            "-fmt",
-            r"%En\t%PVn\t%Vn\n"],
-            extra_ignore_errors=(1,),
-            with_errors=False)
+        output = execute(['cleartool',
+                          'lscheckout',
+                          '-all',
+                          '-cview',
+                          '-me',
+                          '-fmt',
+                          r'%En\t%PVn\t%Vn\n'],
+                         extra_ignore_errors=(1,),
+                         with_errors=False)
 
         if output:
             changeset = self._construct_changeset(output)
 
         return self._sanitize_checkedout_changeset(changeset)
+
+    def _get_activity_changeset(self, activity):
+        """Returns information about the versions changed on a branch.
+
+        This takes into account the changes attached to this activity
+        (including rebase changes) in all vobs of the current view.
+        """
+        changeset = []
+
+        # Get list of revisions and get the diff of each one. Return code 1 is
+        # ignored in order to omit files that ClearCase can't read.
+        output = execute(['cleartool',
+                          'lsactivity',
+                          '-fmt',
+                          '%[versions]p',
+                          activity],
+                         extra_ignore_errors=(1,),
+                         with_errors=False)
+
+        if output:
+            # UCM activity changeset is split by spaces not but EOL, so we
+            # cannot reuse self._construct_changeset here.
+            changeset = output.split()
+
+        return self._sanitize_activity_changeset(changeset)
 
     def _get_branch_changeset(self, branch):
         """Returns information about the versions changed on a branch.
@@ -364,6 +469,9 @@ class ClearCaseClient(SCMClient):
 
         if revisions['tip'] == self.REVISION_CHECKEDOUT_CHANGESET:
             changeset = self._get_checkedout_changeset()
+            return self._do_diff(changeset)
+        elif revisions['base'] == self.REVISION_ACTIVITY_BASE:
+            changeset = self._get_activity_changeset(revisions['tip'])
             return self._do_diff(changeset)
         elif revisions['base'] == self.REVISION_BRANCH_BASE:
             changeset = self._get_branch_changeset(revisions['tip'])
@@ -550,8 +658,8 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
                     if repository['tool'] != 'ClearCase':
                         continue
 
-                    # Add repos where the vobstag matches at the beginning and others
-                    # at the end.
+                    # Add repos where the vobstag matches at the beginning and
+                    # others at the end.
                     if repository['name'] == self.vobstag:
                         repository_scan_order.insert(0, repository)
                     else:
