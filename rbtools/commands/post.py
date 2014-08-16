@@ -710,6 +710,9 @@ class Post(Command):
         api_client, api_root = self.get_api(server_url)
         self.setup_tool(self.tool, api_root=api_root)
 
+        # Check if repository info on reviewboard server match local ones.
+        repository_info = repository_info.find_server_repository_info(api_root)
+
         if self.options.diff_filename:
             parent_diff = None
             base_commit_id = None

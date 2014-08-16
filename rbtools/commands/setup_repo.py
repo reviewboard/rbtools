@@ -106,6 +106,9 @@ class SetupRepo(Command):
         api_client, api_root = self.get_api(server)
         self.setup_tool(tool, api_root=api_root)
 
+        # Check if repository info on reviewboard server match local ones.
+        repository_info = repository_info.find_server_repository_info(api_root)
+
         selected_repo = self.prompt_rb_repository(
             tool.name, repository_info, api_root)
 
