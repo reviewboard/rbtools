@@ -541,23 +541,31 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
         # have a matching vobstag.
         repository_scan_order = []
 
-        for repository in repositories:
-            # Ignore non-ClearCase repositories
-            if repository['tool'] != 'ClearCase':
-                continue
+        # Reduce list of repositories to only ClearCase ones and sort them by
+        # repo name matching vobstag first.
+        try:
+            while True:
+                for repository in repositories:
+                    # Ignore non-ClearCase repositories
+                    if repository['tool'] != 'ClearCase':
+                        continue
 
-            # Add repos where the vobstag matches at the beginning and others
-            # at the end.
-            if repository['name'] == self.vobstag:
-                repository_scan_order.insert(0, repository)
-            else:
-                repository_scan_order.append(repository)
+                    # Add repos where the vobstag matches at the beginning and others
+                    # at the end.
+                    if repository['name'] == self.vobstag:
+                        repository_scan_order.insert(0, repository)
+                    else:
+                        repository_scan_order.append(repository)
+
+                repositories = repositories.get_next()
+        except StopIteration:
+            pass
 
         # Now try to find a matching uuid
         for repository in repository_scan_order:
             repo_name = repository['name']
             try:
-                info = self._get_repository_info(server, repository)
+                info = repository.get_info()
             except APIError, e:
                 # If the current repository is not publicly accessible and the
                 # current user has no explicit access to it, the server will
@@ -580,7 +588,8 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
             path = info['repopath']
             logging.debug('Matching repository uuid:%s with path:%s',
                           uuid, path)
-            return ClearCaseRepositoryInfo(path, path, uuid)
+            return ClearCaseRepositoryInfo(path=path, base_path=path,
+                                           vobstag=self.vobstag)
 
         # We didn't found uuid but if version is >= 1.5.3
         # we can try to use VOB's name hoping it is better

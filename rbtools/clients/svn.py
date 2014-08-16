@@ -649,11 +649,18 @@ class SVNRepositoryInfo(RepositoryInfo):
         repositories use the same path, you'll get back self, otherwise you'll
         get a different SVNRepositoryInfo object (with a different path).
         """
-        repositories = [
-            repository
-            for repository in server.get_repositories()
-            if repository['tool'] == 'Subversion'
-        ]
+        # Reduce list of repositories to only SVN ones.
+        repositories = []
+        page_repositories = server.get_repositories()
+        try:
+            while True:
+                for repository in page_repositories:
+                    # Ignore non-SVN repositories
+                    if repository['tool'] == 'Subversion':
+                        repositories.append(repository)
+                page_repositories = page_repositories.get_next()
+        except StopIteration:
+            pass
 
         # Do two paths. The first will be to try to find a matching entry
         # by path/mirror path. If we don't find anything, then the second will
@@ -665,7 +672,7 @@ class SVNRepositoryInfo(RepositoryInfo):
 
         # We didn't find our locally matched repository, so scan based on UUID.
         for repository in repositories:
-            info = self._get_repository_info(server, repository)
+            info = repository.get_info()
 
             if not info or self.uuid != info['uuid']:
                 continue
