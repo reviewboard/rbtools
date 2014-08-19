@@ -272,8 +272,8 @@ class GitClient(SCMClient):
                 # There is no remote, so skip this part of upstream_branch.
                 upstream_branch = upstream_branch.split('/')[-1]
 
+        logging.debug("Got upstream branch, url: %s, %s" % (upstream_branch, url))
         return upstream_branch, url
-
 
     def _get_git_svn_info(self):
         data = execute([self.git, "svn", "rebase", "-n"],
@@ -313,6 +313,8 @@ class GitClient(SCMClient):
                                              base_path=base_path,
                                              uuid=uuid,
                                              supports_parent_diffs=True)
+        elif self._is_subgit_configured():
+            die("Could not determine Subgit's remote svn config")
         else:
             # Versions of git-svn before 1.5.4 don't (appear to) support
             # 'git svn info'.  If we fail because of an older git install,
@@ -358,34 +360,75 @@ class GitClient(SCMClient):
                 server, path = match.groups([1, 2])
                 break
         if server is None:
-            logging.debug("Failed to parse git remote URL")
-            return None, None
+            logging.debug("Checking if git path is local")
+            if os.path.exists(git_url):
+                logging.debug("Got local git path: %s" % git_url)
+                return None, git_url
+            else:
+                logging.debug("Failed to parse git remote URL")
+                return None, None
         logging.debug("Got git remote server,path: %s,%s" % (server, path))
         return server, path
 
     @memoize
     def _get_subgit_svn_url(self):
         server, path = self._get_git_remote_server_info()
-        if server is None:
+        if server is None and path is None:
             return None
 
         remote_cmd = "git config -f %s/subgit/config --get svn.url" % path
-        svn_remote_url = execute(['ssh', server, remote_cmd])
+        if server:
+            svn_remote_url = execute(['ssh', 'git', server, remote_cmd])
+        else:
+            svn_remote_url = execute(remote_cmd.split())
         if not svn_remote_url:
             logging.debug("Failed to retrieve SVN url from remote Subgit configuration")
             return None
 
-        svn_remote_url = svn_remote_url.replace("file://", "svn+ssh://%s" % server)
+        if server:
+            svn_remote_url = svn_remote_url.replace("file://", "svn+ssh://%s" % server)
         svn_remote_url = svn_remote_url.strip()
         logging.debug("Got remote SVN url from Subgit: %s" % svn_remote_url)
         return svn_remote_url
 
+    def _get_subgit_tracking_branch(self, ref):
+        fetch_cmd = "git fetch origin +refs/svn/map:refs/notes/subgit".split()
+        log_cmd = ['git', 'log', '--notes=subgit',
+                   '--format="%H %N"', ref, '-1']
+
+        failed_to_fetch_notes = \
+            execute(fetch_cmd,
+                    ignore_errors=True,
+                    none_on_ignored_error=True) is None
+        if failed_to_fetch_notes:
+            return None
+        data = execute(log_cmd, split_lines=True, ignore_errors=True)
+        if not data:
+            return None
+        fields = data[0].strip().split()
+        if len(fields) < 3:
+            return None
+
+        # line format is: sha1 svn_ref branches/svn_branch
+        # we want the svn branch
+        return fields[2]
+
     def _get_subgit_info(self):
         svn_remote = self._get_subgit_svn_url()
-        server, path = self._get_git_remote_server_info()
-        svn_info = execute(["svn", "info", svn_remote])
 
-        upstream_branch, url = self._get_git_remote_tracking_info()
+        svn_branch = self._get_subgit_tracking_branch('HEAD')
+        if svn_branch:
+            git_branch = execute(['git', 'branch'])
+        else:
+            if (hasattr(self.options, 'parent_branch') and
+                    self.options.parent_branch is not None):
+                git_branch = self.options.parent_branch
+                svn_branch = self._get_subgit_tracking_branch(git_branch)
+            if not svn_branch:
+                die('Failed to determine Subgit/SVN tracking branch')
+
+        svn_info = execute(["svn", "info", svn_remote + '/' + svn_branch])
+        upstream_branch = 'refs/heads/' + git_branch
         return self._parse_svn_info(svn_info, upstream_branch)
 
     def _strip_heads_prefix(self, ref):
