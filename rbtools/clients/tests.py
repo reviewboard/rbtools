@@ -868,8 +868,11 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self._stub_in_config_and_options()
 
     def _has_hgsubversion(self):
-        output = self._run_hg(['svn', '--help'],
-                              ignore_errors=True, extra_ignore_errors=(255))
+        try:
+            output = self._run_hg(['svn', '--help'],
+                                  ignore_errors=True, extra_ignore_errors=(255))
+        except OSError:
+            return False
 
         return not re.search("unknown command ['\"]svn['\"]", output, re.I)
 
