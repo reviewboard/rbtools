@@ -173,6 +173,13 @@ class Command(object):
                    default=None,
                    help='The password to be supplied to the Review Board '
                         'server.'),
+            Option('--api-token',
+                   dest='api_token',
+                   metavar='TOKEN',
+                   config_key='API_TOKEN',
+                   default=None,
+                   help='The API token to use for authentication, instead of '
+                        'using a username and password.'),
         ]
     )
 
@@ -542,6 +549,7 @@ class Command(object):
         return RBClient(server_url,
                         username=self.options.username,
                         password=self.options.password,
+                        api_token=self.options.api_token,
                         auth_callback=self.credentials_prompt,
                         otp_token_callback=self.otp_token_prompt,
                         disable_proxy=not self.options.enable_proxy)

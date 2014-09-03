@@ -20,13 +20,14 @@ class SyncTransport(Transport):
     to use when authenticating with reviewboard.
     """
     def __init__(self, url, cookie_file=None, username=None, password=None,
-                 agent=None, session=None, disable_proxy=False,
+                 api_token=None, agent=None, session=None, disable_proxy=False,
                  auth_callback=None, otp_token_callback=None, *args, **kwargs):
         super(SyncTransport, self).__init__(url, *args, **kwargs)
         self.server = ReviewBoardServer(self.url,
                                         cookie_file=cookie_file,
                                         username=username,
                                         password=password,
+                                        api_token=api_token,
                                         session=session,
                                         disable_proxy=disable_proxy,
                                         auth_callback=auth_callback,
