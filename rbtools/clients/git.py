@@ -3,7 +3,7 @@ import os
 import re
 import sys
 
-from rbtools.clients import SCMClient, RepositoryInfo
+from rbtools.clients import PatchResult, SCMClient, RepositoryInfo
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError)
 from rbtools.clients.perforce import PerforceClient
@@ -615,12 +615,29 @@ class GitClient(SCMClient):
         This will take the given patch file and apply it to the index,
         scheduling all changes for commit.
         """
-        if p:
-            cmd = ['git', 'apply', '--index', '-p', p, patch_file]
-        else:
-            cmd = ['git', 'apply', '--index', patch_file]
+        cmd = ['git', 'apply', '-3']
 
-        self._execute(cmd)
+        if p:
+            cmd += ['-p', p]
+
+        cmd.append(patch_file)
+
+        rc, data = self._execute(cmd, with_errors=True, return_error_code=True)
+
+        if rc == 0:
+            return PatchResult(applied=True, patch_output=data)
+        elif 'with conflicts' in data:
+            return PatchResult(
+                applied=True,
+                has_conflicts=True,
+                conflicting_files=[
+                    line.split(' ', 1)[1]
+                    for line in data.splitlines()
+                    if line.startswith('U')
+                ],
+                patch_output=data)
+        else:
+            return PatchResult(applied=False, patch_output=data)
 
     def create_commit(self, message, author, run_editor,
                       files=[], all_files=False):

@@ -85,9 +85,40 @@ class Patch(Command):
                     diff_file_path, base_dir):
         """Apply patch patch_file and display results to user."""
         print ("Patch is being applied from request %s with diff revision "
-               " %s." % (request_id, diff_revision))
-        tool.apply_patch(diff_file_path, repository_info.base_path,
-                         base_dir, self.options.px)
+               "%s." % (request_id, diff_revision))
+
+        result = tool.apply_patch(diff_file_path, repository_info.base_path,
+                                  base_dir, self.options.px)
+
+        if result.patch_output:
+            print
+            print result.patch_output.strip()
+            print
+
+        if not result.applied:
+            raise CommandError(
+                'Unable to apply the patch. The patch may be invalid, or '
+                'there may be conflicts that could not be resolvd.')
+
+        if result.has_conflicts:
+            if result.conflicting_files:
+                print ('The patch was partially applied, but there were '
+                       'conflicts in:')
+                print
+
+                for filename in result.conflicting_files:
+                    print '    %s' % filename
+
+                print
+            else:
+                print ('The patch was partially applied, but there were '
+                       'conflicts.')
+
+            return False
+        else:
+            print 'Successfully applied patch.'
+
+            return True
 
     def _extract_commit_message(self, review_request):
         """Returns a commit message based on the review request.
@@ -149,10 +180,11 @@ class Patch(Command):
                 pass
 
             tmp_patch_file = make_tempfile(diff_body)
-            self.apply_patch(repository_info, tool, request_id, diff_revision,
-                             tmp_patch_file, base_dir)
+            success = self.apply_patch(repository_info, tool, request_id,
+                                       diff_revision, tmp_patch_file, base_dir)
 
-            if self.options.commit or self.options.commit_no_edit:
+            if success and (self.options.commit or
+                            self.options.commit_no_edit):
                 try:
                     review_request = api_root.get_review_request(
                         review_request_id=request_id,

@@ -12,6 +12,22 @@ from rbtools.utils.process import die, execute
 SCMCLIENTS = None
 
 
+class PatchResult(object):
+    """The result of a patch operation.
+
+    This stores state on whether the patch could be applied (fully or
+    partially), whether there are conflicts that can be resolved (as in
+    conflict markers, not reject files), which files conflicted, and the
+    patch output.
+    """
+    def __init__(self, applied, has_conflicts=False,
+                 conflicting_files=[], patch_output=None):
+        self.applied = applied
+        self.has_conflicts = has_conflicts
+        self.conflicting_files = conflicting_files
+        self.patch_output = patch_output
+
+
 class SCMClient(object):
     """
     A base representation of an SCM tool for fetching repository information
@@ -153,12 +169,12 @@ class SCMClient(object):
         else:
             return files
 
-    def _execute(self, cmd):
+    def _execute(self, cmd, *args, **kwargs):
         """
         Prints the results of the executed command and returns
         the data result from execute.
         """
-        return execute(cmd, ignore_errors=True)
+        return execute(cmd, ignore_errors=True, *args, **kwargs)
 
     def has_pending_changes(self):
         """Checks if there are changes waiting to be committed.
