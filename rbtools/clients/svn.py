@@ -666,8 +666,9 @@ class SVNRepositoryInfo(RepositoryInfo):
         # by path/mirror path. If we don't find anything, then the second will
         # be to find a matching UUID.
         for repository in repositories:
-            if self.path in (repository['path'],
-                             repository.get('mirror_path', '')):
+            if (self.path == repository['path'] or
+                ('mirror_path' in repository and
+                 self.path == repository['mirror_path'])):
                 return self
 
         # We didn't find our locally matched repository, so scan based on UUID.
