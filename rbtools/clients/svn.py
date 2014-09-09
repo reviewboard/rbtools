@@ -170,6 +170,20 @@ class SVNClient(SCMClient):
                 return int(logentry.attrib['revision'])
 
         raise ValueError
+        
+    def get_raw_commit_message(self, revision):
+        command = ['svn', 'log', '-r', str(revision['tip']), '-l', '1', '--xml']
+        if getattr(self.options, 'repository_url', None):
+            command.append(self.options.repository_url)
+        log = execute(command, ignore_errors=True, none_on_ignored_error=True)
+
+        if log is not None:
+            root = ElementTree.fromstring(log)
+            message = root.find('logentry/msg')
+            if message is not None:
+                return message.text
+
+        raise ValueError
 
     def scan_for_server(self, repository_info):
         # Scan first for dot files, since it's faster and will cover the
