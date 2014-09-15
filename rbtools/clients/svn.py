@@ -41,7 +41,7 @@ class SVNClient(SCMClient):
 
         # Get the SVN repository path (either via a working copy or
         # a supplied URI)
-        svn_info_params = ["svn", "info"]
+        svn_info_params = ["info"]
 
         if getattr(self.options, 'repository_url', None):
             svn_info_params.append(self.options.repository_url)
@@ -50,7 +50,7 @@ class SVNClient(SCMClient):
         #  when used  on a https repository path
         svn_info_params.append("--non-interactive")
 
-        data = execute(svn_info_params, ignore_errors=True)
+        data = self._run_svn(svn_info_params, ignore_errors=True)
 
         m = re.search(r'^Repository Root: (.+)$', data, re.M)
         if not m:
@@ -129,8 +129,8 @@ class SVNClient(SCMClient):
                 # It's not a revision--let's try a changelist. This only makes
                 # sense if we have a working copy.
                 if not self.options.repository_url:
-                    status = execute(['svn', 'status', '--cl', str(revision),
-                                      '--ignore-externals', '--xml'])
+                    status = self._run_svn(['status', '--cl', str(revision),
+                                            '--ignore-externals', '--xml'])
                     cl = ElementTree.fromstring(status).find('changelist')
                     if cl is not None:
                         # TODO: this should warn about mixed-revision working
@@ -158,10 +158,11 @@ class SVNClient(SCMClient):
             raise TooManyRevisionsError
 
     def _convert_symbolic_revision(self, revision):
-        command = ['svn', 'log', '-r', str(revision), '-l', '1', '--xml']
+        command = ['log', '-r', str(revision), '-l', '1', '--xml']
         if getattr(self.options, 'repository_url', None):
             command.append(self.options.repository_url)
-        log = execute(command, ignore_errors=True, none_on_ignored_error=True)
+        log = self._run_svn(command, ignore_errors=True,
+                            none_on_ignored_error=True)
 
         if log is not None:
             root = ElementTree.fromstring(log)
@@ -182,8 +183,8 @@ class SVNClient(SCMClient):
 
     def scan_for_server_property(self, repository_info):
         def get_url_prop(path):
-            url = execute(["svn", "propget", "reviewboard:url", path],
-                          with_errors=False).strip()
+            url = self._run_svn(["propget", "reviewboard:url", path],
+                                with_errors=False).strip()
             return url or None
 
         for path in walk_parents(os.getcwd()):
@@ -220,7 +221,7 @@ class SVNClient(SCMClient):
 
         repository_info = self.get_repository_info()
 
-        diff_cmd = ['svn', 'diff', '--diff-cmd=diff', '--notice-ancestry']
+        diff_cmd = ['diff', '--diff-cmd=diff', '--notice-ancestry']
         changelist = None
 
         if tip == self.REVISION_WORKING_COPY:
@@ -284,7 +285,7 @@ class SVNClient(SCMClient):
                 if svn_show_copies_as_adds in 'Yy':
                     diff_cmd.append("--show-copies-as-adds")
 
-        diff = execute(diff_cmd, split_lines=True)
+        diff = self._run_svn(diff_cmd, split_lines=True)
         diff = self.handle_renames(diff)
 
         if self._supports_empty_files():
@@ -299,12 +300,12 @@ class SVNClient(SCMClient):
 
     def history_scheduled_with_commit(self, changelist):
         """ Method to find if any file status has '+' in 4th column"""
-        status_cmd = ['svn', 'status', '--ignore-externals']
+        status_cmd = ['status', '--ignore-externals']
 
         if changelist:
             status_cmd.extend(['--changelist', changelist])
 
-        for p in execute(status_cmd, split_lines=True):
+        for p in self._run_svn(status_cmd, split_lines=True):
             try:
                 if p[3] == '+':
                     return True
@@ -547,10 +548,10 @@ class SVNClient(SCMClient):
         if '@' in path and not path[-1] == '@':
             path += '@'
 
-        result = execute(["svn", "info", path],
-                         split_lines=True,
-                         ignore_errors=ignore_errors,
-                         none_on_ignored_error=True)
+        result = self._run_svn(["info", path],
+                               split_lines=True,
+                               ignore_errors=ignore_errors,
+                               none_on_ignored_error=True)
         if result is None:
             return None
 
@@ -600,8 +601,9 @@ class SVNClient(SCMClient):
         if added_files:
             added_files = self._strip_p_num_slashes(added_files, int(p_num))
             make_empty_files(added_files)
-            result = execute(['svn', 'add'] + added_files, ignore_errors=True,
-                             none_on_ignored_error=True)
+            result = self._run_svn(['add'] + added_files,
+                                   ignore_errors=True,
+                                   none_on_ignored_error=True)
 
             if result is None:
                 logging.error('Unable to execute "svn add" on: %s',
@@ -612,8 +614,9 @@ class SVNClient(SCMClient):
         if deleted_files:
             deleted_files = self._strip_p_num_slashes(deleted_files,
                                                       int(p_num))
-            result = execute(['svn', 'delete'] + deleted_files,
-                             ignore_errors=True, none_on_ignored_error=True)
+            result = self._run_svn(['delete'] + deleted_files,
+                                   ignore_errors=True,
+                                   none_on_ignored_error=True)
 
             if result is None:
                 logging.error('Unable to execute "svn delete" on: %s',
@@ -628,6 +631,17 @@ class SVNClient(SCMClient):
         return (self.capabilities and
                 self.capabilities.has_capability('scmtools', 'svn',
                                                  'empty_files'))
+
+    def _run_svn(self, svn_args, *args, **kwargs):
+        cmdline = ['svn'] + svn_args
+
+        if getattr(self.options, 'svn_username', None):
+            cmdline += ['--username', self.options.svn_username]
+
+        if getattr(self.options, 'svn_password', None):
+            cmdline += ['--password', self.options.svn_password]
+
+        return execute(cmdline, *args, **kwargs)
 
 
 class SVNRepositoryInfo(RepositoryInfo):
