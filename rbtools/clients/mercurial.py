@@ -352,7 +352,8 @@ class MercurialClient(SCMClient):
 
         return '\n\n'.join([desc.strip() for desc in descs])
 
-    def diff(self, revisions, files=[], extra_args=[]):
+    def diff(self, revisions, include_files=[], exclude_files=[],
+             extra_args=[]):
         """
         Performs a diff across all modified files in a Mercurial repository.
         """
@@ -363,7 +364,7 @@ class MercurialClient(SCMClient):
         if self._type == 'svn':
             diff_cmd.append('--svn')
 
-        diff_cmd += files
+        diff_cmd += include_files
 
         diff = self._execute(
             diff_cmd + ['-r', revisions['base'], '-r', revisions['tip']],

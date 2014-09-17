@@ -420,7 +420,8 @@ class PerforceClient(SCMClient):
 
         return None
 
-    def diff(self, revisions, files=[], extra_args=[]):
+    def diff(self, revisions, include_files=[], exclude_files=[],
+             extra_args=[]):
         """
         Goes through the hard work of generating a diff on Perforce in order
         to take into account adds/deletes and to provide the necessary
@@ -436,7 +437,7 @@ class PerforceClient(SCMClient):
         # this does *not* support any of perforce's traversal literals like ...
         depot_include_files = []
         local_include_files = []
-        for filename in files:
+        for filename in include_files:
             if filename.startswith('//'):
                 depot_include_files.append(filename)
             else:

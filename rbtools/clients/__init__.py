@@ -36,6 +36,7 @@ class SCMClient(object):
     name = None
 
     supports_diff_extra_args = False
+    supports_diff_exclude_files = False
 
     def __init__(self, user_config=None, configs=[], options=None,
                  capabilities=None):
@@ -103,7 +104,8 @@ class SCMClient(object):
             'tip': None,
         }
 
-    def diff(self, revisions, files=[], extra_args=[]):
+    def diff(self, revisions, include_files=[], exclude_files=[],
+             extra_args=[]):
         """
         Returns the generated diff and optional parent diff for this
         repository.

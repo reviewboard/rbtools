@@ -198,7 +198,8 @@ class SVNClient(SCMClient):
 
         return get_url_prop(repository_info.path)
 
-    def diff(self, revisions, files=[], extra_args=[]):
+    def diff(self, revisions, include_files=[], exclude_files=[],
+             extra_args=[]):
         """
         Performs a diff in a Subversion repository.
 
@@ -237,12 +238,12 @@ class SVNClient(SCMClient):
             # or not there's a working copy
             if self.options.repository_url:
                 # No working copy--create 'old' and 'new' URLs
-                if len(files) == 1:
+                if len(include_files) == 1:
                     # If there's a single file or directory passed in, we use
                     # that as part of the URL instead of as a separate
                     # filename.
-                    repository_info.set_base_path(files[0])
-                    files = []
+                    repository_info.set_base_path(include_files[0])
+                    include_files = []
 
                 new_url = (repository_info.path + repository_info.base_path +
                            '@' + tip)
@@ -271,7 +272,7 @@ class SVNClient(SCMClient):
                 empty_files_revisions['base'] = '(revision %s)' % base
                 empty_files_revisions['tip'] = '(revision %s)' % tip
 
-        diff_cmd.extend(files)
+        diff_cmd.extend(include_files)
 
         if self.history_scheduled_with_commit(changelist):
             svn_show_copies_as_adds = getattr(

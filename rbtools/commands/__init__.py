@@ -234,6 +234,12 @@ class Command(object):
                    help='Includes only the given file in the diff. '
                         'This can be used multiple times to specify '
                         'multiple files.'),
+            Option('-X', '--exclude',
+                   dest='exclude_files',
+                   action='append',
+                   config_key='EXCLUDE_FILES',
+                   help='Exclude the given file from the diff. This can be '
+                        'used multiple times to specify multiple files.'),
             Option('--parent',
                    dest='parent_branch',
                    metavar='BRANCH',
