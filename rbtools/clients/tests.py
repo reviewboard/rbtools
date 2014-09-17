@@ -580,6 +580,30 @@ class MercurialClientTests(MercurialTestBase):
         self.assertEqual(md5(result['diff']).hexdigest(),
                          '9c8796936646be5c7349973b0fceacbd')
 
+    def test_diff_exclude(self):
+        """Testing MercurialClient diff with file exclusion."""
+        self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._hg_add_file_commit('exclude.txt', FOO2, 'commit 2')
+
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions, exclude_files=['exclude.txt'])
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('diff' in result)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '68c2bdccf52a4f0baddd0ac9f2ecb7d2')
+
+    def test_diff_exclude_empty(self):
+        """Testing MercurialClient diff with empty file exclusion."""
+        self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._hg_add_file_commit('empty.txt', '', 'commit 2')
+
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions, exclude_files=['empty.txt'])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('diff' in result)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '68c2bdccf52a4f0baddd0ac9f2ecb7d2')
+
     def test_diff_branch_diverge(self):
         """Testing MercurialClient diff with diverged branch"""
         self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')

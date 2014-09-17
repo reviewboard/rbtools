@@ -620,8 +620,8 @@ Options
 .. cmdoption:: -X <file>, --exclude=<file>
 
    Exclude the given file from the diff. This can be used multiple times to
-   specify multiple files. This is currently not available for any SCM
-   backends.
+   specify multiple files. This is currently only available for the Mercurial
+   backend.
 
    The ``EXCLUDE_FILES`` option can be set in :file:`.reviewboardrc` and will
    have the same effect.

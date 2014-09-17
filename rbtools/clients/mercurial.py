@@ -25,6 +25,8 @@ class MercurialClient(SCMClient):
     PRE_CREATION = '/dev/null'
     PRE_CREATION_DATE = 'Thu Jan 01 00:00:00 1970 +0000'
 
+    supports_diff_exclude_files = True
+
     def __init__(self, **kwargs):
         super(MercurialClient, self).__init__(**kwargs)
 
@@ -366,13 +368,18 @@ class MercurialClient(SCMClient):
 
         diff_cmd += include_files
 
+        for exclude_file in exclude_files:
+            diff_cmd.append('-X')
+            diff_cmd.append(exclude_file)
+
         diff = self._execute(
             diff_cmd + ['-r', revisions['base'], '-r', revisions['tip']],
             env=self._hg_env)
 
         if self._supports_empty_files():
             diff = self._handle_empty_files(diff, revisions['base'],
-                                            revisions['tip'])
+                                            revisions['tip'],
+                                            exclude_files=exclude_files)
 
         if 'parent_base' in revisions:
             base_commit_id = revisions['parent_base']
@@ -381,9 +388,11 @@ class MercurialClient(SCMClient):
                 env=self._hg_env)
 
             if self._supports_empty_files():
-                parent_diff = self._handle_empty_files(parent_diff,
-                                                       base_commit_id,
-                                                       revisions['base'])
+                parent_diff = self._handle_empty_files(
+                    parent_diff,
+                    base_commit_id,
+                    revisions['base'],
+                    exclude_files=exclude_files)
         else:
             base_commit_id = revisions['base']
             parent_diff = None
@@ -395,7 +404,7 @@ class MercurialClient(SCMClient):
             'base_commit_id': base_commit_id,
         }
 
-    def _handle_empty_files(self, diff, base, tip):
+    def _handle_empty_files(self, diff, base, tip, exclude_files=[]):
         """Adds added and deleted 0-length files to the diff output.
 
         Since the diff output from hg diff does not give any information on
@@ -423,20 +432,22 @@ class MercurialClient(SCMClient):
                                       env=self._hg_env).strip().split('\t')
 
         for filename in added_empty_files:
-            diff += ('diff -r %s -r %s %s\n'
-                     '--- %s\t%s\n'
-                     '+++ b/%s\t%s\n'
-                     % (base, tip, filename,
-                        self.PRE_CREATION, self.PRE_CREATION_DATE,
-                        filename, tip_date))
+            if filename not in exclude_files:
+                diff += ('diff -r %s -r %s %s\n'
+                         '--- %s\t%s\n'
+                         '+++ b/%s\t%s\n'
+                         % (base, tip, filename,
+                            self.PRE_CREATION, self.PRE_CREATION_DATE,
+                            filename, tip_date))
 
         for filename in deleted_empty_files:
-            diff += ('diff -r %s -r %s %s\n'
-                     '--- a/%s\t%s\n'
-                     '+++ %s\t%s\n'
-                     % (base, tip, filename,
-                        filename, base_date,
-                        self.PRE_CREATION, self.PRE_CREATION_DATE))
+            if filename not in exclude_files:
+                diff += ('diff -r %s -r %s %s\n'
+                         '--- a/%s\t%s\n'
+                         '+++ %s\t%s\n'
+                         % (base, tip, filename,
+                            filename, base_date,
+                            self.PRE_CREATION, self.PRE_CREATION_DATE))
 
         return diff
 
