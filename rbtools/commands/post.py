@@ -710,6 +710,14 @@ class Post(Command):
         api_client, api_root = self.get_api(server_url)
         self.setup_tool(self.tool, api_root=api_root)
 
+        if (self.options.exclude_files and
+           not self.tool.supports_diff_exclude_files):
+
+            raise CommandError(
+                'The %s backend does not support excluding files via the '
+                '-X/--exclude commandline options or the EXCLUDE_FILES '
+                '.reviewboardrc option.' % self.tool.name)
+
         # Check if repository info on reviewboard server match local ones.
         repository_info = repository_info.find_server_repository_info(api_root)
 
@@ -741,7 +749,8 @@ class Post(Command):
             # by the requested files if provided.
             diff_info = self.tool.diff(
                 revisions=revisions,
-                files=self.options.include_files or [],
+                include_files=self.options.include_files or [],
+                exclude_files=self.options.exclude_files or [],
                 extra_args=extra_args)
 
             diff = diff_info['diff']

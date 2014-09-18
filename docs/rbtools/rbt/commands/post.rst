@@ -617,6 +617,15 @@ Options
    multiple times to include multiple files. This is only available with some
    SCM backends (Bazaar, CVS, Git, Mercurial, Perforce, and SVN).
 
+.. cmdoption:: -X <file>, --exclude=<file>
+
+   Exclude the given file from the diff. This can be used multiple times to
+   specify multiple files. This is currently only available for the Mercurial
+   backend.
+
+   The ``EXCLUDE_FILES`` option can be set in :file:`.reviewboardrc` and will
+   have the same effect.
+
 .. cmdoption:: --tracking-branch
 
    Tracking branch from which your branch is derived (git only, defaults to

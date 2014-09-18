@@ -460,8 +460,9 @@ class ClearCaseClient(SCMClient):
 
         return self._sanitize_branch_changeset(changeset)
 
-    def diff(self, revisions, files=[], extra_args=[]):
-        if files:
+    def diff(self, revisions, include_files=[], exclude_files=[],
+             extra_args=[]):
+        if include_files:
             raise Exception(
                 'The ClearCase backend does not currently support the '
                 '-I/--include parameter. To diff for specific files, pass in '
@@ -477,8 +478,8 @@ class ClearCaseClient(SCMClient):
             changeset = self._get_branch_changeset(revisions['tip'])
             return self._do_diff(changeset)
         elif revisions['base'] == self.REVISION_FILES:
-            files = revisions['tip']
-            return self._do_diff(files)
+            include_files = revisions['tip']
+            return self._do_diff(include_files)
         else:
             assert False
 

@@ -144,7 +144,8 @@ class BazaarClient(SCMClient):
             branch = result[0][len(USING_PARENT_PREFIX):]
             return 'revno:%s:%s' % (result[1], branch)
 
-    def diff(self, revisions, files=[], extra_args=[]):
+    def diff(self, revisions, include_files=[], exclude_files=[],
+             extra_args=[]):
         """Returns the diff for the given revision spec.
 
         If the revision spec is empty, this returns the diff of the current
@@ -155,11 +156,12 @@ class BazaarClient(SCMClient):
 
         The summary and description are set if guessing is enabled.
         """
-        diff = self._get_range_diff(revisions['base'], revisions['tip'], files)
+        diff = self._get_range_diff(revisions['base'], revisions['tip'],
+                                    include_files)
 
         if 'parent_base' in revisions:
             parent_diff = self._get_range_diff(
-                revisions['parent_base'], revisions['base'], files)
+                revisions['parent_base'], revisions['base'], include_files)
         else:
             parent_diff = None
 

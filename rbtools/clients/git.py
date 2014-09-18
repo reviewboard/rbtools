@@ -407,7 +407,8 @@ class GitClient(SCMClient):
 
         return execute([self.git, 'rev-parse'] + revisions).strip().split('\n')
 
-    def diff(self, revisions, files=[], extra_args=[]):
+    def diff(self, revisions, include_files=[], exclude_files=[],
+             extra_args=[]):
         """Perform a diff using the given revisions.
 
         If no revisions are specified, this will do a diff of the contents of
@@ -428,13 +429,13 @@ class GitClient(SCMClient):
         diff_lines = self.make_diff(merge_base,
                                     revisions['base'],
                                     revisions['tip'],
-                                    files)
+                                    include_files)
 
         if 'parent_base' in revisions:
             parent_diff_lines = self.make_diff(merge_base,
                                                revisions['parent_base'],
                                                revisions['base'],
-                                               files)
+                                               include_files)
             base_commit_id = revisions['parent_base']
         else:
             parent_diff_lines = None
