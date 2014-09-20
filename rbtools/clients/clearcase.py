@@ -460,7 +460,7 @@ class ClearCaseClient(SCMClient):
 
         return self._sanitize_branch_changeset(changeset)
 
-    def diff(self, revisions, include_files=[], exclude_files=[],
+    def diff(self, revisions, include_files=[], exclude_patterns=[],
              extra_args=[]):
         if include_files:
             raise Exception(

@@ -144,7 +144,7 @@ class BazaarClient(SCMClient):
             branch = result[0][len(USING_PARENT_PREFIX):]
             return 'revno:%s:%s' % (result[1], branch)
 
-    def diff(self, revisions, include_files=[], exclude_files=[],
+    def diff(self, revisions, include_files=[], exclude_patterns=[],
              extra_args=[]):
         """Returns the diff for the given revision spec.
 

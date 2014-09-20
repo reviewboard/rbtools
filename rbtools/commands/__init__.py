@@ -235,11 +235,12 @@ class Command(object):
                         'This can be used multiple times to specify '
                         'multiple files.'),
             Option('-X', '--exclude',
-                   dest='exclude_files',
+                   dest='exclude_patterns',
                    action='append',
-                   config_key='EXCLUDE_FILES',
-                   help='Exclude the given file from the diff. This can be '
-                        'used multiple times to specify multiple files.'),
+                   config_key='EXCLUDE_PATTERNS',
+                   help='Exclude all files that match the given pattern '
+                        'from the diff. This can be used multiple times to '
+                        'specify multiple patterns.'),
             Option('--parent',
                    dest='parent_branch',
                    metavar='BRANCH',

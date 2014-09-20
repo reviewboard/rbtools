@@ -1,3 +1,4 @@
+import fnmatch
 import logging
 import os
 import re
@@ -20,6 +21,8 @@ class GitClient(SCMClient):
     remote repository, whether git, SVN or Perforce.
     """
     name = 'Git'
+
+    supports_diff_exclude_patterns = True
 
     def __init__(self, **kwargs):
         super(GitClient, self).__init__(**kwargs)
@@ -407,7 +410,7 @@ class GitClient(SCMClient):
 
         return execute([self.git, 'rev-parse'] + revisions).strip().split('\n')
 
-    def diff(self, revisions, include_files=[], exclude_files=[],
+    def diff(self, revisions, include_files=[], exclude_patterns=[],
              extra_args=[]):
         """Perform a diff using the given revisions.
 
@@ -429,13 +432,16 @@ class GitClient(SCMClient):
         diff_lines = self.make_diff(merge_base,
                                     revisions['base'],
                                     revisions['tip'],
-                                    include_files)
+                                    include_files,
+                                    exclude_patterns)
 
         if 'parent_base' in revisions:
             parent_diff_lines = self.make_diff(merge_base,
                                                revisions['parent_base'],
                                                revisions['base'],
-                                               include_files)
+                                               include_files,
+                                               exclude_patterns)
+
             base_commit_id = revisions['parent_base']
         else:
             parent_diff_lines = None
@@ -448,40 +454,83 @@ class GitClient(SCMClient):
             'base_commit_id': base_commit_id,
         }
 
-    def make_diff(self, merge_base, base, tip, files):
+    def make_diff(self, merge_base, base, tip, include_files,
+                  exclude_patterns):
         """Performs a diff on a particular branch range."""
         rev_range = "%s..%s" % (base, tip)
 
-        if files:
-            files = ['--'] + files
+        if include_files:
+            include_files = ['--'] + include_files
 
         if self.type in ('svn', 'perforce'):
-            diff_cmd = [self.git, 'diff', '--no-color', '--no-prefix', '-r',
-                        '-u', rev_range]
-        elif self.type == "git":
-            diff_cmd = [self.git, 'diff', '--no-color', '--full-index',
-                        '--ignore-submodules', rev_range]
+            diff_cmd_params = ['--no-color', '--no-prefix', '-r', '-u',
+                               rev_range]
+        elif self.type == 'git':
+            diff_cmd_params = ['--no-color', '--full-index',
+                               '--ignore-submodules', rev_range]
 
             if (self.capabilities is not None and
                 self.capabilities.has_capability('diffs', 'moved_files')):
-                diff_cmd.append('-M')
+                diff_cmd_params.append('-M')
             else:
-                diff_cmd.append('--no-renames')
+                diff_cmd_params.append('--no-renames')
         else:
-            return None
+            assert False
 
         # By default, don't allow using external diff commands. This prevents
         # things from breaking horribly if someone configures a graphical diff
         # viewer like p4merge or kaleidoscope. This can be overridden by
         # setting GIT_USE_EXT_DIFF = True in ~/.reviewboardrc
         if self.user_config.get('GIT_USE_EXT_DIFF', False):
-            diff_cmd.append('--no-ext-diff')
+            diff_cmd_params.append('--no-ext-diff')
 
-        diff_lines = execute(diff_cmd + files,
-                             split_lines=True,
-                             with_errors=False,
-                             ignore_errors=True,
-                             none_on_ignored_error=True)
+        diff_cmd = [self.git, 'diff'] + diff_cmd_params
+
+        if exclude_patterns:
+            # If we have specified files to exclude, we will get a list of all
+            # changed files and run `git diff` on each un-excluded file
+            # individually.
+            changed_files_cmd = [self.git, 'diff-tree'] + diff_cmd_params
+            if self.type == 'git':
+                changed_files_cmd.append('-r')
+
+            changed_files = execute(changed_files_cmd + include_files,
+                                    split_lines=True,
+                                    with_errors=False,
+                                    ignore_errors=True,
+                                    none_on_ignored_error=True)
+
+            changed_files = [line[-1] for line in changed_files]
+
+            for pattern in exclude_patterns:
+                changed_files = fnmatch.filter(changed_files, pattern)
+
+            diff_lines = []
+
+            for filename in changed_files:
+                lines = execute(diff_cmd + ['--', filename],
+                                split_lines=True,
+                                with_errors=False,
+                                ignore_errors=True,
+                                none_on_ignored_error=True)
+
+                if lines is None:
+                    logging.error(
+                        'Could not get diff for all files (git-diff '
+                        'failed for "%s"). Refusing to return a partial '
+                        'diff.' % filename)
+
+                    diff_lines = None
+                    break
+
+                diff_lines += lines
+
+        else:
+            diff_lines = execute(diff_cmd + include_files,
+                                 split_lines=True,
+                                 with_errors=False,
+                                 ignore_errors=True,
+                                 none_on_ignored_error=True)
 
         if self.type == 'svn':
             return self.make_svn_diff(merge_base, diff_lines)

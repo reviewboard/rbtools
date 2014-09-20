@@ -50,16 +50,18 @@ class Diff(Command):
             revisions = None
             extra_args = args
 
-        if self.options.exclude_files and not tool.supports_diff_exclude_files:
+        if (self.options.exclude_patterns and
+            not tool.supports_diff_exclude_patterns):
+
             raise CommandError(
                 'The %s backend does not support excluding files via the '
-                '-X/--exclude commandline options or the EXCLUDE_FILES '
+                '-X/--exclude commandline options or the EXCLUDE_PATTERNS '
                 '.reviewboardrc option.' % tool.name)
 
         diff_info = tool.diff(
             revisions=revisions,
             include_files=self.options.include_files or [],
-            exclude_files=self.options.exclude_files or [],
+            exclude_patterns=self.options.exclude_patterns or [],
             extra_args=extra_args)
 
         diff = diff_info['diff']
