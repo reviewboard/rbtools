@@ -621,7 +621,7 @@ Options
 
    Exclude all files that match the given pattern from the diff. This can be
    used multiple times to specify multiple patterns. This is currently only
-   available with some SCM backends (Git and Mercurial).
+   available with some SCM backends (Git, Mercurial, and SVN).
 
    The ``EXCLUDE_PATTERNS`` option can be set in :file:`.reviewboardrc` and
    will have the same effect.
