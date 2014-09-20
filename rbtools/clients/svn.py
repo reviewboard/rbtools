@@ -308,11 +308,10 @@ class SVNClient(SCMClient):
         }
 
     def _filter_diff(self, diff, exclude_patterns):
-        """
-        Filter through the lines of diff to exclude files.
+        """Filter through the lines of diff to exclude files.
 
-        This function looks for lines that indicates the start of a new file in
-        the diff and check if the filename matches any of the given patterns.
+        This function looks for lines that indicate the start of a new file in
+        the diff and checks if the filename matches any of the given patterns.
         If it does, the diff lines corresponding to that file will not be
         yielded; if the filename does not match any patterns, the lines will be
         yielded as normal.
