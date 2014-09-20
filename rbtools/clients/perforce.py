@@ -420,7 +420,7 @@ class PerforceClient(SCMClient):
 
         return None
 
-    def diff(self, revisions, include_files=[], exclude_files=[],
+    def diff(self, revisions, include_files=[], exclude_patterns=[],
              extra_args=[]):
         """
         Goes through the hard work of generating a diff on Perforce in order

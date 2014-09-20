@@ -84,7 +84,7 @@ class PlasticClient(SCMClient):
         else:
             raise TooManyRevisionsError
 
-    def diff(self, revisions, include_files=[], exclude_files=[],
+    def diff(self, revisions, include_files=[], exclude_patterns=[],
              extra_args=[]):
         """
         Performs a diff across all modified files in a Plastic workspace

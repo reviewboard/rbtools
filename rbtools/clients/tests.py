@@ -155,6 +155,28 @@ class GitClientTests(SCMClientTests):
         self.assertEqual(result['base_commit_id'], base_commit_id)
         self.assertEqual(result['commit_id'], commit_id)
 
+    def test_diff_exclude(self):
+        """Testing Gitclient simple diff with file exclusion."""
+        self.client.get_repository_info()
+        base_commit_id = self._git_get_head()
+
+        self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._git_add_file_commit('exclude.txt', FOO2, 'commit 2')
+        commit_id = self._git_get_head()
+
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions, exclude_patterns=['exclude.txt'])
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 4)
+        self.assertTrue('diff' in result)
+        self.assertTrue('parent_diff' in result)
+        self.assertTrue('base_commit_id' in result)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '69d4616cf985f6b10571036db744e2d8')
+        self.assertEqual(result['parent_diff'], None)
+        self.assertEqual(result['base_commit_id'], base_commit_id)
+        self.assertEqual(result['commit_id'], commit_id)
+
     def test_diff_branch_diverge(self):
         """Testing GitClient diff with divergent branches"""
         self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
@@ -586,7 +608,7 @@ class MercurialClientTests(MercurialTestBase):
         self._hg_add_file_commit('exclude.txt', FOO2, 'commit 2')
 
         revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions, exclude_files=['exclude.txt'])
+        result = self.client.diff(revisions, exclude_patterns=['exclude.txt'])
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
@@ -598,7 +620,7 @@ class MercurialClientTests(MercurialTestBase):
         self._hg_add_file_commit('empty.txt', '', 'commit 2')
 
         revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions, exclude_files=['empty.txt'])
+        result = self.client.diff(revisions, exclude_patterns=['empty.txt'])
         self.assertTrue(isinstance(revisions, dict))
         self.assertTrue('diff' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),

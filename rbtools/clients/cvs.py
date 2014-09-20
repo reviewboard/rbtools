@@ -110,7 +110,7 @@ class CVSClient(SCMClient):
             'tip': None,
         }
 
-    def diff(self, revisions, include_files=[], exclude_files=[],
+    def diff(self, revisions, include_files=[], exclude_patterns=[],
              extra_args=[]):
         """Get the diff for the given revisions.
 

@@ -25,7 +25,7 @@ class MercurialClient(SCMClient):
     PRE_CREATION = '/dev/null'
     PRE_CREATION_DATE = 'Thu Jan 01 00:00:00 1970 +0000'
 
-    supports_diff_exclude_files = True
+    supports_diff_exclude_patterns = True
 
     def __init__(self, **kwargs):
         super(MercurialClient, self).__init__(**kwargs)
@@ -354,7 +354,7 @@ class MercurialClient(SCMClient):
 
         return '\n\n'.join([desc.strip() for desc in descs])
 
-    def diff(self, revisions, include_files=[], exclude_files=[],
+    def diff(self, revisions, include_files=[], exclude_patterns=[],
              extra_args=[]):
         """
         Performs a diff across all modified files in a Mercurial repository.
@@ -368,9 +368,9 @@ class MercurialClient(SCMClient):
 
         diff_cmd += include_files
 
-        for exclude_file in exclude_files:
+        for pattern in exclude_patterns:
             diff_cmd.append('-X')
-            diff_cmd.append(exclude_file)
+            diff_cmd.append(pattern)
 
         diff = self._execute(
             diff_cmd + ['-r', revisions['base'], '-r', revisions['tip']],
@@ -379,7 +379,7 @@ class MercurialClient(SCMClient):
         if self._supports_empty_files():
             diff = self._handle_empty_files(diff, revisions['base'],
                                             revisions['tip'],
-                                            exclude_files=exclude_files)
+                                            exclude_files=exclude_patterns)
 
         if 'parent_base' in revisions:
             base_commit_id = revisions['parent_base']
@@ -392,7 +392,7 @@ class MercurialClient(SCMClient):
                     parent_diff,
                     base_commit_id,
                     revisions['base'],
-                    exclude_files=exclude_files)
+                    exclude_files=exclude_patterns)
         else:
             base_commit_id = revisions['base']
             parent_diff = None
