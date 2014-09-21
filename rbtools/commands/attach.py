@@ -2,6 +2,7 @@ import os
 
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option
+from rbtools.utils.commands import get_review_request
 
 
 class Attach(Command):
@@ -22,22 +23,13 @@ class Attach(Command):
         Command.repository_options,
     ]
 
-    def get_review_request(self, request_id, api_root):
-        """Returns the review request resource for the given ID."""
-        try:
-            request = api_root.get_review_request(review_request_id=request_id)
-        except APIError, e:
-            raise CommandError("Error getting review request: %s" % e)
-
-        return request
-
     def main(self, request_id, path_to_file):
         self.repository_info, self.tool = self.initialize_scm_tool(
             client_name=self.options.repository_type)
         server_url = self.get_server_url(self.repository_info, self.tool)
         api_client, api_root = self.get_api(server_url)
 
-        request = self.get_review_request(request_id, api_root)
+        request = get_review_request(request_id, api_root)
 
         try:
             f = open(path_to_file, 'r')
