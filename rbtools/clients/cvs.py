@@ -1,11 +1,13 @@
 import logging
 import os
+import re
 import socket
 
 from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError)
 from rbtools.utils.checks import check_install
+from rbtools.utils.diffs import filter_diff
 from rbtools.utils.process import execute
 
 
@@ -15,6 +17,10 @@ class CVSClient(SCMClient):
     information and generates compatible diffs.
     """
     name = 'CVS'
+
+    supports_diff_exclude_patterns = True
+
+    INDEX_FILE_RE = re.compile('^Index: (.+)\n$')
 
     REVISION_WORKING_COPY = '--rbtools-working-copy'
 
@@ -129,6 +135,12 @@ class CVSClient(SCMClient):
                  tip == self.REVISION_WORKING_COPY)):
             diff_cmd.extend(['-r', base, '-r', tip])
 
+        diff = execute(diff_cmd + include_files, extra_ignore_errors=(1,),
+                       split_lines=True)
+
+        if exclude_patterns:
+            diff = filter_diff(diff, self.INDEX_FILE_RE, exclude_patterns)
+
         return {
-            'diff': execute(diff_cmd + include_files, extra_ignore_errors=(1,))
+            'diff': ''.join(diff)
         }
