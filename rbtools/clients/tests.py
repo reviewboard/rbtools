@@ -1815,6 +1815,27 @@ class BazaarClientTests(SCMClientTests):
         self._compare_diffs('foo.txt', result['diff'],
                             'a6326b53933f8b255a4b840485d8e210')
 
+    def test_diff_exclude(self):
+        """Testing BazaarClient diff with file exclusion."""
+        os.chdir(self.child_branch)
+
+        self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
+        self._bzr_add_file_commit("exclude.txt", FOO2, "commit 2")
+
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions, exclude_patterns=['exclude.txt'])
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('diff' in result)
+
+        self._compare_diffs('foo.txt', result['diff'],
+                            'a6326b53933f8b255a4b840485d8e210')
+
+        num_files_in_diff = len(filter(lambda line: line.startswith('==='),
+                                       result['diff'].split('\n')))
+
+        self.assertEqual(num_files_in_diff, 1)
+
+
     def test_diff_specific_files(self):
         """Testing BazaarClient diff with specific files"""
         os.chdir(self.child_branch)

@@ -5,6 +5,7 @@ import re
 from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.clients.errors import TooManyRevisionsError
 from rbtools.utils.checks import check_install
+from rbtools.utils.diffs import filter_diff
 from rbtools.utils.process import execute
 
 
@@ -20,6 +21,10 @@ class BazaarClient(SCMClient):
     parent diffs (every branch with a parent supports them).
     """
     name = 'Bazaar'
+
+    supports_diff_exclude_patterns = True
+
+    INDEX_FILE_RE = re.compile("===.+'(.+?)'\n")
 
     # Regular expression that matches the path to the current branch.
     #
@@ -157,7 +162,7 @@ class BazaarClient(SCMClient):
         The summary and description are set if guessing is enabled.
         """
         diff = self._get_range_diff(revisions['base'], revisions['tip'],
-                                    include_files)
+                                    include_files, exclude_patterns)
 
         if 'parent_base' in revisions:
             parent_diff = self._get_range_diff(
@@ -170,12 +175,20 @@ class BazaarClient(SCMClient):
             'parent_diff': parent_diff,
         }
 
-    def _get_range_diff(self, base, tip, files):
+    def _get_range_diff(self, base, tip, include_files, exclude_patterns=[]):
         """Return the diff between 'base' and 'tip'."""
         diff_cmd = ['bzr', 'diff', '-q', '-r',
-                    '%s..%s' % (base, tip)] + files
-        diff = execute(diff_cmd, ignore_errors=True)
-        return diff or None
+                    '%s..%s' % (base, tip)] + include_files
+        diff = execute(diff_cmd, ignore_errors=True, split_lines=True)
+
+        if diff:
+            if exclude_patterns:
+                diff = filter_diff(diff, self.INDEX_FILE_RE, exclude_patterns)
+
+            return ''.join(diff)
+        else:
+            return None
+
 
     def get_raw_commit_message(self, revisions):
         # The result is content in the form of:
