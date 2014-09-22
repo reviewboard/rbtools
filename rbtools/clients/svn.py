@@ -1,4 +1,3 @@
-import fnmatch
 import logging
 import os
 import re
@@ -11,6 +10,7 @@ from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError)
 from rbtools.utils.checks import check_gnu_diff, check_install
+from rbtools.utils.diffs import filter_diff
 from rbtools.utils.filesystem import make_empty_files, walk_parents
 from rbtools.utils.process import execute
 
@@ -301,39 +301,14 @@ class SVNClient(SCMClient):
         diff = self.convert_to_absolute_paths(diff, repository_info)
 
         if exclude_patterns:
-            diff = self._filter_diff(diff, exclude_patterns)
+            # We modify the patterns to use have a leading / because we
+            # convert_to_absolute_paths prepends all filenames with one.
+            diff = filter_diff(diff, self.INDEX_FILE_RE,
+                               ('/' + p for p in exclude_patterns))
 
         return {
             'diff': ''.join(diff),
         }
-
-    def _filter_diff(self, diff, exclude_patterns):
-        """Filter through the lines of diff to exclude files.
-
-        This function looks for lines that indicate the start of a new file in
-        the diff and checks if the filename matches any of the given patterns.
-        If it does, the diff lines corresponding to that file will not be
-        yielded; if the filename does not match any patterns, the lines will be
-        yielded as normal.
-        """
-        include_file = True
-
-        for line in diff:
-            m = self.INDEX_FILE_RE.match(line)
-
-            if m:
-                include_file = True
-                filename = m.group(1)
-
-                for pattern in exclude_patterns:
-                    # The convert_to_absolute_paths method prepends slashes to
-                    # all filenames.
-                    if fnmatch.fnmatch(filename, '/' + pattern):
-                        include_file = False
-                        break
-
-            if include_file:
-                yield line
 
     def history_scheduled_with_commit(self, changelist):
         """ Method to find if any file status has '+' in 4th column"""
