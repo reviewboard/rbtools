@@ -1,5 +1,6 @@
 from rbtools.api.errors import APIError
-from rbtools.commands import Command, CommandError, Option
+from rbtools.commands import Command, CommandError
+from rbtools.utils.commands import get_review_request
 
 
 class Publish(Command):
@@ -12,15 +13,6 @@ class Publish(Command):
         Command.repository_options,
     ]
 
-    def get_review_request(self, request_id, api_root):
-        """Returns the review request resource for the given ID."""
-        try:
-            request = api_root.get_review_request(review_request_id=request_id)
-        except APIError, e:
-            raise CommandError("Error getting review request: %s" % e)
-
-        return request
-
     def main(self, request_id):
         """Run the command."""
         repository_info, tool = self.initialize_scm_tool(
@@ -28,7 +20,8 @@ class Publish(Command):
         server_url = self.get_server_url(repository_info, tool)
         api_client, api_root = self.get_api(server_url)
 
-        request = self.get_review_request(request_id, api_root)
+        request = get_review_request(request_id, api_root)
+
         try:
             draft = request.get_draft()
             draft = draft.update(public=True)

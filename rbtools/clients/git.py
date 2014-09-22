@@ -1,4 +1,3 @@
-import fnmatch
 import logging
 import os
 import re
@@ -11,6 +10,7 @@ from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.svn import SVNClient, SVNRepositoryInfo
 from rbtools.utils.checks import check_install
 from rbtools.utils.console import edit_text
+from rbtools.utils.diffs import remove_filenames_matching_patterns
 from rbtools.utils.process import die, execute
 
 
@@ -463,11 +463,10 @@ class GitClient(SCMClient):
             include_files = ['--'] + include_files
 
         if self.type in ('svn', 'perforce'):
-            diff_cmd_params = ['--no-color', '--no-prefix', '-r', '-u',
-                               rev_range]
+            diff_cmd_params = ['--no-color', '--no-prefix', '-r', '-u']
         elif self.type == 'git':
             diff_cmd_params = ['--no-color', '--full-index',
-                               '--ignore-submodules', rev_range]
+                               '--ignore-submodules']
 
             if (self.capabilities is not None and
                 self.capabilities.has_capability('diffs', 'moved_files')):
@@ -494,21 +493,24 @@ class GitClient(SCMClient):
             if self.type == 'git':
                 changed_files_cmd.append('-r')
 
-            changed_files = execute(changed_files_cmd + include_files,
-                                    split_lines=True,
-                                    with_errors=False,
-                                    ignore_errors=True,
-                                    none_on_ignored_error=True)
+            changed_files = execute(
+                changed_files_cmd + [rev_range] + include_files,
+                split_lines=True,
+                with_errors=False,
+                ignore_errors=True,
+                none_on_ignored_error=True)
 
-            changed_files = [line[-1] for line in changed_files]
-
-            for pattern in exclude_patterns:
-                changed_files = fnmatch.filter(changed_files, pattern)
+            # The output of git diff-tree will be a list of entries that have
+            # changed between the two revisions that we give it. The last part
+            # of the line is the name of the file that has changed.
+            changed_files = remove_filenames_matching_patterns(
+                (filename.split()[-1] for filename in changed_files),
+                exclude_patterns)
 
             diff_lines = []
 
             for filename in changed_files:
-                lines = execute(diff_cmd + ['--', filename],
+                lines = execute(diff_cmd + [rev_range, '--', filename],
                                 split_lines=True,
                                 with_errors=False,
                                 ignore_errors=True,
@@ -516,9 +518,9 @@ class GitClient(SCMClient):
 
                 if lines is None:
                     logging.error(
-                        'Could not get diff for all files (git-diff '
-                        'failed for "%s"). Refusing to return a partial '
-                        'diff.' % filename)
+                        'Could not get diff for all files (git-diff failed '
+                        'for "%s"). Refusing to return a partial diff.' %
+                        filename)
 
                     diff_lines = None
                     break
@@ -526,7 +528,7 @@ class GitClient(SCMClient):
                 diff_lines += lines
 
         else:
-            diff_lines = execute(diff_cmd + include_files,
+            diff_lines = execute(diff_cmd + [rev_range] + include_files,
                                  split_lines=True,
                                  with_errors=False,
                                  ignore_errors=True,

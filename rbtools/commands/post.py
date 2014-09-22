@@ -6,6 +6,7 @@ import sys
 from rbtools.api.errors import APIError
 from rbtools.clients.errors import InvalidRevisionSpecError
 from rbtools.commands import Command, CommandError, Option, OptionGroup
+from rbtools.utils.commands import get_review_request
 from rbtools.utils.console import confirm
 from rbtools.utils.match_score import Score
 from rbtools.utils.repository import get_repository_id
@@ -460,13 +461,7 @@ class Post(Command):
                                                   'commit_ids')
 
         if review_request_id:
-            # Retrieve the review request corresponding to the provided id.
-            try:
-                review_request = api_root.get_review_request(
-                    review_request_id=review_request_id)
-            except APIError, e:
-                raise CommandError("Error getting review request %s: %s"
-                                   % (review_request_id, e))
+            review_request = get_review_request(review_request_id, api_root)
 
             if review_request.status == 'submitted':
                 raise CommandError(
