@@ -7,7 +7,7 @@ from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError)
 from rbtools.utils.checks import check_install
-from rbtools.utils.diffs import filter_diff
+from rbtools.utils.diffs import filter_diff, normalize_patterns
 from rbtools.utils.process import execute
 
 
@@ -124,6 +124,8 @@ class CVSClient(SCMClient):
         files in the working directory. If it's not empty and contains two
         revisions, this will do a diff between those revisions.
         """
+        exclude_patterns = normalize_patterns(exclude_patterns)
+
         include_files = include_files or []
 
         # Diff returns "1" if differences were found.
@@ -139,6 +141,8 @@ class CVSClient(SCMClient):
                        split_lines=True)
 
         if exclude_patterns:
+            # CVS diffs are relative to the current working directory, so the
+            # base_dir parameter to filter_diff is unnecessary.
             diff = filter_diff(diff, self.INDEX_FILE_RE, exclude_patterns)
 
         return {

@@ -627,6 +627,13 @@ Options
    The ``EXCLUDE_PATTERNS`` option can be set in :file:`.reviewboardrc` and
    will have the same effect.
 
+   Relative exclude patterns will be treated as relative to the current working
+   directory, not to the repository directory.
+
+   When working with Perforce, an exclude pattern beginning with ``//`` will be
+   matched against depot paths; all other patterns will be matched against
+   local paths.
+
 .. cmdoption:: --tracking-branch
 
    Tracking branch from which your branch is derived (git only, defaults to

@@ -10,7 +10,7 @@ from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError)
 from rbtools.utils.checks import check_gnu_diff, check_install
-from rbtools.utils.diffs import filter_diff
+from rbtools.utils.diffs import filter_diff, normalize_patterns
 from rbtools.utils.filesystem import make_empty_files, walk_parents
 from rbtools.utils.process import execute
 
@@ -23,7 +23,7 @@ class SVNClient(SCMClient):
     name = 'Subversion'
 
     INDEX_SEP = '=' * 67
-    INDEX_FILE_RE = re.compile('^Index: (.+)\n$')
+    INDEX_FILE_RE = re.compile('^Index: /(.+)\n$')
 
     supports_diff_exclude_patterns = True
 
@@ -216,6 +216,8 @@ class SVNClient(SCMClient):
         SVN repositories do not support branches of branches in a way that
         makes parent diffs possible, so we never return a parent diff.
         """
+        exclude_patterns = normalize_patterns(exclude_patterns)
+
         # Keep track of information needed for handling empty files later.
         empty_files_revisions = {
             'base': None,
@@ -301,10 +303,9 @@ class SVNClient(SCMClient):
         diff = self.convert_to_absolute_paths(diff, repository_info)
 
         if exclude_patterns:
-            # We modify the patterns to use have a leading / because we
-            # convert_to_absolute_paths prepends all filenames with one.
-            diff = filter_diff(diff, self.INDEX_FILE_RE,
-                               ('/' + p for p in exclude_patterns))
+            diff = filter_diff(
+                diff, self.INDEX_FILE_RE, exclude_patterns,
+                base_dir=self.svn_info('.')['Working Copy Root Path'])
 
         return {
             'diff': ''.join(diff),
