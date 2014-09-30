@@ -5,7 +5,7 @@ import re
 from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.clients.errors import TooManyRevisionsError
 from rbtools.utils.checks import check_install
-from rbtools.utils.diffs import filter_diff
+from rbtools.utils.diffs import filter_diff, normalize_patterns
 from rbtools.utils.process import execute
 
 
@@ -161,12 +161,15 @@ class BazaarClient(SCMClient):
 
         The summary and description are set if guessing is enabled.
         """
+        exclude_patterns = normalize_patterns(exclude_patterns)
+
         diff = self._get_range_diff(revisions['base'], revisions['tip'],
                                     include_files, exclude_patterns)
 
         if 'parent_base' in revisions:
             parent_diff = self._get_range_diff(
-                revisions['parent_base'], revisions['base'], include_files)
+                revisions['parent_base'], revisions['base'], include_files,
+                exclude_patterns)
         else:
             parent_diff = None
 
@@ -183,7 +186,8 @@ class BazaarClient(SCMClient):
 
         if diff:
             if exclude_patterns:
-                diff = filter_diff(diff, self.INDEX_FILE_RE, exclude_patterns)
+                diff = filter_diff(diff, self.INDEX_FILE_RE, exclude_patterns,
+                                   base_dir=self.get_repository_info().path)
 
             return ''.join(diff)
         else:

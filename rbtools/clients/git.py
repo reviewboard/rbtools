@@ -10,7 +10,8 @@ from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.svn import SVNClient, SVNRepositoryInfo
 from rbtools.utils.checks import check_install
 from rbtools.utils.console import edit_text
-from rbtools.utils.diffs import remove_filenames_matching_patterns
+from rbtools.utils.diffs import (normalize_patterns,
+                                 remove_filenames_matching_patterns)
 from rbtools.utils.process import die, execute
 
 
@@ -312,7 +313,6 @@ class GitClient(SCMClient):
             self.type = "git"
             return RepositoryInfo(path=url, base_path='',
                                   supports_parent_diffs=True)
-
         return None
 
     def _strip_heads_prefix(self, ref):
@@ -424,6 +424,7 @@ class GitClient(SCMClient):
         make sense given the requested revisions and the tracking branch, this
         will also return a parent diff.
         """
+        exclude_patterns = normalize_patterns(exclude_patterns)
         try:
             merge_base = revisions['parent_base']
         except KeyError:
@@ -505,7 +506,7 @@ class GitClient(SCMClient):
             # of the line is the name of the file that has changed.
             changed_files = remove_filenames_matching_patterns(
                 (filename.split()[-1] for filename in changed_files),
-                exclude_patterns)
+                exclude_patterns, base_dir=self._get_root_directory())
 
             diff_lines = []
 
@@ -716,3 +717,14 @@ class GitClient(SCMClient):
         """Returns the name of the current branch."""
         return execute([self.git, "rev-parse", "--abbrev-ref", "HEAD"],
                        ignore_errors=True).strip()
+
+    def _get_root_directory(self):
+        """Get the root directory of the repository as an absolute path."""
+        git_dir = execute([self.git, "rev-parse", "--git-dir"],
+                          ignore_errors=True).rstrip("\n")
+
+        if git_dir.startswith("fatal:") or not os.path.isdir(git_dir):
+            logging.error("Could not find git repository path.")
+            return None
+
+        return os.path.abspath(os.path.join(git_dir, ".."))
