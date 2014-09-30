@@ -1,3 +1,4 @@
+import fnmatch
 import logging
 import marshal
 import os
@@ -161,6 +162,8 @@ class PerforceClient(SCMClient):
     and generates compatible diffs.
     """
     name = 'Perforce'
+
+    supports_diff_exclude_patterns = True
 
     supports_diff_extra_args = True
 
@@ -427,11 +430,13 @@ class PerforceClient(SCMClient):
         to take into account adds/deletes and to provide the necessary
         revision information.
         """
+        exclude_patterns = self._normalize_patterns(exclude_patterns)
+
         if not revisions:
             # The "path posting" is still interesting enough to keep around. If
             # the given arguments don't parse as valid changelists, fall back
             # on that behavior.
-            return self._path_diff(extra_args)
+            return self._path_diff(extra_args, exclude_patterns)
 
         # Support both //depot/... paths and local filenames. For the moment,
         # this does *not* support any of perforce's traversal literals like ...
@@ -458,7 +463,8 @@ class PerforceClient(SCMClient):
                          'to %s',
                          base, tip)
             return self._compute_range_changes(
-                base, tip, depot_include_files, local_include_files)
+                base, tip, depot_include_files, local_include_files,
+                exclude_patterns)
 
         # Strip off the prefix
         tip = tip[len(self.REVISION_PENDING_CLN_PREFIX):]
@@ -519,7 +525,9 @@ class PerforceClient(SCMClient):
             if ((depot_include_files and
                  depot_file not in depot_include_files) or
                 (local_include_files and
-                 local_file not in local_include_files)):
+                 local_file not in local_include_files) or
+                self._should_exclude_file(local_file, depot_file,
+                                          exclude_patterns)):
                 continue
 
             old_file = ''
@@ -606,7 +614,7 @@ class PerforceClient(SCMClient):
         }
 
     def _compute_range_changes(self, base, tip, depot_include_files,
-                               local_include_files):
+                               local_include_files, exclude_patterns):
         """Compute the changes across files given a revision range.
 
         This will look at the history of all changes within the given range and
@@ -712,6 +720,7 @@ class PerforceClient(SCMClient):
         # Now generate the diff
         supports_moves = self._supports_moves()
         diff_lines = []
+
         for f in files:
             action = f['action']
             depot_file = f['depotFile']
@@ -723,7 +732,9 @@ class PerforceClient(SCMClient):
             if ((depot_include_files and
                  depot_file not in depot_include_files) or
                 (local_include_files and
-                 local_file not in local_include_files)):
+                 local_file not in local_include_files) or
+                self._should_exclude_file(local_file, depot_file,
+                                          exclude_patterns)):
                 continue
 
             if action == 'add':
@@ -943,7 +954,7 @@ class PerforceClient(SCMClient):
 
         return old_filename, new_filename, new_depot_file
 
-    def _path_diff(self, args):
+    def _path_diff(self, args, exclude_patterns):
         """
         Process a path-style diff. This allows people to post individual files
         in various ways.
@@ -1050,6 +1061,11 @@ class PerforceClient(SCMClient):
                     old_file = tmp_diff_from_filename
                     changetype_short = 'M'
                     base_revision = int(first_record['rev'])
+
+                local_path = self._depot_to_local(depot_path)
+                if self._should_exclude_file(local_path, depot_path,
+                                             exclude_patterns):
+                    continue
 
                 # TODO: We're passing new_depot_file='' here just to make
                 # things work like they did before the moved file change was
@@ -1277,3 +1293,38 @@ class PerforceClient(SCMClient):
         return (self.capabilities and
                 self.capabilities.has_capability('scmtools', 'perforce',
                                                  'empty_files'))
+
+    def _should_exclude_file(self, local_file, depot_file, exclude_patterns):
+        """Determine if a file should be excluded from a diff.
+
+        Check if the file identified by (local_file, depot_file) should be
+        excluded from the diff. If a pattern beings with '//', then it will be
+        matched against the depot_file. Otherwise, it will be matched against
+        the local file.
+
+        This function expects `exclude_patterns` to be normalized.
+        """
+        for pattern in exclude_patterns:
+            if pattern.startswith('//'):
+                if fnmatch.fnmatch(depot_file, pattern):
+                    return True
+            elif fnmatch.fnmatch(local_file, pattern):
+                    return True
+
+        return False
+
+    def _normalize_patterns(self, patterns):
+        """Normalize the set of patterns so all non-depot paths are absolute.
+
+        A path with a leading // is interpreted as a depot pattern and remains
+        unchanged. All other paths are normalized to be absolute paths.
+        """
+        normalized_patterns = []
+
+        for pattern in patterns:
+            if pattern.startswith('//'):
+                normalized_patterns.append(pattern)
+            else:
+                normalized_patterns.append(os.path.abspath(pattern))
+
+        return normalized_patterns
