@@ -554,6 +554,7 @@ class GitClient(SCMClient):
             return None
 
         diff_data = ""
+        original_file = ""
         filename = ""
         newfile = False
 
@@ -575,8 +576,9 @@ class GitClient(SCMClient):
                 newfile = True
             elif line.startswith("--- "):
                 newfile = False
+                original_file = line[4:].strip()
                 diff_data += "--- %s\t(revision %s)\n" % \
-                             (line[4:].strip(), rev)
+                             (original_file, rev)
             elif line.startswith("+++ "):
                 filename = line[4:].strip()
                 if newfile:
@@ -584,8 +586,9 @@ class GitClient(SCMClient):
                     diff_data += "+++ %s\t(revision 0)\n" % filename
                 else:
                     # We already printed the "--- " line.
-                    diff_data += "+++ %s\t(working copy)\n" % filename
-            elif line.startswith("new file mode"):
+                    diff_data += "+++ %s\t(working copy)\n" % original_file
+            elif (line.startswith("new file mode") or
+                  line.startswith("deleted file mode")):
                 # Filter this out.
                 pass
             elif line.startswith("Binary files "):
