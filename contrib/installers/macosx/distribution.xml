@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+
+<installer-gui-script minSpecVersion="1">
+ <title>RBTools</title>
+ <organization>org.reviewboard</organization>
+ <domains enable_localSystem="true"/>
+ <options customize="never" require-scripts="true" rootVolumeOnly="true"/>
+ <allowed-os-versions>
+  <os-version min="10.6"/>
+ </allowed-os-versions>
+
+ <background file="background.tiff" alignment="bottomleft"
+             mime-type="image/tiff"/>
+
+ <!-- Define documents displayed at various steps -->
+ <welcome file="welcome.html" mime-type="text/html"/>
+ <conclusion file="conclusion.html" mime-type="text/html"/>
+
+ <!-- List all component packages -->
+ <pkg-ref id="org.reviewboard.rbtools" version="0" auth="root">
+  rbtools.pkg
+ </pkg-ref>
+
+ <choices-outline>
+  <line choice="org.reviewboard.rbtools"/>
+ </choices-outline>
+
+ <choice id="org.reviewboard.rbtools" visible="false" title="RBTools"
+         description="Command line tools for developers using Review Board"
+         start_selected="true">
+  <pkg-ref id="org.reviewboard.rbtools"/>
+ </choice>
+</installer-gui-script>
