@@ -467,7 +467,7 @@ class GitClient(SCMClient):
             diff_cmd_params = ['--no-color', '--no-prefix', '-r', '-u']
         elif self.type == 'git':
             diff_cmd_params = ['--no-color', '--full-index',
-                               '--ignore-submodules']
+                               '--ignore-submodules', '--no-ext-diff']
 
             if (self.capabilities is not None and
                 self.capabilities.has_capability('diffs', 'moved_files')):
