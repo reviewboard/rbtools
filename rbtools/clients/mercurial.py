@@ -277,9 +277,17 @@ class MercurialClient(SCMClient):
             if not outgoing:
                 return result
 
-            result['parent_base'] = self._execute(
+            parent_base = self._execute(
                 ['hg', 'parents', '--hidden', '-r', outgoing[0][1],
-                 '--template', '{node|short}']).split()[0]
+                 '--template', '{node|short}']).split()
+
+            if len(parent_base) == 0:
+                raise Exception(
+                    'Could not find parent base revision. Ensure upstream '
+                    'repository is not empty.')
+
+            result['parent_base'] = parent_base[0]
+
             logging.debug('Identified %s as parent base', result['parent_base'])
 
         return result
