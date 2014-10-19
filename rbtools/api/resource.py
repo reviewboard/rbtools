@@ -498,6 +498,8 @@ class DiffListResource(ListResource):
         The diff and parent_diff arguments should be strings containing
         the diff output.
         """
+        # TODO: This method should be unified with validate_diff() method of
+        # ValidateDiffResource, since they both perform the same operation.
         request = HttpRequest(self._url, method='POST', query_args=kwargs)
         request.add_file('path', 'diff', diff)
 
@@ -664,3 +666,35 @@ class ReviewRequestResource(ItemResource):
 
 RESOURCE_MAP['application/vnd.reviewboard.org.review-request'] = \
     ReviewRequestResource
+
+
+class ValidateDiffResource(ItemResource):
+    """The Validate Diff resource specific base class.
+
+    Provides additional functionality to assist in the validation of diffs.
+    """
+    @request_method_decorator
+    def validate_diff(self, repository, diff, parent_diff=None,
+                      base_dir=None, **kwargs):
+        """Validates a diff.
+
+        The diff and parent_diff arguments should be strings containing
+        the diff output.
+        """
+
+        # TODO: This method should be unified with upload_diff() method of
+        # DiffListResource, since they both perform the same operation.
+        request = HttpRequest(self._url, method='POST', query_args=kwargs)
+        request.add_field('repository', repository)
+        request.add_file('path', 'diff', diff)
+
+        if parent_diff:
+            request.add_file('parent_diff_path', 'parent_diff', parent_diff)
+
+        if base_dir:
+            request.add_field('basedir', base_dir)
+
+        return request
+
+RESOURCE_MAP['application/vnd.reviewboard.org.diff-validation'] = \
+    ValidateDiffResource

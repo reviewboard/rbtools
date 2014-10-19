@@ -447,11 +447,11 @@ class Post(Command):
 
         return None
 
-    def post_request(self, repository_info, server_url, api_root,
+    def post_request(self, repository_info, repository, server_url, api_root,
                      review_request_id=None, changenum=None, diff_content=None,
                      parent_diff_content=None, commit_id=None,
                      base_commit_id=None,
-                     submit_as=None, retries=3):
+                     submit_as=None, retries=3, base_dir=None):
         """Creates or updates a review request, and uploads a diff.
 
         On success the review request id and url are returned.
@@ -471,10 +471,6 @@ class Post(Command):
         else:
             # No review_request_id, so we will create a new review request.
             try:
-                repository = (
-                    self.options.repository_name or
-                    self.options.repository_url or
-                    self.get_repository_path(repository_info, api_root))
                 request_data = {
                     'repository': repository
                 }
@@ -506,8 +502,7 @@ class Post(Command):
             try:
                 diff_kwargs = {
                     'parent_diff': parent_diff_content,
-                    'base_dir': (self.options.basedir or
-                                 repository_info.base_path),
+                    'base_dir': base_dir,
                 }
 
                 if (base_commit_id and
@@ -753,8 +748,31 @@ class Post(Command):
             base_commit_id = diff_info.get('base_commit_id')
             commit_id = diff_info.get('commit_id')
 
+        repository = (
+            self.options.repository_name or
+            self.options.repository_url or
+            self.get_repository_path(repository_info, api_root))
+
+        base_dir = self.options.basedir or repository_info.base_path
+
         if len(diff) == 0:
             raise CommandError("There don't seem to be any diffs!")
+
+        try:
+            diff_validator = api_root.get_validation().get_diff_validation()
+            diff_validator.validate_diff(
+                repository,
+                diff,
+                parent_diff=parent_diff,
+                base_dir=base_dir)
+        except APIError, e:
+            msg_prefix = ''
+
+            if e.error_code == 207:
+                msg_prefix = '%s: ' % e.rsp['file']
+
+            raise CommandError("Error validating diff\n\n%s%s" %
+                               (msg_prefix, e))
 
         if repository_info.supports_changesets and 'changenum' in diff_info:
             changenum = diff_info['changenum']
@@ -784,6 +802,7 @@ class Post(Command):
 
         request_id, review_url = self.post_request(
             repository_info,
+            repository,
             server_url,
             api_root,
             self.options.rid,
@@ -792,7 +811,8 @@ class Post(Command):
             parent_diff_content=parent_diff,
             commit_id=commit_id,
             base_commit_id=base_commit_id,
-            submit_as=self.options.submit_as)
+            submit_as=self.options.submit_as,
+            base_dir=base_dir)
 
         diff_review_url = review_url + 'diff/'
 
