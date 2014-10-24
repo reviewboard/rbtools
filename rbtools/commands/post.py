@@ -773,6 +773,10 @@ class Post(Command):
 
             raise CommandError("Error validating diff\n\n%s%s" %
                                (msg_prefix, e))
+        except AttributeError:
+            # The server doesn't have a diff validation resource. Post as
+            # normal.
+            pass
 
         if repository_info.supports_changesets and 'changenum' in diff_info:
             changenum = diff_info['changenum']
