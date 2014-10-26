@@ -1,6 +1,8 @@
+import datetime
 import logging
 import os
 import sys
+import threading
 from pkg_resources import parse_version
 
 from rbtools.api.errors import APIError
@@ -19,6 +21,48 @@ else:
     import posixpath as cpath
 
 
+class get_elements_from_label_thread(threading.Thread):
+    def __init__(self, threadID, dir_name, label, elements):
+        self.threadID = threadID
+        self.dir_name = dir_name
+        self.elements = elements
+
+        # Remove any trailing vobstag not supported by cleartool find.
+        try:
+            label, vobstag = label.rsplit('@', 1)
+        except:
+            pass
+        self.label = label
+
+        if sys.platform.startswith('win'):
+            self.cc_xpn = '%CLEARCASE_XPN%'
+        else:
+            self.cc_xpn = '$CLEARCASE_XPN'
+
+        threading.Thread.__init__(self)
+
+    def run(self):
+        """Returns a dictionnary of ClearCase elements (oid + version)
+        belonging to a label and identified by path.
+        """
+        output = execute(
+            ['cleartool', 'find', self.dir_name, '-version',
+             'lbtype(%s)' % self.label, '-exec',
+             r'cleartool describe -fmt "%On\t%En\t%Vn\n" ' + self.cc_xpn],
+            extra_ignore_errors=(1,), with_errors=False)
+
+        for line in output.split('\n'):
+            # Does not process empty lines.
+            if not line:
+                continue
+
+            oid, path, version = line.split('\t', 2)
+            self.elements[path] = {
+                'oid': oid,
+                'version': version,
+            }
+
+
 class ClearCaseClient(SCMClient):
     """
     A wrapper around the clearcase tool that fetches repository
@@ -35,6 +79,8 @@ class ClearCaseClient(SCMClient):
     REVISION_CHECKEDOUT_BASE = '--rbtools-checkedout-base'
     REVISION_CHECKEDOUT_CHANGESET = '--rbtools-checkedout-changeset'
     REVISION_FILES = '--rbtools-files'
+    REVISION_LABEL_BASE = '--rbtools-label-base'
+    REVISION_LABEL_PREFIX = 'lbtype:'
 
     def __init__(self, **kwargs):
         super(ClearCaseClient, self).__init__(**kwargs)
@@ -109,6 +155,111 @@ class ClearCaseClient(SCMClient):
         branch_path, number = cpath.split(version_path)
         return branch_path
 
+    def _list_checkedout(self, path):
+        """List all checked out elements in current view below path.
+
+        Run cleartool command twice because:
+        -recurse finds checked out elements under path except path whereas
+        -directory detect only if path directory is checked out.
+        """
+        checkedout_elements = []
+        for option in ['-recurse', '-directory']:
+            # We ignore return code 1 in order to omit files that ClearCase
+            # cannot read.
+            output = execute(['cleartool', 'lscheckout', option, '-cview',
+                              '-fmt', r'%En@@%Vn\n', path],
+                             split_lines=True,
+                             extra_ignore_errors=(1,),
+                             with_errors=False)
+            if output:
+                checkedout_elements.extend(output)
+                logging.debug(output)
+
+        return checkedout_elements
+
+    def _is_a_label(self, label, vobstag=None):
+        """Return True when label is a valid ClearCase lbtype.
+
+        Raise an error when vobstag expected does not match.
+        """
+        label_vobstag = None
+        # Try to find any vobstag.
+        try:
+            label, label_vobstag = label.rsplit('@', 1)
+        except:
+            pass
+
+        # Be sure label is prefix by lbtype, required by cleartool describe.
+        if not label.startswith(self.REVISION_LABEL_PREFIX):
+            label = '%s%s' % (self.REVISION_LABEL_PREFIX, label)
+
+        # If vobstag defined, check if it matchs with the one extracted from
+        # label, otherwise raise an exception.
+        if vobstag and label_vobstag and label_vobstag != vobstag:
+            raise Exception('label vobstag %s does not match expected vobstag '
+                            '%s' % (label_vobstag, vobstag))
+
+        # Finally check if label exists in database, otherwise quit. Ignore
+        # return code 1, it means label does not exist.
+        output = execute(['cleartool', 'describe', '-short', label],
+                         extra_ignore_errors=(1,),
+                         with_errors=False)
+        return bool(output)
+
+    def _get_tmp_label(self):
+        """Generate a string that will be used to set a ClearCase label."""
+
+        now = datetime.datetime.now()
+        temporary_label = 'Current_%d_%d_%d_%d_%d_%d_%d' % (
+            now.year, now.month, now.day, now.hour, now.minute, now.second,
+            now.microsecond)
+        return temporary_label
+
+    def _set_label(self, label, path):
+        """Set a ClearCase label on elements seen under path."""
+
+        checkedout_elements = self._list_checkedout(path)
+        if checkedout_elements:
+            raise Exception(
+                'ClearCase backend cannot set label when some elements are '
+                'checked out:\n%s' % ''.join(checkedout_elements))
+
+        # First create label in vob database.
+        execute(['cleartool', 'mklbtype', '-c', 'label created for rbtools',
+                 label],
+                with_errors=True)
+
+        # We ignore return code 1 in order to omit files that ClearCase cannot
+        # read.
+        recursive_option = ''
+        if cpath.isdir(path):
+            recursive_option = '-recurse'
+
+        # Apply label to path.
+        execute(['cleartool', 'mklabel', '-nc', recursive_option, label, path],
+                extra_ignore_errors=(1,),
+                with_errors=False)
+
+    def _remove_label(self, label):
+        """Remove a ClearCase label from vob database.
+
+        It will remove all references of this label on elements.
+        """
+
+        # Be sure label is prefix by lbtype.
+        if not label.startswith(self.REVISION_LABEL_PREFIX):
+            label = '%s%s' % (self.REVISION_LABEL_PREFIX, label)
+
+        # Label exists so remove it.
+        execute(['cleartool', 'rmtype', '-rmall', '-force', label],
+                with_errors=True)
+
+    def check_options(self):
+        if ((self.options.revision_range or self.options.tracking)
+            and self.viewtype != 'dynamic'):
+            die('To generate diff using parent branch or by passing revision '
+                'ranges, you must use a dynamic view.')
+
     def _determine_version(self, version_path):
         """Determine numeric version of revision.
 
@@ -176,17 +327,25 @@ class ClearCaseClient(SCMClient):
                     'base': self.REVISION_BRANCH_BASE,
                     'tip': revisions[0][len(self.REVISION_BRANCH_PREFIX):],
                 }
+            if revisions[0].startswith(self.REVISION_LABEL_PREFIX):
+                return {
+                    'base': self.REVISION_LABEL_BASE,
+                    'tip': [revisions[0][len(self.REVISION_BRANCH_PREFIX):]],
+                }
             # TODO:
-            # lbtype:label1            => review changes between this label
-            #                             and the working directory
             # stream:streamname[@pvob] => review changes in this UCM stream
             #                             (UCM "branch")
             # baseline:baseline[@pvob] => review changes between this baseline
             #                             and the working directory
         elif n_revs == 2:
+            if (revisions[0].startswith(self.REVISION_LABEL_PREFIX) and
+                revisions[1].startswith(self.REVISION_LABEL_PREFIX)):
+                return {
+                    'base': self.REVISION_LABEL_BASE,
+                    'tip': [x[len(self.REVISION_BRANCH_PREFIX):]
+                            for x in revisions],
+                }
             # TODO:
-            # lbtype:label1 lbtype:label2 => review changes between these two
-            #                                labels
             # baseline:baseline1[@pvob] baseline:baseline2[@pvob]
             #                             => review changes between these two
             #                                baselines
@@ -460,6 +619,113 @@ class ClearCaseClient(SCMClient):
 
         return self._sanitize_branch_changeset(changeset)
 
+    def _get_label_changeset(self, labels):
+        """Returns information about the versions changed between labels.
+
+        This takes into account the changes done between labels and restrict
+        analysis to current working directory. A ClearCase label belongs to a
+        uniq vob.
+        """
+        changeset = []
+        tmp_labels = []
+
+        # Initialize comparison_path to current working directory.
+        # TODO: support another argument to manage a different comparison path.
+        comparison_path = os.getcwd()
+
+        error_message = None
+        try:
+            # Unless user has provided 2 labels, set a temporary label on
+            # current version seen of comparison_path directory. It will be
+            # used to process changeset.
+            # Indeed ClearCase can identify easily each file and associated
+            # version belonging to a label.
+            if len(labels) == 1:
+                tmp_lb = self._get_tmp_label()
+                tmp_labels.append(tmp_lb)
+                self._set_label(tmp_lb, comparison_path)
+                labels.append(tmp_lb)
+
+            label_count = len(labels)
+            if label_count != 2:
+                raise Exception(
+                    'ClearCase label comparison does not support %d labels'
+                    % label_count)
+
+            # Now we get 2 labels for comparison, check if they are both valid.
+            repository_info = self.get_repository_info()
+            for label in labels:
+                if not self._is_a_label(label, repository_info.vobstag):
+                    raise Exception(
+                        'ClearCase label %s is not a valid label' % label)
+
+            previous_label, current_label = labels
+            logging.debug('Comparison between labels %s and %s on %s' %
+                          (previous_label, current_label, comparison_path))
+
+            # List ClearCase element path and version belonging to previous and
+            # current labels, element path is the key of each dict.
+            previous_elements = {}
+            current_elements = {}
+            previous_label_elements_thread = get_elements_from_label_thread(
+                1, comparison_path, previous_label, previous_elements)
+            previous_label_elements_thread.start()
+
+            current_label_elements_thread = get_elements_from_label_thread(
+                2, comparison_path, current_label, current_elements)
+            current_label_elements_thread.start()
+
+            previous_label_elements_thread.join()
+            current_label_elements_thread.join()
+
+            seen = []
+            changelist = {}
+            # Iterate on each ClearCase path in order to find respective
+            # previous and current version.
+            for path in previous_elements.keys() + current_elements.keys():
+                if path in seen:
+                    continue
+                seen.append(path)
+
+                # Initialize previous and current version to "/main/0"
+                changelist[path] = {
+                    'previous': '/main/0',
+                    'current': '/main/0',
+                }
+
+                if path in current_elements:
+                    changelist[path]['current'] = \
+                        current_elements[path]['version']
+                if path in previous_elements:
+                    changelist[path]['previous'] = \
+                        previous_elements[path]['version']
+                logging.debug('path: %s\nprevious: %s\ncurrent:  %s\n' %
+                              (path,
+                               changelist[path]['previous'],
+                               changelist[path]['current']))
+
+                # Prevent adding identical version to comparison.
+                if changelist[path]['current'] == changelist[path]['previous']:
+                    continue
+                changeset.append(
+                    (self._construct_extended_path(path,
+                                                   changelist[path]['previous']),
+                     self._construct_extended_path(path,
+                                                   changelist[path]['current'])))
+
+        except Exception, e:
+            error_message = str(e)
+
+        finally:
+            # Delete all temporary labels.
+            for lb in tmp_labels:
+                if self._is_a_label(lb):
+                    self._remove_label(lb)
+            if error_message:
+                die('Label comparison failed because:\n%s' % error_message)
+
+        return changeset
+
     def diff(self, revisions, include_files=[], exclude_patterns=[],
              extra_args=[]):
         if include_files:
@@ -476,6 +742,9 @@ class ClearCaseClient(SCMClient):
             return self._do_diff(changeset)
         elif revisions['base'] == self.REVISION_BRANCH_BASE:
             changeset = self._get_branch_changeset(revisions['tip'])
+            return self._do_diff(changeset)
+        elif revisions['base'] == self.REVISION_LABEL_BASE:
+            changeset = self._get_label_changeset(revisions['tip'])
             return self._do_diff(changeset)
         elif revisions['base'] == self.REVISION_FILES:
             include_files = revisions['tip']
