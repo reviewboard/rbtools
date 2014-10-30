@@ -507,11 +507,11 @@ class Command(object):
         username and password. This is used as a callback in the
         API when the user requires authorization.
         """
-        if getattr(self.options, 'diff_filename', None) == '-':
-            die('HTTP authentication is required, but cannot be '
-                'used with --diff-filename=-')
-
         if username is None or password is None:
+            if getattr(self.options, 'diff_filename', None) == '-':
+                die('HTTP authentication is required, but cannot be '
+                    'used with --diff-filename=-')
+
             print
             print "==> HTTP Authentication Required"
             print 'Enter authorization information for "%s" at %s' % \
