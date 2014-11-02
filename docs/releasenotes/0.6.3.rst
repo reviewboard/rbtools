@@ -1,0 +1,116 @@
+===========================
+RBTools 0.6.3 Release Notes
+===========================
+
+**Release date:** TBD
+
+
+Bug Fixes
+=========
+
+rbt post
+--------
+
+* Warn about a dirty working directory when posting with Mercurial.
+
+  As with Git, :command:`rbt post` against a Mercurial repository only posts
+  committed changes. If your working directory contains uncommitted changes,
+  :command:`rbt post` will now show a warning.
+
+  Patch by Bruce Cran.
+
+* Print out "your review request still exists" when there are field errors.
+  (:bug:`3428`)
+
+  If any fields specified on the command line have problems and the review
+  request is created, :command:`rbt post` will now inform you that the review
+  request exists, and provide the URL.
+
+* Don't fail when using :option:`--diff-filename=-` and credentials on the
+  command line. (:bug:`3313`)
+
+  Passing a diff file in over stdin was broken in the case where the login
+  credentials were specified on the command line.
+
+
+ClearCase
+---------
+
+* Re-enable support for matching repository by the ClearCase vobstag.
+  (:bug:`3533`)
+
+  RBTools 0.6 regressed a feature that would try to match the repository in
+  Review Board using the ClearCase vobstag. This has been fixed.
+
+  Patch by Nicolas Dély.
+
+
+Git
+---
+
+* Fix the semantics of the ``GIT_USE_EXT_DIFF`` config key.
+
+  Theoretically, users could set ``GIT_USE_EXT_DIFF`` to ``True`` in their
+  :file:`.reviewboardrc` file in order to allow using external diff programs,
+  but the interpretation of this value was inverted. It now works as expected.
+
+
+Mercurial
+---------
+
+* Fix traceback when :command:`hg svn` returns an unexpected error.
+
+  When hgsubversion isn't properly installed, rbtools was crashing. It now
+  prints out an error message instead.
+
+* Provide a better error message when hg upstream is empty. (:bug:`3565`)
+
+  If the upstream repository is empty, it's impossible to post a diff. In this
+  case, :command:`rbt post` would print a cryptic error message. This now
+  explains better what went wrong.
+
+  Patch by Barret Rennie.
+
+
+Perforce
+--------
+
+* Fix handling of deleted files in submitted Perforce changelists.
+  (:bug:`3497`)
+
+  Support for posting submitted Perforce changesets was added in 0.6.2, but a
+  bug prevented it from working when the changelist included deleted files.
+
+
+Subversion
+----------
+
+* Re-enable support for matching repository by the SVN repository UUID.
+  (:bug:`3533`)
+
+  RBTools 0.6 regressed a feature that would try to match the repository in
+  Review Board using the repository UUID. This has been fixed.
+
+  Patch by Nicolas Dély.
+
+* Allow return codes of '1' from :command:`svn propget`. (:bug:`3566`)
+
+  SVN 1.9 is changing the semantics of the propget return value, making it so
+  that '1' indicates success. This is no longer treated as an error in RBTools.
+
+
+Python API
+----------
+
+* Fix errors with HTTP DELETE calls. (:bug:`3450`)
+
+  The API framework was attempting to decode the response from DELETE
+  operations, but these do not contain a response.
+
+
+Contributors
+============
+
+* Barret Rennie
+* Bruce Cran
+* David Trowbridge
