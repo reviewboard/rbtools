@@ -438,7 +438,7 @@ class Command(object):
 
         try:
             exit_code = self.main(*args) or 0
-        except CommandError, e:
+        except CommandError as e:
             if isinstance(e, ParseError):
                 parser.error(e)
             elif self.options.debug:
@@ -446,9 +446,9 @@ class Command(object):
 
             logging.error(e)
             exit_code = 1
-        except CommandExit, e:
+        except CommandExit as e:
             exit_code = e.exit_code
-        except Exception, e:
+        except Exception as e:
             # If debugging is on, we'll let python spit out the
             # stack trace and report the exception, otherwise
             # we'll suppress the trace and print the exception
@@ -471,7 +471,7 @@ class Command(object):
 
         try:
             tool.check_options()
-        except OptionsCheckError, e:
+        except OptionsCheckError as e:
             sys.stderr.write('%s\n' % e)
             sys.exit(1)
 
@@ -581,10 +581,10 @@ class Command(object):
 
         try:
             api_root = api_client.get_root()
-        except ServerInterfaceError, e:
+        except ServerInterfaceError as e:
             raise CommandError("Could not reach the Review Board "
                                "server at %s" % server_url)
-        except APIError, e:
+        except APIError as e:
             raise CommandError("Unexpected API Error: %s" % e)
 
         return api_client, api_root

@@ -545,7 +545,7 @@ class PerforceClient(SCMClient):
                     old_file, new_file = self._extract_edit_files(
                         depot_file, local_file, base_revision, tip,
                         cl_is_shelved, False)
-                except ValueError, e:
+                except ValueError as e:
                     logging.warning('Skipping file %s: %s', depot_file, e)
                     continue
             elif changetype_short == 'A':
@@ -565,7 +565,7 @@ class PerforceClient(SCMClient):
                     old_file, new_file = self._extract_add_files(
                         depot_file, local_file, tip, cl_is_shelved,
                         cl_is_pending)
-                except ValueError, e:
+                except ValueError as e:
                     logging.warning('Skipping file %s: %s', depot_file, e)
                     continue
 
@@ -576,7 +576,7 @@ class PerforceClient(SCMClient):
                 try:
                     old_file, new_file = self._extract_delete_files(
                         depot_file, base_revision)
-                except ValueError, e:
+                except ValueError as e:
                     logging.warning('Skipping file %s#%s: %s', depot_file, e)
                     continue
             elif changetype_short == 'MV-a':
@@ -589,7 +589,7 @@ class PerforceClient(SCMClient):
                     old_file, new_file, new_depot_file = \
                         self._extract_move_files(
                             depot_file, tip, base_revision, cl_is_shelved)
-                except ValueError, e:
+                except ValueError as e:
                     logging.warning('Skipping file %s: %s', depot_file, e)
                     continue
 
@@ -741,7 +741,7 @@ class PerforceClient(SCMClient):
                 try:
                     old_file, new_file = self._extract_add_files(
                         depot_file, local_file, rev, False, False)
-                except ValueError, e:
+                except ValueError as e:
                     logging.warning('Skipping file %s: %s', depot_file, e)
                     continue
 

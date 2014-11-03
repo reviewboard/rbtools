@@ -407,7 +407,7 @@ class Post(Command):
                 raise CommandError('No existing review requests to update for '
                                    'user %s.'
                                    % user.username)
-        except APIError, e:
+        except APIError as e:
             raise CommandError('Error getting review requests for user '
                                '%s: %s' % (user.username, e))
 
@@ -485,7 +485,7 @@ class Post(Command):
 
                 review_request = api_root.get_review_requests().create(
                     **request_data)
-            except APIError, e:
+            except APIError as e:
                 if e.error_code == 204 and changenum:  # Change number in use.
                     rid = e.rsp['review_request']['id']
                     review_request = api_root.get_review_request(
@@ -515,7 +515,7 @@ class Post(Command):
 
                 review_request.get_diffs().upload_diff(diff_content,
                                                        **diff_kwargs)
-            except APIError, e:
+            except APIError as e:
                 error_msg = [
                     u'Error uploading diff\n\n',
                 ]
@@ -542,7 +542,7 @@ class Post(Command):
 
         try:
             draft = review_request.get_draft()
-        except APIError, e:
+        except APIError as e:
             raise CommandError("Error retrieving review request draft: %s" % e)
 
         # Update the review request draft fields based on options set
@@ -598,7 +598,7 @@ class Post(Command):
         if update_fields:
             try:
                 draft = draft.update(**update_fields)
-            except APIError, e:
+            except APIError as e:
                 raise CommandError(u'\n'.join([
                     u'Error updating review request draft: %s\n' % e,
                     u'Your review request still exists, but the diff is '
@@ -725,7 +725,7 @@ class Post(Command):
                     fp = open(diff_path, 'r')
                     diff = fp.read()
                     fp.close()
-                except IOError, e:
+                except IOError as e:
                     raise CommandError("Unable to open diff filename: %s" % e)
         else:
             revisions = self.get_revisions()
@@ -765,7 +765,7 @@ class Post(Command):
                 diff,
                 parent_diff=parent_diff,
                 base_dir=base_dir)
-        except APIError, e:
+        except APIError as e:
             msg_prefix = ''
 
             if e.error_code == 207:

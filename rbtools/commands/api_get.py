@@ -55,7 +55,7 @@ class APIGet(Command):
                 resource = api_client.get_url(path, **query_args)
             else:
                 resource = api_client.get_path(path, **query_args)
-        except APIError, e:
+        except APIError as e:
             if e.rsp:
                 print self._dumps(e.rsp)
                 raise CommandExit(1)

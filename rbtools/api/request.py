@@ -248,7 +248,7 @@ class ReviewBoardHTTPBasicAuthHandler(urllib2.HTTPBasicAuthHandler):
         try:
             response = self.parent.open(request, timeout=request.timeout)
             return response
-        except urllib2.HTTPError, e:
+        except urllib2.HTTPError as e:
             if e.code == 401:
                 headers = e.info()
                 otp_header = headers.get(self.OTP_TOKEN_HEADER, '')
@@ -340,7 +340,7 @@ def create_cookie_jar(cookie_file=None):
                 try:
                     shutil.copyfile(post_review_cookies, cookie_file)
                     os.chmod(cookie_file, 0600)
-                except IOError, e:
+                except IOError as e:
                     logging.warning("There was an error while copying "
                                     "post-review's cookies: %s" % e)
 
@@ -348,7 +348,7 @@ def create_cookie_jar(cookie_file=None):
         try:
             open(cookie_file, 'w').close()
             os.chmod(cookie_file, 0600)
-        except IOError, e:
+        except IOError as e:
             logging.warning("There was an error while creating a "
                             "cookie file: %s" % e)
 
@@ -488,9 +488,9 @@ class ReviewBoardServer(object):
             r = Request(request.url.encode('utf-8'), body, headers,
                         request.method)
             rsp = urllib2.urlopen(r)
-        except urllib2.HTTPError, e:
+        except urllib2.HTTPError as e:
             self.process_error(e.code, e.read())
-        except urllib2.URLError, e:
+        except urllib2.URLError as e:
             raise ServerInterfaceError("%s" % e.reason)
 
         try:

@@ -45,7 +45,7 @@ class Attach(Command):
         try:
             request.get_file_attachments() \
                 .upload_attachment(filename, content, self.options.caption)
-        except APIError, e:
+        except APIError as e:
             raise CommandError("Error uploading file: %s" % e)
 
         print "Uploaded %s to review request %s." % (path_to_file, request_id)

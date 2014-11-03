@@ -126,7 +126,7 @@ def main():
             sys.stderr.write("Could not load command entry point %s\n" %
                              ep.name)
             sys.exit(1)
-        except Exception, e:
+        except Exception as e:
             sys.stderr.write("Unexpected error loading command %s: %s\n" %
                              (ep.name, e))
             sys.exit(1)

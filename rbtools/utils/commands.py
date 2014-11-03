@@ -7,7 +7,7 @@ def get_review_request(review_request_id, api_root):
     try:
         review_request = api_root.get_review_request(
             review_request_id=review_request_id)
-    except APIError, e:
+    except APIError as e:
         raise CommandError("Error getting review request %s: %s"
                            % (review_request_id, e))
 

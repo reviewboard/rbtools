@@ -25,7 +25,7 @@ class Publish(Command):
         try:
             draft = request.get_draft()
             draft = draft.update(public=True)
-        except APIError, e:
+        except APIError as e:
             raise CommandError("Error publishing review request (it may "
                                "already be published): %s" % e)
 

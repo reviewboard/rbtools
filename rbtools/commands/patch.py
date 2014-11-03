@@ -62,7 +62,7 @@ class Patch(Command):
         """
         try:
             diffs = api_root.get_diffs(review_request_id=request_id)
-        except APIError, e:
+        except APIError as e:
             raise CommandError("Error getting diffs: %s" % e)
 
         # Use the latest diff if a diff revision was not given.
@@ -189,7 +189,7 @@ class Patch(Command):
                     review_request = api_root.get_review_request(
                         review_request_id=request_id,
                         force_text_type='plain')
-                except APIError, e:
+                except APIError as e:
                     raise CommandError('Error getting review request %s: %s'
                                        % (request_id, e))
 

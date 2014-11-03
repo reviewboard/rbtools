@@ -52,7 +52,7 @@ class CVSClient(SCMClient):
                 canon = socket.getfqdn(host)
                 repository_path = repository_path.replace('%s:' % host,
                                                           '%s:' % canon)
-            except socket.error, msg:
+            except socket.error as msg:
                 logging.error("failed to get fqdn for %s, msg=%s"
                               % (host, msg))
 

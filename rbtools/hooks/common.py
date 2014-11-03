@@ -23,10 +23,10 @@ def get_api(server_url, username, password):
 
     try:
         api_root = api_client.get_root()
-    except ServerInterfaceError, e:
+    except ServerInterfaceError as e:
         raise HookError('Could not reach the Review Board server at %s: %s'
                         % (server_url, e))
-    except APIError, e:
+    except APIError as e:
         raise HookError('Unexpected API Error: %s' % e)
 
     return api_client, api_root
@@ -73,7 +73,7 @@ def get_review_request(review_request_id, api_root):
     try:
         review_request = api_root.get_review_request(
             review_request_id=review_request_id)
-    except APIError, e:
+    except APIError as e:
         raise HookError('Error getting review request: %s' % e)
 
     return review_request

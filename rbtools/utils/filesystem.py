@@ -36,7 +36,7 @@ def load_config_files(homepath):
         if os.path.exists(filename):
             try:
                 execfile(filename, config)
-            except SyntaxError, e:
+            except SyntaxError as e:
                 die('Syntax error in config file: %s\n'
                     'Line %i offset %i\n' % (filename, e.lineno, e.offset))
 
@@ -94,7 +94,7 @@ def make_empty_files(files):
         if path and not os.path.exists(path):
             try:
                 os.makedirs(path)
-            except OSError, e:
+            except OSError as e:
                 logging.error('Unable to create directory %s: %s', path, e)
                 continue
 
@@ -102,7 +102,7 @@ def make_empty_files(files):
             with open(f, 'w'):
                 # Set the file access and modified times to the current time.
                 os.utime(f, None)
-        except IOError, e:
+        except IOError as e:
             logging.error('Unable to create empty file %s: %s', f, e)
 
 
@@ -157,7 +157,7 @@ def parse_config_file(filename):
     config = {}
     try:
         execfile(filename, config)
-    except SyntaxError, e:
+    except SyntaxError as e:
         die('Syntax error in config file: %s\n'
             'Line %i offset %i\n' % (filename, e.lineno, e.offset))
 

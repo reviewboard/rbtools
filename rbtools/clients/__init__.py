@@ -213,7 +213,7 @@ class SCMClient(object):
             try:
                 with open(patch_file, 'r') as f:
                     patch = f.read()
-            except IOError, e:
+            except IOError as e:
                 logging.error('Unable to read file %s: %s', patch_file, e)
                 patched_empty_files = False
                 return
@@ -327,7 +327,7 @@ def load_scmclients(options):
     for ep in pkg_resources.iter_entry_points(group='rbtools_scm_clients'):
         try:
             SCMCLIENTS[ep.name] = ep.load()(options=options)
-        except Exception, e:
+        except Exception as e:
             logging.error('Could not load SCM Client "%s": %s' % (ep.name, e))
 
 

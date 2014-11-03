@@ -713,7 +713,7 @@ class ClearCaseClient(SCMClient):
                      self._construct_extended_path(path,
                                                    changelist[path]['current'])))
 
-        except Exception, e:
+        except Exception as e:
             error_message = str(e)
 
         finally:
@@ -944,7 +944,7 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
             repo_name = repository['name']
             try:
                 info = repository.get_info()
-            except APIError, e:
+            except APIError as e:
                 # If the current repository is not publicly accessible and the
                 # current user has no explicit access to it, the server will
                 # return error_code 101 and http_status 403.
@@ -991,7 +991,7 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
     def _get_repository_info(self, server, repository):
         try:
             return server.get_repository_info(repository['id'])
-        except APIError, e:
+        except APIError as e:
             # If the server couldn't fetch the repository info, it will return
             # code 210. Ignore those.
             # Other more serious errors should still be raised, though.
