@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import re
 
 from rbtools.api.errors import APIError
@@ -84,16 +86,16 @@ class Patch(Command):
     def apply_patch(self, repository_info, tool, request_id, diff_revision,
                     diff_file_path, base_dir):
         """Apply patch patch_file and display results to user."""
-        print ("Patch is being applied from request %s with diff revision "
-               "%s." % (request_id, diff_revision))
+        print('Patch is being applied from request %s with diff revision '
+              '%s.' % (request_id, diff_revision))
 
         result = tool.apply_patch(diff_file_path, repository_info.base_path,
                                   base_dir, self.options.px)
 
         if result.patch_output:
-            print
-            print result.patch_output.strip()
-            print
+            print()
+            print(result.patch_output.strip())
+            print()
 
         if not result.applied:
             raise CommandError(
@@ -102,21 +104,21 @@ class Patch(Command):
 
         if result.has_conflicts:
             if result.conflicting_files:
-                print ('The patch was partially applied, but there were '
-                       'conflicts in:')
-                print
+                print('The patch was partially applied, but there were '
+                      'conflicts in:')
+                print()
 
                 for filename in result.conflicting_files:
-                    print '    %s' % filename
+                    print('    %s' % filename)
 
-                print
+                print()
             else:
-                print ('The patch was partially applied, but there were '
-                       'conflicts.')
+                print('The patch was partially applied, but there were '
+                      'conflicts.')
 
             return False
         else:
-            print 'Successfully applied patch.'
+            print('Successfully applied patch.')
 
             return True
 
@@ -166,14 +168,14 @@ class Patch(Command):
             self.options.diff_revision)
 
         if self.options.patch_stdout:
-            print diff_body
+            print(diff_body)
         else:
             try:
                 if tool.has_pending_changes():
                     message = 'Working directory is not clean.'
 
                     if not self.options.commit:
-                        print 'Warning: %s' % message
+                        print('Warning: %s' % message)
                     else:
                         raise CommandError(message)
             except NotImplementedError:

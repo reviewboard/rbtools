@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import fnmatch
 import logging
 import marshal
@@ -133,7 +135,7 @@ class P4Wrapper(object):
             if not ignore_errors and (rc or has_error):
                 for record in result:
                     if 'data' in record:
-                        print record['data']
+                        print(record['data'])
                 die('Failed to execute command: %s\n' % (cmd,))
 
             return result
@@ -1154,8 +1156,8 @@ class PerforceClient(SCMClient):
                 if ignore_unmodified:
                     return []
                 else:
-                    print "Warning: %s in your changeset is unmodified" % \
-                          local_path
+                    print("Warning: %s in your changeset is unmodified" %
+                          local_path)
         elif len(dl) > 1:
             m = re.search(r'(\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d)', dl[1])
             if m:

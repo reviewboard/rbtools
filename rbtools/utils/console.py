@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import os
 import subprocess
 from distutils.util import strtobool
@@ -17,7 +19,7 @@ def confirm(question):
             answer = raw_input("%s [Yes/No]: " % question).lower()
             return strtobool(answer)
         except ValueError:
-            print '%s is not a valid answer.' % answer
+            print('%s is not a valid answer.' % answer)
 
 
 def edit_text(content):
@@ -31,7 +33,8 @@ def edit_text(content):
     try:
         subprocess.call([editor, tempfile])
     except OSError:
-        print 'No editor found. Set EDITOR environment variable or install vi.'
+        print('No editor found. Set EDITOR environment variable or install '
+              'vi.')
         raise
 
     f = open(tempfile)

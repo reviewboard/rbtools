@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import logging
 import os
 import re
@@ -820,10 +822,10 @@ class Post(Command):
 
         diff_review_url = review_url + 'diff/'
 
-        print "Review request #%s posted." % request_id
-        print
-        print review_url
-        print diff_review_url
+        print('Review request #%s posted.' % request_id)
+        print()
+        print(review_url)
+        print(diff_review_url)
 
         # Load the review up in the browser if requested to.
         if self.options.open_browser:

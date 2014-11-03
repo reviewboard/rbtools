@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 from rbtools.commands import Command, CommandError, Option
 from rbtools.utils.commands import get_review_request
 
@@ -63,4 +65,5 @@ class Close(Command):
         else:
             request = request.update(status=close_type)
 
-        print "Review request #%s is set to %s." % (request_id, request.status)
+        print('Review request #%s is set to %s.' %
+              (request_id, request.status))

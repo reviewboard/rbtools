@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import os
 
 from rbtools.api.errors import APIError
@@ -46,6 +48,7 @@ class Attach(Command):
             request.get_file_attachments() \
                 .upload_attachment(filename, content, self.options.caption)
         except APIError as e:
-            raise CommandError("Error uploading file: %s" % e)
+            raise CommandError('Error uploading file: %s' % e)
 
-        print "Uploaded %s to review request %s." % (path_to_file, request_id)
+        print('Uploaded %s to review request %s.' %
+              (path_to_file, request_id))

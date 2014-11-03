@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import re
 
 try:
@@ -57,10 +59,10 @@ class APIGet(Command):
                 resource = api_client.get_path(path, **query_args)
         except APIError as e:
             if e.rsp:
-                print self._dumps(e.rsp)
+                print(self._dumps(e.rsp))
                 raise CommandExit(1)
             else:
                 raise CommandError('Could not retrieve the requested '
                                    'resource: %s' % e)
 
-        print self._dumps(resource.rsp)
+        print(self._dumps(resource.rsp))

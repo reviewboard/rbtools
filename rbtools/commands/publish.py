@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError
 from rbtools.utils.commands import get_review_request
@@ -29,4 +31,4 @@ class Publish(Command):
             raise CommandError("Error publishing review request (it may "
                                "already be published): %s" % e)
 
-        print "Review request #%s is published." % (request_id)
+        print('Review request #%s is published.' % request_id)

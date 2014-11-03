@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import os
 import re
 import sys
@@ -1681,7 +1683,7 @@ class PerforceClientTests(SCMClientTests):
         diff_content = re.sub('\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}',
                               '1970-01-01 00:00:00',
                               diff_info['diff'])
-        print diff_content
+        print(diff_content)
         self.assertEqual(md5(diff_content).hexdigest(), expected_diff_hash)
 
     def test_parse_revision_spec_no_args(self):
@@ -2091,7 +2093,7 @@ class BazaarClientTests(SCMClientTests):
         self.options.guess_description = True
         revisions = self.client.parse_revision_spec(['2..3'])
         commit_message = self.client.get_commit_message(revisions)
-        print commit_message
+        print(commit_message)
 
         self.assertEquals("commit 2", commit_message['summary'])
         self.assertEquals("commit 2", commit_message['description'])

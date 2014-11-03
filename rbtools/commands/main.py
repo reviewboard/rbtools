@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import argparse
 import os
 import pkg_resources
@@ -46,10 +48,10 @@ def help(args, parser):
 
         if ep:
             help_text = build_help_text(ep.load())
-            print help_text
+            print(help_text)
             sys.exit(0)
 
-        print "No help found for %s" % args[0]
+        print('No help found for %s' % args[0])
         sys.exit(0)
 
     parser.print_help()
@@ -61,17 +63,17 @@ def help(args, parser):
     commands = list(set([entrypoint.name for entrypoint in entrypoints]))
     common_commands = ['post', 'patch', 'close', 'diff']
 
-    print "\nThe most commonly used commands are:"
+    print('\nThe most commonly used commands are:')
     for command in common_commands:
-        print "  %s" % command
+        print('  %s' % command)
 
-    print "\nOther commands:"
+    print('\nOther commands:')
     for command in sorted(commands):
         if command not in common_commands:
-            print "  %s" % command
+            print('  %s' % command)
 
-    print ("See '%s help <command>' for more information "
-           "on a specific command." % RB_MAIN)
+    print("See '%s help <command>' for more information on a specific "
+          "command." % RB_MAIN)
     sys.exit(0)
 
 

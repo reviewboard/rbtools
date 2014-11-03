@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 from rbtools.clients.errors import InvalidRevisionSpecError
 from rbtools.commands import Command, CommandError
 
@@ -67,4 +69,4 @@ class Diff(Command):
         diff = diff_info['diff']
 
         if diff:
-            print diff
+            print(diff)

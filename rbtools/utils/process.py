@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import logging
 import os
 import subprocess
@@ -14,7 +16,7 @@ def die(msg=None):
     cleanup_tempfiles()
 
     if msg:
-        print msg
+        print(msg)
 
     sys.exit(1)
 

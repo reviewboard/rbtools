@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import logging
 import pkg_resources
 import re
@@ -404,11 +406,11 @@ def print_clients(options):
     will be printed. Additionally, SCM clients which are detected in
     the current directory will be highlighted.
     """
-    print 'The following repository types are supported by this installation'
-    print 'of RBTools. Each "<type>" may be used as a value for the'
-    print '"--repository-type=<type>" command line argument. Repository types'
-    print 'which are detected in the current directory are marked with a "*"'
-    print '[*] "<type>": <Name>'
+    print('The following repository types are supported by this installation')
+    print('of RBTools. Each "<type>" may be used as a value for the')
+    print('"--repository-type=<type>" command line argument. Repository types')
+    print('which are detected in the current directory are marked with a "*"')
+    print('[*] "<type>": <Name>')
 
     if SCMCLIENTS is None:
         load_scmclients(options)
@@ -417,6 +419,6 @@ def print_clients(options):
         repository_info = tool.get_repository_info()
 
         if repository_info:
-            print ' * "%s": %s' % (name, tool.name)
+            print(' * "%s": %s' % (name, tool.name))
         else:
-            print '   "%s": %s' % (name, tool.name)
+            print('   "%s": %s' % (name, tool.name))

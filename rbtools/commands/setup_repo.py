@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import os
 
 from rbtools.commands import Command, CommandError
@@ -94,7 +96,7 @@ class SetupRepo(Command):
             raise CommandError('I/O error generating config file (%s): %s'
                                % (e.errno, e.strerror))
 
-        print "Config written to %s" % file_path
+        print('Config written to %s' % file_path)
 
     def main(self, *args):
         server = self.options.server
@@ -113,8 +115,8 @@ class SetupRepo(Command):
             tool.name, repository_info, api_root)
 
         if not selected_repo:
-            print ("No %s repository found or selected for %s. %s not created."
-                   % (tool.name, server, CONFIG_FILE))
+            print('No %s repository found or selected for %s. %s not created.'
+                  % (tool.name, server, CONFIG_FILE))
             return
 
         config = [

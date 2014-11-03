@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import argparse
 import getpass
 import inspect
@@ -493,8 +495,8 @@ class Command(object):
             server_url = tool.scan_for_server(repository_info)
 
         if not server_url:
-            print ("Unable to find a Review Board server "
-                   "for this source code tree.")
+            print('Unable to find a Review Board server for this source code '
+                  'tree.')
             sys.exit(1)
 
         return server_url
@@ -512,10 +514,10 @@ class Command(object):
                 die('HTTP authentication is required, but cannot be '
                     'used with --diff-filename=-')
 
-            print
-            print "==> HTTP Authentication Required"
-            print 'Enter authorization information for "%s" at %s' % \
-                (realm, urlparse(uri)[1])
+            print()
+            print("==> HTTP Authentication Required")
+            print('Enter authorization information for "%s" at %s' %
+                  (realm, urlparse(uri)[1]))
 
             # getpass will write its prompt to stderr but raw_input
             # writes to stdout. See bug 2831.
@@ -539,21 +541,21 @@ class Command(object):
             die('A two-factor authentication token is required, but cannot '
                 'be used with --diff-filename=-')
 
-        print
-        print '==> Two-factor authentication token required'
+        print()
+        print('==> Two-factor authentication token required')
 
         if token_method == 'sms':
-            print ('You should be getting a text message with '
-                   'an authentication token.')
-            print 'Enter the token below.'
+            print('You should be getting a text message with '
+                  'an authentication token.')
+            print('Enter the token below.')
         elif token_method == 'call':
-            print ('You should be getting an automated phone call with '
-                   'an authentication token.')
-            print 'Enter the token below.'
+            print('You should be getting an automated phone call with '
+                  'an authentication token.')
+            print('Enter the token below.')
         elif token_method == 'generator':
-            print 'Enter the token shown on your token generator app below.'
+            print('Enter the token shown on your token generator app below.')
 
-        print
+        print()
 
         return getpass.getpass('Token: ')
 
