@@ -1,11 +1,7 @@
 from __future__ import print_function
 
+import json
 import re
-
-try:
-    import json
-except ImportError:
-    import simplejson as json
 
 from rbtools.api.errors import APIError
 from rbtools.commands import (Command,

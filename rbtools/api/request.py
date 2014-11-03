@@ -8,28 +8,13 @@ import os
 import shutil
 import urllib
 import urllib2
-from StringIO import StringIO
-from urlparse import urlparse, urlunparse
+from json import loads as json_loads
+from urlparse import parse_qsl, urlparse, urlunparse
 
 try:
     from cStringIO import StringIO
 except ImportError:
     from StringIO import StringIO
-
-try:
-    # Specifically import json_loads, to work around some issues with
-    # installations containing incompatible modules named "json".
-    from json import loads as json_loads
-except ImportError:
-    from simplejson import loads as json_loads
-
-try:
-    # In python 2.6, parse_qsl was deprectated in cgi, and
-    # moved to urlparse.
-    from urlparse import parse_qsl
-except ImportError:
-    from cgi import parse_qsl
-
 
 from rbtools import get_package_version
 from rbtools.api.errors import APIError, create_api_error, ServerInterfaceError

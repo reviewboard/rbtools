@@ -49,12 +49,6 @@ else:
 install_requires = []
 
 
-try:
-    import json
-except ImportError:
-    install_requires.append('simplejson')
-
-
 # Make sure this is a version of Python we are compatible with. This should
 # prevent people on older versions from unintentionally trying to install
 # the source tarball, and failing.
