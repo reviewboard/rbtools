@@ -11,10 +11,9 @@ from nose import SkipTest
 
 from rbtools.api.capabilities import Capabilities
 from rbtools.clients import RepositoryInfo
-from rbtools.clients.bazaar import (
-    BazaarClient,
-    USING_PARENT_PREFIX as BZR_USING_PARENT_PREFIX)
-from rbtools.clients.errors import InvalidRevisionSpecError
+from rbtools.clients.bazaar import BazaarClient
+from rbtools.clients.errors import (InvalidRevisionSpecError,
+                                    TooManyRevisionsError)
 from rbtools.clients.git import GitClient
 from rbtools.clients.mercurial import MercurialClient
 from rbtools.clients.perforce import PerforceClient, P4Wrapper
@@ -129,6 +128,12 @@ class GitClientTests(SCMClientTests):
         self.assertEqual(result['parent_diff'], None)
         self.assertEqual(result['base_commit_id'], base_commit_id)
         self.assertEqual(result['commit_id'], commit_id)
+
+    def test_too_many_revisions(self):
+        """Testing GitClient parse_revision_spec with too many revisions"""
+        self.assertRaises(TooManyRevisionsError,
+                          self.client.parse_revision_spec,
+                          [1, 2, 3])
 
     def test_diff_simple_multiple(self):
         """Testing GitClient simple diff with multiple commits case"""
@@ -453,6 +458,28 @@ class GitClientTests(SCMClientTests):
         self.assertTrue('parent_base' not in revisions)
         self.assertEqual(revisions['base'], base_commit_id)
         self.assertEqual(revisions['tip'], tip_commit_id)
+
+    def test_is_valid_version(self):
+        """Testing GitClient.is_valid_version"""
+        self.assertTrue(self.client.is_valid_version((1, 0, 0), (1, 0, 0)))
+        self.assertTrue(self.client.is_valid_version((1, 1, 0), (1, 0, 0)))
+        self.assertTrue(self.client.is_valid_version((1, 0, 1), (1, 0, 0)))
+        self.assertTrue(self.client.is_valid_version((1, 1, 0), (1, 1, 0)))
+        self.assertTrue(self.client.is_valid_version((1, 1, 1), (1, 1, 0)))
+        self.assertTrue(self.client.is_valid_version((1, 1, 1), (1, 1, 1)))
+
+        self.assertFalse(self.client.is_valid_version((0, 9, 9), (1, 0, 0)))
+        self.assertFalse(self.client.is_valid_version((1, 0, 9), (1, 1, 0)))
+        self.assertFalse(self.client.is_valid_version((1, 1, 0), (1, 1, 1)))
+
+    def test_get_raw_commit_message(self):
+        """Testing GitClient.get_raw_commit_message"""
+        self._git_add_file_commit('foo.txt', FOO2, 'Commit 2')
+        self.client.get_repository_info()
+        revisions = self.client.parse_revision_spec()
+
+        self.assertEqual(self.client.get_raw_commit_message(revisions),
+                         'Commit 2')
 
 
 class MercurialTestBase(SCMClientTests):
@@ -1232,7 +1259,6 @@ class SVNClientTests(SCMClientTests):
         self.assertEqual(revisions['base'], 1549822)
         self.assertEqual(revisions['tip'], 1549823)
 
-
     def test_parse_revision_spec_two_revisions_url(self):
         """Testing SVNClient.parse_revision_spec with R1:R2 syntax and a repository URL"""
         self.options.repository_url = \
@@ -1245,6 +1271,18 @@ class SVNClientTests(SCMClientTests):
         self.assertTrue('parent_base' not in revisions)
         self.assertEqual(revisions['base'], 1549823)
         self.assertEqual(revisions['tip'], 1550211)
+
+    def test_parse_revision_spec_invalid_spec(self):
+        """Testing SVNClient.parse_revision_spec with invalid specifications"""
+        self.assertRaises(InvalidRevisionSpecError,
+                          self.client.parse_revision_spec,
+                          ['aoeu'])
+        self.assertRaises(InvalidRevisionSpecError,
+                          self.client.parse_revision_spec,
+                          ['aoeu', '1234'])
+        self.assertRaises(TooManyRevisionsError,
+                          self.client.parse_revision_spec,
+                          ['1', '2', '3'])
 
 
 class P4WrapperTests(RBTestBase):
@@ -1418,8 +1456,8 @@ class PerforceClientTests(SCMClientTests):
 
         self.assertEqual(url, RB_URL)
 
-    def test_diff_with_changenum(self):
-        """Testing PerforceClient.diff with changenums"""
+    def test_diff_with_pending_changelist(self):
+        """Testing PerforceClient.diff with a pending changelist"""
         client = self._build_client()
         client.p4.repo_files = [
             {
@@ -1467,6 +1505,74 @@ class PerforceClientTests(SCMClientTests):
         revisions = client.parse_revision_spec(['12345'])
         diff = client.diff(revisions)
         self._compare_diff(diff, '07aa18ff67f9aa615fcda7ecddcb354e')
+
+    def test_diff_for_submitted_changelist(self):
+        """Testing PerforceClient.diff with a submitted changelist"""
+        class TestWrapper(self.P4DiffTestWrapper):
+            def change(self, changelist):
+                return [{
+                    'Change': '12345',
+                    'Date': '2013/12/19 11:32:45',
+                    'User': 'example',
+                    'Status': 'submitted',
+                    'Description': 'My change description\n',
+                }]
+
+            def filelog(self, path):
+                return [
+                    {
+                        'change0': '12345',
+                        'action0': 'edit',
+                        'rev0': '3',
+                        'depotFile': '//mydepot/test/README',
+                    }
+                ]
+
+        client = PerforceClient(TestWrapper)
+        client.p4.repo_files = [
+            {
+                'depotFile': '//mydepot/test/README',
+                'rev': '2',
+                'action': 'edit',
+                'change': '12345',
+                'text': 'This is a test.\n',
+            },
+            {
+                'depotFile': '//mydepot/test/README',
+                'rev': '3',
+                'action': 'edit',
+                'change': '',
+                'text': 'This is a mess.\n',
+            },
+        ]
+
+        readme_file = make_tempfile()
+        client.p4.print_file('//mydepot/test/README#3', readme_file)
+
+        client.p4.where_files = {
+            '//mydepot/test/README': readme_file,
+        }
+        client.p4.repo_files = [
+            {
+                'depotFile': '//mydepot/test/README',
+                'rev': '2',
+                'action': 'edit',
+                'change': '12345',
+                'text': 'This is a test.\n',
+            },
+            {
+                'depotFile': '//mydepot/test/README',
+                'rev': '3',
+                'action': 'edit',
+                'change': '',
+                'text': 'This is a mess.\n',
+            },
+        ]
+
+        revisions = client.parse_revision_spec(['12345'])
+        diff = client.diff(revisions)
+        self._compare_diff(diff, '8af5576f5192ca87731673030efb5f39',
+                           expect_changenum=False)
 
     def test_diff_with_moved_files_cap_on(self):
         """Testing PerforceClient.diff with moved files and capability on"""
@@ -1565,10 +1671,12 @@ class PerforceClientTests(SCMClientTests):
         client.p4d_version = (2012, 2)
         return client
 
-    def _compare_diff(self, diff_info, expected_diff_hash):
+    def _compare_diff(self, diff_info, expected_diff_hash,
+                      expect_changenum=True):
         self.assertTrue(isinstance(diff_info, dict))
         self.assertTrue('diff' in diff_info)
-        self.assertTrue('changenum' in diff_info)
+        if expect_changenum:
+            self.assertTrue('changenum' in diff_info)
 
         diff_content = re.sub('\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}',
                               '1970-01-01 00:00:00',
@@ -1661,6 +1769,7 @@ class PerforceClientTests(SCMClientTests):
             PerforceClient.REVISION_PENDING_CLN_PREFIX + '12345')
 
     def test_parse_revision_spec_two_args(self):
+        """Testing PerforceClient.parse_revision_spec with two changelists"""
         class TestWrapper(P4Wrapper):
             def change(self, changelist):
                 change = {
@@ -1692,15 +1801,37 @@ class PerforceClientTests(SCMClientTests):
         self.assertEqual(revisions['tip'], '100')
 
         self.assertRaises(InvalidRevisionSpecError,
-                          lambda: client.parse_revision_spec(['99', '101']))
+                          client.parse_revision_spec,
+                          ['99', '101'])
         self.assertRaises(InvalidRevisionSpecError,
-                          lambda: client.parse_revision_spec(['99', '102']))
+                          client.parse_revision_spec,
+                          ['99', '102'])
         self.assertRaises(InvalidRevisionSpecError,
-                          lambda: client.parse_revision_spec(['101', '100']))
+                          client.parse_revision_spec,
+                          ['101', '100'])
         self.assertRaises(InvalidRevisionSpecError,
-                          lambda: client.parse_revision_spec(['102', '100']))
+                          client.parse_revision_spec,
+                          ['102', '100'])
         self.assertRaises(InvalidRevisionSpecError,
-                          lambda: client.parse_revision_spec(['102', '10284']))
+                          client.parse_revision_spec,
+                          ['102', '10284'])
+
+    def test_parse_revision_spec_invalid_spec(self):
+        """Testing PerforceClient.parse_revision_spec with invalid
+        specifications"""
+        class TestWrapper(P4Wrapper):
+            def change(self, changelist):
+                return []
+
+        client = PerforceClient(TestWrapper)
+
+        self.assertRaises(InvalidRevisionSpecError,
+                          client.parse_revision_spec,
+                          ['aoeu'])
+
+        self.assertRaises(TooManyRevisionsError,
+                          client.parse_revision_spec,
+                          ['1', '2', '3'])
 
 
 class BazaarClientTests(SCMClientTests):
@@ -1742,19 +1873,6 @@ class BazaarClientTests(SCMClientTests):
         foo.close()
         self._run_bzr(["add", file])
         self._run_bzr(["commit", "-m", msg, '--author', 'Test User'])
-
-    def _bzr_get_revno(self, revision_spec=None):
-        command = ['revno']
-        if revision_spec:
-            command += ['-r', revision_spec]
-
-        result = self._run_bzr(command).strip().split('\n')
-
-        if len(result) == 1:
-            return 'revno:' + result[0]
-        elif len(result) == 2 and result[0].startswith(BZR_USING_PARENT_PREFIX):
-            branch = result[0][len(BZR_USING_PARENT_PREFIX):]
-            return 'revno:%s:%s' % (result[1], branch)
 
     def _compare_diffs(self, filename, full_diff, expected_diff_digest):
         """
@@ -1800,6 +1918,12 @@ class BazaarClientTests(SCMClientTests):
         self.chdir_tmp()
         ri = self.client.get_repository_info()
         self.assertEqual(ri, None)
+
+    def test_too_many_revisions(self):
+        """Testing BazaarClient parse_revision_spec with too many revisions"""
+        self.assertRaises(TooManyRevisionsError,
+                          self.client.parse_revision_spec,
+                          [1, 2, 3])
 
     def test_diff_simple(self):
         """Testing BazaarClient simple diff case"""
@@ -1976,9 +2100,9 @@ class BazaarClientTests(SCMClientTests):
         """Testing BazaarClient.parse_revision_spec with no specified revisions"""
         os.chdir(self.child_branch)
 
-        base_commit_id = self._bzr_get_revno()
+        base_commit_id = self.client._get_revno()
         self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
-        tip_commit_id = self._bzr_get_revno()
+        tip_commit_id = self.client._get_revno()
 
         revisions = self.client.parse_revision_spec()
         self.assertTrue(isinstance(revisions, dict))
@@ -1992,9 +2116,9 @@ class BazaarClientTests(SCMClientTests):
         """Testing BazaarClient.parse_revision_spec with one specified revision"""
         os.chdir(self.child_branch)
 
-        base_commit_id = self._bzr_get_revno()
+        base_commit_id = self.client._get_revno()
         self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
-        tip_commit_id = self._bzr_get_revno()
+        tip_commit_id = self.client._get_revno()
 
         revisions = self.client.parse_revision_spec([tip_commit_id])
         self.assertTrue(isinstance(revisions, dict))
@@ -2007,15 +2131,15 @@ class BazaarClientTests(SCMClientTests):
     def test_parse_revision_spec_one_arg_parent(self):
         """Testing BazaarClient.parse_revision_spec with one specified revision and a parent diff"""
         os.chdir(self.original_branch)
-        parent_base_commit_id = self._bzr_get_revno()
+        parent_base_commit_id = self.client._get_revno()
 
         grand_child_branch = mktemp()
         self._run_bzr(["branch", self.child_branch, grand_child_branch])
         os.chdir(grand_child_branch)
 
-        base_commit_id = self._bzr_get_revno()
+        base_commit_id = self.client._get_revno()
         self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
-        tip_commit_id = self._bzr_get_revno()
+        tip_commit_id = self.client._get_revno()
 
         self.options.parent_branch = self.child_branch
 
@@ -2033,9 +2157,9 @@ class BazaarClientTests(SCMClientTests):
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
-        base_commit_id = self._bzr_get_revno()
+        base_commit_id = self.client._get_revno()
         self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
-        tip_commit_id = self._bzr_get_revno()
+        tip_commit_id = self.client._get_revno()
 
         revisions = self.client.parse_revision_spec(
             ['%s..%s' % (base_commit_id, tip_commit_id)])
@@ -2051,9 +2175,9 @@ class BazaarClientTests(SCMClientTests):
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
-        base_commit_id = self._bzr_get_revno()
+        base_commit_id = self.client._get_revno()
         self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
-        tip_commit_id = self._bzr_get_revno()
+        tip_commit_id = self.client._get_revno()
 
         revisions = self.client.parse_revision_spec(
             [base_commit_id, tip_commit_id])

@@ -26,14 +26,6 @@ def cleanup_tempfiles():
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
-def get_config_value(configs, name, default=None):
-    for c in configs:
-        if name in c:
-            return c[name]
-
-    return default
-
-
 def load_config_files(homepath):
     """Loads data from .reviewboardrc files."""
     def _load_config(path):
