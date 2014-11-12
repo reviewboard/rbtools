@@ -2,7 +2,7 @@
 RBTools 0.6.3 Release Notes
 ===========================
 
-**Release date:** TBD
+**Release date:** November 12, 2014
 
 
 Bug Fixes
