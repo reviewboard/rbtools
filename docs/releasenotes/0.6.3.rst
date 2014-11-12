@@ -114,3 +114,4 @@ Contributors
 * Barret Rennie
 * Bruce Cran
 * David Trowbridge
+* Nicolas Dély
