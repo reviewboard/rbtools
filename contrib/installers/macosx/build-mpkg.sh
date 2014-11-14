@@ -57,6 +57,13 @@ pushd $PKG_DEPS/argparse
 $PYTHON_26 ./setup.py install $PY_INSTALL_ARGS
 popd
 
+# Install the six module.
+$EASY_INSTALL_26 -q --editable --always-copy --build-directory $PKG_DEPS six
+pushd $PKG_DEPS/six
+$PYTHON_26 ./setup.py install $PY_INSTALL_ARGS
+$PYTHON_27 ./setup.py install $PY_INSTALL_ARGS
+popd
+
 # Note the ordering. We're going to install the Python 2.6 version last,
 # so that `rbt` will point to it. This ensures compatibility with
 # Snow Leopard and higher.

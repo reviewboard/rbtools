@@ -46,7 +46,7 @@ else:
     download_url = "http://downloads.reviewboard.org/nightlies/"
 
 
-install_requires = []
+install_requires = ['six']
 
 
 # Make sure this is a version of Python we are compatible with. This should
