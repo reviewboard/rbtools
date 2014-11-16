@@ -1,3 +1,6 @@
+import six
+
+
 class APIError(Exception):
     def __init__(self, http_status, error_code, rsp=None, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
@@ -28,7 +31,7 @@ class BadRequestError(APIError):
         if self.rsp and 'fields' in self.rsp:
             lines.append('')
 
-            for field, error in self.rsp['fields'].iteritems():
+            for field, error in six.iteritems(self.rsp['fields']):
                 lines.append('    %s: %s' % (field, '; '.join(error)))
 
         return '\n'.join(lines)

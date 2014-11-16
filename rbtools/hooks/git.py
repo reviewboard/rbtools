@@ -1,3 +1,4 @@
+import six
 from collections import defaultdict
 from copy import deepcopy
 
@@ -90,7 +91,8 @@ def get_review_id_to_commits_map(lines, regex):
     if new_branches:
         review_id_to_commits_map_copy = deepcopy(review_id_to_commits_map)
 
-        for review_id, commit_list in review_id_to_commits_map_copy.iteritems():
+        for review_id, commit_list in six.iteritems(
+                review_id_to_commits_map_copy):
             for commit in commit_list:
                 commit_branch = commit[:commit.find('(') - 1]
 

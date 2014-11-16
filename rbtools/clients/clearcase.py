@@ -1,6 +1,7 @@
 import datetime
 import logging
 import os
+import six
 import sys
 import threading
 from pkg_resources import parse_version
@@ -415,7 +416,7 @@ class ClearCaseClient(SCMClient):
 
         # Convert to list
         changeranges = []
-        for path, version in changelist.iteritems():
+        for path, version in six.iteritems(changelist):
             # Previous version is predecessor of lowest ie its version number
             # decreased by 1.
             branch_path = self._determine_branch_path(version['current'])
@@ -455,7 +456,7 @@ class ClearCaseClient(SCMClient):
 
         # Convert to list
         changeranges = []
-        for path, version in changelist.iteritems():
+        for path, version in six.iteritems(changelist):
             changeranges.append(
                 (self._construct_extended_path(path, version['previous']),
                  self._construct_extended_path(path, version['current']))

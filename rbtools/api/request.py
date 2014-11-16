@@ -6,6 +6,7 @@ import mimetools
 import mimetypes
 import os
 import shutil
+import six
 import urllib
 import urllib2
 from json import loads as json_loads
@@ -37,7 +38,7 @@ class HttpRequest(object):
         # key with dashes.
         query_args = dict([
             (key.replace('_', '-'), value)
-            for key, value in query_args.iteritems()
+            for key, value in six.iteritems(query_args)
         ])
 
         # Add the query arguments to the url

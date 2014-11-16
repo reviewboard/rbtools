@@ -1,4 +1,5 @@
 import re
+import six
 import urlparse
 
 from rbtools.api.decorators import request_method_decorator
@@ -27,7 +28,7 @@ def _create(resource, data=None, query_args={}, *args, **kwargs):
 
     kwargs.update(data)
 
-    for name, value in kwargs.iteritems():
+    for name, value in six.iteritems(kwargs):
         request.add_field(name, value)
 
     return request
@@ -62,7 +63,7 @@ def _update(resource, data=None, query_args={}, *args, **kwargs):
 
     kwargs.update(data)
 
-    for name, value in kwargs.iteritems():
+    for name, value in six.iteritems(kwargs):
         request.add_field(name, value)
 
     return request
@@ -122,7 +123,7 @@ class Resource(object):
 
         # Add a method for each supported REST operation, and
         # for retrieving 'self'.
-        for link, method in SPECIAL_LINKS.iteritems():
+        for link, method in six.iteritems(SPECIAL_LINKS):
             if link in self._links and method[1]:
                 setattr(self,
                         method[0],
@@ -131,7 +132,7 @@ class Resource(object):
 
         # Generate request methods for any additional links
         # the resource has.
-        for link, body in self._links.iteritems():
+        for link, body in six.iteritems(self._links):
             if link not in SPECIAL_LINKS:
                 setattr(self,
                         "get_%s" % link,
@@ -203,7 +204,7 @@ class ResourceDictField(object):
             yield field
 
     def iteritems(self):
-        for key, value in self._fields.iteritems():
+        for key, value in six.iteritems(self._fields):
             yield key, self._resource._wrap_field(value)
 
     def __repr__(self):
@@ -283,7 +284,7 @@ class ItemResource(Resource):
         else:
             data = self._payload
 
-        for name, value in data.iteritems():
+        for name, value in six.iteritems(data):
             if name not in self._excluded_attrs:
                 self._fields[name] = value
 
@@ -307,7 +308,7 @@ class ItemResource(Resource):
             yield key
 
     def iteritems(self):
-        for key, value in self._fields.iteritems():
+        for key, value in six.iteritems(self._fields):
             yield (key, self._wrap_field(value))
 
     def __repr__(self):
@@ -452,7 +453,7 @@ class RootResource(ItemResource):
         super(RootResource, self).__init__(transport, payload, url, token=None)
         # Generate methods for accessing resources directly using
         # the uri-templates.
-        for name, url in payload['uri_templates'].iteritems():
+        for name, url in six.iteritems(payload['uri_templates']):
             attr_name = "get_%s" % name
 
             if not hasattr(self, attr_name):
@@ -659,7 +660,7 @@ class ReviewRequestResource(ItemResource):
         request = self.get_draft(internal=True)
         request.method = 'POST'
 
-        for name, value in kwargs.iteritems():
+        for name, value in six.iteritems(kwargs):
             request.add_field(name, value)
 
         return request

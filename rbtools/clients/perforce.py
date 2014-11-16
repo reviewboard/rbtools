@@ -5,6 +5,7 @@ import logging
 import marshal
 import os
 import re
+import six
 import socket
 import stat
 import subprocess
@@ -417,7 +418,7 @@ class PerforceClient(SCMClient):
 
         # Next try for a counter of the form:
         # reviewboard_url.http:||reviewboard.example.com
-        for key, value in counters.iteritems():
+        for key, value in six.iteritems(counters):
             m = self.ENCODED_COUNTER_URL_RE.match(key)
 
             if m:
@@ -691,7 +692,7 @@ class PerforceClient(SCMClient):
         files = []
         for cln in sorted(changesets.keys()):
             changeset = changesets[cln]
-            for depot_file, change in changeset.iteritems():
+            for depot_file, change in six.iteritems(changeset):
                 action = change['action']
 
                 # Moves will be handled in the 'move/delete' entry
@@ -1035,7 +1036,8 @@ class PerforceClient(SCMClient):
             old_file = new_file = empty_filename
             changetype_short = None
 
-            for depot_path, (first_record, second_record) in files.items():
+            for depot_path, (first_record, second_record) in \
+                    six.iteritems(files):
                 old_file = new_file = empty_filename
                 if first_record is None:
                     new_path = '%s#%s' % (depot_path, second_record['rev'])

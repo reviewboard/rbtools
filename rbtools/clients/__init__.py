@@ -3,6 +3,7 @@ from __future__ import print_function
 import logging
 import pkg_resources
 import re
+import six
 import sys
 
 from rbtools.utils.process import die, execute
@@ -356,7 +357,7 @@ def scan_usable_client(options, client_name=None):
     else:
         scmclients = SCMCLIENTS
 
-    for name, tool in scmclients.iteritems():
+    for name, tool in six.iteritems(scmclients):
         logging.debug('Checking for a %s repository...' % tool.name)
         repository_info = tool.get_repository_info()
 
@@ -415,7 +416,7 @@ def print_clients(options):
     if SCMCLIENTS is None:
         load_scmclients(options)
 
-    for name, tool in SCMCLIENTS.iteritems():
+    for name, tool in six.iteritems(SCMCLIENTS):
         repository_info = tool.get_repository_info()
 
         if repository_info:
