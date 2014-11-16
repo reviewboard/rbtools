@@ -1,6 +1,7 @@
 import re
+
 import six
-import urlparse
+from six.moves.urllib.parse import urljoin
 
 from rbtools.api.decorators import request_method_decorator
 from rbtools.api.request import HttpRequest
@@ -424,7 +425,7 @@ class ListResource(Resource):
     @request_method_decorator
     def get_item(self, pk, **kwargs):
         """Retrieve the item resource with the corresponding primary key."""
-        return HttpRequest(urlparse.urljoin(self._url, '%s/' % pk),
+        return HttpRequest(urljoin(self._url, '%s/' % pk),
                            query_args=kwargs)
 
     def __repr__(self):
@@ -626,7 +627,7 @@ class ReviewRequestResource(ItemResource):
             return self._fields['absolute_url']
         else:
             base_url = self._url.split('/api/')[0]
-            return urlparse.urljoin(base_url, self.url)
+            return urljoin(base_url, self.url)
 
     @property
     def url(self):

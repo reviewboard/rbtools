@@ -6,16 +6,28 @@ import mimetools
 import mimetypes
 import os
 import shutil
-import six
-import urllib
-import urllib2
 from json import loads as json_loads
-from urlparse import parse_qsl, urlparse, urlunparse
 
 try:
     from cStringIO import StringIO
 except ImportError:
     from StringIO import StringIO
+
+import six
+from six.moves.urllib.error import HTTPError, URLError
+from six.moves.urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+from six.moves.urllib.request import (
+    BaseHandler,
+    HTTPBasicAuthHandler,
+    HTTPCookieProcessor,
+    HTTPDigestAuthHandler,
+    HTTPErrorProcessor,
+    HTTPPasswordMgr,
+    ProxyHandler,
+    Request as URLRequest,
+    build_opener,
+    install_opener,
+    urlopen)
 
 from rbtools import get_package_version
 from rbtools.api.errors import APIError, create_api_error, ServerInterfaceError
@@ -47,7 +59,7 @@ class HttpRequest(object):
         url_parts = list(urlparse(url))
         query = dict(parse_qsl(url_parts[4]))
         query.update(query_args)
-        url_parts[4] = urllib.urlencode(query)
+        url_parts[4] = urlencode(query)
         self.url = urlunparse(url_parts)
 
     def add_field(self, name, value):
@@ -106,18 +118,18 @@ class HttpRequest(object):
         return content_type, content.getvalue()
 
 
-class Request(urllib2.Request):
+class Request(URLRequest):
     """A request which contains a method attribute."""
     def __init__(self, url, body='', headers={}, method="PUT"):
-        urllib2.Request.__init__(self, url, body, headers)
+        URLRequest.__init__(self, url, body, headers)
         self.method = method
 
     def get_method(self):
         return self.method
 
 
-class PresetHTTPAuthHandler(urllib2.BaseHandler):
-    """urllib2 handler that presets the use of HTTP Basic Auth."""
+class PresetHTTPAuthHandler(BaseHandler):
+    """Handler that presets the use of HTTP Basic Auth."""
     handler_order = 480  # After Basic auth
 
     AUTH_HEADER = 'Authorization'
@@ -153,7 +165,7 @@ class PresetHTTPAuthHandler(urllib2.BaseHandler):
     https_request = http_request
 
 
-class ReviewBoardHTTPErrorProcessor(urllib2.HTTPErrorProcessor):
+class ReviewBoardHTTPErrorProcessor(HTTPErrorProcessor):
     """Processes HTTP error codes.
 
     Python 2.6 gets HTTP error code processing right, but 2.4 and 2.5
@@ -171,13 +183,13 @@ class ReviewBoardHTTPErrorProcessor(urllib2.HTTPErrorProcessor):
     https_response = http_response
 
 
-class ReviewBoardHTTPBasicAuthHandler(urllib2.HTTPBasicAuthHandler):
+class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
     """Custom Basic Auth handler that doesn't retry excessively.
 
-    urllib2's HTTPBasicAuthHandler retries over and over, which is
-    useless. This subclass only retries once to make sure we've
-    attempted with a valid username and password. It will then fail so
-    we can use our own retry handler.
+    urllib's HTTPBasicAuthHandler retries over and over, which is useless. This
+    subclass only retries once to make sure we've attempted with a valid
+    username and password. It will then fail so we can use our own retry
+    handler.
 
     This also supports two-factor auth, for Review Board servers that
     support it. When requested by the server, the client will be prompted
@@ -189,7 +201,7 @@ class ReviewBoardHTTPBasicAuthHandler(urllib2.HTTPBasicAuthHandler):
     MAX_OTP_TOKEN_ATTEMPTS = 5
 
     def __init__(self, *args, **kwargs):
-        urllib2.HTTPBasicAuthHandler.__init__(self, *args, **kwargs)
+        HTTPBasicAuthHandler.__init__(self, *args, **kwargs)
         self._retried = False
         self._lasturl = ""
         self._needs_otp_token = False
@@ -234,7 +246,7 @@ class ReviewBoardHTTPBasicAuthHandler(urllib2.HTTPBasicAuthHandler):
         try:
             response = self.parent.open(request, timeout=request.timeout)
             return response
-        except urllib2.HTTPError as e:
+        except HTTPError as e:
             if e.code == 401:
                 headers = e.info()
                 otp_header = headers.get(self.OTP_TOKEN_HEADER, '')
@@ -264,7 +276,7 @@ class ReviewBoardHTTPBasicAuthHandler(urllib2.HTTPBasicAuthHandler):
         return None
 
 
-class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
+class ReviewBoardHTTPPasswordMgr(HTTPPasswordMgr):
     """Adds HTTP authentication support for URLs.
 
     Python 2.4's password manager has a bug in http authentication
@@ -275,7 +287,7 @@ class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
     """
     def __init__(self, reviewboard_url, rb_user=None, rb_pass=None,
                  api_token=None, auth_callback=None, otp_token_callback=None):
-        urllib2.HTTPPasswordMgr.__init__(self)
+        HTTPPasswordMgr.__init__(self)
         self.passwd = {}
         self.rb_url = reviewboard_url
         self.rb_user = rb_user
@@ -297,7 +309,7 @@ class ReviewBoardHTTPPasswordMgr(urllib2.HTTPPasswordMgr):
         else:
             # If this is an auth request for some other domain (since HTTP
             # handlers are global), fall back to standard password management.
-            return urllib2.HTTPPasswordMgr.find_user_password(self, realm, uri)
+            return HTTPPasswordMgr.find_user_password(self, realm, uri)
 
     def get_otp_token(self, uri, method):
         if self.otp_token_callback:
@@ -411,12 +423,12 @@ class ReviewBoardServer(object):
         handlers = []
 
         if disable_proxy:
-            handlers.append(urllib2.ProxyHandler({}))
+            handlers.append(ProxyHandler({}))
 
         handlers += [
-            urllib2.HTTPCookieProcessor(self.cookie_jar),
+            HTTPCookieProcessor(self.cookie_jar),
             ReviewBoardHTTPBasicAuthHandler(password_mgr),
-            urllib2.HTTPDigestAuthHandler(password_mgr),
+            HTTPDigestAuthHandler(password_mgr),
             self.preset_auth_handler,
             ReviewBoardHTTPErrorProcessor(),
         ]
@@ -426,11 +438,11 @@ class ReviewBoardServer(object):
         else:
             self.agent = 'RBTools/' + get_package_version()
 
-        opener = urllib2.build_opener(*handlers)
+        opener = build_opener(*handlers)
         opener.addheaders = [
             ('User-agent', self.agent),
         ]
-        urllib2.install_opener(opener)
+        install_opener(opener)
 
     def login(self, username, password):
         """Reset the user information"""
@@ -473,10 +485,10 @@ class ReviewBoardServer(object):
 
             r = Request(request.url.encode('utf-8'), body, headers,
                         request.method)
-            rsp = urllib2.urlopen(r)
-        except urllib2.HTTPError as e:
+            rsp = urlopen(r)
+        except HTTPError as e:
             self.process_error(e.code, e.read())
-        except urllib2.URLError as e:
+        except URLError as e:
             raise ServerInterfaceError("%s" % e.reason)
 
         try:

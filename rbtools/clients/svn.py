@@ -2,8 +2,9 @@ import logging
 import os
 import re
 import sys
-import urllib
 from xml.etree import ElementTree
+
+from six.moves.urllib.parse import unquote
 
 from rbtools.api.errors import APIError
 from rbtools.clients import SCMClient, RepositoryInfo
@@ -362,7 +363,7 @@ class SVNClient(SCMClient):
 
             if url:
                 root = info["Repository Root"]
-                from_path1 = urllib.unquote(url[len(root):])
+                from_path1 = unquote(url[len(root):])
                 return smart_join(from_path1, path2)
 
             if info.get('Schedule', None) != 'normal':
@@ -540,7 +541,7 @@ class SVNClient(SCMClient):
                     # copy, then file paths are already absolute, so just
                     # add initial slash.
                     if self.options.repository_url:
-                        path = urllib.unquote(
+                        path = unquote(
                             "%s/%s" % (repository_info.base_path, file))
                     else:
                         info = self.svn_info(file, True)
@@ -549,7 +550,7 @@ class SVNClient(SCMClient):
                             continue
                         url = info["URL"]
                         root = info["Repository Root"]
-                        path = urllib.unquote(url[len(root):])
+                        path = unquote(url[len(root):])
 
                     line = front + " " + path + rest
 

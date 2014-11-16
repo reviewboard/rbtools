@@ -3,7 +3,7 @@ import os
 import re
 import uuid
 
-from urlparse import urlsplit, urlunparse
+from six.moves.urllib.parse import urlsplit, urlunparse
 
 from rbtools.clients import PatchResult, SCMClient, RepositoryInfo
 from rbtools.clients.errors import (InvalidRevisionSpecError,

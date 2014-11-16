@@ -7,7 +7,8 @@ import logging
 import platform
 import os
 import sys
-from urlparse import urlparse
+
+from six.moves.urllib.parse import urlparse
 
 from rbtools import get_version_string
 from rbtools.api.capabilities import Capabilities
