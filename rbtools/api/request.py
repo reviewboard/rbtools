@@ -325,7 +325,7 @@ def create_cookie_jar(cookie_file=None):
             os.path.isfile(post_review_cookies)):
                 try:
                     shutil.copyfile(post_review_cookies, cookie_file)
-                    os.chmod(cookie_file, 0600)
+                    os.chmod(cookie_file, 0o600)
                 except IOError as e:
                     logging.warning("There was an error while copying "
                                     "post-review's cookies: %s" % e)
@@ -333,7 +333,7 @@ def create_cookie_jar(cookie_file=None):
     if not os.path.isfile(cookie_file):
         try:
             open(cookie_file, 'w').close()
-            os.chmod(cookie_file, 0600)
+            os.chmod(cookie_file, 0o600)
         except IOError as e:
             logging.warning("There was an error while creating a "
                             "cookie file: %s" % e)
