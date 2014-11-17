@@ -1,12 +1,10 @@
-"""Tests for rbtools.api units.
-
-Any new modules created under rbtools/api should be tested here."""
+"""Tests for rbtools.utils units."""
 import os
 import re
 import shutil
 import sys
 
-from rbtools.utils import checks, filesystem, process
+from rbtools.utils import aliases, checks, filesystem, process
 from rbtools.utils.testbase import RBTestBase
 
 
@@ -48,3 +46,57 @@ class UtilitiesTest(RBTestBase):
     def test_die(self):
         """Testing 'die' method."""
         self.assertRaises(SystemExit, process.die)
+
+
+class AliasTest(RBTestBase):
+    """Tests for parameter substitution in rbtools aliases."""
+    def _replace_arguments(self, cmd, args):
+        """Convenience method to return a list instead of generator.
+
+        This allows us to compare with self.assertEqual to another list.
+        """
+        return list(aliases.replace_arguments(cmd, args))
+
+    def test_alias_substitution_basic(self):
+        """Testing variable substitution in rbtools aliases"""
+        self.assertEqual(self._replace_arguments('$1', ['HEAD']),
+                         ['HEAD'])
+
+    def test_alias_subtitution_multiple(self):
+        """Testing variable substitution where multiple variables appear"""
+        self.assertEqual(self._replace_arguments('$1..$2', ['a', 'b']),
+                         ['a..b'])
+
+    def test_alias_substitution_blank(self):
+        """Testing variable substitution where the argument isn't supplied"""
+        self.assertEqual(self._replace_arguments('rbt post $1', []),
+                         ['rbt', 'post', ''])
+
+    def test_alias_substitution_append(self):
+        """Testing variable substitution where no variables are supplied"""
+        self.assertEqual(self._replace_arguments('echo', ['a', 'b', 'c']),
+                         ['echo', 'a', 'b', 'c'])
+
+    def test_alias_dont_substitute_alphabetic_variables(self):
+        """Testing variable substitution with alphabetic variables"""
+        self.assertEqual(self._replace_arguments('$1 $test', ['f']),
+                         ['f', '$test'])
+
+    def test_alias_substitution_star(self):
+        """Testing variable substitution with the $* variable"""
+        self.assertEqual(self._replace_arguments('$*', ['a', 'b', 'c']),
+                         ['a', 'b', 'c'])
+
+    def test_alias_substitution_star_whitespace(self):
+        """Testing $* variable substitution with whitespace-containing args"""
+        self.assertEqual(self._replace_arguments('$*', ['a', 'b', 'c d e']),
+                         ['a', 'b', 'c d e'])
+
+    def test_alias_substitution_bad_quotes(self):
+        """Testing alias substitution with bad quotes."""
+        self.assertRaises(ValueError,
+                          lambda: self._replace_arguments('"$1 $2\\"', []))
+
+    def test_alias_substition_unescaped_quotes(self):
+        """Testing alias substitution with a slash at the end of the string"""
+        self.assertEqual(self._replace_arguments('"$1 \\\\"', ['a']), ['a \\'])

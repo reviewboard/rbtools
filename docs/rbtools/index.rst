@@ -30,6 +30,7 @@ For built in help you may execute::
 
    rbt/configuration
    rbt/commands/index
+   rbt/aliases
 
 
 .. _rbtools-api:

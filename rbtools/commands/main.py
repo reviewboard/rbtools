@@ -7,13 +7,10 @@ import signal
 import subprocess
 import sys
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
-
 from rbtools import get_version_string
 from rbtools.commands import Option, RB_MAIN
+from rbtools.utils.aliases import run_alias
+from rbtools.utils.filesystem import load_config
 
 
 GLOBAL_OPTIONS = [
@@ -137,17 +134,26 @@ def main():
     else:
         # A command class could not be found, so try and execute
         # the "rb-<command>" on the system.
-        args = ['%s-%s' % (RB_MAIN, command_name)] + args
-
         try:
-            sys.exit(subprocess.call(args,
-                                     stdin=sys.stdin,
-                                     stdout=sys.stdout,
-                                     stderr=sys.stderr,
-                                     env=os.environ.copy()))
+            sys.exit(
+                subprocess.call(['%s-%s' % (RB_MAIN, command_name)] + args,
+                                stdin=sys.stdin,
+                                stdout=sys.stdout,
+                                stderr=sys.stderr,
+                                env=os.environ.copy()))
         except OSError:
-            parser.error("'%s' is not a command" % command_name)
+            # OSError is only raised in this scenario when subprocess.call
+            # cannot find an executable with the name rbt-<command_name>. If
+            # this command doesn't exist, we will check if an alias exists
+            # with the name before printing an error message.
+            pass
 
+        aliases = load_config().get('ALIASES', {})
+
+        if command_name in aliases:
+            sys.exit(run_alias(aliases[command_name], args))
+        else:
+            parser.error("'%s' is not a command" % command_name)
 
 if __name__ == "__main__":
     main()
