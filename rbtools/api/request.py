@@ -1,6 +1,4 @@
 import base64
-import cookielib
-import httplib
 import logging
 import mimetools
 import mimetypes
@@ -14,6 +12,8 @@ except ImportError:
     from StringIO import StringIO
 
 import six
+from six.moves.http_client import UNAUTHORIZED
+from six.moves.http_cookiejar import Cookie, MozillaCookieJar
 from six.moves.urllib.error import HTTPError, URLError
 from six.moves.urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from six.moves.urllib.request import (
@@ -220,7 +220,7 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
 
         response = self._do_http_basic_auth(host, request, realm)
 
-        if response and response.code != httplib.UNAUTHORIZED:
+        if response and response.code != UNAUTHORIZED:
             self._retried = False
 
         return response
@@ -350,7 +350,7 @@ def create_cookie_jar(cookie_file=None):
             logging.warning("There was an error while creating a "
                             "cookie file: %s" % e)
 
-    return cookielib.MozillaCookieJar(cookie_file), cookie_file
+    return MozillaCookieJar(cookie_file), cookie_file
 
 
 class ReviewBoardServer(object):
@@ -390,7 +390,7 @@ class ReviewBoardServer(object):
             if domain.count('.') < 1:
                 domain = "%s.local" % domain
 
-            cookie = cookielib.Cookie(
+            cookie = Cookie(
                 version=0,
                 name=RB_COOKIE_NAME,
                 value=session,
