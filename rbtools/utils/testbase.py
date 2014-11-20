@@ -1,10 +1,8 @@
 import os
 import sys
 import uuid
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
+
+from six.moves import cStringIO as StringIO
 
 from rbtools.utils.filesystem import cleanup_tempfiles, make_tempdir
 from rbtools.testing import TestCase

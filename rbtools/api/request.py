@@ -6,12 +6,8 @@ import os
 import shutil
 from json import loads as json_loads
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
-
 import six
+from six.moves import cStringIO as StringIO
 from six.moves.http_client import UNAUTHORIZED
 from six.moves.http_cookiejar import Cookie, MozillaCookieJar
 from six.moves.urllib.error import HTTPError, URLError
