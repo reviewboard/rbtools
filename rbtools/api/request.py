@@ -22,10 +22,10 @@ from six.moves.urllib.request import (
     ProxyHandler,
     Request as URLRequest,
     build_opener,
-    install_opener,
-    urlopen)
+    install_opener)
 
 from rbtools import get_package_version
+from rbtools.api.cache import APICache
 from rbtools.api.errors import APIError, create_api_error, ServerInterfaceError
 from rbtools.utils.filesystem import get_home_path
 
@@ -164,12 +164,12 @@ class PresetHTTPAuthHandler(BaseHandler):
 class ReviewBoardHTTPErrorProcessor(HTTPErrorProcessor):
     """Processes HTTP error codes.
 
-    Python 2.6 gets HTTP error code processing right, but 2.4 and 2.5
-    only accepts HTTP 200 and 206 as success codes. This handler
-    ensures that anything in the 200 range is a success.
+    Python 2.6 gets HTTP error code processing right, but 2.4 and 2.5 only
+    accepts HTTP 200 and 206 as success codes. This handler ensures that
+    anything in the 200 range, as well as 304, is a success.
     """
     def http_response(self, request, response):
-        if not (200 <= response.code < 300):
+        if not (200 <= response.code < 300 or response.code == 304):
             response = self.parent.error('http', request, response,
                                          response.code, response.msg,
                                          response.info())
@@ -440,6 +440,8 @@ class ReviewBoardServer(object):
         ]
         install_opener(opener)
 
+        self._cache = APICache()
+
     def login(self, username, password):
         """Reset the user information"""
         self.preset_auth_handler.reset(username, password)
@@ -481,7 +483,7 @@ class ReviewBoardServer(object):
 
             r = Request(request.url.encode('utf-8'), body, headers,
                         request.method)
-            rsp = urlopen(r)
+            rsp = self._cache.make_request(r)
         except HTTPError as e:
             self.process_error(e.code, e.read())
         except URLError as e:

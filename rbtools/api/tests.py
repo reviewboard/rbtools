@@ -1,8 +1,11 @@
+import datetime
+import locale
 import re
 
+from rbtools.api.cache import APICache, CachedHTTPResponse
 from rbtools.api.capabilities import Capabilities
 from rbtools.api.factory import create_resource
-from rbtools.api.request import HttpRequest
+from rbtools.api.request import HttpRequest, Request
 from rbtools.api.resource import (CountResource,
                                   ItemResource,
                                   ListResource,
@@ -456,3 +459,300 @@ class ReviewRequestResourceTests(TestCase):
             mime_type='application/vnd.reviewboard.org.review-request')
         self.assertTrue(isinstance(r, ReviewRequestResource))
         self.assertEqual(r.absolute_url, 'https://example.com/r/123/')
+
+
+class MockResponse(object):
+    """A mock up for a response from urllib2."""
+    def __init__(self, code, headers, body):
+        """Create a new MockResponse."""
+        self.code = code
+        self.headers = headers
+        self.body = body
+
+        if self.body:
+            self.headers['Content-Type'] = 'text/plain'
+            self.headers['Content-Length'] = len(body)
+
+    def info(self):
+        """Get the response headers."""
+        return self.headers
+
+    def read(self):
+        """Get the response body."""
+        return self.body
+
+    def getcode(self):
+        """Get the response code."""
+        return self.code
+
+
+class MockUrlOpener(object):
+    """A mock url opener that records the number of hits it gets to URL."""
+    CONTENT = 'foobar'
+
+    def __init__(self, endpoints):
+        """Create a new MockUrlOpener given the endpoints: headers mapping."""
+        self.endpoints = {}
+        for url, headers in endpoints.iteritems():
+            self.endpoints[url] = {
+                'hit_count': 0,
+                'headers': headers
+            }
+
+    def __call__(self, request):
+        """Call the URL opener to return a MockResponse for the URL."""
+        url = request.get_full_url()
+
+        self.endpoints[url]['hit_count'] += 1
+
+        headers = self.endpoints[url]['headers'].copy()
+        headers['Date'] = datetime.datetime.now()
+
+        if 'If-none-match' in request.headers and 'ETag' in headers:
+            # If the request includes an If-None-Match header, we should check
+            # if the ETag in our headers matches.
+            if headers.get('ETag') == request.headers['If-none-match']:
+                resp = MockResponse(304, headers, None)
+            else:
+                resp = MockResponse(200, headers, self.CONTENT)
+        elif 'If-modified-since' in request.headers:
+            if 'max-age=0' in headers.get('Cache-Control', ''):
+                # We are only testing the case for when max-age is 0 and when
+                # max-age is very large because it is impractical to require
+                # the tests to sleep().
+                resp = MockResponse(200, headers, self.CONTENT)
+            else:
+                resp = MockResponse(304, headers, self.CONTENT)
+        else:
+            resp = MockResponse(200, headers, self.CONTENT)
+
+        return resp
+
+    def get_hit_count(self, url):
+        return self.endpoints[url]['hit_count']
+
+
+class APICacheTests(TestCase):
+    """Test cases for the APICache class."""
+    content = 'foobar'
+    request_headers = {
+        'http://high_max_age': {
+            'Cache-Control': 'max-age=10000'
+        },
+        'http://zero_max_age': {
+            'Cache-Control': 'max-age=0',
+        },
+        'http://no_cache_etag': {
+            'Cache-Control': 'no-cache',
+            'ETag': 'etag',
+        },
+        'http://no_cache': {
+            'Cache-Control': 'no-cache',
+        },
+        'http://no_cache_date': {
+            'Cache-Control': 'no-cache',
+            'Last-Modified': '1999-12-31T00:00:00',
+        },
+        'http://no_store': {
+            'Cache-Control': 'no-store',
+        },
+        'http://must_revalidate': {
+            'Cache-Control': 'must-revalidate',
+            'ETag': 'etag'
+        },
+        'http://vary': {
+            'Cache-control': 'max-age=1000',
+            'Vary': 'User-agent'
+        },
+        'http://pragma': {
+            'Pragma': 'no-cache'
+        },
+        'http://expired': {
+            'Expires': 'Thu, 01 Dec 1983 20:00:00 GMT',
+        },
+        'http://expires_override': {
+            'Expires': 'Thu, 01 Dec 1983 20:00:00 GMT',
+            'Cache-Control': 'max-age=10000',
+        },
+    }
+
+    def setUp(self):
+        """Create a MockUrlOpener and an instance of the APICache."""
+        self.urlopener = MockUrlOpener(self.request_headers)
+        self.cache = APICache(':memory:', self.urlopener)
+
+    def test_cache_control_header_max_age_high(self):
+        """Testing the cache with a high max-age value"""
+        request = Request('http://high_max_age', method='GET')
+        first_resp = self.cache.make_request(request)
+        second_resp = self.cache.make_request(request)
+
+        self.assertEqual(
+            self.urlopener.get_hit_count('http://high_max_age'),
+            1)
+        self.assertFalse(isinstance(first_resp, CachedHTTPResponse))
+        self.assertTrue(isinstance(second_resp, CachedHTTPResponse))
+
+    def test_cache_control_header_max_age_zero(self):
+        """Testing the cache with a zero max-age value"""
+        request = Request('http://zero_max_age', method='GET')
+        first_resp = self.cache.make_request(request)
+        second_resp = self.cache.make_request(request)
+
+        self.assertEqual(self.urlopener.get_hit_count('http://zero_max_age'),
+                         2)
+        self.assertFalse(isinstance(first_resp, CachedHTTPResponse))
+        self.assertFalse(isinstance(second_resp, CachedHTTPResponse))
+
+    def test_cache_control_header_nocache(self):
+        """Testing the cache with the no-cache control"""
+        request = Request('http://no_cache', method='GET')
+        first_resp = self.cache.make_request(request)
+        second_resp = self.cache.make_request(request)
+
+        self.assertEqual(self.urlopener.get_hit_count('http://no_cache'), 2)
+        self.assertFalse(isinstance(first_resp, CachedHTTPResponse))
+        self.assertFalse(isinstance(second_resp, CachedHTTPResponse))
+
+    def test_cache_control_header_nocache_with_etag(self):
+        """Testing the cache with the no-cache control and a specified ETag"""
+        request = Request('http://no_cache_etag', method='GET')
+        first_resp = self.cache.make_request(request)
+        second_resp = self.cache.make_request(request)
+
+        self.assertEqual(self.urlopener.get_hit_count('http://no_cache_etag'),
+                         2)
+        self.assertFalse(isinstance(first_resp, CachedHTTPResponse))
+        self.assertTrue(isinstance(second_resp, CachedHTTPResponse))
+
+    def test_cache_control_header_nocache_with_etag_updated(self):
+        """Testing the cache with the no-cache control and an updated ETag"""
+        request = Request('http://no_cache_etag', method='GET')
+        first_resp = self.cache.make_request(request)
+
+        # Pretend the end point has been updated since the last request.
+        self.urlopener.endpoints['http://no_cache_etag']['headers']['ETag'] = (
+            'new-etag')
+
+        second_resp = self.cache.make_request(request)
+
+        self.assertEqual(self.urlopener.get_hit_count('http://no_cache_etag'),
+                         2)
+        self.assertFalse(isinstance(first_resp, CachedHTTPResponse))
+        self.assertFalse(isinstance(second_resp, CachedHTTPResponse))
+
+    def test_cache_control_header_nocache_with_last_modfied(self):
+        """Testing the cache with the no-cache control"""
+        request = Request('http://no_cache_date', method='GET')
+        first_resp = self.cache.make_request(request)
+        second_resp = self.cache.make_request(request)
+
+        self.assertEqual(self.urlopener.get_hit_count('http://no_cache_date'),
+                         2)
+        self.assertFalse(isinstance(first_resp, CachedHTTPResponse))
+        self.assertTrue(isinstance(second_resp, CachedHTTPResponse))
+
+    def test_cache_control_header_no_store(self):
+        """Testing the cache with the no-store control"""
+        request = Request('http://no_store', method='GET')
+        first_resp = self.cache.make_request(request)
+        second_resp = self.cache.make_request(request)
+
+        self.assertEqual(self.urlopener.get_hit_count('http://no_store'), 2)
+        self.assertFalse(isinstance(first_resp, CachedHTTPResponse))
+        self.assertFalse(isinstance(second_resp, CachedHTTPResponse))
+
+    def test_cache_control_header_must_revalidate(self):
+        """Testing the cache with the must-revalidate control"""
+        request = Request('http://must_revalidate', method='GET')
+        first_resp = self.cache.make_request(request)
+        second_resp = self.cache.make_request(request)
+
+        self.assertEqual(
+            self.urlopener.get_hit_count('http://must_revalidate'),
+            2)
+        self.assertFalse(isinstance(first_resp, CachedHTTPResponse))
+        self.assertTrue(isinstance(second_resp, CachedHTTPResponse))
+
+    def test_vary_header(self):
+        """Testing the cache with the Vary header"""
+        request = Request('http://vary', headers={'User-agent': 'foo'},
+                          method='GET')
+        first_resp = self.cache.make_request(request)
+        second_resp = self.cache.make_request(request)
+
+        self.assertEqual(self.urlopener.get_hit_count('http://vary'), 1)
+        self.assertFalse(isinstance(first_resp, CachedHTTPResponse))
+        self.assertTrue(isinstance(second_resp, CachedHTTPResponse))
+
+    def test_vary_header_different_requests(self):
+        """Testing the cache with the Vary header and different requests"""
+        first_request = Request('http://vary', headers={'User-agent': 'foo'},
+                                method='GET')
+        second_request = Request('http://vary', headers={'User-agent': 'bar'},
+                                 method='GET')
+
+        first_resp = self.cache.make_request(first_request)
+        second_resp = self.cache.make_request(second_request)
+
+        self.assertEqual(self.urlopener.get_hit_count('http://vary'), 2)
+        self.assertFalse(isinstance(first_resp, CachedHTTPResponse))
+        self.assertFalse(isinstance(second_resp, CachedHTTPResponse))
+
+    def test_pragma_header(self):
+        """Testing the cache with the Pragma: no-cache header"""
+        request = Request('http://pragma', method='GET')
+        first_resp = self.cache.make_request(request)
+        second_resp = self.cache.make_request(request)
+
+        self.assertEqual(self.urlopener.get_hit_count('http://pragma'), 2)
+        self.assertFalse(isinstance(first_resp, CachedHTTPResponse))
+        self.assertFalse(isinstance(second_resp, CachedHTTPResponse))
+
+    def test_expires_header_expired(self):
+        """Testing the cache with the Expires header in the past"""
+        request = Request('http://expired', method='GET')
+        first_resp = self.cache.make_request(request)
+        second_resp = self.cache.make_request(request)
+
+        self.assertEqual(self.urlopener.get_hit_count('http://expired'), 2)
+        self.assertFalse(isinstance(first_resp, CachedHTTPResponse))
+        self.assertFalse(isinstance(second_resp, CachedHTTPResponse))
+
+    def test_expires_header_future(self):
+        """Testing the cache with the Expires header in the future"""
+
+        # We generate the future date in the C locale so that it is properly
+        # formatted.
+        locale.setlocale(locale.LC_TIME, 'C')
+        future_date = datetime.datetime.utcnow() + datetime.timedelta(days=1)
+        future_date = future_date.strftime(APICache.EXPIRES_FORMAT) + 'UTC'
+        locale.resetlocale(locale.LC_TIME)
+
+        self.urlopener.endpoints['http://expires_future'] = {
+            'hit_count': 0,
+            'headers': {
+                'Expires': future_date,
+            },
+        }
+
+        request = Request('http://expires_future', method='GET')
+        first_resp = self.cache.make_request(request)
+        second_resp = self.cache.make_request(request)
+
+        self.assertEqual(self.urlopener.get_hit_count('http://expires_future'),
+                         1)
+        self.assertFalse(isinstance(first_resp, CachedHTTPResponse))
+        self.assertTrue(isinstance(second_resp, CachedHTTPResponse))
+
+    def test_expires_header_overriden_by_max_age(self):
+        """Testing the cache with an Expires header that is overridden"""
+        request = Request('http://expires_override', method='GET')
+        first_resp = self.cache.make_request(request)
+        second_resp = self.cache.make_request(request)
+
+        self.assertEqual(
+            self.urlopener.get_hit_count('http://expires_override'),
+            1)
+        self.assertFalse(isinstance(first_resp, CachedHTTPResponse))
+        self.assertTrue(isinstance(second_resp, CachedHTTPResponse))

@@ -71,13 +71,14 @@ elif sys.hexversion < 0x02070000:
 rb_commands = [
     'api-get = rbtools.commands.api_get:APIGet',
     'attach = rbtools.commands.attach:Attach',
+    'clear-cache = rbtools.commands.clearcache:ClearCache',
     'close = rbtools.commands.close:Close',
-    'setup-repo = rbtools.commands.setup_repo:SetupRepo',
     'diff = rbtools.commands.diff:Diff',
     'list-repo-types = rbtools.commands.list_repo_types:ListRepoTypes',
     'patch = rbtools.commands.patch:Patch',
     'post = rbtools.commands.post:Post',
     'publish = rbtools.commands.publish:Publish',
+    'setup-repo = rbtools.commands.setup_repo:SetupRepo',
     'status = rbtools.commands.status:Status',
 ]
 

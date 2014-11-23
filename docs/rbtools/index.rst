@@ -184,9 +184,15 @@ Special Files
 =============
 
 The :command:`rbt` command stores its login session in a file called
-``~/.rbtools-cookies``. It can also read this information from a file called
-``~/.post-review-cookies.txt``, which was used by the deprecated
-``post-review`` command.
+:file:`~/.rbtools-cookies`. It can also read this information from a file
+called :file:`~/.post-review-cookies.txt`, which was used by the deprecated
+:command:`post-review` command.
+
+The :command:`rbt` command also stores cached API request responses in a
+SQLite database in a cache directory. On Windows this is in
+:file:`%APPDATA%\rbtools\rbtools\apicache.db`, on Linux this is in
+:file:`~/.cache/.rbtools/apicache.db`, and on OSX this is in
+:file:`~/Library/Caches/rbtools/apicache.db`.
 
 
 Indices, Glossary and Tables

@@ -7,6 +7,7 @@ rbt Commands
 
    api-get
    attach
+   clear-cache
    close
    diff
    list-repo-types
