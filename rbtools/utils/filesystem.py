@@ -29,6 +29,7 @@ def load_config_files(homepath):
     def _load_config(path):
         config = {
             'TREES': {},
+            'ALIASES': {},
         }
 
         filename = os.path.join(path, CONFIG_FILE)
@@ -154,7 +155,11 @@ def parse_config_file(filename):
     The ``filename`` argument should contain a full path to a
     .reviewboardrc file.
     """
-    config = {}
+    config = {
+        'TREES': {},
+        'ALIASES': {},
+    }
+
     try:
         execfile(filename, config)
     except SyntaxError as e:
@@ -171,12 +176,19 @@ def load_config():
     This will read all of the .reviewboardrc files influencing the
     cwd and return a dictionary containing the configuration.
     """
-    config = {
-        'TREES': {},
-    }
+    config = {}
+    trees = {}
+    aliases = {}
 
     for filename in get_config_paths():
-        config.update(parse_config_file(filename))
+        parsed_config = parse_config_file(filename)
+
+        trees.update(parsed_config.pop('TREES'))
+        aliases.update(parsed_config.pop('ALIASES'))
+        config.update(parsed_config)
+
+    config['TREES'] = trees
+    config['ALIASES'] = aliases
 
     return config
 
