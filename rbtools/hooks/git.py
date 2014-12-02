@@ -54,8 +54,8 @@ def get_review_id_to_commits_map(lines, regex):
     The commits must be in the form: oldrev newrev refname (separated by
     newlines), as given by a Git pre-receive or post-receive hook.
 
-    If a commit's commit message does not contain a review request ID, we append
-    the commit to the key 0.
+    If a commit's commit message does not contain a review request ID, we
+    append the commit to the key 0.
     """
     review_id_to_commits_map = defaultdict(list)
 
@@ -80,7 +80,8 @@ def get_review_id_to_commits_map(lines, regex):
         for commit_hash in commit_hashes:
             if commit_hash:
                 commit_message = get_commit_message(commit_hash)
-                review_request_id = get_review_request_id(regex, commit_message)
+                review_request_id = get_review_request_id(regex,
+                                                          commit_message)
 
                 commit = '%s (%s)' % (branch_name, commit_hash)
                 review_id_to_commits_map[review_request_id].append(commit)
