@@ -381,8 +381,9 @@ class ClearCaseClient(SCMClient):
         <version number> is the version number of the file in <branch_path>.
 
         A UCM activity changeset can contain changes from different vobs,
-        however reviewboard supports only changes from a single repo at the same
-        time, so changes made outside of the current vobstag will be ignored.
+        however reviewboard supports only changes from a single repo at the
+        same time, so changes made outside of the current vobstag will be
+        ignored.
         """
         changelist = {}
         # Maybe we should be able to access repository_info without calling
@@ -709,10 +710,12 @@ class ClearCaseClient(SCMClient):
                 if changelist[path]['current'] == changelist[path]['previous']:
                     continue
                 changeset.append(
-                    (self._construct_extended_path(path,
-                                                   changelist[path]['previous']),
-                     self._construct_extended_path(path,
-                                                   changelist[path]['current'])))
+                    (self._construct_extended_path(
+                        path,
+                        changelist[path]['previous']),
+                     self._construct_extended_path(
+                        path,
+                        changelist[path]['current'])))
 
         except Exception as e:
             error_message = str(e)

@@ -44,9 +44,7 @@ class GitClientTests(SCMClientTests):
                        translate_newlines=True)
 
     def _git_add_file_commit(self, file, data, msg):
-        """Add a file to a git repository with the content of data
-        and commit with msg.
-        """
+        """Add a file to a git repository with the content of data and commit with msg."""
         foo = open(file, 'w')
         foo.write(data)
         foo.close()
@@ -62,7 +60,8 @@ class GitClientTests(SCMClientTests):
         if not self.is_exe_in_path('git'):
             raise SkipTest('git not found in path')
 
-        self.set_user_home(os.path.join(self.clients_dir, 'testdata', 'homedir'))
+        self.set_user_home(
+            os.path.join(self.clients_dir, 'testdata', 'homedir'))
         self.git_dir = os.path.join(self.clients_dir, 'testdata', 'git-repo')
 
         self.clone_dir = self.chdir_tmp()
@@ -92,7 +91,7 @@ class GitClientTests(SCMClientTests):
         self.assertTrue(server is None)
 
     def test_scan_for_server_reviewboardrc(self):
-        "Testing GitClient scan_for_server, .reviewboardrc case"""
+        """Testing GitClient scan_for_server, .reviewboardrc case"""
         rc = open(os.path.join(self.clone_dir, '.reviewboardrc'), 'w')
         rc.write('REVIEWBOARD_URL = "%s"' % self.TESTSERVER)
         rc.close()
@@ -816,14 +815,17 @@ class MercurialClientTests(MercurialTestBase):
         commit4 = self._hg_get_tip()
         self._hg_add_file_commit('foo.txt', FOO5, 'commit 5')
 
-        self.assertEqual(self.client.parse_revision_spec(['1', '2']),
+        self.assertEqual(
+            self.client.parse_revision_spec(['1', '2']),
             dict(base=commit1, tip=commit2, parent_base=start_base))
 
-        self.assertEqual(self.client.parse_revision_spec(['4']),
+        self.assertEqual(
+            self.client.parse_revision_spec(['4']),
             dict(base=commit3, tip=commit4, parent_base=start_base,
                  commit_id=commit4))
 
-        self.assertEqual(self.client.parse_revision_spec(['2', '4']),
+        self.assertEqual(
+            self.client.parse_revision_spec(['2', '4']),
             dict(base=commit2, tip=commit4, parent_base=start_base))
 
     def test_guess_summary_description_one(self):
@@ -870,8 +872,7 @@ class MercurialClientTests(MercurialTestBase):
                           'desc1\n\ncommit 2\n\ndesc2\n\ncommit 3\n\ndesc3')
 
     def test_guess_summary_description_one_middle(self):
-        """Testing MercurialClient guess summary & description middle commit
-        commit."""
+        """Testing MercurialClient guess summary & description middle commit commit."""
         self.options.guess_summary = True
         self.options.guess_description = True
 
@@ -944,8 +945,8 @@ class MercurialSubversionClientTests(MercurialTestBase):
 
     def _has_hgsubversion(self):
         try:
-            output = self._run_hg(['svn', '--help'],
-                                  ignore_errors=True, extra_ignore_errors=(255))
+            output = self._run_hg(['svn', '--help'], ignore_errors=True,
+                                  extra_ignore_errors=(255))
         except OSError:
             return False
 
@@ -1034,9 +1035,7 @@ class MercurialSubversionClientTests(MercurialTestBase):
                          ri.path)
 
     def testCalculateRepositoryInfo(self):
-        """
-        Testing MercurialClient (+svn) _calculate_hgsubversion_repository_info properly determines repository and base paths.
-        """
+        """Testing MercurialClient (+svn) _calculate_hgsubversion_repository_info properly determines repository and base paths."""
         info = (
             "URL: svn+ssh://testuser@svn.example.net/repo/trunk\n"
             "Repository Root: svn+ssh://testuser@svn.example.net/repo\n"
@@ -1154,7 +1153,6 @@ class SVNClientTests(SCMClientTests):
         return execute(['svn'] + command, env=None, split_lines=False,
                        ignore_errors=False, extra_ignore_errors=(),
                        translate_newlines=True)
-
 
     def _svn_add_file(self, filename, data, changelist=None):
         """Add a file to the test repo."""
@@ -1335,7 +1333,8 @@ class P4WrapperTests(RBTestBase):
 class PerforceClientTests(SCMClientTests):
     class P4DiffTestWrapper(P4Wrapper):
         def __init__(self, options):
-            super(PerforceClientTests.P4DiffTestWrapper, self).__init__(options)
+            super(
+                PerforceClientTests.P4DiffTestWrapper, self).__init__(options)
 
             self._timestamp = time.mktime(time.gmtime(0))
 
@@ -1819,8 +1818,7 @@ class PerforceClientTests(SCMClientTests):
                           ['102', '10284'])
 
     def test_parse_revision_spec_invalid_spec(self):
-        """Testing PerforceClient.parse_revision_spec with invalid
-        specifications"""
+        """Testing PerforceClient.parse_revision_spec with invalid specifications"""
         class TestWrapper(P4Wrapper):
             def change(self, changelist):
                 return []
@@ -1843,7 +1841,8 @@ class BazaarClientTests(SCMClientTests):
         if not self.is_exe_in_path("bzr"):
             raise SkipTest("bzr not found in path")
 
-        self.set_user_home(os.path.join(self.clients_dir, 'testdata', 'homedir'))
+        self.set_user_home(
+            os.path.join(self.clients_dir, 'testdata', 'homedir'))
 
         self.orig_dir = os.getcwd()
 
@@ -1866,10 +1865,7 @@ class BazaarClientTests(SCMClientTests):
         return execute(['bzr'] + command, *args, **kwargs)
 
     def _bzr_add_file_commit(self, file, data, msg):
-        """
-        Add a file to a Bazaar repository with the content of data and commit
-        with msg.
-        """
+        """Add a file to a Bazaar repository with the content of data and commit with msg."""
         foo = open(file, "w")
         foo.write(data)
         foo.close()
@@ -1877,9 +1873,7 @@ class BazaarClientTests(SCMClientTests):
         self._run_bzr(["commit", "-m", msg, '--author', 'Test User'])
 
     def _compare_diffs(self, filename, full_diff, expected_diff_digest):
-        """
-        Testing that the full_diff for ``filename`` matches the ``expected_diff``.
-        """
+        """Testing that the full_diff for ``filename`` matches the ``expected_diff``."""
         diff_lines = full_diff.splitlines()
 
         self.assertEqual("=== modified file %r" % filename, diff_lines[0])
@@ -1960,7 +1954,6 @@ class BazaarClientTests(SCMClientTests):
                                        result['diff'].split('\n')))
 
         self.assertEqual(num_files_in_diff, 1)
-
 
     def test_diff_specific_files(self):
         """Testing BazaarClient diff with specific files"""
@@ -2051,9 +2044,7 @@ class BazaarClientTests(SCMClientTests):
         self.assertFalse("commit 3" in description)
 
     def test_guessed_summary_and_description_in_grand_parent_branch(self):
-        """
-        Testing BazaarClient guessing summary and description for grand parent branch.
-        """
+        """Testing BazaarClient guessing summary and description for grand parent branch."""
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")

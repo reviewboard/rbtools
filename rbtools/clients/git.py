@@ -611,7 +611,8 @@ class GitClient(SCMClient):
         log = execute([self.git, 'log', merge_base], ignore_errors=True)
 
         for line in log:
-            m = re.search(r'[rd]epo.-paths = "(.+)": change = (\d+).*\]', log, re.M)
+            m = re.search(r'[rd]epo.-paths = "(.+)": change = (\d+).*\]',
+                          log, re.M)
 
             if m:
                 base_path = m.group(1).strip()

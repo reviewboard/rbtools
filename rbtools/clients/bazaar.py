@@ -193,7 +193,6 @@ class BazaarClient(SCMClient):
         else:
             return None
 
-
     def get_raw_commit_message(self, revisions):
         # The result is content in the form of:
         #

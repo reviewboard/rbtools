@@ -541,7 +541,8 @@ class PerforceClient(SCMClient):
             try:
                 changetype_short = action_mapping[action]
             except KeyError:
-                die('Unsupported action type "%s" for %s' % (action, depot_file))
+                die('Unsupported action type "%s" for %s'
+                    % (action, depot_file))
 
             if changetype_short == 'M':
                 try:
@@ -794,8 +795,8 @@ class PerforceClient(SCMClient):
                         old_file_a, new_file_a, depot_file, 0, '', 'A',
                         ignore_unmodified=True)
                     diff_lines += self._do_diff(
-                        old_file_b, new_file_b, initial_depot_file, initial_rev,
-                        depot_file, 'D', ignore_unmodified=True)
+                        old_file_b, new_file_b, initial_depot_file,
+                        initial_rev, depot_file, 'D', ignore_unmodified=True)
             elif action == 'skip':
                 continue
             else:
@@ -1142,8 +1143,9 @@ class PerforceClient(SCMClient):
         #     "Binary files "
         if (len(dl) == 1 and
             dl[0].startswith('Files %s and %s differ' %
-                            (old_file, new_file))):
-            dl = ['Binary files %s and %s differ\n' % (old_file, new_file)]
+                             (old_file, new_file))):
+            dl = (['Binary files %s and %s differ\n'
+                  % (old_file, new_file)])
 
         if dl == [] or dl[0].startswith("Binary files "):
             is_empty_and_changed = (self._supports_empty_files() and

@@ -265,8 +265,8 @@ class SVNClient(SCMClient):
                 if base == '0':
                     old_url = repository_info.path + '@' + base
                 else:
-                    old_url = (repository_info.path + repository_info.base_path +
-                               '@' + base)
+                    old_url = (repository_info.path +
+                               repository_info.base_path + '@' + base)
 
                 diff_cmd.extend([old_url, new_url])
 

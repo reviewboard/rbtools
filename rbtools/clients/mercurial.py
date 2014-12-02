@@ -272,7 +272,7 @@ class MercurialClient(SCMClient):
             # If there are missing changesets between base and the remote, we
             # need to generate a parent diff.
             outgoing = self._get_outgoing_changesets(self._get_remote_branch(),
-                                                 rev=result['base'])
+                                                     rev=result['base'])
 
             logging.debug('%d outgoing changesets between remote and base.',
                           len(outgoing))
@@ -291,7 +291,8 @@ class MercurialClient(SCMClient):
 
             result['parent_base'] = parent_base[0]
 
-            logging.debug('Identified %s as parent base', result['parent_base'])
+            logging.debug('Identified %s as parent base',
+                          result['parent_base'])
 
         return result
 
@@ -330,7 +331,6 @@ class MercurialClient(SCMClient):
 
         return RepositoryInfo(path=root, base_path=base_path,
                               supports_parent_diffs=True)
-
 
     def _load_hgrc(self):
         for line in execute(['hg', 'showconfig'], split_lines=True):

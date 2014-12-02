@@ -179,13 +179,15 @@ class PlasticClient(SCMClient):
                 if (changetype in ['A'] or
                     (changetype in ['C'] and parentrevspec == "rev:revid:-1")):
                     # There's only one content to show
-                    self._write_file(filename, newrevspec, tmp_diff_to_filename)
+                    self._write_file(filename, newrevspec,
+                                     tmp_diff_to_filename)
                     new_file = tmp_diff_to_filename
                 elif changetype in ['C']:
                     self._write_file(filename, parentrevspec,
                                      tmp_diff_from_filename)
                     old_file = tmp_diff_from_filename
-                    self._write_file(filename, newrevspec, tmp_diff_to_filename)
+                    self._write_file(filename, newrevspec,
+                                     tmp_diff_to_filename)
                     new_file = tmp_diff_to_filename
                 elif changetype in ['D']:
                     self._write_file(filename, parentrevspec,
