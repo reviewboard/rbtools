@@ -333,7 +333,7 @@ Mercurial
 Perforce
 --------
 
-* git-p4 support now respects the :env:`P4PORT` environment variable.
+* git-p4 support now respects the :envvar:`P4PORT` environment variable.
 
 * Fixed conflicts in Perforce settings when using a :file:`.p4config` file
   and passing :option:`--p4-port` or other Perforce-specific options.
