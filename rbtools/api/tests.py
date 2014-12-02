@@ -577,9 +577,9 @@ class APICacheTests(TestCase):
     }
 
     def setUp(self):
-        """Create a MockUrlOpener and an instance of the APICache."""
+        """Create a MockUrlOpener and an instance of the APICache using it."""
         self.urlopener = MockUrlOpener(self.request_headers)
-        self.cache = APICache(':memory:', self.urlopener)
+        self.cache = APICache(create_db_in_memory=True, urlopen=self.urlopener)
 
     def test_cache_control_header_max_age_high(self):
         """Testing the cache with a high max-age value"""

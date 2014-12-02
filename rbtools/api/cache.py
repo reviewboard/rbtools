@@ -118,72 +118,74 @@ class CachedHTTPResponse(object):
 
 class APICache(object):
     """An API cache backed by a SQLite database."""
-    CACHE_DIR = user_cache_dir('rbtools')
-
     # The format for the Expires: header. Requires an English locale.
     EXPIRES_FORMAT = '%a, %d %b %Y %H:%M:%S %Z'
+
+    CACHE_DIR = user_cache_dir('rbtools')
+    CACHE_PATH = os.path.join(CACHE_DIR, 'apicache.db')
 
     # The API Cache's schema version. If the schema is updated, update this
     # value.
     SCHEMA_VERSION = 1
 
-    def __init__(self, db_path=None, urlopen=urlopen):
+    def __init__(self, create_db_in_memory=False, urlopen=urlopen):
         """Create a new instance of the APICache
 
         If the db_path is provided, it will be used as the path to the SQLite
         database; otherwise, the default cache (in the CACHE_DIR) will be used.
         The urlopen parameter determines the method that is used to open URLs.
         """
-        if db_path is None:
-            self.cache_path = os.path.join(self.CACHE_DIR, 'apicache.db')
-        else:
-            self.cache_path = db_path
-
         self.urlopen = urlopen
 
-        try:
-            cache_exists = os.path.exists(self.cache_path)
-            create_schema = True
+        if create_db_in_memory:
+            self.db = sqlite3.connect(':memory:')
+            self._create_schema()
+        else:
+            try:
+                cache_exists = os.path.exists(self.CACHE_PATH)
+                create_schema = True
 
-            if not cache_exists:
-                if not os.path.exists(self.CACHE_DIR):
-                    logging.debug("Cache directory '%s' does not exist; "
-                                  "creating.",
-                                  self.CACHE_DIR)
-                    os.makedirs(self.CACHE_DIR)
+                if not cache_exists:
+                    if not os.path.exists(self.CACHE_DIR):
+                        logging.debug("Cache directory '%s' does not exist; "
+                                      "creating.",
+                                      self.CACHE_DIR)
+                        os.makedirs(self.CACHE_DIR)
 
-                logging.debug("API cache '%s' does not exist; creating.",
-                              self.cache_path)
+                    logging.debug("API cache '%s' does not exist; creating.",
+                                  self.CACHE_PATH)
 
-            self.db = sqlite3.connect(self.cache_path)
+                self.db = sqlite3.connect(self.CACHE_PATH)
 
-            if cache_exists:
-                try:
-                    with contextlib.closing(self.db.cursor()) as c:
-                        c.execute('SELECT version FROM cache_info')
-                        row = c.fetchone()
+                if cache_exists:
+                    try:
+                        with contextlib.closing(self.db.cursor()) as c:
+                            c.execute('SELECT version FROM cache_info')
+                            row = c.fetchone()
 
-                        if row and row[0] == self.SCHEMA_VERSION:
-                            create_schema = False
-                except sqlite3.Error as e:
-                    self._die('Could not get the HTTP cache schema version', e)
+                            if row and row[0] == self.SCHEMA_VERSION:
+                                create_schema = False
+                    except sqlite3.Error as e:
+                        self._die('Could not get the HTTP cache schema '
+                                  'version', e)
 
-            if create_schema:
-                self._create_schema()
+                if create_schema:
+                    self._create_schema()
 
+                atexit.register(self._write_db)
+            except (OSError, sqlite3.Error) as e:
+                # OSError will be thrown if we cannot create the directory or
+                # file for the API cache. sqlite3.Error will be thrown if
+                # connect fails. In either case, HTTP requests can still be
+                # made, they will just passed through to the URL opener without
+                # attempting to interact with the API cache.
+                logging.warn("Could not create or access API cache '%s'. Try "
+                             "running 'rbt clear-cache' to clear the HTTP "
+                             "cache for the API.",
+                             self.CACHE_PATH)
+
+        if self.db is not None:
             self.db.row_factory = APICache._row_factory
-
-            atexit.register(self._write_db)
-        except (OSError, sqlite3.Error) as e:
-            # OSError will be thrown if we cannot create the directory or file
-            # for the API cache. sqlite3.Error will be thrown if connect fails.
-            # In either case, HTTP requests can still be made, they will just
-            # passed through to the URL opener without attempting to interact
-            # with the API cache.
-            logging.warn("Could not create or access API cache '%s'. Try "
-                         "running 'rbt clear-cache' to clear the HTTP cache "
-                         "for the API.",
-                         self.cache_path, e)
 
     def make_request(self, request):
         """Perform the specified request.
@@ -535,12 +537,10 @@ class APICache(object):
 
 def clear_cache():
     """Delete the HTTP cache used for the API."""
-    cache_path = APICache().cache_path
-
     try:
-        os.unlink(cache_path)
-        print("Cleared cache in '%s'" % cache_path)
+        os.unlink(APICache.CACHE_PATH)
+        print("Cleared cache in '%s'" % APICache.CACHE_PATH)
     except Exception as e:
         logging.error("Could not clear cache in '%s': %s. Try manually "
                       "removing it if it exists.",
-                      cache_path, e)
+                      APICache.CACHE_PATH, e)
