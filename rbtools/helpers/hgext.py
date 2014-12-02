@@ -3,7 +3,8 @@
 
 # We use reposetup because the config is re-read for each repo, after
 # uisetup() is called.
-ALLOWED_PARAMS  = ['git', 'svn']
+ALLOWED_PARAMS = ['git', 'svn']
+
 
 def reposetup(ui, repo):
     for section in ['diff']:
