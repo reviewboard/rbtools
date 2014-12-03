@@ -838,7 +838,7 @@ class MercurialClientTests(MercurialTestBase):
         revisions = self.client.parse_revision_spec([])
         commit_message = self.client.get_commit_message(revisions)
 
-        self.assertEquals(commit_message['summary'], 'commit 1')
+        self.assertEqual(commit_message['summary'], 'commit 1')
 
     def test_guess_summary_description_two(self):
         """Testing MercurialClient guess summary & description 2 commits."""
@@ -851,9 +851,9 @@ class MercurialClientTests(MercurialTestBase):
         revisions = self.client.parse_revision_spec([])
         commit_message = self.client.get_commit_message(revisions)
 
-        self.assertEquals(commit_message['summary'], 'summary 1')
-        self.assertEquals(commit_message['description'],
-                          'body 1\n\nsummary 2\n\nbody 2')
+        self.assertEqual(commit_message['summary'], 'summary 1')
+        self.assertEqual(commit_message['description'],
+                         'body 1\n\nsummary 2\n\nbody 2')
 
     def test_guess_summary_description_three(self):
         """Testing MercurialClient guess summary & description 3 commits."""
@@ -867,9 +867,9 @@ class MercurialClientTests(MercurialTestBase):
         revisions = self.client.parse_revision_spec([])
         commit_message = self.client.get_commit_message(revisions)
 
-        self.assertEquals(commit_message['summary'], 'commit 1')
-        self.assertEquals(commit_message['description'],
-                          'desc1\n\ncommit 2\n\ndesc2\n\ncommit 3\n\ndesc3')
+        self.assertEqual(commit_message['summary'], 'commit 1')
+        self.assertEqual(commit_message['description'],
+                         'desc1\n\ncommit 2\n\ndesc2\n\ncommit 3\n\ndesc3')
 
     def test_guess_summary_description_one_middle(self):
         """Testing MercurialClient guess summary & description middle commit commit."""
@@ -884,8 +884,8 @@ class MercurialClientTests(MercurialTestBase):
         revisions = self.client.parse_revision_spec([tip])
         commit_message = self.client.get_commit_message(revisions)
 
-        self.assertEquals(commit_message['summary'], 'commit 2')
-        self.assertEquals(commit_message['description'], 'desc2')
+        self.assertEqual(commit_message['summary'], 'commit 2')
+        self.assertEqual(commit_message['description'], 'desc2')
 
 
 class MercurialSubversionClientTests(MercurialTestBase):
@@ -2036,7 +2036,7 @@ class BazaarClientTests(SCMClientTests):
         revisions = self.client.parse_revision_spec([])
         commit_message = self.client.get_commit_message(revisions)
 
-        self.assertEquals("commit 3", commit_message['summary'])
+        self.assertEqual("commit 3", commit_message['summary'])
 
         description = commit_message['description']
         self.assertTrue("commit 1" in description)
@@ -2065,7 +2065,7 @@ class BazaarClientTests(SCMClientTests):
         revisions = self.client.parse_revision_spec([])
         commit_message = self.client.get_commit_message(revisions)
 
-        self.assertEquals("commit 3", commit_message['summary'])
+        self.assertEqual("commit 3", commit_message['summary'])
 
         description = commit_message['description']
         self.assertTrue("commit 1" in description)
@@ -2086,8 +2086,8 @@ class BazaarClientTests(SCMClientTests):
         commit_message = self.client.get_commit_message(revisions)
         print(commit_message)
 
-        self.assertEquals("commit 2", commit_message['summary'])
-        self.assertEquals("commit 2", commit_message['description'])
+        self.assertEqual("commit 2", commit_message['summary'])
+        self.assertEqual("commit 2", commit_message['description'])
 
     def test_parse_revision_spec_no_args(self):
         """Testing BazaarClient.parse_revision_spec with no specified revisions"""

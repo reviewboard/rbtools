@@ -365,8 +365,8 @@ class HttpRequestTests(TestCase):
 
     def test_default_values(self):
         """Testing the default values."""
-        self.assertEquals(self.request.url, '/')
-        self.assertEquals(self.request.method, 'GET')
+        self.assertEqual(self.request.url, '/')
+        self.assertEqual(self.request.method, 'GET')
         content_type, content = self.request.encode_multipart_formdata()
         self.assertTrue(content_type is None)
         self.assertTrue(content is None)
@@ -389,14 +389,14 @@ class HttpRequestTests(TestCase):
 
         for f in fields:
             lst = f.split('\r\n\r\n')
-            self.assertEquals(len(lst), 2)
+            self.assertEqual(len(lst), 2)
             k, v = lst
 
             m = re.match('Content-Disposition: form-data; name="(.*?)"$', k)
             self.assertFalse(m is None)
             d[m.group(1)] = v
 
-        self.assertEquals(d, {'foo': 'bar', 'bar': '42', 'name': 'somestring'})
+        self.assertEqual(d, {'foo': 'bar', 'bar': '42', 'name': 'somestring'})
 
 
 class ReviewRequestResourceTests(TestCase):
