@@ -39,6 +39,8 @@ class SCMClient(object):
     supports_diff_extra_args = False
     supports_diff_exclude_patterns = False
 
+    can_amend_commit = False
+
     def __init__(self, user_config=None, configs=[], options=None,
                  capabilities=None):
         self.user_config = user_config

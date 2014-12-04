@@ -25,6 +25,8 @@ class GitClient(SCMClient):
 
     supports_diff_exclude_patterns = True
 
+    can_amend_commit = True
+
     def __init__(self, **kwargs):
         super(GitClient, self).__init__(**kwargs)
         # Store the 'correct' way to invoke git, just plain old 'git' by
@@ -665,6 +667,20 @@ class GitClient(SCMClient):
         status = execute(['git', 'status', '--porcelain',
                           '--untracked-files=no'])
         return status != ''
+
+    def amend_commit(self, message, files=[], all_files=False):
+        """Amend the last commit.
+
+        This modifies the last commit message with the new message provided.
+        """
+        modified_message = message
+
+        if all_files:
+            execute(['git', 'add', '--all', ':/'])
+        elif files:
+            execute(['git', 'add'] + files)
+
+        execute(['git', 'commit', '--amend', '-m', modified_message])
 
     def apply_patch(self, patch_file, base_path=None, base_dir=None, p=None):
         """Apply the given patch to index.

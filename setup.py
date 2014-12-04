@@ -79,6 +79,7 @@ rb_commands = [
     'post = rbtools.commands.post:Post',
     'publish = rbtools.commands.publish:Publish',
     'setup-repo = rbtools.commands.setup_repo:SetupRepo',
+    'stamp = rbtools.commands.stamp:Stamp',
     'status = rbtools.commands.status:Status',
 ]
 
