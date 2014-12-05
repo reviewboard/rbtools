@@ -2,6 +2,8 @@ import datetime
 import locale
 import re
 
+import six
+
 from rbtools.api.cache import APICache, CachedHTTPResponse
 from rbtools.api.capabilities import Capabilities
 from rbtools.api.factory import create_resource
@@ -493,7 +495,7 @@ class MockUrlOpener(object):
     def __init__(self, endpoints):
         """Create a new MockUrlOpener given the endpoints: headers mapping."""
         self.endpoints = {}
-        for url, headers in endpoints.iteritems():
+        for url, headers in six.iteritems(endpoints):
             self.endpoints[url] = {
                 'hit_count': 0,
                 'headers': headers
@@ -724,7 +726,7 @@ class APICacheTests(TestCase):
 
         # We generate the future date in the C locale so that it is properly
         # formatted.
-        locale.setlocale(locale.LC_TIME, 'C')
+        locale.setlocale(locale.LC_TIME, str('C'))
         future_date = datetime.datetime.utcnow() + datetime.timedelta(days=1)
         future_date = future_date.strftime(APICache.EXPIRES_FORMAT) + 'UTC'
         locale.resetlocale(locale.LC_TIME)
