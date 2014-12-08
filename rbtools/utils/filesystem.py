@@ -24,6 +24,12 @@ def cleanup_tempfiles():
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
+def _load_python_file(filename, config):
+    with open(filename) as f:
+        exec(compile(f.read(), filename, 'exec'), config)
+        return config
+
+
 def load_config_files(homepath):
     """Loads data from .reviewboardrc files."""
     def _load_config(path):
@@ -36,7 +42,7 @@ def load_config_files(homepath):
 
         if os.path.exists(filename):
             try:
-                execfile(filename, config)
+                config = _load_python_file(filename, config)
             except SyntaxError as e:
                 die('Syntax error in config file: %s\n'
                     'Line %i offset %i\n' % (filename, e.lineno, e.offset))
@@ -161,7 +167,7 @@ def parse_config_file(filename):
     }
 
     try:
-        execfile(filename, config)
+        config = _load_python_file(filename, config)
     except SyntaxError as e:
         die('Syntax error in config file: %s\n'
             'Line %i offset %i\n' % (filename, e.lineno, e.offset))

@@ -2,6 +2,8 @@ import getpass
 import logging
 import sys
 
+from six.moves import input
+
 from rbtools.api.errors import AuthorizationError
 from rbtools.commands import CommandError
 
@@ -22,7 +24,7 @@ def get_authenticated_session(api_client, api_root, auth_required=False):
         logging.warning('You are not authenticated with the Review Board '
                         'server at %s, please login.' % api_client.url)
         sys.stderr.write('Username: ')
-        username = raw_input()
+        username = input()
         password = getpass.getpass('Password: ')
         api_client.login(username, password)
 

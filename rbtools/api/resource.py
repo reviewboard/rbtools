@@ -1,6 +1,7 @@
 import re
 
 import six
+from six.moves import range
 from six.moves.urllib.parse import urljoin
 
 from rbtools.api.decorators import request_method_decorator
@@ -383,6 +384,9 @@ class ListResource(Resource):
         return self.num_items
 
     def __nonzero__(self):
+        return self.__bool__()
+
+    def __bool__(self):
         return True
 
     def __getitem__(self, key):
@@ -405,7 +409,7 @@ class ListResource(Resource):
                                guess_token=False)
 
     def __iter__(self):
-        for i in xrange(self.num_items):
+        for i in range(self.num_items):
             yield self[i]
 
     @request_method_decorator

@@ -1,11 +1,14 @@
 from __future__ import print_function
 
+import difflib
 import os
+
+import six
+from six.moves import input
 
 from rbtools.commands import Command, CommandError
 from rbtools.utils.console import confirm
 from rbtools.utils.filesystem import CONFIG_FILE
-import difflib
 
 
 class SetupRepo(Command):
@@ -55,9 +58,8 @@ class SetupRepo(Command):
                     if 'mirror_path' in repository:
                         repo_paths[repository['mirror_path']] = repository
 
-                closest_path = difflib.get_close_matches(repository_info.path,
-                                                         repo_paths.keys(),
-                                                         n=1)
+                closest_path = difflib.get_close_matches(
+                    repository_info.path, six.iterkeys(repo_paths), n=1)
 
                 for path in closest_path:
                     repo = repo_paths[path]
@@ -102,7 +104,7 @@ class SetupRepo(Command):
         server = self.options.server
 
         if not server:
-            server = raw_input('Enter the Review Board server URL: ')
+            server = input('Enter the Review Board server URL: ')
 
         repository_info, tool = self.initialize_scm_tool()
         api_client, api_root = self.get_api(server)

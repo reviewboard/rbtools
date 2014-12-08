@@ -938,7 +938,7 @@ class MercurialSubversionClientTests(MercurialTestBase):
             self._get_testing_clone()
         except (OSError, IOError):
             msg = 'could not clone from svn repo!  skipping...'
-            raise SkipTest(msg), None, sys.exc_info()[2]
+            raise SkipTest(msg).with_traceback(sys.exc_info()[2])
 
         self._spin_up_client()
         self._stub_in_config_and_options()
@@ -1950,8 +1950,11 @@ class BazaarClientTests(SCMClientTests):
         self._compare_diffs('foo.txt', result['diff'],
                             'a6326b53933f8b255a4b840485d8e210')
 
-        num_files_in_diff = len(filter(lambda line: line.startswith('==='),
-                                       result['diff'].split('\n')))
+        num_files_in_diff = len([
+            line
+            for line in result['diff'].split('\n')
+            if line.startswith('===')
+        ])
 
         self.assertEqual(num_files_in_diff, 1)
 

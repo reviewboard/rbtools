@@ -1,4 +1,5 @@
 import datetime
+import itertools
 import logging
 import os
 import six
@@ -684,7 +685,8 @@ class ClearCaseClient(SCMClient):
             changelist = {}
             # Iterate on each ClearCase path in order to find respective
             # previous and current version.
-            for path in previous_elements.keys() + current_elements.keys():
+            for path in itertools.chain(previous_elements.keys(),
+                                        current_elements.keys()):
                 if path in seen:
                     continue
                 seen.append(path)

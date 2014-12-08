@@ -4,6 +4,8 @@ import os
 import subprocess
 from distutils.util import strtobool
 
+from six.moves import input
+
 from rbtools.utils.filesystem import make_tempfile
 
 
@@ -16,7 +18,7 @@ def confirm(question):
     """
     while True:
         try:
-            answer = raw_input("%s [Yes/No]: " % question).lower()
+            answer = input("%s [Yes/No]: " % question).lower()
             return strtobool(answer)
         except ValueError:
             print('%s is not a valid answer.' % answer)

@@ -109,8 +109,8 @@ def main():
 
     if not ep:
         try:
-            ep = pkg_resources.iter_entry_points('rbtools_commands',
-                                                 command_name).next()
+            ep = next(pkg_resources.iter_entry_points(
+                'rbtools_commands', command_name))
         except StopIteration:
             # There aren't any custom entry points defined.
             pass

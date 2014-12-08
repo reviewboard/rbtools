@@ -8,6 +8,7 @@ import platform
 import os
 import sys
 
+from six.moves import input
 from six.moves.urllib.parse import urlparse
 
 from rbtools import get_version_string
@@ -520,11 +521,11 @@ class Command(object):
             print('Enter authorization information for "%s" at %s' %
                   (realm, urlparse(uri)[1]))
 
-            # getpass will write its prompt to stderr but raw_input
+            # getpass will write its prompt to stderr but input
             # writes to stdout. See bug 2831.
             if username is None:
                 sys.stderr.write('Username: ')
-                username = raw_input()
+                username = input()
 
             if password is None:
                 password = getpass.getpass('Password: ')

@@ -39,7 +39,7 @@ class PlasticClient(SCMClient):
                         split_lines=True, ignore_errors=True)
 
         # remove blank lines
-        split = filter(None, split)
+        split = [x for x in split if x]
 
         m = re.search(r'^rep:(.+)$', split[0], re.M)
 
