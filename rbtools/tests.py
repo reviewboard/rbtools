@@ -1,3 +1,6 @@
+from __future__ import unicode_literals
+
+
 class OptionsStub(object):
     def __init__(self):
         self.debug = True

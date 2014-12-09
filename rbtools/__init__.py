@@ -25,6 +25,9 @@
 #
 
 
+from __future__ import unicode_literals
+
+
 # The version of RBTools
 #
 # This is in the format of:
@@ -38,10 +41,10 @@ def get_version_string():
     version = '%s.%s' % (VERSION[0], VERSION[1])
 
     if VERSION[2] or VERSION[3]:
-        version += ".%s" % VERSION[2]
+        version += '.%s' % VERSION[2]
 
     if VERSION[3]:
-        version += ".%s" % VERSION[3]
+        version += '.%s' % VERSION[3]
 
     if VERSION[4] != 'final':
         if VERSION[4] == 'rc':
@@ -50,7 +53,7 @@ def get_version_string():
             version += ' %s %s' % (VERSION[4], VERSION[5])
 
     if not is_release():
-        version += " (dev)"
+        version += ' (dev)'
 
     return version
 
@@ -59,10 +62,10 @@ def get_package_version():
     version = '%s.%s' % (VERSION[0], VERSION[1])
 
     if VERSION[2] or VERSION[3]:
-        version += ".%s" % VERSION[2]
+        version += '.%s' % VERSION[2]
 
     if VERSION[3]:
-        version += ".%s" % VERSION[3]
+        version += '.%s' % VERSION[3]
 
     if VERSION[4] != 'final':
         version += '%s%s' % (VERSION[4], VERSION[5])
