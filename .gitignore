@@ -26,3 +26,7 @@ temp
 bak
 
 rbtools/clients/testdata/homedir/.bzr.log
+
+contrib/installers/windows/deps
+contrib/installers/windows/wix/obj
+contrib/installers/windows/wix/*.suo

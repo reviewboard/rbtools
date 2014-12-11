@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+ <Product Id="*"
+          Name="RBTools"
+          Language="1033"
+          Version="$(var.Version)"
+          Manufacturer="Beanbag, Inc."
+          UpgradeCode="D8FE284C-2791-47F6-B8EC-AC05CD06E401">
+  <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine"/>
+
+  <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed."/>
+  <MediaTemplate EmbedCab="yes"/>
+
+  <Feature Id="ProductFeature" Title="RBTools" Level="1">
+   <ComponentGroupRef Id="rbgroup"/>
+   <ComponentRef Id="rbt_cmd"/>
+  </Feature>
+ </Product>
+
+ <Fragment>
+  <Directory Id="TARGETDIR" Name="SourceDir">
+   <Directory Id="ProgramFilesFolder">
+    <Directory Id="INSTALLFOLDER" Name="RBTools">
+     <Directory Id="bin" Name="bin"/>
+    </Directory>
+   </Directory>
+  </Directory>
+ </Fragment>
+
+ <Fragment>
+  <Component Id="rbt_cmd" Directory="bin">
+   <Environment Id="PathEnv" Action="set" System="yes" Part="first"
+                Permanent="no" Name="Path" Value="[INSTALLFOLDER]bin"/>
+   <File Source="files\rbt.cmd"/>
+  </Component>
+ </Fragment>
+</Wix>

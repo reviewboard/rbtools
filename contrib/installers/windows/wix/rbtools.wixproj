@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<Project ToolsVersion="4.0"
+         DefaultTargets="Build"
+         xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+ <PropertyGroup>
+  <Configuration Condition=" '$(Configuration)' == '' ">Release</Configuration>
+  <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
+  <ProductVersion>3.9</ProductVersion>
+  <ProjectGuid>45BB4178-86BF-44FC-BE19-A54763BCA4CC</ProjectGuid>
+  <SchemaVersion>2.0</SchemaVersion>
+  <OutputName>RBTools</OutputName>
+  <OutputType>Package</OutputType>
+  <WixTargetsPath Condition=" '$(WixTargetsPath)' == '' AND '$(MSBuildExtensionsPath32)' != '' ">$(MSBuildExtensionsPath32)\Microsoft\WiX\v3.x\Wix.targets</WixTargetsPath>
+  <WixTargetsPath Condition=" '$(WixTargetsPath)' == '' ">$(MSBuildExtensionsPath)\Microsoft\WiX\v3.x\Wix.targets</WixTargetsPath>
+  <SignOutput Condition="'$(CertificateThumbprint)' != '' ">true</SignOutput>
+  <TimestampUrl Condition="'$(TimestampUrl)' == ''">http://timestamp.verisign.com/scripts/timstamp.dll</TimestampUrl>
+ </PropertyGroup>
+ <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
+  <OutputPath>bin\</OutputPath>
+  <IntermediateOutputPath>obj\$(Configuration)\</IntermediateOutputPath>
+  <WixVariables>
+  </WixVariables>
+  <DefineConstants>root=$(root);Version=$(Version)</DefineConstants>
+  <SuppressAllWarnings>False</SuppressAllWarnings>
+  <Pedantic>True</Pedantic>
+  <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+  <SuppressPdbOutput>True</SuppressPdbOutput>
+ </PropertyGroup>
+ <ItemGroup>
+  <Compile Include="$(OutputPath)\rbtools.wxs">
+   <Link>rbtools.wxs</Link>
+  </Compile>
+  <Compile Include="product.wxs" />
+ </ItemGroup>
+ <Import Project="$(WixTargetsPath)" />
+ <PropertyGroup>
+  <PreBuildEvent>"$(WIX)\bin\heat.exe" dir "$(root)" -gg -ag -dr INSTALLFOLDER -cg rbgroup -srd -sreg -scom -var var.root -out rbtools.wxs</PreBuildEvent>
+ </PropertyGroup>
+ <Target Name="SignCabs">
+  <SignFile CertificateThumbprint="$(CertificateThumbprint)"
+            TimestampUrl="$(TimestampUrl)"
+            SigningTarget="%(SignCabs.FullPath)"/>
+ </Target>
+ <Target Name="SignMsi">
+  <SignFile CertificateThumbprint="$(CertificateThumbprint)"
+            TimestampUrl="$(TimestampUrl)"
+            SigningTarget="%(SignMsi.FullPath)"/>
+ </Target>
+</Project>
