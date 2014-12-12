@@ -1,3 +1,6 @@
+from __future__ import unicode_literals
+
+
 def request_method_decorator(f):
     """Wraps methods returned from a resource to capture HttpRequests.
 

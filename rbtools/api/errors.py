@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import six
 
 
@@ -9,7 +11,7 @@ class APIError(Exception):
         self.rsp = rsp
 
     def __str__(self):
-        code_str = "HTTP %d" % self.http_status
+        code_str = 'HTTP %d' % self.http_status
 
         if self.error_code:
             code_str += ', API Error %d' % self.error_code

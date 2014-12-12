@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import re
 
 import six
@@ -137,7 +139,7 @@ class Resource(object):
         for link, body in six.iteritems(self._links):
             if link not in SPECIAL_LINKS:
                 setattr(self,
-                        "get_%s" % link,
+                        'get_%s' % link,
                         lambda resource=self, url=body['href'], **kwargs: (
                             self._get_url(url, **kwargs)))
 
@@ -459,7 +461,7 @@ class RootResource(ItemResource):
         # Generate methods for accessing resources directly using
         # the uri-templates.
         for name, url in six.iteritems(payload['uri_templates']):
-            attr_name = "get_%s" % name
+            attr_name = 'get_%s' % name
 
             if not hasattr(self, attr_name):
                 setattr(self,
@@ -481,7 +483,7 @@ class RootResource(ItemResource):
                 return str(kwargs.pop(m.group('key'), None) or
                            values[m.group('key')])
             except KeyError:
-                raise ValueError("Template was not provided a value for '%s'" %
+                raise ValueError('Template was not provided a value for "%s"' %
                                  m.group('key'))
 
         url = self._TEMPLATE_PARAM_RE.sub(get_template_value, url_template)
@@ -513,7 +515,7 @@ class DiffListResource(ListResource):
             request.add_file('parent_diff_path', 'parent_diff', parent_diff)
 
         if base_dir:
-            request.add_field("basedir", base_dir)
+            request.add_field('basedir', base_dir)
 
         if base_commit_id:
             request.add_field('base_commit_id', base_commit_id)

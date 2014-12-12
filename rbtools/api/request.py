@@ -1,13 +1,16 @@
+from __future__ import unicode_literals
+
 import base64
 import logging
-import mimetools
 import mimetypes
 import os
+import random
 import shutil
+import sys
+from io import BytesIO
 from json import loads as json_loads
 
 import six
-from six.moves import cStringIO as StringIO
 from six.moves.http_client import UNAUTHORIZED
 from six.moves.http_cookiejar import Cookie, MozillaCookieJar
 from six.moves.urllib.error import HTTPError, URLError
@@ -50,8 +53,6 @@ class HttpRequest(object):
         ])
 
         # Add the query arguments to the url
-        # TODO: Make work with Python < 2.6. In 2.6
-        # parse_qsl was moved from cgi to urlparse.
         url_parts = list(urlparse(url))
         query = dict(parse_qsl(url_parts[4]))
         query.update(query_args)
@@ -74,7 +75,7 @@ class HttpRequest(object):
         del self._files[filename]
 
     def encode_multipart_formdata(self):
-        """ Encodes data for use in an HTTP request.
+        """Encodes data for use in an HTTP request.
 
         Parameters:
             fields - the fields to be encoded.  This should be a dict in a
@@ -85,38 +86,68 @@ class HttpRequest(object):
         if not (self._fields or self._files):
             return None, None
 
-        NEWLINE = '\r\n'
-        BOUNDARY = mimetools.choose_boundary()
-        content = StringIO()
+        NEWLINE = b'\r\n'
+        BOUNDARY = self._make_mime_boundary()
+        content = BytesIO()
 
         for key in self._fields:
-            content.write('--' + BOUNDARY + NEWLINE)
-            content.write('Content-Disposition: form-data; name="%s"' % key)
+            content.write(b'--' + BOUNDARY + NEWLINE)
+            content.write(('Content-Disposition: form-data; '
+                           'name="%s"' % key).encode('utf-8'))
             content.write(NEWLINE + NEWLINE)
-            content.write(str(self._fields[key]) + NEWLINE)
+
+            if isinstance(self._fields[key], six.string_types):
+                content.write(self._fields[key].encode('utf-8') + NEWLINE)
+            else:
+                content.write(six.text_type(self._fields[key]).encode('utf-8')
+                              + NEWLINE)
 
         for key in self._files:
             filename = self._files[key]['filename']
             value = self._files[key]['content']
-            mime_type = (mimetypes.guess_type(filename)[0] or
-                         'application/octet-stream')
-            content.write('--' + BOUNDARY + NEWLINE)
-            content.write('Content-Disposition: form-data; name="%s"; ' % key)
-            content.write('filename="%s"' % filename + NEWLINE)
-            content.write('Content-Type: %s' % mime_type + NEWLINE)
-            content.write(NEWLINE)
-            content.write(value)
+
+            mime_type = mimetypes.guess_type(filename)[0]
+            if mime_type:
+                mime_type = mime_type.encode('utf-8')
+            else:
+                mime_type = b'application/octet-stream'
+
+            content.write(b'--' + BOUNDARY + NEWLINE)
+            content.write(b'Content-Disposition: form-data; name="%s"; '
+                          % key.encode('utf-8'))
+            content.write(b'filename="%s"' % filename.encode('utf-8')
+                          + NEWLINE)
+            content.write(b'Content-Type: %s' % mime_type + NEWLINE)
             content.write(NEWLINE)
 
-        content.write('--' + BOUNDARY + '--' + NEWLINE + NEWLINE)
-        content_type = 'multipart/form-data; boundary=%s' % BOUNDARY
+            if isinstance(value, six.string_types):
+                content.write(value.encode('utf-8'))
+            else:
+                content.write(value)
+
+            content.write(NEWLINE)
+
+        content.write(b'--' + BOUNDARY + b'--' + NEWLINE + NEWLINE)
+        content_type = ('multipart/form-data; boundary=%s' %
+                        BOUNDARY.decode('utf-8')).encode('utf-8')
 
         return content_type, content.getvalue()
+
+    def _make_mime_boundary(self):
+        """Create a mime boundary.
+
+        This exists because mimetools.choose_boundary() is gone in Python 3.x,
+        and email.generator._make_boundary isn't really appropriate to use
+        here.
+        """
+        fmt = '%%0%dd' % len(repr(sys.maxsize - 1))
+        token = random.randrange(sys.maxsize)
+        return (b'=' * 15) + (fmt % token).encode('utf-8') + b'=='
 
 
 class Request(URLRequest):
     """A request which contains a method attribute."""
-    def __init__(self, url, body='', headers={}, method="PUT"):
+    def __init__(self, url, body='', headers={}, method='PUT'):
         URLRequest.__init__(self, url, body, headers)
         self.method = method
 
@@ -227,7 +258,7 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
         if password is None:
             return None
 
-        raw = "%s:%s" % (user, password)
+        raw = '%s:%s' % (user, password)
         auth = 'Basic %s' % base64.b64encode(raw).strip()
 
         if (request.headers.get(self.auth_header, None) == auth and
@@ -336,15 +367,15 @@ def create_cookie_jar(cookie_file=None):
                     os.chmod(cookie_file, 0o600)
                 except IOError as e:
                     logging.warning("There was an error while copying "
-                                    "post-review's cookies: %s" % e)
+                                    "post-review's cookies: %s", e)
 
     if not os.path.isfile(cookie_file):
         try:
             open(cookie_file, 'w').close()
             os.chmod(cookie_file, 0o600)
         except IOError as e:
-            logging.warning("There was an error while creating a "
-                            "cookie file: %s" % e)
+            logging.warning('There was an error while creating a '
+                            'cookie file: %s', e)
 
     return MozillaCookieJar(cookie_file), cookie_file
 
@@ -365,7 +396,7 @@ class ReviewBoardServer(object):
                  api_token=None, agent=None, session=None, disable_proxy=False,
                  auth_callback=None, otp_token_callback=None):
         self.url = url
-        if self.url[-1] != '/':
+        if not self.url.endswith('/'):
             self.url += '/'
 
         self.url = self.url + 'api/'
@@ -384,7 +415,7 @@ class ReviewBoardServer(object):
             # it is a local domain and suffix it (See RFC 2109).
             domain = parsed_url[1].partition(':')[0]  # Remove Port.
             if domain.count('.') < 1:
-                domain = "%s.local" % domain
+                domain = '%s.local' % domain
 
             cookie = Cookie(
                 version=0,
@@ -479,7 +510,7 @@ class ReviewBoardServer(object):
                     'Content-Length': str(len(body)),
                 })
             else:
-                headers['Content-Length'] = "0"
+                headers['Content-Length'] = '0'
 
             r = Request(request.url.encode('utf-8'), body, headers,
                         request.method)
@@ -487,7 +518,7 @@ class ReviewBoardServer(object):
         except HTTPError as e:
             self.process_error(e.code, e.read())
         except URLError as e:
-            raise ServerInterfaceError("%s" % e.reason)
+            raise ServerInterfaceError('%s' % e.reason)
 
         try:
             self.cookie_jar.save()

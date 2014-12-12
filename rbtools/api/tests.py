@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import datetime
 import locale
 import re
@@ -383,22 +385,26 @@ class HttpRequestTests(TestCase):
         request.del_field('err')
 
         ctype, content = request.encode_multipart_formdata()
-        m = re.match('^multipart/form-data; boundary=(.*)$', ctype)
+        m = re.match(b'^multipart/form-data; boundary=(.*)$', ctype)
         self.assertFalse(m is None)
-        fields = [l.strip() for l in content.split('--' + m.group(1))][1:-1]
+        fields = [l.strip() for l in content.split(b'--' + m.group(1))][1:-1]
 
         d = {}
 
+        disposition_re = re.compile(
+            b'Content-Disposition: form-data; name="(.*?)"$')
+
         for f in fields:
-            lst = f.split('\r\n\r\n')
+            lst = f.split(b'\r\n\r\n')
             self.assertEqual(len(lst), 2)
             k, v = lst
 
-            m = re.match('Content-Disposition: form-data; name="(.*?)"$', k)
+            m = disposition_re.match(k)
             self.assertFalse(m is None)
             d[m.group(1)] = v
 
-        self.assertEqual(d, {'foo': 'bar', 'bar': '42', 'name': 'somestring'})
+        self.assertEqual(
+            d, {b'foo': b'bar', b'bar': b'42', b'name': b'somestring'})
 
 
 class ReviewRequestResourceTests(TestCase):

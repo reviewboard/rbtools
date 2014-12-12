@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import json
 
 from rbtools.api.utils import parse_mimetype

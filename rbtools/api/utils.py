@@ -1,3 +1,6 @@
+from __future__ import unicode_literals
+
+
 def parse_mimetype(mime_type):
     """Parse the mime type in to it's component parts."""
     types = mime_type.split(';')[0].split('/')
