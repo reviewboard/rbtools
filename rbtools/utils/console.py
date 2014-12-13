@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 import os
 import subprocess
@@ -18,7 +18,7 @@ def confirm(question):
     """
     while True:
         try:
-            answer = input("%s [Yes/No]: " % question).lower()
+            answer = input('%s [Yes/No]: ' % question).lower()
             return strtobool(answer)
         except ValueError:
             print('%s is not a valid answer.' % answer)

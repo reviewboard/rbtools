@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import logging
 import os
 import shutil
@@ -68,9 +70,9 @@ def load_config_files(homepath):
 
 
 def make_tempfile(content=None):
-    """
-    Creates a temporary file and returns the path. The path is stored
-    in an array for later cleanup.
+    """Creates a temporary file and returns the path.
+
+    The path is stored in an array for later cleanup.
     """
     fd, tmpfile = tempfile.mkstemp()
 
@@ -114,20 +116,18 @@ def make_empty_files(files):
 
 
 def walk_parents(path):
-    """
-    Walks up the tree to the root directory.
-    """
+    """Walks up the tree to the root directory."""
     while os.path.splitdrive(path)[1] != os.sep:
         yield path
         path = os.path.dirname(path)
 
 
 def get_home_path():
-    """Retrieve the homepath"""
+    """Retrieve the homepath."""
     if 'APPDATA' in os.environ:
         return os.environ['APPDATA']
     elif 'HOME' in os.environ:
-        return os.environ["HOME"]
+        return os.environ['HOME']
     else:
         return ''
 
@@ -177,7 +177,7 @@ def parse_config_file(filename):
 
 
 def load_config():
-    """Load configuration from .reviewboardrc files
+    """Load configuration from .reviewboardrc files.
 
     This will read all of the .reviewboardrc files influencing the
     cwd and return a dictionary containing the configuration.

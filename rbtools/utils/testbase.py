@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import os
 import sys
 import uuid
@@ -54,7 +56,7 @@ class RBTestBase(TestCase):
         """
 
         if sys.platform == 'win32' and not name.endswith('.exe'):
-            name += ".exe"
+            name += '.exe'
 
         for dir in os.environ['PATH'].split(os.pathsep):
             if os.path.exists(os.path.join(dir, name)):
@@ -63,8 +65,10 @@ class RBTestBase(TestCase):
         return False
 
     def reset_cl_args(self, values=[]):
-        """Replaces command-line arguments with new ones. Useful for testing
-        program's command-line options."""
+        """Replaces command-line arguments with new ones.
+
+        Useful for testing program's command-line options.
+        """
         sys.argv = values
 
     def set_user_home(self, path):

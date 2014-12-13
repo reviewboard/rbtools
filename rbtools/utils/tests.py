@@ -1,4 +1,5 @@
-"""Tests for rbtools.utils units."""
+from __future__ import unicode_literals
+
 import os
 import re
 import shutil
@@ -9,6 +10,10 @@ from rbtools.utils.testbase import RBTestBase
 
 
 class UtilitiesTest(RBTestBase):
+    """Tests for rbtools.api units.
+
+    Any new modules created under rbtools/api should be tested here.
+    """
     def test_check_install(self):
         """Testing 'check_install' method."""
         self.assertTrue(checks.check_install([sys.executable, ' --version']))

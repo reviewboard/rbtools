@@ -1,15 +1,17 @@
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 import logging
 import os
 import subprocess
 import sys
 
+import six
+
 
 def die(msg=None):
-    """
-    Cleanly exits the program with an error message. Erases all remaining
-    temporary files.
+    """Cleanly exits the program with an error message.
+
+    Erases all remaining temporary files.
     """
     from rbtools.utils.filesystem import cleanup_tempfiles
 
@@ -29,10 +31,9 @@ def execute(command,
             translate_newlines=True,
             with_errors=True,
             none_on_ignored_error=False,
-            return_error_code=False):
-    """
-    Utility function to execute a command and return the output.
-    """
+            return_error_code=False,
+            results_unicode=True):
+    """Utility function to execute a command and return the output."""
     if isinstance(command, list):
         logging.debug('Running: ' + subprocess.list2cmdline(command))
     else:
@@ -86,6 +87,21 @@ def execute(command,
 
     if rc and none_on_ignored_error:
         data = None
+
+    # If Popen is called with universal_newlines=True, the resulting data
+    # returned from stdout will be a text stream (and therefore a unicode
+    # object). Otherwise, it will be a byte stream. Translate the results into
+    # the desired type.
+    if split_lines and len(data) > 0:
+        if results_unicode and isinstance(data[0], bytes):
+            data = [line.decode('utf-8') for line in data]
+        elif not results_unicode and isinstance(data[0], six.text_type):
+            data = [line.encode('utf-8') for line in data]
+    elif not split_lines:
+        if results_unicode and isinstance(data, bytes):
+            data = data.decode('utf-8')
+        elif not results_unicode and isinstance(data, six.text_type):
+            data = line.encode('utf-8')
 
     if return_error_code:
         return rc, data

@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 from rbtools.api.errors import APIError
 from rbtools.commands import CommandError
 
@@ -8,7 +10,7 @@ def get_review_request(review_request_id, api_root):
         review_request = api_root.get_review_request(
             review_request_id=review_request_id)
     except APIError as e:
-        raise CommandError("Error getting review request %s: %s"
+        raise CommandError('Error getting review request %s: %s'
                            % (review_request_id, e))
 
     return review_request

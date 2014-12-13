@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import os
 import subprocess
 import sys
@@ -9,7 +11,8 @@ GNU_DIFF_WIN32_URL = 'http://gnuwin32.sourceforge.net/packages/diffutils.htm'
 
 
 def check_install(command):
-    """
+    """Check if the given command is installed.
+
     Try executing an external command and return a boolean indicating whether
     that command is installed or not.  The 'command' argument should be
     something that executes quickly, without hitting the network (for

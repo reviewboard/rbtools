@@ -1,3 +1,6 @@
+from __future__ import unicode_literals
+
+
 def get_repository_id(repository_info, api_root, repository_name=None):
     """Get the repository ID from the server.
 
