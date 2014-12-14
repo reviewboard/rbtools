@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 from rbtools.commands import Command, CommandError, Option
 from rbtools.utils.commands import get_review_request
@@ -14,18 +14,18 @@ class Close(Command):
     By default, the command will change the status to submitted. The
     user can provide an optional description for this action.
     """
-    name = "close"
-    author = "The Review Board Project"
-    args = "<review-request-id>"
+    name = 'close'
+    author = 'The Review Board Project'
+    args = '<review-request-id>'
     option_list = [
-        Option("--close-type",
-               dest="close_type",
+        Option('--close-type',
+               dest='close_type',
                default=SUBMITTED,
-               help="either submitted or discarded"),
-        Option("--description",
-               dest="description",
+               help='either submitted or discarded'),
+        Option('--description',
+               dest='description',
                default=None,
-               help="optional description accompanied with change"),
+               help='optional description accompanied with change'),
         Command.server_options,
         Command.repository_options,
     ]
@@ -56,7 +56,7 @@ class Close(Command):
         request = get_review_request(request_id, api_root)
 
         if request.status == close_type:
-            raise CommandError("Review request #%s is already %s." % (
+            raise CommandError('Review request #%s is already %s.' % (
                 request_id, close_type))
 
         if self.options.description:

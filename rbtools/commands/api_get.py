@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 import json
 import re
@@ -17,12 +17,12 @@ class APIGet(Command):
     description = 'Retrieve raw API resource payloads.'
     args = '<path> [-- [--<query-arg>=<value> ...]]'
     option_list = [
-        Option("--pretty",
-               action="store_true",
-               dest="pretty_print",
-               config_key="API_GET_PRETTY_PRINT",
+        Option('--pretty',
+               action='store_true',
+               dest='pretty_print',
+               config_key='API_GET_PRETTY_PRINT',
                default=False,
-               help="Pretty print output"),
+               help='Pretty print output'),
         Command.server_options,
     ]
 
@@ -42,7 +42,7 @@ class APIGet(Command):
             if m:
                 query_args[m.group('name')] = m.group('value')
             else:
-                raise ParseError("Unexpected query argument %s" % arg)
+                raise ParseError('Unexpected query argument %s' % arg)
 
         self.repository_info, self.tool = self.initialize_scm_tool()
         server_url = self.get_server_url(self.repository_info, self.tool)

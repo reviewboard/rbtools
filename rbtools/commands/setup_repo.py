@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 import difflib
 import os
@@ -26,12 +26,12 @@ class SetupRepo(Command):
     If the client supports it, it attempts to guess the branch name on the
     server.
     """
-    name = "setup-repo"
-    author = "The Review Board Project"
-    description = ("Configure a repository to point to a Review Board server "
-                   "by generating the configuration file %s"
+    name = 'setup-repo'
+    author = 'The Review Board Project'
+    description = ('Configure a repository to point to a Review Board server '
+                   'by generating the configuration file %s'
                    % CONFIG_FILE)
-    args = ""
+    args = ''
     option_list = [
         Command.server_options,
         Command.perforce_options,
@@ -64,7 +64,7 @@ class SetupRepo(Command):
                 for path in closest_path:
                     repo = repo_paths[path]
                     question = (
-                        "Use the %s repository '%s' (%s)?"
+                        'Use the %s repository "%s" (%s)?'
                         % (tool_name, repo['name'], repo['path']))
 
                     if confirm(question):
@@ -90,10 +90,9 @@ class SetupRepo(Command):
     def generate_config_file(self, file_path, config):
         """Generates the config file in the current working directory."""
         try:
-            outfile = open(file_path, "w")
-            output = self._get_output(config)
-            outfile.write(output)
-            outfile.close()
+            with open(file_path, 'w') as outfile:
+                output = self._get_output(config)
+                outfile.write(output)
         except IOError as e:
             raise CommandError('I/O error generating config file (%s): %s'
                                % (e.errno, e.strerror))
@@ -136,10 +135,10 @@ class SetupRepo(Command):
         output = self._get_output(config)
 
         if not os.path.exists(outfile_path):
-            question = ("Create '%s' with the following?\n\n%s\n"
+            question = ('Create "%s" with the following?\n\n%s\n'
                         % (outfile_path, output))
         else:
-            question = ("'%s' exists. Overwrite with the following?\n\n%s\n"
+            question = ('"%s" exists. Overwrite with the following?\n\n%s\n'
                         % (outfile_path, output))
 
         if not confirm(question):

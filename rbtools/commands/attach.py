@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 import os
 
@@ -9,18 +9,18 @@ from rbtools.utils.commands import get_review_request
 
 class Attach(Command):
     """Attach a file to a review request."""
-    name = "attach"
-    author = "The Review Board Project"
-    args = "<review-request-id> <file>"
+    name = 'attach'
+    author = 'The Review Board Project'
+    args = '<review-request-id> <file>'
     option_list = [
-        Option("--filename",
-               dest="filename",
+        Option('--filename',
+               dest='filename',
                default=None,
-               help="custom filename for file attachment"),
-        Option("--caption",
-               dest="caption",
+               help='custom filename for file attachment'),
+        Option('--caption',
+               dest='caption',
                default=None,
-               help="caption for file attachment"),
+               help='caption for file attachment'),
         Command.server_options,
         Command.repository_options,
     ]
@@ -34,19 +34,18 @@ class Attach(Command):
         request = get_review_request(request_id, api_root)
 
         try:
-            f = open(path_to_file, 'r')
-            content = f.read()
-            f.close()
+            with open(path_to_file, 'rb') as f:
+                content = f.read()
         except IOError:
-            raise CommandError("%s is not a valid file." % path_to_file)
+            raise CommandError('%s is not a valid file.' % path_to_file)
 
         # Check if the user specified a custom filename, otherwise
         # use the original filename.
         filename = self.options.filename or os.path.basename(path_to_file)
 
         try:
-            request.get_file_attachments() \
-                .upload_attachment(filename, content, self.options.caption)
+            request.get_file_attachments().upload_attachment(
+                filename, content, self.options.caption)
         except APIError as e:
             raise CommandError('Error uploading file: %s' % e)
 

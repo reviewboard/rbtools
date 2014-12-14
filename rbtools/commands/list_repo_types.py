@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 from rbtools.clients import print_clients
 from rbtools.commands import Command
 

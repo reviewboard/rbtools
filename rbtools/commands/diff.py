@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 from rbtools.clients.errors import InvalidRevisionSpecError
 from rbtools.commands import Command, CommandError
@@ -6,9 +6,9 @@ from rbtools.commands import Command, CommandError
 
 class Diff(Command):
     """Prints a diff to the terminal."""
-    name = "diff"
-    author = "The Review Board Project"
-    args = "[revisions]"
+    name = 'diff'
+    author = 'The Review Board Project'
+    args = '[revisions]'
     option_list = [
         Command.server_options,
         Command.diff_options,

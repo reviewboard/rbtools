@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 import argparse
 import getpass
@@ -22,12 +22,12 @@ from rbtools.utils.filesystem import (cleanup_tempfiles, get_home_path,
 from rbtools.utils.process import die
 
 
-RB_MAIN = "rbt"
+RB_MAIN = 'rbt'
 
 
 class CommandExit(Exception):
     def __init__(self, exit_code=0):
-        super(CommandExit, self).__init__("Exit with code %s" % exit_code)
+        super(CommandExit, self).__init__('Exit with code %s' % exit_code)
         self.exit_code = exit_code
 
 
@@ -131,18 +131,18 @@ class Command(object):
     ``option_list`` is a list of command line options for the command.
     Each list entry should be an Option or OptionGroup instance.
     """
-    name = ""
-    author = ""
-    description = ""
-    args = ""
+    name = ''
+    author = ''
+    description = ''
+    args = ''
     option_list = []
     _global_options = [
-        Option("-d", "--debug",
-               action="store_true",
-               dest="debug",
-               config_key="DEBUG",
+        Option('-d', '--debug',
+               action='store_true',
+               dest='debug',
+               config_key='DEBUG',
                default=False,
-               help="display debug output"),
+               help='display debug output'),
     ]
 
     server_options = OptionGroup(
@@ -435,7 +435,7 @@ class Command(object):
 
         if len(args) < minargs or (maxargs is not None and
                                    len(args) > maxargs):
-            parser.error("Invalid number of arguments provided")
+            parser.error('Invalid number of arguments provided')
             sys.exit(1)
 
         self.init_logging()
@@ -517,7 +517,7 @@ class Command(object):
                     'used with --diff-filename=-')
 
             print()
-            print("==> HTTP Authentication Required")
+            print('==> HTTP Authentication Required')
             print('Enter authorization information for "%s" at %s' %
                   (realm, urlparse(uri)[1]))
 
@@ -586,10 +586,10 @@ class Command(object):
         try:
             api_root = api_client.get_root()
         except ServerInterfaceError as e:
-            raise CommandError("Could not reach the Review Board "
-                               "server at %s" % server_url)
+            raise CommandError('Could not reach the Review Board '
+                               'server at %s' % server_url)
         except APIError as e:
-            raise CommandError("Unexpected API Error: %s" % e)
+            raise CommandError('Unexpected API Error: %s' % e)
 
         return api_client, api_root
 

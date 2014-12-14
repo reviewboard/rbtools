@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 import argparse
 import os
@@ -40,7 +40,7 @@ def help(args, parser):
     if args:
         # TODO: First check for static help text file before
         # generating it at run time.
-        ep = pkg_resources.get_entry_info("rbtools", "rbtools_commands",
+        ep = pkg_resources.get_entry_info('rbtools', 'rbtools_commands',
                                           args[0])
 
         if ep:
@@ -96,15 +96,15 @@ def main():
     command_name = opt.command[0]
     args = opt.command[1:]
 
-    if command_name == "help":
+    if command_name == 'help':
         help(args, parser)
-    elif opt.help or "--help" in args or '-h' in args:
+    elif opt.help or '--help' in args or '-h' in args:
         help(opt.command, parser)
 
     # Attempt to retrieve the command class from the entry points. We
     # first look in rbtools for the commands, and failing that, we look
     # for third-party commands.
-    ep = pkg_resources.get_entry_info("rbtools", "rbtools_commands",
+    ep = pkg_resources.get_entry_info('rbtools', 'rbtools_commands',
                                       command_name)
 
     if not ep:
@@ -122,11 +122,11 @@ def main():
             # TODO: It might be useful to actual have the strack
             # trace here, due to an import somewhere down the import
             # chain failing.
-            sys.stderr.write("Could not load command entry point %s\n" %
+            sys.stderr.write('Could not load command entry point %s\n' %
                              ep.name)
             sys.exit(1)
         except Exception as e:
-            sys.stderr.write("Unexpected error loading command %s: %s\n" %
+            sys.stderr.write('Unexpected error loading command %s: %s\n' %
                              (ep.name, e))
             sys.exit(1)
 
@@ -153,7 +153,7 @@ def main():
         if command_name in aliases:
             sys.exit(run_alias(aliases[command_name], args))
         else:
-            parser.error("'%s' is not a command" % command_name)
+            parser.error('"%s" is not a command' % command_name)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

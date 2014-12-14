@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 import logging
 
@@ -9,17 +9,17 @@ from rbtools.utils.users import get_username
 
 class Status(Command):
     """Display review requests for the current repository."""
-    name = "status"
-    author = "The Review Board Project"
-    description = "Output a list of your pending review requests."
-    args = ""
+    name = 'status'
+    author = 'The Review Board Project'
+    description = 'Output a list of your pending review requests.'
+    args = ''
     option_list = [
-        Option("--all",
-               dest="all_repositories",
-               action="store_true",
+        Option('--all',
+               dest='all_repositories',
+               action='store_true',
                default=False,
-               help="Show review requests for all repositories instead "
-                    "of the detected repository."),
+               help='Show review requests for all repositories instead '
+                    'of the detected repository.'),
         Command.server_options,
         Command.repository_options,
         Command.perforce_options,

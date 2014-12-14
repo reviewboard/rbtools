@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 import logging
 import os
@@ -17,10 +17,10 @@ from rbtools.utils.review_request import (get_commit_message,
 
 class Post(Command):
     """Create and update review requests."""
-    name = "post"
-    author = "The Review Board Project"
-    description = "Uploads diffs to create and update review requests."
-    args = "[revisions]"
+    name = 'post'
+    author = 'The Review Board Project'
+    description = 'Uploads diffs to create and update review requests.'
+    args = '[revisions]'
 
     GUESS_AUTO = 'auto'
     GUESS_YES = 'yes'
@@ -216,33 +216,31 @@ class Post(Command):
 
         # Only one of --description and --description-file can be used
         if self.options.description and self.options.description_file:
-            raise CommandError("The --description and --description-file "
-                               "options are mutually exclusive.\n")
+            raise CommandError('The --description and --description-file '
+                               'options are mutually exclusive.\n')
 
         # If --description-file is used, read that file
         if self.options.description_file:
             if os.path.exists(self.options.description_file):
-                fp = open(self.options.description_file, "r")
-                self.options.description = fp.read()
-                fp.close()
+                with open(self.options.description_file, 'r') as fp:
+                    self.options.description = fp.read()
             else:
                 raise CommandError(
-                    "The description file %s does not exist.\n" %
+                    'The description file %s does not exist.\n' %
                     self.options.description_file)
 
         # Only one of --testing-done and --testing-done-file can be used
         if self.options.testing_done and self.options.testing_file:
-            raise CommandError("The --testing-done and --testing-done-file "
-                               "options are mutually exclusive.\n")
+            raise CommandError('The --testing-done and --testing-done-file '
+                               'options are mutually exclusive.\n')
 
         # If --testing-done-file is used, read that file
         if self.options.testing_file:
             if os.path.exists(self.options.testing_file):
-                fp = open(self.options.testing_file, "r")
-                self.options.testing_done = fp.read()
-                fp.close()
+                with open(self.options.testing_file, 'r') as fp:
+                    self.options.testing_done = fp.read()
             else:
-                raise CommandError("The testing file %s does not exist.\n" %
+                raise CommandError('The testing file %s does not exist.\n' %
                                    self.options.testing_file)
 
         # If we have an explicitly specified summary, override
@@ -335,8 +333,8 @@ class Post(Command):
 
             if review_request.status == 'submitted':
                 raise CommandError(
-                    "Review request %s is marked as %s. In order to update "
-                    "it, please reopen the review request and try again."
+                    'Review request %s is marked as %s. In order to update '
+                    'it, please reopen the review request and try again.'
                     % (review_request_id, review_request.status))
         else:
             # No review_request_id, so we will create a new review request.
@@ -365,7 +363,7 @@ class Post(Command):
                         review_request = review_request.update(
                             changenum=changenum)
                 else:
-                    raise CommandError("Error creating review request: %s" % e)
+                    raise CommandError('Error creating review request: %s' % e)
 
         if (not repository_info.supports_changesets or
             not self.options.change_only):
@@ -413,7 +411,7 @@ class Post(Command):
         try:
             draft = review_request.get_draft()
         except APIError as e:
-            raise CommandError("Error retrieving review request draft: %s" % e)
+            raise CommandError('Error retrieving review request draft: %s' % e)
 
         # Update the review request draft fields based on options set
         # by the user, or configuration.
@@ -436,10 +434,10 @@ class Post(Command):
 
         if self.options.bugs_closed:
             # Append to the existing list of bugs.
-            self.options.bugs_closed = self.options.bugs_closed.strip(", ")
-            bug_set = (set(re.split("[, ]+", self.options.bugs_closed)) |
+            self.options.bugs_closed = self.options.bugs_closed.strip(', ')
+            bug_set = (set(re.split('[, ]+', self.options.bugs_closed)) |
                        set(review_request.bugs_closed))
-            self.options.bugs_closed = ",".join(bug_set)
+            self.options.bugs_closed = ','.join(bug_set)
             update_fields['bugs_closed'] = self.options.bugs_closed
 
         if self.options.description:
@@ -560,16 +558,19 @@ class Post(Command):
             commit_id = None
 
             if self.options.diff_filename == '-':
-                diff = sys.stdin.read()
+                if hasattr(sys.stdin, 'buffer'):
+                    # Make sure we get bytes on Python 3.x
+                    diff = sys.stdin.buffer.read()
+                else:
+                    diff = sys.stdin.read()
             else:
                 try:
                     diff_path = os.path.join(origcwd,
                                              self.options.diff_filename)
-                    fp = open(diff_path, 'r')
-                    diff = fp.read()
-                    fp.close()
+                    with open(diff_path, 'rb') as fp:
+                        diff = fp.read()
                 except IOError as e:
-                    raise CommandError("Unable to open diff filename: %s" % e)
+                    raise CommandError('Unable to open diff filename: %s' % e)
         else:
             revisions = get_revisions(self.tool, self.cmd_args)
 
@@ -614,7 +615,7 @@ class Post(Command):
             if e.error_code == 207:
                 msg_prefix = '%s: ' % e.rsp['file']
 
-            raise CommandError("Error validating diff\n\n%s%s" %
+            raise CommandError('Error validating diff\n\n%s%s' %
                                (msg_prefix, e))
         except AttributeError:
             # The server doesn't have a diff validation resource. Post as

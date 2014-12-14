@@ -1,19 +1,8 @@
-from __future__ import print_function
-
-import re
+from __future__ import print_function, unicode_literals
 
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option
 from rbtools.utils.filesystem import make_tempfile
-
-
-# MARKDOWN_ESCAPED_CHARS comes from markdown.Markdown.ESCAPED_CHARS. We don't
-# want to have a dependency on markdown for rbtools, so we just copy it into
-# here.
-MARKDOWN_ESCAPED_CHARS = ['\\', '`', '*', '_', '{', '}', '[', ']',
-                          '(', ')', '>', '#', '+', '-', '.', '!']
-MARKDOWN_SPECIAL_CHARS = re.escape(r''.join(MARKDOWN_ESCAPED_CHARS))
-UNESCAPE_CHARS_RE = re.compile(r'\\([%s])' % MARKDOWN_SPECIAL_CHARS)
 
 
 class Patch(Command):
@@ -21,37 +10,37 @@ class Patch(Command):
 
     The patch file indicated by the request id is downloaded from the
     server and then applied locally."""
-    name = "patch"
-    author = "The Review Board Project"
-    args = "<review-request-id>"
+    name = 'patch'
+    author = 'The Review Board Project'
+    args = '<review-request-id>'
     option_list = [
-        Option("-c", "--commit",
-               dest="commit",
-               action="store_true",
+        Option('-c', '--commit',
+               dest='commit',
+               action='store_true',
                default=False,
-               help="Commit using information fetched "
-                    "from the review request (Git/Mercurial only)."),
-        Option("-C", "--commit-no-edit",
-               dest="commit_no_edit",
-               action="store_true",
+               help='Commit using information fetched '
+                    'from the review request (Git/Mercurial only).'),
+        Option('-C', '--commit-no-edit',
+               dest='commit_no_edit',
+               action='store_true',
                default=False,
-               help="Commit using information fetched "
-                    "from the review request (Git/Mercurial only). "
-                    "This differs from -c by not invoking the editor "
-                    "to modify the commit message."),
-        Option("--diff-revision",
-               dest="diff_revision",
+               help='Commit using information fetched '
+                    'from the review request (Git/Mercurial only). '
+                    'This differs from -c by not invoking the editor '
+                    'to modify the commit message.'),
+        Option('--diff-revision',
+               dest='diff_revision',
                default=None,
-               help="revision id of diff to be used as patch"),
-        Option("--px",
-               dest="px",
+               help='revision id of diff to be used as patch'),
+        Option('--px',
+               dest='px',
                default=None,
-               help="numerical pX argument for patch"),
-        Option("--print",
-               dest="patch_stdout",
-               action="store_true",
+               help='numerical pX argument for patch'),
+        Option('--print',
+               dest='patch_stdout',
+               action='store_true',
                default=False,
-               help="print patch to stdout instead of applying"),
+               help='print patch to stdout instead of applying'),
         Command.server_options,
         Command.repository_options,
     ]
@@ -65,7 +54,7 @@ class Patch(Command):
         try:
             diffs = api_root.get_diffs(review_request_id=request_id)
         except APIError as e:
-            raise CommandError("Error getting diffs: %s" % e)
+            raise CommandError('Error getting diffs: %s' % e)
 
         # Use the latest diff if a diff revision was not given.
         # Since diff revisions start a 1, increment by one, and

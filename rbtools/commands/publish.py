@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError
@@ -7,9 +7,9 @@ from rbtools.utils.commands import get_review_request
 
 class Publish(Command):
     """Publish a specific review request from a draft."""
-    name = "publish"
-    author = "The Review Board Project"
-    args = "<review-request-id>"
+    name = 'publish'
+    author = 'The Review Board Project'
+    args = '<review-request-id>'
     option_list = [
         Command.server_options,
         Command.repository_options,
@@ -28,7 +28,7 @@ class Publish(Command):
             draft = request.get_draft()
             draft = draft.update(public=True)
         except APIError as e:
-            raise CommandError("Error publishing review request (it may "
-                               "already be published): %s" % e)
+            raise CommandError('Error publishing review request (it may '
+                               'already be published): %s' % e)
 
         print('Review request #%s is published.' % request_id)
