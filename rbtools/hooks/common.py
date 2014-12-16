@@ -1,7 +1,6 @@
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 import logging
-import re
 import subprocess
 
 from rbtools.api.client import RBClient
