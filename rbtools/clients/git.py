@@ -4,7 +4,8 @@ import re
 import sys
 
 from rbtools.clients import PatchResult, SCMClient, RepositoryInfo
-from rbtools.clients.errors import (InvalidRevisionSpecError,
+from rbtools.clients.errors import (MergeError, PushError,
+                                    InvalidRevisionSpecError,
                                     TooManyRevisionsError)
 from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.svn import SVNClient, SVNRepositoryInfo
@@ -26,6 +27,8 @@ class GitClient(SCMClient):
     supports_diff_exclude_patterns = True
 
     can_amend_commit = True
+    can_merge = True
+    can_push_upstream = True
 
     def __init__(self, **kwargs):
         super(GitClient, self).__init__(**kwargs)
@@ -732,6 +735,53 @@ class GitClient(SCMClient):
 
         execute(['git', 'commit', '-m', modified_message,
                  '--author="%s <%s>"' % (author.fullname, author.email)])
+
+    def merge(self, target, destination, message, author, squash=False):
+        """Merges the target branch with destination branch."""
+        rc, output = execute(
+            ['git', 'checkout', destination],
+            ignore_errors=True,
+            return_error_code=True)
+
+        if rc:
+            raise MergeError("Could not checkout to branch '%s'.\n\n%s" %
+                             (destination, output))
+
+        if squash:
+            method = '--squash'
+        else:
+            method = '--no-ff'
+
+        rc, output = execute(
+            ['git', 'merge', target, method, '--no-commit'],
+            ignore_errors=True,
+            return_error_code=True)
+
+        if rc:
+            raise MergeError("Could not merge branch '%s' into '%s'.\n\n%s" %
+                             (target, destination, output))
+
+        self.create_commit(message, author, False)
+
+    def push_upstream(self, remote_branch):
+        """Pushes the current branch to upstream."""
+        origin_url = self.get_origin()[1]
+        rc, output = execute(
+            ['git', 'pull', '--rebase', origin_url, remote_branch],
+            ignore_errors=True,
+            return_error_code=True)
+
+        if rc:
+            raise PushError('Could not pull changes from upstream.')
+
+        rc, output = execute(
+            ['git', 'push', origin_url, remote_branch],
+            ignore_errors=True,
+            return_error_code=True)
+
+        if rc:
+            raise PushError("Could not push branch '%s' to upstream" %
+                            remote_branch)
 
     def get_current_branch(self):
         """Returns the name of the current branch."""

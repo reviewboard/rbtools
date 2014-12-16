@@ -40,6 +40,8 @@ class SCMClient(object):
     supports_diff_exclude_patterns = False
 
     can_amend_commit = False
+    can_merge = False
+    can_push_upstream = False
 
     def __init__(self, user_config=None, configs=[], options=None,
                  capabilities=None):
@@ -265,6 +267,14 @@ class SCMClient(object):
             result['description'] = commit_message
 
         return result
+
+    def merge(self, target, destination, message, author, squash):
+        """Merges the target branch with destination branch."""
+        raise NotImplementedError
+
+    def push_upstream(self, remote_branch):
+        """Pushes the current branch to upstream."""
+        raise NotImplementedError
 
     def get_raw_commit_message(self, revisions):
         """Extracts the commit messages on the commits in the given revisions.

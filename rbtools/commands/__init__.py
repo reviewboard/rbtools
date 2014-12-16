@@ -430,6 +430,10 @@ class Command(object):
         minargs = len(argspec[0]) - 1
         maxargs = minargs
 
+        # Arguments that have a default value are considered optional.
+        if argspec[3] is not None:
+            minargs -= len(argspec[3])
+
         if argspec[1] is not None:
             maxargs = None
 

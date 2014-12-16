@@ -1,3 +1,13 @@
+class MergeError(Exception):
+    """An error for when merging two branches fails."""
+    pass
+
+
+class PushError(Exception):
+    """An error for when pushing a branch to upstream fails."""
+    pass
+
+
 class OptionsCheckError(Exception):
     """
     An error that represents when command-line options were used

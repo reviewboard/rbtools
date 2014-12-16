@@ -74,6 +74,7 @@ rb_commands = [
     'clear-cache = rbtools.commands.clearcache:ClearCache',
     'close = rbtools.commands.close:Close',
     'diff = rbtools.commands.diff:Diff',
+    'land = rbtools.commands.land:Land',
     'list-repo-types = rbtools.commands.list_repo_types:ListRepoTypes',
     'patch = rbtools.commands.patch:Patch',
     'post = rbtools.commands.post:Post',

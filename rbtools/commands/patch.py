@@ -2,6 +2,7 @@ from __future__ import print_function, unicode_literals
 
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option
+from rbtools.utils.commands import extract_commit_message
 from rbtools.utils.filesystem import make_tempfile
 
 
@@ -111,34 +112,6 @@ class Patch(Command):
 
             return True
 
-    def _extract_commit_message(self, review_request):
-        """Returns a commit message based on the review request.
-
-        The commit message returned contains the Summary, Description, Bugs,
-        and Testing Done fields from the review request, if available.
-        """
-        info = []
-
-        summary = review_request.summary
-        description = review_request.description
-        testing_done = review_request.testing_done
-
-        if not description.startswith(summary):
-            info.append(summary)
-
-        info.append(description)
-
-        if testing_done:
-            info.append('Testing Done:\n%s' % testing_done)
-
-        if review_request.bugs_closed:
-            info.append('Bugs closed: %s'
-                        % ', '.join(review_request.bugs_closed))
-
-        info.append('Reviewed at %s' % review_request.absolute_url)
-
-        return '\n\n'.join(info)
-
     def main(self, request_id):
         """Run the command."""
         repository_info, tool = self.initialize_scm_tool(
@@ -184,7 +157,7 @@ class Patch(Command):
                     raise CommandError('Error getting review request %s: %s'
                                        % (request_id, e))
 
-                message = self._extract_commit_message(review_request)
+                message = extract_commit_message(review_request)
                 author = review_request.get_submitter()
 
                 try:
