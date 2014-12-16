@@ -20,7 +20,7 @@ class CVSClient(SCMClient):
 
     supports_diff_exclude_patterns = True
 
-    INDEX_FILE_RE = re.compile('^Index: (.+)\n$')
+    INDEX_FILE_RE = re.compile(b'^Index: (.+)\n$')
 
     REVISION_WORKING_COPY = '--rbtools-working-copy'
 
@@ -32,20 +32,19 @@ class CVSClient(SCMClient):
             logging.debug('Unable to execute "cvs": skipping CVS')
             return None
 
-        cvsroot_path = os.path.join("CVS", "Root")
+        cvsroot_path = os.path.join('CVS', 'Root')
 
         if not os.path.exists(cvsroot_path):
             return None
 
-        fp = open(cvsroot_path, "r")
-        repository_path = fp.read().strip()
-        fp.close()
+        with open(cvsroot_path, 'r') as fp:
+            repository_path = fp.read().strip()
 
-        i = repository_path.find("@")
+        i = repository_path.find('@')
         if i != -1:
             repository_path = repository_path[i + 1:]
 
-        i = repository_path.rfind(":")
+        i = repository_path.rfind(':')
         if i != -1:
             host = repository_path[:i]
             try:
@@ -53,8 +52,8 @@ class CVSClient(SCMClient):
                 repository_path = repository_path.replace('%s:' % host,
                                                           '%s:' % canon)
             except socket.error as msg:
-                logging.error("failed to get fqdn for %s, msg=%s"
-                              % (host, msg))
+                logging.error('failed to get fqdn for %s, msg=%s',
+                              host, msg)
 
         return RepositoryInfo(path=repository_path)
 
@@ -142,7 +141,7 @@ class CVSClient(SCMClient):
 
         try:
             diff = execute(diff_cmd + include_files, extra_ignore_errors=(1,),
-                           split_lines=True)
+                           split_lines=True, results_unicode=False)
         finally:
             os.chdir(cwd)
 
@@ -151,22 +150,22 @@ class CVSClient(SCMClient):
                                base_dir=self._get_repository_root())
 
         return {
-            'diff': ''.join(diff)
+            'diff': b''.join(diff)
         }
 
     def _get_repository_root(self):
         """Get the root directory of the repository.
 
         This function assumes the current working directory is a CVS
-        repository."""
+        repository.
+        """
         repo_root = ''
 
         # The CVS/Repository file contains the directory within the repository
         # which the current working directory corresponds with. This may be an
         # absolute path or a relative path
-        f = open(os.path.join('CVS', 'Repository'))
-        cvs_repo_path = f.read().strip()
-        f.close()
+        with open(os.path.join('CVS', 'Repository')) as f:
+            cvs_repo_path = f.read().strip()
 
         cvsroot = self.get_repository_info().path
 

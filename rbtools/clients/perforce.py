@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 import fnmatch
 import logging
@@ -170,8 +170,8 @@ class PerforceClient(SCMClient):
 
     supports_diff_extra_args = True
 
-    DATE_RE = re.compile(r'(\w+)\s+(\w+)\s+(\d+)\s+(\d\d:\d\d:\d\d)\s+'
-                         '(\d\d\d\d)')
+    DATE_RE = re.compile(br'(\w+)\s+(\w+)\s+(\d+)\s+(\d\d:\d\d:\d\d)\s+'
+                         br'(\d\d\d\d)')
     ENCODED_COUNTER_URL_RE = re.compile('reviewboard.url\.(\S+)')
 
     REVISION_CURRENT_SYNC = '--rbtools-current-sync'
@@ -237,7 +237,7 @@ class PerforceClient(SCMClient):
             if info[1]:
                 servers += info[1]
 
-            repository_path = ["%s:%s" % (server, port)
+            repository_path = ['%s:%s' % (server, port)
                                for server in servers]
 
             # If there's only one repository path found, then we don't
@@ -613,7 +613,7 @@ class PerforceClient(SCMClient):
             changenum = None
 
         return {
-            'diff': ''.join(diff_lines),
+            'diff': b''.join(diff_lines),
             'changenum': changenum,
         }
 
@@ -806,7 +806,7 @@ class PerforceClient(SCMClient):
                 assert False
 
         return {
-            'diff': ''.join(diff_lines)
+            'diff': b''.join(diff_lines)
         }
 
     def _accumulate_range_change(self, file_entry, change):
@@ -1086,7 +1086,7 @@ class PerforceClient(SCMClient):
         os.unlink(tmp_diff_to_filename)
 
         return {
-            'diff': ''.join(diff_lines),
+            'diff': b''.join(diff_lines),
         }
 
     def _do_diff(self, old_file, new_file, depot_file, base_revision,
@@ -1107,16 +1107,16 @@ class PerforceClient(SCMClient):
         Returns a list of strings of diff lines.
         """
         if hasattr(os, 'uname') and os.uname()[0] == 'SunOS':
-            diff_cmd = ["gdiff", "-urNp", old_file, new_file]
+            diff_cmd = ['gdiff', '-urNp', old_file, new_file]
         else:
-            diff_cmd = ["diff", "-urNp", old_file, new_file]
+            diff_cmd = ['diff', '-urNp', old_file, new_file]
 
         # Diff returns "1" if differences were found.
         dl = execute(diff_cmd, extra_ignore_errors=(1, 2),
-                     translate_newlines=False)
+                     translate_newlines=False, results_unicode=False)
 
         # If the input file has ^M characters at end of line, lets ignore them.
-        dl = dl.replace('\r\r\n', '\r\n')
+        dl = dl.replace(b'\r\r\n', b'\r\n')
         dl = dl.splitlines(True)
 
         cwd = os.getcwd()
@@ -1142,70 +1142,74 @@ class PerforceClient(SCMClient):
         # and the code below expects the output to start with
         #     "Binary files "
         if (len(dl) == 1 and
-            dl[0].startswith('Files %s and %s differ' %
+            dl[0].startswith(b'Files %s and %s differ' %
                              (old_file, new_file))):
-            dl = (['Binary files %s and %s differ\n'
-                  % (old_file, new_file)])
+            dl = [b'Binary files %s and %s differ\n' % (old_file, new_file)]
 
-        if dl == [] or dl[0].startswith("Binary files "):
+        if dl == [] or dl[0].startswith(b'Binary files '):
             is_empty_and_changed = (self._supports_empty_files() and
                                     changetype_short in ('A', 'D'))
 
             if dl == [] and (is_move or is_empty_and_changed):
-                dl.insert(0, "==== %s#%s ==%s== %s ====\n" %
-                          (depot_file, base_revision, changetype_short,
-                           new_local_path))
-                dl.append('\n')
+                line = ('==== %s#%s ==%s== %s ====\n'
+                        % (depot_file, base_revision, changetype_short,
+                           new_local_path)).encode('utf-8')
+                dl.insert(0, line)
+                dl.append(b'\n')
             else:
                 if ignore_unmodified:
                     return []
                 else:
-                    print("Warning: %s in your changeset is unmodified" %
+                    print('Warning: %s in your changeset is unmodified' %
                           local_path)
         elif len(dl) > 1:
-            m = re.search(r'(\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d)', dl[1])
+            m = re.search(br'(\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d)', dl[1])
             if m:
-                timestamp = m.group(1)
+                timestamp = m.group(1).decode('utf-8')
             else:
                 # Thu Sep  3 11:24:48 2007
                 m = self.DATE_RE.search(dl[1])
                 if not m:
-                    die("Unable to parse diff header: %s" % dl[1])
+                    die('Unable to parse diff header: %s' % dl[1])
 
                 month_map = {
-                    "Jan": "01",
-                    "Feb": "02",
-                    "Mar": "03",
-                    "Apr": "04",
-                    "May": "05",
-                    "Jun": "06",
-                    "Jul": "07",
-                    "Aug": "08",
-                    "Sep": "09",
-                    "Oct": "10",
-                    "Nov": "11",
-                    "Dec": "12",
+                    b'Jan': b'01',
+                    b'Feb': b'02',
+                    b'Mar': b'03',
+                    b'Apr': b'04',
+                    b'May': b'05',
+                    b'Jun': b'06',
+                    b'Jul': b'07',
+                    b'Aug': b'08',
+                    b'Sep': b'09',
+                    b'Oct': b'10',
+                    b'Nov': b'11',
+                    b'Dec': b'12',
                 }
                 month = month_map[m.group(2)]
                 day = m.group(3)
                 timestamp = m.group(4)
                 year = m.group(5)
 
-                timestamp = "%s-%s-%s %s" % (year, month, day, timestamp)
+                timestamp = '%s-%s-%s %s' % (year, month, day, timestamp)
 
-            dl[0] = "--- %s\t%s#%s\n" % (local_path, depot_file, base_revision)
-            dl[1] = "+++ %s\t%s\n" % (new_local_path, timestamp)
+            dl[0] = ('--- %s\t%s#%s\n'
+                     % (local_path, depot_file, base_revision)).encode('utf-8')
+            dl[1] = ('+++ %s\t%s\n'
+                     % (new_local_path, timestamp)).encode('utf-8')
 
             if is_move:
-                dl.insert(0, 'Moved to: %s\n' % new_depot_file)
-                dl.insert(0, 'Moved from: %s\n' % depot_file)
+                dl.insert(0,
+                          ('Moved to: %s\n' % new_depot_file).encode('utf-8'))
+                dl.insert(0,
+                          ('Moved from: %s\n' % depot_file).encode('utf-8'))
 
             # Not everybody has files that end in a newline (ugh). This ensures
             # that the resulting diff file isn't broken.
-            if dl[-1][-1] != '\n':
-                dl.append('\n')
+            if not dl[-1].endswith(b'\n'):
+                dl.append(b'\n')
         else:
-            die("ERROR, no valid diffs: %s" % dl[0])
+            die('ERROR, no valid diffs: %s' % dl[0].decode('utf-8'))
 
         return dl
 
@@ -1230,7 +1234,7 @@ class PerforceClient(SCMClient):
         #   when rbt uses their credentials to publish its contents.
 
         if os.path.islink(tmpfile):
-            raise ValueError("'%s' is a symlink" % depot_path)
+            raise ValueError('"%s" is a symlink' % depot_path)
         else:
             os.chmod(tmpfile, stat.S_IREAD | stat.S_IWRITE)
 

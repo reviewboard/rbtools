@@ -520,7 +520,8 @@ class GitClient(SCMClient):
                                 split_lines=True,
                                 with_errors=False,
                                 ignore_errors=True,
-                                none_on_ignored_error=True)
+                                none_on_ignored_error=True,
+                                results_unicode=False)
 
                 if lines is None:
                     logging.error(
@@ -538,14 +539,15 @@ class GitClient(SCMClient):
                                  split_lines=True,
                                  with_errors=False,
                                  ignore_errors=True,
-                                 none_on_ignored_error=True)
+                                 none_on_ignored_error=True,
+                                 results_unicode=False)
 
         if self.type == 'svn':
             return self.make_svn_diff(merge_base, diff_lines)
         elif self.type == 'perforce':
             return self.make_perforce_diff(merge_base, diff_lines)
         else:
-            return ''.join(diff_lines)
+            return b''.join(diff_lines)
 
     def make_svn_diff(self, merge_base, diff_lines):
         """

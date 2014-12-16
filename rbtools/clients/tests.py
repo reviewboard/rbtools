@@ -1679,10 +1679,9 @@ class PerforceClientTests(SCMClientTests):
         if expect_changenum:
             self.assertTrue('changenum' in diff_info)
 
-        diff_content = re.sub('\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}',
-                              '1970-01-01 00:00:00',
+        diff_content = re.sub(br'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}',
+                              br'1970-01-01 00:00:00',
                               diff_info['diff'])
-        print(diff_content)
         self.assertEqual(md5(diff_content).hexdigest(), expected_diff_hash)
 
     def test_parse_revision_spec_no_args(self):
@@ -1866,9 +1865,8 @@ class BazaarClientTests(SCMClientTests):
 
     def _bzr_add_file_commit(self, file, data, msg):
         """Add a file to a Bazaar repository with the content of data and commit with msg."""
-        foo = open(file, "w")
-        foo.write(data)
-        foo.close()
+        with open(file, 'w') as foo:
+            foo.write(data)
         self._run_bzr(["add", file])
         self._run_bzr(["commit", "-m", msg, '--author', 'Test User'])
 
@@ -1876,11 +1874,14 @@ class BazaarClientTests(SCMClientTests):
         """Testing that the full_diff for ``filename`` matches the ``expected_diff``."""
         diff_lines = full_diff.splitlines()
 
-        self.assertEqual("=== modified file %r" % filename, diff_lines[0])
-        self.assertTrue(diff_lines[1].startswith("--- %s\t" % filename))
-        self.assertTrue(diff_lines[2].startswith("+++ %s\t" % filename))
+        self.assertEqual(('=== modified file %r' % filename).encode('utf-8'),
+                         diff_lines[0])
+        self.assertTrue(diff_lines[1].startswith(
+            ('--- %s\t' % filename).encode('utf-8')))
+        self.assertTrue(diff_lines[2].startswith(
+            ('+++ %s\t' % filename).encode('utf-8')))
 
-        diff_body = "\n".join(diff_lines[3:])
+        diff_body = b'\n'.join(diff_lines[3:])
         self.assertEqual(md5(diff_body).hexdigest(), expected_diff_digest)
 
     def test_get_repository_info_original_branch(self):
@@ -1893,7 +1894,7 @@ class BazaarClientTests(SCMClientTests):
                          os.path.realpath(self.original_branch))
         self.assertTrue(ri.supports_parent_diffs)
 
-        self.assertEqual(ri.base_path, "/")
+        self.assertEqual(ri.base_path, '/')
         self.assertFalse(ri.supports_changesets)
 
     def test_get_repository_info_child_branch(self):
@@ -1952,8 +1953,8 @@ class BazaarClientTests(SCMClientTests):
 
         num_files_in_diff = len([
             line
-            for line in result['diff'].split('\n')
-            if line.startswith('===')
+            for line in result['diff'].split(b'\n')
+            if line.startswith(b'===')
         ])
 
         self.assertEqual(num_files_in_diff, 1)

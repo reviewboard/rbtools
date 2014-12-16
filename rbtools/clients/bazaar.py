@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import logging
 import os
 import re
@@ -24,7 +26,7 @@ class BazaarClient(SCMClient):
 
     supports_diff_exclude_patterns = True
 
-    INDEX_FILE_RE = re.compile("===.+'(.+?)'\n")
+    INDEX_FILE_RE = re.compile(b"===.+'(.+?)'\n")
 
     # Regular expression that matches the path to the current branch.
     #
@@ -48,22 +50,22 @@ class BazaarClient(SCMClient):
             logging.debug('Unable to execute "bzr help": skipping Bazaar')
             return None
 
-        bzr_info = execute(["bzr", "info"], ignore_errors=True)
+        bzr_info = execute(['bzr', 'info'], ignore_errors=True)
 
-        if "ERROR: Not a branch:" in bzr_info:
+        if 'ERROR: Not a branch:' in bzr_info:
             # This is not a branch:
             repository_info = None
         else:
             # This is a branch, let's get its attributes:
             branch_match = re.search(self.BRANCH_REGEX, bzr_info, re.MULTILINE)
 
-            path = branch_match.group("branch_path")
-            if path == ".":
+            path = branch_match.group('branch_path')
+            if path == '.':
                 path = os.getcwd()
 
             repository_info = RepositoryInfo(
                 path=path,
-                base_path="/",    # Diffs are always relative to the root.
+                base_path='/',    # Diffs are always relative to the root.
                 supports_parent_diffs=True)
 
         return repository_info
@@ -182,14 +184,15 @@ class BazaarClient(SCMClient):
         """Return the diff between 'base' and 'tip'."""
         diff_cmd = ['bzr', 'diff', '-q', '-r',
                     '%s..%s' % (base, tip)] + include_files
-        diff = execute(diff_cmd, ignore_errors=True, split_lines=True)
+        diff = execute(diff_cmd, ignore_errors=True, split_lines=True,
+                       results_unicode=False)
 
         if diff:
             if exclude_patterns:
                 diff = filter_diff(diff, self.INDEX_FILE_RE, exclude_patterns,
                                    base_dir=self.get_repository_info().path)
 
-            return ''.join(diff)
+            return b''.join(diff)
         else:
             return None
 

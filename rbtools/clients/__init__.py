@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 import logging
 import pkg_resources
@@ -30,9 +30,9 @@ class PatchResult(object):
 
 
 class SCMClient(object):
-    """
-    A base representation of an SCM tool for fetching repository information
-    and generating diffs.
+    """A base representation of an SCM tool.
+
+    These are used for fetching repository information and generating diffs.
     """
     name = None
 
@@ -57,10 +57,11 @@ class SCMClient(object):
         pass
 
     def scan_for_server(self, repository_info):
-        """
-        Scans the current directory on up to find a .reviewboard file
-        containing the server path.
-        """
+        """Find the server path.
+
+        This will scan the current directory and then up through each parent
+        directory until a .reviewboardrc file is found containing the server
+        path."""
         server_url = None
 
         if self.user_config:
@@ -135,7 +136,7 @@ class SCMClient(object):
         elif 'TREES' in config:
             trees = config['TREES']
             if not isinstance(trees, dict):
-                die("Warning: 'TREES' in config file is not a dict!")
+                die('Warning: "TREES" in config file is not a dict!')
 
             # If repository_info is a list, check if any one entry is in trees.
             path = None
@@ -200,9 +201,10 @@ class SCMClient(object):
         # specified in the command's options.
         p_num = p or self._get_p_number(patch_file, base_path, base_dir)
         if (p_num >= 0):
-            cmd = ['patch', '-p' + str(p_num), '-i', str(patch_file)]
+            cmd = ['patch', '-p' + six.text_type(p_num), '-i',
+                   six.text_type(patch_file)]
         else:
-            cmd = ['patch', '-i', str(patch_file)]
+            cmd = ['patch', '-i', six.text_type(patch_file)]
 
         # Ignore return code 2 in case the patch file consists of only empty
         # files, which 'patch' can't handle. Other 'patch' errors also give
@@ -218,11 +220,10 @@ class SCMClient(object):
         # Check the patch for any added/deleted empty files to handle.
         if self._supports_empty_files():
             try:
-                with open(patch_file, 'r') as f:
+                with open(patch_file, 'rb') as f:
                     patch = f.read()
             except IOError as e:
                 logging.error('Unable to read file %s: %s', patch_file, e)
-                patched_empty_files = False
                 return
 
             patched_empty_files = self._apply_patch_for_empty_files(patch,
@@ -312,16 +313,16 @@ class RepositoryInfo(object):
         self.base_path = base_path
         self.supports_changesets = supports_changesets
         self.supports_parent_diffs = supports_parent_diffs
-        logging.debug("repository info: %s" % self)
+        logging.debug('repository info: %s' % self)
 
     def __str__(self):
-        return "Path: %s, Base path: %s, Supports changesets: %s" % \
+        return 'Path: %s, Base path: %s, Supports changesets: %s' % \
             (self.path, self.base_path, self.supports_changesets)
 
     def set_base_path(self, base_path):
         if not base_path.startswith('/'):
             base_path = '/' + base_path
-        logging.debug("changing repository info base_path from %s to %s" %
+        logging.debug('changing repository info base_path from %s to %s',
                       (self.base_path, base_path))
         self.base_path = base_path
 
@@ -392,21 +393,21 @@ def scan_usable_client(options, client_name=None):
     # Verify that options specific to an SCM Client have not been mis-used.
     if (getattr(options, 'change_only', False) and
         not repository_info.supports_changesets):
-        sys.stderr.write("The --change-only option is not valid for the "
-                         "current SCM client.\n")
+        sys.stderr.write('The --change-only option is not valid for the '
+                         'current SCM client.\n')
         sys.exit(1)
 
     if (getattr(options, 'parent_branch', None) and
         not repository_info.supports_parent_diffs):
-        sys.stderr.write("The --parent option is not valid for the "
-                         "current SCM client.\n")
+        sys.stderr.write('The --parent option is not valid for the '
+                         'current SCM client.\n')
         sys.exit(1)
 
     if (not isinstance(tool, PerforceClient) and
         (getattr(options, 'p4_client', None) or
          getattr(options, 'p4_port', None))):
-        sys.stderr.write("The --p4-client and --p4-port options are not valid "
-                         "for the current SCM client.\n")
+        sys.stderr.write('The --p4-client and --p4-port options are not valid '
+                         'for the current SCM client.\n')
         sys.exit(1)
 
     return (repository_info, tool)
