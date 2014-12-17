@@ -18,6 +18,15 @@ def get_commit_message(tool, cmd_args):
     return tool.get_commit_message(get_revisions(tool, cmd_args))
 
 
+def get_raw_commit_message(tool, cmd_args):
+    """Returns the raw commit message for the parsed revisions.
+
+    If the SCMClient supports getting a commit message, this will fetch
+    and store the message for future lookups.
+    """
+    return tool.get_raw_commit_message(get_revisions(tool, cmd_args))
+
+
 def get_draft_or_current_value(field_name, review_request):
     """Returns the draft or current field value from a review request.
 

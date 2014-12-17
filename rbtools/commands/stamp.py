@@ -1,7 +1,7 @@
 from rbtools.commands import Command, CommandError, Option, OptionGroup
 from rbtools.utils.commands import get_review_request
 from rbtools.utils.console import confirm
-from rbtools.utils.review_request import (get_commit_message,
+from rbtools.utils.review_request import (get_raw_commit_message,
                                           get_draft_or_current_value,
                                           guess_existing_review_request_id)
 
@@ -60,6 +60,11 @@ class Stamp(Command):
             raise NotImplementedError('rbt stamp is not supported with %s.'
                                       % self.tool.name)
 
+        commit_message = get_raw_commit_message(self.tool, self.cmd_args)
+
+        if '\nReviewed at http' in commit_message:
+            raise CommandError('This commit is already stamped.')
+
         if not self.options.rid:
             self.options.rid = guess_existing_review_request_id(
                 repository_info, self.options.repository_name, api_root,
@@ -74,12 +79,7 @@ class Stamp(Command):
 
         review_request = get_review_request(self.options.rid, api_root)
         stamp_url = review_request.absolute_url
-        commit_message = get_commit_message(self.tool, self.cmd_args)
+        commit_message += '\n\nReviewed at %s' % stamp_url
 
-        message = []
-        message.append(commit_message['description'])
-        message.append('Reviewed at %s' % stamp_url)
-        message = '\n\n'.join(message)
-
-        self.tool.amend_commit(message)
+        self.tool.amend_commit(commit_message)
         print('Changes committed to current branch.')
