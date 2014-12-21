@@ -35,6 +35,7 @@ class SetupRepo(Command):
     option_list = [
         Command.server_options,
         Command.perforce_options,
+        Command.tfs_options,
     ]
 
     def prompt_rb_repository(self, tool_name, repository_info, api_root):

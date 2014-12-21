@@ -15,6 +15,7 @@ class Diff(Command):
         Command.repository_options,
         Command.perforce_options,
         Command.subversion_options,
+        Command.tfs_options,
     ]
 
     def main(self, *args):

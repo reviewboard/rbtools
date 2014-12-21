@@ -190,6 +190,7 @@ class Post(Command):
         Command.diff_options,
         Command.perforce_options,
         Command.subversion_options,
+        Command.tfs_options,
     ]
 
     def post_process_options(self):

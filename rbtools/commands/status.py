@@ -23,6 +23,7 @@ class Status(Command):
         Command.server_options,
         Command.repository_options,
         Command.perforce_options,
+        Command.tfs_options,
     ]
 
     def output_request(self, request):

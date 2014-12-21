@@ -336,6 +336,22 @@ class Command(object):
         ]
     )
 
+    tfs_options = OptionGroup(
+        name='TFS Options',
+        description='Team Foundation Server specific options for '
+                    'communicating with the TFS server.',
+        option_list=[
+            Option('--tfs-login',
+                   dest='tfs_login',
+                   default=None,
+                   metavar='TFS_LOGIN',
+                   help='Logs in to TFS as a specific user (ie.'
+                        'user@domain,password). Visit https://msdn.microsoft.'
+                        'com/en-us/library/hh190725.aspx to learn about '
+                        'saving credentials for reuse.'),
+        ]
+    )
+
     def __init__(self):
         self.log = logging.getLogger('rb.%s' % self.name)
 

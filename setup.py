@@ -93,6 +93,7 @@ scm_clients = [
     'perforce = rbtools.clients.perforce:PerforceClient',
     'plastic = rbtools.clients.plastic:PlasticClient',
     'svn = rbtools.clients.svn:SVNClient',
+    'tfs = rbtools.clients.tfs:TFSClient',
 ]
 
 setup(name=PACKAGE_NAME,
