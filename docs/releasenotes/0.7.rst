@@ -1,0 +1,257 @@
+=========================
+RBTools 0.7 Release Notes
+=========================
+
+**Release date**: TBD
+
+
+Compatibility Notes
+===================
+
+RBTools now requires Python 2.6 at a minimum.
+
+We advise everyone to upgrade to Python 2.7.
+
+
+New Features
+============
+
+Command Aliases
+---------------
+
+Users can now define their own :command:`rbt` commands using the new aliases
+feature. Aliases can either be shortcuts for longer :command:`rbt`
+command lines, or can call out to external commands or scripts.
+
+See the :ref:`aliases documentation <rbtools-aliases>` for more information.
+
+Patch by Barret Rennie.
+
+
+Windows and Mac OS X Installers
+-------------------------------
+
+There are now installers for RBTools for Windows and Mac OS X. This simplifies
+distribution and installation on these platforms.
+
+Based on work by Bruce Cran.
+
+
+API Tokens
+----------
+
+The in-development Review Board 2.1 will include support for API Tokens. All
+RBTools commands now include an :option:`--api-token` parameter, and an
+equivalent ``API_TOKEN`` config file key for using these tokens in lieu of user
+credentials.
+
+
+API Caching
+-----------
+
+RBTools now includes a simple HTTP caching mechanism for API calls. This can
+speed up the time it takes to run various commands, especially on servers with
+many repositories or users.
+
+Patch by Barret Rennie.
+
+
+rbt diff
+--------
+
+.. program: rbt diff
+
+* Add :option:`-X`/:option:`--exclude-patterns` command line options.
+  (:bug:`1026`)
+
+  This new command line option (and config file entry) is used as the opposite
+  of the :option:`-I` flag. It can be used to exclude certain file paths
+  (including wildcards) from the resulting diff.
+
+  Patch by Barret Rennie.
+
+
+rbt land
+--------
+
+.. program: rbt land
+
+The new :command:`rbt land` command is a quick and easy way to push a change
+that has been reviewed on Review Board to the upstream repository. The change
+may be in a local branch or stored as a patch on Review Board.
+
+When running against Review Board 2.0+, this command will start by checking the
+approval state of the review request (on older versions, it just checks for one
+or more "Ship It!"s). If the change is approved, the patch will be applied just
+like :command:`rbt patch`.
+
+The change can optionally be pushed to the remote repository using the
+:option:`-p`/:option:`--push` command line option.
+
+This is currently only available when using Git repositories.
+
+
+rbt patch
+---------
+
+.. program: rbt patch
+
+* Added :command:`rbt patch -C`
+
+  The new :option:`-C` option works very much like the :option:`-c` option,
+  except it commits immediately without opening up an editor.
+
+  Patch by Stephen Gallagher.
+
+* Enhanced merging capabilities. (:bug:`3389`)
+
+  Until now, if a patch did not apply entirely cleanly, :command:`rbt patch`
+  would fail silently. Now, it will do a better job attempting to handle
+  conflicts, and in the case that it can't handle them, it will partially apply
+  the patch and show a warning about any unapplied changes.
+
+
+rbt post
+--------
+
+.. program: rbt post
+
+* Added :option:`-X`/:option:`--exclude-patterns` command line options.
+  (:bug:`1026`)
+
+  This new command line option (and config file entry) is used as the opposite
+  of the :option:`-I` flag. It can be used to exclude certain file paths
+  (including wildcards) from the resulting diff.
+
+  Patch by Barret Rennie.
+
+* Perform additional validation on diffs before creating a review request.
+  (:bug:`2733`)
+
+  It's possible to use :command:`rbt post` to create (or upload) diffs which
+  will not parse or apply correctly. Historically, this would result in an
+  empty review request that would need to be deleted.
+
+  When using Review Board 2.0+, :command:`rbt post` will now communicate with
+  the Review Board server to do additional validation on the diff prior to
+  creating the review request.
+
+  Patch by Azad Salahli.
+
+
+rbt stamp
+---------
+
+.. program: rbt stamp
+
+The new :command:`rbt stamp` command will amend a commit message with a
+"Reviewed at <url>" line.
+
+This feature is especially useful when using the close-on-submit hooks in
+Review Board 2.x to close out review requests when the changes are committed.
+
+This is currently only supported for Git repositories.
+
+Patch by Yanjia (Nicole) Xin.
+
+
+ClearCase
+---------
+
+* Add support for UCM ClearCase activities. (:bug:`3179`)
+
+  UCM Activities can now be posted using the command
+  :command:`rbt post activity:<activity name>[@pvob]`.
+
+  Patch by Nicolas Dély.
+
+* Add support for posting changes between ClearCase labels. (:bug:`3174`)
+
+  Diffs between ClearCase labels can now be posted using ``lbtype:<label>``
+  for the revision arguments.
+
+  Patch by Nicolas Dély.
+
+
+CVS
+---
+
+* Make diffs relative to the checkout root.
+
+  Until now, running :command:`rbt patch` or :command:`rbt diff` in a
+  subdirectory of the checkout would include only the files in that
+  subdirectory. The behavior has been changed to include all changes in the
+  entire checkout.
+
+  The old behavior can be used with the command :command:`rbt post -I .`
+
+  Patch by Barret Rennie.
+
+
+Mercurial
+---------
+
+* Add support for :command:`rbt patch -c` and :command:`rbt patch -C`.
+
+  The :command:`rbt patch` command can now create commits for Mercurial
+  repositories, using the description in the review request as the commit
+  message.
+
+  Patch by Bruce Cran.
+
+
+Subversion
+----------
+
+* Allow specifying the Subversion credentials on the command line.
+  (:bug:`1556`)
+
+  Subversion repositories configured to require user credentials for each
+  command could not be used with RBTools. These credentials can now be provided
+  using the new :option:`--svn-username` and :option:`--svn-password` options.
+
+* Make diffs relative to the checkout root.
+
+  Until now, running :command:`rbt patch` or :command:`rbt diff` in a
+  subdirectory of the checkout would include only the files in that
+  subdirectory. The behavior has been changed to include all changes in the
+  entire checkout.
+
+  The old behavior can be used with the command :command:`rbt post -I .`
+
+  Patch by Barret Rennie.
+
+
+Team Foundation Server
+----------------------
+
+RBTools 0.7 includes support for posting pending changes for Team Foundation
+Server (TFVC) repositories. This requires `Power Pack`_ for server-side
+support.
+
+.. _`Power Pack`: https://www.reviewboard.org/powerpack/
+
+
+Bug Fixes
+=========
+
+Git-SVN
+-------
+
+* Fix posting of deleted files in git-svn checkouts.
+
+  Patch by Jonathan Doman.
+
+
+Contributors
+------------
+
+* Azad Salahli
+* Barret Rennie
+* Bruce Cran
+* Christian Hammond
+* David Trowbridge
+* Jonathan Doman
+* Nicolas Dély
+* Stephen Gallagher
+* Yanjia (Nicole) Xin

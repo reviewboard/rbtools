@@ -1,6 +1,8 @@
 Aliases
 =======
 
+.. _rbtools-aliases:
+
 :command:`rbt` can be configured to add command aliases. The ``ALIASES`` value
 in :file:`.reviewboardrc` can be added to allow for command aliasing. It is a
 dictionary where the keys are the alias names and the value is the command
