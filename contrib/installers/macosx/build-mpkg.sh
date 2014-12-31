@@ -8,6 +8,13 @@
 # This package ships both Python 2.6 and 2.7 modules, in order to be
 # compatible with any custom or third-party scripts that want to use the
 # API.
+#
+# By default, this will attempt to sign the installer with the official
+# certificate. This requires that the private key for the certificate exists
+# on the machine building the installer. To disable signing a package, set
+# RBTOOLS_SIGN_PACKAGE=no in the environment variable, or to change the
+# certificate used, set RBTOOLS_SIGNATURE to the Common Name of the
+# desired certificate.
 
 PWD=`pwd`
 
@@ -90,9 +97,18 @@ $PKGBUILD \
 $CP $DATA_SRC/distribution.xml $PKG_BUILD
 
 # Now build the actual package that we can ship.
-$PRODUCTBUILD \
+if [ "$RBTOOLS_SIGN_PACKAGE" != "no" ]; then
+    if [ -z "$RBTOOLS_SIGNATURE" ]; then
+        RBTOOLS_SIGNATURE="3rd Party Mac Developer Installer: Beanbag, Inc. (8P6MEUDM64)"
+    fi
+
+    PRODUCTBUILD_SIGN_PARAMS="--sign \"${RBTOOLS_SIGNATURE}\""
+fi
+
+eval $PRODUCTBUILD \
     --distribution contrib/installers/macosx/distribution.xml \
     --resources $PKG_RESOURCES \
     --package-path $PKG_BUILD \
     --version $VERSION \
+    $PRODUCTBUILD_SIGN_PARAMS \
     $PKG_DEST/$PACKAGE_NAME-$VERSION.pkg
