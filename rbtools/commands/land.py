@@ -31,6 +31,7 @@ class Land(Command):
             '--dest',
             dest='destination_branch',
             default=None,
+            config_key='LAND_DEST_BRANCH',
             help='Specifies the destination branch to land changes on.'),
         Option(
             '-r', '--review-request-id',
@@ -108,11 +109,9 @@ class Land(Command):
         if self.options.is_local is not None:
             is_local = self.options.is_local
 
-        if self.options.destination_branch is not None:
-            destination_branch = self.options.destination_branch
-        elif 'LAND_DEST_BRANCH' in self.config:
-            destination_branch = self.config['LAND_DEST_BRANCH']
-        else:
+        destination_branch = self.options.destination_branch
+
+        if not destination_branch:
             raise CommandError('Please specify a destination branch.')
 
         if is_local:
