@@ -5,7 +5,10 @@ from rbtools.commands import Command, CommandError, Option, RB_MAIN
 from rbtools.utils.commands import (build_rbtools_cmd_argv,
                                     extract_commit_message,
                                     get_review_request)
+from rbtools.utils.console import confirm
 from rbtools.utils.process import execute
+from rbtools.utils.review_request import (get_draft_or_current_value,
+                                          guess_existing_review_request_id)
 
 
 class Land(Command):
@@ -58,8 +61,10 @@ class Land(Command):
         patch_command.append(review_request_id)
         print(execute(patch_command))
 
-    def main(self, branch_name=None):
+    def main(self, branch_name=None, *args):
         """Run the command."""
+        self.cmd_args = list(args)
+
         repository_info, self.tool = self.initialize_scm_tool(
             client_name=self.options.repository_type)
         server_url = self.get_server_url(repository_info, self.tool)
@@ -74,11 +79,23 @@ class Land(Command):
                 "This command does not support %s repositories."
                 % self.tool.name)
 
-        if self.options.rid is not None:
+        if self.options.rid:
             request_id = self.options.rid
         else:
-            # TODO: RR ID guessing code.
-            raise CommandError('A review request ID is required.')
+            request_id = guess_existing_review_request_id(
+                repository_info,
+                self.options.repository_name,
+                api_root,
+                api_client,
+                self.tool,
+                self.cmd_args,
+                guess_summary=False,
+                guess_description=False,
+                is_fuzzy_match_func=self._ask_review_request_match)
+
+            if not request_id:
+                raise CommandError('Could not determine the existing review '
+                                   'request URL to land.')
 
         if self.options.destination_branch is not None:
             destination_branch = self.options.destination_branch
@@ -137,5 +154,11 @@ class Land(Command):
         except PushError as e:
             raise CommandError(str(e))
 
-        print("Review request '%s' has landed on '%s'." %
+        print("Review request %s has landed on '%s'." %
               (request_id, destination_branch))
+
+    def _ask_review_request_match(self, review_request):
+        return confirm(
+            "Land Review Request #%s: '%s'? "
+            % (review_request.id,
+               get_draft_or_current_value('summary', review_request)))

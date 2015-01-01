@@ -388,10 +388,10 @@ class GitClient(SCMClient):
 
     def get_parent_branch(self):
         """Returns the parent branch."""
+        parent_branch = getattr(self.options, 'parent_branch', None)
+
         if self.type == 'perforce':
-            parent_branch = self.options.parent_branch or 'p4'
-        else:
-            parent_branch = self.options.parent_branch
+            parent_branch = parent_branch or 'p4'
 
         return parent_branch
 
