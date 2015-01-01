@@ -60,6 +60,12 @@ class Stamp(Command):
             raise NotImplementedError('rbt stamp is not supported with %s.'
                                       % self.tool.name)
 
+        try:
+            if self.tool.has_pending_changes():
+                raise CommandError('Working directory is not clean.')
+        except NotImplementedError:
+            pass
+
         commit_message = get_raw_commit_message(self.tool, self.cmd_args)
 
         if '\nReviewed at http' in commit_message:
