@@ -59,6 +59,7 @@ class Land(Command):
     def patch(self, review_request_id):
         patch_command = [RB_MAIN, 'patch']
         patch_command.extend(build_rbtools_cmd_argv(self.options))
+        patch_command.append('-C')
         patch_command.append(review_request_id)
         print(execute(patch_command))
 
@@ -79,6 +80,9 @@ class Land(Command):
             raise CommandError(
                 "This command does not support %s repositories."
                 % self.tool.name)
+
+        if self.tool.has_pending_changes():
+            raise CommandError('Working directory is not clean.')
 
         if self.options.rid:
             request_id = self.options.rid
@@ -111,16 +115,14 @@ class Land(Command):
         else:
             raise CommandError('Please specify a destination branch.')
 
-        if branch_name is None:
-            branch_name = self.tool.get_current_branch()
+        if is_local:
+            if branch_name is None:
+                branch_name = self.tool.get_current_branch()
 
-        if branch_name == destination_branch:
-            raise CommandError('The local branch cannot be merged onto '
-                               'itself. Try a different local branch or '
-                               'destination branch.')
-
-        if self.tool.has_pending_changes():
-            raise CommandError('Working directory is not clean.')
+            if branch_name == destination_branch:
+                raise CommandError('The local branch cannot be merged onto '
+                                   'itself. Try a different local branch or '
+                                   'destination branch.')
 
         review_request = get_review_request(request_id, api_root)
 
@@ -140,21 +142,21 @@ class Land(Command):
             if not is_rr_approved:
                 raise CommandError(approval_failure)
 
-        if not is_local:
+        if is_local:
+            review_commit_message = extract_commit_message(review_request)
+            author = review_request.get_submitter()
+
+            try:
+                self.tool.merge(
+                    branch_name,
+                    destination_branch,
+                    review_commit_message,
+                    author,
+                    self.options.squash)
+            except MergeError as e:
+                raise CommandError(str(e))
+        else:
             self.patch(request_id)
-
-        review_commit_message = extract_commit_message(review_request)
-        author = review_request.get_submitter()
-
-        try:
-            self.tool.merge(
-                branch_name,
-                destination_branch,
-                review_commit_message,
-                author,
-                self.options.squash)
-        except MergeError as e:
-            raise CommandError(str(e))
 
         try:
             self.tool.push_upstream(destination_branch)
