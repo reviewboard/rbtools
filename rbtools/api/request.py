@@ -120,7 +120,7 @@ class HttpRequest(object):
             content.write(b'Content-Type: %s' % mime_type + NEWLINE)
             content.write(NEWLINE)
 
-            if isinstance(value, six.string_types):
+            if isinstance(value, six.text_type):
                 content.write(value.encode('utf-8'))
             else:
                 content.write(value)
@@ -463,11 +463,11 @@ class ReviewBoardServer(object):
         if agent:
             self.agent = agent
         else:
-            self.agent = 'RBTools/' + get_package_version()
+            self.agent = ('RBTools/' + get_package_version()).encode('utf-8')
 
         opener = build_opener(*handlers)
         opener.addheaders = [
-            ('User-agent', self.agent),
+            (b'User-agent', self.agent),
         ]
         install_opener(opener)
 
@@ -506,11 +506,11 @@ class ReviewBoardServer(object):
 
             if body:
                 headers.update({
-                    'Content-Type': content_type,
-                    'Content-Length': str(len(body)),
+                    b'Content-Type': content_type,
+                    b'Content-Length': str(len(body)),
                 })
             else:
-                headers['Content-Length'] = '0'
+                headers[b'Content-Length'] = '0'
 
             r = Request(request.url.encode('utf-8'), body, headers,
                         request.method)

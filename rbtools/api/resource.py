@@ -24,7 +24,7 @@ def _create(resource, data=None, query_args={}, *args, **kwargs):
     using the 'query_args' parameter, since kwargs is used for the
     fields which will be sent.
     """
-    request = HttpRequest(resource._links['create']['href'], method='POST',
+    request = HttpRequest(resource._links['create']['href'], method=b'POST',
                           query_args=query_args)
 
     if data is None:
@@ -508,7 +508,7 @@ class DiffListResource(ListResource):
         """
         # TODO: This method should be unified with validate_diff() method of
         # ValidateDiffResource, since they both perform the same operation.
-        request = HttpRequest(self._url, method='POST', query_args=kwargs)
+        request = HttpRequest(self._url, method=b'POST', query_args=kwargs)
         request.add_file('path', 'diff', diff)
 
         if parent_diff:
@@ -570,7 +570,7 @@ class FileAttachmentListResource(ListResource):
         The content argument should contain the body of the file to be
         uploaded, in string format.
         """
-        request = HttpRequest(self._url, method='POST', query_args=kwargs)
+        request = HttpRequest(self._url, method=b'POST', query_args=kwargs)
         request.add_file('path', filename, content)
 
         if caption:
@@ -599,7 +599,7 @@ class ScreenshotListResource(ListResource):
         The content argument should contain the body of the screenshot
         to be uploaded, in string format.
         """
-        request = HttpRequest(self._url, method='POST', query_args=kwargs)
+        request = HttpRequest(self._url, method=b'POST', query_args=kwargs)
         request.add_file('path', filename, content)
 
         if caption:
@@ -665,7 +665,7 @@ class ReviewRequestResource(ItemResource):
     @request_method_decorator
     def get_or_create_draft(self, **kwargs):
         request = self.get_draft(internal=True)
-        request.method = 'POST'
+        request.method = b'POST'
 
         for name, value in six.iteritems(kwargs):
             request.add_field(name, value)
@@ -692,7 +692,7 @@ class ValidateDiffResource(ItemResource):
 
         # TODO: This method should be unified with upload_diff() method of
         # DiffListResource, since they both perform the same operation.
-        request = HttpRequest(self._url, method='POST', query_args=kwargs)
+        request = HttpRequest(self._url, method=b'POST', query_args=kwargs)
         request.add_field('repository', repository)
         request.add_file('path', 'diff', diff)
 
