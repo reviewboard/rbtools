@@ -416,6 +416,8 @@ class APICache(object):
 
                 c.execute('INSERT INTO cache_info(version) VALUES(?)',
                           (self.SCHEMA_VERSION,))
+
+            self._write_db()
         except sqlite3.Error as e:
             self._die('Could not create database schema for the HTTP cache', e)
 
@@ -477,6 +479,8 @@ class APICache(object):
                                entry.last_modified, entry.mime_type,
                                entry.item_mime_type, entry.response_body,
                                entry.url, vary_headers))
+
+            self._write_db()
         except sqlite3.Error as e:
             self._die('Could not write entry to the HTTP cache for the API', e)
 
@@ -487,6 +491,8 @@ class APICache(object):
                 c.execute(
                     'DELETE FROM api_cache WHERE URL=? AND vary_headers=?',
                     (entry.url, json.dumps(entry.vary_headers)))
+
+            self._write_db()
         except sqlite3.Error as e:
             self._die('Could not delete entry from the HTTP cache for the API',
                       e)
