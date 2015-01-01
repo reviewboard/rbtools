@@ -48,6 +48,21 @@ class Land(Command):
                  'merging a local branch. Defaults to true unless '
                  '--review-request-id is used.'),
         Option(
+            '--push',
+            dest='push',
+            action='store_true',
+            default=False,
+            config_key='LAND_PUSH',
+            help='Pushes the branch after landing the change.'),
+        Option(
+            '--no-push',
+            dest='push',
+            action='store_false',
+            default=False,
+            config_key='LAND_PUSH',
+            help='Prevents pushing the branch after landing the change, '
+                 'if pushing is enabled by default.'),
+        Option(
             '--squash',
             dest='squash',
             action='store_true',
@@ -157,10 +172,11 @@ class Land(Command):
         else:
             self.patch(request_id)
 
-        try:
-            self.tool.push_upstream(destination_branch)
-        except PushError as e:
-            raise CommandError(str(e))
+        if self.options.push:
+            try:
+                self.tool.push_upstream(destination_branch)
+            except PushError as e:
+                raise CommandError(str(e))
 
         print("Review request %s has landed on '%s'." %
               (request_id, destination_branch))
