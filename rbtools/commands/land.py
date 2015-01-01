@@ -42,9 +42,10 @@ class Land(Command):
             '--local',
             dest='is_local',
             action='store_true',
-            default=False,
-            help='Does not patch the local tree with the '
-                 'review request before landing.'),
+            default=None,
+            help='Forces the change to be merged without patching, if '
+                 'merging a local branch. Defaults to true unless '
+                 '--review-request-id is used.'),
         Option(
             '--squash',
             dest='squash',
@@ -81,6 +82,7 @@ class Land(Command):
 
         if self.options.rid:
             request_id = self.options.rid
+            is_local = branch_name is not None
         else:
             request_id = guess_existing_review_request_id(
                 repository_info,
@@ -96,6 +98,11 @@ class Land(Command):
             if not request_id:
                 raise CommandError('Could not determine the existing review '
                                    'request URL to land.')
+
+            is_local = True
+
+        if self.options.is_local is not None:
+            is_local = self.options.is_local
 
         if self.options.destination_branch is not None:
             destination_branch = self.options.destination_branch
@@ -133,7 +140,7 @@ class Land(Command):
             if not is_rr_approved:
                 raise CommandError(approval_failure)
 
-        if not self.options.is_local:
+        if not is_local:
             self.patch(request_id)
 
         review_commit_message = extract_commit_message(review_request)
