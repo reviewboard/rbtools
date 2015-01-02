@@ -1,3 +1,4 @@
 REVIEWBOARD_URL = "https://reviews.reviewboard.org"
 REPOSITORY = "RBTools"
 BRANCH = "master"
+LAND_DEST_BRANCH = "master"
