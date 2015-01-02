@@ -68,6 +68,13 @@ class Land(Command):
             action='store_true',
             default=False,
             help='Squashes history into a single commit'),
+        Option(
+            '--dry-run',
+            dest='dry_run',
+            action='store_true',
+            default=False,
+            help='Simulates the landing of a change, without actually '
+                 'making any changes to the tree.'),
         Command.server_options,
         Command.repository_options,
     ]
@@ -88,6 +95,8 @@ class Land(Command):
         server_url = self.get_server_url(repository_info, self.tool)
         api_client, api_root = self.get_api(server_url)
         self.setup_tool(self.tool, api_root=api_root)
+
+        dry_run = self.options.dry_run
 
         # Check if repository info on reviewboard server match local ones.
         repository_info = repository_info.find_server_repository_info(api_root)
@@ -160,29 +169,43 @@ class Land(Command):
             review_commit_message = extract_commit_message(review_request)
             author = review_request.get_submitter()
 
-            try:
-                self.tool.merge(
-                    branch_name,
-                    destination_branch,
-                    review_commit_message,
-                    author,
-                    self.options.squash)
-            except MergeError as e:
-                raise CommandError(str(e))
+            if self.options.squash:
+                print('Squashing branch "%s" into "%s"'
+                      % (branch_name, destination_branch))
+            else:
+                print('Merging branch "%s" into "%s"'
+                      % (branch_name, destination_branch))
+
+            if not dry_run:
+                try:
+                    self.tool.merge(
+                        branch_name,
+                        destination_branch,
+                        review_commit_message,
+                        author,
+                        self.options.squash)
+                except MergeError as e:
+                    raise CommandError(str(e))
         else:
-            self.patch(request_id)
+            print('Applying patch from review request %s' % request_id)
+
+            if not dry_run:
+                self.patch(request_id)
 
         if self.options.push:
-            try:
-                self.tool.push_upstream(destination_branch)
-            except PushError as e:
-                raise CommandError(str(e))
+            print('Pushing branch "%s" upstream' % destination_branch)
 
-        print("Review request %s has landed on '%s'." %
+            if not dry_run:
+                try:
+                    self.tool.push_upstream(destination_branch)
+                except PushError as e:
+                    raise CommandError(str(e))
+
+        print('Review request %s has landed on "%s".' %
               (request_id, destination_branch))
 
     def _ask_review_request_match(self, review_request):
         return confirm(
-            "Land Review Request #%s: '%s'? "
+            'Land Review Request #%s: "%s"? '
             % (review_request.id,
                get_draft_or_current_value('summary', review_request)))
