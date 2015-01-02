@@ -137,6 +137,9 @@ def guess_existing_review_request_id(repository_info, repository_name,
         raise CommandError('Error getting review requests for user '
                            '%s: %s' % (user.username, e))
 
+    summary = None
+    description = None
+
     if not guess_summary or not guess_description:
         try:
             commit_message = get_commit_message(tool, cmd_args)
@@ -151,6 +154,9 @@ def guess_existing_review_request_id(repository_info, repository_name,
                 no_commit_error()
         except NotImplementedError:
             raise CommandError('--summary and --description are required.')
+
+    if not summary and not description:
+        return None
 
     possible_matches = get_possible_matches(review_requests, summary,
                                             description)
