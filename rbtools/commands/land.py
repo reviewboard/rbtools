@@ -69,6 +69,13 @@ class Land(Command):
             default=False,
             help='Squashes history into a single commit'),
         Option(
+            '-e', '--edit',
+            dest='edit',
+            action='store_true',
+            default=False,
+            help='Invokes the editor to edit the commit message before '
+                 'landing the change.'),
+        Option(
             '--dry-run',
             dest='dry_run',
             action='store_true',
@@ -183,7 +190,8 @@ class Land(Command):
                         destination_branch,
                         review_commit_message,
                         author,
-                        self.options.squash)
+                        self.options.squash,
+                        self.options.edit)
                 except MergeError as e:
                     raise CommandError(str(e))
         else:

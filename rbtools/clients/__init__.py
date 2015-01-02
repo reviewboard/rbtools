@@ -269,7 +269,8 @@ class SCMClient(object):
 
         return result
 
-    def merge(self, target, destination, message, author, squash):
+    def merge(self, target, destination, message, author, squash=False,
+              run_editor=False):
         """Merges the target branch with destination branch."""
         raise NotImplementedError
 

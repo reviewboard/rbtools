@@ -738,7 +738,8 @@ class GitClient(SCMClient):
         execute(['git', 'commit', '-m', modified_message,
                  '--author="%s <%s>"' % (author.fullname, author.email)])
 
-    def merge(self, target, destination, message, author, squash=False):
+    def merge(self, target, destination, message, author, squash=False,
+              run_editor=False):
         """Merges the target branch with destination branch."""
         rc, output = execute(
             ['git', 'checkout', destination],
@@ -763,7 +764,7 @@ class GitClient(SCMClient):
             raise MergeError("Could not merge branch '%s' into '%s'.\n\n%s" %
                              (target, destination, output))
 
-        self.create_commit(message, author, False)
+        self.create_commit(message, author, run_editor)
 
     def push_upstream(self, remote_branch):
         """Pushes the current branch to upstream."""
