@@ -1,5 +1,4 @@
-.. _rbt-list-repo-types:
-.. program:: rbt list-repo-types
+.. rbt-command:: rbtools.commands.list_repo_types.ListRepoTypes
 
 ===============
 list-repo-types
@@ -12,27 +11,6 @@ types. Each printed type can be used as a value to the
 If a repository of a specific type is detected in the current directory,
 that repository type will be marked by an asterisk (``*``).
 
-Usage::
 
-   $ rbt list-repo-types [options]
-
-
-Default Options
-===============
-
-A number of options to :command:`rbt list-repo-types` can be set by default
-in :file:`.reviewboardrc`. These can go either in the repository's
-or the user's :file:`.reviewboardrc`.
-
-The options include:
-
-* ``DEBUG`` (:option:`-d`)
-
-Options
-=======
-
-.. cmdoption:: -d, --debug
-
-   Display debug output.
-
-   The default can be set in ``DEBUG`` in :file:`.reviewboardrc`.
+.. rbt-command-usage::
+.. rbt-command-options::

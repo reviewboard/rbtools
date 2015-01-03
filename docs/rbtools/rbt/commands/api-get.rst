@@ -1,5 +1,4 @@
-.. _rbt-api-get:
-.. program:: rbt api-get
+.. rbt-command:: rbtools.commands.api_get.APIGet
 
 =======
 api-get
@@ -23,34 +22,6 @@ appears after ``--`` on the command line and takes the form of
    $ # Make a request to http://example.com/api/review-requests/?counts-only=1
    $ rbt api-get /review-requests/ -- --counts-only=1
 
-Usage::
 
-   $ rbt api-get [options] <path> [-- [--<query-arg>=<value> ...]]
-
-
-Default Options
-===============
-
-A number of options to :command:`rbt api-get` can be set by default
-in :file:`.reviewboardrc`. These can go either in the repository's
-or the user's :file:`.reviewboardrc`.
-
-The options include:
-
-* ``DEBUG`` (:option:`-d`)
-* ``API_GET_PRETTY_PRINT`` (:option:`--pretty`)
-
-Options
-=======
-
-.. cmdoption:: -d, --debug
-
-   Display debug output.
-
-   The default can be set in ``DEBUG`` in :file:`.reviewboardrc`.
-
-.. cmdoption:: --pretty
-
-   Pretty print output.
-
-   The default can be set in ``API_GET_PRETTY_PRINT`` in :file:`.reviewboardrc`.
+.. rbt-command-usage::
+.. rbt-command-options::

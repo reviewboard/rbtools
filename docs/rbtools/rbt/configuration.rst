@@ -43,7 +43,7 @@ You should then commit this to your repository.
 The rest of this section covers some of the more common settings you may want
 for your :file:`.reviewboardrc`. You can find more in the documentation for
 many of the commands. For example, see
-:ref:`rbt post's default options <rbt-post-default-options>`.
+:ref:`rbt post's options <rbt-post-options>`.
 
 
 REPOSITORY

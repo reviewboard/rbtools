@@ -1,5 +1,4 @@
-.. _rbt-clear-cache:
-.. program:: rbt clear-cache
+.. rbt-command:: rbtools.commands.clearcache.ClearCache
 
 ===========
 clear-cache
@@ -8,6 +7,6 @@ clear-cache
 :command:`rbt clear-cache` is used to manually clear the HTTP cache for the
 API.
 
-Usage::
 
-    $ rbt clear-cache
+.. rbt-command-usage::
+.. rbt-command-options::
