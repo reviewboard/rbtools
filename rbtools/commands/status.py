@@ -18,8 +18,8 @@ class Status(Command):
                dest='all_repositories',
                action='store_true',
                default=False,
-               help='Show review requests for all repositories instead '
-                    'of the detected repository.'),
+               help='Shows review requests for all repositories instead '
+                    'of just the detected repository.'),
         Command.server_options,
         Command.repository_options,
         Command.perforce_options,

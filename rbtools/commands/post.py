@@ -36,24 +36,29 @@ class Post(Command):
                         'review request gets posted and how, and what '
                         'happens after it is posted.',
             option_list=[
+                Option('-u', '--update',
+                       dest='update',
+                       action='store_true',
+                       default=False,
+                       help='Automatically determines the existing review '
+                            'request to update.',
+                       added_in='0.5.3'),
                 Option('-r', '--review-request-id',
                        dest='rid',
                        metavar='ID',
                        default=None,
                        help='Specifies the existing review request ID to '
                             'update.'),
-                Option('-u', '--update',
-                       dest='update',
-                       action='store_true',
-                       default=False,
-                       help='Automatically determines the existing review '
-                            'request to update.'),
                 Option('-p', '--publish',
                        dest='publish',
                        action='store_true',
                        default=False,
                        config_key='PUBLISH',
-                       help='Immediately publishes the review request after '
+                       help='Publishes the review request immediately after '
+                            'posting.'
+                            '\n'
+                            'All required fields must already be filled in '
+                            'on the review request or must be provided when '
                             'posting.'),
                 Option('-o', '--open',
                        dest='open_browser',
@@ -67,8 +72,14 @@ class Post(Command):
                        metavar='USERNAME',
                        config_key='SUBMIT_AS',
                        default=None,
-                       help='The user name to use as the author of the '
-                            'review request, instead of the logged in user.'),
+                       help='The username to use as the author of the '
+                            'review request, instead of the logged in user.',
+                       extended_help=(
+                           "This is useful when used in a repository's "
+                           "post-commit script to update or create review "
+                           "requests. See :ref:`automating-rbt-post` for "
+                           "more information on this use case."
+                       )),
                 Option('--change-only',
                        dest='change_only',
                        action='store_true',
@@ -100,8 +111,13 @@ class Post(Command):
                        default=GUESS_AUTO,
                        const=GUESS_YES,
                        choices=GUESS_CHOICES,
-                       help='Short-hand for --guess-summary '
-                            '--guess-description.'),
+                       help='Equivalent to setting both --guess-summary '
+                            'and --guess-description.',
+                       extended_help=(
+                           'This can optionally take a value to control the '
+                           'guessing behavior. See :ref:`guessing-behavior` '
+                           'for more information.'
+                       )),
                 Option('--guess-summary',
                        dest='guess_summary',
                        action='store',
@@ -111,7 +127,12 @@ class Post(Command):
                        const=GUESS_YES,
                        choices=GUESS_CHOICES,
                        help='Generates the Summary field based on the '
-                            'commit messages (Bazaar/Git/Mercurial only).'),
+                            'commit messages (Bazaar/Git/Mercurial only).',
+                       extended_help=(
+                           'This can optionally take a value to control the '
+                           'guessing behavior. See :ref:`guessing-behavior` '
+                           'for more information.'
+                       )),
                 Option('--guess-description',
                        dest='guess_description',
                        action='store',
@@ -121,18 +142,26 @@ class Post(Command):
                        const=GUESS_YES,
                        choices=GUESS_CHOICES,
                        help='Generates the Description field based on the '
-                            'commit messages (Bazaar/Git/Mercurial only).'),
+                            'commit messages (Bazaar/Git/Mercurial only).',
+                       extended_help=(
+                           'This can optionally take a value to control the '
+                           'guessing behavior. See :ref:`guessing-behavior` '
+                           'for more information.'
+                       )),
                 Option('--change-description',
                        default=None,
+                       metavar='TEXT',
                        help='A description of what changed in this update '
                             'of the review request. This is ignored for new '
                             'review requests.'),
                 Option('--summary',
                        dest='summary',
+                       metavar='TEXT',
                        default=None,
                        help='The new contents for the Summary field.'),
                 Option('--description',
                        dest='description',
+                       metavar='TEXT',
                        default=None,
                        help='The new contents for the Description field.'),
                 Option('--description-file',
@@ -143,6 +172,7 @@ class Post(Command):
                             'Description field.'),
                 Option('--testing-done',
                        dest='testing_done',
+                       metavar='TEXT',
                        default=None,
                        help='The new contents for the Testing Done field.'),
                 Option('--testing-done-file',
@@ -154,20 +184,26 @@ class Post(Command):
                 Option('--branch',
                        dest='branch',
                        config_key='BRANCH',
+                       metavar='BRANCH',
                        default=None,
-                       help='The branch the change will be committed on.'),
+                       help='The branch the change will be committed on or '
+                            'affects. This is a free-form field and does not '
+                            'control any behavior.'),
                 Option('--bugs-closed',
                        dest='bugs_closed',
+                       metavar='BUG_ID[,...]',
                        default=None,
                        help='The comma-separated list of bug IDs closed.'),
                 Option('--target-groups',
                        dest='target_groups',
                        config_key='TARGET_GROUPS',
+                       metavar='NAME[,...]',
                        default=None,
                        help='The names of the groups that should perform the '
                             'review.'),
                 Option('--target-people',
                        dest='target_people',
+                       metavar='USERNAME[,...]',
                        config_key='TARGET_PEOPLE',
                        default=None,
                        help='The usernames of the people who should perform '
@@ -175,16 +211,21 @@ class Post(Command):
                 Option('--depends-on',
                        dest='depends_on',
                        config_key='DEPENDS_ON',
+                       metavar='ID[,...]',
                        default=None,
-                       help='The new contents for the Depends On field.'),
+                       help='A comma-separated list of review request IDs '
+                            'that this review request will depend on.',
+                       added_in='0.6.1'),
                 Option('--markdown',
                        dest='markdown',
                        action='store_true',
                        config_key='MARKDOWN',
                        default=False,
                        help='Specifies if the summary and description should '
-                            'be interpreted as Markdown-formatted text '
-                            '(Review Board 2.0+ only).'),
+                            'be interpreted as Markdown-formatted text.'
+                            '\n'
+                            'This is only supported in Review Board 2.0+.',
+                       added_in='0.6'),
             ]
         ),
         Command.diff_options,

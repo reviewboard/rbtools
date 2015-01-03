@@ -39,6 +39,24 @@ class ParseError(CommandError):
     pass
 
 
+class SmartHelpFormatter(argparse.HelpFormatter):
+    """Smartly formats help text, preserving paragraphs."""
+    def _split_lines(self, text, width):
+        # NOTE: This function depends on overriding _split_lines's behavior.
+        #       It is clearly documented that this function should not be
+        #       considered public API. However, given that the width we need
+        #       is calculated by HelpFormatter, and HelpFormatter has no
+        #       blessed public API, we have no other choice but to override
+        #       it here.
+        lines = []
+
+        for line in text.splitlines():
+            lines += super(SmartHelpFormatter, self)._split_lines(line, width)
+            lines.append('')
+
+        return lines[:-1]
+
+
 class Option(object):
     """Represents an option for a command.
 
@@ -66,13 +84,24 @@ class Option(object):
         Once we've determined the right set of flags, the option will be
         added to the parser.
         """
-        if 'config_key' in self.attrs:
-            if self.attrs['config_key'] in config:
-                self.attrs['default'] = config[self.attrs['config_key']]
+        attrs = self.attrs.copy()
 
-            del self.attrs['config_key']
+        if 'config_key' in attrs:
+            config_key = attrs.pop('config_key')
 
-        parent.add_argument(*self.opts, **self.attrs)
+            if config_key in config:
+                attrs['default'] = config[config_key]
+
+        if 'deprecated_in' in attrs:
+            attrs['help'] += '\n[Deprecated since %s]' % attrs['deprecated_in']
+
+        # These are used for other purposes, and are not supported by
+        # argparse.
+        for attr in ('added_in', 'deprecated_in', 'extended_help',
+                     'versions_changed'):
+            attrs.pop(attr, None)
+
+        parent.add_argument(*self.opts, **attrs)
 
 
 class OptionGroup(object):
@@ -142,7 +171,9 @@ class Command(object):
                dest='debug',
                config_key='DEBUG',
                default=False,
-               help='display debug output'),
+               help='Displays debug output.',
+               extended_help='This information can be valuable when debugging '
+                             'problems running the command.'),
     ]
 
     server_options = OptionGroup(
@@ -152,7 +183,7 @@ class Command(object):
         option_list=[
             Option('--server',
                    dest='server',
-                   metavar='SERVER',
+                   metavar='URL',
                    config_key='REVIEWBOARD_URL',
                    default=None,
                    help='Specifies the Review Board server to use.'),
@@ -183,7 +214,8 @@ class Command(object):
                    config_key='API_TOKEN',
                    default=None,
                    help='The API token to use for authentication, instead of '
-                        'using a username and password.'),
+                        'using a username and password.',
+                   added_in='0.7'),
         ]
     )
 
@@ -192,24 +224,39 @@ class Command(object):
         option_list=[
             Option('--repository',
                    dest='repository_name',
+                   metavar='NAME',
                    config_key='REPOSITORY',
                    default=None,
                    help='The name of the repository configured on '
                         'Review Board that matches the local repository.'),
             Option('--repository-url',
                    dest='repository_url',
+                   metavar='URL',
                    config_key='REPOSITORY_URL',
                    default=None,
-                   help='The URL for a repository, used for creating '
-                        'a diff outside of a working copy (currently only '
-                        'supported by Subversion with specific revisions '
-                        'or --diff-filename and ClearCase with relative '
-                        'paths outside the view). For git, this specifies '
-                        'the origin url of the current repository, '
-                        'overriding the origin URL supplied by the git '
-                        'client.'),
+                   help='The URL for a repository.'
+                        '\n'
+                        'When generating diffs, this can be used for '
+                        'creating a diff outside of a working copy '
+                        '(currently only supported by Subversion with '
+                        'specific revisions or --diff-filename, and by '
+                        'ClearCase with relative paths outside the view).'
+                        '\n'
+                        'For Git, this specifies the origin URL of the '
+                        'current repository, overriding the origin URL '
+                        'supplied by the client.',
+                   versions_changed={
+                       '0.6': 'Prior versions used the `REPOSITORY` setting '
+                              'in .reviewboardrc, and allowed a '
+                              'repository name to be passed to '
+                              '--repository-url. This is no '
+                              'longer supported in 0.6 and higher. You '
+                              'may need to update your configuration and '
+                              'scripts appropriately.',
+                   }),
             Option('--repository-type',
                    dest='repository_type',
+                   metavar='TYPE',
                    config_key='REPOSITORY_TYPE',
                    default=None,
                    help='The type of repository in the current directory. '
@@ -229,22 +276,43 @@ class Command(object):
         option_list=[
             Option('--revision-range',
                    dest='revision_range',
+                   metavar='REV1:REV2',
                    default=None,
-                   help='Generates a diff for the given revision range. '
-                        '[DEPRECATED]'),
+                   help='Generates a diff for the given revision range.',
+                   deprecated_in='0.6'),
             Option('-I', '--include',
+                   metavar='FILENAME',
                    dest='include_files',
                    action='append',
-                   help='Includes only the given file in the diff. '
+                   help='Includes only the specified file in the diff. '
                         'This can be used multiple times to specify '
-                        'multiple files.'),
+                        'multiple files.'
+                        '\n'
+                        'Supported by: Bazaar, CVS, Git, Mercurial, '
+                        'Perforce, and Subversion.',
+                   added_in='0.6'),
             Option('-X', '--exclude',
+                   metavar='PATTERN',
                    dest='exclude_patterns',
                    action='append',
                    config_key='EXCLUDE_PATTERNS',
-                   help='Exclude all files that match the given pattern '
+                   help='Excludes all files that match the given pattern '
                         'from the diff. This can be used multiple times to '
-                        'specify multiple patterns.'),
+                        'specify multiple patterns.'
+                        '\n'
+                        'Supported by: Bazaar, CVS, Git, Mercurial, '
+                        'Perforce, and Subversion.',
+                   extended_help=(
+                       'Relative exclude patterns will be treated as '
+                       'relative to the current working directory, not to '
+                       'the repository directory.'
+                       '\n'
+                       'When working with Perforce, an exclude pattern '
+                       'beginning with `//` will be matched against depot '
+                       'paths; all other patterns will be matched against '
+                       'local paths.'
+                   ),
+                   added_in='0.7'),
             Option('--parent',
                    dest='parent_branch',
                    metavar='BRANCH',
@@ -264,10 +332,12 @@ class Command(object):
                    config_key='TRACKING_BRANCH',
                    default=None,
                    help='The remote tracking branch from which your local '
-                        'branch is derived (Git/Mercurial only). Defaults '
-                        'are "origin/master" for Git and one of '
-                        '"reviewboard", "origin", "parent", or "default" for '
-                        'Mercurial.'),
+                        'branch is derived (Git/Mercurial only).'
+                        '\n'
+                        'For Git, the default is `origin/master`.'
+                        '\n'
+                        'For Mercurial, the default is one of: '
+                        '`reviewboard`, `origin`, `parent`, or `default`.'),
         ]
     )
 
@@ -315,24 +385,26 @@ class Command(object):
             Option('--svn-username',
                    dest='svn_username',
                    default=None,
-                   metavar='SVN_USERNAME',
+                   metavar='USERNAME',
                    help='The username for the SVN repository.'),
             Option('--svn-password',
                    dest='svn_password',
                    default=None,
-                   metavar='SVN_PASSWORD',
+                   metavar='PASSWORD',
                    help='The password for the SVN repository.'),
             Option('--svn-show-copies-as-adds',
                    dest='svn_show_copies_as_adds',
-                   metavar='y/n',
+                   metavar='y|n',
                    default=None,
-                   help='Treat copied or moved files as new files.'),
+                   help='Treat copied or moved files as new files.',
+                   added_in='0.5.2'),
             Option('--svn-changelist',
                    dest='svn_changelist',
                    default=None,
                    metavar='ID',
                    help='Generates the diff for review based on a '
-                        'local changelist. [DEPRECATED]'),
+                        'local changelist.',
+                   deprecated_in='0.6'),
         ]
     )
 
@@ -357,9 +429,11 @@ class Command(object):
 
     def create_parser(self, config, argv=[]):
         """Create and return the argument parser for this command."""
-        parser = argparse.ArgumentParser(prog=RB_MAIN,
-                                         usage=self.usage(),
-                                         add_help=False)
+        parser = argparse.ArgumentParser(
+            prog=RB_MAIN,
+            usage=self.usage(),
+            add_help=False,
+            formatter_class=SmartHelpFormatter)
 
         for option in self.option_list:
             option.add_to(parser, config, argv)

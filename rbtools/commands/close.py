@@ -21,11 +21,11 @@ class Close(Command):
         Option('--close-type',
                dest='close_type',
                default=SUBMITTED,
-               help='either submitted or discarded'),
+               help='Either `submitted` or `discarded`.'),
         Option('--description',
                dest='description',
                default=None,
-               help='optional description accompanied with change'),
+               help='An optional description accompanying the change.'),
         Command.server_options,
         Command.repository_options,
     ]

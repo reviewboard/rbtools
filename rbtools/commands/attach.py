@@ -16,11 +16,11 @@ class Attach(Command):
         Option('--filename',
                dest='filename',
                default=None,
-               help='custom filename for file attachment'),
+               help='Custom filename for the file attachment.'),
         Option('--caption',
                dest='caption',
                default=None,
-               help='caption for file attachment'),
+               help='Caption for the file attachment.'),
         Command.server_options,
         Command.repository_options,
     ]

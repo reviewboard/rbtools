@@ -22,7 +22,7 @@ class APIGet(Command):
                dest='pretty_print',
                config_key='API_GET_PRETTY_PRINT',
                default=False,
-               help='Pretty print output'),
+               help='Pretty prints the resulting API payload.'),
         Command.server_options,
     ]
 

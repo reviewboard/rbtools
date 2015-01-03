@@ -19,29 +19,35 @@ class Patch(Command):
                dest='commit',
                action='store_true',
                default=False,
-               help='Commit using information fetched '
-                    'from the review request (Git/Mercurial only).'),
+               help='Commits using information fetched '
+                    'from the review request (Git/Mercurial only).',
+               added_in='0.5.3'),
         Option('-C', '--commit-no-edit',
                dest='commit_no_edit',
                action='store_true',
                default=False,
-               help='Commit using information fetched '
+               help='Commits using information fetched '
                     'from the review request (Git/Mercurial only). '
-                    'This differs from -c by not invoking the editor '
+                    'This differs from --commit by not invoking the editor '
                     'to modify the commit message.'),
         Option('--diff-revision',
                dest='diff_revision',
+               metavar='REVISION',
                default=None,
-               help='revision id of diff to be used as patch'),
+               help='The Review Board diff revision ID to use for the patch.'),
         Option('--px',
                dest='px',
+               metavar='NUM',
                default=None,
-               help='numerical pX argument for patch'),
+               help="Strips the given number of paths from filenames in the "
+                    "diff. Equivalent to patch's `-p` argument."),
         Option('--print',
                dest='patch_stdout',
                action='store_true',
                default=False,
-               help='print patch to stdout instead of applying'),
+               help='Prints the patch to standard output instead of applying '
+                    'it to the tree.',
+               added_in='0.5.3'),
         Command.server_options,
         Command.repository_options,
     ]
