@@ -48,14 +48,14 @@ class Land(Command):
                  'merging a local branch. Defaults to true unless '
                  '--review-request-id is used.'),
         Option(
-            '--push',
+            '-p', '--push',
             dest='push',
             action='store_true',
             default=False,
             config_key='LAND_PUSH',
             help='Pushes the branch after landing the change.'),
         Option(
-            '--no-push',
+            '-n', '--no-push',
             dest='push',
             action='store_false',
             default=False,
@@ -67,7 +67,17 @@ class Land(Command):
             dest='squash',
             action='store_true',
             default=False,
-            help='Squashes history into a single commit'),
+            config_key='LAND_SQUASH',
+            help='Squashes history into a single commit.'),
+        Option(
+            '--no-squash',
+            dest='squash',
+            action='store_false',
+            default=False,
+            config_key='LAND_SQUASH',
+            help='Disables squashing history into a single commit, choosing '
+                 'instead to merge the branch, if squashing is enabled by '
+                 'default.'),
         Option(
             '-e', '--edit',
             dest='edit',
