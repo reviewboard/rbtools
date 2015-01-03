@@ -10,6 +10,7 @@ rbt Commands
    clear-cache
    close
    diff
+   land
    list-repo-types
    patch
    post
