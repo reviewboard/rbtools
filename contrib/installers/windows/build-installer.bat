@@ -47,6 +47,12 @@ set PORTABLE_PYTHON_DEP=%DEPS_DIR%\PortablePython-%PORTABLE_PYTHON_VERSION%
 
 
 ::-------------------------------------------------------------------------
+:: Signing certificate
+::-------------------------------------------------------------------------
+set CERT_THUMBPRINT=1d78bb47e6a8fc599ad61c639dc31048177b3800
+
+
+::-------------------------------------------------------------------------
 :: Begin the installation process
 ::-------------------------------------------------------------------------
 if not exist "%DEPS_DIR%" mkdir "%DEPS_DIR%"
@@ -179,6 +185,7 @@ set _wix_path=%CD%\wix
     /p:Root="%BUILD_ROOT%" ^
     /p:OutputPath="%BUILD_STAGE%\\" ^
     /p:SourcePath="%_wix_path%" ^
+    /p:CertificateThumbprint=%CERT_THUMBPRINT% ^
     "%_wix_path%\rbtools.sln"
 
 if ERRORLEVEL 1 exit /B 1
@@ -229,8 +236,6 @@ for /f "skip=2 tokens=2,*" %%A in ('%_reg_query_cmd%') do (
     echo hi
     SET MSBUILDDIR=%%B
 )
-
-echo [%MSBUILDDIR%]
 
 if not exist %MSBUILDDIR%nul (
     echo The MSBuild tools path from the registry does not exist.
