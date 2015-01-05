@@ -121,7 +121,10 @@ class Land(Command):
 
     def main(self, branch_name=None, *args):
         """Run the command."""
-        self.cmd_args = [branch_name] + list(args)
+        self.cmd_args = list(args)
+
+        if branch_name:
+            self.cmd_args.insert(0, branch_name)
 
         repository_info, self.tool = self.initialize_scm_tool(
             client_name=self.options.repository_type)
