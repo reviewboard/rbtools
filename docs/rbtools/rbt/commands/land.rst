@@ -100,4 +100,19 @@ The default behavior can be changed by specifying ``LAND_PUSH = True`` in
 :option:`--no-push`.
 
 
+Deleting landed branches
+========================
+
+Typically, when a branch has landed, it's no longer necessary to keep it
+around. :command:`rbt land` will default to deleting this branch after landing
+it.
+
+If the branch needs to stay around after landing, you can pass
+:option:`--no-delete-branch`.
+
+The default behavior can be changed by specifying
+``LAND_DELETE_BRANCH = False`` in :file:`.reviewboardrc`. It can then be
+selectively enabled by passing :option:`--delete-branch`.
+
+
 .. rbt-command-options::

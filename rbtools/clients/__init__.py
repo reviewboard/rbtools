@@ -42,6 +42,7 @@ class SCMClient(object):
     can_amend_commit = False
     can_merge = False
     can_push_upstream = False
+    can_delete_branch = False
 
     def __init__(self, user_config=None, configs=[], options=None,
                  capabilities=None):
@@ -268,6 +269,14 @@ class SCMClient(object):
             result['description'] = commit_message
 
         return result
+
+    def delete_branch(self, branch_name, merged_only=True):
+        """Deletes the specified branch.
+
+        If merged_only is False, then the branch will be deleted even if not
+        yet merged into an upstream branch.
+        """
+        raise NotImplementedError
 
     def merge(self, target, destination, message, author, squash=False,
               run_editor=False):

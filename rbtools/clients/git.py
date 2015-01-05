@@ -29,6 +29,7 @@ class GitClient(SCMClient):
     can_amend_commit = True
     can_merge = True
     can_push_upstream = True
+    can_delete_branch = True
 
     def __init__(self, **kwargs):
         super(GitClient, self).__init__(**kwargs)
@@ -737,6 +738,19 @@ class GitClient(SCMClient):
 
         execute(['git', 'commit', '-m', modified_message,
                  '--author="%s <%s>"' % (author.fullname, author.email)])
+
+    def delete_branch(self, branch_name, merged_only=True):
+        """Deletes the specified branch.
+
+        If merged_only is False, then the branch will be deleted even if not
+        yet merged into an upstream branch.
+        """
+        if merged_only:
+            delete_flag = '-d'
+        else:
+            delete_flag = '-D'
+
+        execute(['git', 'branch', delete_flag, branch_name])
 
     def merge(self, target, destination, message, author, squash=False,
               run_editor=False):

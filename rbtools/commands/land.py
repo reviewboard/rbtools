@@ -86,6 +86,22 @@ class Land(Command):
             help='Invokes the editor to edit the commit message before '
                  'landing the change.'),
         Option(
+            '--delete-branch',
+            dest='delete_branch',
+            action='store_true',
+            config_key='LAND_DELETE_BRANCH',
+            default=True,
+            help="Deletes the local branch after it's landed. Only used if "
+                 "landing a local branch. This is the default."),
+        Option(
+            '--no-delete-branch',
+            dest='delete_branch',
+            action='store_false',
+            config_key='LAND_DELETE_BRANCH',
+            default=True,
+            help="Prevents the local branch from being deleted after it's "
+                 "landed."),
+        Option(
             '--dry-run',
             dest='dry_run',
             action='store_true',
@@ -118,7 +134,9 @@ class Land(Command):
         # Check if repository info on reviewboard server match local ones.
         repository_info = repository_info.find_server_repository_info(api_root)
 
-        if not self.tool.can_merge or not self.tool.can_push_upstream:
+        if (not self.tool.can_merge or
+            not self.tool.can_push_upstream or
+            not self.tool.can_delete_branch):
             raise CommandError(
                 "This command does not support %s repositories."
                 % self.tool.name)
@@ -204,6 +222,12 @@ class Land(Command):
                         self.options.edit)
                 except MergeError as e:
                     raise CommandError(str(e))
+
+            if self.options.delete_branch:
+                print('Deleting merged branch "%s"' % branch_name)
+
+                if not dry_run:
+                    self.tool.delete_branch(branch_name, merged_only=False)
         else:
             print('Applying patch from review request %s' % request_id)
 
