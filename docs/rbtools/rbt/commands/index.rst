@@ -16,4 +16,5 @@ rbt Commands
    post
    publish
    setup-repo
+   stamp
    status
