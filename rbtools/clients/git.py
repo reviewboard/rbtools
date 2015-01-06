@@ -418,7 +418,7 @@ class GitClient(SCMClient):
 
         svn_branch = self._get_subgit_tracking_branch('HEAD')
         if svn_branch:
-            git_branch = execute(['git', 'branch'])
+            git_branch = self.get_current_branch()
         else:
             if (hasattr(self.options, 'parent_branch') and
                     self.options.parent_branch is not None):
