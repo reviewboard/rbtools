@@ -43,6 +43,6 @@
             SigningTarget="%(SignCabs.FullPath)"/>
  </Target>
  <Target Name="SignMsi">
-  <Exec Command='"$(WindowsSDK80Path)\bin\x64\signtool.exe" sign /sha1 $(CertificateThumbprint) "%(SignMsi.FullPath)"' />
+  <Exec Command='"$(WindowsSDK80Path)\bin\x64\signtool.exe" sign /sha1 $(CertificateThumbprint) /t $(TimestampUrl) "%(SignMsi.FullPath)"' />
  </Target>
 </Project>

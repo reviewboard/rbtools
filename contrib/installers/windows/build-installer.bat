@@ -186,6 +186,7 @@ set _wix_path=%CD%\wix
     /p:OutputPath="%BUILD_STAGE%\\" ^
     /p:SourcePath="%_wix_path%" ^
     /p:CertificateThumbprint=%CERT_THUMBPRINT% ^
+    /p:TimestampUrl=http://timestamp.comodoca.com/authenticode ^
     "%_wix_path%\rbtools.sln"
 
 if ERRORLEVEL 1 exit /B 1
