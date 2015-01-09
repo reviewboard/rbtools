@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 import atexit
 import contextlib
@@ -126,7 +126,7 @@ class APICache(object):
 
     # The API Cache's schema version. If the schema is updated, update this
     # value.
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 2
 
     def __init__(self, create_db_in_memory=False, urlopen=urlopen):
         """Create a new instance of the APICache
@@ -307,7 +307,9 @@ class APICache(object):
                 old_locale = locale.setlocale(locale.LC_TIME)
 
                 try:
-                    locale.setlocale(locale.LC_TIME, 'C')
+                    # 'setlocale' requires the second parameter to be a 'str'
+                    # in both Python 2.x and Python 3+.
+                    locale.setlocale(locale.LC_TIME, str('C'))
                     expires = datetime.datetime.strptime(expires,
                                                          self.EXPIRES_FORMAT)
 
@@ -326,7 +328,7 @@ class APICache(object):
                                   expires)
                 except locale.Error:
                     logging.error("The C locale is unavailable on this "
-                                  "system.  The 'Expires' header cannot be "
+                                  "system. The 'Expires' header cannot be "
                                   "parsed.")
                 finally:
                     locale.setlocale(locale.LC_TIME, old_locale)
@@ -408,7 +410,7 @@ class APICache(object):
                                  last_modified  TEXT,
                                  mime_type      TEXT,
                                  item_mime_type TEXT,
-                                 response_body  TEXT,
+                                 response_body  BLOB,
                                  PRIMARY KEY(url, vary_headers)
                              )''')
 
@@ -464,7 +466,7 @@ class APICache(object):
                               (entry.url, vary_headers, entry.max_age,
                                entry.etag, local_date, entry.last_modified,
                                entry.mime_type, entry.item_mime_type,
-                               entry.response_body))
+                               sqlite3.Binary(entry.response_body)))
                 except sqlite3.IntegrityError:
                     c.execute('''UPDATE api_cache
                                  SET max_age=?,
@@ -510,7 +512,7 @@ class APICache(object):
             last_modified=row[5],
             mime_type=row[6],
             item_mime_type=row[7],
-            response_body=row[8],
+            response_body=six.binary_type(row[8]),
         )
 
     def _write_db(self):
