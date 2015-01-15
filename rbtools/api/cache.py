@@ -248,7 +248,8 @@ class APICache(object):
                             # the old cache entry and save the new one.
                             self._delete_entry(entry)
                             entry.vary_headers = cache_info['vary_headers']
-                            self._save_entry(entry)
+
+                        self._save_entry(entry)
                     else:
                         # This resource is no longer cache-able so we should
                         # delete our cached version.

@@ -6,7 +6,7 @@ import re
 
 import six
 
-from rbtools.api.cache import APICache, CachedHTTPResponse
+from rbtools.api.cache import APICache, CacheEntry, CachedHTTPResponse
 from rbtools.api.capabilities import Capabilities
 from rbtools.api.factory import create_resource
 from rbtools.api.request import HttpRequest, Request
@@ -530,7 +530,19 @@ class MockUrlOpener(object):
                 # the tests to sleep().
                 resp = MockResponse(200, headers, self.CONTENT)
             else:
-                resp = MockResponse(304, headers, self.CONTENT)
+                request_datetime = datetime.datetime.strptime(
+                    request.headers['If-modified-since'],
+                    CacheEntry.DATE_FORMAT)
+
+                header_datetime = datetime.datetime.strptime(
+                    headers['Last-Modified'],
+                    CacheEntry.DATE_FORMAT)
+
+                if request_datetime < header_datetime:
+                    # The content has been modified
+                    resp = MockResponse(200, headers, self.CONTENT)
+                else:
+                    resp = MockResponse(304, headers, None)
         else:
             resp = MockResponse(200, headers, self.CONTENT)
 
@@ -643,11 +655,14 @@ class APICacheTests(TestCase):
             'new-etag')
 
         second_resp = self.cache.make_request(request)
+        third_resp = self.cache.make_request(request)
 
-        self.assertEqual(self.urlopener.get_hit_count('http://no_cache_etag'),
-                         2)
         self.assertFalse(isinstance(first_resp, CachedHTTPResponse))
         self.assertFalse(isinstance(second_resp, CachedHTTPResponse))
+        self.assertTrue(isinstance(third_resp, CachedHTTPResponse))
+
+        self.assertEqual(self.urlopener.get_hit_count('http://no_cache_etag'),
+                         3)
 
     def test_cache_control_header_nocache_with_last_modfied(self):
         """Testing the cache with the no-cache control"""
@@ -659,6 +674,35 @@ class APICacheTests(TestCase):
                          2)
         self.assertFalse(isinstance(first_resp, CachedHTTPResponse))
         self.assertTrue(isinstance(second_resp, CachedHTTPResponse))
+
+    def test_cache_control_header_nocache_with_last_modified_updated(self):
+        """Testing the cache with the no-cache control and an updated
+        Last-Modified header
+        """
+        endpoint = 'http://no_cache_lastmodified_updated'
+        future_date = datetime.datetime.utcnow() + datetime.timedelta(days=1)
+
+        self.urlopener.endpoints[endpoint] = {
+            'hit_count': 0,
+            'headers': {
+                'Cache-Control': 'no-cache',
+                'Last-Modified': '1999-12-31T00:00:00'
+            },
+        }
+
+        request = Request(endpoint, method='GET')
+        first_resp = self.cache.make_request(request)
+
+        self.urlopener.endpoints[endpoint]['headers']['Last-Modified'] = (
+            future_date.strftime(CacheEntry.DATE_FORMAT))
+
+        second_resp = self.cache.make_request(request)
+        third_resp = self.cache.make_request(request)
+
+        self.assertFalse(isinstance(first_resp, CachedHTTPResponse))
+        self.assertFalse(isinstance(second_resp, CachedHTTPResponse))
+        self.assertTrue(isinstance(third_resp, CachedHTTPResponse))
+        self.assertEqual(self.urlopener.get_hit_count(endpoint), 3)
 
     def test_cache_control_header_no_store(self):
         """Testing the cache with the no-store control"""
