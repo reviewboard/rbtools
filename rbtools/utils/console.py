@@ -33,7 +33,7 @@ def edit_text(content):
     tempfile = make_tempfile(content.encode('utf8'))
     editor = os.environ.get('VISUAL') or os.environ.get('EDITOR') or 'vi'
     try:
-        subprocess.call([editor, tempfile])
+        subprocess.call(editor.split() + [tempfile])
     except OSError:
         print('No editor found. Set EDITOR environment variable or install '
               'vi.')
