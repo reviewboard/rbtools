@@ -31,6 +31,12 @@ from rbtools import get_package_version
 from rbtools.api.cache import APICache
 from rbtools.api.errors import APIError, create_api_error, ServerInterfaceError
 from rbtools.utils.filesystem import get_home_path
+try:
+    import ssl
+    from six.moves.urllib.request import HTTPSHandler
+except ImportError:
+    ssl = None
+    HTTPSHandler = None
 
 
 RBTOOLS_COOKIE_FILE = '.rbtools-cookies'
@@ -394,7 +400,7 @@ class ReviewBoardServer(object):
     """
     def __init__(self, url, cookie_file=None, username=None, password=None,
                  api_token=None, agent=None, session=None, disable_proxy=False,
-                 auth_callback=None, otp_token_callback=None):
+                 auth_callback=None, otp_token_callback=None, verify=None):
         self.url = url
         if not self.url.endswith('/'):
             self.url += '/'
@@ -448,6 +454,12 @@ class ReviewBoardServer(object):
                                                          password_mgr)
 
         handlers = []
+
+        if verify is not None:
+            assert ssl is not None
+            verify = os.path.expanduser(verify)
+            context = ssl.create_default_context(cafile=verify)
+            handlers.append(HTTPSHandler(context=context))
 
         if disable_proxy:
             handlers.append(ProxyHandler({}))
