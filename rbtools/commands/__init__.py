@@ -216,6 +216,15 @@ class Command(object):
                    help='The API token to use for authentication, instead of '
                         'using a username and password.',
                    added_in='0.7'),
+            Option('--verify',
+                   dest='verify',
+                   metavar='CA',
+                   config_key='SSL_VERIFY',
+                   default=None,
+                   help='The SSL Certificate authority to use for SSL '
+                        'connections',
+                   # TODO: Fill in added_in
+                   added_in='0.7'),
         ]
     )
 
@@ -667,7 +676,8 @@ class Command(object):
                         api_token=self.options.api_token,
                         auth_callback=self.credentials_prompt,
                         otp_token_callback=self.otp_token_prompt,
-                        disable_proxy=not self.options.enable_proxy)
+                        disable_proxy=not self.options.enable_proxy,
+                        verify=self.options.verify)
 
     def get_api(self, server_url):
         """Returns an RBClient instance and the associated root resource.
