@@ -9,8 +9,7 @@ from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option, OptionGroup
 from rbtools.utils.commands import get_review_request
 from rbtools.utils.console import confirm
-from rbtools.utils.review_request import (get_commit_message,
-                                          get_draft_or_current_value,
+from rbtools.utils.review_request import (get_draft_or_current_value,
                                           get_revisions,
                                           guess_existing_review_request_id)
 
@@ -543,7 +542,8 @@ class Post(Command):
 
         if guess_summary or guess_description:
             try:
-                commit_message = get_commit_message(self.tool, self.cmd_args)
+                assert self.revisions
+                commit_message = self.tool.get_commit_message(self.revisions)
 
                 if commit_message:
                     if guess_summary:
@@ -595,6 +595,7 @@ class Post(Command):
         repository_info = repository_info.find_server_repository_info(api_root)
 
         if self.options.diff_filename:
+            self.revisions = None
             parent_diff = None
             base_commit_id = None
             commit_id = None
@@ -614,9 +615,9 @@ class Post(Command):
                 except IOError as e:
                     raise CommandError('Unable to open diff filename: %s' % e)
         else:
-            revisions = get_revisions(self.tool, self.cmd_args)
+            self.revisions = get_revisions(self.tool, self.cmd_args)
 
-            if revisions:
+            if self.revisions:
                 extra_args = None
             else:
                 extra_args = self.cmd_args
@@ -624,7 +625,7 @@ class Post(Command):
             # Generate a diff against the revisions or arguments, filtering
             # by the requested files if provided.
             diff_info = self.tool.diff(
-                revisions=revisions,
+                revisions=self.revisions,
                 include_files=self.options.include_files or [],
                 exclude_patterns=self.options.exclude_patterns or [],
                 extra_args=extra_args)
@@ -676,11 +677,11 @@ class Post(Command):
             # options.
             self.check_guess_fields()
 
-        if self.options.update:
+        if self.options.update and self.revisions:
             self.options.rid = guess_existing_review_request_id(
                 repository_info, self.options.repository_name, api_root,
-                api_client, self.tool, self.cmd_args, guess_summary=False,
-                guess_description=False,
+                api_client, self.tool, self.revisions,
+                guess_summary=False, guess_description=False,
                 is_fuzzy_match_func=self._ask_review_request_match)
 
             if not self.options.rid:

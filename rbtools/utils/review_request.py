@@ -6,27 +6,6 @@ from rbtools.utils.repository import get_repository_id
 from rbtools.utils.users import get_user
 
 
-def get_commit_message(tool, cmd_args):
-    """Returns the commit message for the parsed revisions.
-
-    If the SCMClient supports getting a commit message, this will fetch
-    and store the message for future lookups.
-
-    This is used for guessing the summary and description fields, and
-    updating exising review requests using -u.
-    """
-    return tool.get_commit_message(get_revisions(tool, cmd_args))
-
-
-def get_raw_commit_message(tool, cmd_args):
-    """Returns the raw commit message for the parsed revisions.
-
-    If the SCMClient supports getting a commit message, this will fetch
-    and store the message for future lookups.
-    """
-    return tool.get_raw_commit_message(get_revisions(tool, cmd_args))
-
-
 def get_draft_or_current_value(field_name, review_request):
     """Returns the draft or current field value from a review request.
 
@@ -102,7 +81,7 @@ def get_revisions(tool, cmd_args):
 
 
 def guess_existing_review_request_id(repository_info, repository_name,
-                                     api_root, api_client, tool, cmd_args,
+                                     api_root, api_client, tool, revisions,
                                      guess_summary, guess_description,
                                      is_fuzzy_match_func=None,
                                      no_commit_error=None):
@@ -142,7 +121,7 @@ def guess_existing_review_request_id(repository_info, repository_name,
 
     if not guess_summary or not guess_description:
         try:
-            commit_message = get_commit_message(tool, cmd_args)
+            commit_message = tool.get_commit_message(revisions)
 
             if commit_message:
                 if not guess_summary:

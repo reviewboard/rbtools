@@ -1,8 +1,8 @@
 from rbtools.commands import Command, CommandError, Option, OptionGroup
 from rbtools.utils.commands import get_review_request
 from rbtools.utils.console import confirm
-from rbtools.utils.review_request import (get_raw_commit_message,
-                                          get_draft_or_current_value,
+from rbtools.utils.review_request import (get_draft_or_current_value,
+                                          get_revisions,
                                           guess_existing_review_request_id)
 
 
@@ -66,7 +66,8 @@ class Stamp(Command):
         except NotImplementedError:
             pass
 
-        commit_message = get_raw_commit_message(self.tool, self.cmd_args)
+        revisions = get_revisions(self.tool, self.cmd_args)
+        commit_message = self.tool.get_raw_commit_message(revisions)
 
         if '\nReviewed at http' in commit_message:
             raise CommandError('This commit is already stamped.')
@@ -74,8 +75,8 @@ class Stamp(Command):
         if not self.options.rid:
             self.options.rid = guess_existing_review_request_id(
                 repository_info, self.options.repository_name, api_root,
-                api_client, self.tool, self.cmd_args, guess_summary=False,
-                guess_description=False,
+                api_client, self.tool, revisions,
+                guess_summary=False, guess_description=False,
                 is_fuzzy_match_func=self._ask_review_request_match,
                 no_commit_error=self.no_commit_error)
 
