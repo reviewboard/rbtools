@@ -1,20 +1,11 @@
-============
-rbt Commands
-============
+.. _rbt-commands:
+
+========
+Commands
+========
 
 .. toctree::
    :maxdepth: 1
+   :glob:
 
-   api-get
-   attach
-   clear-cache
-   close
-   diff
-   land
-   list-repo-types
-   patch
-   post
-   publish
-   setup-repo
-   stamp
-   status
+   *

@@ -2,200 +2,100 @@
 RBTools Documentation
 =====================
 
-RBTools is a set of client tools to use with Review Board.
+RBTools is a set of command line tools for working with `Review Board`_ and
+RBCommons_. It's there to help quickly get your code up for review, check on
+the status of changes, and eventually land your code in the codebase,
+amongst other uses.
+
+RBTools interfaces with your repository's official command line tools, making
+it easy to generate suitable diffs or to apply changes across any supported
+type of repository without having to learn different sets of tools.
+
+Along with a variety of helpful commands, RBTools also provides a powerful
+Python client API for Review Board, giving you the flexibility to develop your
+own integrations.
+
+.. _`Review Board`: https://www.reviewboard.org/
+.. _RBCommons: https://rbcommons.com/
 
 
-Using RBTools
-=============
+What's in RBTools
+=================
 
 .. _rbt:
 
-rbt
----
+rbt Command
+-----------
 
-The recommended command-line interface is the :command:`rbt` tool. This tool
-runs on Windows, Linux, and MacOS X, and allows executing a number of useful
-sub-commands. :command:`rbt` has the following usage::
+All the RBTools commands are invoked through the :command:`rbt` tool. This
+runs on Windows, Linux, and MacOS X, and contains a number of useful
+sub-commands through the following usage::
 
-   $ rbt [--version] <command> [options] [<args>]
+   $ rbt <command> [options] [<args>]
 
-The :command:`rbt` command obsoletes the old "post-review" command.
-For built in help you may execute::
+You can get help on :command:`rbt` or a sub-command in the following ways::
 
    $ rbt help
+   $ rbt help <command>
+   $ rbt <command> --help
 
+Some of the most commonly-used commands include:
 
-.. toctree::
-   :maxdepth: 2
+* :ref:`rbt-post` - Posts changes to Review Board
+* :ref:`rbt-diff` - Displays the diff that will be sent to Review Board
+* :ref:`rbt-land` - Lands a change in a local branch or on a review request
+* :ref:`rbt-patch` - Patches your tree with a change on a review request
+* :ref:`rbt-setup-repo` - Sets up RBTools to talk to your repository
 
-   rbt/configuration
-   rbt/commands/index
-   rbt/aliases
+There are many other commands you may find useful. See the
+:ref:`full list of commands <rbt-commands>`.
 
-
-.. _rbtools-api:
 
 Python API
 ----------
 
-Included with RBTools is a Python client for interacting with the Review Board
-Web API.
+RBTools provides a Python module makes it easy to communicate with any Review
+Board server using its powerful REST API. You can write custom scripts or even
+new RBTools command that can attach metadata to review requests, perform
+reviews, analyze diffs, extract analytics data, or almost anything else.
 
-.. note::
-   This documentation assumes knowledge of the Review Board Web API. When
-   possible links will be provided to relevant sections of the Web API
-   documentation which can be found in the `Web API Guide`_.
-
-.. _`Web API Guide`: http://www.reviewboard.org/docs/manual/dev/webapi/
-
-.. toctree::
-   :maxdepth: 2
-
-   api/overview
-   api/tutorial
-   api/resource-specific
+There's a lot you can do with the API. See the :ref:`rbtools-api`
+documentation for more information.
 
 
 Installation
 ============
 
-Before installing RBTools, you will need to have both Python and setuptools
-installed.
+To install RBTools, simply visit the `RBTools Downloads`_ page and follow the
+instructions for your operating system. If you are using MacOS X or Windows,
+just run the installer and you'll be set.
 
-We require Python 2.4 or higher. We recommend installing Python 2.7. The
-3.x releases will not work.
-
-
-Installing Python
------------------
-
-Linux
-~~~~~
-
-Python 2.x should come with your distribution. If not, or if 2.x isn't
-installed, you will need to install the appropriate package. Please refer to
-your package manager for the appropriate version.
+.. _`RBTools Downloads`: https://www.reviewboard.org/downloads/rbtools/
 
 
-Mac OS X
-~~~~~~~~
-
-Python 2.x comes pre-installed on Mac OS X.
-
-
-Windows
-~~~~~~~
-
-You can install Python by running the latest `Python 2.7 Installer`_ for
-Windows. We recommend the 32-bit MSI installer, as setuptools is not packaged
-for 64-bit.
-
-.. _`Python 2.7 Installer`: http://www.python.org/download/releases/2.7.3/
-
-
-Installing setuptools
----------------------
-
-Linux and Mac OS X
-~~~~~~~~~~~~~~~~~~
-
-To install setuptools on Debian_, Ubuntu_, or another Debian-based
-distribution, type::
-
-    $ apt-get install python-setuptools
-
-
-To install on Fedora_ 8 and above, type::
-
-    $ yum install -y python-setuptools-devel.noarch
-
-To install on a `RedHat Enterprise`_, CentOS_, Fedora_ 7 and earlier, or
-another RedHat-based distribution, type::
-
-    $ yum install python-setuptools
-
-
-Users of other distributions should check with their distribution for native
-packages, or follow the `setuptools installation`_ instructions.
-
-If the version of setuptools available for your distribution is older than
-0.6c9, you'll need to install it first, and then upgrade it to the latest
-version by running::
-
-    $ easy_install -U setuptools
-
-
-.. _`Python setuptools`: http://peak.telecommunity.com/DevCenter/setuptools
-.. _`setuptools installation`: http://peak.telecommunity.com/DevCenter/EasyInstall#installation-instructions
-
-
-Windows
-~~~~~~~
-
-You'll then need to run the latest `Python setuptools Installer`_ (look
-toward the bottom of the page for the file listing).
-
-Once Python and setuptools are installed, you may need to add a couple
-directories to your system path.
-
-1. Open :menuselection:`Start --> Control Panel` and navigate to the
-   :guilabel:`System` icon.
-2. Click on the :guilabel:`Advanced` tab.
-3. Click :guilabel:`Environment Variables`.
-4. Find :envvar:`PATH` in :guilabel:`System variables` and click
-   :guilabel:`Edit`.
-5. Add ``;C:\Python27;C:\Python27\Scripts`` (substitute your Python
-   directory if it's not ``C:\Python27``) to the end of the list.
-
-Depending on your version control system, you may also need to install the
-command-line version of the client. Graphical clients like TortoiseCVS or
-TortoiseSVN are not sufficient, and a ``cvs`` or ``svn`` binary is required.
-
-.. _`Python setuptools Installer`: http://pypi.python.org/pypi/setuptools#windows
-
-
-Installing RBTools
-------------------
-
-Once Python and Setuptools are installed, you can install RBTools just by
-typing::
-
-    $ easy_install -U RBTools
-
-
-.. _Debian: http://www.debian.org/
-.. _Ubuntu: http://www.ubuntu.com/
-.. _`RedHat Enterprise`: http://www.redhat.com/
-.. _Fedora: http://fedoraproject.org/
-.. _CentOS: http://www.centos.org/
-
-
-Installing GNU Diff
--------------------
-
-Depending on your version control system, you may also need to install GNU
-diff. Linux and Mac OS X should come with GNU diff pre-installed. On Windows,
-you can use the `GNU Diffutils Installer`_
-
-.. _`GNU Diffutils Installer`: http://gnuwin32.sourceforge.net/packages/diffutils.htm
-
-
-Special Files
+Configuration
 =============
 
-The :command:`rbt` command stores its login session in a file called
-:file:`~/.rbtools-cookies`. It can also read this information from a file
-called :file:`~/.post-review-cookies.txt`, which was used by the deprecated
-:command:`post-review` command.
+Once you've installed RBTools, you'll want to configure it to
+:ref:`work with your repositories <rbtools-repo-config>`. This is the first
+step to allow any of your developers to easily post changes using RBTools.
 
-The :command:`rbt` command also stores cached API request responses in a
-SQLite database in a cache directory. On Windows this is in
-:file:`%APPDATA%\rbtools\rbtools\apicache.db`, on Linux this is in
-:file:`~/.cache/.rbtools/apicache.db`, and on OSX this is in
-:file:`~/Library/Caches/rbtools/apicache.db`.
+There's also a number of
+:ref:`user-configurable options <rbtools-user-config>` as well, including
+customizable defaults for parameters and
+:ref:`custom aliases <rbtools-aliases>` for common operations or sets of
+flags.
 
 
 Indices, Glossary and Tables
 ============================
 
 * :ref:`glossary`
+
+
+.. toctree::
+   :hidden:
+
+   rbt/index
+   api/index
+   glossary

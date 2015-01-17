@@ -1,7 +1,47 @@
-Aliases
-=======
+.. _rbtools-user-config:
+
+======================
+Per-User Configuration
+======================
+
+There's a lot of flexibility when it comes to the RBTools setup. You can
+provide your own defaults for nearly all RBTools command options, and can
+define custom aliases to improve your workflows.
+
+Like with :ref:`repository configuration <rbtools-repo-config>`, these
+settings are stored in a :file:`.reviewboardrc` file. These can go in the
+repository's own version of the file, if these options should apply to all
+users by default. Otherwise, they can go in the :file:`.reviewboardrc` in your
+home directory.
+
+On Linux and MacOS X, this file can be found in your home directory.
+
+On Windows, it's in :file:`$USERPROFILE\\Local Settings\\Application Data`.
+
+
+Custom Option Defaults
+======================
+
+Most options to RBTools commands allow for custom defaults. Each command has
+documentation on what to set to change the default.
+
+For instance, if you look at the :ref:`rbt-post` documentation, you'll see
+that you can automatically open your browser when posting a review request by
+setting::
+
+    OPEN_BROWSER = True
+
+Or, you can disable usage of your HTTP proxy on any command by setting::
+
+    ENABLE_PROXY = False
+
+Check out the documentation for the different commands to see what you can do.
+
 
 .. _rbtools-aliases:
+
+Aliases
+=======
 
 :command:`rbt` can be configured to add command aliases. The ``ALIASES`` value
 in :file:`.reviewboardrc` can be added to allow for command aliasing. It is a
@@ -31,7 +71,6 @@ As are the following::
 
     $ rbt push 3351
     $ git push && rbt close 3351
-
 
 
 Types of Aliases
@@ -76,3 +115,35 @@ If no parameter substitution is performed, all supplied arguments will be
 appended to the command when it is executed. Non-numeric variables are not
 replaced in the parameter and, if the alias is a system command alias, will be
 handled by the shell.
+
+
+Special Files
+=============
+
+Cookies
+-------
+
+The :command:`rbt` command stores its login session in a cookies file called
+:file:`~/.rbtools-cookies`. To force RBTools to log in again, simply delete
+this file.
+
+If the file is missing, RBTools will check for a legacy
+:file:`~/.post-review-cookies.txt` file. This is for compatibility with the
+old :command:`post-review` command.
+
+
+Cache Database
+--------------
+
+The :command:`rbt` command stores cached API request responses in a SQLite
+database in a cache directory. This is to reduce the time it takes to perform
+certain API requests.
+
+On MacOS X, this is in :file:`~/Library/Caches/rbtools/apicache.db`.
+
+On Linux, this is in :file:`~/.cache/.rbtools/apicache.db`.
+
+On Windows, this is in :file:`%APPDATA%\\rbtools\\rbtools\\apicache.db`.
+
+To delete the cache, either remove this file, or call
+:ref:`rbt clear-cache <rbt-clear-cache>`.

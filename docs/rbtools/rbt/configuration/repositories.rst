@@ -1,15 +1,13 @@
-=============
-Configuration
-=============
+.. _rbtools-repo-config:
+
+=========================
+Repository Configuration
+=========================
 
 There are many ways to configure :command:`rbt` in order to associate
 a Review Board server with a repository. The ideal setup is to configure
 a repository to point to a Review Board server, so that users can use
 :command:`rbt` out of the box, but there are other methods available.
-
-
-Repository Configuration
-========================
 
 All repository types support a :file:`.reviewboardrc` file, which is the
 recommended way to configure your repository. Through here, you can specify
@@ -158,16 +156,3 @@ user's checkout, it will be faster to find the property.
 To set the property on a directory, type::
 
     $ svn propset reviewboard:url http://reviewboard.example.com .
-
-
-Custom User Configuration
-=========================
-
-You can provide your own defaults for RBTools by creating a
-:file:`.reviewboardrc` file in your HOME directory (usually
-:file:`/home/{username}` on Linux,
-:file:`$USERPROFILE\\Local Settings\\Application Data` on Windows).
-
-You might use this to automatically open your browser when posting a
-review request (by setting ``OPEN_BROWSER = True``), or to disable your
-HTTP proxy (``ENABLE_PROXY = False``), for example.

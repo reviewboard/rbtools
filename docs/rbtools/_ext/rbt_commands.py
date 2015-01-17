@@ -64,7 +64,7 @@ class CommandDirective(Directive):
         doc.note_explicit_target(target_node)
         program_node = parse_text(self, '.. program:: rbt %s' % cmd_class.name)
 
-        return [target_node, program_node]
+        return [program_node, target_node]
 
     def get_command_class(self, class_name):
         try:
