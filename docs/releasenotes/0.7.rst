@@ -235,6 +235,15 @@ support.
 Bug Fixes
 =========
 
+rbt patch
+---------
+
+* Fixed invoking the editor for commit messages when the command in
+  :env:`$EDITOR` contained spaces. (:bug:`3652`)
+
+  Patch by Theo Belaire.
+
+
 Git-SVN
 -------
 
@@ -254,4 +263,5 @@ Contributors
 * Jonathan Doman
 * Nicolas Dély
 * Stephen Gallagher
+* Theo Belaire
 * Yanjia (Nicole) Xin
