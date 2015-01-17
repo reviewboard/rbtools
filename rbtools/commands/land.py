@@ -8,6 +8,7 @@ from rbtools.utils.commands import (build_rbtools_cmd_argv,
 from rbtools.utils.console import confirm
 from rbtools.utils.process import execute
 from rbtools.utils.review_request import (get_draft_or_current_value,
+                                          get_revisions,
                                           guess_existing_review_request_id)
 
 
@@ -157,7 +158,7 @@ class Land(Command):
                 api_root,
                 api_client,
                 self.tool,
-                self.cmd_args,
+                get_revisions(self.tool, self.cmd_args),
                 guess_summary=False,
                 guess_description=False,
                 is_fuzzy_match_func=self._ask_review_request_match)
