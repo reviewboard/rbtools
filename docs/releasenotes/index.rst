@@ -4,14 +4,33 @@
 RBTools Release Notes
 =====================
 
+0.7 Releases
+============
+
 .. toctree::
    :maxdepth: 1
 
    0.7
+
+
+0.6 Releases
+============
+
+.. toctree::
+   :maxdepth: 1
+
    0.6.3
    0.6.2
    0.6.1
    0.6
+
+
+0.5 Releases
+============
+
+.. toctree::
+   :maxdepth: 1
+
    0.5.7
    0.5.6
    0.5.5
@@ -20,15 +39,39 @@ RBTools Release Notes
    0.5.2
    0.5.1
    0.5
+
+
+0.4 Releases
+============
+
+.. toctree::
+   :maxdepth: 1
+
    0.4.3
    0.4.2
    0.4.1
    0.4
+
+
+0.3 Releases
+============
+
+.. toctree::
+   :maxdepth: 1
+
    0.3.4
    0.3.3
    0.3.2
    0.3.1
    0.3
+
+
+0.2 Releases
+============
+
+.. toctree::
+   :maxdepth: 1
+
    0.2
    0.2-rc-1
    0.2-beta-2
