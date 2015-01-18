@@ -23,7 +23,7 @@
   <Chain>
    <MsiPackage SourceFile="$(var.rbtools.TargetPath)"
                SuppressSignatureVerification="yes">
-    <MsiProperty Name='TARGETDIR' Value='[InstallFolder]'/>
+    <MsiProperty Name='INSTALLFOLDER' Value='[InstallFolder]'/>
    </MsiPackage>
   </Chain>
  </Bundle>
