@@ -1,8 +1,8 @@
-=========================
-RBTools 0.7 Release Notes
-=========================
+===========================
+RBTools 0.7.0 Release Notes
+===========================
 
-**Release date**: TBD
+**Release date:** January 18, 2015
 
 
 Compatibility Notes
