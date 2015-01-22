@@ -552,6 +552,9 @@ class Command(object):
         Commands should use this method to gain access to the API,
         instead of instantianting their own client.
         """
+        if not urlparse(server_url).scheme:
+            server_url = '%s%s' % ('http://', server_url)
+
         api_client = self._make_api_client(server_url)
 
         try:
