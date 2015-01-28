@@ -455,11 +455,12 @@ class GitClient(SCMClient):
             files = ['--'] + files
 
         if self.type in ('svn', 'perforce'):
-            diff_cmd = [self.git, 'diff', '--no-color', '--no-prefix', '-r',
-                        '-u', rev_range]
+            diff_cmd = [self.git, '-c', 'core.quotepath=false', 'diff',
+                        '--no-color', '--no-prefix', '-r', '-u', rev_range]
         elif self.type == "git":
-            diff_cmd = [self.git, 'diff', '--no-color', '--full-index',
-                        '--ignore-submodules', rev_range]
+            diff_cmd = [self.git, '-c', 'core.quotepath=false', 'diff',
+                        '--no-color', '--full-index', '--ignore-submodules',
+                        rev_range]
 
             if (self.capabilities is not None and
                 self.capabilities.has_capability('diffs', 'moved_files')):
