@@ -566,7 +566,7 @@ class GitClient(SCMClient):
         filename = ""
         newfile = False
 
-        for line in diff_lines:
+        for i, line in enumerate(diff_lines):
             if line.startswith("diff "):
                 # Grab the filename and then filter this out.
                 # This will be in the format of:
@@ -582,7 +582,8 @@ class GitClient(SCMClient):
             elif line.strip() == "--- /dev/null":
                 # New file
                 newfile = True
-            elif line.startswith("--- "):
+            elif (line.startswith("--- ") and i + 1 < len(diff_lines) and
+                  diff_lines[i + 1].startswith('+++ ')):
                 newfile = False
                 original_file = line[4:].strip()
                 diff_data += "--- %s\t(revision %s)\n" % \
@@ -630,7 +631,7 @@ class GitClient(SCMClient):
                 # We should really raise an error here, base_path is required
                 pass
 
-        for line in diff_lines:
+        for i, line in enumerate(diff_lines):
             if line.startswith('diff '):
                 # Grab the filename and then filter this out.
                 # This will be in the format of:
@@ -640,7 +641,8 @@ class GitClient(SCMClient):
                   line.startswith('new file mode ')):
                 # Filter this out
                 pass
-            elif line.startswith('--- '):
+            elif (line.startswith('--- ') and i + 1 < len(diff_lines) and
+                  diff_lines[i + 1].startswith('+++ ')):
                 data = execute(
                     ['p4', 'files', base_path + filename + '@' + p4rev],
                     ignore_errors=True)
