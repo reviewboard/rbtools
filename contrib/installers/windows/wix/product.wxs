@@ -15,6 +15,7 @@
   <Feature Id="ProductFeature" Title="RBTools" Level="1">
    <ComponentGroupRef Id="rbgroup"/>
    <ComponentRef Id="rbt_cmd"/>
+   <ComponentRef Id="rbt_sh"/>
   </Feature>
  </Product>
 
@@ -30,9 +31,14 @@
 
  <Fragment>
   <Component Id="rbt_cmd" Directory="bin">
-   <Environment Id="PathEnv" Action="set" System="yes" Part="first"
+   <Environment Id="rbt_cmd_path_env" Action="set" System="yes" Part="first"
                 Permanent="no" Name="Path" Value="[INSTALLFOLDER]bin"/>
    <File Source="files\rbt.cmd"/>
+  </Component>
+  <Component Id="rbt_sh" Directory="bin">
+   <Environment Id="rbt_sh_path_env" Action="set" System="yes" Part="first"
+                Permanent="no" Name="Path" Value="[INSTALLFOLDER]bin"/>
+   <File Source="files\rbt"/>
   </Component>
  </Fragment>
 </Wix>
