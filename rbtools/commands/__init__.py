@@ -622,7 +622,7 @@ class Command(object):
                 username = input()
 
             if password is None:
-                password = getpass.getpass('Password: ')
+                password = getpass.getpass(b'Password: ')
 
         return username, password
 

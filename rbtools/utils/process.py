@@ -47,8 +47,8 @@ def execute(command,
     # TODO: This can break on systems that don't have the en_US locale
     # installed (which isn't very many). Ideally in this case, we could
     # put something in the config file, but that's not plumbed through to here.
-    env['LC_ALL'] = 'en_US.UTF-8'
-    env['LANGUAGE'] = 'en_US.UTF-8'
+    env[b'LC_ALL'] = b'en_US.UTF-8'
+    env[b'LANGUAGE'] = b'en_US.UTF-8'
 
     if with_errors:
         errors_output = subprocess.STDOUT
