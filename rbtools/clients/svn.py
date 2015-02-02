@@ -447,9 +447,9 @@ class SVNClient(SCMClient):
         # Get a list of all deleted files in this diff so we can differentiate
         # between added empty files and deleted empty files.
         diff_cmd.append('--no-diff-deleted')
-        diff_with_deleted = execute(diff_cmd,
-                                    ignore_errors=True,
-                                    none_on_ignored_error=True)
+        diff_with_deleted = self._run_svn(diff_cmd,
+                                          ignore_errors=True,
+                                          none_on_ignored_error=True)
 
         if not diff_with_deleted:
             return diff_content
