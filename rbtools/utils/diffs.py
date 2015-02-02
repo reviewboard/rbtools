@@ -4,7 +4,7 @@ import fnmatch
 import os
 
 
-def filename_match_any_patterns(filename, patterns, base_dir):
+def filename_match_any_patterns(filename, patterns, base_dir=''):
     """Check if the given filename matches any of the patterns.
 
     If base_dir is not supplied, it will treat the filename as relative to the
@@ -17,7 +17,7 @@ def filename_match_any_patterns(filename, patterns, base_dir):
     return any(fnmatch.fnmatch(filename, pattern) for pattern in patterns)
 
 
-def filter_diff(diff, file_index_re, exclude_patterns, base_dir):
+def filter_diff(diff, file_index_re, exclude_patterns, base_dir=''):
     """Filter through the lines of diff to exclude files.
 
     This function looks for lines that indicate the start of a new file in
@@ -56,7 +56,7 @@ def normalize_patterns(patterns):
     return [os.path.abspath(pattern) for pattern in patterns]
 
 
-def remove_filenames_matching_patterns(filenames, patterns, base_dir):
+def remove_filenames_matching_patterns(filenames, patterns, base_dir=''):
     """Return an iterable of all filenames that do not match any patterns."""
     return (
         filename
