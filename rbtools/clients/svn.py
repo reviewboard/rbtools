@@ -294,14 +294,7 @@ class SVNClient(SCMClient):
                 if svn_show_copies_as_adds in 'Yy':
                     diff_cmd.append("--show-copies-as-adds")
 
-        this_dir = os.getcwd()
-        os.chdir(self.svn_info('.')['Working Copy Root Path'])
-
-        try:
-            diff = self._run_svn(diff_cmd, split_lines=True)
-        finally:
-            os.chdir(this_dir)
-
+        diff = self._run_svn(diff_cmd, split_lines=True)
         diff = self.handle_renames(diff)
 
         if self._supports_empty_files():

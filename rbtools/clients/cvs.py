@@ -136,60 +136,14 @@ class CVSClient(SCMClient):
                  tip == self.REVISION_WORKING_COPY)):
             diff_cmd.extend(['-r', base, '-r', tip])
 
-        cwd = os.getcwd()
-        os.chdir(self._get_repository_root())
-
-        try:
-            diff = execute(diff_cmd + include_files, extra_ignore_errors=(1,),
-                           split_lines=True, results_unicode=False)
-        finally:
-            os.chdir(cwd)
+        diff = execute(diff_cmd + include_files, extra_ignore_errors=(1,),
+                       split_lines=True)
 
         if exclude_patterns:
-            diff = filter_diff(diff, self.INDEX_FILE_RE, exclude_patterns,
-                               base_dir=self._get_repository_root())
+            # CVS diffs are relative to the current working directory, so the
+            # base_dir parameter to filter_diff is unnecessary.
+            diff = filter_diff(diff, self.INDEX_FILE_RE, exclude_patterns)
 
         return {
             'diff': b''.join(diff)
         }
-
-    def _get_repository_root(self):
-        """Get the root directory of the repository.
-
-        This function assumes the current working directory is a CVS
-        repository.
-        """
-        repo_root = ''
-
-        # The CVS/Repository file contains the directory within the repository
-        # which the current working directory corresponds with. This may be an
-        # absolute path or a relative path
-        with open(os.path.join('CVS', 'Repository')) as f:
-            cvs_repo_path = f.read().strip()
-
-        cvsroot = self.get_repository_info().path
-
-        # If the Repository contained the CVSRoot directory, we have to strip
-        # off the absolute parts of the path so that we are left with the
-        # path relative to the CVSRoot
-        if cvs_repo_path.startswith(cvsroot):
-            cvs_repo_path = cvs_repo_path[len(cvsroot):]
-            # Strip off the leading path seperator if it is there so that our
-            # path is fully relative.
-            if cvs_repo_path.startswith(os.path.sep):
-                cvs_repo_path = cvs_repo_path[len(os.path.sep):]
-
-        # We count the number of path separators, which tells us how far up in
-        # the directory tree we have to go to find the root of the CVS
-        # repository.
-        depth = cvs_repo_path.count(os.path.sep)
-        parent_root = os.path.join(repo_root, '..')
-
-        # However, if a subdirectory is checked out, we should stop when the
-        # CVS folder no longer exists
-        while depth > 0 and os.path.exists(os.path.join(parent_root, 'CVS')):
-            repo_root = parent_root
-            parent_root = os.path.join(repo_root, '..')
-            depth -= 1
-
-        return os.path.abspath(repo_root)
