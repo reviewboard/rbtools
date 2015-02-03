@@ -646,7 +646,7 @@ class Post(Command):
             raise CommandError("There don't seem to be any diffs!")
 
         try:
-            diff_validator = api_root.get_validation().get_diff_validation()
+            diff_validator = api_root.get_diff_validation()
             diff_validator.validate_diff(
                 repository,
                 diff,
