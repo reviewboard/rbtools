@@ -25,7 +25,8 @@ from six.moves.urllib.request import (
     ProxyHandler,
     Request as URLRequest,
     build_opener,
-    install_opener)
+    install_opener,
+    urlopen)
 
 from rbtools import get_package_version
 from rbtools.api.cache import APICache
@@ -471,7 +472,14 @@ class ReviewBoardServer(object):
         ]
         install_opener(opener)
 
-        self._cache = APICache()
+        self._cache = None
+        self._urlopen = urlopen
+
+    def enable_cache(self):
+        """Enable caching for all future requests."""
+        if not self._cache:
+            self._cache = APICache()
+            self._urlopen = self._cache.make_request
 
     def login(self, username, password):
         """Reset the user information"""
@@ -514,7 +522,7 @@ class ReviewBoardServer(object):
 
             r = Request(request.url.encode('utf-8'), body, headers,
                         request.method)
-            rsp = self._cache.make_request(r)
+            rsp = self._urlopen(r)
         except HTTPError as e:
             self.process_error(e.code, e.read())
         except URLError as e:

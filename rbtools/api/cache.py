@@ -16,6 +16,8 @@ from rbtools.utils.appdirs import user_cache_dir
 from rbtools.utils.process import die
 
 
+MINIMUM_VERSION = '2.0.13'  # Minimum server version to enable the API cache.
+
 _locale_lock = threading.Lock()  # Lock for getting / setting locale.
 
 
@@ -207,7 +209,8 @@ class APICache(object):
             else:
                 if entry.etag:
                     request.add_header(b'If-None-Match', entry.etag)
-                elif entry.last_modified:
+
+                if entry.last_modified:
                     request.add_header(b'If-Modified-Since',
                                        entry.last_modified)
 

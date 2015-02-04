@@ -84,6 +84,10 @@ class SyncTransport(Transport):
                                    mime_type=mime_type,
                                    item_mime_type=item_content_type)
 
+    def enable_cache(self):
+        """Enable caching for all future HTTP requests."""
+        self.server.enable_cache()
+
     def __repr__(self):
         return '<%s(url=%r, cookie_file=%r, agent=%r)>' % (
             self.__class__.__name__,
