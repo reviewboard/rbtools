@@ -1,6 +1,5 @@
 from __future__ import print_function, unicode_literals
 
-import atexit
 import contextlib
 import datetime
 import json
@@ -171,8 +170,6 @@ class APICache(object):
 
                 if create_schema:
                     self._create_schema()
-
-                atexit.register(self._write_db)
             except (OSError, sqlite3.Error) as e:
                 # OSError will be thrown if we cannot create the directory or
                 # file for the API cache. sqlite3.Error will be thrown if
