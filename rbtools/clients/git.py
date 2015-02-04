@@ -469,11 +469,14 @@ class GitClient(SCMClient):
         if include_files:
             include_files = ['--'] + include_files
 
+        git_cmd = [self.git, '-c', 'core.quotepath=false']
+
         if self.type in ('svn', 'perforce'):
             diff_cmd_params = ['--no-color', '--no-prefix', '-r', '-u']
         elif self.type == 'git':
             diff_cmd_params = ['--no-color', '--full-index',
                                '--ignore-submodules']
+            git_cmd.extend(['-c', 'diff.noprefix=false'])
 
             if (self.capabilities is not None and
                 self.capabilities.has_capability('diffs', 'moved_files')):
@@ -490,13 +493,13 @@ class GitClient(SCMClient):
         if not self.user_config.get('GIT_USE_EXT_DIFF', False):
             diff_cmd_params.append('--no-ext-diff')
 
-        diff_cmd = [self.git, 'diff'] + diff_cmd_params
+        diff_cmd = git_cmd + ['diff'] + diff_cmd_params
 
         if exclude_patterns:
             # If we have specified files to exclude, we will get a list of all
             # changed files and run `git diff` on each un-excluded file
             # individually.
-            changed_files_cmd = [self.git, 'diff-tree'] + diff_cmd_params
+            changed_files_cmd = git_cmd + ['diff-tree'] + diff_cmd_params
             if self.type == 'git':
                 changed_files_cmd.append('-r')
 

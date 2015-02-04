@@ -40,3 +40,7 @@ class Transport(object):
     def execute_request_method(self, method, *args, **kwargs):
         """Execute a method and carry out the returned HttpRequest."""
         return method(*args, **kwargs)
+
+    def enable_cache(self):
+        """Enable caching for all future HTTP requests."""
+        return NotImplementedError

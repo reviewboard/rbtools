@@ -3,9 +3,11 @@ from __future__ import unicode_literals
 import re
 
 import six
+from pkg_resources import parse_version
 from six.moves import range
 from six.moves.urllib.parse import urljoin
 
+from rbtools.api.cache import MINIMUM_VERSION
 from rbtools.api.decorators import request_method_decorator
 from rbtools.api.request import HttpRequest
 
@@ -468,6 +470,12 @@ class RootResource(ItemResource):
                         attr_name,
                         lambda resource=self, url=url, **kwargs: (
                             self._get_template_request(url, **kwargs)))
+
+        server_version = payload.get('product', {}).get('package_version')
+
+        if (server_version is not None and
+            parse_version(server_version) >= parse_version(MINIMUM_VERSION)):
+            transport.enable_cache()
 
     @request_method_decorator
     def _get_template_request(self, url_template, values={}, **kwargs):
