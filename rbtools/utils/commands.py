@@ -19,11 +19,11 @@ DEFAULT_OPTIONS_MAP = {
 }
 
 
-def get_review_request(review_request_id, api_root):
+def get_review_request(review_request_id, api_root, **kwargs):
     """Returns the review request resource for the given ID."""
     try:
         review_request = api_root.get_review_request(
-            review_request_id=review_request_id)
+            review_request_id=review_request_id, **kwargs)
     except APIError as e:
         raise CommandError('Error getting review request %s: %s'
                            % (review_request_id, e))
