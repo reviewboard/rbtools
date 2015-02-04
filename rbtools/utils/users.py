@@ -17,7 +17,7 @@ def get_authenticated_session(api_client, api_root, auth_required=False):
     'auth_required' parameter is True, in which case the user will be prompted
     to login.
     """
-    session = api_root.get_session()
+    session = api_root.get_session(expand='user')
 
     if not session.authenticated:
         if not auth_required:
@@ -27,7 +27,7 @@ def get_authenticated_session(api_client, api_root, auth_required=False):
                         'server at %s, please login.' % api_client.url)
         sys.stderr.write('Username: ')
         username = input()
-        password = getpass.getpass('Password: ')
+        password = getpass.getpass(b'Password: ')
         api_client.login(username, password)
 
         try:
@@ -43,7 +43,7 @@ def get_user(api_client, api_root, auth_required=False):
     session = get_authenticated_session(api_client, api_root, auth_required)
 
     if session:
-        return session.get_user()
+        return session.user
 
 
 def get_username(api_client, api_root, auth_required=False):

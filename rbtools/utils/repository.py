@@ -13,7 +13,9 @@ def get_repository_id(repository_info, api_root, repository_name=None):
     if not isinstance(detected_paths, list):
         detected_paths = [detected_paths]
 
-    repositories = api_root.get_repositories()
+    repositories = api_root.get_repositories(
+        only_fields='id,name,mirror_path,path',
+        only_links='')
 
     try:
         while True:

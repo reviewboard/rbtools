@@ -47,8 +47,8 @@ def execute(command,
     # TODO: This can break on systems that don't have the en_US locale
     # installed (which isn't very many). Ideally in this case, we could
     # put something in the config file, but that's not plumbed through to here.
-    env[b'LC_ALL'] = b'en_US.UTF-8'
-    env[b'LANGUAGE'] = b'en_US.UTF-8'
+    env['LC_ALL'] = 'en_US.UTF-8'
+    env['LANGUAGE'] = 'en_US.UTF-8'
 
     if with_errors:
         errors_output = subprocess.STDOUT
@@ -56,6 +56,13 @@ def execute(command,
         errors_output = subprocess.PIPE
 
     if sys.platform.startswith('win'):
+        # Convert all environment variables to byte strings, so that subprocess
+        # doesn't blow up on Windows.
+        env = dict([
+            (bytes(key), bytes(value))
+            for key, value in six.iteritems(env)
+        ])
+
         p = subprocess.Popen(command,
                              stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE,

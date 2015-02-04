@@ -653,7 +653,7 @@ class Command(object):
 
         print()
 
-        return getpass.getpass('Token: ')
+        return getpass.getpass(b'Token: ')
 
     def _make_api_client(self, server_url):
         """Return an RBClient object for the server.

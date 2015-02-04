@@ -323,7 +323,8 @@ class Post(Command):
         with those one the server, and return the first match.
         """
         if isinstance(repository_info.path, list):
-            repositories = api_root.get_repositories()
+            repositories = api_root.get_repositories(only_fields='path',
+                                                     only_links='')
 
             try:
                 while True:
@@ -370,7 +371,10 @@ class Post(Command):
                                                   'commit_ids')
 
         if review_request_id:
-            review_request = get_review_request(review_request_id, api_root)
+            review_request = get_review_request(
+                review_request_id, api_root,
+                only_fields='absolute_url,bugs_closed,id,status',
+                only_links='diffs,draft')
 
             if review_request.status == 'submitted':
                 raise CommandError(
@@ -392,13 +396,17 @@ class Post(Command):
                 if submit_as:
                     request_data['submit_as'] = submit_as
 
-                review_request = api_root.get_review_requests().create(
-                    **request_data)
+                review_requests = api_root.get_review_requests(
+                    only_fields='',
+                    only_links='create')
+                review_request = review_requests.create(**request_data)
             except APIError as e:
                 if e.error_code == 204 and changenum:  # Change number in use.
                     rid = e.rsp['review_request']['id']
                     review_request = api_root.get_review_request(
-                        review_request_id=rid)
+                        review_request_id=rid,
+                        only_fields='absolute_url,bugs_closed,id,status',
+                        only_links='diffs,draft')
 
                     if not self.options.diff_only:
                         review_request = review_request.update(
@@ -422,8 +430,8 @@ class Post(Command):
                     # the diff.
                     diff_kwargs['base_commit_id'] = base_commit_id
 
-                review_request.get_diffs().upload_diff(diff_content,
-                                                       **diff_kwargs)
+                review_request.get_diffs(only_fields='').upload_diff(
+                    diff_content, **diff_kwargs)
             except APIError as e:
                 error_msg = [
                     u'Error uploading diff\n\n',
@@ -450,7 +458,7 @@ class Post(Command):
                 raise CommandError(u'\n'.join(error_msg))
 
         try:
-            draft = review_request.get_draft()
+            draft = review_request.get_draft(only_fields='commit_id')
         except APIError as e:
             raise CommandError('Error retrieving review request draft: %s' % e)
 
@@ -646,7 +654,7 @@ class Post(Command):
             raise CommandError("There don't seem to be any diffs!")
 
         try:
-            diff_validator = api_root.get_validation().get_diff_validation()
+            diff_validator = api_root.get_diff_validation()
             diff_validator.validate_diff(
                 repository,
                 diff,
