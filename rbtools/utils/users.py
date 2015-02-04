@@ -45,10 +45,14 @@ def get_user(api_client, api_root, auth_required=False):
     if session:
         return session.user
 
+    return None
+
 
 def get_username(api_client, api_root, auth_required=False):
     """Return the username for the current session."""
-    session = get_authenticated_session(api_client, api_root, auth_required)
+    user = get_user(api_client, api_root, auth_required)
 
-    if session:
-        return session.links.user.title
+    if user:
+        return user.username
+
+    return None
