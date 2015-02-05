@@ -1,0 +1,134 @@
+===========================
+RBTools 0.7.1 Release Notes
+===========================
+
+**Release date:** February 4, 2015
+
+
+New Features
+============
+
+rbt setup-repo
+--------------
+
+* Newly-generated :file:`.reviewboardrc` files now automatically include
+  support for :command:`rbt land`.
+
+
+Performance Improvements
+========================
+
+* Reduced the number of API calls needed for most requests.
+
+  When posting changes, or performing other operations against a Review Board
+  server, we ended up making a couple more API calls than needed. The
+  number has now been reduced, speeding things up.
+
+* Reduced the amount of data transferred by half when running against the
+  upcoming Review Board 2.5 betas.
+
+  Review Board 2.5 will be introducing support for limiting the data
+  returned in an API call. RBTools 0.7.1 takes advantage of this support
+  to substantially reduce the amount of data that needs to be processed
+  on the server, transferred, and then parsed.
+
+
+Bug Fixes
+=========
+
+General
+-------
+
+* Server URLs leaving off the ``http://`` or ``https://`` are now assumed
+  to be ``http://``. (:bug:`3718`)
+
+  Previously, leaving this off would result in confusing errors when
+  attempting to connect to the server. It's now fine to just specify the
+  host name and port.
+
+  Patch by Xuanyi Lin.
+
+* Fixed numerous Unicode issues on Windows. (:bug:`3729`)
+
+
+Windows Installer
+-----------------
+
+* Fixed specifying a custom installation directory.
+
+  The user was able to choose a custom directory, but this directory was
+  being ignored.
+
+* Fixed invoking RBTools from Bash shells.
+
+  Bash shells won't execute batch files, so we now ship a compatible script
+  for executing RBTools commands in Bash.
+
+
+API Caching
+-----------
+
+* The API caching layer no longer holds on to the cache database's file
+  descriptors indefinitely.
+
+  The file descriptors are now closed when the API client is no longer
+  in use, rather than when the program exits.
+
+* API caching is now disabled for Review Board 2.0.12 and lower.
+
+  Some bad caching information was being returned from a couple API resources
+  in Review Board, which would lead to stale data. Caching now depends on the
+  upcoming Review Board 2.0.13 release.
+
+
+CVS
+---
+
+* Diffs are once again relative to the current working directory.
+
+  RBTools 0.7 altered how diffs were generated, making them relative to the
+  checkout root instead of the working directory. This ended up breaking
+  things pretty badly for too many people. We've reverted that change. This
+  affects :command:`rbt patch`, :command:`rbt diff`, and :command:`rbt post`.
+
+
+Git
+---
+
+* Fixed generating diffs with ``git-svn`` or ``git-p4`` when modified lines
+  started with ``--`` and a space. (:bug:`3495`)
+
+  In the diff, these lines would appear as ``---``, which was being parsed as
+  the start of a diff header.
+
+* Fixed parsing file paths in diffs that contain complex Unicode characters.
+  (:bug:`3630`)
+
+  Git escaped these complex Unicode characters in a way that we couldn't
+  handle before. We now have logic to unescape them.
+
+
+Subversion
+----------
+
+* Diffs are once again relative to the current working directory.
+
+  RBTools 0.7 altered how diffs were generated, making them relative to the
+  checkout root instead of the working directory. This ended up breaking
+  things pretty badly for too many people. We've reverted that change. This
+  affects :command:`rbt patch`, :command:`rbt diff`, and :command:`rbt post`.
+
+* Fixed the logic for diffing empty files for review, which led to an
+  error.
+
+  Patch by Griffin Myers.
+
+
+Contributors
+============
+
+* Barret Rennie
+* Christian Hammond
+* David Trowbridge
+* Griffin Myers
+* Xuanyi Lin
