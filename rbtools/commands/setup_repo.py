@@ -129,6 +129,7 @@ class SetupRepo(Command):
         try:
             branch = tool.get_current_branch()
             config.append(('BRANCH', branch))
+            config.append(('LAND_DEST_BRANCH', branch))
         except NotImplementedError:
             pass
 

@@ -10,6 +10,7 @@ RBTools Release Notes
 .. toctree::
    :maxdepth: 1
 
+   0.7.1
    0.7
 
 
