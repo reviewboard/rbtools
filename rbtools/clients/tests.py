@@ -1167,6 +1167,13 @@ class SVNClientTests(SCMClientTests):
         if changelist:
             self._run_svn(['changelist', changelist, filename])
 
+    def _svn_add_dir(self, dirname):
+        """Add a directory to the test repo."""
+        if not os.path.exists(dirname):
+            os.mkdir(dirname)
+
+        self._run_svn(['add', dirname])
+
     def test_relative_paths(self):
         """Testing SVNRepositoryInfo._get_relative_path"""
         info = SVNRepositoryInfo('http://svn.example.com/svn/', '/', '')
@@ -1283,6 +1290,53 @@ class SVNClientTests(SCMClientTests):
         self.assertRaises(TooManyRevisionsError,
                           self.client.parse_revision_spec,
                           ['1', '2', '3'])
+
+    def test_same_diff_multiple_methods(self):
+        """Testing SVNClient identical diff generated from root, subdirectory,
+        and via target"""
+
+        # Test diff generation for a single file, where 'svn diff' is invoked
+        # from three different locations.  This should result in an identical
+        # diff for all three cases.  Add a new subdirectory and file
+        # (dir1/A.txt) which will be the lone change captured in the diff.
+        # Cases:
+        #  1) Invoke 'svn diff' from checkout root.
+        #  2) Invoke 'svn diff' from dir1/ subdirectory.
+        #  3) Create dir2/ subdirectory parallel to dir1/.  Invoke 'svn diff'
+        #     from dir2/ where '../dir1/A.txt' is provided as a specific
+        #     target.
+        #
+        # This test is inspired by #3749 which broke cases 2 and 3.
+
+        self._svn_add_dir('dir1')
+        self._svn_add_file('dir1/A.txt', FOO3)
+
+        # Case 1: Generate diff from checkout root.
+        revisions = self.client.parse_revision_spec()
+        result = self.client.diff(revisions)
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('diff' in result)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '1b68063237c584d38a9a3ddbdf1f72a2')
+
+        # Case 2: Generate diff from dir1 subdirectory.
+        os.chdir('dir1')
+        result = self.client.diff(revisions)
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('diff' in result)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '1b68063237c584d38a9a3ddbdf1f72a2')
+
+        # Case 3: Generate diff from dir2 subdirectory, but explicitly target
+        # only ../dir1/A.txt.
+        os.chdir('..')
+        self._svn_add_dir('dir2')
+        os.chdir('dir2')
+        result = self.client.diff(revisions, ['../dir1/A.txt'])
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('diff' in result)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '1b68063237c584d38a9a3ddbdf1f72a2')
 
 
 class P4WrapperTests(RBTestBase):
