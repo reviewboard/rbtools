@@ -1,5 +1,5 @@
 REVIEWBOARD_URL = "https://reviews.reviewboard.org"
 REPOSITORY = "RBTools"
-BRANCH = "master"
-TRACKING_BRANCH = "origin/master"
-LAND_DEST_BRANCH = "master"
+BRANCH = "dvcs"
+TRACKING_BRANCH = "origin/dvcs"
+LAND_DEST_BRANCH = "dvcs"
