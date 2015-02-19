@@ -372,6 +372,12 @@ class GitClient(SCMClient):
 
     @memoize
     def _get_subgit_svn_url(self):
+        svn_url_key = "rbtools.subgit.svn_url"
+        cmd = "git config --get {}".format(svn_url_key)
+        config_svn_url = execute(cmd.split(), ignore_errors=True, none_on_ignored_error=True)
+        if config_svn_url is not None:
+            return config_svn_url.split()
+
         server, path = self._get_git_remote_server_info()
         if server is None and path is None:
             return None
@@ -382,7 +388,11 @@ class GitClient(SCMClient):
         else:
             svn_remote_url = execute(remote_cmd.split(), ignore_errors=True)
         if not svn_remote_url:
-            logging.debug("Failed to retrieve SVN url from remote Subgit configuration")
+            logging.error("Failed to retrieve SVN url from remote Subgit configuration")
+            if server:
+                logging.error("Do you have shell access to {}?".format(server))
+            logging.error("You may wish to specify the URL manually:")
+            logging.error("  git config {} URL".format(svn_url_key))
             return None
 
         if server:
@@ -413,8 +423,46 @@ class GitClient(SCMClient):
         # we want the svn branch
         return fields[2]
 
+    def _get_subgit_parent_branch(self, ref):
+        """Walk up the commit history until we find a branch
+        that subgit knows about, and return the svn branch name.
+        (Note: we will have a bad time if the subgit-created git branch
+        has a different name than the svn branch it mirrors.)
+        """
+        kwargs = {
+            'ignore_errors': True,
+            'none_on_ignored_error': True
+        }
+        cmd = [self.git] + "fetch origin +refs/svn/map:refs/notes/subgit".split()
+        if execute(cmd, **kwargs) is None:
+            logging.error("Failed to fetch subgit notes")
+            return None
+
+        parent_branch = None
+        while not parent_branch:
+            result = execute([self.git, 'rev-parse', ref], **kwargs)
+            if result is None:
+                return None
+
+            ref = result.strip()
+            result = execute([self.git, 'notes', 'show', ref], **kwargs)
+            if result is not None:
+                parent_branch = result.strip().split()[-1].replace("branches/", "")
+                branch_ref = execute([self.git, 'rev-parse', parent_branch], **kwargs)
+                if branch_ref is None:
+                    logging.error("No git branch named {}".format(parent_branch))
+                    return None
+                if branch_ref.strip() != ref:
+                    logging.warning("Parent branch {}".format(parent_branch) +
+                                    " has diverged from branch point")
+                return parent_branch
+
+            ref = ref + "^"
+
     def _get_subgit_info(self):
         svn_remote = self._get_subgit_svn_url()
+        if svn_remote is None:
+            die("Cannot determine remote SVN config through subgit")
 
         svn_branch = self._get_subgit_tracking_branch('HEAD')
         if svn_branch:
@@ -425,7 +473,13 @@ class GitClient(SCMClient):
                 git_branch = self.options.parent_branch
                 svn_branch = self._get_subgit_tracking_branch(git_branch)
             if not svn_branch:
-                die('Failed to determine Subgit/SVN tracking branch')
+                # Here we just grab the name of the svn branch that we git-branched from.
+                # git-svn seems to do something similar, where 'git svn rebase -n' shows
+                # the "Remote Branch" as the svn branch, even when we've brached off in git-land.
+                git_branch = self._get_subgit_parent_branch('HEAD')
+                if not git_branch:
+                    die('Failed to determine Subgit/SVN tracking branch')
+                svn_branch = self._get_subgit_tracking_branch(git_branch)
 
         svn_info = execute(["svn", "info", svn_remote + '/' + svn_branch])
         upstream_branch = 'refs/heads/' + git_branch
@@ -606,13 +660,15 @@ class GitClient(SCMClient):
         else:
             return ''.join(diff_lines)
 
-    def _get_svn_revision(self, merge_base):
+    def _get_svn_revision(self, merge_base, none_on_error=False):
         if self._is_subgit_configured():
             line = execute([self.git, 'notes', 'show', merge_base],
                            ignore_errors=True,
                            none_on_ignored_error=True)
             if line:
                 return re.search("^r([0-9]+)", line).group(1)
+            elif none_on_error:
+                return None
             else:
                 logging.error("subgit configured, but couldn't find svn revision for git ref")
                 logging.error("You may need to add this line to .git/config:")
