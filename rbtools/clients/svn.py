@@ -1,5 +1,6 @@
 import logging
 import os
+import posixpath
 import re
 import sys
 from xml.etree import ElementTree
@@ -535,7 +536,7 @@ class SVNClient(SCMClient):
                     # add initial slash.
                     if self.options.repository_url:
                         path = unquote(
-                            "%s/%s" % (repository_info.base_path, file))
+                            posixpath.join(repository_info.base_path, file))
                     else:
                         info = self.svn_info(file, True)
                         if info is None:
