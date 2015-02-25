@@ -52,6 +52,19 @@ class UtilitiesTest(RBTestBase):
         """Testing 'die' method."""
         self.assertRaises(SystemExit, process.die)
 
+    def test_is_valid_version(self):
+        """Testing 'is_valid_version' method."""
+        self.assertTrue(checks.is_valid_version((1, 0, 0), (1, 0, 0)))
+        self.assertTrue(checks.is_valid_version((1, 1, 0), (1, 0, 0)))
+        self.assertTrue(checks.is_valid_version((1, 0, 1), (1, 0, 0)))
+        self.assertTrue(checks.is_valid_version((1, 1, 0), (1, 1, 0)))
+        self.assertTrue(checks.is_valid_version((1, 1, 1), (1, 1, 0)))
+        self.assertTrue(checks.is_valid_version((1, 1, 1), (1, 1, 1)))
+
+        self.assertFalse(checks.is_valid_version((0, 9, 9), (1, 0, 0)))
+        self.assertFalse(checks.is_valid_version((1, 0, 9), (1, 1, 0)))
+        self.assertFalse(checks.is_valid_version((1, 1, 0), (1, 1, 1)))
+
 
 class AliasTest(RBTestBase):
     """Tests for parameter substitution in rbtools aliases."""

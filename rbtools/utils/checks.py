@@ -56,3 +56,16 @@ def check_gnu_diff():
             sys.stderr.write('\n')
 
         die()
+
+
+def is_valid_version(actual, expected):
+    """
+    Takes two tuples, both in the form:
+        (major_version, minor_version, micro_version)
+    Returns true if the actual version is greater than or equal to
+    the expected version, and false otherwise.
+    """
+    return ((actual[0] > expected[0]) or
+            (actual[0] == expected[0] and actual[1] > expected[1]) or
+            (actual[0] == expected[0] and actual[1] == expected[1] and
+             actual[2] >= expected[2]))
