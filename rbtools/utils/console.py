@@ -17,8 +17,9 @@ def confirm(question):
     'No' values: n, no , f, false, off, 0
     """
     while True:
+        full_question = '%s [Yes/No]: ' % question
+        answer = input(full_question.encode('utf-8')).lower()
         try:
-            answer = input('%s [Yes/No]: ' % question).lower()
             return strtobool(answer)
         except ValueError:
             print('%s is not a valid answer.' % answer)
