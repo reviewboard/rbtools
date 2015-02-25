@@ -396,7 +396,9 @@ class Command(object):
                    dest='svn_show_copies_as_adds',
                    metavar='y|n',
                    default=None,
-                   help='Treat copied or moved files as new files.',
+                   help='Treat copied or moved files as new files.'
+                        '\n'
+                        'This is only supported in Subversion 1.7+.',
                    added_in='0.5.2'),
             Option('--svn-changelist',
                    dest='svn_changelist',
