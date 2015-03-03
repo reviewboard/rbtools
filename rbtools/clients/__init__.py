@@ -45,12 +45,10 @@ class SCMClient(object):
     can_push_upstream = False
     can_delete_branch = False
 
-    def __init__(self, user_config=None, configs=[], options=None,
-                 capabilities=None):
-        self.user_config = user_config
-        self.configs = configs
+    def __init__(self, config=None, options=None):
+        self.config = config or {}
         self.options = options
-        self.capabilities = capabilities
+        self.capabilities = None
 
     def get_repository_info(self):
         return None
@@ -61,24 +59,11 @@ class SCMClient(object):
     def scan_for_server(self, repository_info):
         """Find the server path.
 
-        This will scan the current directory and then up through each parent
-        directory until a .reviewboardrc file is found containing the server
-        path."""
-        server_url = None
-
-        if self.user_config:
-            server_url = self._get_server_from_config(self.user_config,
-                                                      repository_info)
-
-        if not server_url:
-            for config in self.configs:
-                server_url = self._get_server_from_config(config,
-                                                          repository_info)
-
-                if server_url:
-                    break
-
-        return server_url
+        This will search for the server name in the .reviewboardrc config
+        files. These are loaded with the current directory first, and searching
+        through each parent directory, and finally $HOME/.reviewboardrc last.
+        """
+        return self._get_server_from_config(self.config, repository_info)
 
     def parse_revision_spec(self, revisions=[]):
         """Parses the given revision spec.
@@ -354,19 +339,19 @@ class RepositoryInfo(object):
         return self
 
 
-def load_scmclients(options):
+def load_scmclients(config, options):
     global SCMCLIENTS
 
     SCMCLIENTS = {}
 
     for ep in pkg_resources.iter_entry_points(group='rbtools_scm_clients'):
         try:
-            SCMCLIENTS[ep.name] = ep.load()(options=options)
+            SCMCLIENTS[ep.name] = ep.load()(config=config, options=options)
         except Exception as e:
             logging.error('Could not load SCM Client "%s": %s' % (ep.name, e))
 
 
-def scan_usable_client(options, client_name=None):
+def scan_usable_client(config, options, client_name=None):
     from rbtools.clients.perforce import PerforceClient
 
     repository_info = None
@@ -375,7 +360,7 @@ def scan_usable_client(options, client_name=None):
     # TODO: We should only load all of the scm clients if the
     # client_name isn't provided.
     if SCMCLIENTS is None:
-        load_scmclients(options)
+        load_scmclients(config, options)
 
     if client_name:
         if client_name not in SCMCLIENTS:
@@ -432,7 +417,7 @@ def scan_usable_client(options, client_name=None):
     return (repository_info, tool)
 
 
-def print_clients(options):
+def print_clients(config, options):
     """Print the supported detected SCM clients.
 
     Each SCM client, including those provided by third party packages,
@@ -446,7 +431,7 @@ def print_clients(options):
     print('[*] "<type>": <Name>')
 
     if SCMCLIENTS is None:
-        load_scmclients(options)
+        load_scmclients(config, options)
 
     for name, tool in six.iteritems(SCMCLIENTS):
         repository_info = tool.get_repository_info()

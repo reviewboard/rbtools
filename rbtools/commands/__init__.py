@@ -396,7 +396,9 @@ class Command(object):
                    dest='svn_show_copies_as_adds',
                    metavar='y|n',
                    default=None,
-                   help='Treat copied or moved files as new files.',
+                   help='Treat copied or moved files as new files.'
+                        '\n'
+                        'This is only supported in Subversion 1.7+.',
                    added_in='0.5.2'),
             Option('--svn-changelist',
                    dest='svn_changelist',
@@ -562,10 +564,9 @@ class Command(object):
 
     def initialize_scm_tool(self, client_name=None):
         """Initialize the SCM tool for the current working directory."""
-        repository_info, tool = scan_usable_client(self.options,
+        repository_info, tool = scan_usable_client(self.config,
+                                                   self.options,
                                                    client_name=client_name)
-        tool.user_config = self.config
-        tool.configs = [self.config]
 
         try:
             tool.check_options()

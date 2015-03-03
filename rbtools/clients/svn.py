@@ -1,5 +1,6 @@
 import logging
 import os
+import posixpath
 import re
 import sys
 from xml.etree import ElementTree
@@ -9,9 +10,11 @@ from six.moves.urllib.parse import unquote
 from rbtools.api.errors import APIError
 from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.clients.errors import (InvalidRevisionSpecError,
-                                    TooManyRevisionsError)
-from rbtools.utils.checks import check_gnu_diff, check_install
-from rbtools.utils.diffs import filter_diff, normalize_patterns
+                                    OptionsCheckError, TooManyRevisionsError)
+from rbtools.utils.checks import (check_gnu_diff, check_install,
+                                  is_valid_version)
+from rbtools.utils.diffs import (filename_match_any_patterns, filter_diff,
+                                 normalize_patterns)
 from rbtools.utils.filesystem import make_empty_files, walk_parents
 from rbtools.utils.process import execute
 
@@ -35,6 +38,8 @@ class SVNClient(SCMClient):
 
     REVISION_WORKING_COPY = '--rbtools-working-copy'
     REVISION_CHANGELIST_PREFIX = '--rbtools-changelist:'
+
+    SHOW_COPIES_AS_ADDS_MIN_VERSION = (1, 7, 0)
 
     def __init__(self, **kwargs):
         super(SVNClient, self).__init__(**kwargs)
@@ -76,6 +81,11 @@ class SVNClient(SCMClient):
         # Now that we know it's SVN, make sure we have GNU diff installed,
         # and error out if we don't.
         check_gnu_diff()
+
+        # Grab version of SVN client and store as a tuple in the form:
+        #   (major_version, minor_version, micro_version)
+        ver_string = self._run_svn(['--version', '-q'], ignore_errors=True)
+        self.subversion_client_version = tuple(map(int, ver_string.split('.')))
 
         return SVNRepositoryInfo(path, base_path, m.group(1))
 
@@ -281,15 +291,20 @@ class SVNClient(SCMClient):
 
         diff_cmd.extend(include_files)
 
-        if self.history_scheduled_with_commit(changelist):
+        if is_valid_version(self.subversion_client_version,
+                            self.SHOW_COPIES_AS_ADDS_MIN_VERSION):
             svn_show_copies_as_adds = getattr(
                 self.options, 'svn_show_copies_as_adds', None)
+
             if svn_show_copies_as_adds is None:
-                sys.stderr.write("One or more files in your changeset has "
-                                 "history scheduled with commit. Please try "
-                                 "again with '--svn-show-copies-as-adds=y/n"
-                                 "'\n")
-                sys.exit(1)
+                if self.history_scheduled_with_commit(changelist,
+                                                      include_files,
+                                                      exclude_patterns):
+                    sys.stderr.write("One or more files in your changeset has "
+                                     "history scheduled with commit. Please "
+                                     "try again with "
+                                     "'--svn-show-copies-as-adds=y/n'.\n")
+                    sys.exit(1)
             else:
                 if svn_show_copies_as_adds in 'Yy':
                     diff_cmd.append("--show-copies-as-adds")
@@ -312,17 +327,37 @@ class SVNClient(SCMClient):
             'diff': ''.join(diff),
         }
 
-    def history_scheduled_with_commit(self, changelist):
+    def history_scheduled_with_commit(self, changelist, include_files,
+                                      exclude_patterns):
         """ Method to find if any file status has '+' in 4th column"""
-        status_cmd = ['status', '--ignore-externals']
+        status_cmd = ['status', '-q', '--ignore-externals']
 
         if changelist:
             status_cmd.extend(['--changelist', changelist])
 
+        if include_files:
+            status_cmd.extend(include_files)
+
         for p in self._run_svn(status_cmd, split_lines=True):
             try:
+                if not changelist and p.startswith('--- Changelist'):
+                    # svn status returns changelist information last.  If we
+                    # hit a line starting with '--- Changelist' then we have
+                    # reached the changelist section and can exit the loop as
+                    # we are not interested in changelists.
+                    break
+
                 if p[3] == '+':
-                    return True
+                    if exclude_patterns:
+                        # We found a file with history, but first we must make
+                        # sure that it is not being excluded.
+                        filename = p[8:].rstrip()
+
+                        if not filename_match_any_patterns(filename,
+                                                           exclude_patterns):
+                            return True
+                    else:
+                        return True
             except IndexError:
                 # This may be some other output, or just doesn't have the
                 # data we're looking for. Move along.
@@ -458,7 +493,6 @@ class SVNClient(SCMClient):
                                    diff_with_deleted, re.M)
 
         result = []
-        index_line = filename = None
         i = 0
         num_lines = len(diff_content)
 
@@ -485,12 +519,18 @@ class SVNClient(SCMClient):
                             base = '(revision %s)' % info['Revision']
                         else:
                             continue
+                    else:
+                        base = revisions['base']
+                        tip = revisions['tip']
                 else:
                     # Added empty file.
                     result.append('%s\t(added)\n' % index_line)
 
                     if not revisions['base'] and not revisions['tip']:
                         base = tip = '(revision 0)'
+                    else:
+                        base = revisions['base']
+                        tip = revisions['tip']
 
                 result.append('%s\n' % self.INDEX_SEP)
                 result.append('--- %s\t%s\n' % (filename, base))
@@ -535,7 +575,7 @@ class SVNClient(SCMClient):
                     # add initial slash.
                     if self.options.repository_url:
                         path = unquote(
-                            "%s/%s" % (repository_info.base_path, file))
+                            posixpath.join(repository_info.base_path, file))
                     else:
                         info = self.svn_info(file, True)
                         if info is None:
@@ -656,6 +696,15 @@ class SVNClient(SCMClient):
             cmdline += ['--password', self.options.svn_password]
 
         return execute(cmdline, *args, **kwargs)
+
+    def check_options(self):
+        if getattr(self.options, 'svn_show_copies_as_adds', None):
+            if (len(self.options.svn_show_copies_as_adds) > 1
+                or self.options.svn_show_copies_as_adds not in 'YyNn'):
+                raise OptionsCheckError(
+                    'Invalid value \'%s\' for --svn-show-copies-as-adds '
+                    'option. Valid values are \'y\' or \'n\'.' %
+                    self.options.svn_show_copies_as_adds)
 
 
 class SVNRepositoryInfo(RepositoryInfo):

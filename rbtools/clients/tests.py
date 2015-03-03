@@ -10,6 +10,7 @@ from tempfile import mktemp
 from textwrap import dedent
 
 from nose import SkipTest
+from six.moves import cStringIO as StringIO
 
 from rbtools.api.capabilities import Capabilities
 from rbtools.clients import RepositoryInfo
@@ -21,7 +22,8 @@ from rbtools.clients.mercurial import MercurialClient
 from rbtools.clients.perforce import PerforceClient, P4Wrapper
 from rbtools.clients.svn import SVNRepositoryInfo, SVNClient
 from rbtools.tests import OptionsStub
-from rbtools.utils.filesystem import load_config_files, make_tempfile
+from rbtools.utils.checks import is_valid_version
+from rbtools.utils.filesystem import load_config, make_tempfile
 from rbtools.utils.process import execute
 from rbtools.utils.testbase import RBTestBase
 
@@ -68,10 +70,6 @@ class GitClientTests(SCMClientTests):
         self._run_git(['clone', self.git_dir, self.clone_dir])
         self.client = GitClient(options=self.options)
 
-        self.user_config = {}
-        self.configs = []
-        self.client.user_config = self.user_config
-        self.client.configs = self.configs
         self.options.parent_branch = None
 
     def test_get_repository_info_simple(self):
@@ -95,7 +93,7 @@ class GitClientTests(SCMClientTests):
         rc = open(os.path.join(self.clone_dir, '.reviewboardrc'), 'w')
         rc.write('REVIEWBOARD_URL = "%s"' % self.TESTSERVER)
         rc.close()
-        self.client.user_config, configs = load_config_files(self.clone_dir)
+        self.client.config = load_config()
 
         ri = self.client.get_repository_info()
         server = self.client.scan_for_server(ri)
@@ -460,19 +458,6 @@ class GitClientTests(SCMClientTests):
         self.assertEqual(revisions['base'], base_commit_id)
         self.assertEqual(revisions['tip'], tip_commit_id)
 
-    def test_is_valid_version(self):
-        """Testing GitClient.is_valid_version"""
-        self.assertTrue(self.client.is_valid_version((1, 0, 0), (1, 0, 0)))
-        self.assertTrue(self.client.is_valid_version((1, 1, 0), (1, 0, 0)))
-        self.assertTrue(self.client.is_valid_version((1, 0, 1), (1, 0, 0)))
-        self.assertTrue(self.client.is_valid_version((1, 1, 0), (1, 1, 0)))
-        self.assertTrue(self.client.is_valid_version((1, 1, 1), (1, 1, 0)))
-        self.assertTrue(self.client.is_valid_version((1, 1, 1), (1, 1, 1)))
-
-        self.assertFalse(self.client.is_valid_version((0, 9, 9), (1, 0, 0)))
-        self.assertFalse(self.client.is_valid_version((1, 0, 9), (1, 1, 0)))
-        self.assertFalse(self.client.is_valid_version((1, 1, 0), (1, 1, 1)))
-
     def test_get_raw_commit_message(self):
         """Testing GitClient.get_raw_commit_message"""
         self._git_add_file_commit('foo.txt', FOO2, 'Commit 2')
@@ -548,10 +533,6 @@ class MercurialClientTests(MercurialTestBase):
         })
         clone_hgrc.close()
 
-        self.user_config = {}
-        self.configs = []
-        self.client.user_config = self.user_config
-        self.client.configs = self.configs
         self.options.parent_branch = None
 
     def _hg_get_tip(self):
@@ -601,6 +582,7 @@ class MercurialClientTests(MercurialTestBase):
         rc = open(os.path.join(self.clone_dir, '.reviewboardrc'), 'w')
         rc.write('REVIEWBOARD_URL = "%s"' % self.TESTSERVER)
         rc.close()
+        self.client.config = load_config()
 
         ri = self.client.get_repository_info()
         server = self.client.scan_for_server(ri)
@@ -1019,10 +1001,6 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self.client = MercurialClient(options=self.options)
 
     def _stub_in_config_and_options(self):
-        self.user_config = {}
-        self.configs = []
-        self.client.user_config = self.user_config
-        self.client.configs = self.configs
         self.options.parent_branch = None
 
     def testGetRepositoryInfoSimple(self):
@@ -1064,7 +1042,7 @@ class MercurialSubversionClientTests(MercurialTestBase):
         rc = open(rc_filename, 'w')
         rc.write('REVIEWBOARD_URL = "%s"' % self.TESTSERVER)
         rc.close()
-        self.client.user_config, configs = load_config_files(self.clone_dir)
+        self.client.config = load_config()
 
         ri = self.client.get_repository_info()
         server = self.client.scan_for_server(ri)
@@ -1148,6 +1126,7 @@ class SVNClientTests(SCMClientTests):
         os.chdir(os.path.join(self.clone_dir, 'svn-repo'))
 
         self.client = SVNClient(options=self.options)
+        self.options.svn_show_copies_as_adds = None
 
     def _run_svn(self, command):
         return execute(['svn'] + command, env=None, split_lines=False,
@@ -1337,6 +1316,139 @@ class SVNClientTests(SCMClientTests):
         self.assertTrue('diff' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
                          '1b68063237c584d38a9a3ddbdf1f72a2')
+
+    def test_show_copies_as_adds_enabled(self):
+        """Testing SVNClient with --show-copies-as-adds functionality
+        enabled"""
+        self.check_show_copies_as_adds('y', 'ac1835240ec86ee14ddccf1f2236c442')
+
+    def test_show_copies_as_adds_disabled(self):
+        """Testing SVNClient with --show-copies-as-adds functionality
+        disabled"""
+        self.check_show_copies_as_adds('n', 'd41d8cd98f00b204e9800998ecf8427e')
+
+    def check_show_copies_as_adds(self, state, md5str):
+        """Helper function to evaluate --show-copies as adds"""
+        self.client.get_repository_info()
+
+        # Ensure valid SVN client version.
+        if not is_valid_version(self.client.subversion_client_version,
+                                self.client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
+            raise SkipTest('Subversion client is too old to test '
+                           '--show-copies-as-adds.')
+
+        self.options.svn_show_copies_as_adds = state
+
+        self._svn_add_dir('dir1')
+        self._svn_add_dir('dir2')
+        self._run_svn(['copy', 'foo.txt', 'dir1'])
+
+        # Generate identical diff from checkout root, via changelist, and via
+        # explicit include target.
+
+        revisions = self.client.parse_revision_spec()
+        result = self.client.diff(revisions)
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('diff' in result)
+        self.assertEqual(md5(result['diff']).hexdigest(), md5str)
+
+        self._run_svn(['changelist', 'cl1', 'dir1/foo.txt'])
+        revisions = self.client.parse_revision_spec(['cl1'])
+        result = self.client.diff(revisions)
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('diff' in result)
+        self.assertEqual(md5(result['diff']).hexdigest(), md5str)
+        self._run_svn(['changelist', '--remove', 'dir1/foo.txt'])
+
+        os.chdir('dir2')
+        revisions = self.client.parse_revision_spec()
+        result = self.client.diff(revisions, ['../dir1'])
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('diff' in result)
+        self.assertEqual(md5(result['diff']).hexdigest(), md5str)
+
+    def test_history_scheduled_with_commit_nominal(self):
+        """Testing SVNClient.history_scheduled_with_commit nominal cases"""
+        self.client.get_repository_info()
+
+        # Ensure valid SVN client version.
+        if not is_valid_version(self.client.subversion_client_version,
+                                self.client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
+            raise SkipTest('Subversion client is too old to test '
+                           'history_scheduled_with_commit().')
+
+        self._svn_add_dir('dir1')
+        self._svn_add_dir('dir2')
+        self._run_svn(['copy', 'foo.txt', 'dir1'])
+
+        # Squash stderr to prevent error message in test output.
+        sys.stderr = StringIO()
+
+        # Ensure SystemExit is raised when attempting to generate diff from
+        # checkout root, via changelist, and via explicit include target.
+
+        revisions = self.client.parse_revision_spec()
+        with self.assertRaises(SystemExit) as cm:
+            self.client.diff(revisions)
+        self.assertEqual(cm.exception.code, 1)
+
+        self._run_svn(['changelist', 'cl1', 'dir1/foo.txt'])
+        revisions = self.client.parse_revision_spec(['cl1'])
+        with self.assertRaises(SystemExit) as cm:
+            self.client.diff(revisions)
+        self.assertEqual(cm.exception.code, 1)
+        self._run_svn(['changelist', '--remove', 'dir1/foo.txt'])
+
+        os.chdir('dir2')
+        revisions = self.client.parse_revision_spec()
+        with self.assertRaises(SystemExit) as cm:
+            self.client.diff(revisions, ['../dir1'])
+        self.assertEqual(cm.exception.code, 1)
+
+    def test_history_scheduled_with_commit_special_case_changelist(self):
+        """Testing SVNClient.history_scheduled_with_commit ignore history in
+        changelist"""
+        self.client.get_repository_info()
+
+        # Ensure valid SVN client version.
+        if not is_valid_version(self.client.subversion_client_version,
+                                self.client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
+            raise SkipTest('Subversion client is too old to test '
+                           'history_scheduled_with_commit().')
+
+        # Add file with history to changelist, then generate diff from checkout
+        # root.  In this case there should be no SystemExit raised and an
+        # (empty) diff should be produced.
+
+        self._run_svn(['copy', 'foo.txt', 'foo_copy.txt'])
+        self._run_svn(['changelist', 'cl1', 'foo_copy.txt'])
+        revisions = self.client.parse_revision_spec()
+        result = self.client.diff(revisions)
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('diff' in result)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         'd41d8cd98f00b204e9800998ecf8427e')
+
+    def test_history_scheduled_with_commit_special_case_exclude(self):
+        """Testing SVNClient.history_scheduled_with_commit with exclude file"""
+        self.client.get_repository_info()
+
+        # Ensure valid SVN client version.
+        if not is_valid_version(self.client.subversion_client_version,
+                                self.client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
+            raise SkipTest('Subversion client is too old to test '
+                           'history_scheduled_with_commit().')
+
+        # Lone file with history is also excluded.  In this case there should
+        # be no SystemExit raised and an (empty) diff should be produced.
+
+        self._run_svn(['copy', 'foo.txt', 'foo_copy.txt'])
+        revisions = self.client.parse_revision_spec()
+        result = self.client.diff(revisions, [], ['foo_copy.txt'])
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('diff' in result)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         'd41d8cd98f00b204e9800998ecf8427e')
 
 
 class P4WrapperTests(RBTestBase):
@@ -1908,10 +2020,6 @@ class BazaarClientTests(SCMClientTests):
         self.client = BazaarClient(options=self.options)
         os.chdir(self.orig_dir)
 
-        self.user_config = {}
-        self.configs = []
-        self.client.user_config = self.user_config
-        self.client.configs = self.configs
         self.options.parent_branch = None
 
     def _run_bzr(self, command, *args, **kwargs):

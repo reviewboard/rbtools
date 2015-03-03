@@ -19,6 +19,15 @@ LINK_KEYS = set(['href', 'method', 'title'])
 _EXCLUDE_ATTRS = [LINKS_TOK, 'stat']
 
 
+def resource_mimetype(mimetype):
+    """Set the mimetype for the decorated class in the resource map."""
+    def wrapper(cls):
+        RESOURCE_MAP[mimetype] = cls
+        return cls
+
+    return wrapper
+
+
 @request_method_decorator
 def _create(resource, data=None, query_args={}, *args, **kwargs):
     """Generate a POST request on a resource.
@@ -447,6 +456,7 @@ class ListResource(Resource):
                                         self._item_mime_type))
 
 
+@resource_mimetype('application/vnd.reviewboard.org.root')
 class RootResource(ItemResource):
     """The Root resource specific base class.
 
@@ -498,9 +508,8 @@ class RootResource(ItemResource):
         url = self._TEMPLATE_PARAM_RE.sub(get_template_value, url_template)
         return HttpRequest(url, query_args=kwargs)
 
-RESOURCE_MAP['application/vnd.reviewboard.org.root'] = RootResource
 
-
+@resource_mimetype('application/vnd.reviewboard.org.diffs')
 class DiffListResource(ListResource):
     """The Diff List resource specific base class.
 
@@ -539,9 +548,7 @@ class DiffListResource(ListResource):
 
         return request
 
-RESOURCE_MAP['application/vnd.reviewboard.org.diffs'] = DiffListResource
-
-
+@resource_mimetype('application/vnd.reviewboard.org.diff')
 class DiffResource(ItemResource):
     """The Diff resource specific base class.
 
@@ -555,7 +562,6 @@ class DiffResource(ItemResource):
         request.headers['Accept'] = 'text/x-patch'
         return request
 
-RESOURCE_MAP['application/vnd.reviewboard.org.diff'] = DiffResource
 
 
 class DiffCommitListResource(ListResource):
@@ -612,7 +618,7 @@ class DiffCommitResource(ItemResource):
 RESOURCE_MAP['application/vnd.reviewboard.org.diff-commit'] = \
     DiffCommitResource
 
-
+@resource_mimetype('application/vnd.reviewboard.org.file')
 class FileDiffResource(ItemResource):
     """The File Diff resource specific base class."""
     @request_method_decorator
@@ -630,9 +636,8 @@ class FileDiffResource(ItemResource):
             'application/vnd.reviewboard.org.diff.data+json'
         return request
 
-RESOURCE_MAP['application/vnd.reviewboard.org.file'] = FileDiffResource
 
-
+@resource_mimetype('application/vnd.reviewboard.org.file-attachments')
 class FileAttachmentListResource(ListResource):
     """The File Attachment List resource specific base class."""
     @request_method_decorator
@@ -650,18 +655,14 @@ class FileAttachmentListResource(ListResource):
 
         return request
 
-RESOURCE_MAP['application/vnd.reviewboard.org.file-attachments'] = \
-    FileAttachmentListResource
 
-
+@resource_mimetype('application/vnd.reviewboard.org.draft-file-attachments')
 class DraftFileAttachmentListResource(FileAttachmentListResource):
     """The Draft File Attachment List resource specific base class."""
     pass
 
-RESOURCE_MAP['application/vnd.reviewboard.org.draft-file-attachments'] = \
-    DraftFileAttachmentListResource
 
-
+@resource_mimetype('application/vnd.reviewboard.org.screenshots')
 class ScreenshotListResource(ListResource):
     """The Screenshot List resource specific base class."""
     @request_method_decorator
@@ -679,18 +680,14 @@ class ScreenshotListResource(ListResource):
 
         return request
 
-RESOURCE_MAP['application/vnd.reviewboard.org.screenshots'] = \
-    ScreenshotListResource
 
-
+@resource_mimetype('application/vnd.reviewboard.org.draft-screenshots')
 class DraftScreenshotListResource(ScreenshotListResource):
     """The Draft Screenshot List resource specific base class."""
     pass
 
-RESOURCE_MAP['application/vnd.reviewboard.org.draft-screenshots'] = \
-    DraftScreenshotListResource
 
-
+@resource_mimetype('application/vnd.reviewboard.org.review-request')
 class ReviewRequestResource(ItemResource):
     """The Review Request resource specific base class."""
 
@@ -744,10 +741,8 @@ class ReviewRequestResource(ItemResource):
 
         return request
 
-RESOURCE_MAP['application/vnd.reviewboard.org.review-request'] = \
-    ReviewRequestResource
 
-
+@resource_mimetype('application/vnd.reviewboard.org.diff-validation')
 class ValidateDiffResource(ItemResource):
     """The Validate Diff resource specific base class.
 
@@ -775,6 +770,3 @@ class ValidateDiffResource(ItemResource):
             request.add_field('basedir', base_dir)
 
         return request
-
-RESOURCE_MAP['application/vnd.reviewboard.org.diff-validation'] = \
-    ValidateDiffResource

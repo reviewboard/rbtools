@@ -11,7 +11,7 @@ from rbtools.clients.errors import (MergeError, PushError,
                                     TooManyRevisionsError)
 from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.svn import SVNClient, SVNRepositoryInfo
-from rbtools.utils.checks import check_install
+from rbtools.utils.checks import check_install, is_valid_version
 from rbtools.utils.console import edit_text
 from rbtools.utils.diffs import (normalize_patterns,
                                  remove_filenames_matching_patterns)
@@ -254,10 +254,10 @@ class GitClient(SCMClient):
                     ignore_errors=True)
 
                 if (version_parts and svn_remote and
-                    not self.is_valid_version((int(version_parts.group(1)),
-                                               int(version_parts.group(2)),
-                                               int(version_parts.group(3))),
-                                              (1, 5, 4))):
+                    not is_valid_version((int(version_parts.group(1)),
+                                          int(version_parts.group(2)),
+                                          int(version_parts.group(3))),
+                                         (1, 5, 4))):
                     die("Your installation of git-svn must be upgraded to "
                         "version 1.5.4 or later")
 
@@ -341,18 +341,6 @@ class GitClient(SCMClient):
             [self.git, "config", "--get", "remote.%s.url" % upstream_remote],
             ignore_errors=True).rstrip("\n")
         return (upstream_branch, origin_url)
-
-    def is_valid_version(self, actual, expected):
-        """
-        Takes two tuples, both in the form:
-            (major_version, minor_version, micro_version)
-        Returns true if the actual version is greater than or equal to
-        the expected version, and false otherwise.
-        """
-        return ((actual[0] > expected[0]) or
-                (actual[0] == expected[0] and actual[1] > expected[1]) or
-                (actual[0] == expected[0] and actual[1] == expected[1] and
-                 actual[2] >= expected[2]))
 
     def scan_for_server(self, repository_info):
         # Scan first for dot files, since it's faster and will cover the
@@ -493,7 +481,7 @@ class GitClient(SCMClient):
         # things from breaking horribly if someone configures a graphical diff
         # viewer like p4merge or kaleidoscope. This can be overridden by
         # setting GIT_USE_EXT_DIFF = True in ~/.reviewboardrc
-        if not self.user_config.get('GIT_USE_EXT_DIFF', False):
+        if not self.config.get('GIT_USE_EXT_DIFF', False):
             diff_cmd_params.append('--no-ext-diff')
 
         diff_cmd = git_cmd + ['diff'] + diff_cmd_params

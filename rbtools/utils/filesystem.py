@@ -32,43 +32,6 @@ def _load_python_file(filename, config):
         return config
 
 
-def load_config_files(homepath):
-    """Loads data from .reviewboardrc files."""
-    def _load_config(path):
-        config = {
-            'TREES': {},
-            'ALIASES': {},
-        }
-
-        filename = os.path.join(path, CONFIG_FILE)
-
-        if os.path.exists(filename):
-            try:
-                config = _load_python_file(filename, config)
-            except SyntaxError as e:
-                die('Syntax error in config file: %s\n'
-                    'Line %i offset %i\n' % (filename, e.lineno, e.offset))
-
-            return dict((k, config[k])
-                        for k in set(config.keys()) - set(builtin.keys()))
-
-        return None
-
-    configs = []
-
-    for path in walk_parents(os.getcwd()):
-        config = _load_config(path)
-
-        if config:
-            configs.append(config)
-
-    user_config = _load_config(homepath)
-    if user_config:
-        configs.append(user_config)
-
-    return user_config, configs
-
-
 def make_tempfile(content=None):
     """Creates a temporary file and returns the path.
 
@@ -144,7 +107,7 @@ def get_config_paths():
     for path in walk_parents(os.getcwd()):
         filename = os.path.join(path, CONFIG_FILE)
         if os.path.exists(filename):
-            config_paths.insert(0, filename)
+            config_paths.append(filename)
 
     filename = os.path.join(get_home_path(), CONFIG_FILE)
     if os.path.exists(filename):
@@ -186,7 +149,7 @@ def load_config():
     trees = {}
     aliases = {}
 
-    for filename in get_config_paths():
+    for filename in reversed(get_config_paths()):
         parsed_config = parse_config_file(filename)
 
         trees.update(parsed_config.pop('TREES'))
