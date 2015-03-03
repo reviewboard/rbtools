@@ -493,7 +493,6 @@ class SVNClient(SCMClient):
                                    diff_with_deleted, re.M)
 
         result = []
-        index_line = filename = None
         i = 0
         num_lines = len(diff_content)
 
@@ -520,12 +519,18 @@ class SVNClient(SCMClient):
                             base = '(revision %s)' % info['Revision']
                         else:
                             continue
+                    else:
+                        base = revisions['base']
+                        tip = revisions['tip']
                 else:
                     # Added empty file.
                     result.append('%s\t(added)\n' % index_line)
 
                     if not revisions['base'] and not revisions['tip']:
                         base = tip = '(revision 0)'
+                    else:
+                        base = revisions['base']
+                        tip = revisions['tip']
 
                 result.append('%s\n' % self.INDEX_SEP)
                 result.append('--- %s\t%s\n' % (filename, base))
