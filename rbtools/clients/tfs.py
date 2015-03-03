@@ -25,10 +25,8 @@ class TFSClient(SCMClient):
 
     REVISION_WORKING_COPY = '--rbtools-working-copy'
 
-    def __init__(self, user_config=None, configs=[], options=None,
-                 capabilities=None):
-        super(TFSClient, self).__init__(user_config, configs, options,
-                                        capabilities)
+    def __init__(self, config=None, options=None):
+        super(TFSClient, self).__init__(config, options)
 
         self.tf = None
 

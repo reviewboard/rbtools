@@ -478,7 +478,7 @@ class GitClient(SCMClient):
         # things from breaking horribly if someone configures a graphical diff
         # viewer like p4merge or kaleidoscope. This can be overridden by
         # setting GIT_USE_EXT_DIFF = True in ~/.reviewboardrc
-        if not self.user_config.get('GIT_USE_EXT_DIFF', False):
+        if not self.config.get('GIT_USE_EXT_DIFF', False):
             diff_cmd_params.append('--no-ext-diff')
 
         diff_cmd = git_cmd + ['diff'] + diff_cmd_params

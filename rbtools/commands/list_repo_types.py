@@ -11,4 +11,4 @@ class ListRepoTypes(Command):
     description = 'Print a list of supported repository types.'
 
     def main(self, *args):
-        print_clients(self.options)
+        print_clients(self.config, self.options)

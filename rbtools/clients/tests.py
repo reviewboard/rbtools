@@ -23,7 +23,7 @@ from rbtools.clients.perforce import PerforceClient, P4Wrapper
 from rbtools.clients.svn import SVNRepositoryInfo, SVNClient
 from rbtools.tests import OptionsStub
 from rbtools.utils.checks import is_valid_version
-from rbtools.utils.filesystem import load_config_files, make_tempfile
+from rbtools.utils.filesystem import load_config, make_tempfile
 from rbtools.utils.process import execute
 from rbtools.utils.testbase import RBTestBase
 
@@ -70,10 +70,6 @@ class GitClientTests(SCMClientTests):
         self._run_git(['clone', self.git_dir, self.clone_dir])
         self.client = GitClient(options=self.options)
 
-        self.user_config = {}
-        self.configs = []
-        self.client.user_config = self.user_config
-        self.client.configs = self.configs
         self.options.parent_branch = None
 
     def test_get_repository_info_simple(self):
@@ -97,7 +93,7 @@ class GitClientTests(SCMClientTests):
         rc = open(os.path.join(self.clone_dir, '.reviewboardrc'), 'w')
         rc.write('REVIEWBOARD_URL = "%s"' % self.TESTSERVER)
         rc.close()
-        self.client.user_config, configs = load_config_files(self.clone_dir)
+        self.client.config = load_config()
 
         ri = self.client.get_repository_info()
         server = self.client.scan_for_server(ri)
@@ -537,10 +533,6 @@ class MercurialClientTests(MercurialTestBase):
         })
         clone_hgrc.close()
 
-        self.user_config = {}
-        self.configs = []
-        self.client.user_config = self.user_config
-        self.client.configs = self.configs
         self.options.parent_branch = None
 
     def _hg_get_tip(self):
@@ -590,6 +582,7 @@ class MercurialClientTests(MercurialTestBase):
         rc = open(os.path.join(self.clone_dir, '.reviewboardrc'), 'w')
         rc.write('REVIEWBOARD_URL = "%s"' % self.TESTSERVER)
         rc.close()
+        self.client.config = load_config()
 
         ri = self.client.get_repository_info()
         server = self.client.scan_for_server(ri)
@@ -1008,10 +1001,6 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self.client = MercurialClient(options=self.options)
 
     def _stub_in_config_and_options(self):
-        self.user_config = {}
-        self.configs = []
-        self.client.user_config = self.user_config
-        self.client.configs = self.configs
         self.options.parent_branch = None
 
     def testGetRepositoryInfoSimple(self):
@@ -1053,7 +1042,7 @@ class MercurialSubversionClientTests(MercurialTestBase):
         rc = open(rc_filename, 'w')
         rc.write('REVIEWBOARD_URL = "%s"' % self.TESTSERVER)
         rc.close()
-        self.client.user_config, configs = load_config_files(self.clone_dir)
+        self.client.config = load_config()
 
         ri = self.client.get_repository_info()
         server = self.client.scan_for_server(ri)
@@ -2031,10 +2020,6 @@ class BazaarClientTests(SCMClientTests):
         self.client = BazaarClient(options=self.options)
         os.chdir(self.orig_dir)
 
-        self.user_config = {}
-        self.configs = []
-        self.client.user_config = self.user_config
-        self.client.configs = self.configs
         self.options.parent_branch = None
 
     def _run_bzr(self, command, *args, **kwargs):
