@@ -3,6 +3,8 @@ import os
 import re
 import sys
 
+from six.moves import zip
+
 from rbtools.clients import PatchResult, SCMClient, RepositoryInfo
 from rbtools.clients.errors import (MergeError, PushError,
                                     InvalidRevisionSpecError,
@@ -25,6 +27,7 @@ class GitClient(SCMClient):
     name = 'Git'
 
     supports_diff_exclude_patterns = True
+    supports_post_with_history = True
 
     can_amend_commit = True
     can_merge = True
@@ -820,3 +823,53 @@ class GitClient(SCMClient):
             return None
 
         return os.path.abspath(os.path.join(git_dir, ".."))
+
+    def get_history(self, revisions):
+        log_fields = {
+            'commit_id': '%H',
+            'parent_id': '%P',
+            'author_name': '%an',
+            'author_email': '%ae',
+            'author_date': '%ad',
+            'committer_name': '%cn',
+            'committer_email': '%ce',
+            'committer_date': '%cd',
+            'description': '%B',
+        }
+
+        # 0x1f is the ASCII field separator. It is a non-printable character
+        # that should not appear in any field in git log.
+        log_format = '%x1f'.join(log_fields.values())
+
+        log_entries = execute(
+            [self.git, 'log', '-z', '--pretty=format:%s' % log_format,
+             '%s..%s' % (revisions['base'], revisions['tip'])],
+            ignore_errors=True, none_on_ignored_error=True,
+            translate_newlines=True)
+
+        if not log_entries:
+            return None
+
+        history = []
+
+        for log_entry in reversed(log_entries.split('\x00')):
+            log_entry_fields = log_entry.split('\x1f')
+
+            history_entry = dict(zip(log_fields.keys(), log_entry_fields))
+            history_entry['parent_id'] = history_entry['parent_id']
+            history_entry['commit_type'] = 'change'
+
+            parents = history_entry['parent_id'].split()
+
+            if len(parents) > 1:
+                raise NotImplementedError(
+                    'The Git SCMClient only supports posting with linear '
+                    'commit histories.')
+            elif len(parents) == 0:
+                raise NotImplementedError(
+                    'The Git SCMClient only supports posting when there are '
+                    'parents.')
+
+            history.append(history_entry)
+
+        return history

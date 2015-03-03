@@ -38,6 +38,7 @@ class SCMClient(object):
 
     supports_diff_extra_args = False
     supports_diff_exclude_patterns = False
+    supports_post_with_history = False
 
     can_amend_commit = False
     can_merge = False
@@ -309,6 +310,14 @@ class SCMClient(object):
 
         If a derived class is unable to unable to determine the branch,
         ``None`` should be returned.
+        """
+        raise NotImplementedError
+
+    def get_history(self, revisions):
+        """Returns the history between the given revisions.
+
+        Derived classes should override this method if they want to support
+        posting review requests with commit history.
         """
         raise NotImplementedError
 

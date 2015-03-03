@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 
+import logging
 import re
 
 import six
@@ -530,6 +531,14 @@ class DiffListResource(ListResource):
 
         return request
 
+    @request_method_decorator
+    def create_empty_diffset(self, **kwargs):
+        """Create an empty DiffSet for use with commit histories."""
+        request = HttpRequest(self._url, method=b'POST', query_args=kwargs)
+        request.add_field('with_history', 1)
+
+        return request
+
 RESOURCE_MAP['application/vnd.reviewboard.org.diffs'] = DiffListResource
 
 
@@ -547,6 +556,61 @@ class DiffResource(ItemResource):
         return request
 
 RESOURCE_MAP['application/vnd.reviewboard.org.diff'] = DiffResource
+
+
+class DiffCommitListResource(ListResource):
+    """The Commit List resource specific base class.
+
+    Provides additional functionality in the uploading of new commits.
+    """
+
+    @request_method_decorator
+    def upload_commit(self, diff, commit_id, parent_id, commit_type,
+                      author_name, author_email, author_date,
+                      committer_name=None, committer_email=None,
+                      committer_date=None, description=None,
+                      merge_parent_ids=None, parent_diff=None, **kwargs):
+        request = HttpRequest(self._url, method=b'POST', query_args=kwargs)
+
+        request.add_file('path', 'diff', diff)
+        request.add_field('commit_id', commit_id)
+        request.add_field('parent_id', parent_id)
+        request.add_field('commit_type', commit_type)
+
+        request.add_field('author_name', author_name)
+        request.add_field('author_email', author_email)
+        request.add_field('author_date', author_date)
+
+        if committer_name and committer_email and committer_date:
+            request.add_field('committer_name', committer_name)
+            request.add_field('committer_email', committer_email)
+            request.add_field('committer_date', committer_date)
+        elif committer_name or committer_email or committer_date:
+            logging.warning('Not all of the committer name, committer email, '
+                            'and committer date could be determined. None of '
+                            'these fields will be submitted.')
+
+        if description:
+            request.add_field('description', description)
+
+        if parent_diff:
+            request.add_file('parent_diff_path', 'parent_diff', parent_diff)
+
+        if merge_parent_ids:
+            request.add_field('merge_parent_ids', ','.join(merge_parent_ids))
+
+        return request
+
+RESOURCE_MAP['application/vnd.reviewboard.org.diff-commits'] = \
+    DiffCommitListResource
+
+
+class DiffCommitResource(ItemResource):
+    """The DiffCommit resource specific base class."""
+    pass
+
+RESOURCE_MAP['application/vnd.reviewboard.org.diff-commit'] = \
+    DiffCommitResource
 
 
 class FileDiffResource(ItemResource):

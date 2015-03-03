@@ -93,6 +93,23 @@ class Post(Command):
                        help='Uploads a new diff, but does not update '
                             'fields from the change description '
                             '(Perforce/Plastic only).'),
+                Option('-S', '--squash-history',
+                       dest='squash_history',
+                       action='store_true',
+                       config_key='SQUASH_HISTORY',
+                       default=False,
+                       help='Force the review request to be created without '
+                            'history, even if the server supports review '
+                            'requests with history.'),
+                Option('-H', '--with-history',
+                       dest='with_history',
+                       action='store_true',
+                       default=False,
+                       help='Force the review request to be created with '
+                            'history if the server supports review request '
+                            'with history. This overrides the SQUASH_HISTORY'
+                            '.reviewboardrc option and the -S commandline '
+                            'option.'),
             ]
         ),
         Command.server_options,
@@ -359,16 +376,15 @@ class Post(Command):
 
     def post_request(self, repository_info, repository, server_url, api_root,
                      review_request_id=None, changenum=None, diff_content=None,
-                     parent_diff_content=None, commit_id=None,
-                     base_commit_id=None,
-                     submit_as=None, retries=3, base_dir=None):
+                     diff_history=None, parent_diff_content=None,
+                     commit_id=None, base_commit_id=None, submit_as=None,
+                     retries=3, base_dir=None):
         """Creates or updates a review request, and uploads a diff.
 
         On success the review request id and url are returned.
         """
         supports_posting_commit_ids = \
-            self.tool.capabilities.has_capability('review_requests',
-                                                  'commit_ids')
+            self.tool.capabilities.has_capability('diffs', 'commit_ids')
 
         if review_request_id:
             review_request = get_review_request(
@@ -421,6 +437,7 @@ class Post(Command):
                     'parent_diff': parent_diff_content,
                     'base_dir': base_dir,
                 }
+                commit_kwargs = {}
 
                 if (base_commit_id and
                     self.tool.capabilities.has_capability('diffs',
@@ -428,10 +445,37 @@ class Post(Command):
                     # Both the Review Board server and SCMClient support
                     # base commit IDs, so pass that along when creating
                     # the diff.
-                    diff_kwargs['base_commit_id'] = base_commit_id
+                    if diff_history:
+                        commit_kwargs['base_commit_id'] = base_commit_id
+                    else:
+                        diff_kwargs['base_commit_id'] = base_commit_id
 
-                review_request.get_diffs(only_fields='').upload_diff(
-                    diff_content, **diff_kwargs)
+                if diff_history:
+                    diffs = review_request.get_diffs()
+                    diffset = diffs.create_empty_diffset()
+
+                    commits = diffset.get_draft_diff_commits()
+
+                    for entry in diff_history:
+                        commits.upload_commit(
+                            diff=entry['diff'],
+                            commit_id=entry['commit_id'],
+                            parent_id=entry['parent_id'],
+                            commit_type=entry['commit_type'],
+                            author_name=entry.get('author_name'),
+                            author_email=entry.get('author_email'),
+                            author_date=entry.get('author_date'),
+                            committer_name=entry.get('committer_name'),
+                            committer_email=entry.get('committer_email'),
+                            committer_date=entry.get('committer_date'),
+                            description=entry.get('description'),
+                            merge_parent_ids=entry.get('merge_parent_ids'),
+                            parent_diff=entry.get('parent_diff')
+                        )
+                        print('Uploaded commit %s' % entry['commit_id'])
+                else:
+                    review_request.get_diffs(only_fields='').upload_diff(
+                        diff_content, **diff_kwargs)
             except APIError as e:
                 error_msg = [
                     u'Error uploading diff\n\n',
@@ -593,11 +637,33 @@ class Post(Command):
 
         if (self.options.exclude_patterns and
             not self.tool.supports_diff_exclude_patterns):
-
             raise CommandError(
                 'The %s backend does not support excluding files via the '
                 '-X/--exclude commandline options or the EXCLUDE_PATTERNS '
                 '.reviewboardrc option.' % self.tool.name)
+
+        if self.options.with_history:
+            if not self.tool.supports_post_with_history:
+                raise CommandError(
+                    'The %s backend does not support creating multi-commit '
+                    'review requests with the -H/--with-history commandline '
+                    'option.'
+                    % self.tool.name)
+
+        with_history = False
+        history = None
+
+        if self.tool.supports_post_with_history:
+            if self.tool.capabilities.has_capability('diffs',
+                                                     'commit_history'):
+                with_history = (not self.options.squash_history or
+                                self.options.with_history)
+            elif self.options.with_history:
+                logging.warning('The reviewboard server at %s does not '
+                                'support creating review requests with commit '
+                                'histories. Your review request will be '
+                                'created with a squashed diff.'
+                                % server_url)
 
         # Check if repository info on reviewboard server match local ones.
         repository_info = repository_info.find_server_repository_info(api_root)
@@ -642,6 +708,31 @@ class Post(Command):
             parent_diff = diff_info.get('parent_diff')
             base_commit_id = diff_info.get('base_commit_id')
             commit_id = diff_info.get('commit_id')
+            history = None
+
+            if with_history:
+                history = self.tool.get_history(self.revisions)
+                diff = None
+
+                if history:
+                    for i, history_entry in enumerate(history):
+                        diff_info = self.tool.diff(
+                            revisions=self.tool.parse_revision_spec(
+                                ['%s..%s' % (history_entry['parent_id'],
+                                             history_entry['commit_id'])]),
+                            include_files=self.options.include_files or [],
+                            exclude_patterns=(self.options.exclude_patterns or
+                                              []),
+                            extra_args=extra_args)
+
+                        history_entry['diff'] = diff_info['diff']
+
+                        if i == 0:
+                            base_commit_id = diff_info.get('base_commit_id')
+                            history_entry['parent_diff'] = \
+                                diff_info.get('parent_diff')
+                        else:
+                            history_entry['parent_diff'] = None
 
         repository = (
             self.options.repository_name or
@@ -650,16 +741,25 @@ class Post(Command):
 
         base_dir = self.options.basedir or repository_info.base_path
 
-        if len(diff) == 0:
+        if not diff and not history:
             raise CommandError("There don't seem to be any diffs!")
 
         try:
             diff_validator = api_root.get_diff_validation()
-            diff_validator.validate_diff(
-                repository,
-                diff,
-                parent_diff=parent_diff,
-                base_dir=base_dir)
+
+            if with_history:
+                for history_entry in history:
+                    diff_validator.validate_diff(
+                        repository,
+                        history_entry['diff'],
+                        parent_diff=history_entry.get('parent_diff'),
+                        base_dir=base_dir)
+            else:
+                diff_validator.validate_diff(
+                        repository,
+                        diff,
+                        parent_diff=parent_diff,
+                        base_dir=base_dir)
         except APIError as e:
             msg_prefix = ''
 
@@ -702,6 +802,15 @@ class Post(Command):
         if self.options.include_files:
             commit_id = None
 
+        if with_history:
+            diff_history = history
+            diff_content = None
+        else:
+            diff_history = None
+            diff_content = diff
+
+        assert diff_content or diff_history
+
         request_id, review_url = self.post_request(
             repository_info,
             repository,
@@ -710,6 +819,7 @@ class Post(Command):
             self.options.rid,
             changenum=changenum,
             diff_content=diff,
+            diff_history=diff_history,
             parent_diff_content=parent_diff,
             commit_id=commit_id,
             base_commit_id=base_commit_id,
