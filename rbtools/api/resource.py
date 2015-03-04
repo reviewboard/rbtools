@@ -563,7 +563,7 @@ class DiffResource(ItemResource):
         return request
 
 
-
+@resource_mimetype('application/vnd.reviewboard.org.diff-commits')
 class DiffCommitListResource(ListResource):
     """The Commit List resource specific base class.
 
@@ -607,16 +607,12 @@ class DiffCommitListResource(ListResource):
 
         return request
 
-RESOURCE_MAP['application/vnd.reviewboard.org.diff-commits'] = \
-    DiffCommitListResource
 
-
+@resource_mimetype('application/vnd.reviewboard.org.diff-commit')
 class DiffCommitResource(ItemResource):
     """The DiffCommit resource specific base class."""
     pass
 
-RESOURCE_MAP['application/vnd.reviewboard.org.diff-commit'] = \
-    DiffCommitResource
 
 @resource_mimetype('application/vnd.reviewboard.org.file')
 class FileDiffResource(ItemResource):
