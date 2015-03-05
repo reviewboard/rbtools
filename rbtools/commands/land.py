@@ -1,12 +1,14 @@
 from __future__ import print_function, unicode_literals
 
+import subprocess
+
 from rbtools.clients.errors import MergeError, PushError
 from rbtools.commands import Command, CommandError, Option, RB_MAIN
 from rbtools.utils.commands import (build_rbtools_cmd_argv,
                                     extract_commit_message,
                                     get_review_request)
 from rbtools.utils.console import confirm
-from rbtools.utils.process import execute
+from rbtools.utils.process import die
 from rbtools.utils.review_request import (get_draft_or_current_value,
                                           get_revisions,
                                           guess_existing_review_request_id)
@@ -116,9 +118,19 @@ class Land(Command):
     def patch(self, review_request_id):
         patch_command = [RB_MAIN, 'patch']
         patch_command.extend(build_rbtools_cmd_argv(self.options))
-        patch_command.append('-C')
+
+        if self.options.edit:
+            patch_command.append('-c')
+        else:
+            patch_command.append('-C')
+
         patch_command.append(review_request_id)
-        print(execute(patch_command))
+
+        p = subprocess.Popen(patch_command)
+        rc = p.wait()
+
+        if rc:
+            die('Failed to execute command: %s' % patch_command)
 
     def main(self, branch_name=None, *args):
         """Run the command."""
