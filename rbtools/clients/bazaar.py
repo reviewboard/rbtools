@@ -163,7 +163,8 @@ class BazaarClient(SCMClient):
 
         The summary and description are set if guessing is enabled.
         """
-        exclude_patterns = normalize_patterns(exclude_patterns)
+        exclude_patterns = normalize_patterns(exclude_patterns,
+                                              self.get_repository_info().path)
 
         diff = self._get_range_diff(revisions['base'], revisions['tip'],
                                     include_files, exclude_patterns)

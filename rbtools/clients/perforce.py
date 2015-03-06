@@ -433,7 +433,7 @@ class PerforceClient(SCMClient):
         to take into account adds/deletes and to provide the necessary
         revision information.
         """
-        exclude_patterns = self._normalize_patterns(exclude_patterns)
+        exclude_patterns = self.normalize_exclude_patterns(exclude_patterns)
 
         if not revisions:
             # The "path posting" is still interesting enough to keep around. If
@@ -1323,18 +1323,32 @@ class PerforceClient(SCMClient):
 
         return False
 
-    def _normalize_patterns(self, patterns):
+    def normalize_exclude_patterns(self, patterns):
         """Normalize the set of patterns so all non-depot paths are absolute.
 
         A path with a leading // is interpreted as a depot pattern and remains
-        unchanged. All other paths are normalized to be absolute paths.
+        unchanged. A path with a leading path separator is interpreted as being
+        relative to the Perforce client root. All other paths are interpreted
+        as being relative to the current working directory. Non-depot paths are
+        transformed into absolute paths.
         """
-        normalized_patterns = []
+        cwd = os.getcwd()
+        base_dir = self.p4.info().get('Client root')
 
-        for pattern in patterns:
-            if pattern.startswith('//'):
-                normalized_patterns.append(pattern)
+        def normalize(p):
+            if p.startswith('//'):
+                # Absolute depot patterns remain unchanged.
+                return p
+            elif pattern.startswith(os.path.sep):
+                # Patterns beginning with the operating system's path separator
+                # are relative to the repository root.
+                assert base_dir is not None
+                p = os.path.join(base_dir, p[1:])
             else:
-                normalized_patterns.append(os.path.abspath(pattern))
+                # All other patterns are considered to be relative to the
+                # current working directory.
+                p = os.path.join(cwd, p)
 
-        return normalized_patterns
+            return os.path.normpath(p)
+
+        return [normalize(pattern) for pattern in patterns]
