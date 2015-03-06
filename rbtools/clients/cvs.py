@@ -123,7 +123,9 @@ class CVSClient(SCMClient):
         files in the working directory. If it's not empty and contains two
         revisions, this will do a diff between those revisions.
         """
-        exclude_patterns = normalize_patterns(exclude_patterns)
+        # CVS paths are always relative to the current working directory.
+        cwd = os.getcwd()
+        exclude_patterns = normalize_patterns(exclude_patterns, cwd, cwd)
 
         include_files = include_files or []
 
@@ -142,7 +144,8 @@ class CVSClient(SCMClient):
         if exclude_patterns:
             # CVS diffs are relative to the current working directory, so the
             # base_dir parameter to filter_diff is unnecessary.
-            diff = filter_diff(diff, self.INDEX_FILE_RE, exclude_patterns)
+            diff = filter_diff(diff, self.INDEX_FILE_RE, exclude_patterns,
+                               base_dir=cwd)
 
         return {
             'diff': b''.join(diff)

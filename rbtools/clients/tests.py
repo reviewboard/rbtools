@@ -160,7 +160,7 @@ class GitClientTests(SCMClientTests):
         self.assertEqual(result['commit_id'], commit_id)
 
     def test_diff_exclude(self):
-        """Testing Gitclient simple diff with file exclusion."""
+        """Testing GitClient simple diff with file exclusion."""
         self.client.get_repository_info()
         base_commit_id = self._git_get_head()
 
@@ -170,6 +170,63 @@ class GitClientTests(SCMClientTests):
 
         revisions = self.client.parse_revision_spec([])
         result = self.client.diff(revisions, exclude_patterns=['exclude.txt'])
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 4)
+        self.assertTrue('diff' in result)
+        self.assertTrue('parent_diff' in result)
+        self.assertTrue('base_commit_id' in result)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '69d4616cf985f6b10571036db744e2d8')
+        self.assertEqual(result['parent_diff'], None)
+        self.assertEqual(result['base_commit_id'], base_commit_id)
+        self.assertEqual(result['commit_id'], commit_id)
+
+    def test_diff_exclude_in_subdir(self):
+        """Testing GitClient simple diff with file exclusion in a subdir"""
+        base_commit_id = self._git_get_head()
+
+        os.mkdir('subdir')
+        self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
+        os.chdir('subdir')
+        self._git_add_file_commit('exclude.txt', FOO2, 'commit 2')
+
+        self.client.get_repository_info()
+
+        commit_id = self._git_get_head()
+
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions,
+                                  exclude_patterns=['exclude.txt'])
+
+        self.assertTrue(isinstance(result, dict))
+        self.assertEqual(len(result), 4)
+        self.assertTrue('diff' in result)
+        self.assertTrue('parent_diff' in result)
+        self.assertTrue('base_commit_id' in result)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '69d4616cf985f6b10571036db744e2d8')
+        self.assertEqual(result['parent_diff'], None)
+        self.assertEqual(result['base_commit_id'], base_commit_id)
+        self.assertEqual(result['commit_id'], commit_id)
+
+    def test_diff_exclude_root_pattern_in_subdir(self):
+        """Testing GitClient diff with file exclusion in the repo root."""
+        base_commit_id = self._git_get_head()
+
+        os.mkdir('subdir')
+        self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._git_add_file_commit('exclude.txt', FOO2, 'commit 2')
+        os.chdir('subdir')
+
+        self.client.get_repository_info()
+
+        commit_id = self._git_get_head()
+
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(
+            revisions,
+            exclude_patterns=[os.path.sep + 'exclude.txt'])
+
         self.assertTrue(isinstance(result, dict))
         self.assertEqual(len(result), 4)
         self.assertTrue('diff' in result)
@@ -1270,6 +1327,56 @@ class SVNClientTests(SCMClientTests):
                           self.client.parse_revision_spec,
                           ['1', '2', '3'])
 
+    def test_diff_exclude(self):
+        """Testing SVNClient diff with file exclude patterns"""
+        self._svn_add_file('foo.txt', FOO1)
+        self._svn_add_file('exclude.txt', FOO2)
+
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions,
+                                  exclude_patterns=['exclude.txt'])
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('diff' in result)
+
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '1d2b00abce632d104127a2d3673770a1')
+
+    def test_diff_exclude_in_subdir(self):
+        """Testing SVNClient diff with exclude patterns in a subdir"""
+        self._svn_add_file('foo.txt', FOO1)
+        self._svn_add_dir('subdir')
+        self._svn_add_file(os.path.join('subdir', 'exclude.txt'), FOO2)
+
+        os.chdir('subdir')
+
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(
+            revisions,
+            exclude_patterns=['exclude.txt'])
+
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('diff' in result)
+
+        self.assertEqual(result['diff'], '')
+
+    def test_diff_exclude_root_pattern_in_subdir(self):
+        """Testing SVNClient diff with repo exclude patterns in a subdir"""
+        self._svn_add_file('exclude.txt', FOO1)
+        self._svn_add_dir('subdir')
+
+        os.chdir('subdir')
+
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(
+            revisions,
+            exclude_patterns=[os.path.join(os.path.sep, 'exclude.txt'),
+                              '.'])
+
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('diff' in result)
+
+        self.assertEqual(result['diff'], '')
+
     def test_same_diff_multiple_methods(self):
         """Testing SVNClient identical diff generated from root, subdirectory,
         and via target"""
@@ -1443,7 +1550,7 @@ class SVNClientTests(SCMClientTests):
         # be no SystemExit raised and an (empty) diff should be produced.
 
         self._run_svn(['copy', 'foo.txt', 'foo_copy.txt'])
-        revisions = self.client.parse_revision_spec()
+        revisions = self.client.parse_revision_spec([])
         result = self.client.diff(revisions, [], ['foo_copy.txt'])
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
@@ -1542,6 +1649,11 @@ class PerforceClientTests(SCMClientTests):
                 'Status': 'pending',
                 'Description': 'This is a test.\n',
             }]
+
+        def info(self):
+            return {
+                'Client root': '/',
+            }
 
         def run_p4(self, *args, **kwargs):
             assert False
@@ -1998,6 +2110,41 @@ class PerforceClientTests(SCMClientTests):
                           client.parse_revision_spec,
                           ['1', '2', '3'])
 
+    def test_diff_exclude(self):
+        """Testing PerforceClient.normalize_exclude_patterns"""
+        repo_root = self.chdir_tmp()
+        os.mkdir('subdir')
+        cwd = os.getcwd()
+
+        class ExcludeWrapper(P4Wrapper):
+            def info(self):
+                return {
+                    'Client root': repo_root,
+                }
+
+        client = PerforceClient(ExcludeWrapper)
+
+        patterns = [
+            "//depot/path",
+            os.path.join(os.path.sep, "foo"),
+            "foo",
+        ]
+
+        normalized_patterns = [
+            # Depot paths should remain unchanged.
+            patterns[0],
+            # "Absolute" paths (i.e., ones that begin with a path separator)
+            # should be relative to the repository root.
+            os.path.join(repo_root, patterns[1][1:]),
+            # Relative paths should be relative to the current working
+            # directory.
+            os.path.join(cwd, patterns[2]),
+        ]
+
+        result = client.normalize_exclude_patterns(patterns)
+
+        self.assertListEqual(result, normalized_patterns)
+
 
 class BazaarClientTests(SCMClientTests):
     def setUp(self):
@@ -2032,11 +2179,13 @@ class BazaarClientTests(SCMClientTests):
         self._run_bzr(["add", file])
         self._run_bzr(["commit", "-m", msg, '--author', 'Test User'])
 
-    def _compare_diffs(self, filename, full_diff, expected_diff_digest):
+    def _compare_diffs(self, filename, full_diff, expected_diff_digest,
+                       change_type='modified'):
         """Testing that the full_diff for ``filename`` matches the ``expected_diff``."""
         diff_lines = full_diff.splitlines()
 
-        self.assertEqual(('=== modified file %r' % filename).encode('utf-8'),
+        self.assertEqual(('=== %s file %r'
+                          % (change_type, filename)).encode('utf-8'),
                          diff_lines[0])
         self.assertTrue(diff_lines[1].startswith(
             ('--- %s\t' % filename).encode('utf-8')))
@@ -2045,6 +2194,13 @@ class BazaarClientTests(SCMClientTests):
 
         diff_body = b'\n'.join(diff_lines[3:])
         self.assertEqual(md5(diff_body).hexdigest(), expected_diff_digest)
+
+    def _count_files_in_diff(self, diff):
+        return len([
+            line
+            for line in diff.split(b'\n')
+            if line.startswith(b'===')
+        ])
 
     def test_get_repository_info_original_branch(self):
         """Testing BazaarClient get_repository_info with original branch"""
@@ -2113,13 +2269,53 @@ class BazaarClientTests(SCMClientTests):
         self._compare_diffs('foo.txt', result['diff'],
                             'a6326b53933f8b255a4b840485d8e210')
 
-        num_files_in_diff = len([
-            line
-            for line in result['diff'].split(b'\n')
-            if line.startswith(b'===')
-        ])
+        self.assertEqual(self._count_files_in_diff(result['diff']), 1)
 
-        self.assertEqual(num_files_in_diff, 1)
+    def test_diff_exclude_in_subdir(self):
+        """Testing BazaarClient diff with file exclusion in a subdirectory."""
+        os.chdir(self.child_branch)
+
+        self._bzr_add_file_commit('foo.txt', FOO1, 'commit 1')
+
+        os.mkdir('subdir')
+        os.chdir('subdir')
+
+        self._bzr_add_file_commit('exclude.txt', FOO2, 'commit 2')
+
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(revisions,
+                                  exclude_patterns=['exclude.txt', '.'])
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('diff' in result)
+
+        self._compare_diffs('foo.txt', result['diff'],
+                            'a6326b53933f8b255a4b840485d8e210')
+
+        self.assertEqual(self._count_files_in_diff(result['diff']), 1)
+
+    def test_diff_exclude_root_pattern_in_subdir(self):
+        """Testing BazaarClient diff with file exclusion in the repo root."""
+        os.chdir(self.child_branch)
+
+        self._bzr_add_file_commit('exclude.txt', FOO2, 'commit 1')
+
+        os.mkdir('subdir')
+        os.chdir('subdir')
+
+        self._bzr_add_file_commit('foo.txt', FOO1, 'commit 2')
+
+        revisions = self.client.parse_revision_spec([])
+        result = self.client.diff(
+            revisions,
+            exclude_patterns=[os.path.sep + 'exclude.txt',
+                              os.path.sep + 'subdir'])
+
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('diff' in result)
+
+        self._compare_diffs(os.path.join('subdir', 'foo.txt'), result['diff'],
+                            '4deffcb296180fa166eddff2512bd0e4',
+                            change_type='added')
 
     def test_diff_specific_files(self):
         """Testing BazaarClient diff with specific files"""
