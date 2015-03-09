@@ -2,7 +2,7 @@
 RBTools 0.7.2 Release Notes
 ===========================
 
-**Release date:** TBD
+**Release date:** March 9, 2015
 
 
 New Features
