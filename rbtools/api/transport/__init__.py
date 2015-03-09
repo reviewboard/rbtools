@@ -37,6 +37,15 @@ class Transport(object):
         """
         raise NotImplementedError
 
+    def logout(self):
+        """Logs out of a Review Board session on the server.
+
+        The transport should override this method and provide a way
+        to reset the username and password which will be populated
+        in the next request.
+        """
+        raise NotImplementedError
+
     def execute_request_method(self, method, *args, **kwargs):
         """Execute a method and carry out the returned HttpRequest."""
         return method(*args, **kwargs)

@@ -687,7 +687,7 @@ class ValidateDiffResource(ItemResource):
     """
     @request_method_decorator
     def validate_diff(self, repository, diff, parent_diff=None,
-                      base_dir=None, **kwargs):
+                      base_dir=None, base_commit_id=None, **kwargs):
         """Validates a diff.
 
         The diff and parent_diff arguments should be strings containing
@@ -705,5 +705,8 @@ class ValidateDiffResource(ItemResource):
 
         if base_dir:
             request.add_field('basedir', base_dir)
+
+        if base_commit_id:
+            request.add_field('base_commit_id', base_commit_id)
 
         return request

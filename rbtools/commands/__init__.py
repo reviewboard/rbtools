@@ -627,9 +627,8 @@ class Command(object):
                     'used with --diff-filename=-')
 
             print()
-            print('==> HTTP Authentication Required')
-            print('Enter authorization information for "%s" at %s' %
-                  (realm, urlparse(uri)[1]))
+            print('Please log in to the Review Board server at %s.' %
+                  urlparse(uri)[1])
 
             # getpass will write its prompt to stderr but input
             # writes to stdout. See bug 2831.
@@ -654,7 +653,8 @@ class Command(object):
                 'be used with --diff-filename=-')
 
         print()
-        print('==> Two-factor authentication token required')
+        print('Please enter your two-factor authentication token for Review '
+              'Board.')
 
         if token_method == 'sms':
             print('You should be getting a text message with '

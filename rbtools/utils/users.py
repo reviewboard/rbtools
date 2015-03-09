@@ -4,36 +4,47 @@ import getpass
 import logging
 import sys
 
-from six.moves import input
+from six.moves import input, range
 
 from rbtools.api.errors import AuthorizationError
 from rbtools.commands import CommandError
 
 
-def get_authenticated_session(api_client, api_root, auth_required=False):
+def get_authenticated_session(api_client, api_root, auth_required=False,
+                              session=None, num_retries=3):
     """Return an authenticated session.
 
     None will be returned if the user is not authenticated, unless the
     'auth_required' parameter is True, in which case the user will be prompted
     to login.
     """
-    session = api_root.get_session(expand='user')
+    if not session:
+        session = api_root.get_session(expand='user')
 
     if not session.authenticated:
         if not auth_required:
             return None
 
-        logging.warning('You are not authenticated with the Review Board '
-                        'server at %s, please login.' % api_client.url)
-        sys.stderr.write('Username: ')
-        username = input()
-        password = getpass.getpass(b'Password: ')
-        api_client.login(username, password)
+        logging.info('Please log in to the Review Board server at %s',
+                     api_client.domain)
 
-        try:
-            session = session.get_self()
-        except AuthorizationError:
-            raise CommandError('You are not authenticated.')
+        for i in range(num_retries):
+            sys.stderr.write('Username: ')
+            username = input()
+            password = getpass.getpass(b'Password: ')
+            api_client.login(username, password)
+
+            try:
+                session = session.get_self()
+                break
+            except AuthorizationError:
+                sys.stderr.write('\n')
+
+                if i < num_retries - 1:
+                    logging.error('The username or password was incorrect. '
+                                  'Please try again.')
+                else:
+                    raise CommandError('Unable to log in to Review Board.')
 
     return session
 

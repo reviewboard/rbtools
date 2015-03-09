@@ -55,6 +55,9 @@ class SyncTransport(Transport):
     def login(self, username, password):
         self.server.login(username, password)
 
+    def logout(self):
+        self.server.logout()
+
     def execute_request_method(self, method, *args, **kwargs):
         request = method(*args, **kwargs)
 

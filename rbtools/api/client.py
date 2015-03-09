@@ -1,5 +1,7 @@
 from __future__ import unicode_literals
 
+from six.moves.urllib.parse import urlparse
+
 from rbtools.api.transport.sync import SyncTransport
 
 
@@ -12,6 +14,7 @@ class RBClient(object):
     """
     def __init__(self, url, transport_cls=SyncTransport, *args, **kwargs):
         self.url = url
+        self.domain = urlparse(url)[1]
         self._transport = transport_cls(url, *args, **kwargs)
 
     def get_root(self, *args, **kwargs):
@@ -25,3 +28,6 @@ class RBClient(object):
 
     def login(self, *args, **kwargs):
         return self._transport.login(*args, **kwargs)
+
+    def logout(self, *args, **kwargs):
+        return self._transport.logout(*args, **kwargs)

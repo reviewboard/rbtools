@@ -653,25 +653,53 @@ class Post(Command):
         if len(diff) == 0:
             raise CommandError("There don't seem to be any diffs!")
 
-        try:
-            diff_validator = api_root.get_diff_validation()
-            diff_validator.validate_diff(
-                repository,
-                diff,
-                parent_diff=parent_diff,
-                base_dir=base_dir)
-        except APIError as e:
-            msg_prefix = ''
+        # Validate the diffs to ensure that they can be parsed and that
+        # all referenced files can be found.
+        #
+        # Review Board 2.0.14+ (with the diffs.validation.base_commit_ids
+        # capability) is required to successfully validate against hosting
+        # services that need a base_commit_id. This is basically due to
+        # the limitations of a couple Git-specific hosting services
+        # (Beanstalk, Bitbucket, and Unfuddle).
+        #
+        # In order to validate, we need to either not be dealing with a
+        # base commit ID (--diff-filename), or be on a new enough version
+        # of Review Board, or be using a non-Git repository.
+        can_validate_base_commit_ids = \
+            self.tool.capabilities.has_capability('diffs', 'validation',
+                                                  'base_commit_ids')
 
-            if e.error_code == 207:
-                msg_prefix = '%s: ' % e.rsp['file']
+        if (not base_commit_id or
+            can_validate_base_commit_ids or
+            self.tool.name != 'Git'):
+            # We can safely validate this diff before posting it, but we
+            # need to ensure we only pass base_commit_id if the capability
+            # is set.
+            validate_kwargs = {}
 
-            raise CommandError('Error validating diff\n\n%s%s' %
-                               (msg_prefix, e))
-        except AttributeError:
-            # The server doesn't have a diff validation resource. Post as
-            # normal.
-            pass
+            if can_validate_base_commit_ids:
+                validate_kwargs['base_commit_id'] = base_commit_id
+
+            try:
+                diff_validator = api_root.get_diff_validation()
+                diff_validator.validate_diff(
+                    repository,
+                    diff,
+                    parent_diff=parent_diff,
+                    base_dir=base_dir,
+                    **validate_kwargs)
+            except APIError as e:
+                msg_prefix = ''
+
+                if e.error_code == 207:
+                    msg_prefix = '%s: ' % e.rsp['file']
+
+                raise CommandError('Error validating diff\n\n%s%s' %
+                                   (msg_prefix, e))
+            except AttributeError:
+                # The server doesn't have a diff validation resource. Post as
+                # normal.
+                pass
 
         if repository_info.supports_changesets and 'changenum' in diff_info:
             changenum = diff_info['changenum']
