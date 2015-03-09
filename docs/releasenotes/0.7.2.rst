@@ -62,4 +62,5 @@ Contributors
 ============
 
 * Christian Hammond
+* David Trowbridge
 * Griffin Myers
