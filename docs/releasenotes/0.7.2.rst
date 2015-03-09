@@ -1,0 +1,65 @@
+===========================
+RBTools 0.7.2 Release Notes
+===========================
+
+**Release date:** TBD
+
+
+New Features
+============
+
+* Added two new commands: :command:`rbt login` and :command:`rbt logout`.
+
+  These commands make it easy to log in or out of Review Board without
+  having to perform other operations on the server.
+
+  :command:`rbt login` will prompt the user for credentials, log in to
+  Review Board, and store the session cookie. The credentials can
+  optionally be provided by passing :option:`--username` and
+  :option:`--password`.
+
+  :command:`rbt logout` will log out of the Review Board server, invalidating
+  the cookie. The cookie will then be removed from the cookies file.
+
+
+Bug Fixes
+=========
+
+rbt land
+--------
+
+* Fixed using :option:`--edit` when landing remote changes.
+
+  Previously, this option was being ignored, requiring the commit to be
+  amended later.
+
+* The change description is no longer printed to the console when using
+  :option:`--edit`.
+
+
+rbt post
+--------
+
+* Fixed issues posting changes against Git repositories hosted on Bitbucket,
+  Beanstalk, and Unfuddle.
+
+  When running against Review Board 2.0.13 or older, we must go into a
+  compatibility mode for diff validation. We recommend upgrading to
+  2.0.14 or higher.
+
+
+API Caching
+-----------
+
+* API caching is now disabled for Review Board 2.0.13 and lower.
+
+  We found some other caching problems that were worth working around in
+  2.0.13 by disabling the cache. It now requires the upcoming 2.0.14 and
+  higher.
+
+
+Contributors
+============
+
+* Christian Hammond
+* Griffin Myers
