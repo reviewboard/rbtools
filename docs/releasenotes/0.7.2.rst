@@ -25,6 +25,27 @@ New Features
 Bug Fixes
 =========
 
+General
+-------
+
+* Fixed a Unicode issue when prompting for input.
+
+  Patch by Halvor Lund.
+
+* The :file:`.reviewboardrc` search path now uses the original behavior of
+  checking for the file in the current directory or a parent before checking
+  the one in the home directory.
+
+* Fixed file exclusion so that it's consistent across all types of
+  repositories. (:bug:`3776`)
+
+  Previously, patterns matching the root of a repository led to inconsistent
+  behavior across the various repositories. Now all paths begining with
+  a path character (``\`` or ``/``) are treated relative to the root of
+  the checkout. The exception is CVS, which treats it as relative to the
+  current directory, as that's how it handles diff generation in general.
+
+
 rbt land
 --------
 
@@ -48,8 +69,12 @@ rbt post
   2.0.14 or higher.
 
 
-API Caching
------------
+API
+---
+
+* Fixed a Unicode issue when assembling HTTP requests.
+
+  Patch by Halvor Lund.
 
 * API caching is now disabled for Review Board 2.0.13 and lower.
 
@@ -58,9 +83,36 @@ API Caching
   higher.
 
 
+Subversion
+----------
+
+* Fixed handling of empty files in Subversion diffs in certain cases.
+
+* Fixed path concatenation to prevent a leading double slash.
+
+  Patch by Griffin Myers.
+
+* Fixed trying to use ``--svn-show-copies-as-adds`` when using versions of
+  SVN prior to 1.7.
+
+  Patch by Griffin Myers.
+
+* ``--svn-show-copies-as-adds`` now respects included and excluded files.
+  (:bug:`3649`)
+
+  Patch by Griffin Myers.
+
+* Fixed several bugs when using ``--svn-show-copies-as-adds`` with including
+  unwanted items.
+
+  Patch by Griffin Myers.
+
+
 Contributors
 ============
 
+* Barret Rennie
 * Christian Hammond
 * David Trowbridge
 * Griffin Myers
+* Halvor Lund
