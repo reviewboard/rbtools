@@ -2143,8 +2143,7 @@ class PerforceClientTests(SCMClientTests):
 
         result = client.normalize_exclude_patterns(patterns)
 
-        self.assertListEqual(result, normalized_patterns)
-
+        self.assertEqual(result, normalized_patterns)
 
 class BazaarClientTests(SCMClientTests):
     def setUp(self):
