@@ -27,7 +27,7 @@ class SVNClient(SCMClient):
     name = 'Subversion'
 
     INDEX_SEP = '=' * 67
-    INDEX_FILE_RE = re.compile('^Index: /(.+)\n$')
+    INDEX_FILE_RE = re.compile('^Index: (.+?)(?:\t\((added|deleted)\))?\n$')
 
     supports_diff_exclude_patterns = True
 
@@ -227,7 +227,16 @@ class SVNClient(SCMClient):
         SVN repositories do not support branches of branches in a way that
         makes parent diffs possible, so we never return a parent diff.
         """
-        exclude_patterns = normalize_patterns(exclude_patterns)
+        repository_info = self.get_repository_info()
+
+        # SVN paths are always relative to the root of the repository, so we
+        # compute the current path we are checked out at and use that as the
+        # current working directory. We use / for the base_dir because we do
+        # not normalize the paths to be filesystem paths, but instead use SVN
+        # paths.
+        exclude_patterns = normalize_patterns(exclude_patterns,
+                                              '/',
+                                              repository_info.base_path)
 
         # Keep track of information needed for handling empty files later.
         empty_files_revisions = {
@@ -237,8 +246,6 @@ class SVNClient(SCMClient):
 
         base = str(revisions['base'])
         tip = str(revisions['tip'])
-
-        repository_info = self.get_repository_info()
 
         diff_cmd = ['diff', '--diff-cmd=diff', '--notice-ancestry']
         changelist = None
@@ -319,9 +326,7 @@ class SVNClient(SCMClient):
         diff = self.convert_to_absolute_paths(diff, repository_info)
 
         if exclude_patterns:
-            diff = filter_diff(
-                diff, self.INDEX_FILE_RE, exclude_patterns,
-                base_dir=self.svn_info('.')['Working Copy Root Path'])
+            diff = filter_diff(diff, self.INDEX_FILE_RE, exclude_patterns)
 
         return {
             'diff': ''.join(diff),
@@ -353,8 +358,12 @@ class SVNClient(SCMClient):
                         # sure that it is not being excluded.
                         filename = p[8:].rstrip()
 
-                        if not filename_match_any_patterns(filename,
-                                                           exclude_patterns):
+                        should_exclude = filename_match_any_patterns(
+                            filename,
+                            exclude_patterns,
+                            self.get_repository_info().base_path)
+
+                        if not should_exclude:
                             return True
                     else:
                         return True

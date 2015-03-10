@@ -1,0 +1,118 @@
+===========================
+RBTools 0.7.2 Release Notes
+===========================
+
+**Release date:** March 9, 2015
+
+
+New Features
+============
+
+* Added two new commands: :command:`rbt login` and :command:`rbt logout`.
+
+  These commands make it easy to log in or out of Review Board without
+  having to perform other operations on the server.
+
+  :command:`rbt login` will prompt the user for credentials, log in to
+  Review Board, and store the session cookie. The credentials can
+  optionally be provided by passing :option:`--username` and
+  :option:`--password`.
+
+  :command:`rbt logout` will log out of the Review Board server, invalidating
+  the cookie. The cookie will then be removed from the cookies file.
+
+
+Bug Fixes
+=========
+
+General
+-------
+
+* Fixed a Unicode issue when prompting for input.
+
+  Patch by Halvor Lund.
+
+* The :file:`.reviewboardrc` search path now uses the original behavior of
+  checking for the file in the current directory or a parent before checking
+  the one in the home directory.
+
+* Fixed file exclusion so that it's consistent across all types of
+  repositories. (:bug:`3776`)
+
+  Previously, patterns matching the root of a repository led to inconsistent
+  behavior across the various repositories. Now all paths begining with
+  a path character (``\`` or ``/``) are treated relative to the root of
+  the checkout. The exception is CVS, which treats it as relative to the
+  current directory, as that's how it handles diff generation in general.
+
+
+rbt land
+--------
+
+* Fixed using :option:`--edit` when landing remote changes.
+
+  Previously, this option was being ignored, requiring the commit to be
+  amended later.
+
+* The change description is no longer printed to the console when using
+  :option:`--edit`.
+
+
+rbt post
+--------
+
+* Fixed issues posting changes against Git repositories hosted on Bitbucket,
+  Beanstalk, and Unfuddle.
+
+  When running against Review Board 2.0.13 or older, we must go into a
+  compatibility mode for diff validation. We recommend upgrading to
+  2.0.14 or higher.
+
+
+API
+---
+
+* Fixed a Unicode issue when assembling HTTP requests.
+
+  Patch by Halvor Lund.
+
+* API caching is now disabled for Review Board 2.0.13 and lower.
+
+  We found some other caching problems that were worth working around in
+  2.0.13 by disabling the cache. It now requires the upcoming 2.0.14 and
+  higher.
+
+
+Subversion
+----------
+
+* Fixed handling of empty files in Subversion diffs in certain cases.
+
+* Fixed path concatenation to prevent a leading double slash.
+
+  Patch by Griffin Myers.
+
+* Fixed trying to use ``--svn-show-copies-as-adds`` when using versions of
+  SVN prior to 1.7.
+
+  Patch by Griffin Myers.
+
+* ``--svn-show-copies-as-adds`` now respects included and excluded files.
+  (:bug:`3649`)
+
+  Patch by Griffin Myers.
+
+* Fixed several bugs when using ``--svn-show-copies-as-adds`` with including
+  unwanted items.
+
+  Patch by Griffin Myers.
+
+
+Contributors
+============
+
+* Barret Rennie
+* Christian Hammond
+* David Trowbridge
+* Griffin Myers
+* Halvor Lund

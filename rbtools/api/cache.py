@@ -16,7 +16,7 @@ from rbtools.utils.appdirs import user_cache_dir
 from rbtools.utils.process import die
 
 
-MINIMUM_VERSION = '2.0.13'  # Minimum server version to enable the API cache.
+MINIMUM_VERSION = '2.0.14'  # Minimum server version to enable the API cache.
 
 _locale_lock = threading.Lock()  # Lock for getting / setting locale.
 

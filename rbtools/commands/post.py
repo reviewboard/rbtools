@@ -384,7 +384,8 @@ class Post(Command):
         On success the review request id and url are returned.
         """
         supports_posting_commit_ids = \
-            self.tool.capabilities.has_capability('diffs', 'commit_ids')
+            self.tool.capabilities.has_capability('review_requests',
+                                                  'commit_ids')
 
         if review_request_id:
             review_request = get_review_request(
@@ -744,34 +745,62 @@ class Post(Command):
         if not diff and not history:
             raise CommandError("There don't seem to be any diffs!")
 
-        try:
-            diff_validator = api_root.get_diff_validation()
+        # Validate the diffs to ensure that they can be parsed and that
+        # all referenced files can be found.
+        #
+        # Review Board 2.0.14+ (with the diffs.validation.base_commit_ids
+        # capability) is required to successfully validate against hosting
+        # services that need a base_commit_id. This is basically due to
+        # the limitations of a couple Git-specific hosting services
+        # (Beanstalk, Bitbucket, and Unfuddle).
+        #
+        # In order to validate, we need to either not be dealing with a
+        # base commit ID (--diff-filename), or be on a new enough version
+        # of Review Board, or be using a non-Git repository.
+        can_validate_base_commit_ids = \
+            self.tool.capabilities.has_capability('diffs', 'validation',
+                                                  'base_commit_ids')
 
-            if with_history:
-                for history_entry in history:
+        if (not base_commit_id or
+            can_validate_base_commit_ids or
+            self.tool.name != 'Git'):
+            # We can safely validate this diff before posting it, but we
+            # need to ensure we only pass base_commit_id if the capability
+            # is set.
+            validate_kwargs = {}
+
+            if can_validate_base_commit_ids:
+                validate_kwargs['base_commit_id'] = base_commit_id
+
+            try:
+                diff_validator = api_root.get_diff_validation()
+
+                if with_history:
+                    for history_entry in history:
+                        diff_validator.validate_diff(
+                            repository,
+                            history_entry['diff'],
+                            parent_diff=history_entry.get('parent_diff'),
+                            base_dir=base_dir)
+                else:
                     diff_validator.validate_diff(
-                        repository,
-                        history_entry['diff'],
-                        parent_diff=history_entry.get('parent_diff'),
-                        base_dir=base_dir)
-            else:
-                diff_validator.validate_diff(
                         repository,
                         diff,
                         parent_diff=parent_diff,
-                        base_dir=base_dir)
-        except APIError as e:
-            msg_prefix = ''
+                        base_dir=base_dir,
+                        **validate_kwargs)
+            except APIError as e:
+                msg_prefix = ''
 
-            if e.error_code == 207:
-                msg_prefix = '%s: ' % e.rsp['file']
+                if e.error_code == 207:
+                    msg_prefix = '%s: ' % e.rsp['file']
 
-            raise CommandError('Error validating diff\n\n%s%s' %
-                               (msg_prefix, e))
-        except AttributeError:
-            # The server doesn't have a diff validation resource. Post as
-            # normal.
-            pass
+                raise CommandError('Error validating diff\n\n%s%s' %
+                                   (msg_prefix, e))
+            except AttributeError:
+                # The server doesn't have a diff validation resource. Post as
+                # normal.
+                pass
 
         if repository_info.supports_changesets and 'changenum' in diff_info:
             changenum = diff_info['changenum']

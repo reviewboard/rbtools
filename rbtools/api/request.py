@@ -409,22 +409,23 @@ class ReviewBoardServer(object):
         except IOError:
             pass
 
-        if session:
-            parsed_url = urlparse(url)
-            # Get the cookie domain from the url. If the domain
-            # does not contain a '.' (e.g. 'localhost'), we assume
-            # it is a local domain and suffix it (See RFC 2109).
-            domain = parsed_url[1].partition(':')[0]  # Remove Port.
-            if domain.count('.') < 1:
-                domain = '%s.local' % domain
+        # Get the cookie domain from the url. If the domain
+        # does not contain a '.' (e.g. 'localhost'), we assume
+        # it is a local domain and suffix it (See RFC 2109).
+        parsed_url = urlparse(url)
+        self.domain = parsed_url[1].partition(':')[0]  # Remove Port.
 
+        if self.domain.count('.') < 1:
+            self.domain = '%s.local' % self.domain
+
+        if session:
             cookie = Cookie(
                 version=0,
                 name=RB_COOKIE_NAME,
                 value=session,
                 port=None,
                 port_specified=False,
-                domain=domain,
+                domain=self.domain,
                 domain_specified=True,
                 domain_initial_dot=True,
                 path=parsed_url[2],
@@ -484,6 +485,14 @@ class ReviewBoardServer(object):
     def login(self, username, password):
         """Reset the user information"""
         self.preset_auth_handler.reset(username, password)
+
+    def logout(self):
+        """Logs the user out of the session."""
+        self.preset_auth_handler.reset(None, None)
+        self.make_request(HttpRequest('%ssession/' % self.url,
+                                      method='DELETE'))
+        self.cookie_jar.clear(self.domain)
+        self.cookie_jar.save()
 
     def process_error(self, http_status, data):
         """Processes an error, raising an APIError with the information."""

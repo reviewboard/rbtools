@@ -40,6 +40,8 @@ class GitClient(SCMClient):
         # default.
         self.git = 'git'
 
+        self._original_cwd = None
+
     def parse_revision_spec(self, revisions=[]):
         """Parses the given revision spec.
 
@@ -153,6 +155,11 @@ class GitClient(SCMClient):
         return result
 
     def get_repository_info(self):
+        """Get repository information for the current Git working tree.
+
+        This function changes the directory to the top level directory of the
+        current working tree.
+        """
         if not check_install(['git', '--help']):
             # CreateProcess (launched via subprocess, used by check_install)
             # does not automatically append .cmd for things it finds in PATH.
@@ -176,6 +183,13 @@ class GitClient(SCMClient):
         bare = execute([self.git, 'config', 'core.bare'],
                        ignore_errors=True).strip()
         self.bare = bare in ('true', '1')
+
+        # If we are not working in a bare repository, then we will change
+        # directory to the top level working tree lose our original position.
+        # However, we need the original working directory for file exclusion
+        # patterns, so we save it here.
+        if self._original_cwd is None:
+            self._original_cwd = os.getcwd()
 
         # Running in directories other than the top level of
         # of a work-tree would result in broken diffs on the server
@@ -421,7 +435,10 @@ class GitClient(SCMClient):
         make sense given the requested revisions and the tracking branch, this
         will also return a parent diff.
         """
-        exclude_patterns = normalize_patterns(exclude_patterns)
+        exclude_patterns = normalize_patterns(exclude_patterns,
+                                              self._get_root_directory(),
+                                              cwd=self.original_cwd)
+
         try:
             merge_base = revisions['parent_base']
         except KeyError:
@@ -811,6 +828,16 @@ class GitClient(SCMClient):
             return None
 
         return os.path.abspath(os.path.join(git_dir, ".."))
+
+    @property
+    def original_cwd(self):
+        """Get the original current working directory."""
+        if self._original_cwd is None:
+            # If this is None, then we haven't called get_repository_info and
+            # shouldn't have changed directories.
+            self._original_cwd = os.getcwd()
+
+        return self._original_cwd
 
     def get_history(self, revisions):
         log_fields = {

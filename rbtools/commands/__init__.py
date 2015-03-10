@@ -298,20 +298,35 @@ class Command(object):
                    config_key='EXCLUDE_PATTERNS',
                    help='Excludes all files that match the given pattern '
                         'from the diff. This can be used multiple times to '
-                        'specify multiple patterns.'
+                        'specify multiple patterns. UNIX glob syntax is used '
+                        'for pattern matching.'
                         '\n'
                         'Supported by: Bazaar, CVS, Git, Mercurial, '
                         'Perforce, and Subversion.',
                    extended_help=(
-                       'Relative exclude patterns will be treated as '
-                       'relative to the current working directory, not to '
-                       'the repository directory.'
+                       'Patterns that begin with a path separator (/ on Mac '
+                       'OS and Linux, \\ on Windows) will be treated as being '
+                       'relative to the root of the repository. All other '
+                       'patterns are treated as being relative to the current '
+                       'working directory.'
+                       '\n'
+                       'For example, to exclude all ".txt" files from the '
+                       'resulting diff, you would use "-X /\'*.txt\'".'
+                       '\n'
+                       'When working with Mercurial, the patterns are '
+                       'provided directly to "hg" and are not limited to '
+                       'globs. For more information on advanced pattern '
+                       'syntax in Mercurial, run "hg help patterns"'
+                       '\n'
+                       'When working with CVS all diffs are generated '
+                       'relative to the current working directory so '
+                       'patterns beginning with a path separator are treated '
+                       'as relative to the current working directory.'
                        '\n'
                        'When working with Perforce, an exclude pattern '
                        'beginning with `//` will be matched against depot '
                        'paths; all other patterns will be matched against '
-                       'local paths.'
-                   ),
+                       'local paths.'),
                    added_in='0.7'),
             Option('--parent',
                    dest='parent_branch',
@@ -612,9 +627,8 @@ class Command(object):
                     'used with --diff-filename=-')
 
             print()
-            print('==> HTTP Authentication Required')
-            print('Enter authorization information for "%s" at %s' %
-                  (realm, urlparse(uri)[1]))
+            print('Please log in to the Review Board server at %s.' %
+                  urlparse(uri)[1])
 
             # getpass will write its prompt to stderr but input
             # writes to stdout. See bug 2831.
@@ -639,7 +653,8 @@ class Command(object):
                 'be used with --diff-filename=-')
 
         print()
-        print('==> Two-factor authentication token required')
+        print('Please enter your two-factor authentication token for Review '
+              'Board.')
 
         if token_method == 'sms':
             print('You should be getting a text message with '
