@@ -508,23 +508,17 @@ class RootResource(ItemResource):
         return HttpRequest(url, query_args=kwargs)
 
 
-@resource_mimetype('application/vnd.reviewboard.org.diffs')
-class DiffListResource(ListResource):
-    """The Diff List resource specific base class.
+class DiffUploaderMixin(object):
+    """A mixin for uploading diffs to a resource."""
 
-    Provides additional functionality to assist in the uploading of
-    new diffs.
-    """
-    @request_method_decorator
-    def upload_diff(self, diff, parent_diff=None, base_dir=None,
-                    base_commit_id=None, **kwargs):
-        """Uploads a new diff.
+    def prepare_upload_diff_request(self, diff, parent_diff=None,
+                                    base_dir=None, base_commit_id=None,
+                                    **kwargs):
+        """Create a request that can be used to upload a diff.
 
-        The diff and parent_diff arguments should be strings containing
-        the diff output.
+        The diff and parent_diff arguments should be strings containing the
+        diff output.
         """
-        # TODO: This method should be unified with validate_diff() method of
-        # ValidateDiffResource, since they both perform the same operation.
         request = HttpRequest(self._url, method=b'POST', query_args=kwargs)
         request.add_file('path', 'diff', diff)
 
@@ -538,6 +532,30 @@ class DiffListResource(ListResource):
             request.add_field('base_commit_id', base_commit_id)
 
         return request
+
+
+@resource_mimetype('application/vnd.reviewboard.org.diffs')
+class DiffListResource(DiffUploaderMixin, ListResource):
+    """The Diff List resource specific base class.
+
+    This resource provides functionality to assist in the uploading of new
+    diffs.
+    """
+
+    @request_method_decorator
+    def upload_diff(self, diff, parent_diff=None, base_dir=None,
+                    base_commit_id=None, **kwargs):
+        """Upload a diff to the resource.
+
+        The diff and parent_diff arguments should be strings containing the
+        diff output.
+        """
+        return self.prepare_upload_diff_request(
+            diff,
+            parent_diff=parent_diff,
+            base_dir=base_dir,
+            base_commit_id=base_commit_id,
+            **kwargs)
 
 
 @resource_mimetype('application/vnd.reviewboard.org.diff')
@@ -680,31 +698,24 @@ class ReviewRequestResource(ItemResource):
 
 
 @resource_mimetype('application/vnd.reviewboard.org.diff-validation')
-class ValidateDiffResource(ItemResource):
+class ValidateDiffResource(DiffUploaderMixin, ItemResource):
     """The Validate Diff resource specific base class.
 
     Provides additional functionality to assist in the validation of diffs.
     """
+
     @request_method_decorator
-    def validate_diff(self, repository, diff, parent_diff=None,
-                      base_dir=None, base_commit_id=None, **kwargs):
-        """Validates a diff.
+    def validate_diff(self, repository, diff, parent_diff=None, base_dir=None,
+                      base_commit_id=None, **kwargs):
+        """Validate a diff."""
+        request = self.prepare_upload_diff_request(
+            diff,
+            parent_diff=parent_diff,
+            base_dir=base_dir,
+            base_commit_id=base_commit_id,
+            **kwargs)
 
-        The diff and parent_diff arguments should be strings containing
-        the diff output.
-        """
-
-        # TODO: This method should be unified with upload_diff() method of
-        # DiffListResource, since they both perform the same operation.
-        request = HttpRequest(self._url, method=b'POST', query_args=kwargs)
         request.add_field('repository', repository)
-        request.add_file('path', 'diff', diff)
-
-        if parent_diff:
-            request.add_file('parent_diff_path', 'parent_diff', parent_diff)
-
-        if base_dir:
-            request.add_field('basedir', base_dir)
 
         if base_commit_id:
             request.add_field('base_commit_id', base_commit_id)
