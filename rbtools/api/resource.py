@@ -581,49 +581,89 @@ class DiffResource(ItemResource):
         return request
 
 
-@resource_mimetype('application/vnd.reviewboard.org.diff-commits')
-class DiffCommitListResource(ListResource):
-    """The Commit List resource specific base class.
+class DiffCommitUploaderMixin(object):
+    """A mixin for uploading a diff as a commit to a resource."""
 
-    Provides additional functionality in the uploading of new commits.
-    """
+    def prepare_upload_commit_request(self, commit, **kwargs):
+        """Upload a commit to the resource.
 
-    @request_method_decorator
-    def upload_commit(self, diff, commit_id, parent_id, commit_type,
-                      author_name, author_email, author_date,
-                      committer_name=None, committer_email=None,
-                      committer_date=None, description=None,
-                      merge_parent_ids=None, parent_diff=None, **kwargs):
+        The :param:`commit` parameter is expected to be a :class:`dict` with
+        the following keys:
+
+         * ``path``, the contents of the diff to upload;
+         * ``commit_id``, the commit's revision/ID;
+         * ``parent_id``, the parent commit's revision/ID;
+         * ``commit_type``, the type of the commit, either ``'merge'`` or
+           ``'change'``;
+         * ``author_name``, the commit author's name;
+         * ``author_email``, the commit author's email; and
+         * ``author_date``, the date the commit was authored.
+
+        It may also contain the following optional keys for committers (for
+        SCMs that differentiate between authors and committers):
+
+         * ``committer_name``, the committer's name;
+         * ``committer_email``, the committer's email; and
+         * ``committer_date``, the date the commit was committed.
+
+        However, if :param:`commit` contains one of these, it should contain
+        all three, otherwise none of them will be uploaded to the server.
+
+        There are also the following completely optional fields:
+
+         * ``description``, the commit message;
+         * ``parent_diff``, the contents of the parent diff; and
+         * ``merge_parent_ids``, the commit IDs of parents involved in a merge
+           commit (excluding the ``parent_id``).
+        """
         request = HttpRequest(self._url, method=b'POST', query_args=kwargs)
 
-        request.add_file('path', 'diff', diff)
-        request.add_field('commit_id', commit_id)
-        request.add_field('parent_id', parent_id)
-        request.add_field('commit_type', commit_type)
+        request.add_file('path', 'diff', commit['diff'])
+        request.add_field('commit_id', commit['commit_id'])
+        request.add_field('parent_id', commit['parent_id'])
+        request.add_field('commit_type', commit['commit_type'])
 
-        request.add_field('author_name', author_name)
-        request.add_field('author_email', author_email)
-        request.add_field('author_date', author_date)
+        request.add_field('author_name', commit['author_name'])
+        request.add_field('author_email', commit['author_email'])
+        request.add_field('author_date', commit['author_date'])
 
-        if committer_name and committer_email and committer_date:
-            request.add_field('committer_name', committer_name)
-            request.add_field('committer_email', committer_email)
-            request.add_field('committer_date', committer_date)
-        elif committer_name or committer_email or committer_date:
+        if ('committer_name' in commit and
+            'committer_email' in commit and
+            'committer_date' in commit):
+            request.add_field('committer_name', commit['committer_name'])
+            request.add_field('committer_email', commit['committer_email'])
+            request.add_field('committer_date', commit['committer_date'])
+        elif ('committer_name' in commit or
+              'committer_email' in commit or
+              'committer_date' in commit):
             logging.warning('Not all of the committer name, committer email, '
                             'and committer date could be determined. None of '
                             'these fields will be submitted.')
 
-        if description:
-            request.add_field('description', description)
+        if 'description' in commit:
+            request.add_field('description', commit['description'])
 
-        if parent_diff:
-            request.add_file('parent_diff_path', 'parent_diff', parent_diff)
+        if 'parent_diff' in commit and commit['parent_diff']:
+            request.add_file('parent_diff_path', 'parent_diff',
+                             commit['parent_diff'])
 
-        if merge_parent_ids:
-            request.add_field('merge_parent_ids', ','.join(merge_parent_ids))
+        if 'merge_parent_ids' in commit:
+            request.add_field('merge_parent_ids',
+                              ','.join(commit['merge_parent_ids']))
 
         return request
+
+
+@resource_mimetype('application/vnd.reviewboard.org.diff-commits')
+class DiffCommitListResource(DiffCommitUploaderMixin, ListResource):
+    """The Commit List resource specific base class.
+
+    Provides additional functionality for uploading of new commits.
+    """
+
+    @request_method_decorator
+    def upload_commit(self, commit, **kwargs):
+        return self.prepare_upload_commit_request(commit, **kwargs)
 
 
 @resource_mimetype('application/vnd.reviewboard.org.diff-commit')
@@ -752,6 +792,22 @@ class ReviewRequestResource(ItemResource):
 
         for name, value in six.iteritems(kwargs):
             request.add_field(name, value)
+
+        return request
+
+
+@resource_mimetype('application/vnd.reviewboard.org.diff-commit-validation')
+class ValidateDiffCommitResource(DiffCommitUploaderMixin, ItemResource):
+    """The Validate Diff Commit resource specific base class.
+
+    Provides additional functionality to assist in the validation of commits.
+    """
+
+    @request_method_decorator
+    def validate_commit(self, commit, diffset, **kwargs):
+        """Validate a diff commit."""
+        request = self.prepare_upload_commit_request(commit, **kwargs)
+        request.add_field('diff_id', diffset.id)
 
         return request
 
