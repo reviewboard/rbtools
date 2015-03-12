@@ -35,9 +35,9 @@ def execute(command,
             results_unicode=True):
     """Utility function to execute a command and return the output."""
     if isinstance(command, list):
-        logging.debug('Running: ' + subprocess.list2cmdline(command))
+        logging.debug(b'Running: ' + subprocess.list2cmdline(command))
     else:
-        logging.debug('Running: ' + command)
+        logging.debug(b'Running: ' + command)
 
     if env:
         env.update(os.environ)

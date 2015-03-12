@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 import os
 import re
@@ -1424,6 +1424,33 @@ class SVNClientTests(SCMClientTests):
         self.assertEqual(md5(result['diff']).hexdigest(),
                          '1b68063237c584d38a9a3ddbdf1f72a2')
 
+    def test_diff_non_unicode_characters(self):
+        """Testing SVNClient diff with a non-utf8 file"""
+        self._svn_add_file('A.txt', '\xe2'.encode('iso-8859-1'))
+        self._run_svn(['propset', 'svn:mime-type', 'text/plain', 'A.txt'])
+
+        revisions = self.client.parse_revision_spec()
+        result = self.client.diff(revisions)
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('diff' in result)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '13803373ded9af750384a4601d5173ce')
+
+    def test_diff_non_unicode_filename(self):
+        """Testing SVNClient diff with a non-utf8 filename"""
+        self.options.svn_show_copies_as_adds = 'y'
+
+        filename = '\xe2'
+        self._run_svn(['copy', 'foo.txt', filename])
+        self._run_svn(['propset', 'svn:mime-type', 'text/plain', filename])
+
+        revisions = self.client.parse_revision_spec()
+        result = self.client.diff(revisions)
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('diff' in result)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         'bfa99e54b8c23b97b1dee23d2763c4fd')
+
     def test_show_copies_as_adds_enabled(self):
         """Testing SVNClient with --show-copies-as-adds functionality
         enabled"""
@@ -2183,7 +2210,7 @@ class BazaarClientTests(SCMClientTests):
         """Testing that the full_diff for ``filename`` matches the ``expected_diff``."""
         diff_lines = full_diff.splitlines()
 
-        self.assertEqual(('=== %s file %r'
+        self.assertEqual(('=== %s file \'%s\''
                           % (change_type, filename)).encode('utf-8'),
                          diff_lines[0])
         self.assertTrue(diff_lines[1].startswith(
@@ -2543,7 +2570,7 @@ class BazaarClientTests(SCMClientTests):
         self.assertEqual(revisions['tip'], tip_commit_id)
 
 
-FOO = """\
+FOO = b"""\
 ARMA virumque cano, Troiae qui primus ab oris
 Italiam, fato profugus, Laviniaque venit
 litora, multum ille et terris iactatus et alto
@@ -2558,7 +2585,7 @@ impulerit. Tantaene animis caelestibus irae?
 
 """
 
-FOO1 = """\
+FOO1 = b"""\
 ARMA virumque cano, Troiae qui primus ab oris
 Italiam, fato profugus, Laviniaque venit
 litora, multum ille et terris iactatus et alto
@@ -2570,7 +2597,7 @@ Musa, mihi causas memora, quo numine laeso,
 
 """
 
-FOO2 = """\
+FOO2 = b"""\
 ARMA virumque cano, Troiae qui primus ab oris
 ARMA virumque cano, Troiae qui primus ab oris
 ARMA virumque cano, Troiae qui primus ab oris
@@ -2584,7 +2611,7 @@ Musa, mihi causas memora, quo numine laeso,
 
 """
 
-FOO3 = """\
+FOO3 = b"""\
 ARMA virumque cano, Troiae qui primus ab oris
 ARMA virumque cano, Troiae qui primus ab oris
 Italiam, fato profugus, Laviniaque venit
@@ -2598,7 +2625,7 @@ Musa, mihi causas memora, quo numine laeso,
 
 """
 
-FOO4 = """\
+FOO4 = b"""\
 Italiam, fato profugus, Laviniaque venit
 litora, multum ille et terris iactatus et alto
 vi superum saevae memorem Iunonis ob iram;
@@ -2614,7 +2641,7 @@ Musa, mihi causas memora, quo numine laeso,
 
 """
 
-FOO5 = """\
+FOO5 = b"""\
 litora, multum ille et terris iactatus et alto
 Italiam, fato profugus, Laviniaque venit
 vi superum saevae memorem Iunonis ob iram;
@@ -2628,7 +2655,7 @@ ARMA virumque cano, Troiae qui primus ab oris
 ARMA virumque cano, Troiae qui primus ab oris
 """
 
-FOO6 = """\
+FOO6 = b"""\
 ARMA virumque cano, Troiae qui primus ab oris
 ARMA virumque cano, Troiae qui primus ab oris
 Italiam, fato profugus, Laviniaque venit
