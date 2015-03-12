@@ -494,6 +494,7 @@ class PerforceClient(SCMClient):
             'integrate': 'M',
             'add': 'A',
             'branch': 'A',
+            'import': 'A',
             'delete': 'D',
         }
 
