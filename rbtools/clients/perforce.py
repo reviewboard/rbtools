@@ -1113,7 +1113,8 @@ class PerforceClient(SCMClient):
 
         # Diff returns "1" if differences were found.
         dl = execute(diff_cmd, extra_ignore_errors=(1, 2),
-                     translate_newlines=False, results_unicode=False)
+                     log_output_on_error=False, translate_newlines=False,
+                     results_unicode=False)
 
         # If the input file has ^M characters at end of line, lets ignore them.
         dl = dl.replace(b'\r\r\n', b'\r\n')

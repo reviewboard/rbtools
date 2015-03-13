@@ -320,7 +320,8 @@ class SVNClient(SCMClient):
                 if svn_show_copies_as_adds in 'Yy':
                     diff_cmd.append("--show-copies-as-adds")
 
-        diff = self._run_svn(diff_cmd, split_lines=True, results_unicode=False)
+        diff = self._run_svn(diff_cmd, split_lines=True, results_unicode=False,
+                             log_output_on_error=False)
         diff = self.handle_renames(diff)
 
         if self._supports_empty_files():
