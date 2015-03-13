@@ -185,8 +185,8 @@ class BazaarClient(SCMClient):
         """Return the diff between 'base' and 'tip'."""
         diff_cmd = ['bzr', 'diff', '-q', '-r',
                     '%s..%s' % (base, tip)] + include_files
-        diff = execute(diff_cmd, ignore_errors=True, split_lines=True,
-                       results_unicode=False)
+        diff = execute(diff_cmd, ignore_errors=True, log_output_on_error=False,
+                       split_lines=True, results_unicode=False)
 
         if diff:
             if exclude_patterns:

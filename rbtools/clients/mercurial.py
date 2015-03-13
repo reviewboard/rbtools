@@ -382,7 +382,7 @@ class MercurialClient(SCMClient):
 
         diff = self._execute(
             diff_cmd + ['-r', revisions['base'], '-r', revisions['tip']],
-            env=self._hg_env)
+            env=self._hg_env, log_output_on_error=False)
 
         if self._supports_empty_files():
             diff = self._handle_empty_files(diff, revisions['base'],

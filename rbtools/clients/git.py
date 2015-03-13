@@ -513,7 +513,8 @@ class GitClient(SCMClient):
                 split_lines=True,
                 with_errors=False,
                 ignore_errors=True,
-                none_on_ignored_error=True)
+                none_on_ignored_error=True,
+                log_output_on_error=False)
 
             # The output of git diff-tree will be a list of entries that have
             # changed between the two revisions that we give it. The last part
@@ -530,6 +531,7 @@ class GitClient(SCMClient):
                                 with_errors=False,
                                 ignore_errors=True,
                                 none_on_ignored_error=True,
+                                log_output_on_error=False,
                                 results_unicode=False)
 
                 if lines is None:
@@ -549,6 +551,7 @@ class GitClient(SCMClient):
                                  with_errors=False,
                                  ignore_errors=True,
                                  none_on_ignored_error=True,
+                                 log_output_on_error=False,
                                  results_unicode=False)
 
         if self.type == 'svn':

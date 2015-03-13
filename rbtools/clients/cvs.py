@@ -139,7 +139,7 @@ class CVSClient(SCMClient):
             diff_cmd.extend(['-r', base, '-r', tip])
 
         diff = execute(diff_cmd + include_files, extra_ignore_errors=(1,),
-                       split_lines=True)
+                       log_output_on_error=False, split_lines=True)
 
         if exclude_patterns:
             # CVS diffs are relative to the current working directory, so the
