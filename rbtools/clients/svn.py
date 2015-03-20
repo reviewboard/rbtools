@@ -324,7 +324,7 @@ class SVNClient(SCMClient):
                              log_output_on_error=False)
         diff = self.handle_renames(diff)
 
-        if self._supports_empty_files():
+        if self.supports_empty_files():
             diff = self._handle_empty_files(diff, diff_cmd,
                                             empty_files_revisions)
 
@@ -662,7 +662,7 @@ class SVNClient(SCMClient):
         # strip off ending newline, and return it as the second component
         return [s.split(b'\n')[0], b'\n']
 
-    def _apply_patch_for_empty_files(self, patch, p_num):
+    def apply_patch_for_empty_files(self, patch, p_num):
         """Returns True if any empty files in the patch are applied.
 
         If there are no empty files in the patch or if an error occurs while
@@ -701,7 +701,7 @@ class SVNClient(SCMClient):
 
         return patched_empty_files
 
-    def _supports_empty_files(self):
+    def supports_empty_files(self):
         """Checks if the RB server supports added/deleted empty files."""
         return (self.capabilities and
                 self.capabilities.has_capability('scmtools', 'svn',
