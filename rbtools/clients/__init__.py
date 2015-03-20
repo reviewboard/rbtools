@@ -141,10 +141,12 @@ class SCMClient(object):
 
         return None
 
-    def _get_p_number(self, patch_file, base_path, base_dir):
-        """
-        Returns the appropriate int used for patch -pX argument,
-        where x is the aforementioned int.
+    def _get_p_number(self, base_path, base_dir):
+        """Return the appropriate value for the -p argument to patch.
+
+        This function returns an integer. If the integer is -1, then the -p
+        option should not be provided to patch. Otherwise, the return value is
+        the argument to patch -p.
         """
         if base_path and base_dir.startswith(base_path):
             return base_path.count('/') + 1
@@ -179,23 +181,23 @@ class SCMClient(object):
         raise NotImplementedError
 
     def apply_patch(self, patch_file, base_path, base_dir, p=None):
-        """
-        Apply the patch patch_file and return True if the patch was
-        successful, otherwise return False.
-        """
-        # Figure out the pX for patch. Override the p_num if it was
-        # specified in the command's options.
-        p_num = p or self._get_p_number(patch_file, base_path, base_dir)
-        if (p_num >= 0):
-            cmd = ['patch', '-p' + six.text_type(p_num), '-i',
-                   six.text_type(patch_file)]
-        else:
-            cmd = ['patch', '-i', six.text_type(patch_file)]
+        """Apply the patch and return a PatchResult indicating its success."""
+        # Figure out the -p argument for patch. We override the calculated
+        # value if it is supplied via a commandline option.
+        p_num = p or self._get_p_number(base_path, base_dir)
+
+        cmd = ['patch']
+
+        if p_num >= 0:
+            cmd.append('-p%d' % p_num)
+
+        cmd.extend(['-i', six.text_type(patch_file)])
 
         # Ignore return code 2 in case the patch file consists of only empty
         # files, which 'patch' can't handle. Other 'patch' errors also give
         # return code 2, so we must check the command output.
-        patch_output = execute(cmd, extra_ignore_errors=(2,))
+        rc, patch_output = execute(cmd, extra_ignore_errors=(2,),
+                                   return_error_code=True)
         only_garbage_in_patch = ('patch: **** Only garbage was found in the '
                                  'patch input.\n')
 
@@ -204,7 +206,7 @@ class SCMClient(object):
             die('Failed to execute command: %s\n%s' % (cmd, patch_output))
 
         # Check the patch for any added/deleted empty files to handle.
-        if self._supports_empty_files():
+        if self.supports_empty_files():
             try:
                 with open(patch_file, 'rb') as f:
                     patch = f.read()
@@ -212,14 +214,19 @@ class SCMClient(object):
                 logging.error('Unable to read file %s: %s', patch_file, e)
                 return
 
-            patched_empty_files = self._apply_patch_for_empty_files(patch,
-                                                                    p_num)
+            patched_empty_files = self.apply_patch_for_empty_files(patch,
+                                                                   p_num)
 
             # If there are no empty files in a "garbage-only" patch, the patch
             # is probably malformed.
             if (patch_output == only_garbage_in_patch and
                 not patched_empty_files):
                 die('Failed to execute command: %s\n%s' % (cmd, patch_output))
+
+        # TODO: Should this take into account apply_patch_for_empty_files ?
+        #       The return value of that function is False both when it fails
+        #       and when there are no empty files.
+        return PatchResult(applied=(rc == 0), patch_output=patch_output)
 
     def create_commit(self, message, author, run_editor,
                       files=[], all_files=False):
@@ -294,6 +301,22 @@ class SCMClient(object):
 
         If a derived class is unable to unable to determine the branch,
         ``None`` should be returned.
+        """
+        raise NotImplementedError
+
+    def supports_empty_files(self):
+        """Check if the RB server supports added/deleted empty files.
+
+        This method returns False. To change this behaviour, override it in a
+        subclass.
+        """
+        return False
+
+    def apply_patch_for_empty_files(self, patch, p_num):
+        """Return True if any empty files in the patch are applied.
+
+        If there are no empty files in the patch or if an error occurs while
+        applying the patch, we return False.
         """
         raise NotImplementedError
 

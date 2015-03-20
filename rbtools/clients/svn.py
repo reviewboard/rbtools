@@ -11,7 +11,7 @@ import six
 from six.moves.urllib.parse import unquote
 
 from rbtools.api.errors import APIError
-from rbtools.clients import SCMClient, RepositoryInfo
+from rbtools.clients import PatchResult, RepositoryInfo, SCMClient
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     OptionsCheckError, TooManyRevisionsError)
 from rbtools.utils.checks import (check_gnu_diff, check_install,
@@ -324,7 +324,7 @@ class SVNClient(SCMClient):
                              log_output_on_error=False)
         diff = self.handle_renames(diff)
 
-        if self._supports_empty_files():
+        if self.supports_empty_files():
             diff = self._handle_empty_files(diff, diff_cmd,
                                             empty_files_revisions)
 
@@ -662,7 +662,44 @@ class SVNClient(SCMClient):
         # strip off ending newline, and return it as the second component
         return [s.split(b'\n')[0], b'\n']
 
-    def _apply_patch_for_empty_files(self, patch, p_num):
+    def _get_p_number(self, base_path, base_dir):
+        """Return the argument for --strip in svn patch.
+
+        This determines the number of path components to remove from file paths
+        in the diff to be applied.
+        """
+        if base_path and base_dir.startswith(base_path):
+            return base_path.count('/')
+        else:
+            return None
+
+    def apply_patch(self, patch_file, base_path, base_dir, p=None):
+        """Apply the patch and return a PatchResult indicating its success."""
+        cmd = ['patch']
+        p_num = p or self._get_p_number(base_path, base_dir)
+
+        if p_num >= 0:
+            cmd.append('--strip=%d' % p_num)
+
+        cmd.append(six.text_type(patch_file))
+
+        rc, patch_output = self._run_svn(cmd, return_error_code=True)
+
+        if self.supports_empty_files():
+            try:
+                with open(patch_file, 'rb') as f:
+                    patch = f.read()
+            except IOError as e:
+                logging.error('Unable to read file %s: %s', patch_file, e)
+                return
+
+            self.apply_patch_for_empty_files(patch, p_num)
+
+            # TODO: What is svn's equivalent of a garbage patch message?
+
+        return PatchResult(applied=(rc == 0), patch_output=patch_output)
+
+    def apply_patch_for_empty_files(self, patch, p_num):
         """Returns True if any empty files in the patch are applied.
 
         If there are no empty files in the patch or if an error occurs while
@@ -676,7 +713,10 @@ class SVNClient(SCMClient):
         if added_files:
             added_files = self._strip_p_num_slashes(added_files, int(p_num))
             make_empty_files(added_files)
-            result = self._run_svn(['add'] + added_files,
+
+            # We require --force here because svn will complain if we run
+            # `svn add` on a file that has already been added or deleted.
+            result = self._run_svn(['add', '--force'] + added_files,
                                    ignore_errors=True,
                                    none_on_ignored_error=True)
 
@@ -689,7 +729,10 @@ class SVNClient(SCMClient):
         if deleted_files:
             deleted_files = self._strip_p_num_slashes(deleted_files,
                                                       int(p_num))
-            result = self._run_svn(['delete'] + deleted_files,
+
+            # We require --force here because svn will complain if we run
+            # `svn delete` on a file that has already been added or deleted.
+            result = self._run_svn(['delete', '--force'] + deleted_files,
                                    ignore_errors=True,
                                    none_on_ignored_error=True)
 
@@ -701,7 +744,7 @@ class SVNClient(SCMClient):
 
         return patched_empty_files
 
-    def _supports_empty_files(self):
+    def supports_empty_files(self):
         """Checks if the RB server supports added/deleted empty files."""
         return (self.capabilities and
                 self.capabilities.has_capability('scmtools', 'svn',

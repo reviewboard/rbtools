@@ -1149,7 +1149,7 @@ class PerforceClient(SCMClient):
             dl = [b'Binary files %s and %s differ\n' % (old_file, new_file)]
 
         if dl == [] or dl[0].startswith(b'Binary files '):
-            is_empty_and_changed = (self._supports_empty_files() and
+            is_empty_and_changed = (self.supports_empty_files() and
                                     changetype_short in ('A', 'D'))
 
             if dl == [] and (is_move or is_empty_and_changed):
@@ -1254,7 +1254,7 @@ class PerforceClient(SCMClient):
             # XXX: This breaks on filenames with spaces.
             return where_output[-1]['data'].split(' ')[2].strip()
 
-    def _apply_patch_for_empty_files(self, patch, p_num):
+    def apply_patch_for_empty_files(self, patch, p_num):
         """Returns True if any empty files in the patch are applied.
 
         If there are no empty files in the patch or if an error occurs while
@@ -1300,7 +1300,7 @@ class PerforceClient(SCMClient):
                 self.capabilities.has_capability('scmtools', 'perforce',
                                                  'moved_files'))
 
-    def _supports_empty_files(self):
+    def supports_empty_files(self):
         """Checks if the RB server supports added/deleted empty files."""
         return (self.capabilities and
                 self.capabilities.has_capability('scmtools', 'perforce',

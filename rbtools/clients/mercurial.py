@@ -384,7 +384,9 @@ class MercurialClient(SCMClient):
             diff_cmd + ['-r', revisions['base'], '-r', revisions['tip']],
             env=self._hg_env, log_output_on_error=False)
 
-        if self._supports_empty_files():
+        supports_empty_files = self.supports_empty_files()
+
+        if supports_empty_files:
             diff = self._handle_empty_files(diff, revisions['base'],
                                             revisions['tip'],
                                             exclude_files=exclude_patterns)
@@ -395,7 +397,7 @@ class MercurialClient(SCMClient):
                 diff_cmd + ['-r', base_commit_id, '-r', revisions['base']],
                 env=self._hg_env)
 
-            if self._supports_empty_files():
+            if supports_empty_files:
                 parent_diff = self._handle_empty_files(
                     parent_diff,
                     base_commit_id,
@@ -681,7 +683,7 @@ class MercurialClient(SCMClient):
 
         return PatchResult(applied=(rc == 0), patch_output=data)
 
-    def _apply_patch_for_empty_files(self, patch, p_num):
+    def apply_patch_for_empty_files(self, patch, p_num):
         """Returns True if any empty files in the patch are applied.
 
         If there are no empty files in the patch or if an error occurs while
@@ -726,7 +728,7 @@ class MercurialClient(SCMClient):
 
         return patched_empty_files
 
-    def _supports_empty_files(self):
+    def supports_empty_files(self):
         """Checks if the RB server supports added/deleted empty files."""
         return (self.capabilities and
                 self.capabilities.has_capability('scmtools', 'mercurial',
