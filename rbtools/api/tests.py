@@ -808,3 +808,29 @@ class APICacheTests(TestCase):
             1)
         self.assertFalse(isinstance(first_resp, CachedHTTPResponse))
         self.assertTrue(isinstance(second_resp, CachedHTTPResponse))
+
+    def test_saving_non_ascii_data(self):
+        """Testing writing to the cache with non-ASCII data"""
+        # "Hello world" in Japanese as unicode characters.
+        hello_world = '\u3053\u3093\u306b\u3061\u306f\u4e16\u754c'
+
+        entry = CacheEntry(
+            url='http://unicode-example',
+            vary_headers={},
+            max_age=0,
+            etag='etag',
+            local_date=datetime.datetime.now(),
+            last_modified='Sat, 21 Mar 2015 05:33:22 GMT',
+            mime_type='text/plain',
+            item_mime_type=None,
+            response_body=hello_world.encode('utf-8'))
+
+        try:
+            self.cache._save_entry(entry)
+        except:
+            self.fail('Could not write binary data to the API cache.')
+
+        try:
+            self.cache._save_entry(entry)
+        except:
+            self.fail('Could not update binary data in the API cache.')
