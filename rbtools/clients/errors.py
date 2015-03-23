@@ -22,6 +22,11 @@ class InvalidRevisionSpecError(Exception):
     pass
 
 
+class MinimumVersionError(Exception):
+    """An error for when software doesn't meet version requirements."""
+    pass
+
+
 class TooManyRevisionsError(InvalidRevisionSpecError):
     """An error for when too many revisions were specified."""
     def __init__(self):

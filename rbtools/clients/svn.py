@@ -13,7 +13,8 @@ from six.moves.urllib.parse import unquote
 from rbtools.api.errors import APIError
 from rbtools.clients import PatchResult, RepositoryInfo, SCMClient
 from rbtools.clients.errors import (InvalidRevisionSpecError,
-                                    OptionsCheckError, TooManyRevisionsError)
+                                    MinimumVersionError, OptionsCheckError,
+                                    TooManyRevisionsError)
 from rbtools.utils.checks import (check_gnu_diff, check_install,
                                   is_valid_version)
 from rbtools.utils.diffs import (filename_match_any_patterns, filter_diff,
@@ -43,6 +44,7 @@ class SVNClient(SCMClient):
     REVISION_CHANGELIST_PREFIX = '--rbtools-changelist:'
 
     SHOW_COPIES_AS_ADDS_MIN_VERSION = (1, 7, 0)
+    PATCH_MIN_VERSION = (1, 7, 0)
 
     def __init__(self, **kwargs):
         super(SVNClient, self).__init__(**kwargs)
@@ -675,6 +677,12 @@ class SVNClient(SCMClient):
 
     def apply_patch(self, patch_file, base_path, base_dir, p=None):
         """Apply the patch and return a PatchResult indicating its success."""
+        if not is_valid_version(self.subversion_client_version,
+                                self.PATCH_MIN_VERSION):
+            raise MinimumVersionError(
+                'Using "rbt patch" with the SVN backend requires at least '
+                'svn 1.7.0')
+
         cmd = ['patch']
         p_num = p or self._get_p_number(base_path, base_dir)
 
