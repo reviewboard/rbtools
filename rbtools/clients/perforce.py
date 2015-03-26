@@ -167,8 +167,8 @@ class PerforceClient(SCMClient):
     name = 'Perforce'
 
     supports_diff_exclude_patterns = True
-
     supports_diff_extra_args = True
+    supports_patch_revert = True
 
     DATE_RE = re.compile(br'(\w+)\s+(\w+)\s+(\d+)\s+(\d\d:\d\d:\d\d)\s+'
                          br'(\d\d\d\d)')
@@ -176,6 +176,11 @@ class PerforceClient(SCMClient):
 
     REVISION_CURRENT_SYNC = '--rbtools-current-sync'
     REVISION_PENDING_CLN_PREFIX = '--rbtools-pending-cln:'
+
+    ADDED_FILES_RE = re.compile(r'^==== //depot/(\S+)#\d+ ==A== \S+ ====$',
+                                re.M)
+    DELETED_FILES_RE = re.compile(r'^==== //depot/(\S+)#\d+ ==D== \S+ ====$',
+                                  re.M)
 
     def __init__(self, p4_class=P4Wrapper, **kwargs):
         super(PerforceClient, self).__init__(**kwargs)
@@ -494,6 +499,7 @@ class PerforceClient(SCMClient):
             'integrate': 'M',
             'add': 'A',
             'branch': 'A',
+            'import': 'A',
             'delete': 'D',
         }
 
@@ -1113,7 +1119,8 @@ class PerforceClient(SCMClient):
 
         # Diff returns "1" if differences were found.
         dl = execute(diff_cmd, extra_ignore_errors=(1, 2),
-                     translate_newlines=False, results_unicode=False)
+                     log_output_on_error=False, translate_newlines=False,
+                     results_unicode=False)
 
         # If the input file has ^M characters at end of line, lets ignore them.
         dl = dl.replace(b'\r\r\n', b'\r\n')
@@ -1147,7 +1154,7 @@ class PerforceClient(SCMClient):
             dl = [b'Binary files %s and %s differ\n' % (old_file, new_file)]
 
         if dl == [] or dl[0].startswith(b'Binary files '):
-            is_empty_and_changed = (self._supports_empty_files() and
+            is_empty_and_changed = (self.supports_empty_files() and
                                     changetype_short in ('A', 'D'))
 
             if dl == [] and (is_move or is_empty_and_changed):
@@ -1252,17 +1259,20 @@ class PerforceClient(SCMClient):
             # XXX: This breaks on filenames with spaces.
             return where_output[-1]['data'].split(' ')[2].strip()
 
-    def _apply_patch_for_empty_files(self, patch, p_num):
+    def apply_patch_for_empty_files(self, patch, p_num, revert=False):
         """Returns True if any empty files in the patch are applied.
 
         If there are no empty files in the patch or if an error occurs while
         applying the patch, we return False.
         """
         patched_empty_files = False
-        added_files = re.findall(r'^==== //depot/(\S+)#\d+ ==A== \S+ ====$',
-                                 patch, re.M)
-        deleted_files = re.findall(r'^==== //depot/(\S+)#\d+ ==D== \S+ ====$',
-                                   patch, re.M)
+
+        if revert:
+            added_files = self.DELETED_FILES_RE.findall(patch)
+            deleted_files = self.ADDED_FILES_RE.findall(patch)
+        else:
+            added_files = self.ADDED_FILES_RE.findall(patch)
+            deleted_files = self.DELETED_FILES_RE.findall(patch)
 
         # Prepend the root of the Perforce client to each file name.
         p4_info = self.p4.info()

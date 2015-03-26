@@ -48,6 +48,14 @@ class Patch(Command):
                help='Prints the patch to standard output instead of applying '
                     'it to the tree.',
                added_in='0.5.3'),
+        Option('-R', '--revert',
+               dest='revert_patch',
+               action='store_true',
+               default=False,
+               help='Revert the given patch instead of applying it.\n'
+                    'This feature does not work with Bazaar or Mercurial '
+                    'repositories.',
+               added_in='0.7.3'),
         Command.server_options,
         Command.repository_options,
     ]
@@ -80,13 +88,17 @@ class Patch(Command):
         return diff_body, diff_revision, base_dir
 
     def apply_patch(self, repository_info, tool, request_id, diff_revision,
-                    diff_file_path, base_dir):
+                    diff_file_path, base_dir, revert=False):
         """Apply patch patch_file and display results to user."""
-        print('Patch is being applied from request %s with diff revision '
-              '%s.' % (request_id, diff_revision))
+        if revert:
+            print('Patch is being reverted from request %s with diff revision '
+                  '%s.' % (request_id, diff_revision))
+        else:
+            print('Patch is being applied from request %s with diff revision '
+                  '%s.' % (request_id, diff_revision))
 
         result = tool.apply_patch(diff_file_path, repository_info.base_path,
-                                  base_dir, self.options.px)
+                                  base_dir, self.options.px, revert=revert)
 
         if result.patch_output:
             print()
@@ -94,27 +106,43 @@ class Patch(Command):
             print()
 
         if not result.applied:
-            raise CommandError(
-                'Unable to apply the patch. The patch may be invalid, or '
-                'there may be conflicts that could not be resolvd.')
+            if revert:
+                raise CommandError(
+                    'Unable to revert the patch. The patch may be invalid, or '
+                    'there may be conflicts that could not be resolved.')
+            else:
+                raise CommandError(
+                    'Unable to apply the patch. The patch may be invalid, or '
+                    'there may be conflicts that could not be resolved.')
 
         if result.has_conflicts:
             if result.conflicting_files:
-                print('The patch was partially applied, but there were '
-                      'conflicts in:')
+                if revert:
+                    print('The patch was partially reverted, but there were '
+                          'conflicts in:')
+                else:
+                    print('The patch was partially applied, but there were '
+                          'conflicts in:')
+
                 print()
 
                 for filename in result.conflicting_files:
                     print('    %s' % filename)
 
                 print()
+            elif revert:
+                print('The patch was partially reverted, but there were '
+                      'conflicts.')
             else:
                 print('The patch was partially applied, but there were '
                       'conflicts.')
 
             return False
         else:
-            print('Successfully applied patch.')
+            if revert:
+                print('Successfully reverted patch.')
+            else:
+                print('Successfully applied patch.')
 
             return True
 
@@ -122,6 +150,11 @@ class Patch(Command):
         """Run the command."""
         repository_info, tool = self.initialize_scm_tool(
             client_name=self.options.repository_type)
+
+        if self.options.revert_patch and not tool.supports_patch_revert:
+            raise CommandError('The %s backend does not support reverting '
+                               'patches.' % tool.name)
+
         server_url = self.get_server_url(repository_info, tool)
         api_client, api_root = self.get_api(server_url)
         self.setup_tool(tool, api_root=api_root)
@@ -150,8 +183,10 @@ class Patch(Command):
                 pass
 
             tmp_patch_file = make_tempfile(diff_body)
+
             success = self.apply_patch(repository_info, tool, request_id,
-                                       diff_revision, tmp_patch_file, base_dir)
+                                       diff_revision, tmp_patch_file, base_dir,
+                                       revert=self.options.revert_patch)
 
             if success and (self.options.commit or
                             self.options.commit_no_edit):

@@ -27,6 +27,7 @@ class GitClient(SCMClient):
     name = 'Git'
 
     supports_diff_exclude_patterns = True
+    supports_patch_revert = True
     supports_post_with_history = True
 
     can_amend_commit = True
@@ -516,7 +517,8 @@ class GitClient(SCMClient):
                 split_lines=True,
                 with_errors=False,
                 ignore_errors=True,
-                none_on_ignored_error=True)
+                none_on_ignored_error=True,
+                log_output_on_error=False)
 
             # The output of git diff-tree will be a list of entries that have
             # changed between the two revisions that we give it. The last part
@@ -533,6 +535,7 @@ class GitClient(SCMClient):
                                 with_errors=False,
                                 ignore_errors=True,
                                 none_on_ignored_error=True,
+                                log_output_on_error=False,
                                 results_unicode=False)
 
                 if lines is None:
@@ -552,6 +555,7 @@ class GitClient(SCMClient):
                                  with_errors=False,
                                  ignore_errors=True,
                                  none_on_ignored_error=True,
+                                 log_output_on_error=False,
                                  results_unicode=False)
 
         if self.type == 'svn':
@@ -701,13 +705,17 @@ class GitClient(SCMClient):
 
         execute(['git', 'commit', '--amend', '-m', modified_message])
 
-    def apply_patch(self, patch_file, base_path=None, base_dir=None, p=None):
+    def apply_patch(self, patch_file, base_path=None, base_dir=None, p=None,
+                    revert=False):
         """Apply the given patch to index.
 
         This will take the given patch file and apply it to the index,
         scheduling all changes for commit.
         """
         cmd = ['git', 'apply', '-3']
+
+        if revert:
+            cmd.append('-R')
 
         if p:
             cmd += ['-p', p]

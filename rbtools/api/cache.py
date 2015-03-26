@@ -455,14 +455,14 @@ class APICache(object):
             with contextlib.closing(self.db.cursor()) as c:
                 try:
                     c.execute('''INSERT INTO api_cache (url,
-                                                       vary_headers,
-                                                       max_age,
-                                                       etag,
-                                                       local_date,
-                                                       last_modified,
-                                                       mime_type,
-                                                       item_mime_type,
-                                                       response_body)
+                                                        vary_headers,
+                                                        max_age,
+                                                        etag,
+                                                        local_date,
+                                                        last_modified,
+                                                        mime_type,
+                                                        item_mime_type,
+                                                        response_body)
                                  VALUES(?,?,?,?,?,?,?,?,?)''',
                               (entry.url, vary_headers, entry.max_age,
                                entry.etag, local_date, entry.last_modified,
@@ -480,8 +480,9 @@ class APICache(object):
                                  WHERE url=? AND vary_headers=?''',
                               (entry.max_age, entry.etag, local_date,
                                entry.last_modified, entry.mime_type,
-                               entry.item_mime_type, entry.response_body,
-                               entry.url, vary_headers))
+                               entry.item_mime_type,
+                               sqlite3.Binary(entry.response_body), entry.url,
+                               vary_headers))
 
             self._write_db()
         except sqlite3.Error as e:

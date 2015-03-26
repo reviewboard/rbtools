@@ -32,12 +32,13 @@ def execute(command,
             with_errors=True,
             none_on_ignored_error=False,
             return_error_code=False,
+            log_output_on_error=True,
             results_unicode=True):
     """Utility function to execute a command and return the output."""
     if isinstance(command, list):
-        logging.debug('Running: ' + subprocess.list2cmdline(command))
+        logging.debug(b'Running: ' + subprocess.list2cmdline(command))
     else:
-        logging.debug('Running: ' + command)
+        logging.debug(b'Running: ' + command)
 
     if env:
         env.update(os.environ)
@@ -89,8 +90,12 @@ def execute(command,
     if rc and not ignore_errors and rc not in extra_ignore_errors:
         die('Failed to execute command: %s\n%s' % (command, data))
     elif rc:
-        logging.debug('Command exited with rc %s: %s\n%s---'
-                      % (rc, command, data))
+        if log_output_on_error:
+            logging.debug('Command exited with rc %s: %s\n%s---'
+                          % (rc, command, data))
+        else:
+            logging.debug('Command exited with rc %s: %s'
+                          % (rc, command))
 
     if rc and none_on_ignored_error:
         data = None
