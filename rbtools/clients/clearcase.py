@@ -74,6 +74,8 @@ class ClearCaseClient(SCMClient):
     name = 'ClearCase'
     viewtype = None
 
+    supports_patch_revert = True
+
     REVISION_ACTIVITY_BASE = '--rbtools-activity-base'
     REVISION_ACTIVITY_PREFIX = 'activity:'
     REVISION_BRANCH_BASE = '--rbtools-branch-base'

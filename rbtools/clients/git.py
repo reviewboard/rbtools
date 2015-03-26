@@ -25,6 +25,7 @@ class GitClient(SCMClient):
     name = 'Git'
 
     supports_diff_exclude_patterns = True
+    supports_patch_revert = True
 
     can_amend_commit = True
     can_merge = True
@@ -701,13 +702,17 @@ class GitClient(SCMClient):
 
         execute(['git', 'commit', '--amend', '-m', modified_message])
 
-    def apply_patch(self, patch_file, base_path=None, base_dir=None, p=None):
+    def apply_patch(self, patch_file, base_path=None, base_dir=None, p=None,
+                    revert=False):
         """Apply the given patch to index.
 
         This will take the given patch file and apply it to the index,
         scheduling all changes for commit.
         """
         cmd = ['git', 'apply', '-3']
+
+        if revert:
+            cmd.append('-R')
 
         if p:
             cmd += ['-p', p]

@@ -38,6 +38,7 @@ class SCMClient(object):
 
     supports_diff_extra_args = False
     supports_diff_exclude_patterns = False
+    supports_patch_revert = False
 
     can_amend_commit = False
     can_merge = False
@@ -180,13 +181,17 @@ class SCMClient(object):
         """
         raise NotImplementedError
 
-    def apply_patch(self, patch_file, base_path, base_dir, p=None):
+    def apply_patch(self, patch_file, base_path, base_dir, p=None,
+                    revert=False):
         """Apply the patch and return a PatchResult indicating its success."""
         # Figure out the -p argument for patch. We override the calculated
         # value if it is supplied via a commandline option.
         p_num = p or self._get_p_number(base_path, base_dir)
 
         cmd = ['patch']
+
+        if revert:
+            cmd.append('-R')
 
         if p_num >= 0:
             cmd.append('-p%d' % p_num)
@@ -214,8 +219,8 @@ class SCMClient(object):
                 logging.error('Unable to read file %s: %s', patch_file, e)
                 return
 
-            patched_empty_files = self.apply_patch_for_empty_files(patch,
-                                                                   p_num)
+            patched_empty_files = self.apply_patch_for_empty_files(
+                patch, p_num, revert=revert)
 
             # If there are no empty files in a "garbage-only" patch, the patch
             # is probably malformed.
@@ -312,7 +317,7 @@ class SCMClient(object):
         """
         return False
 
-    def apply_patch_for_empty_files(self, patch, p_num):
+    def apply_patch_for_empty_files(self, patch, p_num, revert=False):
         """Return True if any empty files in the patch are applied.
 
         If there are no empty files in the patch or if an error occurs while

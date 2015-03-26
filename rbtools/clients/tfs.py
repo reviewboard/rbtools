@@ -23,6 +23,8 @@ class TFSClient(SCMClient):
     """
     name = 'TFS'
 
+    supports_patch_revert = True
+
     REVISION_WORKING_COPY = '--rbtools-working-copy'
 
     def __init__(self, config=None, options=None):
