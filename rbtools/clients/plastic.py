@@ -17,6 +17,8 @@ class PlasticClient(SCMClient):
     """
     name = 'Plastic'
 
+    supports_patch_revert = True
+
     REVISION_CHANGESET_PREFIX = 'cs:'
 
     def __init__(self, **kwargs):

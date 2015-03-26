@@ -19,6 +19,7 @@ class CVSClient(SCMClient):
     name = 'CVS'
 
     supports_diff_exclude_patterns = True
+    supports_patch_revert = True
 
     INDEX_FILE_RE = re.compile(b'^Index: (.+)\n$')
 

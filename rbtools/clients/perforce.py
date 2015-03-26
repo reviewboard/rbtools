@@ -167,8 +167,8 @@ class PerforceClient(SCMClient):
     name = 'Perforce'
 
     supports_diff_exclude_patterns = True
-
     supports_diff_extra_args = True
+    supports_patch_revert = True
 
     DATE_RE = re.compile(br'(\w+)\s+(\w+)\s+(\d+)\s+(\d\d:\d\d:\d\d)\s+'
                          br'(\d\d\d\d)')
@@ -176,6 +176,11 @@ class PerforceClient(SCMClient):
 
     REVISION_CURRENT_SYNC = '--rbtools-current-sync'
     REVISION_PENDING_CLN_PREFIX = '--rbtools-pending-cln:'
+
+    ADDED_FILES_RE = re.compile(r'^==== //depot/(\S+)#\d+ ==A== \S+ ====$',
+                                re.M)
+    DELETED_FILES_RE = re.compile(r'^==== //depot/(\S+)#\d+ ==D== \S+ ====$',
+                                  re.M)
 
     def __init__(self, p4_class=P4Wrapper, **kwargs):
         super(PerforceClient, self).__init__(**kwargs)
@@ -1254,17 +1259,20 @@ class PerforceClient(SCMClient):
             # XXX: This breaks on filenames with spaces.
             return where_output[-1]['data'].split(' ')[2].strip()
 
-    def apply_patch_for_empty_files(self, patch, p_num):
+    def apply_patch_for_empty_files(self, patch, p_num, revert=False):
         """Returns True if any empty files in the patch are applied.
 
         If there are no empty files in the patch or if an error occurs while
         applying the patch, we return False.
         """
         patched_empty_files = False
-        added_files = re.findall(r'^==== //depot/(\S+)#\d+ ==A== \S+ ====$',
-                                 patch, re.M)
-        deleted_files = re.findall(r'^==== //depot/(\S+)#\d+ ==D== \S+ ====$',
-                                   patch, re.M)
+
+        if revert:
+            added_files = self.DELETED_FILES_RE.findall(patch)
+            deleted_files = self.ADDED_FILES_RE.findall(patch)
+        else:
+            added_files = self.ADDED_FILES_RE.findall(patch)
+            deleted_files = self.DELETED_FILES_RE.findall(patch)
 
         # Prepend the root of the Perforce client to each file name.
         p4_info = self.p4.info()
@@ -1300,7 +1308,7 @@ class PerforceClient(SCMClient):
                 self.capabilities.has_capability('scmtools', 'perforce',
                                                  'moved_files'))
 
-    def supports_empty_files(self):
+    def _supports_empty_files(self):
         """Checks if the RB server supports added/deleted empty files."""
         return (self.capabilities and
                 self.capabilities.has_capability('scmtools', 'perforce',

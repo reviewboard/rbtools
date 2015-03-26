@@ -666,7 +666,8 @@ class MercurialClient(SCMClient):
                           '--removed', '--deleted'])
         return status != ''
 
-    def apply_patch(self, patch_file, base_path=None, base_dir=None, p=None):
+    def apply_patch(self, patch_file, base_path=None, base_dir=None, p=None,
+                    revert=False):
         """Import the given patch.
 
         This will take the given patch file and apply it to the working
@@ -683,7 +684,7 @@ class MercurialClient(SCMClient):
 
         return PatchResult(applied=(rc == 0), patch_output=data)
 
-    def apply_patch_for_empty_files(self, patch, p_num):
+    def apply_patch_for_empty_files(self, patch, p_num, revert=False):
         """Returns True if any empty files in the patch are applied.
 
         If there are no empty files in the patch or if an error occurs while
