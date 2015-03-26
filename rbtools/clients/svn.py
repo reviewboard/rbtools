@@ -19,7 +19,8 @@ from rbtools.utils.checks import (check_gnu_diff, check_install,
                                   is_valid_version)
 from rbtools.utils.diffs import (filename_match_any_patterns, filter_diff,
                                  normalize_patterns)
-from rbtools.utils.filesystem import make_empty_files, walk_parents
+from rbtools.utils.filesystem import (make_empty_files, make_tempfile,
+                                      walk_parents)
 from rbtools.utils.process import execute
 
 
@@ -670,10 +671,60 @@ class SVNClient(SCMClient):
         This determines the number of path components to remove from file paths
         in the diff to be applied.
         """
-        if base_path and base_dir.startswith(base_path):
-            return base_path.count('/')
+        if base_path == '/':
+            # We always need to strip off the leading forward slash.
+            return 1
         else:
-            return None
+            # We strip all leading directories from base_path. The last
+            # directory will not be suffixed with a slash.
+            return base_path.count('/') + 1
+
+    def _exclude_files_not_in_tree(self, patch_file, base_path):
+        """Process a diff and remove entries not in the current directory.
+
+        The file at the location patch_file will be overwritten by the new
+        patch.
+
+        This function returns a tuple of two booleans. The first boolean
+        indicates if any files have been excluded. The second boolean indicates
+        if the resulting diff patch file is empty.
+        """
+        excluded_files = False
+        empty_patch = True
+
+        # If our base path does not have a trailing slash (which it won't
+        # unless we are at a checkout root), we append a slash so that we can
+        # determine if files are under the base_path. We do this so that files
+        # like /trunkish (which begins with /trunk) do not mistakenly get
+        # placed in /trunk if that is the base_path.
+        if not base_path.endswith('/'):
+            base_path += '/'
+
+        filtered_patch_name = make_tempfile()
+
+        with open(filtered_patch_name, 'w') as filtered_patch:
+            with open(patch_file, 'r') as original_patch:
+                include_file = True
+
+                for line in original_patch.readlines():
+                    m = self.INDEX_FILE_RE.match(line)
+
+                    if m:
+                        filename = m.group(1).decode('utf-8')
+
+                        include_file = filename.startswith(base_path)
+
+                        if not include_file:
+                            excluded_files = True
+                        else:
+                            empty_patch = False
+
+                    if include_file:
+                        filtered_patch.write(line)
+
+        os.rename(filtered_patch_name, patch_file)
+
+        return (excluded_files, empty_patch)
 
     def apply_patch(self, patch_file, base_path, base_dir, p=None):
         """Apply the patch and return a PatchResult indicating its success."""
@@ -683,11 +734,29 @@ class SVNClient(SCMClient):
                 'Using "rbt patch" with the SVN backend requires at least '
                 'svn 1.7.0')
 
+        if base_dir and not base_dir.startswith(base_path):
+            # The patch was created in either a higher level directory or a
+            # directory not under this one. We should exclude files from the
+            # patch that are not under this directory.
+            excluded, empty = self._exclude_files_not_in_tree(patch_file,
+                                                              base_path)
+
+            if excluded:
+                logging.warn('This patch was generated in a different '
+                             'directory. To prevent conflicts, all files '
+                             'not under the current directory have been '
+                             'excluded. To apply all files in this '
+                             'patch, apply this patch from the %s directory.'
+                             % base_dir)
+
+                if empty:
+                    logging.warn('All files were excluded from the patch.')
+
         cmd = ['patch']
         p_num = p or self._get_p_number(base_path, base_dir)
 
         if p_num >= 0:
-            cmd.append('--strip=%d' % p_num)
+            cmd.append('--strip=%s' % p_num)
 
         cmd.append(six.text_type(patch_file))
 
