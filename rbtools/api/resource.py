@@ -542,6 +542,18 @@ class DiffUploaderMixin(object):
 
         return request
 
+
+class BasePatchResource(ItemResource):
+    """A resource that can be retrieved as a patch file."""
+
+    @request_method_decorator
+    def get_patch(self, **kwargs):
+        """Retrieves the actual diff file contents."""
+        request = HttpRequest(self._url, query_args=kwargs)
+        request.headers['Accept'] = 'text/x-patch'
+        return request
+
+
 @resource_mimetype('application/vnd.reviewboard.org.diffs')
 class DiffListResource(DiffUploaderMixin, ListResource):
     """The Diff List resource specific base class.
@@ -567,18 +579,12 @@ class DiffListResource(DiffUploaderMixin, ListResource):
 
 
 @resource_mimetype('application/vnd.reviewboard.org.diff')
-class DiffResource(ItemResource):
+class DiffResource(BasePatchResource):
     """The Diff resource specific base class.
 
     Provides the 'get_patch' method for retrieving the content of the
     actual diff file itself.
     """
-    @request_method_decorator
-    def get_patch(self, **kwargs):
-        """Retrieves the actual diff file contents."""
-        request = HttpRequest(self._url, query_args=kwargs)
-        request.headers['Accept'] = 'text/x-patch'
-        return request
 
 
 class DiffCommitUploaderMixin(object):
@@ -667,20 +673,13 @@ class DiffCommitListResource(DiffCommitUploaderMixin, ListResource):
 
 
 @resource_mimetype('application/vnd.reviewboard.org.diff-commit')
-class DiffCommitResource(ItemResource):
+class DiffCommitResource(BasePatchResource):
     """The DiffCommit resource specific base class."""
-    pass
 
 
 @resource_mimetype('application/vnd.reviewboard.org.file')
-class FileDiffResource(ItemResource):
+class FileDiffResource(BasePatchResource):
     """The File Diff resource specific base class."""
-    @request_method_decorator
-    def get_patch(self, **kwargs):
-        """Retrieves the actual diff file contents."""
-        request = HttpRequest(self._url, query_args=kwargs)
-        request.headers['Accept'] = 'text/x-patch'
-        return request
 
     @request_method_decorator
     def get_diff_data(self, **kwargs):
