@@ -36,10 +36,10 @@ class SCMClient(object):
     """
     name = None
 
+    supports_history = False
     supports_diff_extra_args = False
     supports_diff_exclude_patterns = False
     supports_patch_revert = False
-    supports_post_with_history = False
 
     can_amend_commit = False
     can_merge = False

@@ -441,6 +441,47 @@ class Command(object):
         ]
     )
 
+    history_options = OptionGroup(
+        name='History Options',
+        description='Options specific to review requests with commit history.',
+        option_list=[
+            Option('-S', '--squash-history',
+                   dest='squash_history',
+                   action='store_true',
+                   config_key='SQUASH_HISTORY',
+                   default=False,
+                   help='Force the review request to be created without '
+                        'history, even if the server supports review '
+                        'requests with history.'),
+            Option('-H', '--with-history',
+                   dest='with_history',
+                   action='store_true',
+                   default=False,
+                   help='Force the review request to be created with '
+                        'history if the server supports review request '
+                        'with history. This overrides the SQUASH_HISTORY'
+                        '.reviewboardrc option and the -S commandline '
+                        'option.'),
+        ]
+    )
+
+    def should_use_history(self, tool, server_url):
+        """Return if the action should use history or not.
+
+        This function queries the Review Board server to determine if it
+        supports diffs with commit histories.
+        """
+        if tool.supports_history:
+            if tool.capabilities.has_capability('diffs', 'commit_history'):
+                return (not self.options.squash_history or
+                        self.options.with_history)
+            elif self.options.with_history:
+                logging.warning('The Review Board server at %s does not '
+                                'support multi-commit review requests.'
+                                % server_url)
+
+        return False
+
     def __init__(self):
         self.log = logging.getLogger('rb.%s' % self.name)
 

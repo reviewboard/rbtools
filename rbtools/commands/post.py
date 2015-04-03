@@ -93,25 +93,9 @@ class Post(Command):
                        help='Uploads a new diff, but does not update '
                             'fields from the change description '
                             '(Perforce/Plastic only).'),
-                Option('-S', '--squash-history',
-                       dest='squash_history',
-                       action='store_true',
-                       config_key='SQUASH_HISTORY',
-                       default=False,
-                       help='Force the review request to be created without '
-                            'history, even if the server supports review '
-                            'requests with history.'),
-                Option('-H', '--with-history',
-                       dest='with_history',
-                       action='store_true',
-                       default=False,
-                       help='Force the review request to be created with '
-                            'history if the server supports review request '
-                            'with history. This overrides the SQUASH_HISTORY'
-                            '.reviewboardrc option and the -S commandline '
-                            'option.'),
             ]
         ),
+        Command.history_options,
         Command.server_options,
         Command.repository_options,
         OptionGroup(
@@ -697,28 +681,15 @@ class Post(Command):
                 '-X/--exclude commandline options or the EXCLUDE_PATTERNS '
                 '.reviewboardrc option.' % self.tool.name)
 
-        if self.options.with_history:
-            if not self.tool.supports_post_with_history:
-                raise CommandError(
-                    'The %s backend does not support creating multi-commit '
-                    'review requests with the -H/--with-history commandline '
-                    'option.'
-                    % self.tool.name)
+        if (self.options.with_history and
+            not self.tool.supports_history):
+            raise CommandError(
+                'The %s backend does not support creating multi-commit review '
+                'requests with the -H/--with-history commandline option.'
+                % self.tool.name)
 
-        with_history = False
+        with_history = self.should_use_history(self.tool, server_url)
         history = None
-
-        if self.tool.supports_post_with_history:
-            if self.tool.capabilities.has_capability('diffs',
-                                                     'commit_history'):
-                with_history = (not self.options.squash_history or
-                                self.options.with_history)
-            elif self.options.with_history:
-                logging.warning('The reviewboard server at %s does not '
-                                'support creating review requests with commit '
-                                'histories. Your review request will be '
-                                'created with a squashed diff.'
-                                % server_url)
 
         # Check if repository info on reviewboard server match local ones.
         repository_info = repository_info.find_server_repository_info(api_root)

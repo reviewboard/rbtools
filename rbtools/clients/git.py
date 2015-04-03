@@ -26,9 +26,9 @@ class GitClient(SCMClient):
     """
     name = 'Git'
 
+    supports_history = True
     supports_diff_exclude_patterns = True
     supports_patch_revert = True
-    supports_post_with_history = True
 
     can_amend_commit = True
     can_merge = True
