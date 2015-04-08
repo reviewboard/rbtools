@@ -282,8 +282,6 @@ class TFSClient(SCMClient):
                             'server_file': server_file,
                             'filetype': filetype,
                         }
-            import pprint
-            pprint.pprint(changesets)
         except Exception as e:
             logging.debug('Failed to parse output from "tf history": %s',
                           e, exc_info=True)
@@ -341,17 +339,3 @@ class TFSRepositoryInfo(RepositoryInfo):
             path, base_path, supports_changesets, supports_parent_diffs)
 
         self.mappings = mappings
-
-    def find_server_repository_info(self, server):
-        """Try to find the repository from the server's repository list."""
-        repositories = []
-        page_repositories = server.get_repositories()
-        try:
-            while True:
-                for repository in page_repositories:
-                    repositories.append(repository)
-                page_repositories = page_repositories.get_next()
-        except StopIteration:
-            pass
-
-        return self

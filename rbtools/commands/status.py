@@ -65,14 +65,8 @@ class Status(Command):
 
         requests = api_root.get_review_requests(**query_args)
 
-        try:
-            while True:
-                for request in requests:
-                    if request.draft:
-                        self.output_draft(request, request.draft[0])
-                    else:
-                        self.output_request(request)
-
-                requests = requests.get_next(**query_args)
-        except StopIteration:
-            pass
+        for request in requests.all_items:
+            if request.draft:
+                self.output_draft(request, request.draft[0])
+            else:
+                self.output_request(request)
