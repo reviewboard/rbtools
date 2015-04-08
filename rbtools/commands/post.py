@@ -326,16 +326,10 @@ class Post(Command):
             repositories = api_root.get_repositories(only_fields='path',
                                                      only_links='')
 
-            try:
-                while True:
-                    for repo in repositories:
-                        if repo['path'] in repository_info.path:
-                            repository_info.path = repo['path']
-                            raise StopIteration()
-
-                    repositories = repositories.get_next()
-            except StopIteration:
-                pass
+            for repo in repositories.all_items:
+                if repo['path'] in repository_info.path:
+                    repository_info.path = repo['path']
+                    break
 
         if isinstance(repository_info.path, list):
             error_str = [

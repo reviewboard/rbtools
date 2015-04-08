@@ -44,36 +44,31 @@ class SetupRepo(Command):
         The user is prompted to choose a matching repository found on the
         Review Board server.
         """
-        repositories = api_root.get_repositories()
-
         # Go through each matching repo and prompt for a selection. If a
         # selection is made, immediately return the selected repo.
-        try:
-            while True:
-                repo_paths = {}
-                for repository in repositories:
-                    if repository.tool != tool_name:
-                        continue
+        for repository_page in api_root.get_repositories().all_pages:
+            repo_paths = {}
 
-                    repo_paths[repository['path']] = repository
-                    if 'mirror_path' in repository:
-                        repo_paths[repository['mirror_path']] = repository
+            for repository in repository_page:
+                if repository.tool != tool_name:
+                    continue
 
-                closest_path = difflib.get_close_matches(
-                    repository_info.path, six.iterkeys(repo_paths), n=1)
+                repo_paths[repository['path']] = repository
 
-                for path in closest_path:
-                    repo = repo_paths[path]
-                    question = (
-                        'Use the %s repository "%s" (%s)?'
-                        % (tool_name, repo['name'], repo['path']))
+                if 'mirror_path' in repository:
+                    repo_paths[repository['mirror_path']] = repository
 
-                    if confirm(question):
-                        return repo
+            closest_path = difflib.get_close_matches(repository_info.path,
+                                                     six.iterkeys(repo_paths),
+                                                     n=1)
 
-                repositories = repositories.get_next()
-        except StopIteration:
-            pass
+            for path in closest_path:
+                repo = repo_paths[path]
+                question = ('Use the %s repository "%s" (%s)?'
+                            % (tool_name, repo['name'], repo['path']))
+
+                if confirm(question):
+                    return repo
 
         return None
 

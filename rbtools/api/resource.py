@@ -445,6 +445,26 @@ class ListResource(Resource):
         return HttpRequest(urljoin(self._url, '%s/' % pk),
                            query_args=kwargs)
 
+    @property
+    def all_pages(self):
+        """Yield all pages of item resources.
+
+        Each page of resources is itself an instance of the same
+        ``ListResource`` class.
+        """
+        page = self
+
+        while True:
+            yield page
+            page = page.get_next()
+
+    @property
+    def all_items(self):
+        """Yield all item resources in all pages of this resource."""
+        for page in self.all_pages:
+            for item in page:
+                yield item
+
     def __repr__(self):
         return ('%s(transport=%r, payload=%r, url=%r, token=%r, '
                 'item_mime_type=%r)' % (self.__class__.__name__,

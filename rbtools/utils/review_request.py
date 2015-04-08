@@ -32,23 +32,14 @@ def get_possible_matches(review_requests, summary, description, limit=5):
     candidates = []
 
     # Get all potential matches.
-    try:
-        while True:
-            for review_request in review_requests:
-                summary_pair = (
-                    get_draft_or_current_value(
-                        'summary', review_request),
-                    summary)
-                description_pair = (
-                    get_draft_or_current_value(
-                        'description', review_request),
-                    description)
-                score = Score.get_match(summary_pair, description_pair)
-                candidates.append((score, review_request))
-
-            review_requests = review_requests.get_next()
-    except StopIteration:
-        pass
+    for review_request in review_requests.all_items:
+        summary_pair = (get_draft_or_current_value('summary', review_request),
+                        summary)
+        description_pair = (get_draft_or_current_value('description',
+                                                       review_request),
+                            description)
+        score = Score.get_match(summary_pair, description_pair)
+        candidates.append((score, review_request))
 
     # Sort by summary and description on descending rank.
     sorted_candidates = sorted(
