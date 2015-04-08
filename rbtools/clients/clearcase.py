@@ -920,10 +920,6 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
         uuid = self._get_vobs_uuid(self.vobstag)
         logging.debug("Repository's %s uuid is %r" % (self.vobstag, uuid))
 
-        # Limit returned repositories to ClearCase. This prevents extra network
-        # calls for repos we don't care about
-        repositories = server.get_repositories(tool='ClearCase')
-
         # To reduce HTTP requests (_get_repository_info call), we build an
         # ordered list of ClearCase repositories starting with the ones that
         # have a matching vobstag.
@@ -931,19 +927,17 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
 
         # Reduce list of repositories to only ClearCase ones and sort them by
         # repo name matching vobstag first.
-        try:
-            while True:
-                for repository in repositories:
-                    # Add repos where the vobstag matches at the beginning and
-                    # others at the end.
-                    if repository['name'] == self.vobstag:
-                        repository_scan_order.appendleft(repository)
-                    else:
-                        repository_scan_order.append(repository)
+        for repository in server.get_repositories(tool='ClearCase').all_items:
+            # Ignore non-ClearCase repositories.
+            if repository['tool'] != 'ClearCase':
+                continue
 
-                repositories = repositories.get_next()
-        except StopIteration:
-            pass
+            # Add repos where the vobstag matches at the beginning and others
+            # at the end.
+            if repository['name'] == self.vobstag:
+                repository_scan_order.appendleft(repository)
+            else:
+                repository_scan_order.append(repository)
 
         # Now try to find a matching uuid
         for repository in repository_scan_order:

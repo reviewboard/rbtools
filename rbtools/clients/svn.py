@@ -939,19 +939,7 @@ class SVNRepositoryInfo(RepositoryInfo):
         repositories use the same path, you'll get back self, otherwise you'll
         get a different SVNRepositoryInfo object (with a different path).
         """
-        # Reduce list of repositories to only SVN ones.
-        repositories = []
-
-        # Limit returned repositories to Subversion. This prevents extra
-        # network calls for repos we don't care about
-        page_repositories = server.get_repositories(tool='Subversion')
-
-        try:
-            while True:
-                repositories.extend([repo for repo in page_repositories])
-                page_repositories = page_repositories.get_next()
-        except StopIteration:
-            pass
+        repositories = server.get_repositories(tool='Subversion').all_items
 
         # Do two paths. The first will be to try to find a matching entry
         # by path/mirror path. If we don't find anything, then the second will
