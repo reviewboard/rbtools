@@ -758,7 +758,7 @@ class GitClient(SCMClient):
             execute(['git', 'add'] + files)
 
         execute(['git', 'commit', '-m', modified_message,
-                 '--author="%s <%s>"' % (author.fullname, author.email)])
+                 '--author=%s' % author])
 
     def delete_branch(self, branch_name, merged_only=True):
         """Deletes the specified branch.

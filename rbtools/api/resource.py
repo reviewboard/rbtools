@@ -696,6 +696,20 @@ class DiffCommitListResource(DiffCommitUploaderMixin, ListResource):
 class DiffCommitResource(BasePatchResource):
     """The DiffCommit resource specific base class."""
 
+    @property
+    def author_name_and_email(self):
+        """Return the author name and email for the commit."""
+        return '%s <%s>' % (self.author_name, self.author_email)
+
+    def get_commit_message(self, review_request):
+        """Return a commit message based on the commit and its review request.
+
+        The returned commit message contains the commit's description and the
+        URL where the review request was reviewed.
+        """
+        return '%s\n\nReviewed at: %s' % (self.description,
+                                          review_request.absolute_url)
+
 
 @resource_mimetype('application/vnd.reviewboard.org.file')
 class FileDiffResource(BasePatchResource):
@@ -763,6 +777,11 @@ class DraftScreenshotListResource(ScreenshotListResource):
 @resource_mimetype('application/vnd.reviewboard.org.review-request')
 class ReviewRequestResource(ItemResource):
     """The Review Request resource specific base class."""
+
+    @property
+    def submitter_name_and_email(self):
+        submitter = self.get_submitter()
+        return '%s <%s>' % (submitter.fullname, submitter.email)
 
     @property
     def absolute_url(self):

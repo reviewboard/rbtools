@@ -58,10 +58,23 @@ class Patch(Command):
                added_in='0.7.3'),
         Command.server_options,
         Command.repository_options,
+        Command.history_options,
     ]
 
-    def get_patch(self, request_id, api_root, diff_revision=None):
-        """Return the diff as a string, the used diff revision and its basedir.
+    def get_patches(self, request_id, api_root, diff_revision=None,
+                    with_history=False):
+        """Return the set of patches for the corresponding review request.
+
+        This function returns a tuple of the following:
+
+         * a list of the history entry (diff, metadata) tuples;
+         * the diff revision that was retrieved; and
+         * the base directory of the diff.
+
+        In the case of a review request with commit history, the metadata
+        portion of each history entry is the ``DiffCommitResource`` instance.
+        However, if the review request is a squashed review request or the
+        ``with_history`` parameter is False, the metadata will be None.
 
         If a diff revision is not specified, then this will look at the most
         recent diff.
@@ -69,33 +82,61 @@ class Patch(Command):
         try:
             diffs = api_root.get_diffs(review_request_id=request_id)
         except APIError as e:
-            raise CommandError('Error getting diffs: %s' % e)
+            raise CommandError('Error retrieving diffs: %s' % e)
 
-        # Use the latest diff if a diff revision was not given.
-        # Since diff revisions start a 1, increment by one, and
-        # never skip a number, the latest diff revisions number
-        # should be equal to the number of diffs.
         if diff_revision is None:
             diff_revision = diffs.total_results
 
         try:
             diff = diffs.get_item(diff_revision)
-            diff_body = diff.get_patch().data
-            base_dir = getattr(diff, 'basedir', None) or ''
         except APIError:
             raise CommandError('The specified diff revision does not exist.')
 
-        return diff_body, diff_revision, base_dir
+        patches = None
+        base_dir = getattr(diff, 'basedir', '')
+
+        if with_history:
+            try:
+                commits = diff.get_diff_commits()
+            except APIError as e:
+                raise CommandError('Error retrieving commits: %s' % e)
+
+            if commits.total_results == 0:
+                # Even though we've determined we should fetch the history, it
+                # may be the case that the diff revision we've fetched is
+                # squashed.
+                with_history = False
+            else:
+                try:
+                    patches = [
+                        (commit.get_patch().data, commit)
+                        for commit in commits.all_items
+                    ]
+                except APIError as e:
+                    raise CommandError('Error retrieving commits: %s' % e)
+
+        if not with_history:
+            try:
+                patches = [(diff.get_patch().data, None)]
+            except APIError as e:
+                raise CommandError('Error retrieving patch: %s' % e)
+
+        return patches, diff_revision, base_dir
 
     def apply_patch(self, repository_info, tool, request_id, diff_revision,
-                    diff_file_path, base_dir, revert=False):
+                    diff_file_path, base_dir, commit_id=None, revert=False):
         """Apply patch patch_file and display results to user."""
+        if commit_id:
+            commit_id = ' (commit %s)' % commit_id
+
+        commit_id = commit_id or ''
+
         if revert:
             print('Patch is being reverted from request %s with diff revision '
-                  '%s.' % (request_id, diff_revision))
+                  '%s%s.' % (request_id, diff_revision, commit_id))
         else:
             print('Patch is being applied from request %s with diff revision '
-                  '%s.' % (request_id, diff_revision))
+                  '%s%s.' % (request_id, diff_revision, commit_id))
 
         result = tool.apply_patch(diff_file_path, repository_info.base_path,
                                   base_dir, self.options.px, revert=revert)
@@ -140,9 +181,9 @@ class Patch(Command):
             return False
         else:
             if revert:
-                print('Successfully reverted patch.')
+                print('Successfully reverted patch%s.' % commit_id)
             else:
-                print('Successfully applied patch.')
+                print('Successfully applied patch%s.' % commit_id)
 
             return True
 
@@ -155,6 +196,15 @@ class Patch(Command):
             raise CommandError('The %s backend does not support reverting '
                                'patches.' % tool.name)
 
+        if self.options.with_history and not tool.supports_history:
+            raise CommandError('The %s backend does not support applying '
+                               'patches with history.' % tool.name)
+
+        if self.options.with_history and self.options.patch_revert:
+            raise CommandError('The -R option cannot be used when using '
+                               'commit histories. You can reverse this patch '
+                               'by providing the -S option.')
+
         server_url = self.get_server_url(repository_info, tool)
         api_client, api_root = self.get_api(server_url)
         self.setup_tool(tool, api_root=api_root)
@@ -162,14 +212,25 @@ class Patch(Command):
         # Check if repository info on reviewboard server match local ones.
         repository_info = repository_info.find_server_repository_info(api_root)
 
-        # Get the patch, the used patch ID and base dir for the diff
-        diff_body, diff_revision, base_dir = self.get_patch(
+        should_commit = self.options.commit or self.options.commit_no_edit
+
+        # When we are not committing our changes, we do can treat this is the
+        # no history case. The end result will be the same if we apply all the
+        # diffs in order, but this saves us a round trip from checking if the
+        # server supports history and from fetching individual commits vs the
+        # condensed diff.
+        with_history = (should_commit and
+                        self.should_use_history(tool, server_url))
+
+        patches, diff_revision, base_dir = self.get_patches(
             request_id,
             api_root,
-            self.options.diff_revision)
+            self.options.diff_revision,
+            with_history)
 
         if self.options.patch_stdout:
-            print(diff_body)
+            for patch, _ in patches:
+                print(patch)
         else:
             try:
                 if tool.has_pending_changes():
@@ -182,29 +243,60 @@ class Patch(Command):
             except NotImplementedError:
                 pass
 
-            tmp_patch_file = make_tempfile(diff_body)
+            review_request = None
 
-            success = self.apply_patch(repository_info, tool, request_id,
-                                       diff_revision, tmp_patch_file, base_dir,
-                                       revert=self.options.revert_patch)
-
-            if success and (self.options.commit or
-                            self.options.commit_no_edit):
+            if should_commit:
                 try:
                     review_request = api_root.get_review_request(
                         review_request_id=request_id,
                         force_text_type='plain')
                 except APIError as e:
-                    raise CommandError('Error getting review request %s: %s'
+                    raise CommandError('Error retrieving review request %s: %s'
                                        % (request_id, e))
 
-                message = extract_commit_message(review_request)
-                author = review_request.get_submitter()
+            for diff_body, metadata in patches:
+                tmp_patch_file = make_tempfile(diff_body)
 
-                try:
-                    tool.create_commit(message, author,
-                                       not self.options.commit_no_edit)
-                    print('Changes committed to current branch.')
-                except NotImplementedError:
-                    raise CommandError('--commit is not supported with %s'
-                                       % tool.name)
+                commit_id = None
+
+                if metadata:
+                    commit_id = metadata.commit_id
+
+                success = self.apply_patch(repository_info, tool, request_id,
+                                           diff_revision, tmp_patch_file,
+                                           base_dir,
+                                           revert=self.options.revert_patch,
+                                           commit_id=commit_id)
+
+                if not success:
+                    raise CommandError('Could not apply all patches.')
+
+                if should_commit:
+                    if metadata:
+                        author = metadata.author_name_and_email
+                        message = metadata.get_commit_message(review_request)
+                    else:
+                        # We will only have to fetch this once because it is
+                        # part of a squashed review request.
+                        assert len(patches) == 1
+
+                        try:
+                            author = review_request.submitter_name_and_email
+                        except APIError as e:
+                            raise CommandError('Error retrieving review '
+                                               'request %s submitter: %s'
+                                               % (request_id, e))
+
+                        message = extract_commit_message(review_request)
+
+                    try:
+                        tool.create_commit(message, author,
+                                           not self.options.commit_no_edit)
+                    except NotImplementedError:
+                        raise CommandError('The --commit and --commit-no-edit '
+                                           'options are not supported by the '
+                                           '%s backend.'
+                                           % tool.name)
+
+            if should_commit:
+                print('Changes committed to current branch.')

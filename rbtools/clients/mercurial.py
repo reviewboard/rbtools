@@ -522,8 +522,7 @@ class MercurialClient(SCMClient):
         else:
             modified_message = message
 
-        hg_command = ['hg', 'commit', '-m', modified_message,
-                      '-u %s <%s>' % (author.fullname, author.email)]
+        hg_command = ['hg', 'commit', '-m', modified_message, '-u', author]
 
         execute(hg_command + files)
 

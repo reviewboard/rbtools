@@ -218,7 +218,7 @@ class Land(Command):
 
         if is_local:
             review_commit_message = extract_commit_message(review_request)
-            author = review_request.get_submitter()
+            author = review_request.submitter_name_and_email
 
             if self.options.squash:
                 print('Squashing branch "%s" into "%s"'
