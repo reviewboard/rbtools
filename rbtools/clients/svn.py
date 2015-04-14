@@ -48,6 +48,7 @@ class SVNClient(SCMClient):
     REVISION_WORKING_COPY = '--rbtools-working-copy'
     REVISION_CHANGELIST_PREFIX = '--rbtools-changelist:'
 
+    VERSION_NUMBER_RE = re.compile(br'(\d+)\.(\d+)\.(\d+)')
     SHOW_COPIES_AS_ADDS_MIN_VERSION = (1, 7, 0)
     PATCH_MIN_VERSION = (1, 7, 0)
 
@@ -89,6 +90,8 @@ class SVNClient(SCMClient):
         if not m:
             return None
 
+        uuid = m.group(1)
+
         # Now that we know it's SVN, make sure we have GNU diff installed,
         # and error out if we don't.
         check_gnu_diff()
@@ -96,9 +99,17 @@ class SVNClient(SCMClient):
         # Grab version of SVN client and store as a tuple in the form:
         #   (major_version, minor_version, micro_version)
         ver_string = self._run_svn(['--version', '-q'], ignore_errors=True)
-        self.subversion_client_version = tuple(map(int, ver_string.split('.')))
+        m = self.VERSION_NUMBER_RE.match(ver_string)
 
-        return SVNRepositoryInfo(path, base_path, m.group(1))
+        if not m:
+            logging.warn('Unable to parse SVN client version triple from '
+                         '"%s". Assuming version 0.0.0.'
+                         % ver_string.strip())
+            self.subversion_client_version = (0, 0, 0)
+        else:
+            self.subversion_client_version = tuple(map(int, m.groups()))
+
+        return SVNRepositoryInfo(path, base_path, uuid)
 
     def parse_revision_spec(self, revisions=[]):
         """Parses the given revision spec.

@@ -382,7 +382,7 @@ class MercurialClient(SCMClient):
 
         diff = self._execute(
             diff_cmd + ['-r', revisions['base'], '-r', revisions['tip']],
-            env=self._hg_env, log_output_on_error=False)
+            env=self._hg_env, log_output_on_error=False, results_unicode=False)
 
         supports_empty_files = self.supports_empty_files()
 
@@ -395,7 +395,7 @@ class MercurialClient(SCMClient):
             base_commit_id = revisions['parent_base']
             parent_diff = self._execute(
                 diff_cmd + ['-r', base_commit_id, '-r', revisions['base']],
-                env=self._hg_env)
+                env=self._hg_env, results_unicode=False)
 
             if supports_empty_files:
                 parent_diff = self._handle_empty_files(

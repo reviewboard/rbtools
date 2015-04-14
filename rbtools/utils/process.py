@@ -114,7 +114,7 @@ def execute(command,
             if results_unicode and isinstance(data, bytes):
                 data = data.decode('utf-8')
             elif not results_unicode and isinstance(data, six.text_type):
-                data = line.encode('utf-8')
+                data = data.encode('utf-8')
 
     if return_error_code:
         return rc, data
