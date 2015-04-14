@@ -2,6 +2,9 @@ from __future__ import print_function, unicode_literals
 
 import subprocess
 
+import six
+
+from rbtools.api.errors import APIError
 from rbtools.clients.errors import MergeError, PushError
 from rbtools.commands import Command, CommandError, Option, RB_MAIN
 from rbtools.utils.commands import (build_rbtools_cmd_argv,
@@ -113,9 +116,10 @@ class Land(Command):
                  'making any changes to the tree.'),
         Command.server_options,
         Command.repository_options,
+        Command.history_options,
     ]
 
-    def patch(self, review_request_id):
+    def patch(self, review_request_id, with_history):
         patch_command = [RB_MAIN, 'patch']
         patch_command.extend(build_rbtools_cmd_argv(self.options))
 
@@ -146,6 +150,11 @@ class Land(Command):
         self.setup_tool(self.tool, api_root=api_root)
 
         dry_run = self.options.dry_run
+
+        # If we are squashing into a single commit, then there is not point
+        # using the review request's commit history.
+        with_history = (not self.options.squash and
+                        self.should_use_history(self.tool, server_url))
 
         # Check if repository info on reviewboard server match local ones.
         repository_info = repository_info.find_server_repository_info(api_root)
@@ -189,7 +198,7 @@ class Land(Command):
         if not destination_branch:
             raise CommandError('Please specify a destination branch.')
 
-        if is_local:
+        if is_local or with_history:
             if branch_name is None:
                 branch_name = self.tool.get_current_branch()
 
@@ -217,38 +226,42 @@ class Land(Command):
                 raise CommandError(approval_failure)
 
         if is_local:
-            review_commit_message = extract_commit_message(review_request)
-            author = review_request.submitter_name_and_email
-
             if self.options.squash:
                 print('Squashing branch "%s" into "%s"'
                       % (branch_name, destination_branch))
             else:
                 print('Merging branch "%s" into "%s"'
                       % (branch_name, destination_branch))
+        else:
+            print('Applying patch from review request %s' % request_id)
 
             if not dry_run:
+                self.patch(request_id, with_history)
+
+        if is_local or with_history:
+            if not dry_run:
                 try:
-                    self.tool.merge(
-                        branch_name,
-                        destination_branch,
-                        review_commit_message,
-                        author,
-                        self.options.squash,
-                        self.options.edit)
+                    author = review_request.submitter_name_and_email
+                    review_commit_message = extract_commit_message(
+                        review_request)
+
+                    self.tool.merge(branch_name,
+                                    destination_branch,
+                                    review_commit_message,
+                                    author,
+                                    self.options.squash,
+                                    self.options.edit)
+                except APIError as e:
+                    raise CommandError(
+                        'Could not fetch review request submitter: %s' % e)
                 except MergeError as e:
-                    raise CommandError(str(e))
+                    raise CommandError(six.text_type(e))
 
             if self.options.delete_branch:
                 print('Deleting merged branch "%s"' % branch_name)
 
                 if not dry_run:
                     self.tool.delete_branch(branch_name, merged_only=False)
-        else:
-            print('Applying patch from review request %s' % request_id)
-
-            if not dry_run:
-                self.patch(request_id)
 
         if self.options.push:
             print('Pushing branch "%s" upstream' % destination_branch)
@@ -257,7 +270,7 @@ class Land(Command):
                 try:
                     self.tool.push_upstream(destination_branch)
                 except PushError as e:
-                    raise CommandError(str(e))
+                    raise CommandError(six.text_type(e))
 
         print('Review request %s has landed on "%s".' %
               (request_id, destination_branch))
