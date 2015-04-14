@@ -712,7 +712,8 @@ class Post(Command):
                 repository_info, self.options.repository_name, api_root,
                 api_client, self.tool, self.revisions,
                 guess_summary=False, guess_description=False,
-                is_fuzzy_match_func=self._ask_review_request_match)
+                is_fuzzy_match_func=self._ask_review_request_match,
+                submit_as=self.options.submit_as)
 
             if not self.options.rid:
                 raise CommandError('Could not determine the existing review '
