@@ -55,6 +55,8 @@ class SVNClient(SCMClient):
     def __init__(self, **kwargs):
         super(SVNClient, self).__init__(**kwargs)
 
+        self._svn_info_cache = {}
+
     def get_repository_info(self):
         if not check_install(['svn', 'help']):
             logging.debug('Unable to execute "svn help": skipping SVN')
@@ -631,8 +633,6 @@ class SVNClient(SCMClient):
 
     def svn_info(self, path, ignore_errors=False):
         """Return a dict which is the result of 'svn info' at a given path."""
-        svninfo = {}
-
         # SVN's internal path recognizers think that any file path that
         # includes an '@' character will be path@rev, and skips everything that
         # comes after the '@'. This makes it hard to do operations on files
@@ -640,21 +640,26 @@ class SVNClient(SCMClient):
         if b'@' in path and not path[-1] == b'@':
             path += b'@'
 
-        result = self._run_svn([b"info", path],
-                               split_lines=True,
-                               ignore_errors=ignore_errors,
-                               none_on_ignored_error=True,
-                               results_unicode=False)
-        if result is None:
-            return None
+        if path not in self._svn_info_cache:
+            result = self._run_svn([b"info", path],
+                                   split_lines=True,
+                                   ignore_errors=ignore_errors,
+                                   none_on_ignored_error=True,
+                                   results_unicode=False)
+            if result is None:
+                self._svn_info_cache[path] = None
+            else:
+                svninfo = {}
 
-        for info in result:
-            parts = info.strip().split(b': ', 1)
-            if len(parts) == 2:
-                key, value = parts
-                svninfo[key] = value
+                for info in result:
+                    parts = info.strip().split(b': ', 1)
+                    if len(parts) == 2:
+                        key, value = parts
+                        svninfo[key] = value
 
-        return svninfo
+                self._svn_info_cache[path] = svninfo
+
+        return self._svn_info_cache[path]
 
     # Adapted from server code parser.py
     def parse_filename_header(self, s):
