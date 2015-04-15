@@ -1,40 +1,37 @@
+from __future__ import unicode_literals
+
+
 class MergeError(Exception):
     """An error for when merging two branches fails."""
-    pass
 
 
 class PushError(Exception):
     """An error for when pushing a branch to upstream fails."""
-    pass
 
 
 class OptionsCheckError(Exception):
-    """
-    An error that represents when command-line options were used
-    inappropriately for the given SCMClient backend. The message in the
-    exception is presented to the user.
-    """
-    pass
+    """An error for when command-line options are used incorrectly."""
 
 
 class InvalidRevisionSpecError(Exception):
     """An error for when the specified revisions are invalid."""
-    pass
 
 
 class MinimumVersionError(Exception):
     """An error for when software doesn't meet version requirements."""
-    pass
 
 
 class TooManyRevisionsError(InvalidRevisionSpecError):
     """An error for when too many revisions were specified."""
+
     def __init__(self):
         super(TooManyRevisionsError, self).__init__(
             'Too many revisions specified')
 
 
 class EmptyChangeError(Exception):
+    """An error for when there are no changed files."""
+
     def __init__(self):
-        super(EmptyChangeError, self).__init(
+        super(EmptyChangeError, self).__init__(
             "Couldn't find any affected files for this change.")
