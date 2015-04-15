@@ -13,7 +13,8 @@ from six.moves.urllib.parse import unquote
 
 from rbtools.api.errors import APIError
 from rbtools.clients import PatchResult, RepositoryInfo, SCMClient
-from rbtools.clients.errors import (InvalidRevisionSpecError,
+from rbtools.clients.errors import (AuthenticationError,
+                                    InvalidRevisionSpecError,
                                     MinimumVersionError, OptionsCheckError,
                                     TooManyRevisionsError)
 from rbtools.utils.checks import (check_gnu_diff, check_install,
@@ -196,11 +197,12 @@ class SVNClient(SCMClient):
             raise TooManyRevisionsError
 
     def _convert_symbolic_revision(self, revision):
-        command = ['log', '-r', str(revision), '-l', '1', '--xml']
+        command = ['-r', six.text_type(revision), '-l', '1']
+
         if getattr(self.options, 'repository_url', None):
             command.append(self.options.repository_url)
-        log = self._run_svn(command, ignore_errors=True,
-                            none_on_ignored_error=True)
+
+        log = self.svn_log_xml(command)
 
         if log is not None:
             root = ElementTree.fromstring(log)
@@ -865,6 +867,39 @@ class SVNClient(SCMClient):
             cmdline += ['--password', self.options.svn_password]
 
         return execute(cmdline, *args, **kwargs)
+
+    def svn_log_xml(self, svn_args, *args, **kwargs):
+        """Run SVN log non-interactively and retrieve XML output.
+
+        We cannot run SVN log interactively and retrieve XML output because the
+        authentication prompts will be intermixed with the XML output and cause
+        XML parsing to fail.
+
+        This function returns None (as if none_on_ignored_error where True) if
+        an error occurs that is not an authentication error.
+        """
+        command = ['log', '--non-interactive', '--xml'] + svn_args
+        rc, result, errors = self._run_svn(command,
+                                           *args,
+                                           return_error_code=True,
+                                           with_errors=False,
+                                           return_errors=True,
+                                           ignore_errors=True,
+                                           **kwargs)
+
+        if rc:
+            # SVN Error E215004: --non-interactive was passed but the remote
+            # repository requires authentication.
+            if errors.startswith(b'svn: E215004'):
+                raise AuthenticationError(
+                    'Could not authenticate against remote SVN repository. '
+                    'Please provide the --svn-username and either the '
+                    '--svn-password or --svn-prompt-password command-line '
+                    'options.')
+
+            return None
+
+        return result
 
     def check_options(self):
         if getattr(self.options, 'svn_show_copies_as_adds', None):
