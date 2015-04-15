@@ -1,6 +1,10 @@
 from __future__ import unicode_literals
 
 
+class AuthenticationError(Exception):
+    """An error for when authentication fails."""
+
+
 class MergeError(Exception):
     """An error for when merging two branches fails."""
 
