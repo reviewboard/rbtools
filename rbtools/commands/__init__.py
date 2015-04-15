@@ -407,6 +407,14 @@ class Command(object):
                    default=None,
                    metavar='PASSWORD',
                    help='The password for the SVN repository.'),
+            Option('--svn-prompt-password',
+                   dest='svn_prompt_password',
+                   default=False,
+                   action='store_true',
+                   help="Prompt for the user's svn password. This option "
+                        "overrides the password provided by the "
+                        "--svn-password option.",
+                   added_in='0.7.3'),
             Option('--svn-show-copies-as-adds',
                    dest='svn_show_copies_as_adds',
                    metavar='y|n',
