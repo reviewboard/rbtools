@@ -33,7 +33,8 @@ def execute(command,
             none_on_ignored_error=False,
             return_error_code=False,
             log_output_on_error=True,
-            results_unicode=True):
+            results_unicode=True,
+            return_errors=False):
     """Utility function to execute a command and return the output.
 
     :param command:
@@ -53,7 +54,8 @@ def execute(command,
         If ``True``, all line endings will be translated to ``\n``.
     :param with_errors:
         If ``True``, the command's standard output and standard error streams
-        will be combined.
+        will be combined. This parameter is mutually exclusive with the
+        ``return_errors`` parameter.
     :param none_on_ignored_error:
         If ``True``, this function will return ``None`` if either
         ``ignore_errors`` is ``True` and the program returns a non-zero exit
@@ -69,13 +71,44 @@ def execute(command,
         Determines if the output will be interpreted as UTF-8. If ``True``,
         the process's output will be returned as a ``six.text_type``.
         Otherwise, it will return a ``six.binary_type``.
+    :param return_errors:
+        Determines if the standard error stream will be returned. This
+        parameter is mutually exclusive with the ``with_errors`` parameter.
 
     :returns:
-        This function returns either the output of the command or a tuple of
-        the command's return code and its output. The output will contain both
-        the standard output and standard error streams if ``with_errors`` is
-        ``True``; otherwise, it will just return the standard output stream.
+        This function returns either a single value or a 2- or 3-tuple.
+
+        If ``return_error_code`` is True, the error code of the process will be
+        returned as the first element of the tuple.
+
+        If ``return_errors`` is True, the process' standard error stream will
+        be returned as the last element of the tuple.
+
+        If both of ``return_error_code`` and ``return_errors`` are ``False``,
+        then the process' output will be returned. If either or both of them
+        are ``True``, then this is the other element of the returned tuple.
     """
+    def post_process_output(output):
+        """Post process the given output to convert it to the desired type."""
+        # If Popen is called with universal_newlines=True, the resulting data
+        # returned from stdout will be a text stream (and therefore a unicode
+        # object). Otherwise, it will be a byte stream. Translate the results
+        # into the desired type.
+        if split_lines and len(output) > 0:
+            if results_unicode and isinstance(output[0], six.binary_type):
+                return [line.decode('utf-8') for line in output]
+            elif not results_unicode and isinstance(output[0], six.text_type):
+                return [line.encode('utf-8') for line in output]
+        elif not split_lines:
+            if results_unicode and isinstance(output, six.binary_type):
+                return output.decode('utf-8')
+            elif not results_unicode and isinstance(output, six.text_type):
+                return output.encode('utf-8')
+
+        return output
+
+    assert not (with_errors and return_errors)
+
     if isinstance(command, list):
         logging.debug(b'Running: ' + subprocess.list2cmdline(command))
     else:
@@ -121,10 +154,19 @@ def execute(command,
                              close_fds=True,
                              universal_newlines=translate_newlines,
                              env=new_env)
+
+    errors = None
+
     if split_lines:
         data = p.stdout.readlines()
+
+        if return_errors:
+            errors = p.stderr.readlines()
     else:
         data = p.stdout.read()
+
+        if return_errors:
+            errors = p.stderr.read()
 
     rc = p.wait()
 
@@ -142,22 +184,17 @@ def execute(command,
         data = None
 
     if data is not None:
-        # If Popen is called with universal_newlines=True, the resulting data
-        # returned from stdout will be a text stream (and therefore a unicode
-        # object). Otherwise, it will be a byte stream. Translate the results
-        # into the desired type.
-        if split_lines and len(data) > 0:
-            if results_unicode and isinstance(data[0], six.binary_type):
-                data = [line.decode('utf-8') for line in data]
-            elif not results_unicode and isinstance(data[0], six.text_type):
-                data = [line.encode('utf-8') for line in data]
-        elif not split_lines:
-            if results_unicode and isinstance(data, six.binary_type):
-                data = data.decode('utf-8')
-            elif not results_unicode and isinstance(data, six.text_type):
-                data = data.encode('utf-8')
+        data = post_process_output(data)
 
-    if return_error_code:
-        return rc, data
+    if return_errors:
+        errors = post_process_output(errors)
+
+    if return_error_code or return_errors:
+        if return_error_code and return_errors:
+            return rc, data, errors
+        elif return_error_code:
+            return rc, data
+        else:
+            return data, errors
     else:
         return data
