@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 
+import getpass
 import logging
 import os
 import posixpath
@@ -855,6 +856,10 @@ class SVNClient(SCMClient):
 
         if getattr(self.options, 'svn_username', None):
             cmdline += ['--username', self.options.svn_username]
+
+        if getattr(self.options, 'svn_prompt_password', None):
+            self.options.svn_prompt_password = False
+            self.options.svn_password = getpass.getpass(b'SVN Password:')
 
         if getattr(self.options, 'svn_password', None):
             cmdline += ['--password', self.options.svn_password]
