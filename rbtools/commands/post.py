@@ -789,9 +789,9 @@ class Post(Command):
                                    'request to update.')
 
         # If only certain files within a commit are being submitted for review,
-        # do not include the commit id. This prevents conflicts if mutliple
+        # do not include the commit id. This prevents conflicts if multiple
         # files from the same commit are posted for review separately.
-        if self.options.include_files:
+        if self.options.include_files or self.options.exclude_patterns:
             commit_id = None
 
         if with_history:
