@@ -1,6 +1,10 @@
 from __future__ import unicode_literals
 
 
+class SCMError(Exception):
+    """A generic error from an SCM."""
+
+
 class AuthenticationError(Exception):
     """An error for when authentication fails."""
 

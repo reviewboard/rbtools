@@ -16,7 +16,7 @@ from rbtools.clients import PatchResult, RepositoryInfo, SCMClient
 from rbtools.clients.errors import (AuthenticationError,
                                     InvalidRevisionSpecError,
                                     MinimumVersionError, OptionsCheckError,
-                                    TooManyRevisionsError)
+                                    SCMError, TooManyRevisionsError)
 from rbtools.utils.checks import (check_gnu_diff, check_install,
                                   is_valid_version)
 from rbtools.utils.diffs import (filename_match_any_patterns, filter_diff,
@@ -171,7 +171,8 @@ class SVNClient(SCMClient):
                 # sense if we have a working copy.
                 if not self.options.repository_url:
                     status = self._run_svn(['status', '--cl', str(revision),
-                                            '--ignore-externals', '--xml'])
+                                            '--ignore-externals', '--xml'],
+                                           results_unicode=False)
                     cl = ElementTree.fromstring(status).find('changelist')
                     if cl is not None:
                         # TODO: this should warn about mixed-revision working
@@ -207,7 +208,17 @@ class SVNClient(SCMClient):
         log = self.svn_log_xml(command)
 
         if log is not None:
-            root = ElementTree.fromstring(log)
+            try:
+                root = ElementTree.fromstring(log)
+            except ValueError as e:
+                # _convert_symbolic_revision() nominally raises a ValueError to
+                # indicate any failure to determine the revision number from
+                # the log entry.  Here, we explicitly catch a ValueError from
+                # ElementTree and raise a generic SCMError so that this
+                # specific failure to parse the XML log output is
+                # differentiated from the nominal case.
+                raise SCMError('Failed to parse svn log - %s.' % e)
+
             logentry = root.find('logentry')
             if logentry is not None:
                 return int(logentry.attrib['revision'])
@@ -890,6 +901,7 @@ class SVNClient(SCMClient):
                                            with_errors=False,
                                            return_errors=True,
                                            ignore_errors=True,
+                                           results_unicode=False,
                                            **kwargs)
 
         if rc:

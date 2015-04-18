@@ -8,6 +8,7 @@ V 27
 2013-12-17T07:04:48.063012Z
 K 7
 svn:log
-V 8
-Commit 2
+V 37
+Commit 2 -- a non-utf8 character: é
+
 END

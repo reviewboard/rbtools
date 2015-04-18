@@ -1327,6 +1327,17 @@ class SVNClientTests(SCMClientTests):
                           self.client.parse_revision_spec,
                           ['1', '2', '3'])
 
+    def test_parse_revision_spec_non_unicode_log(self):
+        """Testing SVNClient.parse_revision_spec with a non-utf8 log entry"""
+        # Note: the svn log entry for commit r2 contains one non-utf8 character
+        revisions = self.client.parse_revision_spec(['2'])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(revisions['base'], 1)
+        self.assertEqual(revisions['tip'], 2)
+
     def test_diff_exclude(self):
         """Testing SVNClient diff with file exclude patterns"""
         self._svn_add_file('foo.txt', FOO1)
@@ -1444,7 +1455,17 @@ class SVNClientTests(SCMClientTests):
         self._run_svn(['copy', 'foo.txt', filename])
         self._run_svn(['propset', 'svn:mime-type', 'text/plain', filename])
 
+        # Generate identical diff from checkout root and via changelist.
+
         revisions = self.client.parse_revision_spec()
+        result = self.client.diff(revisions)
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('diff' in result)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         'bfa99e54b8c23b97b1dee23d2763c4fd')
+
+        self._run_svn(['changelist', 'cl1', filename])
+        revisions = self.client.parse_revision_spec(['cl1'])
         result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
