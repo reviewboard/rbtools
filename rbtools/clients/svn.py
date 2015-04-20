@@ -58,8 +58,12 @@ class SVNClient(SCMClient):
         super(SVNClient, self).__init__(**kwargs)
 
         self._svn_info_cache = {}
+        self._svn_repository_info_cache = None
 
     def get_repository_info(self):
+        if self._svn_repository_info_cache:
+            return self._svn_repository_info_cache
+
         if not check_install(['svn', 'help']):
             logging.debug('Unable to execute "svn help": skipping SVN')
             return None
@@ -113,7 +117,11 @@ class SVNClient(SCMClient):
         else:
             self.subversion_client_version = tuple(map(int, m.groups()))
 
-        return SVNRepositoryInfo(path, base_path, uuid)
+        self._svn_repository_info_cache = SVNRepositoryInfo(path,
+                                                            base_path,
+                                                            uuid)
+
+        return self._svn_repository_info_cache
 
     def parse_revision_spec(self, revisions=[]):
         """Parses the given revision spec.
