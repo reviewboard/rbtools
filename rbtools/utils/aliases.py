@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import logging
 import re
 import shlex
@@ -62,7 +64,7 @@ def run_alias(alias, args):
 
         return subprocess.call(cmd, shell=use_shell)
     except ValueError as e:
-        logging.error("Could not execute alias '%s'; it was malformed: %s",
+        logging.error('Could not execute alias "%s"; it was malformed: %s',
                       alias, e)
 
     return 1
