@@ -99,19 +99,23 @@ def get_config_paths():
     """Return the paths to each .reviewboardrc influencing the cwd.
 
     A list of paths to .reviewboardrc files will be returned, where
-    each subsequent list entry should take precedence over the previous.
-    i.e. configuration found in files further down the list will take
-    precedence.
+    each subsequent list entry should have lower precedence than the previous.
+    i.e. configuration found in files further up the list will take precedence.
     """
     config_paths = []
+
     for path in walk_parents(os.getcwd()):
-        filename = os.path.join(path, CONFIG_FILE)
+        filename = os.path.realpath(os.path.join(path, CONFIG_FILE))
+
         if os.path.exists(filename):
             config_paths.append(filename)
 
-    filename = os.path.join(get_home_path(), CONFIG_FILE)
-    if os.path.exists(filename):
-        config_paths.append(filename)
+    home_config_path = os.path.realpath(os.path.join(get_home_path(),
+                                                     CONFIG_FILE))
+
+    if (os.path.exists(home_config_path) and
+        home_config_path not in config_paths):
+        config_paths.append(home_config_path)
 
     return config_paths
 
