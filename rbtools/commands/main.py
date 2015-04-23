@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 from rbtools import get_version_string
-from rbtools.commands import Option, RB_MAIN
+from rbtools.commands import find_entry_point_for_command, Option, RB_MAIN
 from rbtools.utils.aliases import run_alias
 from rbtools.utils.filesystem import load_config
 
@@ -40,8 +40,7 @@ def help(args, parser):
     if args:
         # TODO: First check for static help text file before
         # generating it at run time.
-        ep = pkg_resources.get_entry_info('rbtools', 'rbtools_commands',
-                                          args[0])
+        ep = find_entry_point_for_command(args[0])
 
         if ep:
             help_text = build_help_text(ep.load())
@@ -101,25 +100,13 @@ def main():
     elif opt.help or '--help' in args or '-h' in args:
         help(opt.command, parser)
 
-    # Attempt to retrieve the command class from the entry points. We
-    # first look in rbtools for the commands, and failing that, we look
-    # for third-party commands.
-    ep = pkg_resources.get_entry_info('rbtools', 'rbtools_commands',
-                                      command_name)
-
-    if not ep:
-        try:
-            ep = next(pkg_resources.iter_entry_points(
-                'rbtools_commands', command_name))
-        except StopIteration:
-            # There aren't any custom entry points defined.
-            pass
+    ep = find_entry_point_for_command(command_name)
 
     if ep:
         try:
             command = ep.load()()
         except ImportError:
-            # TODO: It might be useful to actual have the strack
+            # TODO: It might be useful to actual have the stack
             # trace here, due to an import somewhere down the import
             # chain failing.
             sys.stderr.write('Could not load command entry point %s\n' %

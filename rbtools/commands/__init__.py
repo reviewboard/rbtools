@@ -4,6 +4,7 @@ import argparse
 import getpass
 import inspect
 import logging
+import pkg_resources
 import platform
 import os
 import sys
@@ -18,7 +19,7 @@ from rbtools.api.errors import APIError, ServerInterfaceError
 from rbtools.clients import scan_usable_client
 from rbtools.clients.errors import OptionsCheckError
 from rbtools.utils.filesystem import (cleanup_tempfiles, get_home_path,
-                                      load_config)
+                                      is_exe_in_path, load_config)
 from rbtools.utils.process import die
 
 
@@ -734,3 +735,36 @@ class Command(object):
         functionality.
         """
         raise NotImplementedError()
+
+
+def find_entry_point_for_command(command_name):
+    """Return an entry point for the given rbtools command.
+
+    If no entry point is found, None is returned.
+    """
+    # Attempt to retrieve the command class from the entry points. We
+    # first look in rbtools for the commands, and failing that, we look
+    # for third-party commands.
+    entry_point = pkg_resources.get_entry_info('rbtools', 'rbtools_commands',
+                                               command_name)
+
+    if not entry_point:
+        try:
+            entry_point = next(pkg_resources.iter_entry_points(
+                'rbtools_commands', command_name))
+        except StopIteration:
+            # There aren't any custom entry points defined.
+            pass
+
+    return entry_point
+
+
+def command_exists(cmd_name):
+    """Determine if the given command exists.
+
+    This function checks for the existence of an RBTools command entry point
+    with the given name and an executable named rbt-"cmd_name" on the path.
+    Aliases are not considered.
+    """
+    return (find_entry_point_for_command(cmd_name) or
+            is_exe_in_path('rbt-%s' % cmd_name))
