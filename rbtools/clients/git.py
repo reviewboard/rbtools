@@ -4,7 +4,7 @@ import re
 import sys
 
 from rbtools.clients import PatchResult, SCMClient, RepositoryInfo
-from rbtools.clients.errors import (MergeError, PushError,
+from rbtools.clients.errors import (AmendError, MergeError, PushError,
                                     InvalidRevisionSpecError,
                                     TooManyRevisionsError)
 from rbtools.clients.perforce import PerforceClient
@@ -688,19 +688,24 @@ class GitClient(SCMClient):
                           '--untracked-files=no'])
         return status != ''
 
-    def amend_commit(self, message, files=[], all_files=False):
-        """Amend the last commit.
+    def amend_commit_description(self, message, revisions):
+        """Update a commit message to the given string.
 
-        This modifies the last commit message with the new message provided.
+        Since git can amend only the most recent commit, an AmendError will be
+        raised if revisions points to a commit other than the the most recent
+        commit.
         """
-        modified_message = message
+        if revisions and revisions['tip']:
+            commit_ids = execute([self.git, 'rev-parse', 'HEAD',
+                                  revisions['tip']], split_lines=True)
+            head_id = commit_ids[0].strip()
+            revision_id = commit_ids[1].strip()
 
-        if all_files:
-            execute(['git', 'add', '--all', ':/'])
-        elif files:
-            execute(['git', 'add'] + files)
+            if head_id != revision_id:
+                raise AmendError('Commit "%s" is not the latest commit, '
+                                 'and thus cannot be modified' % revision_id)
 
-        execute(['git', 'commit', '--amend', '-m', modified_message])
+        execute([self.git, 'commit', '--amend', '-m', message])
 
     def apply_patch(self, patch_file, base_path=None, base_dir=None, p=None,
                     revert=False):

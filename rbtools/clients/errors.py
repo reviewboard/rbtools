@@ -17,6 +17,10 @@ class PushError(Exception):
     """An error for when pushing a branch to upstream fails."""
 
 
+class AmendError(Exception):
+    """An error for when amending a commit fails."""
+
+
 class OptionsCheckError(Exception):
     """An error for when command-line options are used incorrectly."""
 

@@ -11,7 +11,7 @@ from rbtools.utils.console import confirm
 from rbtools.utils.process import die
 from rbtools.utils.review_request import (get_draft_or_current_value,
                                           get_revisions,
-                                          guess_existing_review_request_id)
+                                          guess_existing_review_request)
 
 
 class Land(Command):
@@ -164,7 +164,7 @@ class Land(Command):
             request_id = self.options.rid
             is_local = branch_name is not None
         else:
-            request_id = guess_existing_review_request_id(
+            request = guess_existing_review_request(
                 repository_info,
                 self.options.repository_name,
                 api_root,
@@ -175,10 +175,11 @@ class Land(Command):
                 guess_description=False,
                 is_fuzzy_match_func=self._ask_review_request_match)
 
-            if not request_id:
+            if not request or not request.id:
                 raise CommandError('Could not determine the existing review '
                                    'request URL to land.')
 
+            request_id = request.id
             is_local = True
 
         if self.options.is_local is not None:
