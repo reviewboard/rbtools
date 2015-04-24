@@ -325,6 +325,16 @@ class SCMClient(object):
         """
         raise NotImplementedError
 
+    def amend_commit_description(self, message, revisions=None):
+        """Update a commit message to the given string.
+
+        The optional revisions argument exists to provide compatibility with
+        SCMs that allow modification of multiple changesets at any given time.
+        It takes a parsed revision spec, and will amend the change referenced
+        by the tip revision therein.
+        """
+        raise NotImplementedError
+
 
 class RepositoryInfo(object):
     """

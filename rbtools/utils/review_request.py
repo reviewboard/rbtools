@@ -1,3 +1,5 @@
+import logging
+
 from rbtools.api.errors import APIError
 from rbtools.clients.errors import InvalidRevisionSpecError
 from rbtools.commands import CommandError
@@ -71,12 +73,65 @@ def get_revisions(tool, cmd_args):
     return revisions
 
 
-def guess_existing_review_request_id(repository_info, repository_name,
-                                     api_root, api_client, tool, revisions,
-                                     guess_summary, guess_description,
-                                     is_fuzzy_match_func=None,
-                                     no_commit_error=None,
-                                     submit_as=None):
+def find_review_request_by_change_id(api_client, api_root, repository_info,
+                                     repository_name, revisions):
+    """Ask ReviewBoard for the review request ID for the tip revision.
+
+    Note that this function calls the ReviewBoard API with the only_fields
+    paramater, thus the returned review request will contain only the fields
+    specified by the only_fields variable.
+
+    If no review request is found, None will be returned instead.
+    """
+    only_fields = 'id,commit_id,changenum,status,url,absolute_url'
+    change_id = revisions['tip']
+    logging.debug('Attempting to find review request from tip revision ID: %s'
+                  % change_id)
+    # Strip off any prefix that might have been added by the SCM.
+    change_id = change_id.split(':', 1)[1]
+
+    optional_args = {}
+
+    if change_id.isdigit():
+        # Populate integer-only changenum field also for compatibility
+        # with older API versions
+        optional_args['changenum'] = int(change_id)
+
+    user = get_user(api_client, api_root, auth_required=True)
+    repository_id = get_repository_id(
+        repository_info, api_root, repository_name)
+
+    # Don't limit query to only pending requests because it's okay to stamp a
+    # submitted review.
+    review_requests = api_root.get_review_requests(repository=repository_id,
+                                                   from_user=user.username,
+                                                   commit_id=change_id,
+                                                   only_links='self',
+                                                   only_fields=only_fields,
+                                                   **optional_args)
+
+    if review_requests:
+        count = review_requests.total_results
+
+        # Only one review can be associated with a specific commit ID.
+        if count > 0:
+            assert count == 1, '%d review requests were returned' % count
+            review_request = review_requests[0]
+            logging.debug('Found review request %s with status %s'
+                          % (review_request.id, review_request.status))
+
+            if review_request.status != 'discarded':
+                return review_request
+
+    return None
+
+
+def guess_existing_review_request(repository_info, repository_name,
+                                  api_root, api_client, tool, revisions,
+                                  guess_summary, guess_description,
+                                  is_fuzzy_match_func=None,
+                                  no_commit_error=None,
+                                  submit_as=None):
     """Try to guess the existing review request ID if it is available.
 
     The existing review request is guessed by comparing the existing
@@ -85,10 +140,16 @@ def guess_existing_review_request_id(repository_info, repository_name,
     they are not provided.
 
     If the summary and description exactly match those of an existing
-    review request, the ID for which is immediately returned. Otherwise,
+    review request, that request is immediately returned. Otherwise,
     the user is prompted to select from a list of potential matches,
     sorted by the highest ranked match first.
+
+    Note that this function calls the ReviewBoard API with the only_fields
+    paramater, thus the returned review request will contain only the fields
+    specified by the only_fields variable.
     """
+    only_fields = 'id,summary,description,draft,url,absolute_url'
+
     if submit_as:
         username = submit_as
     else:
@@ -106,7 +167,7 @@ def guess_existing_review_request_id(repository_info, repository_name,
             from_user=username,
             status='pending',
             expand='draft',
-            only_fields='id,summary,description,draft',
+            only_fields=only_fields,
             only_links='draft',
             show_all_unpublished=True)
 
@@ -149,7 +210,7 @@ def guess_existing_review_request_id(repository_info, repository_name,
         if ((score.is_exact_match() and exact_match_count == 1) or
             (callable(is_fuzzy_match_func) and
              is_fuzzy_match_func(review_request))):
-            return review_request.id
+            return review_request
 
     return None
 
