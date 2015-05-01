@@ -195,6 +195,14 @@ class Command(object):
                    default=True,
                    help='Prevents requests from going through a proxy '
                         'server.'),
+            Option('--disable-ssl-verification',
+                   action='store_true',
+                   dest='disable_ssl_verification',
+                   config_key='DISABLE_SSL_VERIFICATION',
+                   default=False,
+                   help='Disable SSL certificate verification. This is useful '
+                        'with servers that have self-signed certificates.',
+                   added_in='0.7.3'),
             Option('--username',
                    dest='username',
                    metavar='USERNAME',
@@ -469,6 +477,15 @@ class Command(object):
 
         return parser
 
+    def post_process_options(self):
+        if self.options.disable_ssl_verification:
+            try:
+                import ssl
+                ssl._create_unverified_context()
+            except:
+                raise CommandError('The --disable-ssl-verification flag is '
+                                   'only available with Python 2.7.9+')
+
     def usage(self):
         """Return a usage string for the command."""
         usage = '%%(prog)s %s [options] %s' % (self.name, self.args)
@@ -686,13 +703,15 @@ class Command(object):
         The RBClient will be instantiated with the proper arguments
         for talking to the provided Review Board server url.
         """
-        return RBClient(server_url,
-                        username=self.options.username,
-                        password=self.options.password,
-                        api_token=self.options.api_token,
-                        auth_callback=self.credentials_prompt,
-                        otp_token_callback=self.otp_token_prompt,
-                        disable_proxy=not self.options.enable_proxy)
+        return RBClient(
+            server_url,
+            username=self.options.username,
+            password=self.options.password,
+            api_token=self.options.api_token,
+            auth_callback=self.credentials_prompt,
+            otp_token_callback=self.otp_token_prompt,
+            disable_proxy=not self.options.enable_proxy,
+            disable_ssl_verification=self.options.disable_ssl_verification)
 
     def get_api(self, server_url):
         """Returns an RBClient instance and the associated root resource.

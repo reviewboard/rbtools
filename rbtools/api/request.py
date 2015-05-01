@@ -33,6 +33,15 @@ from rbtools.api.cache import APICache
 from rbtools.api.errors import APIError, create_api_error, ServerInterfaceError
 from rbtools.utils.filesystem import get_home_path
 
+# Python 2.7.9+ added strict HTTPS certificate validation (finally). These APIs
+# don't exist everywhere so soft-import them.
+try:
+    import ssl
+    from six.moves.urllib.request import HTTPSHandler
+except ImportError:
+    ssl = None
+    HTTPSHandler = None
+
 
 RBTOOLS_COOKIE_FILE = '.rbtools-cookies'
 RB_COOKIE_NAME = 'rbsessionid'
@@ -395,7 +404,8 @@ class ReviewBoardServer(object):
     """
     def __init__(self, url, cookie_file=None, username=None, password=None,
                  api_token=None, agent=None, session=None, disable_proxy=False,
-                 auth_callback=None, otp_token_callback=None):
+                 auth_callback=None, otp_token_callback=None,
+                 disable_ssl_verification=False):
         self.url = url
         if not self.url.endswith('/'):
             self.url += '/'
@@ -450,6 +460,10 @@ class ReviewBoardServer(object):
                                                          password_mgr)
 
         handlers = []
+
+        if disable_ssl_verification:
+            context = ssl._create_unverified_context()
+            handlers.append(HTTPSHandler(context=context))
 
         if disable_proxy:
             handlers.append(ProxyHandler({}))

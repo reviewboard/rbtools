@@ -233,6 +233,8 @@ class Post(Command):
     ]
 
     def post_process_options(self):
+        super(Post, self).post_process_options()
+
         # -g implies --guess-summary and --guess-description
         if self.options.guess_fields:
             self.options.guess_fields = self.normalize_guess_value(

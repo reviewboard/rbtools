@@ -10,6 +10,7 @@ DEFAULT_OPTIONS_MAP = {
     'debug': '--debug',
     'server': '--server',
     'enable_proxy': '--disable-proxy',
+    'disable_ssl_verification': '--disable-ssl-verification',
     'username': '--username',
     'password': '--password',
     'api_token': '--api-token',
