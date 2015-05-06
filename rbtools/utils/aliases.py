@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import logging
 import re
 import shlex
@@ -45,24 +47,38 @@ def replace_arguments(cmd, args):
             yield arg
 
 
+def expand_alias(alias, args):
+    """Expand the given alias.
+
+    This function returns a tuple of the list of command line arguments and
+    whether or not shell execution is required for the alias.
+    """
+    use_shell = alias.startswith('!')
+
+    if use_shell:
+        command = replace_arguments(alias[1:], args)
+    else:
+        command = [RB_MAIN] + list(replace_arguments(alias, args))
+
+    return command, use_shell
+
+
 def run_alias(alias, args):
     """Run the alias with the given arguments, after expanding parameters.
 
     Parameter expansion is done by the replace_arguments function.
     """
-    use_shell = alias.startswith('!')
+    cmd, use_shell = expand_alias(alias, args)
 
     try:
         if use_shell:
             # If we are using the shell, we must provide our program as a
             # string instead of a sequence.
-            cmd = subprocess.list2cmdline(replace_arguments(alias[1:], args))
-        else:
-            cmd = [RB_MAIN] + list(replace_arguments(alias, args))
+            cmd = subprocess.list2cmdline(cmd)
 
         return subprocess.call(cmd, shell=use_shell)
     except ValueError as e:
-        logging.error("Could not execute alias '%s'; it was malformed: %s",
+        logging.error('Could not execute alias "%s"; it was malformed: %s',
                       alias, e)
 
     return 1

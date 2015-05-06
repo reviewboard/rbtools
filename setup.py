@@ -70,6 +70,7 @@ elif sys.hexversion < 0x02070000:
 
 rb_commands = [
     'api-get = rbtools.commands.api_get:APIGet',
+    'alias = rbtools.commands.alias:Alias',
     'attach = rbtools.commands.attach:Attach',
     'clear-cache = rbtools.commands.clearcache:ClearCache',
     'close = rbtools.commands.close:Close',

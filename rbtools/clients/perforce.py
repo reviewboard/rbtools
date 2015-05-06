@@ -8,11 +8,14 @@ import re
 import six
 import socket
 import stat
+import string
 import subprocess
 
 from rbtools.clients import SCMClient, RepositoryInfo
-from rbtools.clients.errors import (EmptyChangeError,
+from rbtools.clients.errors import (AmendError,
+                                    EmptyChangeError,
                                     InvalidRevisionSpecError,
+                                    SCMError,
                                     TooManyRevisionsError)
 from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.filesystem import make_empty_files, make_tempfile
@@ -39,11 +42,15 @@ class P4Wrapper(object):
         lines = self.run_p4(['counters'], split_lines=True)
         return self._parse_keyval_lines(lines, self.COUNTERS_RE)
 
-    def change(self, changenum, password=None):
+    def change(self, changenum, marshalled=True, password=None):
         return self.run_p4(['change', '-o', str(changenum)],
                            password=password, ignore_errors=True,
                            none_on_ignored_error=True,
-                           marshalled=True)
+                           marshalled=marshalled)
+
+    def modify_change(self, new_change_spec):
+        """new_change_spec must contain the changelist number."""
+        return self.run_p4(['change', '-i'], input_string=new_change_spec)
 
     def files(self, path):
         return self.run_p4(['files', path], marshalled=True)
@@ -96,7 +103,13 @@ class P4Wrapper(object):
         return self.run_p4(['where', depot_path], marshalled=True)
 
     def run_p4(self, p4_args, marshalled=False, password=None,
-               ignore_errors=False, *args, **kwargs):
+               ignore_errors=False, input_string=None, *args, **kwargs):
+        """Invoke p4.
+
+        In the current implementation, the arguments 'marshalled' and
+        'input_string' cannot be used together, i.e. this command doesn't
+        allow inputting and outputting at the same time.
+        """
         cmd = ['p4']
 
         if marshalled:
@@ -137,9 +150,20 @@ class P4Wrapper(object):
                 for record in result:
                     if 'data' in record:
                         print(record['data'])
-                die('Failed to execute command: %s\n' % (cmd,))
+
+                raise SCMError('Failed to execute command: %s\n' % cmd)
 
             return result
+
+        elif input_string is not None:
+            p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+            p.communicate(input_string)  # Send input, wait, set returncode
+
+            if not ignore_errors and p.returncode:
+                raise SCMError('Failed to execute command: %s\n' % cmd)
+
+            return None
+
         else:
             result = execute(cmd, ignore_errors=ignore_errors, *args, **kwargs)
 
@@ -166,6 +190,7 @@ class PerforceClient(SCMClient):
     """
     name = 'Perforce'
 
+    can_amend_commit = True
     supports_diff_exclude_patterns = True
     supports_diff_extra_args = True
     supports_patch_revert = True
@@ -175,6 +200,7 @@ class PerforceClient(SCMClient):
     ENCODED_COUNTER_URL_RE = re.compile('reviewboard.url\.(\S+)')
 
     REVISION_CURRENT_SYNC = '--rbtools-current-sync'
+    REVISION_DEFAULT_CLN = 'default'
     REVISION_PENDING_CLN_PREFIX = '--rbtools-pending-cln:'
 
     ADDED_FILES_RE = re.compile(r'^==== //depot/(\S+)#\d+ ==A== \S+ ====$',
@@ -304,7 +330,8 @@ class PerforceClient(SCMClient):
         if n_revs == 0:
             return {
                 'base': self.REVISION_CURRENT_SYNC,
-                'tip': self.REVISION_PENDING_CLN_PREFIX + 'default',
+                'tip': (self.REVISION_PENDING_CLN_PREFIX +
+                        self.REVISION_DEFAULT_CLN)
             }
         elif n_revs == 1:
             # A single specified CLN can be any of submitted, pending, or
@@ -382,7 +409,7 @@ class PerforceClient(SCMClient):
             raise TooManyRevisionsError
 
     def _get_changelist_status(self, changelist):
-        if changelist == 'default':
+        if changelist == self.REVISION_DEFAULT_CLN:
             return 'pending'
         else:
             change = self.p4.change(changelist)
@@ -475,7 +502,7 @@ class PerforceClient(SCMClient):
                 exclude_patterns)
 
         # Strip off the prefix
-        tip = tip[len(self.REVISION_PENDING_CLN_PREFIX):]
+        tip = tip.split(':', 1)[1]
 
         # Try to get the files out of the working directory first. If that
         # doesn't work, look at shelved files.
@@ -613,7 +640,7 @@ class PerforceClient(SCMClient):
         # description server-side. Ideally we'd change this to remove the
         # server-side implementation and just implement --guess-summary and
         # --guess-description, but that would create a lot of unhappy users.
-        if cl_is_pending and tip != 'default':
+        if cl_is_pending and tip != self.REVISION_DEFAULT_CLN:
             changenum = str(tip)
         else:
             changenum = None
@@ -1259,6 +1286,32 @@ class PerforceClient(SCMClient):
             # XXX: This breaks on filenames with spaces.
             return where_output[-1]['data'].split(' ')[2].strip()
 
+    def get_raw_commit_message(self, revisions):
+        """Extract the commit message based on the provided revision range.
+
+        Since local changelists in perforce are not ordered with respect to
+        one another, this implementation looks at only the tip revision.
+        """
+        changelist = revisions['tip']
+
+        # The parsed revision spec may include a prefix indicating that it is
+        # pending. This prefix, which is delimited by a colon, must be
+        # stripped in order to run p4 change on the actual changelist number.
+        changelist = changelist.split(':', 1)[1]
+
+        if changelist == self.REVISION_DEFAULT_CLN:
+            # The default changelist has no description and couldn't be
+            # accessed from p4 change anyway
+            return ''
+
+        logging.debug('Fetching description for changelist %s', changelist)
+        change = self.p4.change(changelist)
+
+        if len(change) == 1 and 'Description' in change[0]:
+            return change[0]['Description']
+        else:
+            return ''
+
     def apply_patch_for_empty_files(self, patch, p_num, revert=False):
         """Returns True if any empty files in the patch are applied.
 
@@ -1362,3 +1415,73 @@ class PerforceClient(SCMClient):
             return os.path.normpath(p)
 
         return [normalize(pattern) for pattern in patterns]
+
+    def _replace_description_in_changelist_spec(self, old_spec,
+                                                new_description):
+        """Replace the description in the given changelist spec.
+
+        old_spec is a formatted p4 changelist spec string (the raw output from
+        p4 change). This method replaces the existing description with
+        new_description, and returns the new changelist spec.
+        """
+        new_spec = ''
+        whitespace = tuple(string.whitespace)
+        description_key = 'Description:'
+        skipping_old_description = False
+
+        for line in old_spec.splitlines(True):
+            if not skipping_old_description:
+                if not line.startswith(description_key):
+                    new_spec += line
+
+                else:
+                    # Insert the new description. Don't include the first line
+                    # of the old one if it happens to be on the same line as
+                    # the key.
+                    skipping_old_description = True
+                    new_spec += description_key
+
+                    for desc_line in new_description.splitlines():
+                        new_spec += '\t%s\n' % desc_line
+
+            else:
+                # Ignore the description from the original file (all lines
+                # that start with whitespace until the next key is
+                # encountered).
+                if line.startswith(whitespace):
+                    continue
+                else:
+                    skipping_old_description = False
+                    new_spec += '\n%s' % line
+
+        return new_spec
+
+    def amend_commit_description(self, message, revisions):
+        """Update a commit message to the given string.
+
+        Since local changelists on perforce have no ordering with respect to
+        each other, the revisions argument is mandatory.
+        """
+        # Get the changelist number from the tip revision, removing the prefix
+        # if necessary. Don't allow amending submitted or default changelists.
+        changelist_id = revisions['tip']
+        logging.debug('Preparing to amend change %s' % changelist_id)
+
+        if not changelist_id.startswith(self.REVISION_PENDING_CLN_PREFIX):
+            raise AmendError('Cannot modify submitted changelist %s'
+                             % changelist_id)
+
+        changelist_num = changelist_id.split(':', 1)[1]
+
+        if changelist_num == self.REVISION_DEFAULT_CLN:
+            raise AmendError('Cannot modify the default changelist')
+        elif not changelist_num.isdigit():
+            raise AmendError('%s is an invalid changelist ID' % changelist_num)
+
+        # Get the current changelist description and insert the new message.
+        # Since p4 change -i doesn't take in marshalled objects, we get the
+        # description as raw text and manually edit it.
+        change = self.p4.change(changelist_num, marshalled=False)
+        new_change = self._replace_description_in_changelist_spec(
+            change, message)
+        self.p4.modify_change(new_change)

@@ -11,8 +11,7 @@ from rbtools.utils.commands import get_review_request
 from rbtools.utils.console import confirm
 from rbtools.utils.review_request import (get_draft_or_current_value,
                                           get_revisions,
-                                          guess_existing_review_request_id)
-
+                                          guess_existing_review_request)
 
 class Post(Command):
     """Create and update review requests."""
@@ -235,6 +234,8 @@ class Post(Command):
     ]
 
     def post_process_options(self):
+        super(Post, self).post_process_options()
+
         # -g implies --guess-summary and --guess-description
         if self.options.guess_fields:
             self.options.guess_fields = self.normalize_guess_value(
@@ -777,16 +778,18 @@ class Post(Command):
             self.check_guess_fields()
 
         if self.options.update and self.revisions:
-            self.options.rid = guess_existing_review_request_id(
+            review_request = guess_existing_review_request(
                 repository_info, self.options.repository_name, api_root,
                 api_client, self.tool, self.revisions,
                 guess_summary=False, guess_description=False,
                 is_fuzzy_match_func=self._ask_review_request_match,
                 submit_as=self.options.submit_as)
 
-            if not self.options.rid:
+            if not review_request or not review_request.id:
                 raise CommandError('Could not determine the existing review '
                                    'request to update.')
+
+            self.options.rid = review_request.id
 
         # If only certain files within a commit are being submitted for review,
         # do not include the commit id. This prevents conflicts if multiple

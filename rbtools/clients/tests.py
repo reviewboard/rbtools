@@ -23,7 +23,7 @@ from rbtools.clients.perforce import PerforceClient, P4Wrapper
 from rbtools.clients.svn import SVNRepositoryInfo, SVNClient
 from rbtools.tests import OptionsStub
 from rbtools.utils.checks import is_valid_version
-from rbtools.utils.filesystem import load_config, make_tempfile
+from rbtools.utils.filesystem import is_exe_in_path, load_config, make_tempfile
 from rbtools.utils.process import execute
 from rbtools.utils.testbase import RBTestBase
 
@@ -59,7 +59,7 @@ class GitClientTests(SCMClientTests):
     def setUp(self):
         super(GitClientTests, self).setUp()
 
-        if not self.is_exe_in_path('git'):
+        if not is_exe_in_path('git'):
             raise SkipTest('git not found in path')
 
         self.set_user_home(
@@ -573,7 +573,7 @@ class MercurialClientTests(MercurialTestBase):
 
     def setUp(self):
         super(MercurialClientTests, self).setUp()
-        if not self.is_exe_in_path('hg'):
+        if not is_exe_in_path('hg'):
             raise SkipTest('hg not found in path')
 
         self.hg_dir = os.path.join(self.clients_dir, 'testdata', 'hg-repo')
@@ -959,7 +959,7 @@ class MercurialSubversionClientTests(MercurialTestBase):
         fp.close()
 
         for exe in self._required_exes:
-            if not self.is_exe_in_path(exe):
+            if not is_exe_in_path(exe):
                 raise SkipTest('missing svn stuff!  giving up!')
 
         if not self._has_hgsubversion():
@@ -1174,7 +1174,7 @@ class SVNClientTests(SCMClientTests):
     def setUp(self):
         super(SVNClientTests, self).setUp()
 
-        if not self.is_exe_in_path('svn'):
+        if not is_exe_in_path('svn'):
             raise SkipTest('svn not found in path')
 
         self.svn_dir = os.path.join(self.clients_dir, 'testdata', 'svn-repo')
@@ -1327,6 +1327,17 @@ class SVNClientTests(SCMClientTests):
                           self.client.parse_revision_spec,
                           ['1', '2', '3'])
 
+    def test_parse_revision_spec_non_unicode_log(self):
+        """Testing SVNClient.parse_revision_spec with a non-utf8 log entry"""
+        # Note: the svn log entry for commit r2 contains one non-utf8 character
+        revisions = self.client.parse_revision_spec(['2'])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' not in revisions)
+        self.assertEqual(revisions['base'], 1)
+        self.assertEqual(revisions['tip'], 2)
+
     def test_diff_exclude(self):
         """Testing SVNClient diff with file exclude patterns"""
         self._svn_add_file('foo.txt', FOO1)
@@ -1444,7 +1455,17 @@ class SVNClientTests(SCMClientTests):
         self._run_svn(['copy', 'foo.txt', filename])
         self._run_svn(['propset', 'svn:mime-type', 'text/plain', filename])
 
+        # Generate identical diff from checkout root and via changelist.
+
         revisions = self.client.parse_revision_spec()
+        result = self.client.diff(revisions)
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('diff' in result)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         'bfa99e54b8c23b97b1dee23d2763c4fd')
+
+        self._run_svn(['changelist', 'cl1', filename])
+        revisions = self.client.parse_revision_spec(['cl1'])
         result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
@@ -2176,7 +2197,7 @@ class BazaarClientTests(SCMClientTests):
     def setUp(self):
         super(BazaarClientTests, self).setUp()
 
-        if not self.is_exe_in_path("bzr"):
+        if not is_exe_in_path("bzr"):
             raise SkipTest("bzr not found in path")
 
         self.set_user_home(

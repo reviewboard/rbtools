@@ -4,6 +4,7 @@ import argparse
 import getpass
 import inspect
 import logging
+import pkg_resources
 import platform
 import os
 import sys
@@ -18,7 +19,7 @@ from rbtools.api.errors import APIError, ServerInterfaceError
 from rbtools.clients import scan_usable_client
 from rbtools.clients.errors import OptionsCheckError
 from rbtools.utils.filesystem import (cleanup_tempfiles, get_home_path,
-                                      load_config)
+                                      is_exe_in_path, load_config)
 from rbtools.utils.process import die
 
 
@@ -194,6 +195,14 @@ class Command(object):
                    default=True,
                    help='Prevents requests from going through a proxy '
                         'server.'),
+            Option('--disable-ssl-verification',
+                   action='store_true',
+                   dest='disable_ssl_verification',
+                   config_key='DISABLE_SSL_VERIFICATION',
+                   default=False,
+                   help='Disable SSL certificate verification. This is useful '
+                        'with servers that have self-signed certificates.',
+                   added_in='0.7.3'),
             Option('--username',
                    dest='username',
                    metavar='USERNAME',
@@ -509,6 +518,15 @@ class Command(object):
 
         return parser
 
+    def post_process_options(self):
+        if self.options.disable_ssl_verification:
+            try:
+                import ssl
+                ssl._create_unverified_context()
+            except:
+                raise CommandError('The --disable-ssl-verification flag is '
+                                   'only available with Python 2.7.9+')
+
     def usage(self):
         """Return a usage string for the command."""
         usage = '%%(prog)s %s [options] %s' % (self.name, self.args)
@@ -726,13 +744,15 @@ class Command(object):
         The RBClient will be instantiated with the proper arguments
         for talking to the provided Review Board server url.
         """
-        return RBClient(server_url,
-                        username=self.options.username,
-                        password=self.options.password,
-                        api_token=self.options.api_token,
-                        auth_callback=self.credentials_prompt,
-                        otp_token_callback=self.otp_token_prompt,
-                        disable_proxy=not self.options.enable_proxy)
+        return RBClient(
+            server_url,
+            username=self.options.username,
+            password=self.options.password,
+            api_token=self.options.api_token,
+            auth_callback=self.credentials_prompt,
+            otp_token_callback=self.otp_token_prompt,
+            disable_proxy=not self.options.enable_proxy,
+            disable_ssl_verification=self.options.disable_ssl_verification)
 
     def get_api(self, server_url):
         """Returns an RBClient instance and the associated root resource.
@@ -775,3 +795,36 @@ class Command(object):
         functionality.
         """
         raise NotImplementedError()
+
+
+def find_entry_point_for_command(command_name):
+    """Return an entry point for the given rbtools command.
+
+    If no entry point is found, None is returned.
+    """
+    # Attempt to retrieve the command class from the entry points. We
+    # first look in rbtools for the commands, and failing that, we look
+    # for third-party commands.
+    entry_point = pkg_resources.get_entry_info('rbtools', 'rbtools_commands',
+                                               command_name)
+
+    if not entry_point:
+        try:
+            entry_point = next(pkg_resources.iter_entry_points(
+                'rbtools_commands', command_name))
+        except StopIteration:
+            # There aren't any custom entry points defined.
+            pass
+
+    return entry_point
+
+
+def command_exists(cmd_name):
+    """Determine if the given command exists.
+
+    This function checks for the existence of an RBTools command entry point
+    with the given name and an executable named rbt-"cmd_name" on the path.
+    Aliases are not considered.
+    """
+    return (find_entry_point_for_command(cmd_name) or
+            is_exe_in_path('rbt-%s' % cmd_name))

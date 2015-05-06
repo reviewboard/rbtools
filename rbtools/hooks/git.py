@@ -17,7 +17,7 @@ def get_commit_hashes(old_rev, new_rev):
     """Returns a list of abbreviated commit hashes from old_rev to new_rev."""
     git_command = ['git', 'rev-list', '--abbrev-commit', '--reverse', '%s..%s'
                    % (old_rev, new_rev)]
-    return execute(git_command, split_lines=True)
+    return execute(git_command).split('\n')
 
 
 def get_unique_commit_hashes(ref_name, new_rev):
