@@ -406,11 +406,10 @@ class ReviewBoardServer(object):
                  api_token=None, agent=None, session=None, disable_proxy=False,
                  auth_callback=None, otp_token_callback=None,
                  disable_ssl_verification=False):
-        self.url = url
-        if not self.url.endswith('/'):
-            self.url += '/'
+        if not url.endswith('/'):
+            url += '/'
 
-        self.url = self.url + 'api/'
+        self.url = url + 'api/'
         self.cookie_jar, self.cookie_file = create_cookie_jar(
             cookie_file=cookie_file)
 
@@ -448,6 +447,16 @@ class ReviewBoardServer(object):
                 rest={'HttpOnly': None})
             self.cookie_jar.set_cookie(cookie)
             self.cookie_jar.save()
+
+        if username:
+            # If the username parameter is given, we have to clear the session
+            # cookie manually or it will override the username:password
+            # combination retrieved from the authentication callback.
+            try:
+                self.cookie_jar.clear(self.domain, parsed_url[2],
+                                      RB_COOKIE_NAME)
+            except KeyError:
+                pass
 
         # Set up the HTTP libraries to support all of the features we need.
         password_mgr = ReviewBoardHTTPPasswordMgr(self.url,
