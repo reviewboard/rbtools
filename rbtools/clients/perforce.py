@@ -614,7 +614,7 @@ class PerforceClient(SCMClient):
                     old_file, new_file = self._extract_delete_files(
                         depot_file, base_revision)
                 except ValueError as e:
-                    logging.warning('Skipping file %s#%s: %s', depot_file, e)
+                    logging.warning('Skipping file %s: %s', depot_file, e)
                     continue
             elif changetype_short == 'MV-a':
                 # The server supports move information. We ignore this
