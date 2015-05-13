@@ -22,8 +22,13 @@ class SyncTransport(Transport):
     def __init__(self, url, cookie_file=None, username=None, password=None,
                  api_token=None, agent=None, session=None, disable_proxy=False,
                  auth_callback=None, otp_token_callback=None,
-                 disable_ssl_verification=False, *args, **kwargs):
+                 disable_ssl_verification=False, allow_caching=True,
+                 cache_location=None, in_memory_cache=False,
+                 *args, **kwargs):
         super(SyncTransport, self).__init__(url, *args, **kwargs)
+        self.allow_caching = allow_caching
+        self.cache_location = cache_location
+        self.in_memory_cache = in_memory_cache
         self.server = ReviewBoardServer(
             self.url,
             cookie_file=cookie_file,
@@ -91,8 +96,16 @@ class SyncTransport(Transport):
                                    item_mime_type=item_content_type)
 
     def enable_cache(self):
-        """Enable caching for all future HTTP requests."""
-        self.server.enable_cache()
+        """Enable caching for all future HTTP requests.
+
+        The cache will be created at the default location if none is provided.
+
+        If the in_memory parameter is True, the cache will be created in memory
+        instead of on disk. This overrides the cache_location parameter.
+        """
+        if self.allow_caching:
+            self.server.enable_cache(cache_location=self.cache_location,
+                                     in_memory=self.in_memory_cache)
 
     def __repr__(self):
         return '<%s(url=%r, cookie_file=%r, agent=%r)>' % (

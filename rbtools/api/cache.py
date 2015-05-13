@@ -119,17 +119,19 @@ class CachedHTTPResponse(object):
 
 class APICache(object):
     """An API cache backed by a SQLite database."""
+
     # The format for the Expires: header. Requires an English locale.
     EXPIRES_FORMAT = '%a, %d %b %Y %H:%M:%S %Z'
 
-    CACHE_DIR = user_cache_dir('rbtools')
-    CACHE_PATH = os.path.join(CACHE_DIR, 'apicache.db')
+    DEFAULT_CACHE_DIR = user_cache_dir('rbtools')
+    DEFAULT_CACHE_PATH = os.path.join(DEFAULT_CACHE_DIR, 'apicache.db')
 
     # The API Cache's schema version. If the schema is updated, update this
     # value.
     SCHEMA_VERSION = 2
 
-    def __init__(self, create_db_in_memory=False, urlopen=urlopen):
+    def __init__(self, create_db_in_memory=False, db_location=None,
+                 urlopen=urlopen):
         """Create a new instance of the APICache
 
         If the db_path is provided, it will be used as the path to the SQLite
@@ -139,24 +141,31 @@ class APICache(object):
         self.urlopen = urlopen
 
         if create_db_in_memory:
+            logging.debug('Creating API cache in memory.')
+
             self.db = sqlite3.connect(':memory:')
+            self._db_location = None
             self._create_schema()
         else:
+            self.cache_path = db_location or self.DEFAULT_CACHE_PATH
+
             try:
-                cache_exists = os.path.exists(self.CACHE_PATH)
+                cache_exists = os.path.exists(self.cache_path)
                 create_schema = True
 
                 if not cache_exists:
-                    if not os.path.exists(self.CACHE_DIR):
-                        logging.debug("Cache directory '%s' does not exist; "
-                                      "creating.",
-                                      self.CACHE_DIR)
-                        os.makedirs(self.CACHE_DIR)
+                    cache_dir = os.path.dirname(self.cache_path)
 
-                    logging.debug("API cache '%s' does not exist; creating.",
-                                  self.CACHE_PATH)
+                    if not os.path.exists(cache_dir):
+                        logging.debug('Cache directory "%s" does not exist; '
+                                      'creating.',
+                                      cache_dir)
+                        os.makedirs(cache_dir)
 
-                self.db = sqlite3.connect(self.CACHE_PATH)
+                    logging.debug('API cache "%s" does not exist; creating.',
+                                  self.cache_path)
+
+                self.db = sqlite3.connect(self.cache_path)
 
                 if cache_exists:
                     try:
@@ -172,16 +181,16 @@ class APICache(object):
 
                 if create_schema:
                     self._create_schema()
-            except (OSError, sqlite3.Error) as e:
+            except (OSError, sqlite3.Error):
                 # OSError will be thrown if we cannot create the directory or
                 # file for the API cache. sqlite3.Error will be thrown if
                 # connect fails. In either case, HTTP requests can still be
                 # made, they will just passed through to the URL opener without
                 # attempting to interact with the API cache.
-                logging.warn("Could not create or access API cache '%s'. Try "
-                             "running 'rbt clear-cache' to clear the HTTP "
-                             "cache for the API.",
-                             self.CACHE_PATH)
+                logging.warn('Could not create or access API cache "%s". Try '
+                             'running "rbt clear-cache" to clear the HTTP '
+                             'cache for the API.',
+                             self.cache_path)
 
         if self.db is not None:
             self.db.row_factory = APICache._row_factory
@@ -324,13 +333,13 @@ class APICache(object):
                     else:
                         max_age = (expires - now).seconds
                 except ValueError:
-                    logging.error("The format of the 'Expires' header (value "
-                                  "%s) does not match the expected format.",
+                    logging.error('The format of the "Expires" header (value '
+                                  '%s) does not match the expected format.',
                                   expires)
                 except locale.Error:
-                    logging.error("The C locale is unavailable on this "
-                                  "system. The 'Expires' header cannot be "
-                                  "parsed.")
+                    logging.error('The C locale is unavailable on this '
+                                  'system. The "Expires" header cannot be '
+                                  'parsed.')
                 finally:
                     locale.setlocale(locale.LC_TIME, old_locale)
 
@@ -523,17 +532,17 @@ class APICache(object):
             try:
                 self.db.commit()
             except sqlite3.Error as e:
-                logging.error("Could not write database to disk: %s. Try "
-                              "running 'rbt clear-cache' to manually clear "
-                              "the HTTP cache for the API.",
+                logging.error('Could not write database to disk: %s. Try '
+                              'running "rbt clear-cache" to manually clear '
+                              'the HTTP cache for the API.',
                               e)
                 die()
 
     def _die(self, msg, e):
         """Remove the connection to the database and print an error message."""
         self.db = None  # So that _write_db doesn't cause an exception
-        logging.error("%s: %s. Try running 'rbt clear-cache' to manually "
-                      "clear the HTTP cache for the API.",
+        logging.error('%s: %s. Try running "rbt clear-cache" to manually '
+                      'clear the HTTP cache for the API.',
                       msg, e)
         die()
 
@@ -545,12 +554,12 @@ class APICache(object):
         ]
 
 
-def clear_cache():
+def clear_cache(cache_path=APICache.DEFAULT_CACHE_PATH):
     """Delete the HTTP cache used for the API."""
     try:
-        os.unlink(APICache.CACHE_PATH)
-        print("Cleared cache in '%s'" % APICache.CACHE_PATH)
+        os.unlink(cache_path)
+        print("Cleared cache in '%s'" % cache_path)
     except Exception as e:
-        logging.error("Could not clear cache in '%s': %s. Try manually "
-                      "removing it if it exists.",
-                      APICache.CACHE_PATH, e)
+        logging.error('Could not clear cache in "%s": %s. Try manually '
+                      'removing it if it exists.',
+                      cache_path, e)
