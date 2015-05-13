@@ -50,6 +50,12 @@ class Transport(object):
         """Execute a method and carry out the returned HttpRequest."""
         return method(*args, **kwargs)
 
-    def enable_cache(self):
-        """Enable caching for all future HTTP requests."""
-        return NotImplementedError
+    def enable_cache(self, cache_location=None, in_memory=False):
+        """Enable caching for all future HTTP requests.
+
+        The cache will be created at the default location if none is provided.
+
+        If the in_memory parameter is True, the cache will be created in memory
+        instead of on disk. This overrides the cache_location parameter.
+        """
+        raise NotImplementedError

@@ -258,12 +258,6 @@ class ClearCaseClient(SCMClient):
         execute(['cleartool', 'rmtype', '-rmall', '-force', label],
                 with_errors=True)
 
-    def check_options(self):
-        if ((self.options.revision_range or self.options.tracking)
-            and self.viewtype != 'dynamic'):
-            die('To generate diff using parent branch or by passing revision '
-                'ranges, you must use a dynamic view.')
-
     def _determine_version(self, version_path):
         """Determine numeric version of revision.
 
@@ -342,6 +336,10 @@ class ClearCaseClient(SCMClient):
             # baseline:baseline[@pvob] => review changes between this baseline
             #                             and the working directory
         elif n_revs == 2:
+            if self.viewtype != 'dynamic':
+                die('To generate a diff using multiple revisions, you must '
+                    'use a dynamic view.')
+
             if (revisions[0].startswith(self.REVISION_LABEL_PREFIX) and
                 revisions[1].startswith(self.REVISION_LABEL_PREFIX)):
                 return {
