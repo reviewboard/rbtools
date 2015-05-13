@@ -225,6 +225,28 @@ class Command(object):
                    help='The API token to use for authentication, instead of '
                         'using a username and password.',
                    added_in='0.7'),
+            Option('--cache-location',
+                   dest='cache_location',
+                   metavar='FILE',
+                   config_key='CACHE_LOCATION',
+                   default=None,
+                   help='The file to use for the API cache database.',
+                   added_in='0.7.3'),
+            Option('--in-memory-cache',
+                   dest='in_memory_cache',
+                   config_key='IN_MEMORY_CACHE',
+                   action='store_true',
+                   default=False,
+                   help='Store the API cache in memory instead of on the '
+                        'filesystem.',
+                   added_in='0.7.3'),
+            Option('--disable-cache',
+                   dest='disable_cache',
+                   config_key='DISABLE_CACHE',
+                   action='store_true',
+                   default=False,
+                   help='Disable the HTTP cache.',
+                   added_in='0.7.3'),
         ]
     )
 
@@ -752,7 +774,10 @@ class Command(object):
             auth_callback=self.credentials_prompt,
             otp_token_callback=self.otp_token_prompt,
             disable_proxy=not self.options.enable_proxy,
-            disable_ssl_verification=self.options.disable_ssl_verification)
+            disable_ssl_verification=self.options.disable_ssl_verification,
+            allow_caching=not self.options.disable_cache,
+            cache_location=self.options.cache_location,
+            in_memory_cache=self.options.in_memory_cache)
 
     def get_api(self, server_url):
         """Returns an RBClient instance and the associated root resource.
