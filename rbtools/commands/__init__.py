@@ -246,6 +246,15 @@ class Command(object):
                    default=False,
                    help='Disable the HTTP cache.',
                    added_in='0.7.3'),
+            Option('--dont-save-credentials',
+                   config_key='SAVE_COOKIES',
+                   dest='save_cookies',
+                   action='store_false',
+                   default=True,
+                   help='Use an in-memory cookie store instead of writing '
+                        'them to a file. No credentials will be saved or '
+                        'loaded.',
+                   added_in='0.8.0'),
         ]
     )
 
@@ -735,7 +744,8 @@ class Command(object):
             disable_ssl_verification=self.options.disable_ssl_verification,
             allow_caching=not self.options.disable_cache,
             cache_location=self.options.cache_location,
-            in_memory_cache=self.options.in_memory_cache)
+            in_memory_cache=self.options.in_memory_cache,
+            save_cookies=self.options.save_cookies)
 
     def get_api(self, server_url):
         """Returns an RBClient instance and the associated root resource.

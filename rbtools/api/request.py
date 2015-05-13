@@ -12,7 +12,7 @@ from json import loads as json_loads
 
 import six
 from six.moves.http_client import UNAUTHORIZED
-from six.moves.http_cookiejar import Cookie, MozillaCookieJar
+from six.moves.http_cookiejar import Cookie, CookieJar, MozillaCookieJar
 from six.moves.urllib.error import HTTPError, URLError
 from six.moves.urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from six.moves.urllib.request import (
@@ -405,18 +405,25 @@ class ReviewBoardServer(object):
     def __init__(self, url, cookie_file=None, username=None, password=None,
                  api_token=None, agent=None, session=None, disable_proxy=False,
                  auth_callback=None, otp_token_callback=None,
-                 disable_ssl_verification=False):
+                 disable_ssl_verification=False, save_cookies=True):
         if not url.endswith('/'):
             url += '/'
 
         self.url = url + 'api/'
-        self.cookie_jar, self.cookie_file = create_cookie_jar(
-            cookie_file=cookie_file)
 
-        try:
-            self.cookie_jar.load(ignore_expires=True)
-        except IOError:
-            pass
+        self.save_cookies = save_cookies
+
+        if self.save_cookies:
+            self.cookie_jar, self.cookie_file = create_cookie_jar(
+                cookie_file=cookie_file)
+
+            try:
+                self.cookie_jar.load(ignore_expires=True)
+            except IOError:
+                pass
+        else:
+            self.cookie_jar = CookieJar()
+            self.cookie_file = None
 
         # Get the cookie domain from the url. If the domain
         # does not contain a '.' (e.g. 'localhost'), we assume
@@ -446,7 +453,9 @@ class ReviewBoardServer(object):
                 comment_url=None,
                 rest={'HttpOnly': None})
             self.cookie_jar.set_cookie(cookie)
-            self.cookie_jar.save()
+
+            if self.save_cookies:
+                self.cookie_jar.save()
 
         if username:
             # If the username parameter is given, we have to clear the session
@@ -523,7 +532,9 @@ class ReviewBoardServer(object):
         self.make_request(HttpRequest('%ssession/' % self.url,
                                       method='DELETE'))
         self.cookie_jar.clear(self.domain)
-        self.cookie_jar.save()
+
+        if self.save_cookies:
+            self.cookie_jar.save()
 
     def process_error(self, http_status, data):
         """Processes an error, raising an APIError with the information."""
@@ -568,9 +579,10 @@ class ReviewBoardServer(object):
         except URLError as e:
             raise ServerInterfaceError('%s' % e.reason)
 
-        try:
-            self.cookie_jar.save()
-        except IOError:
-            pass
+        if self.save_cookies:
+            try:
+                self.cookie_jar.save()
+            except IOError:
+                pass
 
         return rsp
