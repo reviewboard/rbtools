@@ -375,16 +375,8 @@ class HttpRequestTests(TestCase):
         self.assertTrue(content_type is None)
         self.assertTrue(content is None)
 
-    def test_post_form_data(self):
-        """Testing the multipart form data generation."""
-        request = HttpRequest('/', 'POST')
-        request.add_field('foo', 'bar')
-        request.add_field('bar', 42)
-        request.add_field('err', 'must-be-deleted')
-        request.add_field('name', 'somestring')
-        request.del_field('err')
-
-        ctype, content = request.encode_multipart_formdata()
+    def _get_fields_as_dict(self, ctype, content):
+        """Extract the fields of a HTTP multipart request as a dictionary."""
         m = re.match(b'^multipart/form-data; boundary=(.*)$', ctype)
         self.assertFalse(m is None)
         fields = [l.strip() for l in content.split(b'--' + m.group(1))][1:-1]
@@ -403,8 +395,43 @@ class HttpRequestTests(TestCase):
             self.assertFalse(m is None)
             d[m.group(1)] = v
 
+        return d
+
+    def test_post_form_data(self):
+        """Testing the multipart form data generation."""
+        request = HttpRequest('/', 'POST')
+        request.add_field('foo', 'bar')
+        request.add_field('bar', 42)
+        request.add_field('err', 'must-be-deleted')
+        request.add_field('name', 'somestring')
+        request.del_field('err')
+
+        ctype, content = request.encode_multipart_formdata()
+
+        d = self._get_fields_as_dict(ctype, content)
+
         self.assertEqual(
             d, {b'foo': b'bar', b'bar': b'42', b'name': b'somestring'})
+
+    def test_post_unicode_data(self):
+        """Testing the encoding of multipart form data with unicode and binary
+        field data
+        """
+        konnichiwa = '\u3053\u3093\u306b\u3061\u306f'
+
+        request = HttpRequest('/', 'POST')
+        request.add_field('foo', konnichiwa)
+        request.add_field('bar', konnichiwa.encode('utf-8'))
+        request.add_field('baz', b'\xff')
+
+        ctype, content = request.encode_multipart_formdata()
+
+        fields = self._get_fields_as_dict(ctype, content)
+
+        self.assertIn('foo', fields)
+        self.assertEqual(fields['foo'], konnichiwa.encode('utf-8'))
+        self.assertEqual(fields['bar'], konnichiwa.encode('utf-8'))
+        self.assertEqual(fields['baz'], b'\xff')
 
 
 class ReviewRequestResourceTests(TestCase):
