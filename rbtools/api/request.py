@@ -102,12 +102,12 @@ class HttpRequest(object):
 
         for key in self._fields:
             content.write(b'--' + BOUNDARY + NEWLINE)
-            content.write(('Content-Disposition: form-data; '
-                           'name="%s"' % key).encode('utf-8'))
+            content.write(b'Content-Disposition: form-data; '
+                          b'name="%s"' % key.encode('utf-8'))
             content.write(NEWLINE + NEWLINE)
 
-            if isinstance(self._fields[key], six.string_types):
-                content.write(self._fields[key].encode('utf-8') + NEWLINE)
+            if isinstance(self._fields[key], six.binary_type):
+                content.write(self._fields[key] + NEWLINE)
             else:
                 content.write(six.text_type(self._fields[key]).encode('utf-8')
                               + NEWLINE)
@@ -138,8 +138,7 @@ class HttpRequest(object):
             content.write(NEWLINE)
 
         content.write(b'--' + BOUNDARY + b'--' + NEWLINE + NEWLINE)
-        content_type = ('multipart/form-data; boundary=%s' %
-                        BOUNDARY.decode('utf-8')).encode('utf-8')
+        content_type = b'multipart/form-data; boundary=%s' % BOUNDARY
 
         return content_type, content.getvalue()
 

@@ -12,8 +12,8 @@ import threading
 import six
 from six.moves.urllib.request import urlopen
 
+from rbtools.api.errors import CacheError
 from rbtools.utils.appdirs import user_cache_dir
-from rbtools.utils.process import die
 
 
 MINIMUM_VERSION = '2.0.14'  # Minimum server version to enable the API cache.
@@ -144,7 +144,7 @@ class APICache(object):
             logging.debug('Creating API cache in memory.')
 
             self.db = sqlite3.connect(':memory:')
-            self._db_location = None
+            self.cache_path = None
             self._create_schema()
         else:
             self.cache_path = db_location or self.DEFAULT_CACHE_PATH
@@ -176,8 +176,8 @@ class APICache(object):
                             if row and row[0] == self.SCHEMA_VERSION:
                                 create_schema = False
                     except sqlite3.Error as e:
-                        self._die('Could not get the HTTP cache schema '
-                                  'version', e)
+                        self._die(
+                            'Could not get the HTTP cache schema version', e)
 
                 if create_schema:
                     self._create_schema()
@@ -532,19 +532,23 @@ class APICache(object):
             try:
                 self.db.commit()
             except sqlite3.Error as e:
-                logging.error('Could not write database to disk: %s. Try '
-                              'running "rbt clear-cache" to manually clear '
-                              'the HTTP cache for the API.',
-                              e)
-                die()
+                self._die('Could not write database to disk', e)
 
-    def _die(self, msg, e):
-        """Remove the connection to the database and print an error message."""
-        self.db = None  # So that _write_db doesn't cause an exception
-        logging.error('%s: %s. Try running "rbt clear-cache" to manually '
-                      'clear the HTTP cache for the API.',
-                      msg, e)
-        die()
+    def _die(self, message, inner_exception):
+        """Build an appropriate CacheError and raise it."""
+        message = '%s: %s.' % (message, inner_exception)
+
+        if self.cache_path:
+            if self.cache_path == APICache.DEFAULT_CACHE_PATH:
+                cache_args = ''
+            else:
+                cache_args = ' --cache-location %s' % self.cache_path
+
+            message += (' Try running "rbt clear-cache%s" to manually clear '
+                        'the HTTP Cache for the API.'
+                        % cache_args)
+
+        raise CacheError(message)
 
     def _split_csv(self, csvline):
         """Split a line of comma-separated values into a list."""
