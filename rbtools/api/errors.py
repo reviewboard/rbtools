@@ -39,6 +39,10 @@ class BadRequestError(APIError):
         return '\n'.join(lines)
 
 
+class CacheError(Exception):
+    """An exception for caching errors."""
+
+
 class ServerInterfaceError(Exception):
     def __init__(self, msg, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)

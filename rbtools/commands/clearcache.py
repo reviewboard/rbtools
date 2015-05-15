@@ -9,12 +9,12 @@ class ClearCache(Command):
     description = 'Delete the HTTP cache used for the API.'
 
     option_list = [
-        Option('--disable-cache',
-               dest='disable_cache',
-               config_key='DISABLE_CACHE',
-               action='store_true',
-               default=False,
-               help='Disable the HTTP cache.',
+        Option('--cache-location',
+               dest='cache_location',
+               metavar='FILE',
+               config_key='CACHE_LOCATION',
+               default=None,
+               help='The file to use for the API cache database.',
                added_in='0.7.3'),
     ]
 
