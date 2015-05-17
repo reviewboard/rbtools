@@ -694,6 +694,10 @@ class Post(Command):
 
         base_dir = self.options.basedir or repository_info.base_path
 
+        if repository is None:
+            raise CommandError('Could not find the repository on the Review '
+                               'Board server.')
+
         if len(diff) == 0:
             raise CommandError("There don't seem to be any diffs!")
 
