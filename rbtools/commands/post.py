@@ -592,9 +592,8 @@ class Post(Command):
             (self.options.guess_description == self.GUESS_AUTO and
              is_new_review_request))
 
-        if guess_summary or guess_description:
+        if self.revisions and (guess_summary or guess_description):
             try:
-                assert self.revisions
                 commit_message = self.tool.get_commit_message(self.revisions)
 
                 if commit_message:
