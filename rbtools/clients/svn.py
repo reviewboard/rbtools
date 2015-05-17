@@ -962,10 +962,13 @@ class SVNRepositoryInfo(RepositoryInfo):
 
         # We didn't find our locally matched repository, so scan based on UUID.
         for repository in repositories:
-            info = repository.get_info()
+            try:
+                info = repository.get_info()
 
-            if not info or self.uuid != info['uuid']:
-                continue
+                if not info or self.uuid != info['uuid']:
+                    continue
+            except APIError:
+                pass
 
             repos_base_path = info['url'][len(info['root_url']):]
             relpath = self._get_relative_path(self.base_path, repos_base_path)
