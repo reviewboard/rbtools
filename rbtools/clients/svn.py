@@ -69,10 +69,6 @@ class SVNClient(SCMClient):
         if getattr(self.options, 'repository_url', None):
             svn_info_params.append(self.options.repository_url)
 
-        # Add --non-interactive so that this command will not hang
-        #  when used  on a https repository path
-        svn_info_params.append("--non-interactive")
-
         data = self._run_svn(svn_info_params, ignore_errors=True,
                              results_unicode=False)
 
@@ -865,17 +861,17 @@ class SVNClient(SCMClient):
                                                  'empty_files'))
 
     def _run_svn(self, svn_args, *args, **kwargs):
-        cmdline = [b'svn'] + svn_args
+        cmdline = [b'svn', b'--non-interactive'] + svn_args
 
         if getattr(self.options, 'svn_username', None):
-            cmdline += ['--username', self.options.svn_username]
+            cmdline += [b'--username', self.options.svn_username]
 
         if getattr(self.options, 'svn_prompt_password', None):
             self.options.svn_prompt_password = False
             self.options.svn_password = getpass.getpass(b'SVN Password:')
 
         if getattr(self.options, 'svn_password', None):
-            cmdline += ['--password', self.options.svn_password]
+            cmdline += [b'--password', self.options.svn_password]
 
         return execute(cmdline, *args, **kwargs)
 
@@ -889,7 +885,7 @@ class SVNClient(SCMClient):
         This function returns None (as if none_on_ignored_error where True) if
         an error occurs that is not an authentication error.
         """
-        command = ['log', '--non-interactive', '--xml'] + svn_args
+        command = ['log', '--xml'] + svn_args
         rc, result, errors = self._run_svn(command,
                                            *args,
                                            return_error_code=True,
