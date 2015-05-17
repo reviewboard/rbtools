@@ -436,8 +436,8 @@ class SVNClient(SCMClient):
             url = info.get('Copied From URL', None)
 
             if url:
-                root = info["Repository Root"]
-                from_path1 = unquote(url[len(root):])
+                root = info['Repository Root']
+                from_path1 = unquote(url[len(root):]).encode('utf-8')
                 return smart_join(from_path1, path2)
 
             if info.get('Schedule', None) != 'normal':
@@ -637,7 +637,7 @@ class SVNClient(SCMClient):
                         root = info["Repository Root"]
                         path = unquote(url[len(root):])
 
-                    line = b'%s %s%s' % (front, path, rest)
+                    line = b'%s %s%s' % (front, path.encode('utf-8'), rest)
 
             result.append(line)
 
