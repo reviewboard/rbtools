@@ -586,9 +586,8 @@ class Post(Command):
             (self.options.guess_description == self.GUESS_AUTO and
              is_new_review_request))
 
-        if guess_summary or guess_description:
+        if self.revisions and (guess_summary or guess_description):
             try:
-                assert self.revisions
                 commit_message = self.tool.get_commit_message(self.revisions)
 
                 if commit_message:
@@ -687,6 +686,10 @@ class Post(Command):
             self.get_repository_path(repository_info, api_root))
 
         base_dir = self.options.basedir or repository_info.base_path
+
+        if repository is None:
+            raise CommandError('Could not find the repository on the Review '
+                               'Board server.')
 
         if len(diff) == 0:
             raise CommandError("There don't seem to be any diffs!")
