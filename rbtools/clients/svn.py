@@ -633,7 +633,7 @@ class SVNClient(SCMClient):
                         root = info["Repository Root"]
                         path = unquote(url[len(root):])
 
-                    line = b'%s %s%s' % (front, path.encode('utf-8'), rest)
+                    line = b'%s %s%s' % (front, path, rest)
 
             result.append(line)
 
