@@ -404,7 +404,7 @@ class ReviewBoardServer(object):
     def __init__(self, url, cookie_file=None, username=None, password=None,
                  api_token=None, agent=None, session=None, disable_proxy=False,
                  auth_callback=None, otp_token_callback=None,
-                 disable_ssl_verification=False, save_cookies=True):
+                 verify_ssl=True, save_cookies=True):
         if not url.endswith('/'):
             url += '/'
 
@@ -478,7 +478,7 @@ class ReviewBoardServer(object):
 
         handlers = []
 
-        if disable_ssl_verification:
+        if not verify_ssl:
             context = ssl._create_unverified_context()
             handlers.append(HTTPSHandler(context=context))
 
