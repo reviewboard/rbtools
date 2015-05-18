@@ -22,7 +22,7 @@ class SyncTransport(Transport):
     def __init__(self, url, cookie_file=None, username=None, password=None,
                  api_token=None, agent=None, session=None, disable_proxy=False,
                  auth_callback=None, otp_token_callback=None,
-                 disable_ssl_verification=False, allow_caching=True,
+                 verify_ssl=True, allow_caching=True,
                  cache_location=None, in_memory_cache=False,
                  save_cookies=True, *args, **kwargs):
         super(SyncTransport, self).__init__(url, *args, **kwargs)
@@ -39,7 +39,7 @@ class SyncTransport(Transport):
             disable_proxy=disable_proxy,
             auth_callback=auth_callback,
             otp_token_callback=otp_token_callback,
-            disable_ssl_verification=disable_ssl_verification,
+            verify_ssl=verify_ssl,
             save_cookies=save_cookies)
 
     def get_root(self):
