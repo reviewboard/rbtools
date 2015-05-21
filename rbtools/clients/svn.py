@@ -386,16 +386,17 @@ class SVNClient(SCMClient):
         if include_files:
             status_cmd.extend(include_files)
 
-        for p in self._run_svn(status_cmd, split_lines=True):
+        for p in self._run_svn(status_cmd, split_lines=True,
+                               results_unicode=False):
             try:
-                if not changelist and p.startswith('--- Changelist'):
+                if not changelist and p.startswith(b'--- Changelist'):
                     # svn status returns changelist information last.  If we
                     # hit a line starting with '--- Changelist' then we have
                     # reached the changelist section and can exit the loop as
                     # we are not interested in changelists.
                     break
 
-                if p[3] == '+':
+                if p[3] == b'+':
                     if exclude_patterns:
                         # We found a file with history, but first we must make
                         # sure that it is not being excluded.
