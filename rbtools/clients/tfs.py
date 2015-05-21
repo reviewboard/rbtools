@@ -37,9 +37,7 @@ class TFSClient(SCMClient):
             # two standard install locations.
             tf_locations = [
                 'tf.cmd',
-                'tf.exe',
                 r'%programfiles(x86)%\Microsoft Visual Studio 12.0\Common7\IDE\tf.cmd',
-                r'%programfiles(x86)%\Microsoft Visual Studio 12.0\Common7\IDE\tf.exe',
                 r'%programfiles%\Microsoft Team Foundation Server 12.0\Tools\tf.cmd',
             ]
 
