@@ -29,6 +29,10 @@ DEFAULT_OPTIONS_MAP = {
 STAMP_STRING_FORMAT = 'Reviewed at %s'
 
 
+class AlreadyStampedError(CommandError):
+    """An error indicating the change has already been stamped."""
+
+
 def get_review_request(review_request_id, api_root, **kwargs):
     """Returns the review request resource for the given ID."""
     try:
@@ -101,7 +105,7 @@ def stamp_commit_with_review_url(revisions, review_request_url, tool):
     stamp_string = STAMP_STRING_FORMAT % review_request_url
 
     if stamp_string in commit_message:
-        raise CommandError('This change is already stamped.')
+        raise AlreadyStampedError('This change is already stamped.')
 
     new_message = (commit_message.rstrip() + '\n\n' + stamp_string)
     tool.amend_commit_description(new_message, revisions)

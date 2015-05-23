@@ -7,7 +7,9 @@ import sys
 
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option, OptionGroup
-from rbtools.utils.commands import get_review_request
+from rbtools.utils.commands import (AlreadyStampedError,
+                                    get_review_request,
+                                    stamp_commit_with_review_url)
 from rbtools.utils.console import confirm
 from rbtools.utils.review_request import (get_draft_or_current_value,
                                           get_revisions,
@@ -65,6 +67,13 @@ class Post(Command):
                        default=False,
                        help='Opens a web browser to the review request '
                             'after posting.'),
+                Option('-s', '--stamp',
+                       dest='stamp_when_posting',
+                       action='store_true',
+                       config_key='STAMP_WHEN_POSTING',
+                       default=False,
+                       help='Stamps the commit message with the review '
+                            'request URL while posting the review.'),
                 Option('--submit-as',
                        dest='submit_as',
                        metavar='USERNAME',
@@ -441,7 +450,9 @@ class Post(Command):
                     only_links='create')
                 review_request = review_requests.create(**request_data)
             except APIError as e:
-                if e.error_code == 204 and changenum:  # Change number in use.
+                if e.error_code == 204 and changenum:
+                    # The change number is already in use. Get the review
+                    # request for that change and update it instead.
                     rid = e.rsp['review_request']['id']
                     review_request = api_root.get_review_request(
                         review_request_id=rid,
@@ -540,6 +551,38 @@ class Post(Command):
         except APIError as e:
             raise CommandError('Error retrieving review request draft: %s' % e)
 
+        # Stamp the commit message with the review request URL before posting
+        # the review, so that we can use the stamped commit message when
+        # guessing the description. This enables the stamped message to be
+        # present on the review if the user has chosen to publish immediately
+        # upon posting.
+        if self.options.stamp_when_posting:
+            if not self.tool.can_amend_commit:
+                print('Cannot stamp review URL onto the commit message; '
+                      'stamping is not supported with %s.' % self.tool.name)
+
+            else:
+                try:
+                    stamp_commit_with_review_url(self.revisions,
+                                                 review_request.absolute_url,
+                                                 self.tool)
+                    print('Stamped review URL onto the commit message.')
+                except AlreadyStampedError:
+                    print('Commit message has already been stamped')
+                except Exception as e:
+                    logging.debug('Caught exception while stamping the '
+                                  'commit message. Proceeding to post '
+                                  'without stamping.', exc_info=True)
+                    print('Could not stamp review URL onto the commit '
+                          'message.')
+
+        # If the user has requested to guess the summary or description,
+        # get the commit message and override the summary and description
+        # options. The guessing takes place after stamping so that the
+        # guessed description matches the commit when rbt exits.
+        if not self.options.diff_filename:
+            self.check_guess_fields()
+
         # Update the review request draft fields based on options set
         # by the user, or configuration.
         update_fields = {}
@@ -626,9 +669,8 @@ class Post(Command):
             (self.options.guess_description == self.GUESS_AUTO and
              is_new_review_request))
 
-        if guess_summary or guess_description:
+        if self.revisions and (guess_summary or guess_description):
             try:
-                assert self.revisions
                 commit_message = self.tool.get_commit_message(self.revisions)
 
                 if commit_message:
@@ -762,6 +804,10 @@ class Post(Command):
 
         base_dir = self.options.basedir or repository_info.base_path
 
+        if repository is None:
+            raise CommandError('Could not find the repository on the Review '
+                               'Board server.')
+
         if not diff and not history:
             raise CommandError("There don't seem to be any diffs!")
 
@@ -770,12 +816,6 @@ class Post(Command):
             commit_id = changenum
         else:
             changenum = None
-
-        if not self.options.diff_filename:
-            # If the user has requested to guess the summary or description,
-            # get the commit message and override the summary and description
-            # options.
-            self.check_guess_fields()
 
         if self.options.update and self.revisions:
             review_request = guess_existing_review_request(

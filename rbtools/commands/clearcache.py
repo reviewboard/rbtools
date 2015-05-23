@@ -20,4 +20,4 @@ class ClearCache(Command):
 
     def main(self):
         """Unlink the API cache's path."""
-        clear_cache(self.options.cache_path)
+        clear_cache(self.options.cache_location
