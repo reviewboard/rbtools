@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 
 import re
+from collections import defaultdict, deque
 
 import six
 from pkg_resources import parse_version
@@ -10,6 +11,7 @@ from six.moves.urllib.parse import urljoin
 from rbtools.api.cache import MINIMUM_VERSION
 from rbtools.api.decorators import request_method_decorator
 from rbtools.api.request import HttpRequest
+from rbtools.utils.graphs import path_exists
 
 
 RESOURCE_MAP = {}
@@ -246,8 +248,8 @@ class ResourceLinkField(ResourceDictField):
         self._transport = resource._transport
 
     @request_method_decorator
-    def get(self):
-        return HttpRequest(self._fields['href'])
+    def get(self, **query_args):
+        return HttpRequest(self._fields['href'], query_args=query_args)
 
 
 class ResourceListField(list):
@@ -715,6 +717,70 @@ class ReviewRequestResource(ItemResource):
             request.add_field(name, value)
 
         return request
+
+    def build_dependency_graph(self):
+        """Build the dependency graph for the review request.
+
+        Only review requests in the same repository as this one will be in the
+        graph.
+
+        A ValueError is raised if the graph would contain cycles.
+        """
+        def get_url(resource):
+            """Get the URL of the resource."""
+            if hasattr(resource, 'href'):
+                return resource.href
+            else:
+                return resource.absolute_url
+
+        # Even with the API cache, we don't want to be making more requests
+        # than necessary. The review request resource will be cached by an
+        # ETag, so there will still be a round trip if we don't cache them
+        # here.
+        review_requests_by_url = {}
+        review_requests_by_url[self.absolute_url] = self
+
+        def get_review_request_resource(resource):
+            url = get_url(resource)
+
+            if url not in review_requests_by_url:
+                review_requests_by_url[url] = resource.get(expand='repository')
+
+            return review_requests_by_url[url]
+
+        repository = self.get_repository()
+
+        graph = defaultdict(set)
+
+        visited = set()
+
+        unvisited = deque()
+        unvisited.append(self)
+
+        while unvisited:
+            head = unvisited.popleft()
+
+            if head in visited:
+                continue
+
+            visited.add(get_url(head))
+
+            for tail in head.depends_on:
+                tail = get_review_request_resource(tail)
+
+                if path_exists(graph, tail.id, head.id):
+                    raise ValueError('Circular dependencies.')
+
+                # We don't want to include review requests for other
+                # repositories, so we'll stop if we reach one. We also don't
+                # want to re-land submitted review requests.
+                if (repository.id == tail.repository.id and
+                    tail.status != 'submitted'):
+                    graph[head].add(tail)
+                    unvisited.append(tail)
+
+        graph.default_factory = None
+        return graph
 
 
 @resource_mimetype('application/vnd.reviewboard.org.diff-validation')

@@ -8,6 +8,7 @@ from rbtools.utils.commands import (build_rbtools_cmd_argv,
                                     extract_commit_message,
                                     get_review_request)
 from rbtools.utils.console import confirm
+from rbtools.utils.graphs import toposort
 from rbtools.utils.process import execute
 from rbtools.utils.review_request import (get_draft_or_current_value,
                                           get_revisions,
@@ -101,6 +102,15 @@ class Land(Command):
                default=False,
                help='Simulates the landing of a change, without actually '
                     'making any changes to the tree.'),
+        Option('--recursive',
+               dest='recursive',
+               action='store_true',
+               default=False,
+               help='Recursively fetch patches for review requests that the '
+                    'specified review request depends on. This is equivalent '
+                    'to calling "rbt patch" for each of those review '
+                    'requests.',
+               added_in='0.8.0'),
         Command.server_options,
         Command.repository_options,
     ]
@@ -123,9 +133,16 @@ class Land(Command):
             raise CommandError('Failed to execute "rbt patch":\n%s'
                                % output)
 
-    def land(self, destination_branch, review_request, source_branch=None,
-             squash=False, edit=False, delete_branch=True, dry_run=False):
-        """Land an individual review request."""
+    def can_land(self, review_request):
+        """Determine if the review request is land-able.
+
+        A review request can be landed if it is approved or, if the Review
+        Board server does not keep track of approval, if the review request
+        has a ship-it count.
+
+        This function returns the error with landing the review request or None
+        if it can be landed.
+        """
         try:
             is_rr_approved = review_request.approved
             approval_failure = review_request.approval_failure
@@ -134,23 +151,28 @@ class Land(Command):
             # doesn't support the `approved` field. Determining it manually.
             if review_request.ship_it_count == 0:
                 is_rr_approved = False
-                approval_failure = ('The review request has not been marked '
+                approval_failure = ('review request has not been marked '
                                     '"Ship It!"')
             else:
                 is_rr_approved = True
         finally:
             if not is_rr_approved:
-                raise CommandError(approval_failure)
+                return approval_failure
 
+        return None
+
+    def land(self, destination_branch, review_request, source_branch=None,
+             squash=False, edit=False, delete_branch=True, dry_run=False):
+        """Land an individual review request."""
         if source_branch:
             review_commit_message = extract_commit_message(review_request)
             author = review_request.get_submitter()
 
             if squash:
-                print('Squashing branch "%s" into "%s"'
+                print('Squashing branch "%s" into "%s".'
                       % (source_branch, destination_branch))
             else:
-                print('Merging branch "%s" into "%s"'
+                print('Merging branch "%s" into "%s".'
                       % (source_branch, destination_branch))
 
             if not dry_run:
@@ -165,12 +187,12 @@ class Land(Command):
                     raise CommandError(six.text_type(e))
 
             if delete_branch:
-                print('Deleting merged branch "%s"' % source_branch)
+                print('Deleting merged branch "%s".' % source_branch)
 
                 if not dry_run:
                     self.tool.delete_branch(source_branch, merged_only=False)
         else:
-            print('Applying patch from review request %s' % review_request.id)
+            print('Applying patch from review request %s.' % review_request.id)
 
             if not dry_run:
                 self.patch(review_request.id)
@@ -243,6 +265,44 @@ class Land(Command):
                                    'destination branch.')
         else:
             branch_name = None
+
+        land_error = self.can_land(review_request)
+
+        if land_error is not None:
+            raise CommandError('Cannot land review request %s: %s'
+                               % (review_request_id, land_error))
+
+        if self.options.recursive:
+            # The dependency graph shows us which review requests depend on
+            # which other ones. What we are actually after is the order to land
+            # them in, which is the topological sorting order of the converse
+            # graph. It just so happens that if we reverse the topological sort
+            # of a graph, it is a valid topological sorting of the converse
+            # graph, so we don't have to compute the converse graph.
+            dependency_graph = review_request.build_dependency_graph()
+            dependencies = toposort(dependency_graph)[1:]
+
+            if dependencies:
+                print('Recursively landing dependencies of review request %s.'
+                      % review_request_id)
+
+                for dependency in dependencies:
+                    land_error = self.can_land(dependency)
+
+                    if land_error is not None:
+                        raise CommandError(
+                            'Aborting recursive land of review request %s.\n'
+                            'Review request %s cannot be landed: %s'
+                            % (review_request_id, dependency.id, land_error))
+
+                for dependency in reversed(dependencies):
+                    self.land(self.options.destination_branch,
+                              dependency,
+                              None,
+                              self.options.squash,
+                              self.options.edit,
+                              self.options.delete_branch,
+                              self.options.dry_run)
 
         self.land(self.options.destination_branch,
                   review_request,
