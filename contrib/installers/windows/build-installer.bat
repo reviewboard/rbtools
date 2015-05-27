@@ -234,7 +234,6 @@ if ERRORLEVEL 1 (
 )
 
 for /f "skip=2 tokens=2,*" %%A in ('%_reg_query_cmd%') do (
-    echo hi
     SET MSBUILDDIR=%%B
 )
 
