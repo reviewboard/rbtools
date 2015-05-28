@@ -2,7 +2,6 @@ from __future__ import print_function, unicode_literals
 
 import six
 
-from rbtools.api.errors import APIError
 from rbtools.clients.errors import MergeError, PushError
 from rbtools.commands import Command, CommandError, Option, RB_MAIN
 from rbtools.utils.commands import (build_rbtools_cmd_argv,
