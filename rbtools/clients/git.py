@@ -42,6 +42,21 @@ class GitClient(SCMClient):
         self.git = 'git'
 
         self._original_cwd = None
+        self._git_version = None
+
+        version_str = execute([self.git, 'version'], ignore_errors=True,
+                              none_on_ignored_error=True)
+
+        if version_str:
+            m = re.search(r'(\d+).(\d+).(\d+)', version_str)
+
+            if m:
+                self._git_version = (int(m.group(1)),
+                                     int(m.group(2)),
+                                     int(m.group(3)))
+
+        self._supports_git_config_flag = (self._git_version and
+                                          self._git_version >= (1, 8, 0))
 
     def parse_revision_spec(self, revisions=[]):
         """Parses the given revision spec.
@@ -478,14 +493,19 @@ class GitClient(SCMClient):
         if include_files:
             include_files = ['--'] + include_files
 
-        git_cmd = [self.git, '-c', 'core.quotepath=false']
+        git_cmd = [self.git]
+
+        if self._supports_git_config_flag:
+            git_cmd.extend(['-c', 'core.quotepath=false'])
 
         if self.type in ('svn', 'perforce'):
             diff_cmd_params = ['--no-color', '--no-prefix', '-r', '-u']
         elif self.type == 'git':
             diff_cmd_params = ['--no-color', '--full-index',
                                '--ignore-submodules']
-            git_cmd.extend(['-c', 'diff.noprefix=false'])
+
+            if self._supports_git_config_flag:
+                git_cmd.extend(['-c', 'diff.noprefix=false'])
 
             if (self.capabilities is not None and
                 self.capabilities.has_capability('diffs', 'moved_files')):

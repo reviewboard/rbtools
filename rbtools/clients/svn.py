@@ -976,7 +976,7 @@ class SVNRepositoryInfo(RepositoryInfo):
                 if not info or self.uuid != info['uuid']:
                     continue
             except APIError:
-                pass
+                continue
 
             repos_base_path = info['url'][len(info['root_url']):]
             relpath = self._get_relative_path(self.base_path, repos_base_path)
