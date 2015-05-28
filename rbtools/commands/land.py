@@ -128,6 +128,11 @@ class Land(Command):
         else:
             patch_command.append('-C')
 
+        if with_history:
+            patch_command.append('-H')
+        else:
+            patch_command.append('-S')
+
         patch_command.append(review_request_id)
 
         p = subprocess.Popen(patch_command)
