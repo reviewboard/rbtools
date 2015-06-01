@@ -388,17 +388,19 @@ class Post(Command):
         else:
             # No review_request_id, so we will create a new review request.
             try:
+                # Until we are Python 2.7+ only, the keys in request_data have
+                # to be bytes. See bug 3753 for details.
                 request_data = {
-                    'repository': repository
+                    b'repository': repository
                 }
 
                 if changenum:
-                    request_data['changenum'] = changenum
+                    request_data[b'changenum'] = changenum
                 elif commit_id and supports_posting_commit_ids:
-                    request_data['commit_id'] = commit_id
+                    request_data[b'commit_id'] = commit_id
 
                 if submit_as:
-                    request_data['submit_as'] = submit_as
+                    request_data[b'submit_as'] = submit_as
 
                 review_requests = api_root.get_review_requests(
                     only_fields='',
