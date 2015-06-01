@@ -268,7 +268,7 @@ class Post(Command):
         # Only one of --description and --description-file can be used
         if self.options.description and self.options.description_file:
             raise CommandError('The --description and --description-file '
-                               'options are mutually exclusive.\n')
+                               'options are mutually exclusive.')
 
         # If --description-file is used, read that file
         if self.options.description_file:
@@ -277,13 +277,13 @@ class Post(Command):
                     self.options.description = fp.read()
             else:
                 raise CommandError(
-                    'The description file %s does not exist.\n' %
-                    self.options.description_file)
+                    'The description file %s does not exist.'
+                    % self.options.description_file)
 
         # Only one of --testing-done and --testing-done-file can be used
         if self.options.testing_done and self.options.testing_file:
             raise CommandError('The --testing-done and --testing-done-file '
-                               'options are mutually exclusive.\n')
+                               'options are mutually exclusive.')
 
         # If --testing-done-file is used, read that file
         if self.options.testing_file:
@@ -291,8 +291,8 @@ class Post(Command):
                 with open(self.options.testing_file, 'r') as fp:
                     self.options.testing_done = fp.read()
             else:
-                raise CommandError('The testing file %s does not exist.\n' %
-                                   self.options.testing_file)
+                raise CommandError('The testing file %s does not exist.'
+                                   % self.options.testing_file)
 
         # If we have an explicitly specified summary, override
         # --guess-summary
@@ -309,6 +309,12 @@ class Post(Command):
         else:
             self.options.guess_description = self.normalize_guess_value(
                 self.options.guess_description, '--guess-description')
+
+        # If the --diff-filename argument is used, we can't do automatic
+        # updating.
+        if self.options.diff_filename and self.options.update:
+            raise CommandError('The --update option cannot be used when '
+                               'using --diff-filename.')
 
         # If we have an explicitly specified review request ID, override
         # --update
@@ -562,12 +568,12 @@ class Post(Command):
             try:
                 draft = draft.update(**update_fields)
             except APIError as e:
-                raise CommandError(u'\n'.join([
-                    u'Error updating review request draft: %s\n' % e,
-                    u'Your review request still exists, but the diff is '
-                    u'not attached.\n',
-                    u'%s\n' % review_request.absolute_url,
-                ]))
+                raise CommandError(
+                    'Error updating review request draft: %s\n\n'
+                    'Your review request still exists, but the diff is not '
+                    'attached.\n\n'
+                    '%s\n'
+                    % (e, review_request.absolute_url))
 
         return review_request.id, review_request.absolute_url
 
