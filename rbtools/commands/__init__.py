@@ -764,7 +764,7 @@ class Command(object):
             api_root = api_client.get_root()
         except ServerInterfaceError as e:
             raise CommandError('Could not reach the Review Board '
-                               'server at %s' % server_url)
+                               'server at %s: %s' % (server_url, e))
         except APIError as e:
             raise CommandError('Unexpected API Error: %s' % e)
 
