@@ -164,10 +164,14 @@ class TFSClient(SCMClient):
             new_filename = pending_change.attrib['server-item']
             local_filename = pending_change.attrib['local-item']
             old_version = pending_change.attrib['version']
-            file_type = pending_change.attrib['file-type']
+            file_type = pending_change.attrib.get('file-type')
             new_version = '(pending)'
             old_data = ''
             new_data = ''
+
+            if (not file_type or (not os.path.isfile(local_filename) and
+                                  'delete' not in action)):
+                continue
 
             if 'rename' in action:
                 old_filename = pending_change.attrib['source-item']
