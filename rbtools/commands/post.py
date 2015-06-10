@@ -73,7 +73,8 @@ class Post(Command):
                        config_key='STAMP_WHEN_POSTING',
                        default=False,
                        help='Stamps the commit message with the review '
-                            'request URL while posting the review.'),
+                            'request URL while posting the review.',
+                       added_in='0.7.3'),
                 Option('--submit-as',
                        dest='submit_as',
                        metavar='USERNAME',
