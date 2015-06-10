@@ -233,7 +233,7 @@ class Command(object):
                    help='Use an in-memory cookie store instead of writing '
                         'them to a file. No credentials will be saved or '
                         'loaded.',
-                   added_in='0.8.0'),
+                   added_in='0.7.3'),
             Option('--disable-cache',
                    dest='disable_cache',
                    config_key='DISABLE_CACHE',
