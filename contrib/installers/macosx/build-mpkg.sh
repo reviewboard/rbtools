@@ -99,10 +99,10 @@ $CP $DATA_SRC/distribution.xml $PKG_BUILD
 # Now build the actual package that we can ship.
 if [ "$RBTOOLS_SIGN_PACKAGE" != "no" ]; then
     if [ -z "$RBTOOLS_SIGNATURE" ]; then
-        RBTOOLS_SIGNATURE="3rd Party Mac Developer Installer: Beanbag, Inc. (8P6MEUDM64)"
+        RBTOOLS_SIGNATURE="Developer ID Installer: Beanbag, Inc. (8P6MEUDM64)"
     fi
 
-    PRODUCTBUILD_SIGN_PARAMS="--sign \"${RBTOOLS_SIGNATURE}\""
+    PRODUCTBUILD_SIGN_PARAMS="--sign \"${RBTOOLS_SIGNATURE}\" --timestamp"
 fi
 
 eval $PRODUCTBUILD \

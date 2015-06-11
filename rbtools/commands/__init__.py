@@ -233,7 +233,7 @@ class Command(object):
                    help='Use an in-memory cookie store instead of writing '
                         'them to a file. No credentials will be saved or '
                         'loaded.',
-                   added_in='0.8.0'),
+                   added_in='0.7.3'),
             Option('--disable-cache',
                    dest='disable_cache',
                    config_key='DISABLE_CACHE',
@@ -805,7 +805,7 @@ class Command(object):
             api_root = api_client.get_root()
         except ServerInterfaceError as e:
             raise CommandError('Could not reach the Review Board '
-                               'server at %s' % server_url)
+                               'server at %s: %s' % (server_url, e))
         except APIError as e:
             raise CommandError('Unexpected API Error: %s' % e)
 

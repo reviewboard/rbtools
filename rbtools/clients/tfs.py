@@ -161,34 +161,43 @@ class TFSClient(SCMClient):
 
         for pending_change in root.findall('./pending-changes/pending-change'):
             action = pending_change.attrib['change-type'].split(', ')
-            new_filename = pending_change.attrib['server-item']
+            new_filename = pending_change.attrib['server-item'].encode('utf-8')
             local_filename = pending_change.attrib['local-item']
-            old_version = pending_change.attrib['version']
-            file_type = pending_change.attrib['file-type']
-            new_version = '(pending)'
-            old_data = ''
-            new_data = ''
+            old_version = pending_change.attrib['version'].encode('utf-8')
+            file_type = pending_change.attrib.get('file-type')
+            new_version = b'(pending)'
+            old_data = b''
+            new_data = b''
+
+            if (not file_type or (not os.path.isfile(local_filename) and
+                                  'delete' not in action)):
+                continue
 
             if 'rename' in action:
-                old_filename = pending_change.attrib['source-item']
+                old_filename = \
+                    pending_change.attrib['source-item'].encode('utf-8')
             else:
                 old_filename = new_filename
 
             if 'add' in action:
-                old_filename = '/dev/null'
+                old_filename = b'/dev/null'
 
                 if file_type != 'binary':
                     with open(local_filename) as f:
                         new_data = f.read()
-                old_data = ''
+                old_data = b''
             elif 'delete' in action:
-                old_data = self._run_tf(['print', '-version:%s' % old_version,
-                                         old_filename])
-                new_data = ''
-                new_version = '(deleted)'
+                old_data = self._run_tf(
+                    ['print', '-version:%s' % old_version.decode('utf-8'),
+                     old_filename.decode('utf-8')],
+                    results_unicode=False)
+                new_data = b''
+                new_version = b'(deleted)'
             elif 'edit' in action:
-                old_data = self._run_tf(['print', '-version:%s' % old_version,
-                                         old_filename])
+                old_data = self._run_tf(
+                    ['print', '-version:%s' % old_version.decode('utf-8'),
+                     old_filename.decode('utf-8')],
+                    results_unicode=False)
 
                 with open(local_filename) as f:
                     new_data = f.read()
@@ -197,17 +206,23 @@ class TFSClient(SCMClient):
                 if 'add' in action:
                     old_filename = new_filename
 
-                diff.append('--- %s\t%s\n' % (old_filename, old_version))
-                diff.append('+++ %s\t%s\n' % (new_filename, new_version))
-                diff.append('Binary files %s and %s differ\n'
+                diff.append(b'--- %s\t%s\n' % (old_filename, old_version))
+                diff.append(b'+++ %s\t%s\n' % (new_filename, new_version))
+                diff.append(b'Binary files %s and %s differ\n'
                             % (old_filename, new_filename))
             elif old_filename != new_filename and old_data == new_data:
                 # Renamed file with no changes (difflib will completely skip
                 # these, so do it by hand).
-                diff.append('--- %s\t%s\n' % (old_filename, old_version))
-                diff.append('+++ %s\t%s\n' % (new_filename, new_version))
+                diff.append(b'--- %s\t%s\n' % (old_filename, old_version))
+                diff.append(b'+++ %s\t%s\n' % (new_filename, new_version))
             else:
-                diff.append(''.join(difflib.unified_diff(
+                if old_data and not old_data.endswith(b'\n'):
+                    old_data += b'\n'
+
+                if new_data and not new_data.endswith(b'\n'):
+                    new_data += b'\n'
+
+                diff.append(b''.join(difflib.unified_diff(
                     old_data.splitlines(True), new_data.splitlines(True),
                     old_filename, new_filename,
                     old_version, new_version)))
@@ -218,7 +233,7 @@ class TFSClient(SCMClient):
                             'in your review request.')
 
         return {
-            'diff': ''.join(diff),
+            'diff': b''.join(diff),
             'parent_diff': None,
             'base_commit_id': base,
         }
@@ -285,7 +300,7 @@ class TFSClient(SCMClient):
                           e, exc_info=True)
             logging.debug(history)
 
-    def _run_tf(self, args):
+    def _run_tf(self, args, **kwargs):
         cmdline = [self.tf, '-noprompt']
 
         if getattr(self.options, 'tfs_login', None):
@@ -299,7 +314,7 @@ class TFSClient(SCMClient):
                 if arg.startswith('-'):
                     cmdline[i] = '/' + arg[1:]
 
-        return execute(cmdline, ignore_errors=True)
+        return execute(cmdline, ignore_errors=True, **kwargs)
 
     def _convert_symbolic_revision(self, revision):
         """Convert a symbolic revision into a numeric changeset."""

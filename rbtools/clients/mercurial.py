@@ -493,15 +493,13 @@ class MercurialClient(SCMClient):
         If the remote branch is not defined, the parent branch of the
         repository is returned.
         """
-        try:
-            remote = self._remote_path[0]
-        except IndexError:
-            remote = None
+        remote = getattr(self.options, 'tracking', None)
 
-        tracking = getattr(self.options, 'tracking', None)
-
-        if not remote and tracking:
-            remote = tracking
+        if not remote:
+            try:
+                remote = self._remote_path[0]
+            except IndexError:
+                remote = None
 
         if not remote:
             die('Could not determine remote branch to use for diff creation. '

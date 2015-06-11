@@ -1,0 +1,275 @@
+===========================
+RBTools 0.7.3 Release Notes
+===========================
+
+**Release date:** May 27, 2015
+
+
+Compatibility Notes
+===================
+
+* Team Foundation Server support does not yet work with Visual Studio
+  2013 Update 4 or higher.
+
+  In Visual Studio 2013 Update 4, the command line tool we used,
+  :command:`tf.cmd`, has been rewritten, and many of the features we
+  depended on were dropped.
+
+  For the moment, you will need to stick with Update 3 or lower in order to
+  continue using `Power Pack`_'s TFS support. Alternatively, if you're running
+  Update 4, you can try installing `Team Explorer Everywhere`_.
+
+.. _`Power Pack`: https://www.reviewboard.org/powerpack/
+.. _`Team Explorer Everywhere`:
+   https://www.visualstudio.com/en-us/products/team-explorer-everywhere-vs.aspx
+
+
+New Features
+============
+
+General
+-------
+
+.. :program: rbt post
+
+* Added a :option:`--disable-ssl-verification` option to all commands
+  to disable verifying SSL certificates when running on Python 2.7.9+.
+  (:bug:`3705`)
+
+  Starting in Python 2.7.9, SSL certificates and their associated hostnames
+  can be fully verified, improving security. However, this can cause problems
+  for self-signed certificates. This new option disables that verification.
+
+  We recommend that production servers do not use self-signed certificates.
+
+* Added new options for manipulating cache behavior.
+
+  All commands now support a few new options for caching:
+
+  * :option:`--disable-cache` will disable all caching behavior.
+
+  * :option:`--disable-cache-storage` will enable caching behavior, but will
+    not persist the cache to disk. The cache will only remain valid for the
+    run of the RBTools command.
+
+  * :option:`--cache-location` specifies the path to the cache file to read
+    from and write to.
+
+* Added a :option:`--disable-cookie-storage` option to prevent cookies from being
+  written to disk.
+
+
+rbt patch
+---------
+
+.. :program: rbt patch
+
+* Added support for reverting patches.
+
+  The new :option:`-R`/:option:`--revert` option allows reverting a
+  patch in a review request. This is handy when applying a patch to a
+  repository containing other modifications, and then wanting to revert
+  that patch.
+
+  This supports CVS, Git, Perforce, and Subversion repositories.
+
+
+rbt post
+--------
+
+.. :program: rbt post
+
+* Added a :option:`-s`/:option:`--stamp` flag to auto-stamp the commit message
+  with the review request URL when posting a change.
+
+  This is equivalent to posting a change and then manually running
+  :program:`rbt stamp`.
+
+  The configuration option ``STAMP_WHEN_POSTING`` can be set to enable
+  this behavior by default.
+
+  Patch by Andrew Brandon.
+
+
+Perforce
+--------
+
+* Added support for imported files. (:bug:`3574`)
+
+  Perforce can integrate from a remote depot, which adds files using
+  the "import" method. We now treat these like any other added files.
+
+* Added support for stamping commits when using :command:`rbt stamp`,
+  :command:`rbt post --stamp`, or :command:`rbt land`.
+
+  Patch by Andrew Brandon.
+
+
+Subversion
+----------
+
+.. :program: rbt post
+
+* Added a :option:`--svn-prompt-password` option for requesting to prompt
+  for Subversion passwords.
+
+  When specified on the command line, the user will be prompted for their
+  Subversion password the first time a Subversion command needs to be
+  performed during that run of the RBTools command.
+
+
+API
+===
+
+.. py:currentmodule:: rbtools.api.client
+
+* Clients can disable persistent cookie storage by passing
+  ``save_cookies=False`` to the :py:class:`RBClient` constructor.
+
+* Clients can disable SSL certificate validation on Python 2.7.9+ by passing
+  ``verify_ssl=False`` to the :py:class:`RBClient` constructor.
+
+* Clients can alter cache behavior by passing the new ``allow_caching=``,
+  ``cache_location=``, and ``in_memory_cache=`` options to the
+  :py:class:`RBClient` constructor.
+
+* Added a ``return_errors`` flag to :py:func:`rbtools.utils.process.execute`.
+
+  If set, the error output will be returned from the function call.
+  This cannot be used if ``with_errors`` is set.
+
+* Changed some error handling cases in the API caching layer to raise a
+  :py:class:`CacheError` instead of exiting the process.
+
+
+Bug Fixes
+=========
+
+General
+-------
+
+* Failed diff commands no longer log the output of the diff. (:bug:`3781`)
+
+* Fixed crashes in some calls attempting to get data from an external process
+  when the process returns a non-zero return code.
+
+  Patch by Griffin Myers.
+
+* Providing the :option:`--username` to any command now clears the current
+  session, using the new username and password. (:bug:`3858`)
+
+* The :file:`.reviewboardrc` file in the home directory is no longer parsed
+  multiple times.
+
+* Data sent to the API is no longer assumed to be encoded as UTF8.
+
+
+Caching
+-------
+
+* Fixed caching results from the API containing non-ASCII characters.
+
+
+rbt patch
+---------
+
+* Fixed various issues patching files for Bazaar, ClearCase, CVS, Subversion,
+  Plastic, and TFS.
+
+  Patching previously only worked reliably for Git, Mercurial, and Perforce.
+  We've expanded the support for the other supported SCMs so that patching
+  will work everywhere.
+
+  For patching files on Subversion, svn 1.7.0 or higher must be installed,
+  so that we can utilize :command:`svn patch`.
+
+* Fixed patching files in subdirectories on a Subversion repository.
+
+
+rbt post
+--------
+
+* When excluding files during upload, the commit ID is no longer set on the
+  review request.
+
+* Failing to find the correct repository now returns a sane error message.
+  (:bug:`3687`)
+
+* Fixed posting changes using Perforce depot paths. (:bug:`3864`)
+
+
+ClearCase
+---------
+
+* Fixed a crash when attempting to generate a diff with multiple revisions.
+  (:bug:`3814`)
+
+
+Git
+---
+
+* Fixed Unicode errors when processing diffs for git-svn and git-p4
+  containing non-UTF8 characters. (:bug:`3843`)
+
+* Fixed a crash in the server-side git hook scripts. (:bug:`3824`)
+
+  Patch by Tien Vu.
+
+
+Mercurial
+---------
+
+* Fixed Unicode errors when processing diffs containing non-UTF8 characters.
+
+  Patch by Halvor Lund.
+
+
+Subversion
+----------
+
+* Fixed compatibility with :command:`svn` 1.7.x and lower. (:bug:`3876`)
+
+* Fixed Unicode errors when parsing results from :command:`svn info`
+  and :command:`svn status` containing non-UTF8 characters.
+
+* Fixed Unicode errors when processing commit logs containing non-UTF8
+  characters. (:bug:`3844`)
+
+  Patch by Griffin Myers.
+
+* Fixed Unicode errors when processing diffs containing non-UTF8 characters
+  (:bug:`3870`)
+
+* Fixed Unicode errors with non-UTF8 filenames in a change.
+
+* Fixed incorrect results for some operations involving the inspection of
+  commit logs when SVN requires authentication.
+
+  The old behavior just resulted in some cryptic error messages when SVN
+  attempted to prompt for authentication credentials. Now, a clear error
+  message is shown instructing the user how to proceed.
+
+* Improved parsing of the Subversion client version. (:bug:`3834`)
+
+  Subversion versions that contain additional version details (such as
+  ``1.6.1-SlikSvn-tag-1.6.1``) are now parsed correctly.
+
+  Patch by Griffin Myers.
+
+* Subversion no longer attempts to ask the user whether they want to save
+  credentials when passing them on the command line. (:bug:`3871`)
+
+* Missing or inaccessible Subversion repositories configured on Review Board
+  no longer breaks posting changes for review. (:bug:`3865`)
+
+
+Contributors
+============
+
+* Andrew Brandon
+* Barret Rennie
+* Christian Hammond
+* David Trowbridge
+* Griffin Myers
+* Halvor Lund
+* Tien Vu
