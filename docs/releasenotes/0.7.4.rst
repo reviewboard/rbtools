@@ -1,0 +1,78 @@
+===========================
+RBTools 0.7.4 Release Notes
+===========================
+
+**Release date:** June 11, 2015
+
+
+Compatibility Notes
+===================
+
+* Team Foundation Server support does not yet work with Visual Studio
+  2013 Update 4 or higher.
+
+  In Visual Studio 2013 Update 4, the command line tool we used,
+  :command:`tf.cmd`, has been rewritten, and many of the features we
+  depended on were dropped.
+
+  For the moment, you will need to stick with Update 3 or lower in order to
+  continue using `Power Pack`_'s TFS support. Alternatively, if you're running
+  Update 4, you can try installing `Team Explorer Everywhere`_.
+
+.. _`Power Pack`: https://www.reviewboard.org/powerpack/
+.. _`Team Explorer Everywhere`:
+   https://www.visualstudio.com/en-us/products/team-explorer-everywhere-vs.aspx
+
+
+Bug Fixes
+=========
+
+General
+-------
+
+* Fixed a Python 2.6 compatibility problem. (:bug:`3753`)
+
+* When there are communication errors with a Review Board server, the error
+  message will now contain more details on what went wrong. (:bug:`3840`)
+
+* Fixed additional Unicode issues when running in a non-UTF-8 environment.
+
+  Patch by Bartosz Gołek.
+
+
+rbt post
+--------
+
+* The :option:`--diff-filename` and :option:`--update` flags are now
+  mutually-exclusive. (:bug:`3755`)
+
+  The :option:`--update` option didn't make sense when using a diff filename,
+  since the review request could not be guessed. There's now an error shown
+  when trying to use both.
+
+
+Mercurial
+---------
+
+* The :option:`--tracking-branch` option wasn't overriding the built-in
+  default tracking branch.
+
+  Patch by Andrew Bettison.
+
+
+Team Foundation Server
+----------------------
+
+* Modifications to directories or other non-files no longer break diff
+  generation.
+
+* Fixed issues with file encodings and newlines.
+
+
+Contributors
+============
+
+* Andrew Bettison
+* Bartosz Gołek
+* Christian Hammond
+* David Trowbridge
