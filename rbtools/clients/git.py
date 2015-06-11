@@ -42,21 +42,30 @@ class GitClient(SCMClient):
         self.git = 'git'
 
         self._original_cwd = None
-        self._git_version = None
 
-        version_str = execute([self.git, 'version'], ignore_errors=True,
-                              none_on_ignored_error=True)
+    def _supports_git_config_flag(self):
+        """Return if the installed version of git supports the -c flag.
 
-        if version_str:
-            m = re.search(r'(\d+).(\d+).(\d+)', version_str)
+        This will execute ``git --version`` on the first call and cache the
+        result.
+        """
+        if not hasattr(self, '_git_version_at_least_180'):
+            self._git_version_least_180 = False
 
-            if m:
-                self._git_version = (int(m.group(1)),
-                                     int(m.group(2)),
-                                     int(m.group(3)))
+            version_str = execute([self.git, 'version'], ignore_errors=True,
+                                  none_on_ignored_error=True)
 
-        self._supports_git_config_flag = (self._git_version and
-                                          self._git_version >= (1, 8, 0))
+            if version_str:
+                m = re.search('(\d+)\.(\d+)\.(\d+)', version_str)
+
+                if m:
+                    git_version = (int(m.group(1)),
+                                   int(m.group(2)),
+                                   int(m.group(3)))
+
+                    self._git_version_at_least_180 = git_version >= (1, 8, 0)
+
+        return self._git_version_at_least_180
 
     def parse_revision_spec(self, revisions=[]):
         """Parses the given revision spec.
@@ -495,7 +504,7 @@ class GitClient(SCMClient):
 
         git_cmd = [self.git]
 
-        if self._supports_git_config_flag:
+        if self._supports_git_config_flag():
             git_cmd.extend(['-c', 'core.quotepath=false'])
 
         if self.type in ('svn', 'perforce'):
@@ -504,7 +513,7 @@ class GitClient(SCMClient):
             diff_cmd_params = ['--no-color', '--full-index',
                                '--ignore-submodules']
 
-            if self._supports_git_config_flag:
+            if self._supports_git_config_flag():
                 git_cmd.extend(['-c', 'diff.noprefix=false'])
 
             if (self.capabilities is not None and
