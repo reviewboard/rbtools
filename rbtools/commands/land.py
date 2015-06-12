@@ -202,7 +202,7 @@ class Land(Command):
             print('Applying patch from review request %s.' % review_request.id)
 
             if not dry_run:
-                self.patch(review_request.id)
+                self.patch(review_request.id, with_history)
 
         print('Review request %s has landed on "%s".' %
               (review_request.id, self.options.destination_branch))
