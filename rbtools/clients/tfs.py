@@ -1,10 +1,10 @@
 from __future__ import unicode_literals
 
-import difflib
 import logging
 import os
 import re
 import sys
+import tempfile
 import urllib2
 import xml.etree.ElementTree as ET
 
@@ -202,30 +202,43 @@ class TFSClient(SCMClient):
                 with open(local_filename) as f:
                     new_data = f.read()
 
+            old_label = b'%s\t%s' % (old_filename, old_version)
+            new_label = b'%s\t%s' % (new_filename, new_version)
+
             if file_type == 'binary':
                 if 'add' in action:
                     old_filename = new_filename
 
-                diff.append(b'--- %s\t%s\n' % (old_filename, old_version))
-                diff.append(b'+++ %s\t%s\n' % (new_filename, new_version))
+                diff.append(b'--- %s\n' % old_label)
+                diff.append(b'+++ %s\n' % new_label)
                 diff.append(b'Binary files %s and %s differ\n'
                             % (old_filename, new_filename))
             elif old_filename != new_filename and old_data == new_data:
-                # Renamed file with no changes (difflib will completely skip
-                # these, so do it by hand).
-                diff.append(b'--- %s\t%s\n' % (old_filename, old_version))
-                diff.append(b'+++ %s\t%s\n' % (new_filename, new_version))
+                # Renamed file with no changes
+                diff.append(b'--- %s\n' % old_label)
+                diff.append(b'+++ %s\n' % new_label)
             else:
-                if old_data and not old_data.endswith(b'\n'):
-                    old_data += b'\n'
+                old_tmp = tempfile.NamedTemporaryFile(delete=False)
+                old_tmp.write(old_data)
+                old_tmp.close()
 
-                if new_data and not new_data.endswith(b'\n'):
-                    new_data += b'\n'
+                new_tmp = tempfile.NamedTemporaryFile(delete=False)
+                new_tmp.write(new_data)
+                new_tmp.close()
 
-                diff.append(b''.join(difflib.unified_diff(
-                    old_data.splitlines(True), new_data.splitlines(True),
-                    old_filename, new_filename,
-                    old_version, new_version)))
+                unified_diff = execute(
+                    ['diff', '-u',
+                     '--label', old_label.decode('utf-8'),
+                     '--label', new_label.decode('utf-8'),
+                     old_tmp.name, new_tmp.name],
+                    extra_ignore_errors=(1,),
+                    log_output_on_error=False,
+                    results_unicode=False)
+
+                diff.append(unified_diff)
+
+                os.unlink(old_tmp.name)
+                os.unlink(new_tmp.name)
 
         if len(root.findall('./candidate-pending-changes/pending-change')) > 0:
             logging.warning('There are added or deleted files which have not '
