@@ -473,6 +473,7 @@ class MercurialClient(SCMClient):
 
         files = execute(cmd, env=self._hg_env, ignore_errors=True,
                         none_on_ignored_error=True)
+        files = files.replace('\\', '/')  # workaround for issue 3894
 
         return (files and set(files.splitlines())) or set()
 
