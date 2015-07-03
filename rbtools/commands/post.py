@@ -752,7 +752,9 @@ class Post(Command):
         if len(diff) == 0:
             raise CommandError("There don't seem to be any diffs!")
 
-        if repository_info.supports_changesets and 'changenum' in diff_info:
+        if (repository_info.supports_changesets and
+            not self.options.diff_filename and
+            'changenum' in diff_info):
             changenum = diff_info['changenum']
             commit_id = changenum
         else:
