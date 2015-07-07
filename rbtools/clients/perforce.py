@@ -1297,7 +1297,8 @@ class PerforceClient(SCMClient):
         # The parsed revision spec may include a prefix indicating that it is
         # pending. This prefix, which is delimited by a colon, must be
         # stripped in order to run p4 change on the actual changelist number.
-        changelist = changelist.split(':', 1)[1]
+        if ':' in changelist:
+            changelist = changelist.split(':', 1)[1]
 
         if changelist == self.REVISION_DEFAULT_CLN:
             # The default changelist has no description and couldn't be
