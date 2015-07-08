@@ -428,7 +428,7 @@ class HttpRequestTests(TestCase):
 
         fields = self._get_fields_as_dict(ctype, content)
 
-        self.assertIn('foo', fields)
+        self.assertTrue('foo' in fields)
         self.assertEqual(fields['foo'], konnichiwa.encode('utf-8'))
         self.assertEqual(fields['bar'], konnichiwa.encode('utf-8'))
         self.assertEqual(fields['baz'], b'\xff')
