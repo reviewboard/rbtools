@@ -170,6 +170,7 @@ class PerforceClient(SCMClient):
 
     REVISION_CURRENT_SYNC = '--rbtools-current-sync'
     REVISION_PENDING_CLN_PREFIX = '--rbtools-pending-cln:'
+    REVISION_DEFAULT_CLN = 'default'
 
     def __init__(self, p4_class=P4Wrapper, **kwargs):
         super(PerforceClient, self).__init__(**kwargs)
@@ -293,7 +294,8 @@ class PerforceClient(SCMClient):
         if n_revs == 0:
             return {
                 'base': self.REVISION_CURRENT_SYNC,
-                'tip': self.REVISION_PENDING_CLN_PREFIX + 'default',
+                'tip': self.REVISION_PENDING_CLN_PREFIX +
+                       self.REVISION_DEFAULT_CLN,
             }
         elif n_revs == 1:
             # A single specified CLN can be any of submitted, pending, or
@@ -589,20 +591,39 @@ class PerforceClient(SCMClient):
                                ignore_unmodified=True)
             diff_lines += dl
 
-        # For pending changesets, report the change number to the reviewboard
-        # server when posting. This is used to extract the changeset
-        # description server-side. Ideally we'd change this to remove the
-        # server-side implementation and just implement --guess-summary and
-        # --guess-description, but that would create a lot of unhappy users.
-        if cl_is_pending and tip != 'default':
-            changenum = str(tip)
-        else:
-            changenum = None
-
         return {
             'diff': ''.join(diff_lines),
-            'changenum': changenum,
+            'changenum': self.get_changenum(revisions),
         }
+
+    def get_changenum(self, revisions):
+        """Return the change number for the given revisions.
+
+        This is only used when the client is supposed to send a change number
+        to the server (such as with Perforce).
+
+        Args:
+            revisions (dict):
+                A revisions dictionary as returned by ``parse_revision_spec``.
+
+        Returns:
+            unicode:
+            The change number to send to the Review Board server.
+        """
+        # This is used to report the change number to the Review Board server
+        # when posting pending changesets. By reporting the change number, we
+        # extract the changeset description server-side. Ideally we'd change
+        # this to remove the server-side implementation and just implement
+        # --guess-summary and --guess-description, but that would likely
+        # create a lot of unhappy users.
+        tip = revisions['tip']
+
+        if tip.startswith(self.REVISION_PENDING_CLN_PREFIX):
+            tip = tip[len(self.REVISION_PENDING_CLN_PREFIX):]
+            if tip != self.REVISION_DEFAULT_CLN:
+                return tip
+
+        return None
 
     def _compute_range_changes(self, base, tip, depot_include_files,
                                local_include_files):

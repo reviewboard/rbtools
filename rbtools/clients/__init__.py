@@ -34,6 +34,22 @@ class SCMClient(object):
     def check_options(self):
         pass
 
+    def get_changenum(self, revisions):
+        """Return the change number for the given revisions.
+
+        This is only used when the client is supposed to send a change number
+        to the server (such as with Perforce).
+
+        Args:
+            revisions (dict):
+                A revisions dictionary as returned by ``parse_revision_spec``.
+
+        Returns:
+            unicode:
+            The change number to send to the Review Board server.
+        """
+        return None
+
     def scan_for_server(self, repository_info):
         """
         Scans the current directory on up to find a .reviewboard file

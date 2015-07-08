@@ -756,9 +756,10 @@ class Post(Command):
             not self.options.diff_filename and
             'changenum' in diff_info):
             changenum = diff_info['changenum']
-            commit_id = changenum
         else:
-            changenum = None
+            changenum = self.tool.get_changenum(self.get_revisions())
+
+        commit_id = changenum
 
         if not self.options.diff_filename:
             # If the user has requested to guess the summary or description,
