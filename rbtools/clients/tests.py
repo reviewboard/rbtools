@@ -5,6 +5,7 @@ import re
 import sys
 import time
 from hashlib import md5
+from functools import wraps
 from random import randint
 from tempfile import mktemp
 from textwrap import dedent
@@ -1170,6 +1171,27 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self.assertEqual(result['parent_diff'], None)
 
 
+def svn_version_set_hash(svn16_hash, svn17_hash):
+    """Pass the appropriate hash to the wrapped function.
+
+    SVN 1.6 and 1.7+ will generate slightly different output for ``svn diff``
+    when generating the diff with a working copy. This works around that by
+    checking the installed SVN version and passing the appropriate hash.
+    """
+    def decorator(f):
+        @wraps(f)
+        def wrapped(self):
+            self.client.get_repository_info()
+
+            if self.client.subversion_client_version < (1, 7):
+                return f(self, svn16_hash)
+            else:
+                return f(self, svn17_hash)
+
+        return wrapped
+    return decorator
+
+
 class SVNClientTests(SCMClientTests):
     def setUp(self):
         super(SVNClientTests, self).setUp()
@@ -1388,7 +1410,9 @@ class SVNClientTests(SCMClientTests):
 
         self.assertEqual(result['diff'], '')
 
-    def test_same_diff_multiple_methods(self):
+    @svn_version_set_hash('043befc507b8177a0f010dc2cecc4205',
+                          '1b68063237c584d38a9a3ddbdf1f72a2')
+    def test_same_diff_multiple_methods(self, md5_sum):
         """Testing SVNClient identical diff generated from root, subdirectory,
         and via target"""
 
@@ -1413,16 +1437,14 @@ class SVNClientTests(SCMClientTests):
         result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '1b68063237c584d38a9a3ddbdf1f72a2')
+        self.assertEqual(md5(result['diff']).hexdigest(), md5_sum)
 
         # Case 2: Generate diff from dir1 subdirectory.
         os.chdir('dir1')
         result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '1b68063237c584d38a9a3ddbdf1f72a2')
+        self.assertEqual(md5(result['diff']).hexdigest(), md5_sum)
 
         # Case 3: Generate diff from dir2 subdirectory, but explicitly target
         # only ../dir1/A.txt.
@@ -1432,10 +1454,11 @@ class SVNClientTests(SCMClientTests):
         result = self.client.diff(revisions, ['../dir1/A.txt'])
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '1b68063237c584d38a9a3ddbdf1f72a2')
+        self.assertEqual(md5(result['diff']).hexdigest(), md5_sum)
 
-    def test_diff_non_unicode_characters(self):
+    @svn_version_set_hash('902d662a110400f7470294b2d9e72d36',
+                          '13803373ded9af750384a4601d5173ce')
+    def test_diff_non_unicode_characters(self, md5_sum):
         """Testing SVNClient diff with a non-utf8 file"""
         self._svn_add_file('A.txt', '\xe2'.encode('iso-8859-1'))
         self._run_svn(['propset', 'svn:mime-type', 'text/plain', 'A.txt'])
@@ -1444,10 +1467,11 @@ class SVNClientTests(SCMClientTests):
         result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '13803373ded9af750384a4601d5173ce')
+        self.assertEqual(md5(result['diff']).hexdigest(), md5_sum)
 
-    def test_diff_non_unicode_filename(self):
+    @svn_version_set_hash('79cbd5c4974f97d173ee87c50fa9cff2',
+                          'bfa99e54b8c23b97b1dee23d2763c4fd')
+    def test_diff_non_unicode_filename(self, md5_sum):
         """Testing SVNClient diff with a non-utf8 filename"""
         self.options.svn_show_copies_as_adds = 'y'
 
@@ -1461,16 +1485,14 @@ class SVNClientTests(SCMClientTests):
         result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         'bfa99e54b8c23b97b1dee23d2763c4fd')
+        self.assertEqual(md5(result['diff']).hexdigest(), md5_sum)
 
         self._run_svn(['changelist', 'cl1', filename])
         revisions = self.client.parse_revision_spec(['cl1'])
         result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         'bfa99e54b8c23b97b1dee23d2763c4fd')
+        self.assertEqual(md5(result['diff']).hexdigest(), md5_sum)
 
     def test_show_copies_as_adds_enabled(self):
         """Testing SVNClient with --show-copies-as-adds functionality
@@ -1543,22 +1565,17 @@ class SVNClientTests(SCMClientTests):
         # checkout root, via changelist, and via explicit include target.
 
         revisions = self.client.parse_revision_spec()
-        with self.assertRaises(SystemExit) as cm:
-            self.client.diff(revisions)
-        self.assertEqual(cm.exception.code, 1)
+        self.assertRaises(SystemExit, self.client.diff, revisions)
 
         self._run_svn(['changelist', 'cl1', 'dir1/foo.txt'])
         revisions = self.client.parse_revision_spec(['cl1'])
-        with self.assertRaises(SystemExit) as cm:
-            self.client.diff(revisions)
-        self.assertEqual(cm.exception.code, 1)
+        self.assertRaises(SystemExit, self.client.diff, revisions)
+
         self._run_svn(['changelist', '--remove', 'dir1/foo.txt'])
 
         os.chdir('dir2')
         revisions = self.client.parse_revision_spec()
-        with self.assertRaises(SystemExit) as cm:
-            self.client.diff(revisions, ['../dir1'])
-        self.assertEqual(cm.exception.code, 1)
+        self.assertRaises(SystemExit, self.client.diff, revisions, ['../dir1'])
 
     def test_history_scheduled_with_commit_special_case_changelist(self):
         """Testing SVNClient.history_scheduled_with_commit ignore history in

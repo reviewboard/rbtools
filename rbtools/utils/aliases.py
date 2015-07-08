@@ -3,7 +3,10 @@ from __future__ import unicode_literals
 import logging
 import re
 import shlex
+import sys
 import subprocess
+
+import six
 
 from rbtools.commands import RB_MAIN
 
@@ -11,6 +14,8 @@ from rbtools.commands import RB_MAIN
 # Regular expression for matching argument replacement
 _arg_re = re.compile(r'\$(\d+)')
 
+# Prior to Python 2.7.3, the shlex module could not accept unicode input.
+_SHLEX_SUPPORTS_UNICODE = sys.version_info >= (2, 7, 3)
 
 def replace_arguments(cmd, args):
     """Do parameter substitution for the given command.
@@ -28,6 +33,12 @@ def replace_arguments(cmd, args):
 
     did_replacement = False
 
+    shlex_convert_text_type = (not _SHLEX_SUPPORTS_UNICODE and
+                               isinstance(cmd, six.text_type))
+
+    if shlex_convert_text_type:
+        cmd = cmd.encode('utf-8')
+
     for part in shlex.split(cmd):
         if part == '$*':
             did_replacement = True
@@ -39,6 +50,9 @@ def replace_arguments(cmd, args):
 
             if subs != 0:
                 did_replacement = True
+
+            if shlex_convert_text_type:
+                part = part.decode('utf-8')
 
             yield part
 
