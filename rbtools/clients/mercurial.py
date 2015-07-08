@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import logging
 import os
 import re
@@ -51,7 +53,7 @@ class MercurialClient(SCMClient):
 
     @property
     def hidden_changesets_supported(self):
-        """Whether the repository supports hidden changesets.
+        """Return whether the repository supports hidden changesets.
 
         Mercurial 1.9 and above support hidden changesets. These are changesets
         that have been hidden from regular repository view. They still exist
@@ -75,7 +77,7 @@ class MercurialClient(SCMClient):
 
     @property
     def hg_root(self):
-        """The root of the working directory.
+        """Return the root of the working directory.
 
         This will return the root directory of the current repository. If the
         current working directory is not inside a mercurial repository, this
@@ -99,10 +101,11 @@ class MercurialClient(SCMClient):
 
         self._load_hgrc()
 
-        svn_info = execute(["hg", "svn", "info"], ignore_errors=True)
+        svn_info = execute(['hg', 'svn', 'info'], ignore_errors=True)
+
         if (not svn_info.startswith('abort:') and
-                not svn_info.startswith("hg: unknown command") and
-                not svn_info.lower().startswith('not a child of')):
+            not svn_info.startswith('hg: unknown command') and
+            not svn_info.lower().startswith('not a child of')):
             self._type = 'svn'
             self._svn_info = svn_info
         else:
@@ -120,6 +123,7 @@ class MercurialClient(SCMClient):
         self._initted = True
 
     def get_repository_info(self):
+        """Return the repository info object."""
         if not check_install(['hg', '--help']):
             logging.debug('Unable to execute "hg --help": skipping Mercurial')
             return None
@@ -144,7 +148,7 @@ class MercurialClient(SCMClient):
                                   supports_parent_diffs=True)
 
     def parse_revision_spec(self, revisions=[]):
-        """Parses the given revision spec.
+        """Parse the given revision spec.
 
         The 'revisions' argument is a list of revisions as specified by the
         user. Items in the list do not necessarily represent a single revision,
@@ -344,29 +348,30 @@ class MercurialClient(SCMClient):
             self.hgrc[key] = value.strip()
 
     def get_raw_commit_message(self, revisions):
-        """
-        Extracts all descriptions in the given revision range and concatenates
-        them, most recent ones going first.
+        """Return the raw commit message.
+
+        This extracts all descriptions in the given revision range and
+        concatenates them, most recent ones going first.
         """
         rev1 = revisions['base']
         rev2 = revisions['tip']
 
         delim = str(uuid.uuid1())
-        descs = self._execute([
-            'hg', 'log', '--hidden', '-r', '%s::%s' % (rev1, rev2),
-            '--template', '{desc}%s' % delim], env=self._hg_env)
+        descs = self._execute(
+            ['hg', 'log', '--hidden', '-r', '%s::%s' % (rev1, rev2),
+             '--template', '{desc}%s' % delim],
+            env=self._hg_env,
+            results_unicode=False)
         # This initial element in the base changeset, which we don't
         # care about. The last element is always empty due to the string
         # ending with <delim>.
         descs = descs.split(delim)[1:-1]
 
-        return '\n\n'.join([desc.strip() for desc in descs])
+        return b'\n\n'.join([desc.strip() for desc in descs])
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
              extra_args=[]):
-        """
-        Performs a diff across all modified files in a Mercurial repository.
-        """
+        """Return a diff across all modified files in the given revisions."""
         self._init()
 
         diff_cmd = ['hg', 'diff', '--hidden']
@@ -415,7 +420,7 @@ class MercurialClient(SCMClient):
         }
 
     def _handle_empty_files(self, diff, base, tip, exclude_files=[]):
-        """Adds added and deleted 0-length files to the diff output.
+        """Add added and deleted 0-length files to the diff output.
 
         Since the diff output from hg diff does not give any information on
         0-length files, we manually add this extra information to the patch.
@@ -437,9 +442,10 @@ class MercurialClient(SCMClient):
         if not (added_empty_files or deleted_empty_files):
             return diff
 
-        base_date, tip_date = execute(['hg', 'log', '-r', base, '-r', tip,
-                                       '--template', '{date|date}\\t'],
-                                      env=self._hg_env).strip().split('\t')
+        dates = execute(['hg', 'log', '-r', base, '-r', tip,
+                         '--template', '{date|date}\\t'],
+                        env=self._hg_env)
+        base_date, tip_date = dates.strip().split('\t')
 
         for filename in added_empty_files:
             if filename not in exclude_files:
@@ -448,7 +454,7 @@ class MercurialClient(SCMClient):
                          '+++ b/%s\t%s\n'
                          % (base, tip, filename,
                             self.PRE_CREATION, self.PRE_CREATION_DATE,
-                            filename, tip_date))
+                            filename, tip_date)).encode('utf-8')
 
         for filename in deleted_empty_files:
             if filename not in exclude_files:
@@ -457,12 +463,13 @@ class MercurialClient(SCMClient):
                          '+++ %s\t%s\n'
                          % (base, tip, filename,
                             filename, base_date,
-                            self.PRE_CREATION, self.PRE_CREATION_DATE))
+                            self.PRE_CREATION,
+                            self.PRE_CREATION_DATE)).encode('utf-8')
 
         return diff
 
     def _get_files_in_changeset(self, rev, get_empty=False):
-        """Returns a set of all files in the specified changeset.
+        """Return a set of all files in the specified changeset.
 
         If get_empty is True, we return only 0-length files in the changeset.
         """
@@ -473,11 +480,12 @@ class MercurialClient(SCMClient):
 
         files = execute(cmd, env=self._hg_env, ignore_errors=True,
                         none_on_ignored_error=True)
+        files = files.replace('\\', '/')  # workaround for issue 3894
 
         return (files and set(files.splitlines())) or set()
 
     def _get_parent_for_hgsubversion(self):
-        """Returns the parent Subversion branch.
+        """Return the parent Subversion branch.
 
         Returns the parent branch defined in the command options if it exists,
         otherwise returns the parent Subversion branch of the current
@@ -488,7 +496,7 @@ class MercurialClient(SCMClient):
                         '{node}\n']).strip())
 
     def _get_remote_branch(self):
-        """Returns the remote branch assoicated with this repository.
+        """Return the remote branch assoicated with this repository.
 
         If the remote branch is not defined, the parent branch of the
         repository is returned.
@@ -509,7 +517,7 @@ class MercurialClient(SCMClient):
 
     def create_commit(self, message, author, run_editor,
                       files=[], all_files=False):
-        """Commits the given modified files.
+        """Commit the given modified files.
 
         This is expected to be called after applying a patch. This commits the
         patch using information from the review request, opening the commit
@@ -525,11 +533,11 @@ class MercurialClient(SCMClient):
         execute(hg_command + files)
 
     def _get_current_branch(self):
-        """Returns the current branch of this repository."""
+        """Return the current branch of this repository."""
         return execute(['hg', 'branch'], env=self._hg_env).strip()
 
     def _get_bottom_and_top_outgoing_revs_for_remote(self, rev=None):
-        """Returns the bottom and top outgoing revisions.
+        """Return the bottom and top outgoing revisions.
 
         Returns the bottom and top outgoing revisions for the changesets
         between the current branch and the remote branch.
@@ -550,8 +558,7 @@ class MercurialClient(SCMClient):
         return bottom_rev, top_rev
 
     def _get_outgoing_changesets(self, remote, rev=None):
-        """
-        Return the outgoing changesets between us and a remote.
+        """Return the outgoing changesets between us and a remote.
 
         This will return a list of tuples of (rev, node, branch) for
         each outgoing changeset. The list will be sorted in revision order.
@@ -654,7 +661,7 @@ class MercurialClient(SCMClient):
         return execute(cmd, *args, **kwargs)
 
     def has_pending_changes(self):
-        """Checks if there are changes waiting to be committed.
+        """Check if there are changes waiting to be committed.
 
         Returns True if the working directory has been modified,
         otherwise returns False.
@@ -682,7 +689,7 @@ class MercurialClient(SCMClient):
         return PatchResult(applied=(rc == 0), patch_output=data)
 
     def apply_patch_for_empty_files(self, patch, p_num, revert=False):
-        """Returns True if any empty files in the patch are applied.
+        """Return True if any empty files in the patch are applied.
 
         If there are no empty files in the patch or if an error occurs while
         applying the patch, we return False.
@@ -727,7 +734,7 @@ class MercurialClient(SCMClient):
         return patched_empty_files
 
     def supports_empty_files(self):
-        """Checks if the RB server supports added/deleted empty files."""
+        """Check if the RB server supports added/deleted empty files."""
         return (self.capabilities and
                 self.capabilities.has_capability('scmtools', 'mercurial',
                                                  'empty_files'))

@@ -385,8 +385,8 @@ def load_scmclients(config, options):
     for ep in pkg_resources.iter_entry_points(group='rbtools_scm_clients'):
         try:
             SCMCLIENTS[ep.name] = ep.load()(config=config, options=options)
-        except Exception as e:
-            logging.error('Could not load SCM Client "%s": %s' % (ep.name, e))
+        except Exception:
+            logging.exception('Could not load SCM Client "%s"', ep.name)
 
 
 def scan_usable_client(config, options, client_name=None):
