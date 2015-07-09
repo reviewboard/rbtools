@@ -761,9 +761,10 @@ class Post(Command):
             not self.options.diff_filename and
             'changenum' in diff_info):
             changenum = diff_info['changenum']
-            commit_id = changenum
         else:
-            changenum = None
+            changenum = self.tool.get_changenum(self.get_revisions())
+
+        commit_id = changenum
 
         if self.options.update and self.revisions:
             review_request = guess_existing_review_request(
