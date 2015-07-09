@@ -1,0 +1,4 @@
+hgsubversion
+kgb
+mock
+nose
