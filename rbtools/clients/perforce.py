@@ -200,8 +200,8 @@ class PerforceClient(SCMClient):
     ENCODED_COUNTER_URL_RE = re.compile('reviewboard.url\.(\S+)')
 
     REVISION_CURRENT_SYNC = '--rbtools-current-sync'
-    REVISION_DEFAULT_CLN = 'default'
     REVISION_PENDING_CLN_PREFIX = '--rbtools-pending-cln:'
+    REVISION_DEFAULT_CLN = 'default'
 
     ADDED_FILES_RE = re.compile(r'^==== //depot/(\S+)#\d+ ==A== \S+ ====$',
                                 re.M)
@@ -635,20 +635,39 @@ class PerforceClient(SCMClient):
                                ignore_unmodified=True)
             diff_lines += dl
 
-        # For pending changesets, report the change number to the reviewboard
-        # server when posting. This is used to extract the changeset
-        # description server-side. Ideally we'd change this to remove the
-        # server-side implementation and just implement --guess-summary and
-        # --guess-description, but that would create a lot of unhappy users.
-        if cl_is_pending and tip != self.REVISION_DEFAULT_CLN:
-            changenum = str(tip)
-        else:
-            changenum = None
-
         return {
             'diff': b''.join(diff_lines),
-            'changenum': changenum,
+            'changenum': self.get_changenum(revisions),
         }
+
+    def get_changenum(self, revisions):
+        """Return the change number for the given revisions.
+
+        This is only used when the client is supposed to send a change number
+        to the server (such as with Perforce).
+
+        Args:
+            revisions (dict):
+                A revisions dictionary as returned by ``parse_revision_spec``.
+
+        Returns:
+            unicode:
+            The change number to send to the Review Board server.
+        """
+        # This is used to report the change number to the Review Board server
+        # when posting pending changesets. By reporting the change number, we
+        # extract the changeset description server-side. Ideally we'd change
+        # this to remove the server-side implementation and just implement
+        # --guess-summary and --guess-description, but that would likely
+        # create a lot of unhappy users.
+        tip = revisions['tip']
+
+        if tip.startswith(self.REVISION_PENDING_CLN_PREFIX):
+            tip = tip[len(self.REVISION_PENDING_CLN_PREFIX):]
+            if tip != self.REVISION_DEFAULT_CLN:
+                return tip
+
+        return None
 
     def _compute_range_changes(self, base, tip, depot_include_files,
                                local_include_files, exclude_patterns):
