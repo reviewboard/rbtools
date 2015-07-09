@@ -823,7 +823,7 @@ class Post(Command):
         if repository_info.supports_changesets and 'changenum' in diff_info:
             changenum = diff_info['changenum']
         else:
-            changenum = self.tool.get_changenum(self.get_revisions())
+            changenum = self.tool.get_changenum(self.revisions)
 
         commit_id = changenum
 
