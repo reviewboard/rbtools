@@ -15,7 +15,7 @@ class APIGet(Command):
     name = 'api-get'
     author = 'The Review Board Project'
     description = 'Retrieve raw API resource payloads.'
-    args = '<path> [-- [--<query-arg>=<value> ...]]'
+    args = '<path> [--<query-arg>=<value> ...]'
     option_list = [
         Option('--pretty',
                action='store_true',

@@ -780,14 +780,21 @@ class PerforceClient(SCMClient):
         for f in files:
             action = f['action']
             depot_file = f['depotFile']
-            local_file = self._depot_to_local(depot_file)
+
+            try:
+                local_file = self._depot_to_local(depot_file)
+            except SCMError:
+                logging.warning('Could not find local filename for "%s"',
+                                depot_file)
+                local_file = None
+
             rev = f['rev']
             initial_depot_file = f['initialDepotFile']
             initial_rev = f['initialRev']
 
             if ((depot_include_files and
                  depot_file not in depot_include_files) or
-                (local_include_files and
+                (local_include_files and local_file and
                  local_file not in local_include_files) or
                 self._should_exclude_file(local_file, depot_file,
                                           exclude_patterns)):
@@ -1401,8 +1408,8 @@ class PerforceClient(SCMClient):
             if pattern.startswith('//'):
                 if fnmatch.fnmatch(depot_file, pattern):
                     return True
-            elif fnmatch.fnmatch(local_file, pattern):
-                    return True
+            elif local_file and fnmatch.fnmatch(local_file, pattern):
+                return True
 
         return False
 
