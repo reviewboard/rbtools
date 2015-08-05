@@ -188,8 +188,10 @@ class Patch(Command):
                                        diff_revision, tmp_patch_file, base_dir,
                                        revert=self.options.revert_patch)
 
-            if success and (self.options.commit or
-                            self.options.commit_no_edit):
+            if not success:
+                raise CommandError('Could not apply patch')
+
+            if self.options.commit or self.options.commit_no_edit:
                 try:
                     review_request = api_root.get_review_request(
                         review_request_id=request_id,

@@ -127,7 +127,8 @@ class Land(Command):
 
         patch_command.append(six.text_type(review_request_id))
 
-        rc, output = execute(patch_command, return_error_code=True)
+        rc, output = execute(patch_command, ignore_errors=True,
+                             return_error_code=True)
 
         if rc:
             raise CommandError('Failed to execute "rbt patch":\n%s'
