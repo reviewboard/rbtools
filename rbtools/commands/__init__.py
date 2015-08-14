@@ -201,6 +201,16 @@ class Command(object):
                    default=None,
                    help='The password to be supplied to the Review Board '
                         'server.'),
+            Option('--ext-auth-cookies',
+                   dest='ext_auth_cookies',
+                   metavar='EXT_AUTH_COOKIES',
+                   config_key='EXT_AUTH_COOKIES',
+                   default=None,
+                   help='Use an external cookie store with pre-fetched '
+                        'authentication data. This is useful with servers '
+                        'that require extra web authentication to access '
+                        'Review Board, e.g. on single sign-on enabled sites.',
+                   added_in='0.7.5'),
             Option('--api-token',
                    dest='api_token',
                    metavar='TOKEN',
@@ -746,7 +756,8 @@ class Command(object):
             allow_caching=not self.options.disable_cache,
             cache_location=self.options.cache_location,
             in_memory_cache=self.options.in_memory_cache,
-            save_cookies=self.options.save_cookies)
+            save_cookies=self.options.save_cookies,
+            ext_auth_cookies=self.options.ext_auth_cookies)
 
     def get_api(self, server_url):
         """Returns an RBClient instance and the associated root resource.
