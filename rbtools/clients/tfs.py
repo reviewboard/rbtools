@@ -11,7 +11,7 @@ import xml.etree.ElementTree as ET
 from rbtools.clients import RepositoryInfo, SCMClient
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError)
-from rbtools.utils.checks import check_install
+from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.process import die, execute
 
 
@@ -59,6 +59,10 @@ class TFSClient(SCMClient):
         if not m:
             logging.debug('Could not find the collection from "tf workfold"')
             return None
+
+        # Now that we know it's TFS, make sure we have GNU diff installed,
+        # and error out if we don't.
+        check_gnu_diff()
 
         path = urllib2.unquote(m.group(1))
 
