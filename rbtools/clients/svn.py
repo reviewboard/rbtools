@@ -88,7 +88,7 @@ class SVNClient(SCMClient):
         if not m:
             return None
 
-        base_path = m.group(1)[len(path):] or "/"
+        base_path = m.group(1)[len(path):] or b'/'
 
         m = re.search(b'^Repository UUID: (.+)$', data, re.M)
         if not m:

@@ -1201,7 +1201,8 @@ class SVNClientTests(SCMClientTests):
 
         self.svn_dir = os.path.join(self.clients_dir, 'testdata', 'svn-repo')
         self.clone_dir = self.chdir_tmp()
-        self._run_svn(['co', 'file://' + self.svn_dir, 'svn-repo'])
+        self.svn_repo_url = 'file://' + self.svn_dir
+        self._run_svn(['co', self.svn_repo_url, 'svn-repo'])
         os.chdir(os.path.join(self.clone_dir, 'svn-repo'))
 
         self.client = SVNClient(options=self.options)
@@ -1360,9 +1361,11 @@ class SVNClientTests(SCMClientTests):
         self.assertEqual(revisions['base'], 1)
         self.assertEqual(revisions['tip'], 2)
 
-    def test_diff_exclude(self):
+    @svn_version_set_hash('6613644d417f7c90f83f3a2d16b1dad5',
+                          '7630ea80056a7340d93a556e9af60c63')
+    def test_diff_exclude(self, md5sum):
         """Testing SVNClient diff with file exclude patterns"""
-        self._svn_add_file('foo.txt', FOO1)
+        self._svn_add_file('bar.txt', FOO1)
         self._svn_add_file('exclude.txt', FOO2)
 
         revisions = self.client.parse_revision_spec([])
@@ -1371,8 +1374,7 @@ class SVNClientTests(SCMClientTests):
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
 
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '1d2b00abce632d104127a2d3673770a1')
+        self.assertEqual(md5(result['diff']).hexdigest(), md5sum)
 
     def test_diff_exclude_in_subdir(self):
         """Testing SVNClient diff with exclude patterns in a subdir"""
@@ -1493,6 +1495,20 @@ class SVNClientTests(SCMClientTests):
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
         self.assertEqual(md5(result['diff']).hexdigest(), md5_sum)
+
+    def test_diff_non_unicode_filename_repository_url(self):
+        """Testing SVNClient diff with a non-utf8 filename via repository_url
+        option"""
+        self.options.repository_url = self.svn_repo_url
+
+        # Note: commit r4 adds one file with a non-utf8 character in both its
+        # filename and content.
+        revisions = self.client.parse_revision_spec(['4'])
+        result = self.client.diff(revisions)
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('diff' in result)
+        self.assertEqual(md5(result['diff']).hexdigest(),
+                         '60c4d21f4d414da947f4e7273e6d1326')
 
     def test_show_copies_as_adds_enabled(self):
         """Testing SVNClient with --show-copies-as-adds functionality

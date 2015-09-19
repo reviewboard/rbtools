@@ -1,0 +1,13 @@
+K 10
+svn:author
+V 6
+gmyers
+K 8
+svn:date
+V 27
+2015-09-19T02:03:29.984142Z
+K 7
+svn:log
+V 62
+Add file with non-utf8 character in both filename and content.
+END
