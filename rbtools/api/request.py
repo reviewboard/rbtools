@@ -11,7 +11,7 @@ from io import BytesIO
 from json import loads as json_loads
 
 import six
-from six.moves.http_client import UNAUTHORIZED
+from six.moves.http_client import UNAUTHORIZED, NOT_MODIFIED
 from six.moves.http_cookiejar import Cookie, CookieJar, MozillaCookieJar
 from six.moves.urllib.error import HTTPError, URLError
 from six.moves.urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
@@ -209,7 +209,8 @@ class ReviewBoardHTTPErrorProcessor(HTTPErrorProcessor):
     anything in the 200 range, as well as 304, is a success.
     """
     def http_response(self, request, response):
-        if not (200 <= response.code < 300 or response.code == 304):
+        if not (200 <= response.code < 300 or
+                response.code == NOT_MODIFIED):
             response = self.parent.error('http', request, response,
                                          response.code, response.msg,
                                          response.info())
@@ -283,7 +284,7 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
             response = self.parent.open(request, timeout=request.timeout)
             return response
         except HTTPError as e:
-            if e.code == 401:
+            if e.code == UNAUTHORIZED:
                 headers = e.info()
                 otp_header = headers.get(self.OTP_TOKEN_HEADER, '')
 
@@ -404,13 +405,14 @@ class ReviewBoardServer(object):
     def __init__(self, url, cookie_file=None, username=None, password=None,
                  api_token=None, agent=None, session=None, disable_proxy=False,
                  auth_callback=None, otp_token_callback=None,
-                 verify_ssl=True, save_cookies=True):
+                 verify_ssl=True, save_cookies=True, ext_auth_cookies=None):
         if not url.endswith('/'):
             url += '/'
 
         self.url = url + 'api/'
 
         self.save_cookies = save_cookies
+        self.ext_auth_cookies = ext_auth_cookies
 
         if self.save_cookies:
             self.cookie_jar, self.cookie_file = create_cookie_jar(
@@ -423,6 +425,14 @@ class ReviewBoardServer(object):
         else:
             self.cookie_jar = CookieJar()
             self.cookie_file = None
+
+        if self.ext_auth_cookies:
+            try:
+                self.cookie_jar.load(ext_auth_cookies, ignore_expires=True)
+            except IOError as e:
+                logging.critical('There was an error while loading a '
+                                 'cookie file: %s', e)
+                pass
 
         # Get the cookie domain from the url. If the domain
         # does not contain a '.' (e.g. 'localhost'), we assume

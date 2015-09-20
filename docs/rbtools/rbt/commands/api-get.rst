@@ -16,11 +16,10 @@ detects the path begins with ``http://`` or ``https://``, it will treat the
 path itself as the request URL.
 
 Query arguments may also be specified for the request. Each query argument
-appears after ``--`` on the command line and takes the form of
-``--<query-arg>=<value>``. For example::
+takes the form of ``--<query-arg>=<value>``. For example::
 
    $ # Make a request to http://example.com/api/review-requests/?counts-only=1
-   $ rbt api-get /review-requests/ -- --counts-only=1
+   $ rbt api-get /review-requests/ --counts-only=1
 
 
 .. rbt-command-usage::
