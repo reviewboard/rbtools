@@ -25,12 +25,69 @@ class Status(Command):
         Command.perforce_options,
         Command.tfs_options,
     ]
+    # The number of spaces between the request's status and the request's id
+    # and summary.
+    TAB_SIZE = 3
+    # The number of spaces after the end of the request's summary.
+    PADDING = 5
 
-    def output_request(self, request):
-        print('   r/%s - %s' % (request.id, request.summary))
+    def tabulate(self, request_stats):
+        """Print review request summary and status in a table.
 
-    def output_draft(self, request, draft):
-        print(' * r/%s - %s' % (request.id, draft.summary))
+        Args:
+            request_stats (dict):
+                A dict that contains statistics about each review request.
+        """
+        if len(request_stats):
+            max_status_length = max(d['status_len'] for d in request_stats)
+            max_row_length = (max(d['summary_len'] for d in request_stats) +
+                              self.PADDING + self.TAB_SIZE + max_status_length)
+            white_space = max_status_length + self.TAB_SIZE
+            border = '=' * max_row_length
+
+            print(border)
+            print('%s%s' % ('Status'.ljust(white_space), 'Review Request'))
+            print(border)
+
+            for request in request_stats:
+                status = request['status'].ljust(white_space)
+                print('%s%s' % (status, request['summary']))
+        else:
+            print('No review requests found.')
+
+        print()
+
+    def get_data(self, requests):
+        """Return current status and review summary for all reviews.
+
+        Args:
+            requests (ListResource):
+                A ListResource that contains data on all open/draft requests.
+
+        Returns:
+            list: A list whose elements are dicts of each request's statistics.
+        """
+        requests_stats = []
+
+        for request in requests.all_items:
+            if request.draft:
+                status = 'Draft'
+            elif request.issue_open_count:
+                status = 'Open Issues (%s)' % request.issue_open_count
+            elif request.ship_it_count:
+                status = 'Ship It! (%s)' % request.ship_it_count
+            else:
+                status = 'Pending'
+
+            summary = 'r/%s - %s' % (request.id, request.summary)
+            requests_stats.append({
+                'status': status,
+                'summary': summary,
+                'status_len': len(status),
+                'summary_len': len(summary),
+            })
+
+        return requests_stats
 
     def main(self):
         repository_info, tool = self.initialize_scm_tool(
@@ -64,9 +121,5 @@ class Status(Command):
                                 'requests from all repositories.')
 
         requests = api_root.get_review_requests(**query_args)
-
-        for request in requests.all_items:
-            if request.draft:
-                self.output_draft(request, request.draft[0])
-            else:
-                self.output_request(request)
+        request_stats = self.get_data(requests)
+        self.tabulate(request_stats)
