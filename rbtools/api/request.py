@@ -11,7 +11,7 @@ from io import BytesIO
 from json import loads as json_loads
 
 import six
-from six.moves.http_client import UNAUTHORIZED
+from six.moves.http_client import UNAUTHORIZED, NOT_MODIFIED
 from six.moves.http_cookiejar import Cookie, CookieJar, MozillaCookieJar
 from six.moves.urllib.error import HTTPError, URLError
 from six.moves.urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
@@ -209,7 +209,8 @@ class ReviewBoardHTTPErrorProcessor(HTTPErrorProcessor):
     anything in the 200 range, as well as 304, is a success.
     """
     def http_response(self, request, response):
-        if not (200 <= response.code < 300 or response.code == 304):
+        if not (200 <= response.code < 300 or
+                response.code == NOT_MODIFIED):
             response = self.parent.error('http', request, response,
                                          response.code, response.msg,
                                          response.info())
@@ -283,7 +284,7 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
             response = self.parent.open(request, timeout=request.timeout)
             return response
         except HTTPError as e:
-            if e.code == 401:
+            if e.code == UNAUTHORIZED:
                 headers = e.info()
                 otp_header = headers.get(self.OTP_TOKEN_HEADER, '')
 
