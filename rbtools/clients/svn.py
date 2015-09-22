@@ -330,8 +330,15 @@ class SVNClient(SCMClient):
 
         diff_cmd.extend(include_files)
 
-        if is_valid_version(self.subversion_client_version,
-                            self.SHOW_COPIES_AS_ADDS_MIN_VERSION):
+        # Check for and validate --svn-show-copies-as-adds option, or evaluate
+        # working copy to determine if scheduled commit will contain
+        # addition-with-history commit. When this case occurs then
+        # --svn-show-copies-as-adds must be specified. Note: this only
+        # pertains to local modifications in a working copy and not diffs
+        # between specific numeric revisions.
+        if (((tip == self.REVISION_WORKING_COPY) or changelist) and
+            is_valid_version(self.subversion_client_version,
+                             self.SHOW_COPIES_AS_ADDS_MIN_VERSION)):
             svn_show_copies_as_adds = getattr(
                 self.options, 'svn_show_copies_as_adds', None)
 
@@ -379,13 +386,6 @@ class SVNClient(SCMClient):
         for p in self._run_svn(status_cmd, split_lines=True,
                                results_unicode=False):
             try:
-                if not changelist and p.startswith(b'--- Changelist'):
-                    # svn status returns changelist information last.  If we
-                    # hit a line starting with '--- Changelist' then we have
-                    # reached the changelist section and can exit the loop as
-                    # we are not interested in changelists.
-                    break
-
                 if p[3] == b'+':
                     if exclude_patterns:
                         # We found a file with history, but first we must make
