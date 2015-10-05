@@ -20,6 +20,8 @@ LINKS_TOK = 'links'
 LINK_KEYS = set(['href', 'method', 'title'])
 _EXCLUDE_ATTRS = [LINKS_TOK, 'stat']
 
+_EXTRA_DATA_PREFIX = 'extra_data__'
+
 
 def resource_mimetype(mimetype):
     """Set the mimetype for the decorated class in the resource map."""
@@ -30,6 +32,24 @@ def resource_mimetype(mimetype):
     return wrapper
 
 
+def _preprocess_fields(fields):
+    """Pre-process request fields.
+
+    This function rewrites fields of the form ``extra_data__field_name`` to
+    fields of the form ``extra_data.field_name`` so that Review Board can
+    understand them.
+
+    Args:
+        fields (dict):
+            A mapping of field names to field values.
+    """
+    for name, value in six.iteritems(fields):
+        if name.startswith(_EXTRA_DATA_PREFIX):
+            name = 'extra_data.%s' % name[len(_EXTRA_DATA_PREFIX):]
+
+        yield name, value
+
+
 @request_method_decorator
 def _create(resource, data=None, query_args={}, *args, **kwargs):
     """Generate a POST request on a resource.
@@ -37,6 +57,13 @@ def _create(resource, data=None, query_args={}, *args, **kwargs):
     Unlike other methods, any additional query args must be passed in
     using the 'query_args' parameter, since kwargs is used for the
     fields which will be sent.
+
+    Review Board expects ``extra_data`` fields to be sent as
+    ``extra_data.field_name``, which cannot be passed as a raw literal in
+    Python. Fields like this would have to be added to a dict and splatted.
+    However, this function also accepts keyword arguments of the form
+    ``extra_data__field_name``, which will be rewritten to fields of the form
+    ``extra_data.field_name``.
     """
     request = HttpRequest(resource._links['create']['href'], method=b'POST',
                           query_args=query_args)
@@ -46,7 +73,7 @@ def _create(resource, data=None, query_args={}, *args, **kwargs):
 
     kwargs.update(data)
 
-    for name, value in six.iteritems(kwargs):
+    for name, value in _preprocess_fields(kwargs):
         request.add_field(name, value)
 
     return request
@@ -72,6 +99,13 @@ def _update(resource, data=None, query_args={}, *args, **kwargs):
     Unlike other methods, any additional query args must be passed in
     using the 'query_args' parameter, since kwargs is used for the
     fields which will be sent.
+
+    Review Board expects ``extra_data`` fields to be sent as
+    ``extra_data.field_name``, which cannot be passed as a raw literal in
+    Python. Fields like this would have to be added to a dict and splatted.
+    However, this function also accepts keyword arguments of the form
+    ``extra_data__field_name``, which will be rewritten to fields of the form
+    ``extra_data.field_name``.
     """
     request = HttpRequest(resource._links['update']['href'], method='PUT',
                           query_args=query_args)
@@ -81,7 +115,7 @@ def _update(resource, data=None, query_args={}, *args, **kwargs):
 
     kwargs.update(data)
 
-    for name, value in six.iteritems(kwargs):
+    for name, value in _preprocess_fields(kwargs):
         request.add_field(name, value)
 
     return request
