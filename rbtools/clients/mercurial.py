@@ -480,9 +480,13 @@ class MercurialClient(SCMClient):
 
         files = execute(cmd, env=self._hg_env, ignore_errors=True,
                         none_on_ignored_error=True)
-        files = files.replace('\\', '/')  # workaround for issue 3894
 
-        return (files and set(files.splitlines())) or set()
+        if files:
+            files = files.replace('\\', '/')  # workaround for issue 3894
+
+            return set(files.splitlines())
+
+        return set()
 
     def _get_parent_for_hgsubversion(self):
         """Return the parent Subversion branch.
