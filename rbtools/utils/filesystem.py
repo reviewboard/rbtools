@@ -109,10 +109,10 @@ def walk_parents(path):
 
 def get_home_path():
     """Retrieve the homepath."""
-    if 'APPDATA' in os.environ:
-        return os.environ['APPDATA']
-    elif 'HOME' in os.environ:
+    if 'HOME' in os.environ:
         return os.environ['HOME']
+    elif 'APPDATA' in os.environ:
+        return os.environ['APPDATA']
     else:
         return ''
 
