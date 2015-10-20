@@ -118,20 +118,40 @@ def get_home_path():
 
 
 def get_config_paths():
-    """Return the paths to each .reviewboardrc influencing the cwd.
+    """Return the paths to each :file:`.reviewboardrc` influencing the cwd.
 
-    A list of paths to .reviewboardrc files will be returned, where
+    A list of paths to :file:`.reviewboardrc` files will be returned, where
     each subsequent list entry should have lower precedence than the previous.
     i.e. configuration found in files further up the list will take precedence.
+
+    Configuration in the paths set in :envvar:$`RBTOOLS_CONFIG_PATH` will take
+    precedence over files found in the current working directory or its
+    parents.
     """
     config_paths = []
 
+    # Apply config files from $RBTOOLS_CONFIG_PATH first, ...
+    for path in os.environ.get('RBTOOLS_CONFIG_PATH', '').split(os.pathsep):
+        # Filter out empty paths, this also takes care of if
+        # $RBTOOLS_CONFIG_PATH is unset or empty.
+        if not path:
+            continue
+
+        filename = os.path.realpath(os.path.join(path, CONFIG_FILE))
+
+        if (os.path.exists(filename) and
+            filename not in config_paths):
+            config_paths.append(filename)
+
+    # ... then config files from the current or parent directories.
     for path in walk_parents(os.getcwd()):
         filename = os.path.realpath(os.path.join(path, CONFIG_FILE))
 
-        if os.path.exists(filename):
+        if (os.path.exists(filename) and
+            filename not in config_paths):
             config_paths.append(filename)
 
+    # Finally, the user's own config file.
     home_config_path = os.path.realpath(os.path.join(get_home_path(),
                                                      CONFIG_FILE))
 
