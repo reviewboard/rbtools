@@ -102,7 +102,7 @@ def get_config_paths():
     each subsequent list entry should have lower precedence than the previous.
     i.e. configuration found in files further up the list will take precedence.
 
-    Configuration in the paths set in :envvar:$`RBTOOLS_CONFIG_PATH` will take
+    Configuration in the paths set in :envvar:`$RBTOOLS_CONFIG_PATH` will take
     precedence over files found in the current working directory or its
     parents.
     """

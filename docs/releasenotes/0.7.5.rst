@@ -1,0 +1,126 @@
+===========================
+RBTools 0.7.5 Release Notes
+===========================
+
+**Release date:** October 26, 2015
+
+
+New Features
+============
+
+* Users can now specify the search path for :file:`.reviewboardrc` files.
+
+  The :envvar:`$RBTOOLS_CONFIG_PATH` environment variable now controls the
+  search path. It's a list of paths separated by the system's native path
+  separator (``':'`` on Linux/MacOS X, ``';'`` on Windows). These paths are
+  searched prior to any default paths.
+
+  This is handy for forcing the :file:`.reviewboardrc` file in your home
+  directory to be searched first.
+
+  Patch by Nils Philippsen.
+
+
+Bug Fixes
+=========
+
+General
+-------
+
+* Fixed displaying error output containing non-ASCII characters. (:bug:`3907`)
+
+* On Windows, home directory detection now prefers the :envvar:`%HOME%`
+  environment variable to :envvar:`%APPDATA%`.
+
+  Prior to this release, :envvar:`%HOME%` was always ignored in favor of
+  :envvar:`%APPDATA%`, which caused problems in certain setups.
+
+  Patch by Vadim Zeitlin.
+
+
+rbt api-get
+-----------
+
+* The help output no longer mistakenly shows that `--` is required before
+  query arguments.
+
+
+rbt post
+--------
+
+* Fixed a crash when using :option:`--diff-filename`. (:bug:`3908`)
+
+
+Git
+---
+
+* Git version checking is no longer performed unless Git is installed,
+  preventing a harmless but visible error message for systems without Git.
+
+
+Mercurial
+---------
+
+* Fixed path separator differences when posting a change against Mercurial
+  on Windows. (:bug:`3894`)
+
+  Patch by Ali Kamali.
+
+* Fixed a regression with looking for empty files.
+
+  When looking for empty files in a change (which must be handled specially),
+  RBTools would get a null result, which wasn't being handled correctly.
+
+
+Perforce
+--------
+
+* Fixed posting submitted Perforce changes.
+
+  Posting submitted changes for review regressed in 0.7.x. They can now be
+  posted again.
+
+* Fixed posting Perforce paths that are not included in the client view.
+  (:bug:`3864`)
+
+  It's once again possible to post a committed revision for review when the
+  commit contains files not in the client view.
+
+
+Subversion
+----------
+
+* Fixed Unicode issues when parsing repository info when using
+  :option:`--repository-url`. (:bug:`3969`)
+
+  Patch by Griffin Myers.
+
+* Fixed issues processing when a changeset has history scheduled with a
+  commit.
+
+  Patch by Griffin Myers.
+
+
+Team Foundation Server
+----------------------
+
+* Fixed a number of issues with diff generation on TFS.
+
+  The method previously used to generate diffs didn't deal with a lot of cases
+  that could come up when using different editors or platforms, such as files
+  that don't end with a newline or files that start with a byte-order marker.
+
+  RBTools now requires GNU diff for TFS diff generation.
+
+
+Contributors
+============
+
+* Ali Kamali
+* Anthony Hache
+* Barret Rennie
+* Christian Hammond
+* David Trowbridge
+* Griffin Myers
+* Nils Philippsen
+* Vadim Zeitlin
