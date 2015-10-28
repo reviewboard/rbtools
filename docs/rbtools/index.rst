@@ -84,7 +84,8 @@ There's also a number of
 :ref:`user-configurable options <rbtools-user-config>` as well, including
 customizable defaults for parameters and
 :ref:`custom aliases <rbtools-aliases>` for common operations or sets of
-flags.
+flags. Auto-completions are also available and can be installed by using the
+command :ref:`rbt setup-completion <rbt-setup-completion>`.
 
 
 Indices, Glossary and Tables

@@ -1,0 +1,16 @@
+#compdef rbt
+
+_rbt_get_all_commands()
+{
+    for opt in `rbt --help | grep -o "^  [A-Za-z\-]*\S"`
+    do
+        if [[ $opt != "command"* && $opt != "-"* ]]; then
+            opts_list+="${opt}"
+        fi
+    done
+}
+
+opts_list=()
+_rbt_get_all_commands
+_arguments '1:commands:{_describe 'values' opts_list}' \
+		   '*:file:_files'
