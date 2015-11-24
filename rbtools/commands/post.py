@@ -60,6 +60,16 @@ class Post(Command):
                             'All required fields must already be filled in '
                             'on the review request or must be provided when '
                             'posting.'),
+                Option('-t', '--trivial-publish',
+                       dest='trivial_publish',
+                       action='store_true',
+                       default=False,
+                       help='Publish the review request immediately after '
+                            'posting. Mark this publish as trivial. E-mails '
+                            'are not sent for trivial publishes.'
+                            '\n'
+                            'This option implies --publish.',
+                       added_in='0.8.0'),
                 Option('-o', '--open',
                        dest='open_browser',
                        action='store_true',
@@ -322,6 +332,9 @@ class Post(Command):
         if self.options.rid and self.options.update:
             self.options.update = False
 
+        if self.options.trivial_publish:
+            self.options.publish = True
+
     def normalize_guess_value(self, guess, arg_name):
         if guess in self.GUESS_YES_INPUT_VALUES:
             return self.GUESS_YES
@@ -555,6 +568,11 @@ class Post(Command):
 
         if self.options.publish:
             update_fields['public'] = True
+
+            if (self.options.trivial_publish and
+                self.tool.capabilities.has_capability('review_requests',
+                                                      'trivial_publish')):
+                update_fields['trivial'] = True
 
         if supports_posting_commit_ids and commit_id != draft.commit_id:
             update_fields['commit_id'] = commit_id or ''
