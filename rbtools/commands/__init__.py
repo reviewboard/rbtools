@@ -9,6 +9,7 @@ import platform
 import os
 import sys
 
+from colorlog import ColoredFormatter
 from six.moves import input
 from six.moves.urllib.parse import urlparse
 
@@ -175,6 +176,30 @@ class Command(object):
                help='Displays debug output.',
                extended_help='This information can be valuable when debugging '
                              'problems running the command.'),
+        OptionGroup(
+            name='RBTools Warning and Error Color Options',
+            description='Default color settings for warnings and errors',
+            option_list=[
+                Option('--color',
+                       dest='color',
+                       config_key='COLOR',
+                       default='auto',
+                       help='Enables color output.',
+                       extended_help='Enables color output on terminal.'),
+                Option('--log-warn-color',
+                       dest='warn_color',
+                       config_key='LOG_WARNING_COLOR',
+                       default='yellow'),
+                Option('--log-error-color',
+                       dest='error_color',
+                       config_key='LOG_ERROR_COLOR',
+                       default='red'),
+                Option('--log-critical-color',
+                       dest='critical_color',
+                       config_key='LOG_CRITICAL_COLOR',
+                       default='bold_red'),
+            ]
+        )
     ]
 
     server_options = OptionGroup(
@@ -575,7 +600,32 @@ class Command(object):
         # Handler for warnings, errors, and criticals. They'll show the
         # level prefix and the message.
         handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+
+        if (self.options.color == 'always' or
+            (self.options.color == 'auto' and
+             sys.stderr.isatty())):
+            handler.setFormatter(ColoredFormatter(
+                '%(log_color)s%(levelname)-8s%(reset)s'
+                '%(message_log_color)s%(message)s',
+                datefmt=None,
+                reset=True,
+                log_colors={
+                    'WARNING': self.options.warn_color,
+                    'ERROR': self.options.error_color,
+                    'CRITICAL': self.options.critical_color,
+                },
+                secondary_log_colors={
+                    'message': {
+                        'WARNING': self.options.warn_color,
+                        'ERROR': self.options.error_color,
+                        'CRITICAL': self.options.critical_color,
+                    }
+                },
+                style='%'
+            ))
+        else:
+            handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+
         handler.setLevel(logging.WARNING)
         root.addHandler(handler)
 

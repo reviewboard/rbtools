@@ -46,7 +46,11 @@ else:
     download_url = "http://downloads.reviewboard.org/nightlies/"
 
 
-install_requires = ['six>=1.8.0']
+install_requires = [
+    'colorlog',
+    'colorama',
+    'six>=1.8.0',
+]
 
 
 # Make sure this is a version of Python we are compatible with. This should
