@@ -721,8 +721,10 @@ class Command(object):
         """Returns the Review Board server url."""
         if self.options.server:
             server_url = self.options.server
-        else:
+        elif tool:
             server_url = tool.scan_for_server(repository_info)
+        else:
+            server_url = None
 
         if not server_url:
             print('Unable to find a Review Board server for this source code '
