@@ -65,10 +65,8 @@ class Post(Command):
                        action='store_true',
                        default=False,
                        help='Publish the review request immediately after '
-                            'posting. Mark this publish as trivial. E-mails '
-                            'are not sent for trivial publishes.'
-                            '\n'
-                            'This option implies --publish.',
+                            'posting, but without sending an e-mail '
+                            'notification.',
                        added_in='0.8.0'),
                 Option('-o', '--open',
                        dest='open_browser',
@@ -166,7 +164,8 @@ class Post(Command):
                            'guessing behavior. See :ref:`guessing-behavior` '
                            'for more information.'
                        )),
-                Option('--change-description',
+                Option('-m', '--change-description',
+                       dest='change_description',
                        default=None,
                        metavar='TEXT',
                        help='A description of what changed in this update '
@@ -239,8 +238,9 @@ class Post(Command):
                        action='store_true',
                        config_key='MARKDOWN',
                        default=False,
-                       help='Specifies if the summary and description should '
-                            'be interpreted as Markdown-formatted text.'
+                       help='Specifies if the summary, description, and '
+                            'change description should should be interpreted '
+                            'as Markdown-formatted text.'
                             '\n'
                             'This is only supported in Review Board 2.0+.',
                        added_in='0.6'),
@@ -397,7 +397,7 @@ class Post(Command):
         if review_request_id:
             review_request = get_review_request(
                 review_request_id, api_root,
-                only_fields='absolute_url,bugs_closed,id,status',
+                only_fields='absolute_url,bugs_closed,id,status,public',
                 only_links='diffs,draft')
 
             if review_request.status == 'submitted':
@@ -562,10 +562,6 @@ class Post(Command):
             # valid Markdown, so tell the server so it won't escape the text.
             update_fields['text_type'] = 'markdown'
 
-        if self.options.change_description:
-            update_fields['changedescription'] = \
-                self.options.change_description
-
         if self.options.publish:
             update_fields['public'] = True
 
@@ -573,6 +569,21 @@ class Post(Command):
                 self.tool.capabilities.has_capability('review_requests',
                                                       'trivial_publish')):
                 update_fields['trivial'] = True
+
+        if self.options.change_description is not None:
+            if review_request.public:
+                update_fields['changedescription'] = \
+                    self.options.change_description
+
+                if (self.options.markdown and
+                    self.tool.capabilities.has_capability('text', 'markdown')):
+                    update_fields['changedescription_text_type'] = 'markdown'
+                else:
+                    update_fields['changedescription_text_type'] = 'plain'
+            else:
+                logging.error(
+                    'The change description field can only be set when '
+                    'publishing an update. Use --description instead.')
 
         if supports_posting_commit_ids and commit_id != draft.commit_id:
             update_fields['commit_id'] = commit_id or ''
