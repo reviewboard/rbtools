@@ -5,6 +5,8 @@ import os
 import six
 import sys
 import threading
+from collections import deque
+
 from pkg_resources import parse_version
 
 from rbtools.api.errors import APIError
@@ -921,7 +923,7 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
         # To reduce HTTP requests (_get_repository_info call), we build an
         # ordered list of ClearCase repositories starting with the ones that
         # have a matching vobstag.
-        repository_scan_order = []
+        repository_scan_order = deque()
 
         # Reduce list of repositories to only ClearCase ones and sort them by
         # repo name matching vobstag first.
@@ -933,7 +935,7 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
             # Add repos where the vobstag matches at the beginning and others
             # at the end.
             if repository['name'] == self.vobstag:
-                repository_scan_order.insert(0, repository)
+                repository_scan_order.appendleft(repository)
             else:
                 repository_scan_order.append(repository)
 
