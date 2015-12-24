@@ -941,13 +941,14 @@ class SVNRepositoryInfo(RepositoryInfo):
         """
         # Reduce list of repositories to only SVN ones.
         repositories = []
-        page_repositories = server.get_repositories()
+
+        # Limit returned repositories to Subversion. This prevents extra
+        # network calls for repos we don't care about
+        page_repositories = server.get_repositories(tool='Subversion')
+
         try:
             while True:
-                for repository in page_repositories:
-                    # Ignore non-SVN repositories
-                    if repository['tool'] == 'Subversion':
-                        repositories.append(repository)
+                repositories.extend([repo for repo in page_repositories])
                 page_repositories = page_repositories.get_next()
         except StopIteration:
             pass

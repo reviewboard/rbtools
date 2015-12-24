@@ -920,7 +920,9 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
         uuid = self._get_vobs_uuid(self.vobstag)
         logging.debug("Repository's %s uuid is %r" % (self.vobstag, uuid))
 
-        repositories = server.get_repositories()
+        # Limit returned repositories to ClearCase. This prevents extra network
+        # calls for repos we don't care about
+        repositories = server.get_repositories(tool='ClearCase')
 
         # To reduce HTTP requests (_get_repository_info call), we build an
         # ordered list of ClearCase repositories starting with the ones that
@@ -932,10 +934,6 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
         try:
             while True:
                 for repository in repositories:
-                    # Ignore non-ClearCase repositories
-                    if repository['tool'] != 'ClearCase':
-                        continue
-
                     # Add repos where the vobstag matches at the beginning and
                     # others at the end.
                     if repository['name'] == self.vobstag:
