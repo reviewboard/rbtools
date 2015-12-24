@@ -927,7 +927,7 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
 
         # Reduce list of repositories to only ClearCase ones and sort them by
         # repo name matching vobstag first.
-        for repository in server.get_repositories().all_items:
+        for repository in server.get_repositories(tool='ClearCase').all_items:
             # Ignore non-ClearCase repositories.
             if repository['tool'] != 'ClearCase':
                 continue
