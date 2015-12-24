@@ -46,7 +46,11 @@ else:
     download_url = "http://downloads.reviewboard.org/nightlies/"
 
 
-install_requires = ['six>=1.8.0']
+install_requires = [
+    'colorlog',
+    'colorama',
+    'six>=1.8.0',
+]
 
 
 # Make sure this is a version of Python we are compatible with. This should
@@ -82,6 +86,7 @@ rb_commands = [
     'patch = rbtools.commands.patch:Patch',
     'post = rbtools.commands.post:Post',
     'publish = rbtools.commands.publish:Publish',
+    'setup-completion = rbtools.commands.setup_completion:SetupCompletion',
     'setup-repo = rbtools.commands.setup_repo:SetupRepo',
     'stamp = rbtools.commands.stamp:Stamp',
     'status = rbtools.commands.status:Status',

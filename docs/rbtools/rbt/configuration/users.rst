@@ -18,6 +18,11 @@ On Linux and MacOS X, this file can be found in your home directory.
 
 On Windows, it's in :file:`$USERPROFILE\\Local Settings\\Application Data`.
 
+If you need to override repository-wide settings for yourself, you can set
+:envvar:`$RBTOOLS_CONFIG_PATH` to a list of paths, separated by colons (Linux,
+Mac OS X) or semicolons (Windows).  These paths are searched first for
+:file:`.reviewboardrc` files.
+
 
 Custom Option Defaults
 ======================

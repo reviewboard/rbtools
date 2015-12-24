@@ -953,10 +953,11 @@ class SVNRepositoryInfo(RepositoryInfo):
         get a different SVNRepositoryInfo object (with a different path).
         """
         # Reduce list of repositories to only SVN ones.
+
         repositories = [
             repository
-            for repository in server.get_repositories().all_items
-            if repository['tool'] == 'Subversion'
+            for repository in
+            server.get_repositories(tool='Subversion').all_items
         ]
 
         # Do two paths. The first will be to try to find a matching entry
