@@ -96,7 +96,7 @@ def main():
     args = opt.command[1:]
 
     if command_name == 'help':
-        help(args, parser):2
+        help(args, parser):
     elif opt.help or '--help' in args[:2] or '-h' in args[:2]:
         help(opt.command, parser)
 
