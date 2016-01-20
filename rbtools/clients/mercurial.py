@@ -412,6 +412,13 @@ class MercurialClient(SCMClient):
             base_commit_id = revisions['base']
             parent_diff = None
 
+        # If reviewboard requests a relative revision via hgweb it will fail
+        # since hgweb does not support the relative revision syntax (^1, -1).
+        # Rewrite this relative node id to an absolute node id.
+        base_commit_id = self._execute(
+            ['hg', 'log', '-r', base_commit_id, '-T {node}'],
+            env=self._hg_env, results_unicode=False)
+
         return {
             'diff': diff,
             'parent_diff': parent_diff,
