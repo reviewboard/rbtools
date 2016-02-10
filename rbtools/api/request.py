@@ -496,7 +496,7 @@ class ReviewBoardServer(object):
         if not verify_ssl:
             context = ssl._create_unverified_context()
             handlers.append(HTTPSHandler(context=context))
-        elif certif8:
+        elif certifi:
             context = ssl.create_default_context(cafile=certifi.where())
             handlers.append(HTTPSHandler(context=context))
 
