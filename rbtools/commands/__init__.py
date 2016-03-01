@@ -522,6 +522,13 @@ class Command(object):
                         'user@domain,password). Visit https://msdn.microsoft.'
                         'com/en-us/library/hh190725.aspx to learn about '
                         'saving credentials for reuse.'),
+            Option('--tf-cmd',
+                   dest='tf_cmd',
+                   default=None,
+                   metavar='TF_CMD',
+                   config_key='TF_CMD',
+                   help='The full path of where to find the tf command. This '
+                        'overrides any detected path.'),
         ]
     )
 

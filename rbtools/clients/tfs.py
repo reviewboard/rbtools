@@ -31,22 +31,28 @@ class TFSClient(SCMClient):
         super(TFSClient, self).__init__(config, options)
 
         self.tf = None
+        tf_locations = []
+
+        if getattr(self.options, 'tf_cmd', None):
+            tf_locations.append(self.options.tf_cmd)
 
         if sys.platform.startswith('win'):
             # First check in the system path. If that doesn't work, look in the
             # two standard install locations.
-            tf_locations = [
+            tf_locations.extend([
                 'tf.cmd',
                 r'%programfiles(x86)%\Microsoft Visual Studio 12.0\Common7\IDE\tf.cmd',
                 r'%programfiles%\Microsoft Team Foundation Server 12.0\Tools\tf.cmd',
-            ]
+            ])
+        else:
+            tf_locations.append('tf')
 
-            for location in tf_locations:
-                if check_install([location, 'help']):
-                    self.tf = location
-                    break
-        elif check_install(['tf', 'help']):
-            self.tf = 'tf'
+        for location in tf_locations:
+            location = os.path.expandvars(location)
+
+            if check_install([location, 'help']):
+                self.tf = location
+                break
 
     def get_repository_info(self):
         if self.tf is None:
