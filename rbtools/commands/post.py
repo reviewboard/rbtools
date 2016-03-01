@@ -759,7 +759,10 @@ class Post(Command):
         else:
             changenum = self.tool.get_changenum(self.get_revisions())
 
-        commit_id = changenum
+        # Not all scm clients support get_changenum, so if get_changenum
+        # returns None (the default for clients that don't have changenums),
+        # we'll prefer the existing commit_id.
+        commit_id = changenum or commit_id
 
         if not self.options.diff_filename:
             # If the user has requested to guess the summary or description,
