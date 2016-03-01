@@ -787,7 +787,10 @@ class Post(Command):
         else:
             changenum = self.tool.get_changenum(self.revisions)
 
-        commit_id = changenum
+        # Not all scm clients support get_changenum, so if get_changenum
+        # returns None (the default for clients that don't have changenums),
+        # we'll prefer the existing commit_id.
+        commit_id = changenum or commit_id
 
         if self.options.update and self.revisions:
             review_request = guess_existing_review_request(
