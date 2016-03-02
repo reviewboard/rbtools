@@ -12,6 +12,7 @@ from rbtools.clients import RepositoryInfo, SCMClient
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError)
 from rbtools.utils.checks import check_gnu_diff, check_install
+from rbtools.utils.diffs import filename_match_any_patterns
 from rbtools.utils.process import die, execute
 
 
@@ -23,6 +24,7 @@ class TFSClient(SCMClient):
     """
     name = 'TFS'
 
+    supports_diff_exclude_patterns = True
     supports_patch_revert = True
 
     REVISION_WORKING_COPY = '--rbtools-working-copy'
@@ -181,6 +183,12 @@ class TFSClient(SCMClient):
 
             if (not file_type or (not os.path.isfile(local_filename) and
                                   'delete' not in action)):
+                continue
+
+            if (exclude_patterns and
+                filename_match_any_patterns(local_filename,
+                                            exclude_patterns,
+                                            base_dir=None)):
                 continue
 
             if 'rename' in action:
