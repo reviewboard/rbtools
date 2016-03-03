@@ -22,7 +22,7 @@ class TFSClient(SCMClient):
     This wraps the 'tf' command-line tool to get repository information and
     create diffs.
     """
-    name = 'TFS'
+    name = 'Team Foundation Server'
 
     supports_diff_exclude_patterns = True
     supports_patch_revert = True
