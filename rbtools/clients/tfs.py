@@ -180,6 +180,7 @@ class TFSClient(SCMClient):
             new_version = b'(pending)'
             old_data = b''
             new_data = b''
+            copied = 'branch' in action
 
             if (not file_type or (not os.path.isfile(local_filename) and
                                   'delete' not in action)):
@@ -196,6 +197,13 @@ class TFSClient(SCMClient):
                     pending_change.attrib['source-item'].encode('utf-8')
             else:
                 old_filename = new_filename
+
+            if copied:
+                old_filename = \
+                    pending_change.attrib['source-item'].encode('utf-8')
+                old_version = (
+                    '%d' % self._convert_symbolic_revision(
+                        'W', old_filename.decode('utf-8')))
 
             if 'add' in action:
                 old_filename = b'/dev/null'
@@ -222,6 +230,9 @@ class TFSClient(SCMClient):
 
             old_label = b'%s\t%s' % (old_filename, old_version)
             new_label = b'%s\t%s' % (new_filename, new_version)
+
+            if copied:
+                diff.append(b'Copied from: %s\n' % old_filename)
 
             if file_type == 'binary':
                 if 'add' in action:
@@ -326,8 +337,6 @@ class TFSClient(SCMClient):
                             'server_file': server_file,
                             'filetype': filetype,
                         }
-            import pprint
-            pprint.pprint(changesets)
         except Exception as e:
             logging.debug('Failed to parse output from "tf history": %s',
                           e, exc_info=True)
@@ -349,7 +358,7 @@ class TFSClient(SCMClient):
 
         return execute(cmdline, ignore_errors=True, **kwargs)
 
-    def _convert_symbolic_revision(self, revision):
+    def _convert_symbolic_revision(self, revision, path=None):
         """Convert a symbolic revision into a numeric changeset."""
         args = ['history', '-stopafter:1', '-recursive', '-format:xml']
 
@@ -359,7 +368,7 @@ class TFSClient(SCMClient):
         if revision != 'W':
             args.append('-version:%s' % revision)
 
-        args.append(os.getcwd())
+        args.append(path or os.getcwd())
 
         data = self._run_tf(args)
         try:
