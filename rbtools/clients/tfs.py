@@ -166,7 +166,11 @@ class TFSClient(SCMClient):
                 base, tip, include_files, exclude_patterns)
 
     def _diff_working_copy(self, base, include_files, exclude_patterns):
-        status = self._run_tf(['status', '-format:xml'])
+        # We pass results_unicode=False because that uses the filesystem
+        # encoding, but the XML results we get should always be UTF-8, and are
+        # well-formed with the encoding specified. We can therefore let
+        # ElementTree determine how to decode it.
+        status = self._run_tf(['status', '-format:xml'], results_unicode=False)
         root = ET.fromstring(status)
 
         diff = []
@@ -302,8 +306,13 @@ class TFSClient(SCMClient):
         # us [base, tip]. Increment the base to avoid this.
         real_base = str(int(base) + 1)
 
+        # We pass results_unicode=False because that uses the filesystem
+        # encoding, but the XML results we get should always be UTF-8, and are
+        # well-formed with the encoding specified. We can therefore let
+        # ElementTree determine how to decode it.
         history = self._run_tf(['history', '-version:%s~%s' % (real_base, tip),
-                                '-recursive', '-format:xml', os.getcwd()])
+                                '-recursive', '-format:xml', os.getcwd()],
+                               results_unicode=False)
 
         changesets = {}
 
@@ -370,7 +379,11 @@ class TFSClient(SCMClient):
 
         args.append(path or os.getcwd())
 
-        data = self._run_tf(args)
+        # We pass results_unicode=False because that uses the filesystem
+        # encoding, but the XML results we get should always be UTF-8, and are
+        # well-formed with the encoding specified. We can therefore let
+        # ElementTree determine how to decode it.
+        data = self._run_tf(args, results_unicode=False)
         try:
             root = ET.fromstring(data)
             item = root.find('./changeset')
