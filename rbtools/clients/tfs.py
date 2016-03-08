@@ -22,7 +22,7 @@ class TFSClient(SCMClient):
     This wraps the 'tf' command-line tool to get repository information and
     create diffs.
     """
-    name = 'TFS'
+    name = 'Team Foundation Server'
 
     supports_diff_exclude_patterns = True
     supports_patch_revert = True
@@ -166,7 +166,11 @@ class TFSClient(SCMClient):
                 base, tip, include_files, exclude_patterns)
 
     def _diff_working_copy(self, base, include_files, exclude_patterns):
-        status = self._run_tf(['status', '-format:xml'])
+        # We pass results_unicode=False because that uses the filesystem
+        # encoding, but the XML results we get should always be UTF-8, and are
+        # well-formed with the encoding specified. We can therefore let
+        # ElementTree determine how to decode it.
+        status = self._run_tf(['status', '-format:xml'], results_unicode=False)
         root = ET.fromstring(status)
 
         diff = []
@@ -180,6 +184,7 @@ class TFSClient(SCMClient):
             new_version = b'(pending)'
             old_data = b''
             new_data = b''
+            copied = 'branch' in action
 
             if (not file_type or (not os.path.isfile(local_filename) and
                                   'delete' not in action)):
@@ -196,6 +201,13 @@ class TFSClient(SCMClient):
                     pending_change.attrib['source-item'].encode('utf-8')
             else:
                 old_filename = new_filename
+
+            if copied:
+                old_filename = \
+                    pending_change.attrib['source-item'].encode('utf-8')
+                old_version = (
+                    '%d' % self._convert_symbolic_revision(
+                        'W', old_filename.decode('utf-8')))
 
             if 'add' in action:
                 old_filename = b'/dev/null'
@@ -222,6 +234,9 @@ class TFSClient(SCMClient):
 
             old_label = b'%s\t%s' % (old_filename, old_version)
             new_label = b'%s\t%s' % (new_filename, new_version)
+
+            if copied:
+                diff.append(b'Copied from: %s\n' % old_filename)
 
             if file_type == 'binary':
                 if 'add' in action:
@@ -291,8 +306,13 @@ class TFSClient(SCMClient):
         # us [base, tip]. Increment the base to avoid this.
         real_base = str(int(base) + 1)
 
+        # We pass results_unicode=False because that uses the filesystem
+        # encoding, but the XML results we get should always be UTF-8, and are
+        # well-formed with the encoding specified. We can therefore let
+        # ElementTree determine how to decode it.
         history = self._run_tf(['history', '-version:%s~%s' % (real_base, tip),
-                                '-recursive', '-format:xml', os.getcwd()])
+                                '-recursive', '-format:xml', os.getcwd()],
+                               results_unicode=False)
 
         changesets = {}
 
@@ -347,7 +367,7 @@ class TFSClient(SCMClient):
 
         return execute(cmdline, ignore_errors=True, **kwargs)
 
-    def _convert_symbolic_revision(self, revision):
+    def _convert_symbolic_revision(self, revision, path=None):
         """Convert a symbolic revision into a numeric changeset."""
         args = ['history', '-stopafter:1', '-recursive', '-format:xml']
 
@@ -357,9 +377,13 @@ class TFSClient(SCMClient):
         if revision != 'W':
             args.append('-version:%s' % revision)
 
-        args.append(os.getcwd())
+        args.append(path or os.getcwd())
 
-        data = self._run_tf(args)
+        # We pass results_unicode=False because that uses the filesystem
+        # encoding, but the XML results we get should always be UTF-8, and are
+        # well-formed with the encoding specified. We can therefore let
+        # ElementTree determine how to decode it.
+        data = self._run_tf(args, results_unicode=False)
         try:
             root = ET.fromstring(data)
             item = root.find('./changeset')
