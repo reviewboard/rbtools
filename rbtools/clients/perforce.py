@@ -1,6 +1,5 @@
 from __future__ import print_function, unicode_literals
 
-import fnmatch
 import logging
 import marshal
 import os
@@ -10,6 +9,8 @@ import socket
 import stat
 import string
 import subprocess
+from fnmatch import fnmatch
+from locale import getpreferredencoding
 
 from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.clients.errors import (AmendError,
@@ -1337,7 +1338,7 @@ class PerforceClient(SCMClient):
         change = self.p4.change(changelist)
 
         if len(change) == 1 and 'Description' in change[0]:
-            return change[0]['Description']
+            return change[0]['Description'].decode(getpreferredencoding())
         else:
             return ''
 
@@ -1408,9 +1409,9 @@ class PerforceClient(SCMClient):
         """
         for pattern in exclude_patterns:
             if pattern.startswith('//'):
-                if fnmatch.fnmatch(depot_file, pattern):
+                if fnmatch(depot_file, pattern):
                     return True
-            elif local_file and fnmatch.fnmatch(local_file, pattern):
+            elif local_file and fnmatch(local_file, pattern):
                 return True
 
         return False

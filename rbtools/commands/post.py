@@ -422,10 +422,6 @@ class Post(Command):
                         review_request_id=rid,
                         only_fields='absolute_url,bugs_closed,id,status',
                         only_links='diffs,draft')
-
-                    if not self.options.diff_only:
-                        review_request = review_request.update(
-                            changenum=changenum)
                 else:
                     raise CommandError('Error creating review request: %s' % e)
 
