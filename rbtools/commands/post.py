@@ -625,12 +625,24 @@ class Post(Command):
                 commit_message = self.tool.get_commit_message(self.revisions)
 
                 if commit_message:
-                    if guess_summary:
-                        self.options.summary = commit_message['summary']
+                    guessed_summary = commit_message['summary']
+                    guessed_description = commit_message['description']
 
-                    if guess_description:
-                        self.options.description = \
-                            commit_message['description']
+                    if guess_summary and guess_description:
+                        self.options.summary = guessed_summary
+                        self.options.description = guessed_description
+                    elif guess_summary:
+                        self.options.summary = guessed_summary
+                    elif guess_description:
+                        # If we're guessing the description but not the summary
+                        # (for example, if --summary was included), we probably
+                        # don't want to strip off the summary line of the
+                        # commit message.
+                        if guessed_description.startswith(guessed_summary):
+                            self.options.description = guessed_description
+                        else:
+                            self.options.description = \
+                                guessed_summary + '\n\n' + guessed_description
             except NotImplementedError:
                 # The SCMClient doesn't support getting commit messages,
                 # so we can't provide the guessed versions.
