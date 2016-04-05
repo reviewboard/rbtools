@@ -422,6 +422,13 @@ class Post(Command):
                 if submit_as:
                     request_data[b'submit_as'] = submit_as
 
+                if self.tool.can_bookmark:
+                    bookmark = self.tool.get_current_bookmark()
+                    request_data[b'extra_data__local_bookmark'] = bookmark
+                elif self.tool.can_branch:
+                    branch = self.tool.get_current_branch()
+                    request_data[b'extra_data__local_branch'] = branch
+
                 review_requests = api_root.get_review_requests(
                     only_fields='',
                     only_links='create')

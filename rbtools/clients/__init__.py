@@ -44,6 +44,8 @@ class SCMClient(object):
     can_merge = False
     can_push_upstream = False
     can_delete_branch = False
+    can_branch = False
+    can_bookmark = False
 
     def __init__(self, config=None, options=None):
         self.config = config or {}

@@ -2,6 +2,9 @@ from __future__ import print_function, unicode_literals
 
 import logging
 
+import texttable as tt
+from backports.shutil_get_terminal_size import get_terminal_size
+
 from rbtools.commands import Command, Option
 from rbtools.utils.repository import get_repository_id
 from rbtools.utils.users import get_username
@@ -39,19 +42,39 @@ class Status(Command):
                 A dict that contains statistics about each review request.
         """
         if len(request_stats):
-            max_status_length = max(d['status_len'] for d in request_stats)
-            max_row_length = (max(d['summary_len'] for d in request_stats) +
-                              self.PADDING + self.TAB_SIZE + max_status_length)
-            white_space = max_status_length + self.TAB_SIZE
-            border = '=' * max_row_length
+            has_branches = False
+            has_bookmarks = False
 
-            print(border)
-            print('%s%s' % ('Status'.ljust(white_space), 'Review Request'))
-            print(border)
+            table = tt.Texttable(get_terminal_size().columns)
+            header = ['Status', 'Review Request']
 
             for request in request_stats:
-                status = request['status'].ljust(white_space)
-                print('%s%s' % (status, request['summary']))
+                if 'branch' in request:
+                    has_branches = True
+
+                if 'bookmark' in request:
+                    has_bookmarks = True
+
+            if has_branches:
+                header.append('Branch')
+
+            if has_bookmarks:
+                header.append('Bookmark')
+
+            table.header(header)
+
+            for request in request_stats:
+                row = [request['status'], request['summary']]
+
+                if has_branches:
+                    row.append(request.get('branch') or '')
+
+                if has_bookmarks:
+                    row.append(request.get('bookmark') or '')
+
+                table.add_row(row)
+
+            print(table.draw())
         else:
             print('No review requests found.')
 
@@ -68,6 +91,7 @@ class Status(Command):
             list: A list whose elements are dicts of each request's statistics.
         """
         requests_stats = []
+        request_stats = {}
 
         for request in requests.all_items:
             if request.draft:
@@ -79,13 +103,19 @@ class Status(Command):
             else:
                 status = 'Pending'
 
-            summary = 'r/%s - %s' % (request.id, request.summary)
-            requests_stats.append({
+            request_stats = {
                 'status': status,
-                'summary': summary,
-                'status_len': len(status),
-                'summary_len': len(summary),
-            })
+                'summary': 'r/%s - %s' % (request.id, request.summary)
+            }
+
+            if 'local_branch' in request.extra_data:
+                request_stats['branch'] = \
+                    request.extra_data['local_branch']
+            elif 'local_bookmark' in request.extra_data:
+                request_stats['bookmark'] = \
+                    request.extra_data['local_bookmark']
+
+            requests_stats.append(request_stats)
 
         return requests_stats
 

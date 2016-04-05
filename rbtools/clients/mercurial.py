@@ -29,6 +29,9 @@ class MercurialClient(SCMClient):
 
     supports_diff_exclude_patterns = True
 
+    can_branch = True
+    can_bookmark = True
+
     def __init__(self, **kwargs):
         super(MercurialClient, self).__init__(**kwargs)
 
@@ -750,3 +753,12 @@ class MercurialClient(SCMClient):
         return (self.capabilities and
                 self.capabilities.has_capability('scmtools', 'mercurial',
                                                  'empty_files'))
+
+    def get_current_bookmark(self):
+        """Return the name of the current bookmark.
+
+        Returns:
+            bytes:
+            A string with the name of the current bookmark.
+        """
+        return execute(['hg', 'id', '-B'], ignore_errors=True).strip()

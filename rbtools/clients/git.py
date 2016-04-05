@@ -31,6 +31,7 @@ class GitClient(SCMClient):
     can_merge = True
     can_push_upstream = True
     can_delete_branch = True
+    can_branch = True
 
     def __init__(self, **kwargs):
         super(GitClient, self).__init__(**kwargs)
@@ -852,7 +853,12 @@ class GitClient(SCMClient):
                             remote_branch)
 
     def get_current_branch(self):
-        """Returns the name of the current branch."""
+        """Return the name of the current branch.
+
+        Returns:
+            bytes:
+            A string with the name of the current branch.
+        """
         return execute([self.git, "rev-parse", "--abbrev-ref", "HEAD"],
                        ignore_errors=True).strip()
 

@@ -26,6 +26,8 @@ class BazaarClient(SCMClient):
 
     supports_diff_exclude_patterns = True
 
+    can_branch = True
+
     INDEX_FILE_RE = re.compile(b"===.+'(.+?)'\n")
 
     # Regular expression that matches the path to the current branch.
@@ -233,3 +235,12 @@ class BazaarClient(SCMClient):
                 message.append(line)
 
         return ''.join(message).strip()
+
+    def get_current_branch(self):
+        """Return the name of the current branch.
+
+        Returns:
+            bytes:
+            A string with the name of the current branch.
+        """
+        return execute(['bzr', 'nick'], ignore_errors=True).strip()
