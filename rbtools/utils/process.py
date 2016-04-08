@@ -4,6 +4,9 @@ import logging
 import os
 import subprocess
 import sys
+if sys.platform.startswith('linux'):
+  reload(sys)
+  sys.setdefaultencoding("utf-8")
 
 import six
 
