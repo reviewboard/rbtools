@@ -1,0 +1,171 @@
+===========================
+RBTools 0.7.6 Release Notes
+===========================
+
+**Release date:** TBD
+
+
+New Features
+============
+
+rbt api-get
+-----------
+
+* rbt api-get can now be used outside of a checkout.
+
+  When passing :option:`--server`, :command:`rbt api-get` can be used
+  anywhere, making it useful for more types of integrations.
+
+
+Team Foundation Server
+----------------------
+
+* Added support for specifying the path to the :command:`tf.exe` command for
+  TFS.
+
+  The :command:`tf.exe` path can now be specified by using the
+  :option:`--tf-cmd` option on the command line, or by setting
+  ``TF_CMD`` in :file:`.reviewboardrc`.
+
+  Patch by Brandon Martin.
+
+* Added support for using :option:`--exclude` on TFS.
+
+  Patch by Brandon Martin.
+
+* Added support for branch (copy) operations on TFS.
+
+  Branched/copied files can now be posted against Review Board when using
+  `Power Pack`_ 1.4.1 or higher. These can also be combined with edit
+  operations.
+
+  Based on work by Brandon Martin.
+
+
+.. _Power Pack: https://www.reviewboard.org/powerpack/
+
+
+API
+---
+
+.. currentmodule:: rbtools.api.resource
+
+* Added pagination helpers for all :py:class:`ListResources <ListResource>`.
+
+  This introduces :py:func:`ListResource.all_pages`, which yields every page
+  of the resource, and :py:func:`ListResource.all_items`, which yields every
+  item on the page. These should help with processing pages of information
+  from the API in a consistent way.
+
+
+Performance Improvements
+========================
+
+* Reduced the work needed to look up ClearCase and Subversion repositories.
+
+  For ClearCase and Subversion, it's necessary to fetch a list of all
+  compatible repositories in order to compare certain information. We now
+  take advantage of server-side filtering to reduce the set of repositories
+  we have to scan through.
+
+  Patch by Joshua Olson.
+
+* Improved performance when locally scanning ClearCase repositories.
+
+
+Bug Fixes
+=========
+
+General
+-------
+
+* When running in a non-interactive console, RBTools commands will no longer
+  hang prompting for login credentials.
+
+  It's up to the caller to ensure that RBTools has a valid session cookie or
+  credentials (such as an API token) provided on the command line or in
+  :file:`.reviewboardrc`.
+
+  Patch by Vadim Zeitlin.
+
+
+rbt post
+--------
+
+* Fixed posting commit IDs for non-Perforce clients.
+
+  Patch by Ben Asher.
+
+* The summary of a commit is no longer lost if passing a custom summary and
+  guessing the description from the commit message.
+
+  If the summary is passed on the command line but the description is guessed
+  from the commit message, the first line of the commit message would be lost.
+  This change improves that by concatenating the summary and description back
+  together if the summary line isn't being used for the review request.
+
+  Based on work by Alexander Goncahrov.
+
+
+rbt setup-repo
+--------------
+
+* Improved the fuzzy matching of repositories, to help more accurately
+  return possibly matching results.
+
+  Patch by H W Tovetjärn.
+
+
+Mercurial
+---------
+
+* Fixed broken parent commit IDs when using relative, negative, or short
+  revisions. (:bug:`3915`)
+
+  When referencing a relative revision (those starting with a ``^``), or
+  specifying a negative or short revision number, hgweb would fail to find
+  the matching commits. We now normalize those revisions.
+
+  Patch by André Klitzing.
+
+
+Perforce
+--------
+
+* Fixed a crash when posting a changelist that included a deleted symbolic
+  link. (:bug:`4037`)
+
+  This was supposed to log that the file would be skipped, but there was
+  an error with the logging call.
+
+  Patch by Akis Kalligeros.
+
+* Fixed a Unicode mismatch when updating an existing review request from a
+  changeset using :option:`rbt post -u <--update>`.
+
+* Fixed a bad update call that would lead to an empty but harmless "CRITICAL"
+  error message.
+
+
+Team Foundation Server
+----------------------
+
+* Fixed :command:`rbt setup-repo` with TFS repositories.
+
+* Fixed properly decoding the character set of XML files coming from TFS.
+
+
+Contributors
+============
+
+* Akis Kalligeros
+* Alexander Goncahrov
+* André Klitzing
+* Barret Rennie
+* Ben Asher
+* Brandon Martin
+* Christian Hammond
+* David Trowbridge
+* H W Tovetjärn
+* Joshua Olson
+* Vadim Zeitlin
