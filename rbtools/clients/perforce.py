@@ -9,6 +9,7 @@ import socket
 import stat
 import string
 import subprocess
+import sys
 from fnmatch import fnmatch
 from locale import getpreferredencoding
 
@@ -233,15 +234,19 @@ class PerforceClient(SCMClient):
         if client_root is None:
             return None
 
-        norm_cwd = os.path.normcase(os.path.realpath(os.getcwd()) +
-                                    os.path.sep)
-        norm_client_root = os.path.normcase(os.path.realpath(client_root) +
-                                            os.path.sep)
+        # A 'null' client root is a valid configuration on Windows
+        # client, so don't enforce the repository directory check.
+        if (client_root.lower() != 'null' or
+            not sys.platform.startswith('win')):
+            norm_cwd = os.path.normcase(os.path.realpath(os.getcwd()) +
+                                        os.path.sep)
+            norm_client_root = os.path.normcase(os.path.realpath(client_root) +
+                                                os.path.sep)
 
-        # Don't accept the repository if the current directory is outside the
-        # root of the Perforce client.
-        if not norm_cwd.startswith(norm_client_root):
-            return None
+            # Don't accept the repository if the current directory
+            # is outside the root of the Perforce client.
+            if not norm_cwd.startswith(norm_client_root):
+                return None
 
         try:
             parts = repository_path.split(':')
