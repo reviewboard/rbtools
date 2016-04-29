@@ -668,12 +668,13 @@ class PerforceClient(SCMClient):
         # this to remove the server-side implementation and just implement
         # --guess-summary and --guess-description, but that would likely
         # create a lot of unhappy users.
-        tip = revisions['tip']
+        if revisions is not None:
+            tip = revisions['tip']
 
-        if tip.startswith(self.REVISION_PENDING_CLN_PREFIX):
-            tip = tip[len(self.REVISION_PENDING_CLN_PREFIX):]
-            if tip != self.REVISION_DEFAULT_CLN:
-                return tip
+            if tip.startswith(self.REVISION_PENDING_CLN_PREFIX):
+                tip = tip[len(self.REVISION_PENDING_CLN_PREFIX):]
+                if tip != self.REVISION_DEFAULT_CLN:
+                    return tip
 
         return None
 
