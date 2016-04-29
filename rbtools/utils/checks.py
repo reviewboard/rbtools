@@ -24,7 +24,12 @@ def check_install(command):
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE)
         return True
-    except OSError:
+    except (OSError, ValueError):
+        # We catch ValueError exceptions here to work around bug in the
+        # version of Python that ships with OS X 10.11. I don't know if the
+        # logic is 100% reliable but if we get a ValueError here, it typically
+        # means the command we are trying to run doesn't exist. See
+        # http://bugs.python.org/issue26083
         return False
 
 
