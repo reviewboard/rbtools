@@ -340,12 +340,15 @@ class Post(Command):
         with those one the server, and return the first match.
         """
         if isinstance(repository_info.path, list):
-            repositories = api_root.get_repositories(only_fields='path',
-                                                     only_links='')
+            repositories = api_root.get_repositories(
+                only_fields='path,mirror_path', only_links='')
 
             for repo in repositories.all_items:
                 if repo['path'] in repository_info.path:
                     repository_info.path = repo['path']
+                    break
+                elif repo['mirror_path'] in repository_info.path:
+                    repository_info.path = repo['mirror_path']
                     break
 
         if isinstance(repository_info.path, list):
