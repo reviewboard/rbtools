@@ -416,7 +416,7 @@ class MercurialClient(SCMClient):
         # since hgweb does not support the relative revision syntax (^1, -1).
         # Rewrite this relative node id to an absolute node id.
         base_commit_id = self._execute(
-            ['hg', 'log', '-r', base_commit_id, '-T {node}'],
+            ['hg', 'log', '-r', base_commit_id, '--template', '{node}'],
             env=self._hg_env, results_unicode=False)
 
         return {
