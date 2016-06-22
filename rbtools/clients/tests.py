@@ -1,5 +1,6 @@
 from __future__ import print_function, unicode_literals
 
+import json
 import os
 import re
 import sys
@@ -10,10 +11,14 @@ from random import randint
 from tempfile import mktemp
 from textwrap import dedent
 
+from kgb import SpyAgency
 from nose import SkipTest
 from six.moves import cStringIO as StringIO
+from six.moves.urllib.request import urlopen
 
 from rbtools.api.capabilities import Capabilities
+from rbtools.api.client import RBClient
+from rbtools.api.tests import MockResponse
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.bazaar import BazaarClient
 from rbtools.clients.errors import (InvalidRevisionSpecError,
@@ -1192,6 +1197,207 @@ def svn_version_set_hash(svn16_hash, svn17_hash):
     return decorator
 
 
+class SVNRepositoryInfoTests(SpyAgency, SCMClientTests):
+    """Unit tests for rbtools.clients.svn.SVNRepositoryInfo."""
+
+    payloads = {
+        'http://localhost:8080/api/': {
+            'mimetype': 'application/vnd.reviewboard.org.root+json',
+            'rsp': {
+                'uri_templates': {},
+                'links': {
+                    'self': {
+                        'href': 'http://localhost:8080/api/',
+                        'method': 'GET',
+                    },
+                    'repositories': {
+                        'href': 'http://localhost:8080/api/repositories/',
+                        'method': 'GET',
+                    },
+                },
+                'stat': 'ok',
+            },
+        },
+        'http://localhost:8080/api/repositories/?tool=Subversion': {
+            'mimetype': 'application/vnd.reviewboard.org.repositories+json',
+            'rsp': {
+                'repositories': [
+                    {
+                        # This one doesn't have a mirror_path, to emulate
+                        # Review Board 1.6.
+                        'id': 1,
+                        'name': 'SVN Repo 1',
+                        'path': 'https://svn1.example.com/',
+                        'links': {
+                            'info': {
+                                'href': ('https://localhost:8080/api/'
+                                         'repositories/1/info/'),
+                                'method': 'GET',
+                            },
+                        },
+                    },
+                    {
+                        'id': 2,
+                        'name': 'SVN Repo 2',
+                        'path': 'https://svn2.example.com/',
+                        'mirror_path': 'svn+ssh://svn2.example.com/',
+                        'links': {
+                            'info': {
+                                'href': ('https://localhost:8080/api/'
+                                         'repositories/2/info/'),
+                                'method': 'GET',
+                            },
+                        },
+                    },
+                ],
+                'links': {
+                    'next': {
+                        'href': ('http://localhost:8080/api/repositories/'
+                                 '?tool=Subversion&page=2'),
+                        'method': 'GET',
+                    },
+                },
+                'total_results': 3,
+                'stat': 'ok',
+            },
+        },
+        'http://localhost:8080/api/repositories/?tool=Subversion&page=2': {
+            'mimetype': 'application/vnd.reviewboard.org.repositories+json',
+            'rsp': {
+                'repositories': [
+                    {
+                        'id': 3,
+                        'name': 'SVN Repo 3',
+                        'path': 'https://svn3.example.com/',
+                        'mirror_path': 'svn+ssh://svn3.example.com/',
+                        'links': {
+                            'info': {
+                                'href': ('https://localhost:8080/api/'
+                                         'repositories/3/info/'),
+                                'method': 'GET',
+                            },
+                        },
+                    },
+                ],
+                'total_results': 3,
+                'stat': 'ok',
+            },
+        },
+        'https://localhost:8080/api/repositories/1/info/': {
+            'mimetype': 'application/vnd.reviewboard.org.repository-info+json',
+            'rsp': {
+                'info': {
+                    'uuid': 'UUID-1',
+                    'url': 'https://svn1.example.com/',
+                    'root_url': 'https://svn1.example.com/',
+                },
+                'stat': 'ok',
+            },
+        },
+        'https://localhost:8080/api/repositories/2/info/': {
+            'mimetype': 'application/vnd.reviewboard.org.repository-info+json',
+            'rsp': {
+                'info': {
+                    'uuid': 'UUID-2',
+                    'url': 'https://svn2.example.com/',
+                    'root_url': 'https://svn2.example.com/',
+                },
+                'stat': 'ok',
+            },
+        },
+        'https://localhost:8080/api/repositories/3/info/': {
+            'mimetype': 'application/vnd.reviewboard.org.repository-info+json',
+            'rsp': {
+                'info': {
+                    'uuid': 'UUID-3',
+                    'url': 'https://svn3.example.com/',
+                    'root_url': 'https://svn3.example.com/',
+                },
+                'stat': 'ok',
+            },
+        },
+    }
+
+    def setUp(self):
+        super(SVNRepositoryInfoTests, self).setUp()
+
+        self.spy_on(urlopen, call_fake=self._urlopen)
+
+        self.api_client = RBClient('http://localhost:8080/')
+        self.root_resource = self.api_client.get_root()
+
+    def test_find_server_repository_info_with_path_match(self):
+        """Testing SVNRepositoryInfo.find_server_repository_info with
+        path matching
+        """
+        info = SVNRepositoryInfo('https://svn1.example.com/', '/', '')
+
+        repo_info = info.find_server_repository_info(self.root_resource)
+        self.assertEqual(repo_info, info)
+        self.assertEqual(repo_info.repository_id, 1)
+
+    def test_find_server_repository_info_with_mirror_path_match(self):
+        """Testing SVNRepositoryInfo.find_server_repository_info with
+        mirror_path matching
+        """
+        info = SVNRepositoryInfo('svn+ssh://svn2.example.com/', '/', '')
+
+        repo_info = info.find_server_repository_info(self.root_resource)
+        self.assertEqual(repo_info, info)
+        self.assertEqual(repo_info.repository_id, 2)
+
+    def test_find_server_repository_info_with_uuid_match(self):
+        """Testing SVNRepositoryInfo.find_server_repository_info with
+        UUID matching
+        """
+        info = SVNRepositoryInfo('svn+ssh://blargle/', '/', 'UUID-3')
+
+        repo_info = info.find_server_repository_info(self.root_resource)
+        self.assertNotEqual(repo_info, info)
+        self.assertEqual(repo_info.repository_id, 3)
+
+    def test_relative_paths(self):
+        """Testing SVNRepositoryInfo._get_relative_path"""
+        info = SVNRepositoryInfo('http://svn.example.com/svn/', '/', '')
+        self.assertEqual(info._get_relative_path('/foo', '/bar'), None)
+        self.assertEqual(info._get_relative_path('/', '/trunk/myproject'),
+                         None)
+        self.assertEqual(info._get_relative_path('/trunk/myproject', '/'),
+                         '/trunk/myproject')
+        self.assertEqual(
+            info._get_relative_path('/trunk/myproject', ''),
+            '/trunk/myproject')
+        self.assertEqual(
+            info._get_relative_path('/trunk/myproject', '/trunk'),
+            '/myproject')
+        self.assertEqual(
+            info._get_relative_path('/trunk/myproject', '/trunk/myproject'),
+            '/')
+
+    def _urlopen(self, request):
+        url = request.get_full_url()
+
+        try:
+            payload = self.payloads[url]
+        except KeyError:
+            return MockResponse(404, {}, json.dumps({
+                'rsp': {
+                    'stat': 'fail',
+                    'err': {
+                        'code': 100,
+                        'msg': 'Object does not exist',
+                    },
+                },
+            }))
+
+        return MockResponse(
+            200,
+            {
+                'Content-Type': payload['mimetype'],
+            },
+            json.dumps(payload['rsp']))
+
+
 class SVNClientTests(SCMClientTests):
     def setUp(self):
         super(SVNClientTests, self).setUp()
@@ -1232,24 +1438,6 @@ class SVNClientTests(SCMClientTests):
             os.mkdir(dirname)
 
         self._run_svn(['add', dirname])
-
-    def test_relative_paths(self):
-        """Testing SVNRepositoryInfo._get_relative_path"""
-        info = SVNRepositoryInfo('http://svn.example.com/svn/', '/', '')
-        self.assertEqual(info._get_relative_path('/foo', '/bar'), None)
-        self.assertEqual(info._get_relative_path('/', '/trunk/myproject'),
-                         None)
-        self.assertEqual(info._get_relative_path('/trunk/myproject', '/'),
-                         '/trunk/myproject')
-        self.assertEqual(
-            info._get_relative_path('/trunk/myproject', ''),
-            '/trunk/myproject')
-        self.assertEqual(
-            info._get_relative_path('/trunk/myproject', '/trunk'),
-            '/myproject')
-        self.assertEqual(
-            info._get_relative_path('/trunk/myproject', '/trunk/myproject'),
-            '/')
 
     def test_parse_revision_spec_no_args(self):
         """Testing SVNClient.parse_revision_spec with no specified revisions"""

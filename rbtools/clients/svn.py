@@ -921,25 +921,76 @@ class SVNClient(SCMClient):
 
 
 class SVNRepositoryInfo(RepositoryInfo):
+    """Information on a Subversion repository.
+
+    This stores information on the path and, optionally, UUID of a Subversion
+    repository. It can match a local repository against those on a Review Board
+    server.
+
+    Attributes:
+        repository_id (int):
+            ID of the repository in the API. This is used primarily for
+            testing purposes, and is not guaranteed to be set.
+
+        uuid (unicode):
+            UUID of the Subversion repository.
     """
-    A representation of a SVN source code repository. This version knows how to
-    find a matching repository on the server even if the URLs differ.
-    """
-    def __init__(self, path, base_path, uuid, supports_parent_diffs=False):
-        RepositoryInfo.__init__(self, path, base_path,
-                                supports_parent_diffs=supports_parent_diffs)
+
+    def __init__(self, path, base_path, uuid, repository_id=None):
+        """Initialize the repository information.
+
+        Args:
+            path (unicode):
+                Subversion checkout path.
+
+            base_path (unicode):
+                Root of the Subversion repository.
+
+            uuid (unicode):
+                UUID of the Subversion repository.
+
+            repository_id (int, optional):
+                ID of the repository in the API. This is used primarily for
+                testing purposes, and is not guaranteed to be set.
+        """
+        super(SVNRepositoryInfo, self).__init__(path, base_path)
+
         self.uuid = uuid
+        self.repository_id = repository_id
 
     def find_server_repository_info(self, server):
-        """
+        """Return server-side information on the current Subversion repository.
+
         The point of this function is to find a repository on the server that
         matches self, even if the paths aren't the same. (For example, if self
         uses an 'http' path, but the server uses a 'file' path for the same
         repository.) It does this by comparing repository UUIDs. If the
         repositories use the same path, you'll get back self, otherwise you'll
         get a different SVNRepositoryInfo object (with a different path).
+
+        Args:
+            server (rbtools.api.resource.RootResource):
+                The root resource for the Review Board server.
+
+        Returns:
+            SVNRepositoryInfo:
+            The server-side information for this repository.
         """
+        # Since all_items is a generator, and we need to process the list of
+        # repositories twice, we're going to keep a cached list of repositories
+        # that we'll add to as we iterate through the first time. That way,
+        # we can iterate through a second time, without performing another
+        # call to the server.
+        #
+        # Hopefully we'll match a repository in the first (less expensive) loop
+        # and won't need it.
+        #
+        # Note also that we're not fetching all pages up-front, as that could
+        # lead to a lot of unnecessary API requests if the repository in
+        # question is found before the last page of results in the first for
+        # loop.
         repositories = server.get_repositories(tool='Subversion').all_items
+        cached_repos = []
 
         # Do two paths. The first will be to try to find a matching entry
         # by path/mirror path. If we don't find anything, then the second will
@@ -948,10 +999,13 @@ class SVNRepositoryInfo(RepositoryInfo):
             if (self.path == repository['path'] or
                 ('mirror_path' in repository and
                  self.path == repository['mirror_path'])):
+                self.repository_id = repository.id
                 return self
 
+            cached_repos.append(repository)
+
         # We didn't find our locally matched repository, so scan based on UUID.
-        for repository in repositories:
+        for repository in cached_repos:
             try:
                 info = repository.get_info()
 
@@ -964,7 +1018,8 @@ class SVNRepositoryInfo(RepositoryInfo):
             relpath = self._get_relative_path(self.base_path, repos_base_path)
 
             if relpath:
-                return SVNRepositoryInfo(info['url'], relpath, self.uuid)
+                return SVNRepositoryInfo(info['url'], relpath, self.uuid,
+                                         repository_id=repository.id)
 
         # We didn't find a matching repository on the server. We'll just return
         # self and hope for the best. In reality, we'll likely fail, but we
