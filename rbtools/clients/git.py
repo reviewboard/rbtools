@@ -536,7 +536,13 @@ class GitClient(SCMClient):
             # changed files and run `git diff` on each un-excluded file
             # individually.
             changed_files_cmd = git_cmd + ['diff-tree'] + diff_cmd_params
-            if self.type == 'git':
+
+            if self.type in ('svn', 'perforce'):
+                # We don't want to send -u along to git diff-tree because it
+                # will generate diff information along with the list of
+                # changed files.
+                changed_files_cmd.remove('-u')
+            elif self.type == 'git':
                 changed_files_cmd.append('-r')
 
             changed_files = execute(

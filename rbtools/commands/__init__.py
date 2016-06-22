@@ -725,11 +725,25 @@ class Command(object):
         tool.capabilities = self.get_capabilities(api_root)
 
     def get_server_url(self, repository_info, tool):
-        """Returns the Review Board server url."""
+        """Return the Review Board server url.
+
+        Args:
+            repository_info (rbtools.clients.RepositoryInfo, optional):
+                Information about the current repository
+
+            tool (rbtools.clients.SCMClient, optional):
+                The repository client.
+
+        Returns:
+            unicode:
+            The server URL.
+        """
         if self.options.server:
             server_url = self.options.server
-        else:
+        elif tool:
             server_url = tool.scan_for_server(repository_info)
+        else:
+            server_url = None
 
         if not server_url:
             print('Unable to find a Review Board server for this source code '

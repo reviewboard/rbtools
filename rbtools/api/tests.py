@@ -519,8 +519,10 @@ class MockResponse(object):
         self.body = body
 
         if self.body:
-            self.headers['Content-Type'] = 'text/plain'
             self.headers['Content-Length'] = len(body)
+
+            if 'Content-Type' not in self.headers:
+                self.headers['Content-Type'] = 'text/plain'
 
     def info(self):
         """Get the response headers."""
