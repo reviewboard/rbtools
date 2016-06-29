@@ -44,8 +44,12 @@ class APIGet(Command):
             else:
                 raise ParseError('Unexpected query argument %s' % arg)
 
-        self.repository_info, self.tool = self.initialize_scm_tool()
-        server_url = self.get_server_url(self.repository_info, self.tool)
+        if self.options.server:
+            server_url = self.options.server
+        else:
+            repository_info, tool = self.initialize_scm_tool()
+            server_url = self.get_server_url(repository_info, tool)
+
         api_client, api_root = self.get_api(server_url)
 
         try:

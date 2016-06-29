@@ -25,6 +25,22 @@ def get_authenticated_session(api_client, api_root, auth_required=False,
         if not auth_required:
             return None
 
+        # Interactive prompts don't work correctly when input doesn't come
+        # from a terminal. This could seem to be a rare case not worth
+        # worrying about, but this is what happens when using native
+        # Python in Cygwin terminal emulator under Windows and it's very
+        # puzzling to the users, especially because stderr is also _not_
+        # flushed automatically in this case, so the program just appears
+        # to hang.
+        if not sys.stdin.isatty():
+            logging.error('Authentication is required but input is not a tty.')
+            if sys.platform == 'win32':
+                logging.info('Check that you are not running this script '
+                             'from a Cygwin terminal emulator (or use '
+                             'Cygwin Python to run it).')
+
+            raise CommandError('Unable to log in to Review Board.')
+
         logging.info('Please log in to the Review Board server at %s',
                      api_client.domain)
 

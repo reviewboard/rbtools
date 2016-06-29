@@ -60,7 +60,7 @@ class SetupRepo(Command):
 
             closest_path = difflib.get_close_matches(repository_info.path,
                                                      six.iterkeys(repo_paths),
-                                                     n=1)
+                                                     n=4, cutoff=0.4)
 
             for path in closest_path:
                 repo = repo_paths[path]

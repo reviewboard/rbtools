@@ -952,13 +952,7 @@ class SVNRepositoryInfo(RepositoryInfo):
         repositories use the same path, you'll get back self, otherwise you'll
         get a different SVNRepositoryInfo object (with a different path).
         """
-        # Reduce list of repositories to only SVN ones.
-
-        repositories = [
-            repository
-            for repository in
-            server.get_repositories(tool='Subversion').all_items
-        ]
+        repositories = server.get_repositories(tool='Subversion').all_items
 
         # Do two paths. The first will be to try to find a matching entry
         # by path/mirror path. If we don't find anything, then the second will

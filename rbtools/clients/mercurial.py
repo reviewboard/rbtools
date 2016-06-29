@@ -29,6 +29,9 @@ class MercurialClient(SCMClient):
 
     supports_diff_exclude_patterns = True
 
+    can_branch = True
+    can_bookmark = True
+
     def __init__(self, **kwargs):
         super(MercurialClient, self).__init__(**kwargs)
 
@@ -412,6 +415,13 @@ class MercurialClient(SCMClient):
             base_commit_id = revisions['base']
             parent_diff = None
 
+        # If reviewboard requests a relative revision via hgweb it will fail
+        # since hgweb does not support the relative revision syntax (^1, -1).
+        # Rewrite this relative node id to an absolute node id.
+        base_commit_id = self._execute(
+            ['hg', 'log', '-r', base_commit_id, '-T {node}'],
+            env=self._hg_env, results_unicode=False)
+
         return {
             'diff': diff,
             'parent_diff': parent_diff,
@@ -742,3 +752,12 @@ class MercurialClient(SCMClient):
         return (self.capabilities and
                 self.capabilities.has_capability('scmtools', 'mercurial',
                                                  'empty_files'))
+
+    def get_current_bookmark(self):
+        """Return the name of the current bookmark.
+
+        Returns:
+            bytes:
+            A string with the name of the current bookmark.
+        """
+        return execute(['hg', 'id', '-B'], ignore_errors=True).strip()

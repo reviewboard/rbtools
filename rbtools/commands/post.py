@@ -467,6 +467,13 @@ class Post(Command):
                 if submit_as:
                     request_data[b'submit_as'] = submit_as
 
+                if self.tool.can_bookmark:
+                    bookmark = self.tool.get_current_bookmark()
+                    request_data[b'extra_data__local_bookmark'] = bookmark
+                elif self.tool.can_branch:
+                    branch = self.tool.get_current_branch()
+                    request_data[b'extra_data__local_branch'] = branch
+
                 review_requests = api_root.get_review_requests(
                     only_fields='',
                     only_links='create')
@@ -480,10 +487,6 @@ class Post(Command):
                         review_request_id=rid,
                         only_fields='absolute_url,bugs_closed,id,status',
                         only_links='diffs,draft')
-
-                    if not self.options.diff_only:
-                        review_request = review_request.update(
-                            changenum=changenum)
                 else:
                     raise CommandError('Error creating review request: %s' % e)
 
@@ -712,12 +715,24 @@ class Post(Command):
                 commit_message = self.tool.get_commit_message(self.revisions)
 
                 if commit_message:
-                    if guess_summary:
-                        self.options.summary = commit_message['summary']
+                    guessed_summary = commit_message['summary']
+                    guessed_description = commit_message['description']
 
-                    if guess_description:
-                        self.options.description = \
-                            commit_message['description']
+                    if guess_summary and guess_description:
+                        self.options.summary = guessed_summary
+                        self.options.description = guessed_description
+                    elif guess_summary:
+                        self.options.summary = guessed_summary
+                    elif guess_description:
+                        # If we're guessing the description but not the summary
+                        # (for example, if --summary was included), we probably
+                        # don't want to strip off the summary line of the
+                        # commit message.
+                        if guessed_description.startswith(guessed_summary):
+                            self.options.description = guessed_description
+                        else:
+                            self.options.description = \
+                                guessed_summary + '\n\n' + guessed_description
             except NotImplementedError:
                 # The SCMClient doesn't support getting commit messages,
                 # so we can't provide the guessed versions.
@@ -854,7 +869,10 @@ class Post(Command):
         else:
             changenum = self.tool.get_changenum(self.revisions)
 
-        commit_id = changenum
+        # Not all scm clients support get_changenum, so if get_changenum
+        # returns None (the default for clients that don't have changenums),
+        # we'll prefer the existing commit_id.
+        commit_id = changenum or commit_id
 
         if self.options.update and self.revisions:
             review_request = guess_existing_review_request(
