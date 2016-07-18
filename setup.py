@@ -46,7 +46,10 @@ else:
     download_url = "http://downloads.reviewboard.org/nightlies/"
 
 
-install_requires = ['six>=1.8.0']
+install_requires = [
+    'six>=1.8.0',
+    'tqdm',
+]
 
 
 # Make sure this is a version of Python we are compatible with. This should
@@ -74,6 +77,7 @@ rb_commands = [
     'clear-cache = rbtools.commands.clearcache:ClearCache',
     'close = rbtools.commands.close:Close',
     'diff = rbtools.commands.diff:Diff',
+    'install = rbtools.commands.install:Install',
     'land = rbtools.commands.land:Land',
     'list-repo-types = rbtools.commands.list_repo_types:ListRepoTypes',
     'login = rbtools.commands.login:Login',
