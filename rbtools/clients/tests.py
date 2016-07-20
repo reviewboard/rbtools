@@ -11,6 +11,7 @@ from random import randint
 from tempfile import mktemp
 from textwrap import dedent
 
+import six
 from kgb import SpyAgency
 from nose import SkipTest
 from six.moves import cStringIO as StringIO
@@ -546,10 +547,13 @@ class GitClientTests(SpyAgency, SCMClientTests):
         It must raise a PushError exception because the 'git pull' from an
         invalid upstream branch will fail.
         """
-        self.assertRaisesRegexp(
-            PushError,
-            'Could not pull changes from upstream.',
-            lambda: self.client.push_upstream('non-existent-branch'))
+        try:
+            self.client.push_upstream('non-existent-branch')
+        except PushError as e:
+            self.assertEqual(six.text_type(e),
+                             'Could not pull changes from upstream.')
+        else:
+            self.fail('Expected PushError')
 
     def test_push_upstream_no_push_exception(self):
         """Testing GitClient.push_upstream with 'git push' disabled.
@@ -570,11 +574,14 @@ class GitClientTests(SpyAgency, SCMClientTests):
         It must raise a MergeError exception because 'git checkout' to the
         invalid destination branch will fail.
         """
-        self.assertRaisesRegexp(
-            MergeError,
-            "^Could not checkout to branch \'non-existent-branch\'",
-            lambda: self.client.merge('master', 'non-existent-branch',
-                                      'commit message', self.AUTHOR))
+        try:
+            self.client.merge('master', 'non-existent-branch',
+                              'commit message', self.AUTHOR)
+        except MergeError as e:
+            self.assertTrue(six.text_type(e).startswith(
+                "Could not checkout to branch 'non-existent-branch'"))
+        else:
+            self.fail('Expected MergeError')
 
     def test_merge_invalid_target(self):
         """Testing GitClient.merge with an invalid target branch.
@@ -582,11 +589,14 @@ class GitClientTests(SpyAgency, SCMClientTests):
         It must raise a MergeError exception because 'git merge' from an
         invalid target branch will fail.
         """
-        self.assertRaisesRegexp(
-            MergeError,
-            "^Could not merge branch \'non-existent-branch\'",
-            lambda: self.client.merge('non-existent-branch', 'master',
-                                      'commit message', self.AUTHOR))
+        try:
+            self.client.merge('non-existent-branch', 'master',
+                              'commit message', self.AUTHOR)
+        except MergeError as e:
+            self.assertTrue(six.text_type(e).startswith(
+                "Could not merge branch 'non-existent-branch'"))
+        else:
+            self.fail('Expected MergeError')
 
     def test_merge_with_squash(self):
         """Testing GitClient.merge with squash set to True.
