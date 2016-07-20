@@ -43,7 +43,7 @@ class RBTestBase(TestCase):
         """Returns current user's home directory."""
         return os.environ['HOME']
 
-    def is_exe_in_path(sefl, name):
+    def is_exe_in_path(self, name):
         """Checks whether an executable is in the user's search path.
 
         This expects a name without any system-specific executable extension.
