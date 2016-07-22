@@ -713,6 +713,10 @@ class DiffCommitUploaderMixin(object):
             request.add_field('merge_parent_ids',
                               ','.join(commit['merge_parent_ids']))
 
+        if 'original_commit_ids' in commit:
+            request.add_field('original_commit_ids',
+                              ','.join(commit['original_commit_ids']))
+
         return request
 
 

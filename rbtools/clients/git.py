@@ -3,6 +3,7 @@ import os
 import re
 import sys
 
+import six
 from six.moves import zip
 
 from rbtools.clients import PatchResult, SCMClient, RepositoryInfo
@@ -27,6 +28,7 @@ class GitClient(SCMClient):
     name = 'Git'
 
     supports_history = True
+    supports_history_metadata = True
     supports_diff_exclude_patterns = True
     supports_patch_revert = True
 
@@ -35,6 +37,36 @@ class GitClient(SCMClient):
     can_push_upstream = True
     can_delete_branch = True
     can_branch = True
+
+    #: The notes ref used for keeping track of commit history locally.
+    #:
+    #: We will enable rewriting for this ref so that git will automatically
+    #: rewrite notes when rebasing and amending.
+    _METADATA_REF = 'rbt-history-metadata'
+
+    @property
+    def supports_history_metadata(self):
+        """Whether or not the version of git supports history metadata.
+
+        Storing and retrieving commit metadata is dependant upon whether or not
+        ``git notes`` is present.
+
+        Returns:
+            bool:
+            Whether or not the installed version of git supports history
+            metadata.
+        """
+        if not hasattr(self, '_supports_notes'):
+            self._supports_notes = (
+                execute([self.git, 'notes'], ignore_errors=True,
+                        none_on_ignored_error=True)
+                is not None
+            )
+
+            if self._supports_notes:
+                self._ensure_can_rewrite_history()
+
+        return self._supports_notes
 
     def __init__(self, **kwargs):
         super(GitClient, self).__init__(**kwargs)
@@ -897,17 +929,19 @@ class GitClient(SCMClient):
             'committer_email': '%ce',
             'committer_date': '%cd',
             'description': '%B',
+            'original_commit_ids': '%N',
         }
 
         # 0x1f is the ASCII field separator. It is a non-printable character
         # that should not appear in any field in git log.
-        log_format = '%x1f'.join(log_fields.values())
+        log_format = '%x1f'.join(six.itervalues(log_fields))
 
         log_entries = execute(
-            [self.git, 'log', '-z', '--pretty=format:%s' % log_format,
+            [self.git, 'log', '-z', '--notes=%s' % self._METADATA_REF,
+             '--pretty=format:%s' % log_format,
              '%s..%s' % (revisions['base'], revisions['tip'])],
             ignore_errors=True, none_on_ignored_error=True,
-            translate_newlines=True)
+            translate_newlines=True, with_errors=False)
 
         if not log_entries:
             return None
@@ -920,6 +954,15 @@ class GitClient(SCMClient):
             history_entry = dict(zip(log_fields.keys(), log_entry_fields))
             history_entry['parent_id'] = history_entry['parent_id']
             history_entry['commit_type'] = 'change'
+
+            history_entry['original_commit_ids'] = [
+                commit_id.strip()
+                for commit_id in history_entry['original_commit_ids'].split()
+                if commit_id.strip()
+            ]
+
+            if not history_entry['original_commit_ids']:
+                del history_entry['original_commit_ids']
 
             parents = history_entry['parent_id'].split()
 
@@ -935,3 +978,62 @@ class GitClient(SCMClient):
             history.append(history_entry)
 
         return history
+
+    def write_history_metadata(self, commit_id):
+        """Write history metadata about a commit.
+
+        Args:
+            commit_id (unicode):
+                The commit ID to write metadata about.
+        """
+        execute([self.git, 'notes', '--ref=%s' % self._METADATA_REF, 'add',
+                 '-f', '-m', commit_id, commit_id])
+
+    def get_history_metadata(self, commit_id):
+        """Return the history metadata about a commit, if any.
+
+        Args:
+            commit_id (unicode):
+                The commit ID to return metadata about.
+
+        Returns:
+            list of unicode:
+            The list of commit IDs that make up this commit.
+        """
+        commits = execute([self.git, 'notes', '--ref=%s' % self._METADATA_REF,
+                           'show', commit_id],
+                          ignore_errors=True, none_on_ignored_error=True,
+                          split_lines=True)
+
+        if commits is None:
+            commits = []
+        else:
+            commits = filter(bool, [commit.strip() for commit in commits])
+
+        return commits
+
+    def _ensure_can_rewrite_history(self):
+        """Ensure that reference rewriting is enabled for notes.
+
+        This will enable reference rewriting for the :py:attr:`_MEATADATA_REF`
+        notes ref if it is not already enabled.
+        """
+        refs = execute([self.git, 'config', '--get-all', 'notes.rewriteRef'],
+                       ignore_errors=True, none_on_ignored_error=True,
+                       split_lines=True)
+
+        full_notes_ref = 'refs/notes/%s' % self._METADATA_REF
+
+        if not refs or ('%s\n' % full_notes_ref) not in refs:
+            execute([self.git, 'config', '--add', 'notes.rewriteRef',
+                     full_notes_ref])
+
+        rewrite_mode = execute([self.git, 'config', 'notes.rewriteMode'],
+                               ignore_errors=True, none_on_ignored_error=True)
+
+        if rewrite_mode is None or rewrite_mode.strip() != 'concatenate':
+            logging.warn('notes.rewriteMode is not set to concatenate. '
+                         'Review Board will not be able to correctly track '
+                         'rebased and amended commits without this. To fix '
+                         'this, run:\n'
+                         '\tgit config notes.rewriteMode concatenate')

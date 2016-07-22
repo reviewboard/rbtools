@@ -37,6 +37,7 @@ class SCMClient(object):
     name = None
 
     supports_history = False
+    supports_history_metadata = False
     supports_diff_extra_args = False
     supports_diff_exclude_patterns = False
     supports_patch_revert = False
@@ -359,6 +360,28 @@ class SCMClient(object):
         SCMs that allow modification of multiple changesets at any given time.
         It takes a parsed revision spec, and will amend the change referenced
         by the tip revision therein.
+        """
+        raise NotImplementedError
+
+    def write_history_metadata(self, commit_id):
+        """Write history metadata about a commit.
+
+        Args:
+            commit_id (unicode):
+                The commit ID to write metadata about.
+        """
+        raise NotImplementedError
+
+    def get_history_metadata(self, commit_id):
+        """Return the history metadata about a commit, if any.
+
+        Args:
+            commit_id (unicode):
+                The commit ID to return metadata about.
+
+        Returns:
+            list of unicode:
+            The list of commit IDs that make up this commit.
         """
         raise NotImplementedError
 

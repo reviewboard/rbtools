@@ -541,8 +541,12 @@ class Post(Command):
                                     % (msg_prefix, e))
 
                         commits.upload_commit(entry)
+                        commit_id = entry['commit_id']
 
-                        print('Uploaded commit %s' % entry['commit_id'])
+                        if self.tool.supports_history_metadata:
+                            self.tool.write_history_metadata(commit_id)
+
+                        print('Uploaded commit %s' % commit_id)
                 else:
                     review_request.get_diffs(only_fields='').upload_diff(
                         diff_content, **diff_kwargs)
