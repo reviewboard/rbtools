@@ -52,7 +52,7 @@ class GitClientTests(SCMClientTests):
                        translate_newlines=True)
 
     def _git_add_file_commit(self, file, data, msg):
-        """Add a file to a git repository with the content of data and commit with msg."""
+        """Add a file to a git repository with the content of data and commit with msg"""
         foo = open(file, 'w')
         foo.write(data)
         foo.close()
@@ -166,7 +166,7 @@ class GitClientTests(SCMClientTests):
         self.assertEqual(result['commit_id'], commit_id)
 
     def test_diff_exclude(self):
-        """Testing GitClient simple diff with file exclusion."""
+        """Testing GitClient simple diff with file exclusion"""
         self.client.get_repository_info()
         base_commit_id = self._git_get_head()
 
@@ -216,7 +216,7 @@ class GitClientTests(SCMClientTests):
         self.assertEqual(result['commit_id'], commit_id)
 
     def test_diff_exclude_root_pattern_in_subdir(self):
-        """Testing GitClient diff with file exclusion in the repo root."""
+        """Testing GitClient diff with file exclusion in the repo root"""
         base_commit_id = self._git_get_head()
 
         os.mkdir('subdir')
@@ -367,7 +367,7 @@ class GitClientTests(SCMClientTests):
         self.assertEqual(result['commit_id'], commit_id)
 
     def test_diff_slash_tracking(self):
-        """Testing GitClient diff with tracking branch that has slash in its name."""
+        """Testing GitClient diff with tracking branch that has slash in its name"""
         self._run_git(['fetch', 'origin'])
         self._run_git(['checkout', '-b', 'my/branch', '--track',
                        'origin/not-master'])
@@ -409,12 +409,12 @@ class GitClientTests(SCMClientTests):
 
     def test_parse_revision_spec_no_args_parent(self):
         """Testing GitClient.parse_revision_spec with no specified revisions and a parent diff"""
-        parent_base_commit_id = self._git_get_head()
 
         self._run_git(['fetch', 'origin'])
         self._run_git(['checkout', '-b', 'parent-branch', '--track',
                        'origin/not-master'])
 
+        parent_base_commit_id = self._git_get_head()
         base_commit_id = self._git_get_head()
 
         self._run_git(['checkout', '-b', 'topic-branch'])
@@ -519,6 +519,497 @@ class GitClientTests(SCMClientTests):
         self.assertTrue('tip' in revisions)
         self.assertTrue('parent_base' not in revisions)
         self.assertEqual(revisions['base'], base_commit_id)
+        self.assertEqual(revisions['tip'], tip_commit_id)
+
+    def test_diff_finding_parent(self):
+        """Testing GitClient.parse_revision_spec with target branch off a
+        tracking branch not aligned with the remote"""
+        # In this case, the parent must be the non-aligned tracking branch
+        # and the parent_base must be the remote tracking branch.
+        self.client.get_repository_info()
+
+        self._git_add_file_commit('foo.txt', FOO1, 'on master')
+        self._run_git(['checkout', 'not-master'])  # A remote branch
+        parent_base_commit_id = self._git_get_head()
+        self._git_add_file_commit('foo.txt', FOO2, 'on not-master')
+        parent_commit_id = self._git_get_head()
+        self._run_git(['checkout', '-b', 'topic-branch'])
+        self._git_add_file_commit('foo.txt', FOO3, 'commit 2')
+        self._git_add_file_commit('foo.txt', FOO4, 'commit 3')
+        tip_commit_id = self._git_get_head()
+
+        self.client.get_repository_info()
+
+        revisions = self.client.parse_revision_spec(
+            ['topic-branch', '^not-master'])
+
+        # revisions =
+        #     {
+        #         'base': u'357c1b9',
+        #         'tip': u'10c5cd3',
+        #         'parent_base': u'0e88e51',
+        #     }
+        #
+        # `git log --graph --all --decorate --oneline` =
+        #     * 7c17015 (master) on master
+        #     | * 10c5cd3 (HEAD -> topic-branch) commit 3
+        #     | * 00c99f9 commit 2
+        #     | * 357c1b9 (not-master) on not-master
+        #     | * 0e88e51 (origin/not-master) Commit 2
+        #     |/
+        #     * 18c5c09 (origin/master, origin/HEAD) Commit 1
+        #     * e6a3577 Initial Commit
+
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertEqual(len(revisions), 3)
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' in revisions)
+        self.assertEqual(revisions['base'], parent_commit_id)
+        self.assertEqual(revisions['tip'], tip_commit_id)
+        self.assertEqual(revisions['parent_base'], parent_base_commit_id)
+
+    def test_diff_finding_parent_case_one(self):
+        """Testing GitClient.parse_revision_spec with target branch off a
+        tracking branch aligned with the remote"""
+        # In this case, the parent_base should be the tracking branch aligned
+        # with the remote.
+        self.client.get_repository_info()
+
+        self._run_git(['fetch', 'origin'])
+        self._run_git(['checkout', '-b', 'not-master',
+                       '--track', 'origin/not-master'])
+        parent_commit_id = self._git_get_head()
+        self._run_git(['checkout', '-b', 'feature-branch'])
+        self._git_add_file_commit('foo.txt', FOO3, 'on feature-branch')
+        tip_commit_id = self._git_get_head()
+
+        self.client.get_repository_info()
+
+        revisions = self.client.parse_revision_spec()
+
+        # revisions =
+        #     {
+        #         'commit_id': u'0a5734a',
+        #         'base': u'0e88e51',
+        #         'tip': u'0a5734a',
+        #     }
+        #
+        # `git log --graph --all --decorate --oneline` =
+        #     * 0a5734a (HEAD -> feature-branch) on feature-branch
+        #     * 0e88e51 (origin/not-master, not-master) Commit 2
+        #     * 18c5c09 (origin/master, origin/HEAD, master) Commit 1
+        #     * e6a3577 Initial Commit
+
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertEqual(len(revisions), 3)
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+
+        # Because parent_base == base, parent_base will not be in revisions.
+        self.assertFalse('parent_base' in revisions)
+        self.assertEqual(revisions['base'], parent_commit_id)
+        self.assertEqual(revisions['tip'], tip_commit_id)
+
+    def test_diff_finding_parent_case_two(self):
+        """Testing GitClient.parse_revision_spec with target branch off
+        a tracking branch with changes since the remote"""
+        # In this case, the parent_base must be the remote tracking branch,
+        # despite the fact that it is a few changes behind.
+        self.client.get_repository_info()
+
+        self._run_git(['fetch', 'origin'])
+        self._run_git(['checkout', '-b', 'not-master',
+                       '--track', 'origin/not-master'])
+        parent_base_commit_id = self._git_get_head()
+        self._git_add_file_commit('foo.txt', FOO2, 'on not-master')
+        parent_commit_id = self._git_get_head()
+        self._run_git(['checkout', '-b', 'feature-branch'])
+        self._git_add_file_commit('foo.txt', FOO3, 'on feature-branch')
+        tip_commit_id = self._git_get_head()
+
+        self.client.get_repository_info()
+
+        revisions = self.client.parse_revision_spec(['feature-branch',
+                                                     '^not-master'])
+
+        # revisions =
+        #     {
+        #         'base': u'b0f5d74',
+        #         'tip': u'8b5d1b9',
+        #         'parent_base': u'0e88e51',
+        #     }
+        #
+        # `git log --graph --all --decorate --oneline` =
+        #     * 8b5d1b9 (HEAD -> feature-branch) on feature-branch
+        #     * b0f5d74 (not-master) on not-master
+        #     * 0e88e51 (origin/not-master) Commit 2
+        #     * 18c5c09 (origin/master, origin/HEAD, master) Commit 1
+        #     * e6a3577 Initial Commit
+
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertEqual(len(revisions), 3)
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' in revisions)
+        self.assertEqual(revisions['base'], parent_commit_id)
+        self.assertEqual(revisions['tip'], tip_commit_id)
+        self.assertEqual(revisions['parent_base'], parent_base_commit_id)
+
+    def test_diff_finding_parent_case_three(self):
+        """Testing GitClient.parse_revision_spec with target branch off a
+        branch not properly tracking the remote"""
+
+        # In this case, the parent_base must be the remote tracking branch,
+        # even though it is not properly being tracked.
+        self.client.get_repository_info()
+
+        self._run_git(['branch', '--no-track', 'not-master',
+                       'origin/not-master'])
+        self._run_git(['checkout', 'not-master'])
+        parent_commit_id = self._git_get_head()
+        self._run_git(['checkout', '-b', 'feature-branch'])
+        self._git_add_file_commit('foo.txt', FOO3, 'on feature-branch')
+        tip_commit_id = self._git_get_head()
+
+        self.client.get_repository_info()
+
+        revisions = self.client.parse_revision_spec(['feature-branch',
+                                                     '^not-master'])
+
+        # revisions =
+        #     {
+        #         'base': u'0e88e51',
+        #         'tip': u'58981f2',
+        #     }
+        #
+        # `git log --graph --all --decorate --oneline` =
+        #     * 58981f2 (HEAD -> feature-branch) on feature-branch
+        #     * 0e88e51 (origin/not-master, not-master) Commit 2
+        #     * 18c5c09 (origin/master, origin/HEAD, master) Commit 1
+        #     * e6a3577 Initial Commit
+
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertEqual(len(revisions), 2)
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertFalse('parent_base' in revisions)
+        self.assertEqual(revisions['base'], parent_commit_id)
+        self.assertEqual(revisions['tip'], tip_commit_id)
+
+    def test_diff_finding_parent_case_four(self):
+        """Testing GitClient.parse_revision_spec with a target branch that
+        merged a tracking branch off another tracking branch"""
+        # In this case, the parent_base must be the base of the merge, because
+        # the user will expect that the diff would show the merged changes.
+        self.client.get_repository_info()
+
+        self._run_git(['checkout', 'master'])
+        parent_commit_id = self._git_get_head()
+        self._run_git(['checkout', '-b', 'feature-branch'])
+        self._git_add_file_commit('foo.txt', FOO1, 'on feature-branch')
+        self._run_git(['merge', 'origin/not-master'])
+        tip_commit_id = self._git_get_head()
+
+        self.client.get_repository_info()
+
+        revisions = self.client.parse_revision_spec()
+
+        # revisions =
+        #     {
+        #         'commit_id': u'bef8dcd',
+        #         'base': u'18c5c09',
+        #         'tip': u'bef8dcd',
+        #     }
+        #
+        # `git log --graph --all --decorate --oneline` =
+        #     *   bef8dcd (HEAD -> feature-branch) Merge remote-tracking branch
+        #                 'origin/not-master' into feature-branch
+        #     |\
+        #     | * 0e88e51 (origin/not-master) Commit 2
+        #     * | a385539 on feature-branch
+        #     |/
+        #     * 18c5c09 (origin/master, origin/HEAD, master) Commit 1
+        #     * e6a3577 Initial Commit
+
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertEqual(len(revisions), 3)
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('commit_id' in revisions)
+        self.assertFalse('parent_base' in revisions)
+        self.assertEqual(revisions['base'], parent_commit_id)
+        self.assertEqual(revisions['tip'], tip_commit_id)
+        self.assertEqual(revisions['commit_id'], tip_commit_id)
+
+    def test_diff_finding_parent_case_five(self):
+        """Testing GitClient.parse_revision_spec with a target branch posted
+        off a tracking branch that merged another tracking branch"""
+        # In this case, the parent_base must be tracking branch that merged
+        # the other tracking branch.
+        self.client.get_repository_info()
+
+        self._git_add_file_commit('foo.txt', FOO2, 'on master')
+        self._run_git(['checkout', '-b', 'not-master',
+                       '--track', 'origin/not-master'])
+        self._run_git(['merge', 'origin/master'])
+        parent_commit_id = self._git_get_head()
+        self._run_git(['checkout', '-b', 'feature-branch'])
+        self._git_add_file_commit('foo.txt', FOO4, 'on feature-branch')
+        tip_commit_id = self._git_get_head()
+
+        self.client.get_repository_info()
+
+        revisions = self.client.parse_revision_spec()
+
+        # revisions =
+        #     {
+        #         'commit_id': u'ebf2e89',
+        #         'base': u'0e88e51',
+        #         'tip': u'ebf2e89'
+        #     }
+        #
+        # `git log --graph --all --decorate --oneline` =
+        #     * ebf2e89 (HEAD -> feature-branch) on feature-branch
+        #     * 0e88e51 (origin/not-master, not-master) Commit 2
+        #     | * 7e202ff (master) on master
+        #     |/
+        #     * 18c5c09 (origin/master, origin/HEAD) Commit 1
+        #     * e6a3577 Initial Commit
+
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertEqual(len(revisions), 3)
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('commit_id' in revisions)
+        self.assertFalse('parent_base' in revisions)
+        self.assertEqual(revisions['base'], parent_commit_id)
+        self.assertEqual(revisions['tip'], tip_commit_id)
+        self.assertEqual(revisions['commit_id'], tip_commit_id)
+
+    def test_diff_finding_parent_case_six(self):
+        """Testing GitClient.parse_revision_spec with a target branch posted
+        off a remote branch without any tracking branches"""
+        # In this case, the parent_base must be remote tracking branch. The
+        # existence of a tracking branch shouldn't matter much.
+        self.client.get_repository_info()
+
+        self._run_git(['checkout', '-b', 'feature-branch',
+                       'origin/not-master'])
+        parent_commit_id = self._git_get_head()
+        self._git_add_file_commit('foo.txt', FOO2, 'on feature-branch')
+        tip_commit_id = self._git_get_head()
+
+        self.client.get_repository_info()
+
+        # revisions =
+        #     {
+        #         'commit_id': u'19da590',
+        #         'base': u'0e88e51',
+        #         'tip': u'19da590',
+        #     }
+        #
+        # `git log --graph --all --decorate --oneline` =
+        #     * 19da590 (HEAD -> feature-branch) on feature-branch
+        #     * 0e88e51 (origin/not-master) Commit 2
+        #     * 18c5c09 (origin/master, origin/HEAD, master) Commit 1
+        #     * e6a3577 Initial Commit
+
+        revisions = self.client.parse_revision_spec([])
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertEqual(len(revisions), 3)
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('commit_id' in revisions)
+        self.assertFalse('parent_base' in revisions)
+        self.assertEqual(revisions['base'], parent_commit_id)
+        self.assertEqual(revisions['tip'], tip_commit_id)
+        self.assertEqual(revisions['commit_id'], tip_commit_id)
+
+    def test_diff_finding_parent_case_seven(self):
+        """Testing GitClient.parse_revision_spec with a target branch posted
+        off a remote branch that is aligned to the same commit as another
+        remote branch"""
+        # In this case, the parent_base must be common commit that the two
+        # remote branches are aligned to.
+        self.client.get_repository_info()
+
+        # Since pushing data upstream to the test repo corrupts its state,
+        # we clone the clone and use one clone as the remote for the other.
+        self.git_dir = os.getcwd()
+        self.clone_dir = self.chdir_tmp()
+        self._run_git(['clone', self.git_dir, self.clone_dir])
+
+        self.client.get_repository_info()
+
+        self._run_git(['checkout', '-b', 'remote-branch1'])
+        self._git_add_file_commit('foo1.txt', FOO1, 'on remote-branch1')
+        self._run_git(['push', 'origin', 'remote-branch1'])
+        self._run_git(['checkout', '-b', 'remote-branch2'])
+        self._git_add_file_commit('foo2.txt', FOO1, 'on remote-branch2')
+        self._run_git(['push', 'origin', 'remote-branch2'])
+
+        self._run_git(['checkout', 'master'])
+        self._run_git(['merge', 'remote-branch1'])
+        self._run_git(['merge', 'remote-branch2'])
+        self._git_add_file_commit('foo3.txt', FOO1, 'on master')
+        parent_commit_id = self._git_get_head()
+
+        self._run_git(['push', 'origin', 'master:remote-branch1'])
+        self._run_git(['push', 'origin', 'master:remote-branch2'])
+
+        self._run_git(['checkout', '-b', 'feature-branch'])
+        self._git_add_file_commit('foo4.txt', FOO1, 'on feature-branch')
+
+        tip_commit_id = self._git_get_head()
+
+        revisions = self.client.parse_revision_spec(['feature-branch',
+                                                     '^master'])
+
+        # revisions =
+        #     {
+        #         'base': u'bf0036b',
+        #         'tip': u'dadae87',
+        #     }
+        #
+        # `git log --graph --all --decorate --oneline` =
+        #     * dadae87 (HEAD -> feature-branch) on feature-branch
+        #     * bf0036b (origin/remote-branch2, origin/remote-branch1, master)
+        #                                                                 on master
+        #     * 5f48441 (remote-branch2) on remote-branch2
+        #     * eb40eaf (remote-branch1) on remote-branch1
+        #     * 18c5c09 (origin/master, origin/HEAD) Commit 1
+        #     * e6a3577 Initial Commit
+
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertEqual(len(revisions), 2)
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertFalse('parent_base' in revisions)
+        self.assertEqual(revisions['base'], parent_commit_id)
+        self.assertEqual(revisions['tip'], tip_commit_id)
+
+    def test_diff_finding_parent_case_eight(self):
+        """Testing GitClient.parse_revision_spec with a target branch not
+        up-to-date with a remote branch"""
+        # In this case, there is no good way of detecting the remote branch we
+        # are not up-to-date with, so the parent_base must be the common commit
+        # that the target branch and remote branch share.
+        self.client.get_repository_info()
+
+        # Since pushing data upstream to the test repo corrupts its state,
+        # we clone the clone and use one clone as the remote for the other.
+        self.git_dir = os.getcwd()
+        self.clone_dir = self.chdir_tmp()
+        self._run_git(['clone', self.git_dir, self.clone_dir])
+
+        self.client.get_repository_info()
+
+        self._run_git(['checkout', 'master'])
+        self._git_add_file_commit('foo.txt', FOO1, 'on master')
+
+        parent_base_commit_id = self._git_get_head()
+
+        self._run_git(['checkout', '-b', 'remote-branch1'])
+        self._git_add_file_commit('foo1.txt', FOO1, 'on remote-branch1')
+        self._run_git(['push', 'origin', 'remote-branch1'])
+
+        self._run_git(['checkout', 'master'])
+        self._git_add_file_commit('foo2.txt', FOO1, 'on master')
+        parent_commit_id = self._git_get_head()
+
+        self._run_git(['checkout', '-b', 'feature-branch'])
+        self._git_add_file_commit('foo3.txt', FOO1, 'on feature-branch')
+
+        self.client.get_repository_info()
+        tip_commit_id = self._git_get_head()
+
+        revisions = self.client.parse_revision_spec(['feature-branch',
+                                                     '^master'])
+
+        # revisions =
+        #     {
+        #         'base': u'318f050',
+        #         'tip': u'6e37a00',
+        #         'parent_base': u'0ff6635'
+        #     }
+        #
+        # `git log --graph --all --decorate --oneline` =
+        #     * 6e37a00 (HEAD -> feature-branch) on feature-branch
+        #     * 318f050 (master) on master
+        #     | * 9ad7b1f (origin/remote-branch1, remote-branch1) on remote-branch1
+        #     |/
+        #     * 0ff6635 on master
+        #     * 18c5c09 (origin/master, origin/HEAD) Commit 1
+        #     * e6a3577 Initial Commit
+
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertEqual(len(revisions), 3)
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' in revisions)
+        self.assertEqual(revisions['parent_base'], parent_base_commit_id)
+        self.assertEqual(revisions['base'], parent_commit_id)
+        self.assertEqual(revisions['tip'], tip_commit_id)
+
+    def test_diff_finding_parent_case_nine(self):
+        """Testing GitClient.parse_revision_spec with a target branch that has
+        branches from different remotes in its path"""
+
+        # In this case, the other remotes should be ignored and the parent_base
+        # should be some origin/*.
+        self.client.get_repository_info()
+        self._run_git(['checkout', 'not-master'])
+
+        orig_clone = os.getcwd()
+        self.clone_dir = self.chdir_tmp()
+        self._run_git(['clone', self.git_dir, self.clone_dir])
+
+        self.client.get_repository_info()
+
+        # Adding the original clone as a second remote to our repository.
+        self._run_git(['remote', 'add', 'not-origin', orig_clone])
+        self._run_git(['fetch', 'not-origin'])
+        parent_base_commit_id = self._git_get_head()
+
+        self._run_git(['checkout', 'master'])
+        self._run_git(['merge', 'not-origin/master'])
+
+        self._git_add_file_commit('foo1.txt', FOO1, 'on master')
+        self._run_git(['push', 'not-origin', 'master:master'])
+        self._git_add_file_commit('foo2.txt', FOO1, 'on master')
+        parent_commit_id = self._git_get_head()
+
+        self._run_git(['checkout', '-b', 'feature-branch'])
+        self._git_add_file_commit('foo3.txt', FOO1, 'on feature-branch')
+        tip_commit_id = self._git_get_head()
+
+        revisions = self.client.parse_revision_spec(['feature-branch',
+                                                     '^master'])
+
+        # revisions =
+        #     {
+        #         'base': u'6f23ed0',
+        #         'tip': u'8703f95',
+        #         'parent_base': u'18c5c09',
+        #     }
+        #
+        # `git log --graph --all --decorate --oneline` =
+        #     * 8703f95 (HEAD -> feature-branch) on feature-branch
+        #     * 6f23ed0 (master) on master
+        #     * f6236bf (not-origin/master) on master
+        #     | * 0e88e51 (origin/not-master, not-origin/not-master) Commit 2
+        #     |/
+        #     * 18c5c09 (origin/master, origin/HEAD) Commit 1
+        #     * e6a3577 Initial Commit
+
+        self.assertTrue(isinstance(revisions, dict))
+        self.assertEqual(len(revisions), 3)
+        self.assertTrue('base' in revisions)
+        self.assertTrue('tip' in revisions)
+        self.assertTrue('parent_base' in revisions)
+        self.assertEqual(revisions['parent_base'], parent_base_commit_id)
+        self.assertEqual(revisions['base'], parent_commit_id)
         self.assertEqual(revisions['tip'], tip_commit_id)
 
     def test_get_raw_commit_message(self):
@@ -676,7 +1167,7 @@ class MercurialClientTests(MercurialTestBase):
                          '9c8796936646be5c7349973b0fceacbd')
 
     def test_diff_exclude(self):
-        """Testing MercurialClient diff with file exclusion."""
+        """Testing MercurialClient diff with file exclusion"""
         self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
         self._hg_add_file_commit('exclude.txt', FOO2, 'commit 2')
 
@@ -688,7 +1179,7 @@ class MercurialClientTests(MercurialTestBase):
                          '68c2bdccf52a4f0baddd0ac9f2ecb7d2')
 
     def test_diff_exclude_empty(self):
-        """Testing MercurialClient diff with empty file exclusion."""
+        """Testing MercurialClient diff with empty file exclusion"""
         self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
         self._hg_add_file_commit('empty.txt', '', 'commit 2')
 
@@ -874,7 +1365,7 @@ class MercurialClientTests(MercurialTestBase):
             dict(base=commit2, tip=commit4, parent_base=start_base))
 
     def test_guess_summary_description_one(self):
-        """Testing MercurialClient guess summary & description 1 commit."""
+        """Testing MercurialClient guess summary & description 1 commit"""
         self.options.guess_summary = True
         self.options.guess_description = True
 
@@ -886,7 +1377,7 @@ class MercurialClientTests(MercurialTestBase):
         self.assertEqual(commit_message['summary'], 'commit 1')
 
     def test_guess_summary_description_two(self):
-        """Testing MercurialClient guess summary & description 2 commits."""
+        """Testing MercurialClient guess summary & description 2 commits"""
         self.options.guess_summary = True
         self.options.guess_description = True
 
@@ -901,7 +1392,7 @@ class MercurialClientTests(MercurialTestBase):
                          'body 1\n\nsummary 2\n\nbody 2')
 
     def test_guess_summary_description_three(self):
-        """Testing MercurialClient guess summary & description 3 commits."""
+        """Testing MercurialClient guess summary & description 3 commits"""
         self.options.guess_summary = True
         self.options.guess_description = True
 
@@ -917,7 +1408,7 @@ class MercurialClientTests(MercurialTestBase):
                          'desc1\n\ncommit 2\n\ndesc2\n\ncommit 3\n\ndesc3')
 
     def test_guess_summary_description_one_middle(self):
-        """Testing MercurialClient guess summary & description middle commit commit."""
+        """Testing MercurialClient guess summary & description middle commit commit"""
         self.options.guess_summary = True
         self.options.guess_description = True
 
@@ -1076,7 +1567,7 @@ class MercurialSubversionClientTests(MercurialTestBase):
                          ri.path)
 
     def testCalculateRepositoryInfo(self):
-        """Testing MercurialClient (+svn) _calculate_hgsubversion_repository_info properly determines repository and base paths."""
+        """Testing MercurialClient (+svn) _calculate_hgsubversion_repository_info properly determines repository and base paths"""
         info = (
             "URL: svn+ssh://testuser@svn.example.net/repo/trunk\n"
             "Repository Root: svn+ssh://testuser@svn.example.net/repo\n"
@@ -1159,7 +1650,7 @@ class MercurialSubversionClientTests(MercurialTestBase):
         self.assertEqual(result['parent_diff'], None)
 
     def testDiffOfRevision(self):
-        """Testing MercurialClient (+svn) diff specifying a revision."""
+        """Testing MercurialClient (+svn) diff specifying a revision"""
         self.client.get_repository_info()
 
         self._hg_add_file_commit('foo.txt', FOO4, 'edit 4', branch='b')
@@ -1198,7 +1689,7 @@ def svn_version_set_hash(svn16_hash, svn17_hash):
 
 
 class SVNRepositoryInfoTests(SpyAgency, SCMClientTests):
-    """Unit tests for rbtools.clients.svn.SVNRepositoryInfo."""
+    """Unit tests for rbtools.clients.svn.SVNRepositoryInfo"""
 
     payloads = {
         'http://localhost:8080/api/': {
@@ -1420,7 +1911,7 @@ class SVNClientTests(SCMClientTests):
                        translate_newlines=True)
 
     def _svn_add_file(self, filename, data, changelist=None):
-        """Add a file to the test repo."""
+        """Add a file to the test repo"""
         is_new = not os.path.exists(filename)
 
         f = open(filename, 'w')
@@ -1433,7 +1924,7 @@ class SVNClientTests(SCMClientTests):
             self._run_svn(['changelist', changelist, filename])
 
     def _svn_add_dir(self, dirname):
-        """Add a directory to the test repo."""
+        """Add a directory to the test repo"""
         if not os.path.exists(dirname):
             os.mkdir(dirname)
 
@@ -2475,7 +2966,7 @@ class BazaarClientTests(SCMClientTests):
         return execute(['bzr'] + command, *args, **kwargs)
 
     def _bzr_add_file_commit(self, file, data, msg):
-        """Add a file to a Bazaar repository with the content of data and commit with msg."""
+        """Add a file to a Bazaar repository with the content of data and commit with msg"""
         with open(file, 'w') as foo:
             foo.write(data)
         self._run_bzr(["add", file])
@@ -2483,7 +2974,7 @@ class BazaarClientTests(SCMClientTests):
 
     def _compare_diffs(self, filename, full_diff, expected_diff_digest,
                        change_type='modified'):
-        """Testing that the full_diff for ``filename`` matches the ``expected_diff``."""
+        """Testing that the full_diff for ``filename`` matches the ``expected_diff``"""
         diff_lines = full_diff.splitlines()
 
         self.assertEqual(('=== %s file \'%s\''
@@ -2557,7 +3048,7 @@ class BazaarClientTests(SCMClientTests):
                             'a6326b53933f8b255a4b840485d8e210')
 
     def test_diff_exclude(self):
-        """Testing BazaarClient diff with file exclusion."""
+        """Testing BazaarClient diff with file exclusion"""
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
@@ -2574,7 +3065,7 @@ class BazaarClientTests(SCMClientTests):
         self.assertEqual(self._count_files_in_diff(result['diff']), 1)
 
     def test_diff_exclude_in_subdir(self):
-        """Testing BazaarClient diff with file exclusion in a subdirectory."""
+        """Testing BazaarClient diff with file exclusion in a subdirectory"""
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit('foo.txt', FOO1, 'commit 1')
@@ -2596,7 +3087,7 @@ class BazaarClientTests(SCMClientTests):
         self.assertEqual(self._count_files_in_diff(result['diff']), 1)
 
     def test_diff_exclude_root_pattern_in_subdir(self):
-        """Testing BazaarClient diff with file exclusion in the repo root."""
+        """Testing BazaarClient diff with file exclusion in the repo root"""
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit('exclude.txt', FOO2, 'commit 1')
@@ -2708,7 +3199,7 @@ class BazaarClientTests(SCMClientTests):
         self.assertFalse("commit 3" in description)
 
     def test_guessed_summary_and_description_in_grand_parent_branch(self):
-        """Testing BazaarClient guessing summary and description for grand parent branch."""
+        """Testing BazaarClient guessing summary and description for grand parent branch"""
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
@@ -2737,7 +3228,7 @@ class BazaarClientTests(SCMClientTests):
         self.assertFalse("commit 3" in description)
 
     def test_guessed_summary_and_description_with_revision_range(self):
-        """Testing BazaarClient guessing summary and description with a revision range."""
+        """Testing BazaarClient guessing summary and description with a revision range"""
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")

@@ -65,44 +65,65 @@ class GitClient(SCMClient):
 
         return self._git_version_at_least_180
 
-    def parse_revision_spec(self, revisions=[]):
-        """Parses the given revision spec.
+    def parse_revision_spec(self, revisions=[], remote=None):
+        """Parse the given revision spec.
 
-        The 'revisions' argument is a list of revisions as specified by the
-        user. Items in the list do not necessarily represent a single revision,
-        since the user can use SCM-native syntaxes such as "r1..r2" or "r1:r2".
-        SCMTool-specific overrides of this method are expected to deal with
-        such syntaxes.
+        Args:
+            revisions (list of unicode, optional):
+                The 'revisions' argument is a list of revisions as specified by
+                the user. Items in the list do not necessarily represent a
+                single revision, since the user can use SCM-native syntaxes
+                such as "r1..r2" or "r1:r2". SCMTool-specific overrides of this
+                method are expected to deal with such syntaxes.
 
-        This will return a dictionary with the following keys:
-            'base':        A revision to use as the base of the resulting diff.
-            'tip':         A revision to use as the tip of the resulting diff.
-            'parent_base': (optional) The revision to use as the base of a
-                           parent diff.
-            'commit_id':   (optional) The ID of the single commit being posted,
-                           if not using a range.
+            remote (unicode, optional):
+                This is most commonly ``origin``, but can be changed via
+                configuration or command-line options. This represents the
+                remote which is configured in Review Board.
 
-        These will be used to generate the diffs to upload to Review Board (or
-        print). The diff for review will include the changes in (base, tip],
-        and the parent diff (if necessary) will include (parent_base, base].
+        Returns:
+            dict:
+            A dictionary with the following keys:
 
-        If a single revision is passed in, this will return the parent of that
-        revision for 'base' and the passed-in revision for 'tip'.
+                base (unicode):
+                    A revision to use as the base of the resulting diff.
 
-        If zero revisions are passed in, this will return the current HEAD as
-        'tip', and the upstream branch as 'base', taking into account parent
-        branches explicitly specified via --parent.
+                tip (unicode):
+                    A revision to use as the tip of the resulting diff.
+
+                parent_base (unicode, optional):
+                    The revision to use as the base of a parent diff.
+
+                commit_id (unicode, optional):
+                    The ID of the single commit being posted, if not using a
+                    range.
+
+            These will be used to generate the diffs to upload to Review Board
+            (or print). The diff for review will include the changes in (base,
+            tip], and the parent diff (if necessary) will include (parent_base,
+            base].
+
+            If a single revision is passed in, this will return the parent of
+            that revision for 'base' and the passed-in revision for 'tip'.
+
+            If zero revisions are passed in, this will return the current HEAD
+            as 'tip', and the upstream branch as 'base', taking into account
+            parent branches explicitly specified via --parent.
         """
         n_revs = len(revisions)
         result = {}
 
+        if not remote:
+            remote_branch, _ = self.get_origin()
+            remote = remote_branch.split('/')[0]
+
         if n_revs == 0:
-            # No revisions were passed in--start with HEAD, and find the
+            # No revisions were passed in. Start with HEAD, and find the
             # tracking branch automatically.
             parent_branch = self.get_parent_branch()
             head_ref = self._rev_parse(self.get_head_ref())[0]
-            merge_base = self._rev_parse(
-                self._get_merge_base(head_ref, self.upstream_branch))[0]
+            merge_base = self._rev_list_youngest_remote_ancestor(
+                head_ref, 'origin')
 
             result = {
                 'tip': head_ref,
@@ -168,8 +189,8 @@ class GitClient(SCMClient):
                 raise InvalidRevisionSpecError(
                     'Unexpected result while parsing revision spec')
 
-            parent_base = self._get_merge_base(result['base'],
-                                               self.upstream_branch)
+            parent_base = self._rev_list_youngest_remote_ancestor(
+                result['base'], 'origin')
             if parent_base != result['base']:
                 result['parent_base'] = parent_base
         else:
@@ -433,16 +454,45 @@ class GitClient(SCMClient):
 
         return head_ref
 
-    def _get_merge_base(self, rev1, rev2):
-        """Returns the merge base."""
-        return execute([self.git, "merge-base", rev1, rev2]).strip()
-
     def _rev_parse(self, revisions):
         """Runs `git rev-parse` and returns a list of revisions."""
         if not isinstance(revisions, list):
             revisions = [revisions]
 
         return execute([self.git, 'rev-parse'] + revisions).strip().split('\n')
+
+    def _rev_list_youngest_remote_ancestor(self, local_branch, remote):
+        """Return the youngest ancestor of ``local_branch`` on ``remote``.
+
+        Args:
+            local_branch (unicode):
+                The commit whose ancestor we are trying to find.
+
+            remote (unicode):
+                This is most commonly ``origin``, but can be changed via
+                configuration or command-line options. This represents the
+                remote which is configured in Review Board.
+
+        Returns:
+            unicode:
+            The youngest ancestor of local_branch that is also contained in
+            the remote repository (where youngest means the commit that can
+            be reached from local_branch by following the least number of
+            parent links).
+        """
+        local_commits = execute([self.git, 'rev-list', local_branch, '--not',
+                                 '--remotes=%s' % remote])
+        local_commits = local_commits.split()
+
+        if local_commits == []:
+            # We are currently at a commit also available to the remote.
+            return local_branch
+
+        local_commit = local_commits[-1]
+        youngest_remote_commit = self._rev_parse('%s^' % local_commit)
+        logging.debug('Found youngest remote git commit %s',
+                      youngest_remote_commit)
+        return youngest_remote_commit[0]
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
              extra_args=[]):
