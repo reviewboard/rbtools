@@ -459,6 +459,7 @@ class Command(object):
                    help='The password for the SVN repository.'),
             Option('--svn-prompt-password',
                    dest='svn_prompt_password',
+                   config_key='SVN_PROMPT_PASSWORD',
                    default=False,
                    action='store_true',
                    help="Prompt for the user's svn password. This option "
