@@ -2010,7 +2010,7 @@ class PerforceClientTests(SCMClientTests):
 
             def info(self):
                 return {
-                    'Client root': '/',
+                    'Client root': os.getcwd() + os.path.sep + 'invalid',
                     'Server address': SERVER_PATH,
                     'Server version': 'P4D/FREEBSD60X86_64/2012.2/525804 '
                                       '(2012/09/18)',
