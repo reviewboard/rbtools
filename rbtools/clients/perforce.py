@@ -231,6 +231,7 @@ class PerforceClient(SCMClient):
 
         client_root = p4_info.get('Client root')
 
+
         if client_root is None:
             return None
 
@@ -238,10 +239,8 @@ class PerforceClient(SCMClient):
         # client, so don't enforce the repository directory check.
         if (client_root.lower() != 'null' or
             not sys.platform.startswith('win')):
-            norm_cwd = os.path.normcase(os.path.realpath(os.getcwd()) +
-                                        os.path.sep)
-            norm_client_root = os.path.normcase(os.path.realpath(client_root) +
-                                                os.path.sep)
+            norm_cwd = os.path.normcase(os.path.realpath(os.getcwd())) 
+            norm_client_root = os.path.normcase(os.path.realpath(client_root))
 
             # Don't accept the repository if the current directory
             # is outside the root of the Perforce client.
