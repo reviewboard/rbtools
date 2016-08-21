@@ -231,7 +231,6 @@ class PerforceClient(SCMClient):
 
         client_root = p4_info.get('Client root')
 
-
         if client_root is None:
             return None
 
