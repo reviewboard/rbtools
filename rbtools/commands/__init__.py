@@ -391,6 +391,13 @@ class Command(object):
                    metavar='FILENAME',
                    help='Uploads an existing diff file, instead of '
                         'generating a new diff.'),
+        ]
+    )
+
+    branch_options = OptionGroup(
+        name='Branch Options',
+        description='Options for selecting branches.',
+        option_list=[
             Option('--tracking-branch',
                    dest='tracking',
                    metavar='BRANCH',

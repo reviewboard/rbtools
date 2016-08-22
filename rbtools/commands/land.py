@@ -113,6 +113,7 @@ class Land(Command):
                  'making any changes to the tree.'),
         Command.server_options,
         Command.repository_options,
+        Command.branch_options,
     ]
 
     def patch(self, review_request_id):

@@ -237,6 +237,7 @@ class Post(Command):
             ]
         ),
         Command.diff_options,
+        Command.branch_options,
         Command.perforce_options,
         Command.subversion_options,
         Command.tfs_options,
