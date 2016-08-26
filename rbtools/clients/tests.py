@@ -11,6 +11,7 @@ from random import randint
 from tempfile import mktemp
 from textwrap import dedent
 
+import six
 from kgb import SpyAgency
 from nose import SkipTest
 from six.moves import cStringIO as StringIO
@@ -22,6 +23,8 @@ from rbtools.api.tests import MockResponse
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.bazaar import BazaarClient
 from rbtools.clients.errors import (InvalidRevisionSpecError,
+                                    MergeError,
+                                    PushError,
                                     TooManyRevisionsError)
 from rbtools.clients.git import GitClient
 from rbtools.clients.mercurial import MercurialClient
@@ -29,6 +32,7 @@ from rbtools.clients.perforce import PerforceClient, P4Wrapper
 from rbtools.clients.svn import SVNRepositoryInfo, SVNClient
 from rbtools.tests import OptionsStub
 from rbtools.utils.checks import is_valid_version
+from rbtools.utils.console import edit_text
 from rbtools.utils.filesystem import is_exe_in_path, load_config, make_tempfile
 from rbtools.utils.process import execute
 from rbtools.utils.testbase import RBTestBase
@@ -43,8 +47,15 @@ class SCMClientTests(RBTestBase):
         self.clients_dir = os.path.dirname(__file__)
 
 
-class GitClientTests(SCMClientTests):
+class GitClientTests(SpyAgency, SCMClientTests):
     TESTSERVER = "http://127.0.0.1:8080"
+    AUTHOR = type(
+        b'Author',
+        (object,),
+        {
+            'fullname': 'name',
+            'email': 'email'
+        })
 
     def _run_git(self, command):
         return execute(['git'] + command, env=None, split_lines=False,
@@ -1020,6 +1031,242 @@ class GitClientTests(SCMClientTests):
 
         self.assertEqual(self.client.get_raw_commit_message(revisions),
                          'Commit 2')
+
+    def test_push_upstream_pull_exception(self):
+        """Testing GitClient.push_upstream with an invalid remote branch.
+
+        It must raise a PushError exception because the 'git pull' from an
+        invalid upstream branch will fail.
+        """
+        try:
+            self.client.push_upstream('non-existent-branch')
+        except PushError as e:
+            self.assertEqual(six.text_type(e),
+                             'Could not pull changes from upstream.')
+        else:
+            self.fail('Expected PushError')
+
+    def test_push_upstream_no_push_exception(self):
+        """Testing GitClient.push_upstream with 'git push' disabled.
+
+        We set the push url to be an invalid one, which should normally cause
+        the 'git push' to fail. However, push_upstream() must not fail (must
+        not raise a PushError) because it gets its origin_url from the Git
+        config, which still contains a valid fetch url.
+        """
+        self._run_git(['remote', 'set-url', '--push', 'origin', 'bad-url'])
+
+        # This line should not raise an exception.
+        self.client.push_upstream('master')
+
+    def test_merge_invalid_destination(self):
+        """Testing GitClient.merge with an invalid destination branch.
+
+        It must raise a MergeError exception because 'git checkout' to the
+        invalid destination branch will fail.
+        """
+        try:
+            self.client.merge('master', 'non-existent-branch',
+                              'commit message', self.AUTHOR)
+        except MergeError as e:
+            self.assertTrue(six.text_type(e).startswith(
+                "Could not checkout to branch 'non-existent-branch'"))
+        else:
+            self.fail('Expected MergeError')
+
+    def test_merge_invalid_target(self):
+        """Testing GitClient.merge with an invalid target branch.
+
+        It must raise a MergeError exception because 'git merge' from an
+        invalid target branch will fail.
+        """
+        try:
+            self.client.merge('non-existent-branch', 'master',
+                              'commit message', self.AUTHOR)
+        except MergeError as e:
+            self.assertTrue(six.text_type(e).startswith(
+                "Could not merge branch 'non-existent-branch'"))
+        else:
+            self.fail('Expected MergeError')
+
+    def test_merge_with_squash(self):
+        """Testing GitClient.merge with squash set to True.
+
+        We use a KGB function spy to check if execute is called with the
+        right arguments i.e. with the '--squash' flag (and not with the
+        '--no-ff' flag.
+        """
+        self.spy_on(execute)
+
+        self.client.get_repository_info()
+
+        # Since pushing data upstream to the test repo corrupts its state,
+        # we clone the clone and use one clone as the remote for the other.
+        # We need to push data upstrem for the merge to work.
+        self.git_dir = os.getcwd()
+        self.clone_dir = self.chdir_tmp()
+        self._run_git(['clone', self.git_dir, self.clone_dir])
+
+        self.client.get_repository_info()
+
+        self._run_git(['checkout', '-b', 'new-branch'])
+        self._git_add_file_commit('foo1.txt', FOO1, 'on new-branch')
+        self._run_git(['push', 'origin', 'new-branch'])
+
+        self.client.merge('new-branch', 'master', 'message', self.AUTHOR,
+                          True)
+
+        self.assertTrue(execute.spy.called_with(['git', 'merge', 'new-branch',
+                                                 '--squash', '--no-commit'],
+                                                ignore_errors=True,
+                                                return_error_code=True))
+
+    def test_merge_without_squash(self):
+        """Testing GitClient.merge with squash set to False.
+
+        We use a KGB function spy to check if execute is called with the
+        right arguments i.e. with the '--no-ff' flag (and not with the
+        '--squash' flag).
+        """
+        self.spy_on(execute)
+
+        self.client.get_repository_info()
+
+        # Since pushing data upstream to the test repo corrupts its state,
+        # we clone the clone and use one clone as the remote for the other.
+        # We need to push data upstrem for the merge to work.
+        self.git_dir = os.getcwd()
+        self.clone_dir = self.chdir_tmp()
+        self._run_git(['clone', self.git_dir, self.clone_dir])
+
+        self.client.get_repository_info()
+
+        self._run_git(['checkout', '-b', 'new-branch'])
+        self._git_add_file_commit('foo1.txt', FOO1, 'on new-branch')
+        self._run_git(['push', 'origin', 'new-branch'])
+
+        self.client.merge('new-branch', 'master', 'message', self.AUTHOR,
+                          False)
+
+        self.assertTrue(execute.spy.called_with(['git', 'merge', 'new-branch',
+                                                 '--no-ff', '--no-commit'],
+                                                ignore_errors=True,
+                                                return_error_code=True))
+
+    def test_create_commit_run_editor(self):
+        """Testing GitClient.create_commit with run_editor set to True.
+
+        We use a KGB function spy to check if edit_text is called, and then
+        we intercept the call returning a custom commit message. We then
+        ensure that execute is called with that custom commit message.
+        """
+        self.spy_on(edit_text, call_fake=self.return_new_message)
+        self.spy_on(execute)
+
+        foo = open('foo.txt', 'w')
+        foo.write('change')
+        foo.close()
+
+        self.client.create_commit('old_message', self.AUTHOR, True,
+                                  ['foo.txt'])
+
+        self.assertTrue(edit_text.spy.called)
+        self.assertTrue(execute.spy.last_called_with(
+            ['git', 'commit', '-m', 'new_message', '--author="name <email>"']))
+
+    def test_create_commit_without_run_editor(self):
+        """Testing GitClient.create_commit with run_editor set to False.
+
+        We use a KGB function spy to check if edit_text is not called. We set
+        it up so that if edit_text was called, we intercept the call returning
+        a custom commit message. However, since we are expecting edit_text to
+        not be called, we ensure that execute is called with the old commit
+        message (and not the custom new one).
+        """
+        self.spy_on(edit_text, call_fake=self.return_new_message)
+        self.spy_on(execute)
+
+        foo = open('foo.txt', 'w')
+        foo.write('change')
+        foo.close()
+
+        self.client.create_commit('old_message', self.AUTHOR, False,
+                                  ['foo.txt'])
+
+        self.assertFalse(edit_text.spy.called)
+        self.assertTrue(execute.spy.last_called_with(
+            ['git', 'commit', '-m', 'old_message', '--author="name <email>"']))
+
+    def test_create_commit_all_files(self):
+        """Testing GitClient.create_commit with all_files set to True.
+
+        We use a KGB function spy to check if execute is called with the
+        right arguments i.e. with 'git add --all :/' (and not with 'git add
+        <filenames>').
+        """
+        self.spy_on(execute)
+
+        foo = open('foo.txt', 'w')
+        foo.write('change')
+        foo.close()
+
+        self.client.create_commit('message', self.AUTHOR, False, [], True)
+
+        self.assertTrue(execute.spy.called_with(['git', 'add', '--all',
+                                                 ':/']))
+
+    def test_create_commit_without_all_files(self):
+        """Testing GitClient.create_commit with all_files set to False.
+
+        We use a KGB function spy to check if execute is called with the
+        right arguments i.e. with 'git add <filenames>' (and not with 'git add
+        --all :/').
+        """
+        self.spy_on(execute)
+
+        foo = open('foo.txt', 'w')
+        foo.write('change')
+        foo.close()
+
+        self.client.create_commit('message', self.AUTHOR, False, ['foo.txt'],
+                                  False)
+
+        self.assertTrue(execute.spy.called_with(['git', 'add', 'foo.txt']))
+
+    def test_delete_branch_with_merged_only(self):
+        """Testing GitClient.delete_branch with merged_only set to True.
+
+        We use a KGB function spy to check if execute is called with the
+        right arguments i.e. with the -d flag (and not the -D flag).
+        """
+        self.spy_on(execute)
+
+        self._run_git(['branch', 'new-branch'])
+
+        self.client.delete_branch('new-branch', True)
+
+        self.assertTrue(execute.spy.called)
+        self.assertTrue(execute.spy.last_called_with(['git', 'branch', '-d',
+                                                      'new-branch']))
+
+    def test_delete_branch_without_merged_only(self):
+        """Testing GitClient.delete_branch with merged_only set to False.
+
+        We use a KGB function spy to check if execute is called with the
+        right arguments i.e. with the -D flag (and not the -d flag).
+        """
+        self.spy_on(execute)
+
+        self._run_git(['branch', 'new-branch'])
+
+        self.client.delete_branch('new-branch', False)
+
+        self.assertTrue(execute.spy.called)
+        self.assertTrue(execute.spy.last_called_with(['git', 'branch', '-D',
+                                                      'new-branch']))
+
+    def return_new_message(self, message):
+        return 'new_message'
 
 
 class MercurialTestBase(SCMClientTests):

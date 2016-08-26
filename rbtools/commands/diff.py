@@ -12,6 +12,7 @@ class Diff(Command):
     option_list = [
         Command.server_options,
         Command.diff_options,
+        Command.branch_options,
         Command.repository_options,
         Command.perforce_options,
         Command.subversion_options,

@@ -7,6 +7,7 @@ import logging
 import pkg_resources
 import platform
 import os
+import subprocess
 import sys
 
 from colorlog import ColoredFormatter
@@ -417,6 +418,13 @@ class Command(object):
                    metavar='FILENAME',
                    help='Uploads an existing diff file, instead of '
                         'generating a new diff.'),
+        ]
+    )
+
+    branch_options = OptionGroup(
+        name='Branch Options',
+        description='Options for selecting branches.',
+        option_list=[
             Option('--tracking-branch',
                    dest='tracking',
                    metavar='BRANCH',
@@ -485,6 +493,7 @@ class Command(object):
                    help='The password for the SVN repository.'),
             Option('--svn-prompt-password',
                    dest='svn_prompt_password',
+                   config_key='SVN_PROMPT_PASSWORD',
                    default=False,
                    action='store_true',
                    help="Prompt for the user's svn password. This option "
@@ -675,6 +684,7 @@ class Command(object):
             sys.exit(1)
 
         self.init_logging()
+        logging.debug('Command line: %s', subprocess.list2cmdline(argv))
 
         try:
             exit_code = self.main(*args) or 0

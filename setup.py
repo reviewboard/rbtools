@@ -52,6 +52,7 @@ install_requires = [
     'colorama',
     'six>=1.8.0',
     'texttable',
+    'tqdm',
 ]
 
 
@@ -81,6 +82,7 @@ rb_commands = [
     'clear-cache = rbtools.commands.clearcache:ClearCache',
     'close = rbtools.commands.close:Close',
     'diff = rbtools.commands.diff:Diff',
+    'install = rbtools.commands.install:Install',
     'land = rbtools.commands.land:Land',
     'list-repo-types = rbtools.commands.list_repo_types:ListRepoTypes',
     'login = rbtools.commands.login:Login',

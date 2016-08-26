@@ -45,6 +45,7 @@ class Stamp(Command):
         Command.server_options,
         Command.repository_options,
         Command.diff_options,
+        Command.branch_options,
         Command.perforce_options,
     ]
 

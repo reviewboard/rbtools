@@ -113,6 +113,7 @@ class Land(Command):
                added_in='0.8.0'),
         Command.server_options,
         Command.repository_options,
+        Command.branch_options,
     ]
 
     def patch(self, review_request_id):

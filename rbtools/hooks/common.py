@@ -14,13 +14,29 @@ class HookError(Exception):
     pass
 
 
-def get_api(server_url, username, password):
+def get_api(server_url, **kwargs):
     """Returns an RBClient instance and the associated root resource.
 
     Hooks should use this method to gain access to the API, instead of
-    instantianting their own client.
+    instantiating their own client.
+
+    Args:
+        server_url (unicode):
+            The server URL to retrieve.
+
+        **kwargs (dict):
+            Additional keyword arguments to pass to the
+            :py:class:`~rbtools.api.client.RBClient` constructor. See
+            :py:meth:`SyncTransport.__init__()
+            <rbtools.api.transport.sync.SyncTransport.__init__>` for arguments
+            that are accepted.
+
+    Returns:
+        tuple:
+        This returns a 2-tuple of the :py:class:`~rbtools.api.client.RBClient`
+        and :py:class:`<root resource> rbtools.api.resource.Resource`.
     """
-    api_client = RBClient(server_url, username=username, password=password)
+    api_client = RBClient(server_url, **kwargs)
 
     try:
         api_root = api_client.get_root()
