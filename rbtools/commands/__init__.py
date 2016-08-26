@@ -6,6 +6,7 @@ import inspect
 import logging
 import platform
 import os
+import subprocess
 import sys
 
 from six.moves import input
@@ -632,6 +633,7 @@ class Command(object):
             sys.exit(1)
 
         self.init_logging()
+        logging.debug('Command line: %s', subprocess.list2cmdline(argv))
 
         try:
             exit_code = self.main(*args) or 0
