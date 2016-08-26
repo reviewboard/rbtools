@@ -6,7 +6,6 @@ import os
 import shutil
 import tempfile
 import zipfile
-from contextlib import contextmanager
 
 import tqdm
 from six.moves.urllib.error import HTTPError, URLError
@@ -59,11 +58,15 @@ class Install(Command):
 
         label = 'Downloading %s' % package
 
-        with self.download_file(url, label=label) as zip_filename:
+        zip_filename = self.download_file(url, label=label)
+
+        try:
             self.check_download(url, zip_filename)
             self.unzip(
                 zip_filename,
                 os.path.join(user_data_dir('rbtools'), 'packages', package))
+        finally:
+            os.unlink(zip_filename)
 
     def check_download(self, url, zip_filename):
         """Check to see if the file was successfully downloaded.
@@ -84,8 +87,9 @@ class Install(Command):
         """
         if check_install('gpg'):
             execute(['gpg', '--recv-keys', '4ED1F993'])
+            sig_filename = self.download_file('%s.asc' % url)
 
-            with self.download_file('%s.asc' % url) as sig_filename:
+            try:
                 retcode, output, errors = execute(
                     ['gpg', '--verify', sig_filename, zip_filename],
                     with_errors=False, ignore_errors=True,
@@ -97,6 +101,8 @@ class Install(Command):
                     raise CommandError(
                         'Unable to verify authenticity of file downloaded '
                         'from %s:\n%s' % (url, errors))
+            finally:
+                os.unlink(sig_filename)
         else:
             logging.info('"gpg" not installed. Skipping signature validation.')
 
@@ -164,7 +170,6 @@ class Install(Command):
         finally:
             zip_file.close()
 
-    @contextmanager
     def download_file(self, url, label=None):
         """Download the given file.
 
@@ -197,10 +202,11 @@ class Install(Command):
             read_bytes = 0
             bar_format = '{desc} {bar} {percentage:3.0f}% [{remaining}]'
 
-            with tempfile.NamedTemporaryFile() as f:
-                with tqdm.tqdm(total=total_bytes, desc=label or '',
-                               ncols=80, disable=label is None,
-                               bar_format=bar_format) as bar:
+            with tqdm.tqdm(total=total_bytes, desc=label or '',
+                           ncols=80, disable=label is None,
+                           bar_format=bar_format) as bar:
+                try:
+                    f = tempfile.NamedTemporaryFile(delete=False)
                     while read_bytes != total_bytes:
                         chunk = response.read(8192)
                         chunk_length = len(chunk)
@@ -209,9 +215,9 @@ class Install(Command):
                         f.write(chunk)
 
                         bar.update(chunk_length)
+                finally:
+                    f.close()
 
-                    f.flush()
-                    bar.close()
-                    yield f.name
+            return f.name
         except (HTTPError, URLError) as e:
             raise CommandError('Error when downloading file: %s' % e)
