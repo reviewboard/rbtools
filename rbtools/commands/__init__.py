@@ -538,6 +538,14 @@ class Command(object):
                    config_key='TF_CMD',
                    help='The full path of where to find the tf command. This '
                         'overrides any detected path.'),
+            Option('--tfs-shelveset-owner',
+                   dest='tfs_shelveset_owner',
+                   default=None,
+                   metavar='TFS_SHELVESET_OWNER',
+                   help='When posting a shelveset name created by another '
+                        'user (other than the one who owns the current '
+                        'workdir), look for that shelveset using this '
+                        'username.'),
         ]
     )
 
