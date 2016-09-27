@@ -1,5 +1,6 @@
 from __future__ import print_function, unicode_literals
 
+import logging
 import subprocess
 
 from rbtools.clients.errors import MergeError, PushError
@@ -214,6 +215,14 @@ class Land(Command):
                     'The review request has not been marked "Ship It!"'
             else:
                 is_rr_approved = True
+        except Exception as e:
+            logging.exception(
+                'Unexpected error while looking up review request '
+                'approval state: %s',
+                e)
+            raise CommandError(
+                'An error was encountered while executing the land '
+                'command.')
         finally:
             if not is_rr_approved:
                 raise CommandError(approval_failure)
