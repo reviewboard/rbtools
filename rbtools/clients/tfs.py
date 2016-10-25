@@ -335,6 +335,35 @@ class TEEWrapper(object):
             'base_commit_id': base,
         }
 
+    def _run_tf(self, args, **kwargs):
+        """Run the "tf" command.
+
+        Args:
+            args (list):
+                A list of arguments to pass to rb-tfs.
+
+            **kwargs (dict):
+                Additional keyword arguments for the :py:meth:`execute` call.
+
+        Returns:
+            unicode:
+            The output of the command.
+        """
+        cmdline = [self.tf, '-noprompt']
+
+        if getattr(self.options, 'tfs_login', None):
+            cmdline.append('-login:%s' % self.options.tfs_login)
+
+        cmdline += args
+
+        # Use / style arguments when running on windows.
+        if sys.platform.startswith('win'):
+            for i, arg in enumerate(cmdline):
+                if arg.startswith('-'):
+                    cmdline[i] = '/' + arg[1:]
+
+        return execute(cmdline, ignore_errors=True, **kwargs)
+
 
 class TFHelperWrapper(object):
     """Implementation wrapper using our own helper."""

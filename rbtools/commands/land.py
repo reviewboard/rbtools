@@ -1,6 +1,7 @@
 from __future__ import print_function, unicode_literals
 
 import six
+import logging
 
 from rbtools.clients.errors import MergeError, PushError
 from rbtools.commands import Command, CommandError, Option, RB_MAIN
@@ -150,13 +151,21 @@ class Land(Command):
             approval_failure = review_request.approval_failure
         except AttributeError:
             # The Review Board server is an old version (pre-2.0) that
-            # doesn't support the `approved` field. Determining it manually.
+            # doesn't support the `approved` field. Determine it manually.
             if review_request.ship_it_count == 0:
                 is_rr_approved = False
-                approval_failure = ('review request has not been marked '
-                                    '"Ship It!"')
+                approval_failure = \
+                    'The review request has not been marked "Ship It!"'
             else:
                 is_rr_approved = True
+        except Exception as e:
+            logging.exception(
+                'Unexpected error while looking up review request '
+                'approval state: %s',
+                e)
+
+            return ('An error was encountered while executing the land '
+                    'command.')
         finally:
             if not is_rr_approved:
                 return approval_failure
