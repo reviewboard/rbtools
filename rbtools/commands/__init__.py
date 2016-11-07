@@ -608,6 +608,23 @@ class Command(object):
         logging.debug('Home = %s', get_home_path())
         logging.debug('Current directory = %s', os.getcwd())
 
+    def create_arg_parser(self, argv):
+        """Create and return the argument parser.
+
+        Args:
+            argv (list of unicode):
+                A list of command line arguments
+
+        Returns:
+            argparse.ArgumentParser:
+            Argument parser for commandline arguments
+        """
+        self.config = load_config()
+        parser = self.create_parser(self.config, argv)
+        parser.add_argument('args', nargs=argparse.REMAINDER)
+
+        return parser
+
     def run_from_argv(self, argv):
         """Execute the command using the provided arguments.
 
@@ -615,12 +632,9 @@ class Command(object):
         from ``argv`` and the commands ``main`` method will
         be called.
         """
-        self.config = load_config()
-
-        parser = self.create_parser(self.config, argv)
-        parser.add_argument('args', nargs=argparse.REMAINDER)
-
+        parser = self.create_arg_parser(argv)
         self.options = parser.parse_args(argv[2:])
+
         args = self.options.args
 
         # Check that the proper number of arguments have been provided.

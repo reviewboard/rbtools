@@ -15,12 +15,16 @@ from rbtools.utils.review_request import (get_draft_or_current_value,
                                           get_revisions,
                                           guess_existing_review_request)
 
+
 class Post(Command):
     """Create and update review requests."""
     name = 'post'
     author = 'The Review Board Project'
     description = 'Uploads diffs to create and update review requests.'
     args = '[revisions]'
+
+    #: Reserved built-in fields that can be set using the ``--field`` argument.
+    reserved_fields = ('description', 'testing-done', 'summary')
 
     GUESS_AUTO = 'auto'
     GUESS_YES = 'yes'
@@ -111,6 +115,15 @@ class Post(Command):
             description='Options for setting the contents of fields in the '
                         'review request.',
             option_list=[
+                Option('-f', '--field',
+                       dest='fields',
+                       action='append',
+                       default=None,
+                       metavar='FIELD_NAME=VALUE',
+                       help='Sets custom fields into the extra_data of a '
+                            'review request. Can also be used to set '
+                            'built-in fields like description, summary, '
+                            'testing-done.'),
                 Option('-g', '--guess-fields',
                        dest='guess_fields',
                        action='store',
@@ -245,6 +258,39 @@ class Post(Command):
 
     def post_process_options(self):
         super(Post, self).post_process_options()
+
+        extra_fields = {}
+
+        if self.options.fields is None:
+            self.options.fields = []
+
+        for field in self.options.fields:
+            key_value_pair = field.split('=', 1)
+
+            if len(key_value_pair) != 2:
+                raise CommandError(
+                    'The --field argument should be in the form of: '
+                    '--field name=value; got "%s" instead.'
+                    % field
+                )
+
+            key, value = key_value_pair
+
+            if key in self.reserved_fields:
+                key_var = key.replace('-', '_')
+
+                if getattr(self.options, key_var):
+                    raise CommandError(
+                        'The "{0}" field was provided by both --{0}= '
+                        'and --field {0}=. Please use --{0} instead.'
+                        .format(key)
+                    )
+
+                setattr(self.options, key_var, value)
+            else:
+                extra_fields['extra_data.%s' % key] = value
+
+        self.options.extra_fields = extra_fields
 
         # -g implies --guess-summary and --guess-description
         if self.options.guess_fields:
@@ -512,6 +558,8 @@ class Post(Command):
         # Update the review request draft fields based on options set
         # by the user, or configuration.
         update_fields = {}
+
+        update_fields.update(self.options.extra_fields)
 
         if self.options.target_groups:
             update_fields['target_groups'] = self.options.target_groups
