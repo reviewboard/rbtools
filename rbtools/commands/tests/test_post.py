@@ -72,11 +72,10 @@ class PostCommandTests(RBTestBase):
         description and rbt post --field testing_done='No tests'
         """
         post = self._create_post_command(['testing_done=No tests'])
-        self.assertIsNone(post.options.testing_done)
+        self.assertEqual(post.options.testing_done, None)
         post = self._create_post_command(['description'])
 
-        with self.assertRaises(CommandError):
-            post.post_process_options()
+        self.assertRaises(CommandError, post.post_process_options)
 
     def test_multiple_delimiter(self):
         """Testing multiple delimiters with rbt post --field
@@ -96,5 +95,4 @@ class PostCommandTests(RBTestBase):
         post = self._create_post_command(['description=test'])
         post.options.description = 'test'
 
-        with self.assertRaises(CommandError):
-            post.post_process_options()
+        self.assertRaises(CommandError, post.post_process_options)
