@@ -97,7 +97,7 @@ def main():
 
     if command_name == 'help':
         help(args, parser)
-    elif opt.help or '--help' in args or '-h' in args:
+    elif opt.help or '--help' in args[:2] or '-h' in args[:2]:
         help(opt.command, parser)
 
     ep = find_entry_point_for_command(command_name)
