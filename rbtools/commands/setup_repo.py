@@ -118,7 +118,8 @@ class SetupRepo(Command):
 
         config = [
             ('REVIEWBOARD_URL', server),
-            ('REPOSITORY', selected_repo['name'])
+            ('REPOSITORY', selected_repo['name']),
+            ('REPOSITORY_TYPE', tool.entrypoint_name),
         ]
 
         try:
