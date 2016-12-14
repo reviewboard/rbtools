@@ -23,7 +23,9 @@ from rbtools.utils.filesystem import (cleanup_tempfiles, get_home_path,
 from rbtools.utils.process import die
 
 
-RB_MAIN = 'rbt'
+# NOTE: This needs to be a byte string, since it's going to go in argv,
+#       which are all expected to be byte strings.
+RB_MAIN = b'rbt'
 
 
 class CommandExit(Exception):
@@ -655,7 +657,8 @@ class Command(object):
             sys.exit(1)
 
         self.init_logging()
-        logging.debug('Command line: %s', subprocess.list2cmdline(argv))
+        logging.debug('Command line: %s',
+                      subprocess.list2cmdline(argv).decode('utf8'))
 
         try:
             exit_code = self.main(*args) or 0

@@ -98,7 +98,7 @@ def main():
 
     if command_name == 'help':
         help(args, parser)
-    elif opt.help or '--help' in args or '-h' in args:
+    elif opt.help or b'--help' in args or b'-h' in args:
         help(opt.command, parser)
 
     # Attempt to retrieve the command class from the entry points. We
