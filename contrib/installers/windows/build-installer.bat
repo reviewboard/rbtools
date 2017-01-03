@@ -39,9 +39,9 @@ call :SetMSBuildPath || goto :Abort
 ::-------------------------------------------------------------------------
 :: Dependencies
 ::-------------------------------------------------------------------------
-set PYTHON_VERSION=2.7.12
-set PYTHON_URL=http://python.org/ftp/python/2.7.12/python-2.7.12.msi
-set PYTHON_MD5=fe0ef5b8fd02722f32f7284324934f9d
+set PYTHON_VERSION=2.7.13
+set PYTHON_URL=http://python.org/ftp/python/2.7.13/python-2.7.13.msi
+set PYTHON_MD5=0f057ab4490e63e528eaa4a70df711d9
 set PYTHON_DEP=%DEPS_DIR%\python-%PYTHON_VERSION%
 
 
