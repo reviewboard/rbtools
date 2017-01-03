@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Builds RBTools installers for MacOS X.
+# Builds RBTools installers for macOS.
 #
 # This will build an installer that users can download and use on
 # Snow Leopard and higher.
@@ -23,16 +23,31 @@ if test ! -e "$PWD/setup.py"; then
     exit 1
 fi
 
+which python2.7 >/dev/null || {
+    echo "python2.7 could not be found." >&2
+    exit 1
+}
+
+which pip2.6 >/dev/null || {
+    echo "pip2.6 could not be found." >&2
+    exit 1
+}
+
+which pip2.7 >/dev/null || {
+    echo "pip2.7 could not be found." >&2
+    exit 1
+}
+
 PACKAGE_NAME=RBTools
 IDENTIFIER=org.reviewboard.rbtools
 
 # Figure out the version of the package.
-VERSION=`python -c 'import rbtools; print rbtools.get_package_version()'`
+VERSION=`PYTHONPATH=. python -c 'import rbtools; print rbtools.get_package_version()'`
 
 DATA_SRC=contrib/installers/macosx
 RESOURCES_SRC=$DATA_SRC/resources
 PKG_BASE=$PWD/build/osx-pkg
-PKG_DEPS=$PKG_BASE/deps
+PKG_PYBUILD=$PKG_BASE/pybuild
 PKG_BUILD=$PKG_BASE/build
 PKG_SRC=$PKG_BASE/src
 PKG_RESOURCES=$PKG_BASE/resources
@@ -41,9 +56,6 @@ PKG_DEST=$PWD/dist
 # Note that we want explicit paths so that we don't use the version in a
 # virtualenv. For consistency and safety, we'll just do the same for all
 # executables.
-PYTHON_26=/usr/bin/python2.6
-PYTHON_27=/usr/bin/python2.7
-EASY_INSTALL_26=/usr/bin/easy_install-2.6
 TIFFUTIL=/usr/bin/tiffutil
 PKGBUILD=/usr/bin/pkgbuild
 PRODUCTBUILD=/usr/bin/productbuild
@@ -51,31 +63,36 @@ RM=/bin/rm
 MKDIR=/bin/mkdir
 CP=/bin/cp
 
-PY_INSTALL_ARGS="--root $PKG_SRC"
+PIP_INSTALL_ARGS="
+    --disable-pip-version-check \
+    --no-cache-dir \
+    --ignore-installed \
+    --root $PKG_SRC
+"
 
 # Clean up from any previous builds.
 rm -rf $PKG_BASE
-$MKDIR -p $PKG_SRC $PKG_DEPS $PKG_BUILD $PKG_RESOURCES $PKG_DEST
+$MKDIR -p $PKG_SRC $PKG_PYBUILD $PKG_BUILD $PKG_RESOURCES $PKG_DEST
 
-# Python 2.6 requires the argparse module, so install that first. We don't
-# need this for Python 2.7.
-$EASY_INSTALL_26 -q --editable --always-copy --build-directory $PKG_DEPS argparse
-pushd $PKG_DEPS/argparse
-$PYTHON_26 ./setup.py install $PY_INSTALL_ARGS
-popd
+# Install RBTools and dependencies.
+#
+# We start off by building a wheel distribution, which we can build in
+# "release" package mode, fixing egg filenames. Then we install that using
+# pip on each supported version of Python, ensuring we have modern packages
+# with all dependencies installed.
+#
+# Both the 2.6 and 2.7 binaries for "rbt" will end up being installed. Pip
+# will install into /Library/Frameworks/Python.framework/Versions/2.7/bin for
+# Python 2.7, and /usr/local/bin for 2.6. On modern macOS, the Python binary
+# directories are searched first, allowing the 2.7 version to be favored over
+# the 2.6 version.
+python2.7 ./setup.py release bdist_wheel \
+    -b $PKG_PYBUILD/build \
+    -d $PKG_PYBUILD/dist
 
-# Install the six module.
-$EASY_INSTALL_26 -q --editable --always-copy --build-directory $PKG_DEPS six
-pushd $PKG_DEPS/six
-$PYTHON_26 ./setup.py install $PY_INSTALL_ARGS
-$PYTHON_27 ./setup.py install $PY_INSTALL_ARGS
-popd
-
-# Note the ordering. We're going to install the Python 2.6 version last,
-# so that `rbt` will point to it. This ensures compatibility with
-# Snow Leopard and higher.
-$PYTHON_27 ./setup.py install $PY_INSTALL_ARGS
-$PYTHON_26 ./setup.py install $PY_INSTALL_ARGS
+RBTOOLS_PY2_FILENAME=$PKG_PYBUILD/dist/RBTools-*-py2-none-any.whl
+pip2.6 install $PIP_INSTALL_ARGS $RBTOOLS_PY2_FILENAME
+pip2.7 install $PIP_INSTALL_ARGS $RBTOOLS_PY2_FILENAME
 
 # Copy any needed resource files, so that productbuild can later get to them.
 $CP $RESOURCES_SRC/* $PKG_RESOURCES
