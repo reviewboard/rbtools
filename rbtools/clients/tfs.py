@@ -549,6 +549,7 @@ class TFHelperWrapper(object):
 
         return execute(cmdline,
                        with_errors=False,
+                       results_unicode=False,
                        return_error_code=True,
                        return_errors=True,
                        **kwargs)

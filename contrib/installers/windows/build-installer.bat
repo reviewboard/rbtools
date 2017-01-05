@@ -1,8 +1,7 @@
 ::
 :: Build the installer for RBTools for Windows.
 ::
-:: This will fetch Portable Python, prepare a slimmed-down build, and
-:: build a WiX package for RBTools.
+:: This will fetch Python and build a WiX package for RBTools.
 ::
 :: This can be run in an automated fashion, but it must be run manually the
 :: first time in order to handle the installation of Portable Python (since
@@ -40,25 +39,27 @@ call :SetMSBuildPath || goto :Abort
 ::-------------------------------------------------------------------------
 :: Dependencies
 ::-------------------------------------------------------------------------
-set PORTABLE_PYTHON_VERSION=2.7.6.1
-set PORTABLE_PYTHON_URL=http://ftp.osuosl.org/pub/portablepython/v2.7/PortablePython_%PORTABLE_PYTHON_VERSION%.exe
-set PORTABLE_PYTHON_MD5=5b480c1bbbc06b779a7d150c26f2147d
-set PORTABLE_PYTHON_DEP=%DEPS_DIR%\PortablePython-%PORTABLE_PYTHON_VERSION%
+set PYTHON_VERSION=2.7.13
+set PYTHON_URL=http://python.org/ftp/python/2.7.13/python-2.7.13.msi
+set PYTHON_MD5=0f057ab4490e63e528eaa4a70df711d9
+set PYTHON_DEP=%DEPS_DIR%\python-%PYTHON_VERSION%
 
 
 ::-------------------------------------------------------------------------
 :: Signing certificate
 ::-------------------------------------------------------------------------
-set CERT_THUMBPRINT=1d78bb47e6a8fc599ad61c639dc31048177b3800
+set CERT_THUMBPRINT=61ce7f9111bdfe3a264f36c7b62571e10acc8822
 
 
 ::-------------------------------------------------------------------------
 :: Begin the installation process
 ::-------------------------------------------------------------------------
 if not exist "%DEPS_DIR%" mkdir "%DEPS_DIR%"
+if not exist "%BUILD_STAGE%" mkdir "%BUILD_STAGE%"
 
-call :InstallPortablePython || goto :Abort
+call :InstallPython || goto :Abort
 call :CreateBuildDirectory || goto :Abort
+call :InstallPackagers || goto :Abort
 call :InstallRBTools || goto :Abort
 call :RemoveUnwantedFiles || goto :Abort
 call :BuildInstaller || goto :Abort
@@ -69,39 +70,30 @@ goto :EOF
 
 
 ::-------------------------------------------------------------------------
-:: Installs and trims the Portable Python dependency
+:: Installs Python
 ::-------------------------------------------------------------------------
-:InstallPortablePython
+:InstallPython
 setlocal
 
 echo.
-echo == Installing Portable Python ==
+echo == Installing Python ==
 
-set _PORTABLE_PYTHON_INSTALLER=%TEMP%\PortablePython-%PORTABLE_PYTHON_VERSION%.exe
+set _PYTHON_INSTALLER=%TEMP%\python-%PYTHON_VERSION%.msi
 
-if not exist "%PORTABLE_PYTHON_DEP%" (
-    if not exist "%_PORTABLE_PYTHON_INSTALLER%" (
-        echo Downloading Portable Python v%PORTABLE_PYTHON_VERSION%...
-        call :DownloadAndVerify %PORTABLE_PYTHON_URL% ^
-                                "%_PORTABLE_PYTHON_INSTALLER%" ^
-                                %PORTABLE_PYTHON_MD5% || exit /B 1
+if not exist "%PYTHON_DEP%" (
+    if not exist "%_PYTHON_INSTALLER%" (
+        echo Downloading Python v%PYTHON_VERSION%...
+        call :DownloadAndVerify %PYTHON_URL% ^
+                                "%_PYTHON_INSTALLER%" ^
+                                %PYTHON_MD5% || exit /B 1
 
-        echo Downloaded to %_PORTABLE_PYTHON_INSTALLER%
+        echo Downloaded to %_PYTHON_INSTALLER%
     )
 
     echo Running the installer...
-    echo.
-    echo **PAY ATTENTION**
-    echo.
-    echo You need to use the default destination path for the installer, and you
-    echo must choose the "Minimum" install type.
-    echo.
+    msiexec /quiet /a "%_PYTHON_INSTALLER%" TARGETDIR="%PYTHON_DEP%"
 
-    start "" /wait "%_PORTABLE_PYTHON_INSTALLER%" /D=%PORTABLE_PYTHON_DEP%
-
-    if ERRORLEVEL 1 exit /B 1
-
-    del /F /Q "%_PORTABLE_PYTHON_INSTALLER%"
+    del /F /Q "%_PYTHON_INSTALLER%"
 )
 
 goto :EOF
@@ -113,14 +105,40 @@ goto :EOF
 :CreateBuildDirectory
 setlocal
 
-:: Create a copy of the Portable Python directory. This is where we'll be
-:: installing RBTools and dependencies, and what we'll actually be
-:: distributing.
+:: Create a copy of the Python directory. This is where we'll be installing
+:: RBTools and dependencies, and what we'll actually be distributing.
 echo.
 echo == Creating build directory ==
 
 call :DeleteIfExists "%BUILD_ROOT%"
-xcopy /EYI "%PORTABLE_PYTHON_DEP%\App" "%BUNDLED_PYTHON_DIR%" >NUL
+xcopy /EYI "%PYTHON_DEP%" "%BUNDLED_PYTHON_DIR%" >NUL
+
+goto :EOF
+
+
+::-------------------------------------------------------------------------
+:: Install package tools
+::-------------------------------------------------------------------------
+:InstallPackagers
+setlocal
+
+echo.
+echo == Installing pip and setuptools ==
+echo.
+echo --------------------------- [Install log] ---------------------------
+
+pushd %TREE_ROOT%
+"%BUNDLED_PYTHON%" -m ensurepip --upgrade
+"%BUNDLED_PYTHON%" -m pip install -U pip setuptools
+
+if ERRORLEVEL 1 (
+    popd
+    exit /B 1
+)
+
+popd
+
+echo ---------------------------------------------------------------------
 
 goto :EOF
 
@@ -162,6 +180,7 @@ echo == Removing unwanted files ==
 
 call :DeleteIfExists "%BUNDLED_PYTHON_DIR%\Doc"
 call :DeleteIfExists "%BUNDLED_PYTHON_DIR%\tcl"
+call :DeleteIfExists "%BUNDLED_PYTHON_DIR%\python-%PYTHON_VERSION%.msi"
 
 goto :EOF
 
