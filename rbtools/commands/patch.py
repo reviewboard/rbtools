@@ -148,19 +148,26 @@ class Patch(Command):
 
     def main(self, request_id):
         """Run the command."""
-        repository_info, tool = self.initialize_scm_tool(
-            client_name=self.options.repository_type)
+        if self.options.patch_stdout and self.options.server:
+            server_url = self.options.server
+        else:
+            repository_info, tool = self.initialize_scm_tool(
+                client_name=self.options.repository_type)
 
-        if self.options.revert_patch and not tool.supports_patch_revert:
-            raise CommandError('The %s backend does not support reverting '
-                               'patches.' % tool.name)
+            if self.options.revert_patch and not tool.supports_patch_revert:
+                raise CommandError('The %s backend does not support reverting '
+                                   'patches.' % tool.name)
 
-        server_url = self.get_server_url(repository_info, tool)
+            server_url = self.get_server_url(repository_info, tool)
+
         api_client, api_root = self.get_api(server_url)
-        self.setup_tool(tool, api_root=api_root)
 
-        # Check if repository info on reviewboard server match local ones.
-        repository_info = repository_info.find_server_repository_info(api_root)
+        if not self.options.patch_stdout:
+            self.setup_tool(tool, api_root=api_root)
+
+            # Check if repository info on reviewboard server match local ones.
+            repository_info = repository_info.find_server_repository_info(
+                api_root)
 
         # Get the patch, the used patch ID and base dir for the diff
         diff_body, diff_revision, base_dir = self.get_patch(
