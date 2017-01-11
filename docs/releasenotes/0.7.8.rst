@@ -2,7 +2,7 @@
 RBTools 0.7.8 Release Notes
 ===========================
 
-**Release date:** TBD
+**Release date:** January 11, 2017
 
 
 Installers
@@ -73,6 +73,14 @@ General
 
 * Fixed a crash when passing Unicode characters as arguments on the command
   line.
+
+
+rbt post
+--------
+
+* :option:`--guess-fields` (:option:`-g`) no longer overwrites
+  :option:`--guess-summary` or :option:`--guess-description` if those are
+  specified.
 
 
 Team Foundation Server
