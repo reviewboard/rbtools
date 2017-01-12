@@ -1,0 +1,99 @@
+===========================
+RBTools 0.7.8 Release Notes
+===========================
+
+**Release date:** January 11, 2017
+
+
+Installers
+==========
+
+This release introduces some much-needed fixes and improvements to our
+installers.
+
+
+Windows
+-------
+
+* The Windows installer has been updated to include Python 2.7.13, which
+  includes bug fixes and enhanced support for SSL certificate verification.
+
+* Updated the code signing certificate used for our builds.
+
+
+macOS
+-----
+
+* Improved Python version compatibility.
+
+  The installer will now install RBTools in such a way where the Python 2.7
+  version will be used for all modern versions of macOS, and the Python 2.6
+  version will be used for older (Snow Leopard era) versions.
+
+  Previously, the Python 2.6 version was always the dominant version, leading
+  to compatibility problems when trying to integrate with the RBTools Python
+  API.
+
+* Fixed the ``tqdm`` dependency issue many users encountered with recent
+  versions of the RBTools installer.
+
+
+New Features
+============
+
+rbt patch
+---------
+
+* :command:`rbt patch --print` can now be run outside of a source tree.
+
+  This is useful when you want to fetch the patch from a review request, but
+  don't necessary have or need a checkout of the source tree.
+
+  Patch by Stephen Kiernan.
+
+
+rbt setup-repo
+--------------
+
+* The generated :file:`.reviewboardrc` file now stores the repository type.
+
+  The ``REPOSITORY_TYPE`` setting is now set for new :file:`.reviewboardrc`
+  files, speeding up RBTools commands by eliminating the need to guess the
+  repository type, and fixing issues when nesting repositories.
+
+  If you already have a :file:`.reviewboardrc`, you can manually edit it to
+  include this setting.
+
+
+Bug Fixes
+=========
+
+General
+-------
+
+* Fixed a crash when passing Unicode characters as arguments on the command
+  line.
+
+
+rbt post
+--------
+
+* :option:`--guess-fields` (:option:`-g`) no longer overwrites
+  :option:`--guess-summary` or :option:`--guess-description` if those are
+  specified.
+
+
+Team Foundation Server
+----------------------
+
+* Fixed generating and uploading diffs containing Unicode
+  :abbr:`BOM (Byte Order Mark)` characters.
+
+
+Contributors
+============
+
+* Barret Rennie
+* Christian Hammond
+* David Trowbridge
+* Stephen Kiernan
