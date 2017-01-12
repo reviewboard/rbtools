@@ -144,7 +144,7 @@ class Post(Command):
                        action='store',
                        config_key='GUESS_SUMMARY',
                        nargs='?',
-                       default=GUESS_AUTO,
+                       default=None,
                        const=GUESS_YES,
                        choices=GUESS_CHOICES,
                        help='Generates the Summary field based on the '
@@ -159,7 +159,7 @@ class Post(Command):
                        action='store',
                        config_key='GUESS_DESCRIPTION',
                        nargs='?',
-                       default=GUESS_AUTO,
+                       default=None,
                        const=GUESS_YES,
                        choices=GUESS_CHOICES,
                        help='Generates the Description field based on the '
@@ -293,12 +293,15 @@ class Post(Command):
         self.options.extra_fields = extra_fields
 
         # -g implies --guess-summary and --guess-description
-        if self.options.guess_fields:
-            self.options.guess_fields = self.normalize_guess_value(
-                self.options.guess_fields, '--guess-fields')
+        self.options.guess_fields = self.normalize_guess_value(
+            self.options.guess_fields, '--guess-fields')
 
-            self.options.guess_summary = self.options.guess_fields
-            self.options.guess_description = self.options.guess_fields
+        for field_name in ('guess_summary', 'guess_description'):
+            # We want to ensure we only override --guess-{field} with
+            # --guess-fields when --guess-{field} is not provided.
+            # to the default (auto).
+            if getattr(self.options, field_name) is None:
+                setattr(self.options, field_name, self.options.guess_fields)
 
         if self.options.revision_range:
             raise CommandError(
