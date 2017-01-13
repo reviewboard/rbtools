@@ -23,6 +23,11 @@ if test ! -e "$PWD/setup.py"; then
     exit 1
 fi
 
+if test ! -z "$VIRTUAL_ENV"; then
+    echo "You cannot build the installer from within a virtualenv." >&2
+    exit 1
+fi
+
 which python2.7 >/dev/null || {
     echo "python2.7 could not be found." >&2
     exit 1

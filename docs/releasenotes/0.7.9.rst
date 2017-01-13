@@ -1,0 +1,37 @@
+===========================
+RBTools 0.7.9 Release Notes
+===========================
+
+**Release date:** January 13, 2017
+
+
+Installers
+==========
+
+macOS
+-----
+
+* Fixed an issue with a bad build of the macOS installer.
+
+  The previously "improved" build was actually built incorrectly, preventing
+  users from being able to actually use RBTools. The new build should be
+  compatible with most systems.
+
+  Note that if you've completely replaced your system-standard Python with a
+  version from Homebrew or another third-party package software, and the
+  system Python directories are not in your :envvar:`PATH`, then you'll need
+  to install the new RBTools using :command:`pip` instead. Instructions
+  are available on the `RBTools downloads page`_.
+
+  If you have a :file:`/Users/chipx86` directory on your filesystem from
+  the previous (0.7.8) installer, please delete it. This was an artifact of
+  the broken build.
+
+
+.. _RBTools downloads page: https://www.reviewboard.org/downloads/rbtools/
+
+
+Contributors
+============
+
+* Christian Hammond
