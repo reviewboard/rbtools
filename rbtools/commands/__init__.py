@@ -10,6 +10,7 @@ import os
 import subprocess
 import sys
 
+import colorama
 from six.moves import input
 from six.moves.urllib.parse import urlparse
 
@@ -563,6 +564,38 @@ class Command(object):
         else:
             return usage
 
+    def _create_formatter(self, level, fmt):
+        """Create a logging formatter for the appropriate logging level.
+
+        When writing to a TTY, the format will be colorized by the colors
+        specified in the ``COLORS`` configuration in :file:`.reviewboardrc`.
+        Otherwise, the format will not be altered.
+
+        Args:
+            level (unicode):
+                The logging level name.
+
+            fmt (unicode):
+                The logging format.
+
+        Returns:
+            logging.Formatter:
+            The created formatter.
+        """
+        color = ''
+        reset = ''
+
+        if sys.stdout.isatty():
+            color_name = self.config['COLOR'].get(level.upper())
+
+            if color_name:
+                color = getattr(colorama.Fore, color.upper(), '')
+
+                if color:
+                    reset = colorama.Fore.RESET
+
+        return logging.Formatter(fmt.format(color=color, reset=reset))
+
     def init_logging(self):
         """Initializes logging for the command.
 
@@ -578,11 +611,17 @@ class Command(object):
         debug messages in the form of ">>> message", making it easier to
         distinguish between debugging and other messages.
         """
+        if sys.stdout.isatty():
+            # We only use colorized logging when writing to TTYs, so we don't
+            # bother initializing it then.
+            colorama.init()
+
         root = logging.getLogger()
 
         if self.options.debug:
             handler = logging.StreamHandler()
-            handler.setFormatter(logging.Formatter('>>> %(message)s'))
+            handler.setFormatter(self._create_formatter(
+                'DEBUG', '{color}>>>{reset} %(message)s'))
             handler.setLevel(logging.DEBUG)
             handler.addFilter(LogLevelFilter(logging.DEBUG))
             root.addHandler(handler)
@@ -593,17 +632,28 @@ class Command(object):
 
         # Handler for info messages. We'll treat these like prints.
         handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter('%(message)s'))
+        handler.setFormatter(self._create_formatter(
+            'INFO', '{color}%(message)s{reset}'))
+
         handler.setLevel(logging.INFO)
         handler.addFilter(LogLevelFilter(logging.INFO))
         root.addHandler(handler)
 
-        # Handler for warnings, errors, and criticals. They'll show the
+        # Handlers for warnings, errors, and criticals. They'll show the
         # level prefix and the message.
-        handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
-        handler.setLevel(logging.WARNING)
-        root.addHandler(handler)
+        levels = (
+            ('WARNING', logging.WARNING),
+            ('ERROR', logging.ERROR),
+            ('CRITICAL', logging.CRITICAL),
+        )
+
+        for level_name, level in levels:
+            handler = logging.StreamHandler()
+            handler.setFormatter(self._create_formatter(
+                level_name, '{color}%(levelname)s:{reset} %(message)s'))
+            handler.addFilter(LogLevelFilter(level))
+            handler.setLevel(level)
+            root.addHandler(handler)
 
         logging.debug('RBTools %s', get_version_string())
         logging.debug('Python %s', sys.version)

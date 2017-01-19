@@ -48,6 +48,7 @@ else:
 
 install_requires = [
     'backports.shutil_get_terminal_size',
+    'colorama',
     'six>=1.8.0',
     'texttable',
     'tqdm',

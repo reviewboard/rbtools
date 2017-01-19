@@ -191,19 +191,28 @@ def load_config():
     This will read all of the .reviewboardrc files influencing the
     cwd and return a dictionary containing the configuration.
     """
+    nested_config = {
+        'ALIASES': {},
+        'COLOR': {
+            'INFO': None,
+            'DEBUG': None,
+            'WARNING': 'yellow',
+            'ERROR': 'red',
+            'CRITICAL': 'red'
+        },
+        'TREES': {},
+    }
     config = {}
-    trees = {}
-    aliases = {}
 
     for filename in reversed(get_config_paths()):
         parsed_config = parse_config_file(filename)
 
-        trees.update(parsed_config.pop('TREES'))
-        aliases.update(parsed_config.pop('ALIASES'))
+        for key in nested_config:
+            nested_config[key].update(parsed_config.pop(key, {}))
+
         config.update(parsed_config)
 
-    config['TREES'] = trees
-    config['ALIASES'] = aliases
+    config.update(nested_config)
 
     return config
 
