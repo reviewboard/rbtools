@@ -589,7 +589,7 @@ class Command(object):
             color_name = self.config['COLOR'].get(level.upper())
 
             if color_name:
-                color = getattr(colorama.Fore, color.upper(), '')
+                color = getattr(colorama.Fore, color_name.upper(), '')
 
                 if color:
                     reset = colorama.Fore.RESET
