@@ -38,7 +38,7 @@ def get_authenticated_session(api_client, api_root, auth_required=False,
                 logging.error('Check that you are not running this script '
                               'from a Cygwin terminal emulator (or use '
                               'Cygwin Python to run it). '
-                              'You may also try logining in first with '
+                              'You may also try logging in first with '
                               'rbt login --username <username> --password <password> '
                               'or rbt login --api-token')
             raise CommandError('Unable to log in to Review Board.')
