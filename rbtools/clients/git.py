@@ -719,7 +719,7 @@ class GitClient(SCMClient):
         have been staged in the index, otherwise returns False.
         """
         status = execute(['git', 'status', '--porcelain',
-                          '--untracked-files=no'])
+                          '--untracked-files=no', '--ignore-submodules=dirty'])
         return status != ''
 
     def amend_commit_description(self, message, revisions):
