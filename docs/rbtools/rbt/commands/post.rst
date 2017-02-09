@@ -33,6 +33,8 @@ The following subsections will explain how :command:`rbt post` is used
 with different repository types.
 
 
+.. _rbt-post-perforce:
+
 Perforce
 --------
 
@@ -105,6 +107,9 @@ The following paths are supported:
    //path/to/dir/...[#@]rev,[#@]rev
 
 
+.. _rbt-post-cvs:
+.. _rbt-post-subversion:
+
 CVS and Subversion
 ------------------
 
@@ -128,6 +133,8 @@ the review request, you can include them on the command line, like so::
 
 
 .. _DVCS:
+.. _rbt-post-git:
+.. _rbt-post-mercurial:
 
 Distributed Version Control Systems
 -----------------------------------
@@ -140,22 +147,15 @@ diff between the current branches commit, and the master branch, simply run::
    $ rbt post
 
 If you'd like to update an existing review request with new changes instead,
-use the :option:`-r` parameter. For example, to update review request #42,
-type::
+use the :option:`-u` parameter. This will attempt to locate the matching
+review request for your change's commit message. ::
 
-   $ rbt post -r 42
+   $ rbt post -u
 
-You can also use the :option:`-u` parameter to automatically determine the
-existing review request based on the patch summary and description::
+If you want to update a specific review request by ID, you can use the
+:option:`-r` parameter::
 
-    $ rbt post -u
-
-Additionally, :command:`rbt post` can generate a summary and description for
-your review request based on the commit messages from the involved commits.
-This is accomplished using the :option:`-g` parameter. To post a new review
-request with a generated summary and description, simply run::
-
-   $ rbt post -g
+    $ rbt post -r 42
 
 In the case where you are working on code based on a branch that isn't
 available to the repository Review Board has configured, you'll want to take
@@ -204,6 +204,8 @@ which specifies the remote branch name. For example::
 
     $ rbt post --tracking-branch=upstream/master
 
+
+.. _rbt-post-clearcase:
 
 ClearCase
 ---------
