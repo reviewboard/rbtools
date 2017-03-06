@@ -115,12 +115,14 @@ class GitClient(SCMClient):
                 result['base'] = merge_base
 
             # Since the user asked us to operate on HEAD, warn them about a
-            # dirty working directory
-            if self.has_pending_changes():
+            # dirty working directory.
+            if (self.has_pending_changes() and
+                not self.config.get('SUPPRESS_CLIENT_WARNINGS', False)):
                 logging.warning('Your working directory is not clean. Any '
                                 'changes which have not been committed '
                                 'to a branch will not be included in your '
                                 'review request.')
+
         elif n_revs == 1 or n_revs == 2:
             # Let `git rev-parse` sort things out.
             parsed = self._rev_parse(revisions)
