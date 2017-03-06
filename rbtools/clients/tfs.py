@@ -5,8 +5,9 @@ import os
 import re
 import sys
 import tempfile
-import urllib2
 import xml.etree.ElementTree as ET
+
+from six.moves.urllib.parse import unquote
 
 from rbtools.clients import RepositoryInfo, SCMClient
 from rbtools.clients.errors import (InvalidRevisionSpecError,
@@ -83,7 +84,7 @@ class TEEWrapper(object):
         # and error out if we don't.
         check_gnu_diff()
 
-        path = urllib2.unquote(m.group(1))
+        path = unquote(m.group(1))
 
         return RepositoryInfo(path)
 

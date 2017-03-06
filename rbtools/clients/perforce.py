@@ -589,7 +589,9 @@ class PerforceClient(SCMClient):
                         depot_file, local_file, base_revision, tip,
                         cl_is_shelved, False)
                 except ValueError as e:
-                    logging.warning('Skipping file %s: %s', depot_file, e)
+                    if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
+                        logging.warning('Skipping file %s: %s', depot_file, e)
+
                     continue
             elif changetype_short == 'A':
                 # Perforce has a charming quirk where the revision listed for
@@ -609,20 +611,26 @@ class PerforceClient(SCMClient):
                         depot_file, local_file, tip, cl_is_shelved,
                         cl_is_pending)
                 except ValueError as e:
-                    logging.warning('Skipping file %s: %s', depot_file, e)
+                    if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
+                        logging.warning('Skipping file %s: %s', depot_file, e)
+
                     continue
 
                 if os.path.islink(new_file):
-                    logging.warning('Skipping symlink %s', new_file)
+                    if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
+                        logging.warning('Skipping symlink %s', new_file)
+
                     continue
             elif changetype_short == 'D':
                 try:
                     old_file, new_file = self._extract_delete_files(
                         depot_file, base_revision)
                 except ValueError as e:
-                    logging.warning(
-                        'Skipping file %s#%s: %s',
-                        depot_file, base_revision, e)
+                    if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
+                        logging.warning(
+                                'Skipping file %s#%s: %s',
+                                depot_file, base_revision, e)
+
                     continue
             elif changetype_short == 'MV-a':
                 # The server supports move information. We ignore this
@@ -635,7 +643,9 @@ class PerforceClient(SCMClient):
                         self._extract_move_files(
                             depot_file, tip, base_revision, cl_is_shelved)
                 except ValueError as e:
-                    logging.warning('Skipping file %s: %s', depot_file, e)
+                    if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
+                        logging.warning('Skipping file %s: %s', depot_file, e)
+
                     continue
 
             dl = self._do_diff(old_file, new_file, depot_file, base_revision,
@@ -711,9 +721,11 @@ class PerforceClient(SCMClient):
                 try:
                     cln = int(file_entry[change_key])
                 except ValueError:
-                    logging.warning('Skipping file %s: unable to parse '
-                                    'change number "%s"',
-                                    depot_file, file_entry[change_key])
+                    if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
+                        logging.warning('Skipping file %s: unable to parse '
+                                        'change number "%s"',
+                                        depot_file, file_entry[change_key])
+
                     break
 
                 if action == 'integrate':
@@ -730,9 +742,11 @@ class PerforceClient(SCMClient):
                     rev_key = 'rev%d' % cid
                     rev = int(file_entry[rev_key])
                 except ValueError:
-                    logging.warning('Skipping file %s: unable to parse '
-                                    'revision number "%s"',
-                                    depot_file, file_entry[rev_key])
+                    if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
+                        logging.warning('Skipping file %s: unable to parse '
+                                        'revision number "%s"',
+                                        depot_file, file_entry[rev_key])
+
                     break
 
                 change = {
@@ -793,8 +807,10 @@ class PerforceClient(SCMClient):
             try:
                 local_file = self._depot_to_local(depot_file)
             except SCMError:
-                logging.warning('Could not find local filename for "%s"',
-                                depot_file)
+                if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
+                    logging.warning('Could not find local filename for "%s"',
+                                    depot_file)
+
                 local_file = None
 
             rev = f['rev']
@@ -814,7 +830,9 @@ class PerforceClient(SCMClient):
                     old_file, new_file = self._extract_add_files(
                         depot_file, local_file, rev, False, False)
                 except ValueError as e:
-                    logging.warning('Skipping file %s: %s', depot_file, e)
+                    if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
+                        logging.warning('Skipping file %s: %s', depot_file, e)
+
                     continue
 
                 diff_lines += self._do_diff(
@@ -825,7 +843,9 @@ class PerforceClient(SCMClient):
                     old_file, new_file = self._extract_delete_files(
                         initial_depot_file, initial_rev)
                 except ValueError:
-                    logging.warning('Skipping file %s: %s', depot_file, e)
+                    if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
+                        logging.warning('Skipping file %s: %s', depot_file, e)
+
                     continue
 
                 diff_lines += self._do_diff(
@@ -836,7 +856,9 @@ class PerforceClient(SCMClient):
                     old_file, new_file = self._extract_edit_files(
                         depot_file, local_file, initial_rev, rev, False, True)
                 except ValueError:
-                    logging.warning('Skipping file %s: %s', depot_file, e)
+                    if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
+                        logging.warning('Skipping file %s: %s', depot_file, e)
+
                     continue
 
                 diff_lines += self._do_diff(
@@ -849,7 +871,9 @@ class PerforceClient(SCMClient):
                     old_file_b, new_file_b = self._extract_delete_files(
                         initial_depot_file, initial_rev)
                 except ValueError:
-                    logging.warning('Skipping file %s: %s', depot_file, e)
+                    if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
+                        logging.warning('Skipping file %s: %s', depot_file, e)
+
                     continue
 
                 if supports_moves:

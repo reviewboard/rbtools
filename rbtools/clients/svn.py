@@ -949,7 +949,8 @@ class SVNRepositoryInfo(RepositoryInfo):
             UUID of the Subversion repository.
     """
 
-    def __init__(self, path, base_path, uuid, repository_id=None):
+    def __init__(self, path, base_path, uuid, supports_parent_diffs=False,
+                 repository_id=None):
         """Initialize the repository information.
 
         Args:
@@ -962,11 +963,15 @@ class SVNRepositoryInfo(RepositoryInfo):
             uuid (unicode):
                 UUID of the Subversion repository.
 
+            supports_parent_diffs (bool, optional):
+                Whether or not the repository supports parent diffs.
+
             repository_id (int, optional):
                 ID of the repository in the API. This is used primarily for
                 testing purposes, and is not guaranteed to be set.
         """
-        super(SVNRepositoryInfo, self).__init__(path, base_path)
+        super(SVNRepositoryInfo, self).__init__(
+            path, base_path, supports_parent_diffs=supports_parent_diffs)
 
         self.uuid = uuid
         self.repository_id = repository_id

@@ -16,6 +16,8 @@
 # certificate used, set RBTOOLS_SIGNATURE to the Common Name of the
 # desired certificate.
 
+set -e
+
 PWD=`pwd`
 
 if test ! -e "$PWD/setup.py"; then
@@ -40,6 +42,8 @@ which pip2.7 >/dev/null || {
 
 PACKAGE_NAME=RBTools
 IDENTIFIER=org.reviewboard.rbtools
+
+PYTHON_VERSIONS=(2.6 2.7)
 
 # Figure out the version of the package.
 VERSION=`PYTHONPATH=. python -c 'import rbtools; print rbtools.get_package_version()'`
@@ -67,6 +71,7 @@ PIP_INSTALL_ARGS="
     --disable-pip-version-check \
     --no-cache-dir \
     --ignore-installed \
+    --force-reinstall \
     --root $PKG_SRC
 "
 
@@ -77,22 +82,61 @@ $MKDIR -p $PKG_SRC $PKG_PYBUILD $PKG_BUILD $PKG_RESOURCES $PKG_DEST
 # Install RBTools and dependencies.
 #
 # We start off by building a wheel distribution, which we can build in
-# "release" package mode, fixing egg filenames. Then we install that using
-# pip on each supported version of Python, ensuring we have modern packages
+# "release" package mode, fixing egg filenames. We'll build one per Python
+# version, in order to ensure we're packaging version-specific dependencies
+# correctly. Then we install that using pip, ensuring we have modern packages
 # with all dependencies installed.
-#
-# Both the 2.6 and 2.7 binaries for "rbt" will end up being installed. Pip
-# will install into /Library/Frameworks/Python.framework/Versions/2.7/bin for
-# Python 2.7, and /usr/local/bin for 2.6. On modern macOS, the Python binary
-# directories are searched first, allowing the 2.7 version to be favored over
-# the 2.6 version.
-python2.7 ./setup.py release bdist_wheel \
-    -b $PKG_PYBUILD/build \
-    -d $PKG_PYBUILD/dist
+for pyver in "${PYTHON_VERSIONS[@]}"; do
+    echo
+    echo
+    echo == Building package for Python ${pyver} ==
+    echo
+    /usr/bin/python${pyver} ./setup.py release bdist_wheel \
+        -b ${PKG_PYBUILD}/build \
+        -d ${PKG_PYBUILD}/dist
 
-RBTOOLS_PY2_FILENAME=$PKG_PYBUILD/dist/RBTools-*-py2-none-any.whl
-pip2.6 install $PIP_INSTALL_ARGS $RBTOOLS_PY2_FILENAME
-pip2.7 install $PIP_INSTALL_ARGS $RBTOOLS_PY2_FILENAME
+    RBTOOLS_PY2_FILENAME=${PKG_PYBUILD}/dist/RBTools-*-py2-none-any.whl
+
+    # Build the package, and set the PYTHONPATH to the location used for
+    # the upstream Python installer builds, so that if upstream Python is
+    # installed, we'll make use of the newer modules there (like pip) instead
+    # of the system Python.
+    #
+    # We're also going to invoke pip as a module, to avoid having to figure
+    # out the right file path.
+    PYTHONPATH=/Library/Frameworks/Python.framework/Versions/${pyver}/lib/python${pyver}/site-packages \
+    /usr/bin/python${pyver} -m pip.__main__ install \
+        $PIP_INSTALL_ARGS \
+        $RBTOOLS_PY2_FILENAME
+
+    rm $RBTOOLS_PY2_FILENAME
+done
+
+# Fix up the /usr/local/bin/rbt script to try to use the version of Python in
+# the path, instead of a hard-coded version. For modern versions of macOS,
+# this will use Python 2.7, and for older versions, 2.6.
+#
+# If the user has a custom Python installed (from the official Python
+# installers or from Homebrew), this will favor those.
+#
+# If they have Python 3 as the default for "python", then they're going to
+# have a bad time.
+echo "#!/usr/bin/env python
+
+# -*- coding: utf-8 -*-
+import re
+import sys
+
+sys.path.insert(
+    0, '/Library/Python/%s.%s/site-packages' % sys.version_info[:2])
+
+from rbtools.commands.main import main
+
+
+if __name__ == '__main__':
+    sys.exit(main())
+" > ${PKG_SRC}/usr/local/bin/rbt
+
 
 # Copy any needed resource files, so that productbuild can later get to them.
 $CP $RESOURCES_SRC/* $PKG_RESOURCES
