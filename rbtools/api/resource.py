@@ -608,6 +608,8 @@ class FileAttachmentListResource(ListResource):
 
 RESOURCE_MAP['application/vnd.reviewboard.org.file-attachments'] = \
     FileAttachmentListResource
+RESOURCE_MAP['application/vnd.reviewboard.org.user-file-attachments'] = \
+    FileAttachmentListResource
 
 
 class DraftFileAttachmentListResource(FileAttachmentListResource):
