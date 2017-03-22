@@ -72,6 +72,9 @@ just run the installer and you'll be set.
 
 .. _`RBTools Downloads`: https://www.reviewboard.org/downloads/rbtools/
 
+If you're using Microsoft's Team Foundation Server, there's some extra
+:ref:`installation or configuration <rbtools-tfs>` that may be necessary.
+
 
 Configuration
 =============
