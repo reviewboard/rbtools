@@ -9,7 +9,6 @@ from rbtools.utils.commands import (build_rbtools_cmd_argv,
                                     extract_commit_message,
                                     get_review_request)
 from rbtools.utils.console import confirm
-from rbtools.utils.process import die
 from rbtools.utils.review_request import (get_draft_or_current_value,
                                           get_revisions,
                                           guess_existing_review_request)
@@ -132,7 +131,7 @@ class Land(Command):
         rc = p.wait()
 
         if rc:
-            die('Failed to execute command: %s' % patch_command)
+            raise CommandError('Failed to execute command: %s' % patch_command)
 
     def main(self, branch_name=None, *args):
         """Run the command."""

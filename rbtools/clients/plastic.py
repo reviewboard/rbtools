@@ -4,10 +4,11 @@ import re
 
 from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.clients.errors import (InvalidRevisionSpecError,
-                                    TooManyRevisionsError)
+                                    TooManyRevisionsError,
+                                    SCMError)
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempfile
-from rbtools.utils.process import die, execute
+from rbtools.utils.process import execute
 
 
 class PlasticClient(SCMClient):
@@ -143,7 +144,7 @@ class PlasticClient(SCMClient):
                           r'dst:(?P<dstpath>.*)$',
                           f)
             if not m:
-                die("Could not parse 'cm log' response: %s" % f)
+                raise SCMError('Could not parse "cm log" response: %s' % f)
 
             changetype = m.group("type")
             filename = m.group("file")
@@ -196,8 +197,9 @@ class PlasticClient(SCMClient):
                                      tmp_diff_from_filename)
                     old_file = tmp_diff_from_filename
                 else:
-                    die("Don't know how to handle change type '%s' for %s" %
-                        (changetype, filename))
+                    raise SCMError("Don't know how to handle change type "
+                                   "'%s' for %s"
+                                   % (changetype, filename))
 
                 dl = self._diff_files(old_file, new_file, filename,
                                       newrevspec, parentrevspec, changetype)

@@ -48,10 +48,6 @@ class UtilitiesTest(RBTestBase):
         self.assertTrue(re.match('.*?%d.%d.%d' % sys.version_info[:3],
                         process.execute([sys.executable, '-V'])))
 
-    def test_die(self):
-        """Testing 'die' method."""
-        self.assertRaises(SystemExit, process.die)
-
     def test_is_valid_version(self):
         """Testing 'is_valid_version' method."""
         self.assertTrue(checks.is_valid_version((1, 0, 0), (1, 0, 0)))

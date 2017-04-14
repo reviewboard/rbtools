@@ -8,21 +8,6 @@ import sys
 import six
 
 
-def die(msg=None):
-    """Cleanly exits the program with an error message.
-
-    Erases all remaining temporary files.
-    """
-    from rbtools.utils.filesystem import cleanup_tempfiles
-
-    cleanup_tempfiles()
-
-    if msg:
-        print(msg)
-
-    sys.exit(1)
-
-
 def execute(command,
             env=None,
             split_lines=False,
@@ -173,7 +158,7 @@ def execute(command,
     rc = p.wait()
 
     if rc and not ignore_errors and rc not in extra_ignore_errors:
-        die('Failed to execute command: %s\n%s' % (command, data))
+        raise Exception('Failed to execute command: %s\n%s' % (command, data))
     elif rc:
         if log_output_on_error:
             logging.debug('Command exited with rc %s: %s\n%s---'

@@ -16,7 +16,7 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
 from rbtools.utils.appdirs import user_data_dir
 from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.diffs import filename_match_any_patterns
-from rbtools.utils.process import die, execute
+from rbtools.utils.process import execute
 
 
 class TFExeWrapper(object):
@@ -200,7 +200,8 @@ class TFExeWrapper(object):
             return self._diff_working_copy(base, include_files,
                                            exclude_patterns)
         else:
-            die('Posting committed changes is not yet supported for TFS.')
+            raise SCMError('Posting committed changes is not yet supported '
+                           'for TFS when using the tf.exe wrapper.')
 
     def _diff_working_copy(self, base, include_files, exclude_patterns):
         """Return a diff of the working copy.
@@ -576,7 +577,9 @@ class TEEWrapper(object):
             return self._diff_working_copy(base, include_files,
                                            exclude_patterns)
         else:
-            die('Posting committed changes is not yet supported for TFS.')
+            raise SCMError('Posting committed changes is not yet supported '
+                           'for TFS when using the Team Explorer Everywhere '
+                           'wrapper.')
 
     def _diff_working_copy(self, base, include_files, exclude_patterns):
         """Return a diff of the working copy.

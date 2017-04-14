@@ -9,12 +9,13 @@ from six.moves.urllib.parse import urlsplit, urlunparse
 
 from rbtools.clients import PatchResult, SCMClient, RepositoryInfo
 from rbtools.clients.errors import (InvalidRevisionSpecError,
-                                    TooManyRevisionsError)
+                                    TooManyRevisionsError,
+                                    SCMError)
 from rbtools.clients.svn import SVNClient
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_empty_files
 from rbtools.utils.console import edit_text
-from rbtools.utils.process import die, execute
+from rbtools.utils.process import execute
 
 
 class MercurialClient(SCMClient):
@@ -522,8 +523,9 @@ class MercurialClient(SCMClient):
                 remote = None
 
         if not remote:
-            die('Could not determine remote branch to use for diff creation. '
-                'Specify --tracking-branch to continue.')
+            raise SCMError('Could not determine remote branch to use for '
+                           'diff creation. Specify --tracking-branch to '
+                           'continue.')
 
         return remote
 

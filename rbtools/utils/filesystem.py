@@ -5,8 +5,6 @@ import os
 import shutil
 import tempfile
 
-from rbtools.utils.process import die
-
 
 CONFIG_FILE = '.reviewboardrc'
 
@@ -156,8 +154,9 @@ def parse_config_file(filename):
     try:
         config = _load_python_file(filename, config)
     except SyntaxError as e:
-        die('Syntax error in config file: %s\n'
-            'Line %i offset %i\n' % (filename, e.lineno, e.offset))
+        raise Exception('Syntax error in config file: %s\n'
+                        'Line %i offset %i\n'
+                        % (filename, e.lineno, e.offset))
 
     return dict((k, config[k])
                 for k in set(config.keys()) - set(builtin.keys()))
