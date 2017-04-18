@@ -649,6 +649,7 @@ class FileDiffResource(ItemResource):
 
 
 @resource_mimetype('application/vnd.reviewboard.org.file-attachments')
+@resource_mimetype('application/vnd.reviewboard.org.user-file-attachments')
 class FileAttachmentListResource(ListResource):
     """The File Attachment List resource specific base class."""
     @request_method_decorator

@@ -171,6 +171,51 @@ class TEEWrapper(object):
             'tip': None,
         }
 
+    def _convert_symbolic_revision(self, revision, path=None):
+        """Convert a symbolic revision into a numeric changeset.
+
+        Args:
+            revision (unicode):
+                The TFS versionspec to convert.
+
+            path (unicode, optional):
+                The itemspec that the revision applies to.
+
+        Returns:
+            int:
+            The changeset number corresponding to the versionspec.
+        """
+        args = ['history', '-stopafter:1', '-recursive', '-format:xml']
+
+        # 'tf history -version:W'` doesn't seem to work (even though it's
+        # supposed to). Luckily, W is the default when -version isn't passed,
+        # so just elide it.
+        if revision != 'W':
+            args.append('-version:%s' % revision)
+
+        args.append(path or os.getcwd())
+
+        # We pass results_unicode=False because that uses the filesystem
+        # encoding to decode the output, but the XML results we get should
+        # always be UTF-8, and are well-formed with the encoding specified. We
+        # can therefore let ElementTree determine how to decode it.
+        data = self._run_tf(args, results_unicode=False)
+
+        try:
+            root = ET.fromstring(data)
+            item = root.find('./changeset')
+
+            if item is not None:
+                return int(item.attrib['id'])
+            else:
+                raise Exception('No changesets found')
+        except Exception as e:
+            logging.debug('Failed to parse output from "tf history": %s\n%s',
+                          e, data, exc_info=True)
+
+            raise InvalidRevisionSpecError(
+                '"%s" does not appear to be a valid versionspec' % revision)
+
     def diff(self, revisions, include_files, exclude_patterns):
         """Return the generated diff.
 
