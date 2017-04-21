@@ -7,3 +7,4 @@ Configuration
 
    repositories
    users
+   tfs

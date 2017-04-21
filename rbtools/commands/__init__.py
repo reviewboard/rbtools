@@ -22,7 +22,6 @@ from rbtools.clients import scan_usable_client
 from rbtools.clients.errors import OptionsCheckError
 from rbtools.utils.filesystem import (cleanup_tempfiles, get_home_path,
                                       is_exe_in_path, load_config)
-from rbtools.utils.process import die
 
 
 # NOTE: This needs to be a byte string, since it's going to go in argv,
@@ -746,8 +745,7 @@ class Command(object):
         try:
             tool.check_options()
         except OptionsCheckError as e:
-            sys.stderr.write('%s\n' % e)
-            sys.exit(1)
+            raise CommandError('%s\n' % e)
 
         return repository_info, tool
 
@@ -781,9 +779,8 @@ class Command(object):
             server_url = None
 
         if not server_url:
-            print('Unable to find a Review Board server for this source code '
-                  'tree.')
-            sys.exit(1)
+            raise CommandError('Unable to find a Review Board server for this '
+                               'source code tree.')
 
         return server_url
 
@@ -797,8 +794,8 @@ class Command(object):
         """
         if username is None or password is None:
             if getattr(self.options, 'diff_filename', None) == '-':
-                die('HTTP authentication is required, but cannot be '
-                    'used with --diff-filename=-')
+                raise CommandError('HTTP authentication is required, but '
+                                   'cannot be used with --diff-filename=-')
 
             # Interactive prompts don't work correctly when input doesn't come
             # from a terminal. This could seem to be a rare case not worth
@@ -840,8 +837,9 @@ class Command(object):
         or application. The user will be prompted for this token.
         """
         if getattr(self.options, 'diff_filename', None) == '-':
-            die('A two-factor authentication token is required, but cannot '
-                'be used with --diff-filename=-')
+            raise CommandError('A two-factor authentication token is '
+                               'required, but cannot be used with '
+                               '--diff-filename=-')
 
         print()
         print('Please enter your two-factor authentication token for Review '

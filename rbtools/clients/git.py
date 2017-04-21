@@ -6,14 +6,15 @@ import sys
 from rbtools.clients import PatchResult, SCMClient, RepositoryInfo
 from rbtools.clients.errors import (AmendError, MergeError, PushError,
                                     InvalidRevisionSpecError,
-                                    TooManyRevisionsError)
+                                    TooManyRevisionsError,
+                                    SCMError)
 from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.svn import SVNClient, SVNRepositoryInfo
 from rbtools.utils.checks import check_install, is_valid_version
 from rbtools.utils.console import edit_text
 from rbtools.utils.diffs import (normalize_patterns,
                                  remove_filenames_matching_patterns)
-from rbtools.utils.process import die, execute
+from rbtools.utils.process import execute
 
 
 class GitClient(SCMClient):
@@ -318,8 +319,8 @@ class GitClient(SCMClient):
                                           int(version_parts.group(2)),
                                           int(version_parts.group(3))),
                                          (1, 5, 4))):
-                    die("Your installation of git-svn must be upgraded to "
-                        "version 1.5.4 or later")
+                    raise SCMError('Your installation of git-svn must be '
+                                   'upgraded to version 1.5.4 or later.')
 
         # Okay, maybe Perforce (git-p4).
         git_p4_ref = os.path.join(git_dir, 'refs', 'remotes', 'p4', 'master')

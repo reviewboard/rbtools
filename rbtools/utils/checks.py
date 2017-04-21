@@ -4,7 +4,7 @@ import os
 import subprocess
 import sys
 
-from rbtools.utils.process import die, execute
+from rbtools.utils.process import execute
 
 
 GNU_DIFF_WIN32_URL = 'http://gnuwin32.sourceforge.net/packages/diffutils.htm'
@@ -49,18 +49,14 @@ def check_gnu_diff():
         pass
 
     if not has_gnu_diff:
-        sys.stderr.write('\n')
-        sys.stderr.write('GNU diff is required in order to generate diffs. '
-                         'Make sure it is installed\n')
-        sys.stderr.write('and in the path.\n')
-        sys.stderr.write('\n')
+        error = ('GNU diff is required in order to generate diffs. '
+                 'Make sure it is installed and in the path.\n')
 
         if os.name == 'nt':
-            sys.stderr.write('On Windows, you can install this from:\n')
-            sys.stderr.write(GNU_DIFF_WIN32_URL)
-            sys.stderr.write('\n')
+            error += ('On Windows, you can install this from %s\n'
+                      % GNU_DIFF_WIN32_URL)
 
-        die()
+        raise Exception(error)
 
 
 def is_valid_version(actual, expected):

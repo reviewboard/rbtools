@@ -6,7 +6,8 @@ import re
 import six
 import sys
 
-from rbtools.utils.process import die, execute
+from rbtools.clients.errors import SCMError
+from rbtools.utils.process import execute
 
 
 # The clients are lazy loaded via load_scmclients()
@@ -141,7 +142,7 @@ class SCMClient(object):
         elif 'TREES' in config:
             trees = config['TREES']
             if not isinstance(trees, dict):
-                die('Warning: "TREES" in config file is not a dict!')
+                raise ValueError('"TREES" in config file is not a dict!')
 
             # If repository_info is a list, check if any one entry is in trees.
             path = None
@@ -226,7 +227,8 @@ class SCMClient(object):
 
         if (patch_output and patch_output.startswith('patch: **** ') and
             patch_output != only_garbage_in_patch):
-            die('Failed to execute command: %s\n%s' % (cmd, patch_output))
+            raise SCMError('Failed to execute command: %s\n%s'
+                           % (cmd, patch_output))
 
         # Check the patch for any added/deleted empty files to handle.
         if self.supports_empty_files():
@@ -244,7 +246,8 @@ class SCMClient(object):
             # is probably malformed.
             if (patch_output == only_garbage_in_patch and
                 not patched_empty_files):
-                die('Failed to execute command: %s\n%s' % (cmd, patch_output))
+                raise SCMError('Failed to execute command: %s\n%s'
+                               % (cmd, patch_output))
 
         # TODO: Should this take into account apply_patch_for_empty_files ?
         #       The return value of that function is False both when it fails

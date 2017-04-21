@@ -11,10 +11,10 @@ from pkg_resources import parse_version
 
 from rbtools.api.errors import APIError
 from rbtools.clients import SCMClient, RepositoryInfo
-from rbtools.clients.errors import InvalidRevisionSpecError
+from rbtools.clients.errors import InvalidRevisionSpecError, SCMError
 from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.filesystem import make_tempfile
-from rbtools.utils.process import die, execute
+from rbtools.utils.process import execute
 
 # This specific import is necessary to handle the paths for
 # cygwin enabled machines.
@@ -122,8 +122,9 @@ class ClearCaseClient(SCMClient):
                 # because webview types also list the 'snapshot'
                 # entry in properties.
                 if 'webview' in properties:
-                    die("Webviews are not supported. You can use rbt commands"
-                        " only in dynamic or snapshot views.")
+                    raise SCMError('Webviews are not supported. You can use '
+                                   'rbt commands only in dynamic or snapshot '
+                                   'views.')
                 if 'dynamic' in properties:
                     self.viewtype = 'dynamic'
                 else:
@@ -135,12 +136,12 @@ class ClearCaseClient(SCMClient):
         vobstag = execute(["cleartool", "describe", "-short", "vob:."],
                           ignore_errors=True).strip()
         if "Error: " in vobstag:
-            die("To generate diff run rbt inside vob.")
+            raise SCMError("Failed to generate diff run rbt inside vob.")
 
         root_path = execute(["cleartool", "pwv", "-root"],
                             ignore_errors=True).strip()
         if "Error: " in root_path:
-            die("To generate diff run rbt inside view.")
+            raise SCMError("Failed to generate diff run rbt inside view.")
 
         # From current working directory cut path to VOB.
         # VOB's tag contain backslash character before VOB's name.
@@ -339,8 +340,8 @@ class ClearCaseClient(SCMClient):
             #                             and the working directory
         elif n_revs == 2:
             if self.viewtype != 'dynamic':
-                die('To generate a diff using multiple revisions, you must '
-                    'use a dynamic view.')
+                raise SCMError('To generate a diff using multiple revisions, '
+                               'you must use a dynamic view.')
 
             if (revisions[0].startswith(self.REVISION_LABEL_PREFIX) and
                 revisions[1].startswith(self.REVISION_LABEL_PREFIX)):
@@ -411,7 +412,8 @@ class ClearCaseClient(SCMClient):
                 }
 
             if version_number == 0:
-                die("Unexepected version_number=0 in activity changeset")
+                raise SCMError('Unexepected version_number=0 in activity '
+                               'changeset')
             elif version_number > changelist[path]['highest']:
                 changelist[path]['highest'] = version_number
                 changelist[path]['current'] = current
@@ -730,7 +732,7 @@ class ClearCaseClient(SCMClient):
                 if self._is_a_label(lb):
                     self._remove_label(lb)
             if error_message:
-                die('Label comparison failed because:\n%s' % error_message)
+                raise SCMError('Label comparison failed:\n%s' % error_message)
 
         return changeset
 
@@ -952,8 +954,8 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
                     # We can safely ignore this repository unless the VOB tag
                     # matches.
                     if repo_name == self.vobstag:
-                        die('You do not have permission to access this '
-                            'repository.')
+                        raise SCMError('You do not have permission to access '
+                                       'this repository.')
 
                     continue
                 else:

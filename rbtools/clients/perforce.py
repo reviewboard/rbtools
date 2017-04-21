@@ -21,7 +21,7 @@ from rbtools.clients.errors import (AmendError,
                                     TooManyRevisionsError)
 from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.filesystem import make_empty_files, make_tempfile
-from rbtools.utils.process import die, execute
+from rbtools.utils.process import execute
 
 
 class P4Wrapper(object):
@@ -259,7 +259,7 @@ class PerforceClient(SCMClient):
                 hostname, port = parts
 
             if not hostname:
-                die('Path %s is not a valid Perforce P4PORT' % repository_path)
+                raise SCMError('Path %s is not a valid Perforce P4PORT' % repository_path)
 
             info = socket.gethostbyaddr(hostname)
 
@@ -580,8 +580,8 @@ class PerforceClient(SCMClient):
             try:
                 changetype_short = action_mapping[action]
             except KeyError:
-                die('Unsupported action type "%s" for %s'
-                    % (action, depot_file))
+                raise SCMError('Unsupported action type "%s" for %s'
+                               % (action, depot_file))
 
             if changetype_short == 'M':
                 try:
@@ -1087,7 +1087,8 @@ class PerforceClient(SCMClient):
             m = r_revision_range.match(path)
 
             if not m:
-                die('Path %r does not match a valid Perforce path.' % (path,))
+                raise SCMError('Path %s does not match a valid Perforce path.'
+                               % path)
             revision1 = m.group('revision1')
             revision2 = m.group('revision2')
             first_rev_path = m.group('path')
@@ -1263,7 +1264,7 @@ class PerforceClient(SCMClient):
                 # Thu Sep  3 11:24:48 2007
                 m = self.DATE_RE.search(dl[1])
                 if not m:
-                    die('Unable to parse diff header: %s' % dl[1])
+                    raise SCMError('Unable to parse diff header: %s' % dl[1])
 
                 month_map = {
                     b'Jan': b'01',
@@ -1302,7 +1303,7 @@ class PerforceClient(SCMClient):
             if not dl[-1].endswith(b'\n'):
                 dl.append(b'\n')
         else:
-            die('ERROR, no valid diffs: %s' % dl[0].decode('utf-8'))
+            raise SCMError('No valid diffs: %s' % dl[0].decode('utf-8'))
 
         return dl
 
