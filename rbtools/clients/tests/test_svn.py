@@ -729,3 +729,19 @@ class SVNClientTests(SCMClientTests):
         self.assertTrue('diff' in result)
         self.assertEqual(md5(result['diff']).hexdigest(),
                          'd41d8cd98f00b204e9800998ecf8427e')
+
+    def test_rename_diff_mangling_bug_4546(self):
+        """Test diff with removal of lines that look like headers"""
+        # If a file has lines that look like "-- XX (YY)", and one of those
+        # files gets removed, our rename handling would filter them out. Test
+        # that the bug is fixed.
+        with open('bug-4546.txt', 'w') as f:
+            f.write('-- test line1\n'
+                    '-- test line2\n'
+                    '-- test line (test2)\n')
+
+        revisions = self.client.parse_revision_spec()
+        result = self.client.diff(revisions)
+        self.assertTrue(isinstance(result, dict))
+        self.assertTrue('diff' in result)
+        self.assertTrue('--- test line (test1)' in result['diff'])
