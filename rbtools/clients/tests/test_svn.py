@@ -23,22 +23,27 @@ from rbtools.utils.checks import is_valid_version
 from rbtools.utils.process import execute
 
 
-def svn_version_set_hash(svn16_hash, svn17_hash):
+def svn_version_set_hash(svn16_hash, svn17_hash, svn19_hash):
     """Pass the appropriate hash to the wrapped function.
 
-    SVN 1.6 and 1.7+ will generate slightly different output for ``svn diff``
-    when generating the diff with a working copy. This works around that by
-    checking the installed SVN version and passing the appropriate hash.
+    SVN 1.6, 1.7/1.8, and 1.9+ will generate slightly different output for
+    ``svn diff`` when generating the diff with a working copy. This works
+    around that by checking the installed SVN version and passing the
+    appropriate hash.
     """
     def decorator(f):
         @wraps(f)
         def wrapped(self):
             self.client.get_repository_info()
 
-            if self.client.subversion_client_version < (1, 7):
+            version = self.client.subversion_client_version
+
+            if version < (1, 7):
                 return f(self, svn16_hash)
-            else:
+            elif version < (1, 9):
                 return f(self, svn17_hash)
+            else:
+                return f(self, svn19_hash)
 
         return wrapped
     return decorator
@@ -402,7 +407,8 @@ class SVNClientTests(SCMClientTests):
         self.assertEqual(revisions['tip'], 2)
 
     @svn_version_set_hash('6613644d417f7c90f83f3a2d16b1dad5',
-                          '7630ea80056a7340d93a556e9af60c63')
+                          '7630ea80056a7340d93a556e9af60c63',
+                          '6a5339da19e60c7706e44aeebfa4da5f')
     def test_diff_exclude(self, md5sum):
         """Testing SVNClient diff with file exclude patterns"""
         self._svn_add_file('bar.txt', FOO1)
@@ -414,6 +420,7 @@ class SVNClientTests(SCMClientTests):
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
 
+        print result['diff']
         self.assertEqual(md5(result['diff']).hexdigest(), md5sum)
 
     def test_diff_exclude_in_subdir(self):
@@ -453,7 +460,8 @@ class SVNClientTests(SCMClientTests):
         self.assertEqual(result['diff'], '')
 
     @svn_version_set_hash('043befc507b8177a0f010dc2cecc4205',
-                          '1b68063237c584d38a9a3ddbdf1f72a2')
+                          '1b68063237c584d38a9a3ddbdf1f72a2',
+                          '466f7c2092e085354f5b24b91d48dd80')
     def test_same_diff_multiple_methods(self, md5_sum):
         """Testing SVNClient identical diff generated from root, subdirectory,
         and via target"""
@@ -499,7 +507,8 @@ class SVNClientTests(SCMClientTests):
         self.assertEqual(md5(result['diff']).hexdigest(), md5_sum)
 
     @svn_version_set_hash('902d662a110400f7470294b2d9e72d36',
-                          '13803373ded9af750384a4601d5173ce')
+                          '13803373ded9af750384a4601d5173ce',
+                          'f11dfbe58925871c5f64b6ca647a8d3c')
     def test_diff_non_unicode_characters(self, md5_sum):
         """Testing SVNClient diff with a non-utf8 file"""
         self._svn_add_file('A.txt', '\xe2'.encode('iso-8859-1'))
@@ -512,7 +521,8 @@ class SVNClientTests(SCMClientTests):
         self.assertEqual(md5(result['diff']).hexdigest(), md5_sum)
 
     @svn_version_set_hash('79cbd5c4974f97d173ee87c50fa9cff2',
-                          'bfa99e54b8c23b97b1dee23d2763c4fd')
+                          'bfa99e54b8c23b97b1dee23d2763c4fd',
+                          '7c6a4506828826aa7043adca347ef327')
     def test_diff_non_unicode_filename(self, md5_sum):
         """Testing SVNClient diff with a non-utf8 filename"""
         self.options.svn_show_copies_as_adds = 'y'
@@ -536,7 +546,10 @@ class SVNClientTests(SCMClientTests):
         self.assertTrue('diff' in result)
         self.assertEqual(md5(result['diff']).hexdigest(), md5_sum)
 
-    def test_diff_non_unicode_filename_repository_url(self):
+    @svn_version_set_hash('60c4d21f4d414da947f4e7273e6d1326',
+                          '60c4d21f4d414da947f4e7273e6d1326',
+                          '571e47c456698bad35bca06523473008')
+    def test_diff_non_unicode_filename_repository_url(self, md5sum):
         """Testing SVNClient diff with a non-utf8 filename via repository_url
         option"""
         self.options.repository_url = self.svn_repo_url
@@ -547,20 +560,25 @@ class SVNClientTests(SCMClientTests):
         result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '60c4d21f4d414da947f4e7273e6d1326')
+        self.assertEqual(md5(result['diff']).hexdigest(), md5sum)
 
-    def test_show_copies_as_adds_enabled(self):
+    @svn_version_set_hash('ac1835240ec86ee14ddccf1f2236c442',
+                          'ac1835240ec86ee14ddccf1f2236c442',
+                          '610f5506e670dc55a2464a6ad9af015c')
+    def test_show_copies_as_adds_enabled(self, md5sum):
         """Testing SVNClient with --show-copies-as-adds functionality
         enabled"""
-        self.check_show_copies_as_adds('y', 'ac1835240ec86ee14ddccf1f2236c442')
+        self.check_show_copies_as_adds('y', md5sum)
 
-    def test_show_copies_as_adds_disabled(self):
+    @svn_version_set_hash('d41d8cd98f00b204e9800998ecf8427e',
+                          'd41d8cd98f00b204e9800998ecf8427e',
+                          'b656e2f9b70ade256c3fe855c13ee52c')
+    def test_show_copies_as_adds_disabled(self, md5sum):
         """Testing SVNClient with --show-copies-as-adds functionality
         disabled"""
-        self.check_show_copies_as_adds('n', 'd41d8cd98f00b204e9800998ecf8427e')
+        self.check_show_copies_as_adds('n', md5sum)
 
-    def check_show_copies_as_adds(self, state, md5str):
+    def check_show_copies_as_adds(self, state, md5sum):
         """Helper function to evaluate --show-copies-as-adds"""
         self.client.get_repository_info()
 
@@ -586,20 +604,20 @@ class SVNClientTests(SCMClientTests):
         result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(), md5str)
+        self.assertEqual(md5(result['diff']).hexdigest(), md5sum)
 
         self._run_svn(['changelist', 'cl1', 'dir1/foo.txt'])
         revisions = self.client.parse_revision_spec(['cl1'])
         result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(), md5str)
+        self.assertEqual(md5(result['diff']).hexdigest(), md5sum)
 
         revisions = self.client.parse_revision_spec()
         result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(), md5str)
+        self.assertEqual(md5(result['diff']).hexdigest(), md5sum)
 
         self._run_svn(['changelist', '--remove', 'dir1/foo.txt'])
 
@@ -608,7 +626,7 @@ class SVNClientTests(SCMClientTests):
         result = self.client.diff(revisions, ['../dir1'])
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(), md5str)
+        self.assertEqual(md5(result['diff']).hexdigest(), md5sum)
 
     def test_history_scheduled_with_commit_nominal(self):
         """Testing SVNClient.history_scheduled_with_commit nominal cases"""
