@@ -25,7 +25,7 @@ temp
 .idea
 bak
 
-rbtools/clients/testdata/homedir/.bzr.log
+rbtools/clients/tests/testdata/homedir/.bzr.log
 
 contrib/installers/windows/deps
 contrib/installers/windows/wix/obj
