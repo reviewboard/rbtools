@@ -83,14 +83,14 @@ def execute(command,
 
         if split_lines and len(output) > 0:
             if results_unicode and isinstance(output[0], six.binary_type):
-                return [line.decode(encoding) for line in output]
+                return [line.decode(encoding, 'replace') for line in output]
             elif not results_unicode and isinstance(output[0], six.text_type):
-                return [line.encode('utf-8') for line in output]
+                return [line.encode('utf-8', 'replace') for line in output]
         elif not split_lines:
             if results_unicode and isinstance(output, six.binary_type):
-                return output.decode(encoding)
+                return output.decode(encoding, 'replace')
             elif not results_unicode and isinstance(output, six.text_type):
-                return output.encode('utf-8')
+                return output.encode('utf-8', 'replace')
 
         return output
 
