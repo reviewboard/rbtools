@@ -562,7 +562,7 @@ class GitClient(SCMClient):
             diff_cmd_params = ['--no-color', '--no-prefix', '-r', '-u']
         elif self.type == 'git':
             diff_cmd_params = ['--no-color', '--full-index',
-                               '--ignore-submodules']
+                               '--ignore-submodules', '--no-ext-diff']
 
             if self._supports_git_config_flag():
                 git_cmd.extend(['-c', 'diff.noprefix=false'])
