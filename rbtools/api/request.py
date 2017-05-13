@@ -42,6 +42,11 @@ except ImportError:
     ssl = None
     HTTPSHandler = None
 
+# if we have certifi, use that ca bundle
+try:
+    import certifi
+except ImportError:
+    certifi = None
 
 RBTOOLS_COOKIE_FILE = '.rbtools-cookies'
 RB_COOKIE_NAME = 'rbsessionid'
@@ -490,6 +495,9 @@ class ReviewBoardServer(object):
 
         if not verify_ssl:
             context = ssl._create_unverified_context()
+            handlers.append(HTTPSHandler(context=context))
+        elif certifi:
+            context = ssl.create_default_context(cafile=certifi.where())
             handlers.append(HTTPSHandler(context=context))
 
         if disable_proxy:
