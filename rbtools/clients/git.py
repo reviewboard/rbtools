@@ -561,7 +561,7 @@ class GitClient(SCMClient):
         if self.type in ('svn', 'perforce'):
             diff_cmd_params = ['--no-color', '--no-prefix', '-r', '-u']
         elif self.type == 'git':
-            diff_cmd_params = ['--no-color', '--full-index',
+            diff_cmd_params = ['--no-color', '--full-index', '--binary',
                                '--ignore-submodules']
 
             if self._supports_git_config_flag():
