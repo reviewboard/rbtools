@@ -35,10 +35,12 @@ def get_authenticated_session(api_client, api_root, auth_required=False,
         if not sys.stdin.isatty():
             logging.error('Authentication is required but input is not a tty.')
             if sys.platform == 'win32':
-                logging.info('Check that you are not running this script '
-                             'from a Cygwin terminal emulator (or use '
-                             'Cygwin Python to run it).')
-
+                logging.error('Check that you are not running this script '
+                              'from a Cygwin terminal emulator (or use '
+                              'Cygwin Python to run it). '
+                              'You may also try logging in first with '
+                              'rbt login --username <username> --password <password> '
+                              'or rbt login --api-token')
             raise CommandError('Unable to log in to Review Board.')
 
         logging.info('Please log in to the Review Board server at %s',
