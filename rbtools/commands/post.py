@@ -11,6 +11,7 @@ from rbtools.utils.commands import (AlreadyStampedError,
                                     get_review_request,
                                     stamp_commit_with_review_url)
 from rbtools.utils.console import confirm
+from rbtools.utils.process import execute
 from rbtools.utils.review_request import (get_draft_or_current_value,
                                           get_revisions,
                                           guess_existing_review_request)
@@ -868,14 +869,25 @@ class Post(Command):
 
         # Load the review up in the browser if requested to.
         if self.options.open_browser:
-            try:
-                import webbrowser
-                if 'open_new_tab' in dir(webbrowser):
-                    # open_new_tab is only in python 2.5+
-                    webbrowser.open_new_tab(review_url)
-                elif 'open_new' in dir(webbrowser):
-                    webbrowser.open_new(review_url)
-                else:
-                    os.system('start %s' % review_url)
-            except:
-                logging.error('Error opening review URL: %s' % review_url)
+            if sys.platform == 'darwin':
+                # The 'webbrowser' module currently does a bunch of stuff with
+                # AppleScript, which is broken on macOS 10.12.5. See
+                # https://bugs.python.org/issue30392 for more discussion.
+                try:
+                    execute(['open', review_url])
+                except Exception as e:
+                    logging.exception('Error opening review URL %s: %s',
+                                      review_url, e)
+            else:
+                try:
+                    import webbrowser
+                    if 'open_new_tab' in dir(webbrowser):
+                        # open_new_tab is only in python 2.5+
+                        webbrowser.open_new_tab(review_url)
+                    elif 'open_new' in dir(webbrowser):
+                        webbrowser.open_new(review_url)
+                    else:
+                        os.system('start %s' % review_url)
+                except Exception as e:
+                    logging.exception('Error opening review URL %s: %s',
+                                      review_url, e)
