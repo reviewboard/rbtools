@@ -477,42 +477,46 @@ class SVNClient(SCMClient):
             return diff_content
 
         result = []
+        num_lines = len(diff_content)
+        i = 0
 
-        from_line = to_line = None
-        for line in diff_content:
-            if self.DIFF_ORIG_FILE_LINE_RE.match(line):
-                from_line = line
-                continue
+        while i < num_lines:
+            if (i + 4 < num_lines and
+                self.INDEX_FILE_RE.match(diff_content[i]) and
+                diff_content[i + 1][:-1] == self.INDEX_SEP and
+                self.DIFF_ORIG_FILE_LINE_RE.match(diff_content[i + 2]) and
+                self.DIFF_NEW_FILE_LINE_RE.match(diff_content[i + 3])):
+                from_line = diff_content[i + 2]
+                to_line = diff_content[i + 3]
 
-            if self.DIFF_NEW_FILE_LINE_RE.match(line):
-                to_line = line
-                continue
-
-            # This is where we decide how mangle the previous '--- '
-            if from_line and to_line:
-                # If the file is marked completely removed, bail out with
-                # original diff. The reason for this is that 'svn diff
-                # --notice-ancestry' generates two diffs for a replaced file:
-                # one as a complete deletion, and one as a new addition.
-                # If it was replaced with history, though, we need to preserve
-                # the file name in the "deletion" part - or the patch won't
-                # apply.
-                if self.DIFF_COMPLETE_REMOVAL_RE.match(line):
-                    result.append(from_line)
-                    result.append(to_line)
+                # If the file is marked completely removed, bail out with the
+                # original diff. The reason for this is that
+                # ``svn diff --notice-ancestry`` generates two diffs for a
+                # replaced file: one as a complete deletion, and one as a new
+                # addition. If it was replaced with history, though, we need to
+                # preserve the file name in the "deletion" part, or the patch
+                # won't apply.
+                if self.DIFF_COMPLETE_REMOVAL_RE.match(diff_content[i + 4]):
+                    result.extend(diff_content[i:i + 5])
                 else:
                     to_file, _ = self.parse_filename_header(to_line[4:])
                     copied_from = self.find_copyfrom(to_file)
+
+                    result.append(diff_content[i])
+                    result.append(diff_content[i + 1])
+
                     if copied_from is not None:
                         result.append(from_line.replace(to_file, copied_from))
                     else:
-                        result.append(from_line)  # As is, no copy performed
-                    result.append(to_line)
-                from_line = to_line = None
+                        result.append(from_line)
 
-            # We only mangle '---' lines. All others get added straight to
-            # the output.
-            result.append(line)
+                    result.append(to_line)
+                    result.append(diff_content[i + 4])
+
+                i += 5
+            else:
+                result.append(diff_content[i])
+                i += 1
 
         return result
 
