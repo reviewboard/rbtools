@@ -1,3 +1,6 @@
+.. default-intersphinx:: rbt0.7
+
+
 ===========================
 RBTools 0.7.4 Release Notes
 ===========================
@@ -43,12 +46,14 @@ General
 rbt post
 --------
 
-* The :option:`--diff-filename` and :option:`--update` flags are now
-  mutually-exclusive. (:bug:`3755`)
+.. program:: rbt post
 
-  The :option:`--update` option didn't make sense when using a diff filename,
-  since the review request could not be guessed. There's now an error shown
-  when trying to use both.
+* The :option:`--diff-filename` and :option:`--update` flags are
+  now mutually-exclusive. (:bug:`3755`)
+
+  The :option:`--update` option didn't make sense when using a diff
+  filename, since the review request could not be guessed. There's now an
+  error shown when trying to use both.
 
 
 Mercurial

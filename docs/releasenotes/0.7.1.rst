@@ -1,3 +1,6 @@
+.. default-intersphinx:: rbt0.7
+
+
 ===========================
 RBTools 0.7.1 Release Notes
 ===========================
@@ -12,7 +15,7 @@ rbt setup-repo
 --------------
 
 * Newly-generated :file:`.reviewboardrc` files now automatically include
-  support for :command:`rbt land`.
+  support for :rbtcommand:`rbt land`.
 
 
 Performance Improvements
@@ -89,7 +92,8 @@ CVS
   RBTools 0.7 altered how diffs were generated, making them relative to the
   checkout root instead of the working directory. This ended up breaking
   things pretty badly for too many people. We've reverted that change. This
-  affects :command:`rbt patch`, :command:`rbt diff`, and :command:`rbt post`.
+  affects :rbtcommand:`rbt patch`, :rbtcommand:`rbt diff`, and
+  :rbtcommand:`rbt post`.
 
 
 Git
@@ -116,7 +120,8 @@ Subversion
   RBTools 0.7 altered how diffs were generated, making them relative to the
   checkout root instead of the working directory. This ended up breaking
   things pretty badly for too many people. We've reverted that change. This
-  affects :command:`rbt patch`, :command:`rbt diff`, and :command:`rbt post`.
+  affects :rbtcommand:`rbt patch`, :rbtcommand:`rbt diff`, and
+  :rbtcommand:`rbt post`.
 
 * Fixed the logic for diffing empty files for review, which led to an
   error.

@@ -24,10 +24,9 @@ General
 * Syntax errors in :file:`.reviewboardrc` files are now reported, along with
   the filename, line number and offset in the line. Patch by Eric Huss.
 
-* Added a :option:`--diff-filename` option to post-review to specify an
-  existing diff to upload instead of generating a new diff. A value of
-  ``-`` will tell post-review to read from standard input. Patch by
-  Chris Clark.
+* Added a ``--diff-filename`` option to post-review to specify an existing
+  diff to upload instead of generating a new diff. A value of ``-`` will tell
+  post-review to read from standard input. Patch by Chris Clark.
 
 * post-review is now much more flexible with the HTTP status codes received
   from the server. It used to assume that anything other than an HTTP 200 OK
@@ -38,7 +37,7 @@ General
 Git
 ~~~
 
-* Git now supports :option:`--revision-range`. Patch by Flavio Castelli.
+* Git now supports ``--revision-range``. Patch by Flavio Castelli.
 
 * Parent branches are now properly detected rather than hard-coding ``master``.
   The logic now attempts the following:
@@ -46,7 +45,7 @@ Git
   1. Tries to detect he tracking branch for the current HEAD, if possible.
   2. If a tracking branch doesn't exist, or is not remote, it will fall back
      on ``origin/master``.
-  3. If the new :option:`--tracking-branch` parameter is specified, this
+  3. If the new ``--tracking-branch`` parameter is specified, this
      branch will be used instead of ``origin/master``.
 
   Patch by Dan Savilonis.
@@ -55,9 +54,8 @@ Git
 Mercurial
 ~~~~~~~~~
 
-* Added support for :option:`--guess-description` and
-  :option:`--guess-summary` for Mercurial. These support revision ranges.
-  Patch by Stefan Ring.
+* Added support for ``--guess-description`` and ``--guess-summary`` for
+  Mercurial. These support revision ranges.  Patch by Stefan Ring.
 
 
 Perforce
@@ -83,8 +81,7 @@ Perforce
 Subversion
 ~~~~~~~~~~
 
-* Subversion now supports the :option:`--revision-range` parameter.
-  (:bug:`1162`)
+* Subversion now supports the ``--revision-range`` parameter. (:bug:`1162`)
 
 
 Bugs Fixed
@@ -100,9 +97,9 @@ General
 * post-review no longer unconditionally publishes a draft when setting
   a field (such as the summary, target reviewers, etc.). This was resulting
   in an extra change description entry, even if uploading the diff failed.
-  We now explicitly require using :option:`--publish`. (:bug:`811`)
+  We now explicitly require using ``--publish``. (:bug:`811`)
 
-* Fix error reporting when using :option:`--diff-only`. When encountering
+* Fix error reporting when using ``--diff-only``. When encountering
   a server-side error, an exception would be thrown, instead of handling them
   in a sane fashion. This was due to special-casing error reporting for this
   option. We now report the errors properly. Patch by Eric Huss.

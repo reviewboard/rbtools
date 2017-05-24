@@ -1,3 +1,6 @@
+.. default-intersphinx:: rbt0.5
+
+
 ===========================
 RBTools 0.5.3 Release Notes
 ===========================
@@ -33,6 +36,8 @@ Commands
 rbt patch
 ~~~~~~~~~
 
+.. program:: rbt patch
+
 * Added a :option:`--print` option for printing the patch instead of
   applying it to the tree.
 
@@ -50,6 +55,8 @@ rbt patch
 
 rbt post
 ~~~~~~~~
+
+.. program:: rbt post
 
 * Added a :option:`-u` option for automatically determining the review
   request to update.
@@ -73,7 +80,7 @@ rbt post
 rbt setup-repo
 ~~~~~~~~~~~~~~
 
-* Added a new :command:`rbt setup-repo` command for creating a
+* Added a new :rbtcommand:`rbt setup-repo` command for creating a
   :file:`.reviewboardrc` file.
 
   This is used when first setting up a repository. It will prompt for the
@@ -90,12 +97,13 @@ SCM Support
 Mercurial
 ~~~~~~~~~
 
+.. program:: rbt post
+
 * Added support for hidden changesets.
 
   The Mercurial support now allows hidden changesets to be specified
   when using :option:`--revision-range` or any other time a revision is
-  needed. RBTools now passes :option:`--hidden` to all Mercurial
-  commands.
+  needed. RBTools now passes ``--hidden`` to all Mercurial commands.
 
   Patch by Gregory Szorc.
 
@@ -145,6 +153,8 @@ Bug Fixes
 General
 -------
 
+.. program:: rbt post
+
 * Fixed a missing space in the "You are not authenticated" string when
   prompting to log in.
 
@@ -160,7 +170,7 @@ General
 * Fixed problems with loading third-party RBTools commands.
 
   Third-party RBTools commands are now properly loaded, invoked, and shown
-  in :option:`--help` output.
+  in ``--help`` output.
 
 
 Commands
@@ -169,7 +179,7 @@ Commands
 rbt diff
 ~~~~~~~~
 
-* Fixed a crash when using :command:`rbt diff`. Patch by Jose Pereira.
+* Fixed a crash when using :rbtcommand:`rbt diff`. Patch by Jose Pereira.
 
 
 SCM Support
@@ -184,6 +194,8 @@ Bazaar
 
 Git
 ~~~
+
+.. program:: rbt post
 
 * Fixed a crash when attempting to diff with :command:`git-p4`.
   Patch by Edward Lee.

@@ -1,3 +1,6 @@
+.. default-intersphinx:: rbt0.5
+
+
 ===========================
 RBTools 0.5.0 Release Notes
 ===========================
@@ -45,6 +48,8 @@ Largely implemented by John Sintal.
 rbt close
 ~~~~~~~~~
 
+.. program:: rbt close
+
 Close review requests as submitted. Optionally, a review request may be
 discarded by providing the value ``discarded`` to the
 :option:`--close-type` option.
@@ -63,6 +68,8 @@ Largely implemented by John Sintal.
 
 rbt patch
 ~~~~~~~~~
+
+.. program:: rbt patch
 
 Download the latest diff from a review request and apply it to the
 local working directory. The :option:`--diff-revision` option may be
@@ -95,6 +102,8 @@ Largely implemented by John Sintal.
 
 rbt status
 ~~~~~~~~~~
+
+.. program:: rbt status
 
 Output a list of your pending review requests associated with the
 working directory's repository. Review requests which currently have

@@ -11,7 +11,7 @@ New Features
 * Added support for posting from Bazaar repositories. Patch by Max Rabkin.
   (:bug:`773`)
 
-* Passing :option:`--basedir` to :command:`post-review` will override
+* Passing ``--basedir`` to :command:`post-review` will override
   the computed base directory used for Subversion diffs.
 
 * Added better support for moved files in Perforce.
@@ -58,7 +58,7 @@ Git
 Mercurial
 ---------
 
-* Fixed :option:`--guess-summary` when it has newline characters in it.
+* Fixed ``--guess-summary`` when it has newline characters in it.
   Patch by Alexander Kouznetsov. (:bug:`2703`)
 
 

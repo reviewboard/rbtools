@@ -1,3 +1,6 @@
+.. default-intersphinx:: rbt0.5
+
+
 ===========================
 RBTools 0.5.4 Release Notes
 ===========================
@@ -8,9 +11,9 @@ RBTools 0.5.4 Release Notes
 Deprecation
 ===========
 
-* :command:`post-review` is deprecated (and has been for a while). It now
+* :rbtcommand:`post-review` is deprecated (and has been for a while). It now
   shows a deprecation warning in order to remind me to use
-  :command:`rbt post`.
+  :rbtcommand:`rbt post`.
 
 
 Bug Fixes
@@ -28,6 +31,8 @@ rbt patch
 
 rbt post
 --------
+
+.. program:: rbt post
 
 * Fixed R1:R2 syntax for :option:`--revision-range` for Git repositories.
   (:bug:`3182`)

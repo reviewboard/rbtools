@@ -1,3 +1,6 @@
+.. default-intersphinx:: rbt0.7
+
+
 ===========================
 RBTools 0.7.7 Release Notes
 ===========================
@@ -11,13 +14,15 @@ New Features
 rbt install
 -----------
 
-:command:`rbt install` is a new command which can install dependencies used by
-RBTools. This is currently used for new dependencies for Team Foundation
+:rbtcommand:`rbt install` is a new command which can install dependencies used
+by RBTools. This is currently used for new dependencies for Team Foundation
 Server, as described below.
 
 
 rbt post
 --------
+
+.. program:: rbt post
 
 * Added a :option:`--field` option for setting custom fields.
 
@@ -35,9 +40,9 @@ Team Foundation Server
 
 * Add a new adapter for communicating with TFS.
 
-  Until now, using Team Foundation Server from RBTools required installing `Team
-  Explorer Everywhere`_. In this release, we've added an alternative adapter
-  which improves functionality and performance. To install this, run
+  Until now, using Team Foundation Server from RBTools required installing
+  `Team Explorer Everywhere`_. In this release, we've added an alternative
+  adapter which improves functionality and performance. To install this, run
   :command:`rbt install tfs`.
 
 * Add support for posting shelved changesets.
@@ -55,14 +60,16 @@ Bug Fixes
 rbt land
 --------
 
-* Add the :option:`--tracking-branch` option to :command:`rbt land`.
+.. program:: rbt land
+
+* Add the :option:`--tracking-branch` option to :rbtcommand:`rbt land`.
   (:bug:`4161`)
 
   This command now allows specifying the tracking branch, which allows landing
   changes to upstream branches that are not the default (e.g. "origin/master").
 
-* Fixed a crash when :command:`rbt land` was unable to determine the approval
-  state. (:bug:`4024`)
+* Fixed a crash when :rbtcommand:`rbt land` was unable to determine the
+  approval state. (:bug:`4024`)
 
   In some cases, attempting to determine the approval state of a review request
   was encountering an unexpected error, leading to an ugly crash. In these
@@ -77,8 +84,8 @@ rbt login
 * Fix an error when the server is unspecified.
 
   If the Review Board server was not specified via the command line or config
-  file, :command:`rbt login` would fail with an ugly error. This has been fixed
-  to show a helpful message.
+  file, :rbtcommand:`rbt login` would fail with an ugly error. This has been
+  fixed to show a helpful message.
 
 
 rbt post
@@ -102,7 +109,9 @@ rbt post
 Git
 ---
 
-* Fix a crash when using :option:`--exclude-patterns` with ``git-svn`` and
+.. program:: rbt post
+
+* Fix a crash when using :option:`--exclude` with ``git-svn`` and
   ``git-p4`` repositories.
 
 
@@ -139,13 +148,15 @@ Perforce
 Subversion
 ----------
 
+.. program:: rbt post
+
 * Fix looking up Subversion repositories by UUID.
 
   RBTools 0.7.6 regressed a feature that could match the local Subversion
   repository to the repository on the server using the UUID. This has been
   fixed.
 
-* Added a configuration file key for :option:`--svn-prompt-password`.
+* Added a configuration file key for :option:`--svn-prompt-password`
   (:bug:`4446`)
 
   The value for this attribute can now be set permanently in

@@ -44,7 +44,7 @@ Automation
 :program:`post-review` can be used in automation scenarios, such as posting
 a new review request automatically when a change is committed to a branch.
 This allows review requests to be created or updated on behalf of another
-user when using the :option:`--submit-as` parameter. See the documentation
+user when using the ``--submit-as`` parameter. See the documentation
 for more information.
 
 
@@ -73,7 +73,7 @@ Bugs Fixed
 * Fixed the new default changeset support on newer versions of P4.
   Patch by Laurent Nicolas.
 
-* Fixed :option:`--revision-range` with a revision of 0 on Subversion.
+* Fixed ``--revision-range`` with a revision of 0 on Subversion.
   Patch by Nathan Heijermans.
 
 * We now properly support excess tabs in diff file headers from Subversion

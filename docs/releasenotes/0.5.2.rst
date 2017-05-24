@@ -1,3 +1,6 @@
+.. default-intersphinx:: rbt0.5
+
+
 ===========================
 RBTools 0.5.2 Release Notes
 ===========================
@@ -12,16 +15,16 @@ New Features
 
   Previously, our support for Bitbucket was limited to Mercurial repositories,
   but starting in Review Board 1.7.13, you can post to Git repositories as
-  well. This only works with :command:`rbt post`.
+  well. This only works with :rbtcommand:`rbt post`.
 
-* Added :option:`--help` to :command:`rbt` and all commands.
+* Added ``--help`` to :rbtcommand:`rbt` and all commands.
 
   We now support ``rbt help <command>``, ``rbt --help <command>``, and
   ``rbt <command> --help``.
 
-  This also supports the short-hand flag, :option:`-h`.
+  This also supports the short-hand flag, ``--help``.
 
-* Added the :command:`rbt get` tool.
+* Added the :rbtcommand:`rbt get` tool.
 
   This command takes a path to an API resource, requests the resource, and
   prints it as JSON. The path can either be a full URL, or a path relative
@@ -34,7 +37,7 @@ New Features
   ``rbt api-get /review-requests/ -- --counts-only=1`` would result in a
   request to ``http://example.com/api/review-requests/?counts-only=1``.
 
-* Added git-p4 support to :command:`rbt post`.
+* Added git-p4 support to :rbtcommand:`rbt post`.
 
   Changes on a branch of a git-p4 repository can now be posted to
   Review Board against a configured Perforce repository.
@@ -46,18 +49,20 @@ New Features
 
 * Improved error feedback when posting/updating a review request.
 
-  :command:`rbt post` now shows proper error messages from the server
+  :rbtcommand:`rbt post` now shows proper error messages from the server
   when there's an issue creating or updating a review request. It also
   logs additional detailed information in the debug output.
 
   Patch by Andrew Grigorev.
 
-* Added an :option:`--svn-show-copies-as-adds` flag to :command:`rbt post`.
+* Added an :option:`--svn-show-copies-as-adds
+  <rbt post --svn-show-copies-as-adds>` flag to :rbtcommand:`rbt post`.
   (:bug:`3024`)
 
-  When copying a branch and posting for review, :command:`rbt post` will
+  When copying a branch and posting for review, :rbtcommand:`rbt post` will
   inform the user that it cannot post the change by default, and to pass
-  :option:`--svn-show-copies-as-adds`, which will include the copied
+  :option:`--svn-show-copies-as-adds
+  <rbt post --svn-show-copies-as-adds>`, which will include the copied
   branch. This helps avoid the problem of accidentally posting a massive,
   potentially unnecessary change for review.
 
@@ -67,8 +72,10 @@ New Features
 Bug Fixes
 =========
 
+.. program:: rbt post
+
 * Fixed a breakage where the git-svn support attempted to access the value
-  for :option:`--parent-branch`, which isn't available for git-svn.
+  for :option:`--parent`, which isn't available for git-svn.
   Patch by Hanno S.
 
 * Fixed a breakage in Plastic support, due to a code refactor. (:bug:`3044`)

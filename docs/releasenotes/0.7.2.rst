@@ -1,3 +1,6 @@
+.. default-intersphinx:: rbt0.7
+
+
 ===========================
 RBTools 0.7.2 Release Notes
 ===========================
@@ -8,18 +11,21 @@ RBTools 0.7.2 Release Notes
 New Features
 ============
 
-* Added two new commands: :command:`rbt login` and :command:`rbt logout`.
+* Added two new commands: :rbtcommand:`rbt login` and
+  :rbtcommand:`rbt logout`.
 
   These commands make it easy to log in or out of Review Board without
   having to perform other operations on the server.
 
-  :command:`rbt login` will prompt the user for credentials, log in to
+  :rbtcommand:`rbt login` will prompt the user for credentials, log in to
   Review Board, and store the session cookie. The credentials can
-  optionally be provided by passing :option:`--username` and
-  :option:`--password`.
+  optionally be provided by passing
+  :option:`--username <rbt login --username>` and
+  :option:`--password <rbt login --password>`.
 
-  :command:`rbt logout` will log out of the Review Board server, invalidating
-  the cookie. The cookie will then be removed from the cookies file.
+  :rbtcommand:`rbt logout` will log out of the Review Board server,
+  invalidating the cookie. The cookie will then be removed from the cookies
+  file.
 
 
 Bug Fixes
@@ -48,6 +54,8 @@ General
 
 rbt land
 --------
+
+.. program:: rbt land
 
 * Fixed using :option:`--edit` when landing remote changes.
 

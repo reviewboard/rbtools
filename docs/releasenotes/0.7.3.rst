@@ -1,3 +1,6 @@
+.. default-intersphinx:: rbt0.7
+
+
 ===========================
 RBTools 0.7.3 Release Notes
 ===========================
@@ -30,7 +33,7 @@ New Features
 General
 -------
 
-.. :program: rbt post
+.. program:: rbt post
 
 * Added a :option:`--disable-ssl-verification` option to all commands
   to disable verifying SSL certificates when running on Python 2.7.9+.
@@ -55,14 +58,14 @@ General
   * :option:`--cache-location` specifies the path to the cache file to read
     from and write to.
 
-* Added a :option:`--disable-cookie-storage` option to prevent cookies from being
-  written to disk.
+* Added a :option:`--disable-cookie-storage` option to prevent cookies from
+  being written to disk.
 
 
 rbt patch
 ---------
 
-.. :program: rbt patch
+.. program:: rbt patch
 
 * Added support for reverting patches.
 
@@ -77,13 +80,13 @@ rbt patch
 rbt post
 --------
 
-.. :program: rbt post
+.. program:: rbt post
 
 * Added a :option:`-s`/:option:`--stamp` flag to auto-stamp the commit message
   with the review request URL when posting a change.
 
   This is equivalent to posting a change and then manually running
-  :program:`rbt stamp`.
+  :rbtcommand:`rbt stamp`.
 
   The configuration option ``STAMP_WHEN_POSTING`` can be set to enable
   this behavior by default.
@@ -99,8 +102,8 @@ Perforce
   Perforce can integrate from a remote depot, which adds files using
   the "import" method. We now treat these like any other added files.
 
-* Added support for stamping commits when using :command:`rbt stamp`,
-  :command:`rbt post --stamp`, or :command:`rbt land`.
+* Added support for stamping commits when using :rbtcommand:`rbt stamp`,
+  :option:`rbt post --stamp`, or :rbtcommand:`rbt land`.
 
   Patch by Andrew Brandon.
 
@@ -108,7 +111,7 @@ Perforce
 Subversion
 ----------
 
-.. :program: rbt post
+.. program:: rbt post
 
 * Added a :option:`--svn-prompt-password` option for requesting to prompt
   for Subversion passwords.

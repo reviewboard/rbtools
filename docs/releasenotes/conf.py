@@ -36,6 +36,7 @@ import rbtools
 # ones.
 extensions = [
     'sphinx.ext.intersphinx',
+    'beanbag_docutils.sphinx.ext.intersphinx_utils',
     'extralinks',
 ]
 
@@ -211,9 +212,20 @@ latex_documents = [
 #latex_use_modindex = True
 
 
-# Example configuration for intersphinx: refer to the Python standard
-# library.
+# Check whether reviewboard.org intersphinx lookups should use the local
+# server.
+if os.getenv('DOCS_USE_LOCAL_RBWEBSITE') == '1':
+    rbwebsite_url = 'http://localhost:8081'
+else:
+    rbwebsite_url = 'https://www.reviewboard.org'
+
 intersphinx_mapping = {
-    'http://www.reviewboard.org/docs/manual/dev': None,
-    'http://www.reviewboard.org/docs/rbtools/dev': None,
+    'python': ('https://docs.python.org/2.7', None),
+    'rb-latest': ('%s/docs/rbtools/latest/' % rbwebsite_url, None),
+    'rb2.0': ('%s/docs/manual/2.0/' % rbwebsite_url, None),
+    'rb2.5': ('%s/docs/manual/2.5/' % rbwebsite_url, None),
+    'rbt0.5': ('%s/docs/rbtools/0.5/' % rbwebsite_url, None),
+    'rbt0.6': ('%s/docs/rbtools/0.6/' % rbwebsite_url, None),
+    'rbt0.7': ('%s/docs/rbtools/0.7/' % rbwebsite_url, None),
+    'rbt-latest': ('%s/docs/rbtools/latest/' % rbwebsite_url, None),
 }

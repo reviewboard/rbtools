@@ -1,3 +1,6 @@
+.. default-intersphinx:: rbt0.7
+
+
 ===========================
 RBTools 0.7.6 Release Notes
 ===========================
@@ -11,14 +14,18 @@ New Features
 rbt api-get
 -----------
 
+.. program:: rbt api-get
+
 * rbt api-get can now be used outside of a checkout.
 
-  When passing :option:`--server`, :command:`rbt api-get` can be used
+  When passing :option:`--server`, :rbtcommand:`rbt api-get` can be used
   anywhere, making it useful for more types of integrations.
 
 
 Team Foundation Server
 ----------------------
+
+.. program:: rbt post
 
 * Added support for specifying the path to the :command:`tf.exe` command for
   TFS.
@@ -141,7 +148,7 @@ Perforce
   Patch by Akis Kalligeros.
 
 * Fixed a Unicode mismatch when updating an existing review request from a
-  changeset using :option:`rbt post -u <--update>`.
+  changeset using :option:`rbt post -u`.
 
 * Fixed a bad update call that would lead to an empty but harmless "CRITICAL"
   error message.
@@ -150,7 +157,7 @@ Perforce
 Team Foundation Server
 ----------------------
 
-* Fixed :command:`rbt setup-repo` with TFS repositories.
+* Fixed :rbtcommand:`rbt setup-repo` with TFS repositories.
 
 * Fixed properly decoding the character set of XML files coming from TFS.
 

@@ -21,8 +21,8 @@ New Feature
 
   Patch by Eric Huss.
 
-* Added support for :option:`--parent`, :option:`--guess-summary`, and
-  :option:`--guess-description` for :command:`hgsubversion`. Patch by
+* Added support for ``--parent``, ``--guess-summary``, and
+  ``--guess-description`` for :command:`hgsubversion`. Patch by
   Augie Fackler.
 
 * post-review no longer needs simplejson if using Python 2.6.

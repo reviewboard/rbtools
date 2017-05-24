@@ -1,3 +1,6 @@
+.. default-intersphinx:: rbt0.7
+
+
 ===========================
 RBTools 0.7.0 Release Notes
 ===========================
@@ -40,10 +43,12 @@ Based on work by Bruce Cran.
 API Tokens
 ----------
 
+.. program:: rbt post
+
 The in-development Review Board 2.1 will include support for API Tokens. All
 RBTools commands now include an :option:`--api-token` parameter, and an
-equivalent ``API_TOKEN`` config file key for using these tokens in lieu of user
-credentials.
+equivalent ``API_TOKEN`` config file key for using these tokens in lieu of
+user credentials.
 
 
 API Caching
@@ -59,10 +64,9 @@ Patch by Barret Rennie.
 rbt diff
 --------
 
-.. program: rbt diff
+.. program:: rbt diff
 
-* Add :option:`-X`/:option:`--exclude-patterns` command line options.
-  (:bug:`1026`)
+* Add :option:`-X`/:option:`--exclude` command line options. (:bug:`1026`)
 
   This new command line option (and config file entry) is used as the opposite
   of the :option:`-I` flag. It can be used to exclude certain file paths
@@ -74,16 +78,16 @@ rbt diff
 rbt land
 --------
 
-.. program: rbt land
+.. program:: rbt land
 
-The new :command:`rbt land` command is a quick and easy way to push a change
-that has been reviewed on Review Board to the upstream repository. The change
-may be in a local branch or stored as a patch on Review Board.
+The new :rbtcommand:`rbt land` command is a quick and easy way to push a
+change that has been reviewed on Review Board to the upstream repository. The
+change may be in a local branch or stored as a patch on Review Board.
 
 When running against Review Board 2.0+, this command will start by checking the
 approval state of the review request (on older versions, it just checks for one
 or more "Ship It!"s). If the change is approved, the patch will be applied just
-like :command:`rbt patch`.
+like :rbtcommand:`rbt patch`.
 
 The change can optionally be pushed to the remote repository using the
 :option:`-p`/:option:`--push` command line option.
@@ -94,9 +98,9 @@ This is currently only available when using Git repositories.
 rbt patch
 ---------
 
-.. program: rbt patch
+.. program:: rbt patch
 
-* Added :command:`rbt patch -C`
+* Added :option:`rbt patch -C`
 
   The new :option:`-C` option works very much like the :option:`-c` option,
   except it commits immediately without opening up an editor.
@@ -105,19 +109,19 @@ rbt patch
 
 * Enhanced merging capabilities. (:bug:`3389`)
 
-  Until now, if a patch did not apply entirely cleanly, :command:`rbt patch`
-  would fail silently. Now, it will do a better job attempting to handle
-  conflicts, and in the case that it can't handle them, it will partially apply
-  the patch and show a warning about any unapplied changes.
+  Until now, if a patch did not apply entirely cleanly,
+  :rbtcommand:`rbt patch` would fail silently. Now, it will do a better
+  job attempting to handle conflicts, and in the case that it can't handle
+  them, it will partially apply the patch and show a warning about any
+  unapplied changes.
 
 
 rbt post
 --------
 
-.. program: rbt post
+.. program:: rbt post
 
-* Added :option:`-X`/:option:`--exclude-patterns` command line options.
-  (:bug:`1026`)
+* Added :option:`-X`/:option:`--exclude` command line options. (:bug:`1026`)
 
   This new command line option (and config file entry) is used as the opposite
   of the :option:`-I` flag. It can be used to exclude certain file paths
@@ -128,13 +132,13 @@ rbt post
 * Perform additional validation on diffs before creating a review request.
   (:bug:`2733`)
 
-  It's possible to use :command:`rbt post` to create (or upload) diffs which
-  will not parse or apply correctly. Historically, this would result in an
-  empty review request that would need to be deleted.
+  It's possible to use :rbtcommand:`rbt post` to create (or upload) diffs
+  which will not parse or apply correctly. Historically, this would result in
+  an empty review request that would need to be deleted.
 
-  When using Review Board 2.0+, :command:`rbt post` will now communicate with
-  the Review Board server to do additional validation on the diff prior to
-  creating the review request.
+  When using Review Board 2.0+, :rbtcommand:`rbt post` will now communicate
+  with the Review Board server to do additional validation on the diff prior
+  to creating the review request.
 
   Patch by Azad Salahli.
 
@@ -142,9 +146,9 @@ rbt post
 rbt stamp
 ---------
 
-.. program: rbt stamp
+.. program:: rbt stamp
 
-The new :command:`rbt stamp` command will amend a commit message with a
+The new :rbtcommand:`rbt stamp` command will amend a commit message with a
 "Reviewed at <url>" line.
 
 This feature is especially useful when using the close-on-submit hooks in
@@ -178,7 +182,7 @@ CVS
 
 * Make diffs relative to the checkout root.
 
-  Until now, running :command:`rbt patch` or :command:`rbt diff` in a
+  Until now, running :rbtcommand:`rbt patch` or :rbtcommand:`rbt diff` in a
   subdirectory of the checkout would include only the files in that
   subdirectory. The behavior has been changed to include all changes in the
   entire checkout.
@@ -191,9 +195,9 @@ CVS
 Mercurial
 ---------
 
-* Add support for :command:`rbt patch -c` and :command:`rbt patch -C`.
+* Add support for :option:`rbt patch -c` and :option:`rbt patch -C`.
 
-  The :command:`rbt patch` command can now create commits for Mercurial
+  The :rbtcommand:`rbt patch` command can now create commits for Mercurial
   repositories, using the description in the review request as the commit
   message.
 
@@ -202,6 +206,8 @@ Mercurial
 
 Subversion
 ----------
+
+.. program:: rbt post
 
 * Allow specifying the Subversion credentials on the command line.
   (:bug:`1556`)
@@ -212,7 +218,7 @@ Subversion
 
 * Make diffs relative to the checkout root.
 
-  Until now, running :command:`rbt patch` or :command:`rbt diff` in a
+  Until now, running :rbtcommand:`rbt patch` or :rbtcommand:`rbt diff` in a
   subdirectory of the checkout would include only the files in that
   subdirectory. The behavior has been changed to include all changes in the
   entire checkout.
@@ -239,7 +245,7 @@ rbt patch
 ---------
 
 * Fixed invoking the editor for commit messages when the command in
-  :env:`$EDITOR` contained spaces. (:bug:`3652`)
+  :envvar:`$EDITOR` contained spaces. (:bug:`3652`)
 
   Patch by Theo Belaire.
 

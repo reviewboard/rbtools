@@ -20,16 +20,15 @@ New Features
 post-review
 -----------
 
-* Added :option:`--http-username` and :option:`--http-password` for
-  providing defaults for Basic HTTP Authentication. Patch by Mike Stoddart.
-  (:bug:`1514`)
+* Added ``--http-username`` and ``--http-password`` for providing defaults for
+  Basic HTTP Authentication. Patch by Mike Stoddart.  (:bug:`1514`)
 
 
 Clear Case
 ----------
 
-* Added proper support for :option:`--tracking-branch` and
-  :option:`--revision-range`. (:bug:`1588`)
+* Added proper support for ``--tracking-branch`` and ``--revision-range``.
+  (:bug:`1588`)
 
 * Clear Case configuration has moved to :file:`.reviewboardrc`. (:bug:`1516`)
 
@@ -37,40 +36,39 @@ Clear Case
 Git
 ---
 
-* Added automatic parent diff determination when using
-  :option:`--revision-range`.
+* Added automatic parent diff determination when using ``--revision-range``.
 
   Using a revision range where the first revision wasn't upstream would
-  require the use of :option:`--parent`. Now the proper parent is calculated
+  require the use of ``--parent``. Now the proper parent is calculated
   automatically. Patch by David Gardner.
 
 * Added support for working against bare repositories when using
-  :option:`--revision-range`. Patch by Jan Koprowski.
+  ``--revision-range``. Patch by Jan Koprowski.
 
-* Enhanced :option:`--revision-range` to take any valid Git revisions.
+* Enhanced ``--revision-range`` to take any valid Git revisions.
 
   Any revision that ``git rev-parse`` understands can be used. Patch by
   Jan Koprowski.
 
-* Support :option:`--repository-url` for overriding the git origin URL.
+* Support ``--repository-url`` for overriding the git origin URL.
   Patch by Vikram Oberoi.
 
 
 Mercurial
 ---------
 
-* Added support for :option:`--guess-summary` and
-  :option:`--guess-description`. Patch by Daniel Cestari.
+* Added support for ``--guess-summary`` and ``--guess-description``. Patch by
+  Daniel Cestari.
 
-* Allow a single revision to be passed to :option:`--revision-range`.
+* Allow a single revision to be passed to ``--revision-range``.
   Patch by Peter Ward.
 
 
 Subversion
 ----------
 
-* Added support for :option:`--svn-changelist` for specifying
-  SVN changelists. Patch by Joe Drago.
+* Added support for ``--svn-changelist`` for specifying SVN changelists. Patch
+  by Joe Drago.
 
 
 Bug Fixes
@@ -92,7 +90,7 @@ Clear Case
 
 * Fixed breakages with binary files.
 
-* Removed support for :option:`--label`, which was useless.
+* Removed support for ``--label``, which was useless.
 
 * Running just :command:`post-review` will now produce a working diff of checked out
   files.
@@ -108,7 +106,7 @@ Clear Case
 * Fixed diff generation to use the :command:`diff` program instead of
   hand-crafting the diffs. (:bug:`1553`, :bug:`1644`)
 
-* Running with :option:`--revision-range` with paths that don't exist no
+* Running with ``--revision-range`` with paths that don't exist no
   longer produces unreadable IOException errors. (:bug:`1599`)
 
 
@@ -127,7 +125,7 @@ Git
 
 * The correct SVN remote tracking branch is now used for git-svn repositories.
 
-  It shouldn't be necessary anymore to use :option:`--parent` in typical cases.
+  It shouldn't be necessary anymore to use ``--parent`` in typical cases.
   Patch by Steven Ihde.
 
 

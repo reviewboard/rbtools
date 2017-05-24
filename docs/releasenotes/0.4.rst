@@ -21,12 +21,12 @@ post-review
   PASSWORD, PARENT_BRANCH, TRACKING_BRANCH, P4_CLIENT, P4_PORT, P4_PASSWD,
   DEBUG, HTTP_USERNAME, and HTTP_PASSWORD.
 
-* Added a :option:`--disable-proxy` option for disabling the HTTP(S) proxy
+* Added a ``--disable-proxy`` option for disabling the HTTP(S) proxy
   server.
 
   Some systems are configured to use a proxy server, which can get in the
   way of using a local Review Board server. By using the
-  :option:`--disable-proxy` option, this proxy server will by bypassed.
+  ``--disable-proxy`` option, this proxy server will by bypassed.
 
   This can also be configured by setting ``ENABLE_PROXY = False`` in
   :file:`.reviewboardrc`.
@@ -71,9 +71,9 @@ post-review
 Git
 ---
 
-* Fixed problems when using :option:`--repository-url`.
+* Fixed problems when using ``--repository-url``.
 
-  There were a few problems when using :option:`--repository-url` with Git.
+  There were a few problems when using ``--repository-url`` with Git.
   There would be an ``UnboundLocalError``, crashing post-review, and
   it wouldn't set the upstream branch, causing failures later. It also was
   completely ignored for git-svn.
@@ -105,10 +105,10 @@ Mercurial
 Perforce
 --------
 
-* Using :option:`--revision-range` on Perforce now provides better errors.
+* Using ``--revision-range`` on Perforce now provides better errors.
   (:bug:`1495`)
 
-  We don't support :option:`--revision-range` on Perforce. Trying to use
+  We don't support ``--revision-range`` on Perforce. Trying to use
   this was causing a confusing error message. Now we have a friendly
   error.
 
