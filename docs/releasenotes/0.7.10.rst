@@ -1,0 +1,152 @@
+.. default-intersphinx:: rbt0.7
+
+
+============================
+RBTools 0.7.10 Release Notes
+============================
+
+**Release date:** TBD
+
+
+Installers
+==========
+
+macOS
+-----
+
+* Fixed compatibility on all macOS installs.
+
+  In the past, our macOS installer had various issues depending on a
+  combination of the macOS version and the Python installation. This led
+  to the installer working great for some users and not at all for others.
+
+  The new installer has been carefully built to work on all standard macOS
+  installs, going back several major versions, and to work when using a
+  version of Python custom-installed from python.org or homebrew_.
+
+
+.. _homebrew: https://brew.sh
+
+
+New Features
+============
+
+* Added new support for Team Foundation Server on Visual Studio 2017.
+
+  Visual Studio 2017 made some changes that prevented our existing Team
+  Foundation Server support from working, but added better support to the
+  :command:`tf.exe` command. We now support this, allowing users to post
+  against Team Foundation Server on Visual Studio 2010 through 2017.
+
+* Added a configuration option to suppress harmless warnings from Git,
+  Mercurial, and Perforce. (:bug:`4041`)
+
+  Users can now set ``SUPPRESS_CLIENT_WARNINGS`` in :file:`.reviewboardrc` to
+  prevent warnings about missing files or dirty working directories. This
+  can be useful if you're frequently encountering large numbers of warnings
+  that you don't care about.
+
+* Improved the ability to match ClearCase repositories.
+
+  ClearCase VOBs are path-based, and these paths are dependent on the
+  operating system. This can make it difficult to match ClearCase
+  repositories.
+
+  Now repository names on Review Board can be set to match the entire VOB
+  path (which is still dependent on the path format on the OS), or can be
+  named after some component of the path (such as the actual VOB name). For
+  instance, a VOB of ``/vobs/myVOB`` could have a corresponding repository
+  named ``myVOB``.
+
+  Patch by Chris Hunt.
+
+
+Performance Improvements
+========================
+
+* Improved performance when scanning and matching ClearCase repositories.
+
+  Patch by Chris Hunt.
+
+
+Bug Fixes
+=========
+
+rbt post
+--------
+
+.. program:: rbt post
+
+* Fixed opening review requests in the browser on macOS when posting using
+  :option:`--open`. (:bug:`4546`)
+
+  Recent versions of macOS introduced a regression in the AppleScript used
+  to open URLs in browsers, which is needed by Python's :py:mod:`webbrowser`
+  module to open posted review requests in browsers.
+
+  RBTools will now post using :command:`open` instead, ensuring the right
+  browser is used.
+
+* Fix incomplete help output around :option:`--tracking-branch`'s default
+  behavior when using Git.
+
+  The old output said that on Git, ``origin/master`` will be used as the
+  default tracking branch if one is not otherwise specified. However, the
+  actual logic first attempts to use the remote branch that the current branch
+  tracks (if any). The help output has been fixed to reflect this.
+
+
+API
+---
+
+* Fixed support for uploading user file attachments (added in Review Board
+  3.0).
+
+* Fixed the API to raise exceptions in places that formerly just quit the
+  process.
+
+  We had some old code in our API, primarily those interfacing with source
+  code management tools, that would exit the program when things went wrong.
+  These now raise errors instead, allowing calling programs to gracefully
+  handle the errors.
+
+
+Git
+---
+
+* Fixed a crash when posting changes against git-svn repositories.
+
+* Submodules with changes no longer cause warnings saying that your main
+  repository is dirty when posting changes.
+
+  Patch by Vadim Zeitlin.
+
+
+Subversion
+----------
+
+* Fixed problems with Subversion diffs with lines looking like diff file
+  headers. (:bug:`4546`)
+
+  When fixing up Subversion diffs before posting for review, lines that looked
+  like a diff file header (``-- XX (YY)``) would be interpreted as one,
+  causing diffs to lose content. The code handling this is now more careful to
+  ensure the lines are in fact part of diff headers.
+
+
+Team Foundation Server
+----------------------
+
+* Fixed a regression when posting changes using the Team Explorer Everywhere
+  adapter.
+
+
+Contributors
+============
+
+* Barret Rennie
+* Christian Hammond
+* Chris Hunt
+* David Trowbridge
+* Simon Zhang
+* Vadim Zeitlin
