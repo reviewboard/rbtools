@@ -65,6 +65,14 @@ Options
    Show review requests for all repositories instead of the detected
    repository.
 
+.. cmdoption:: --repository
+
+   The name of the repository to look up when posting the change. This is
+   the same name shown on the New Review Request page or in the repository
+   configuration page.
+
+   The default can be set in ``REPOSITORY`` in :file:`.reviewboardrc`.
+
 .. cmdoption:: --repository-type
 
    Specifies the type of repository in the current directory. In most cases

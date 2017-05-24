@@ -611,6 +611,12 @@ Options
 
    The default can be set in ``PARENT_BRANCH`` in :file:`.reviewboardrc`.
 
+.. cmdoption:: --revision-range <rev1:rev2>
+
+   Generates a diff for the given revision range.
+
+   .. deprecated:: 0.6
+
 .. cmdoption:: -I <file>, --include=<file>
 
    Include only the specified file in the diff. This argument can be passed in
