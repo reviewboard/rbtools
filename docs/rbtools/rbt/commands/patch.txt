@@ -79,3 +79,7 @@ Options
    supported values.
 
    The default can be set in ``REPOSITORY_TYPE`` in :file:`.reviewboardrc`.
+
+.. cmdoption:: --print
+
+   Prints the patch to standard output instead of applying it to the tree.

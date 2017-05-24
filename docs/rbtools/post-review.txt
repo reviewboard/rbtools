@@ -741,4 +741,15 @@ Perforce Options
 
    The default can be set in ``P4_PASSWD`` in :file:`.reviewboardrc`.
 
+
+Subversion Options
+------------------
+
+.. cmdoption:: --svn-show-copies-as-adds
+
+   Treat copied or moved files as new files.
+
+   This is only supported in Subversion 1.7+.
+
+
 .. comment: vim: ft=rst et ts=3
