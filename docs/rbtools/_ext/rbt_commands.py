@@ -62,7 +62,13 @@ class CommandDirective(Directive):
 
         target_node = nodes.target('', '', ids=[name], names=[name])
         doc.note_explicit_target(target_node)
-        program_node = parse_text(self, '.. program:: rbt %s' % cmd_class.name)
+        program_node = parse_text(
+            self,
+            '.. rbtcommand:: rbt %(command_name)s\n'
+            '.. program:: rbt %(command_name)s'
+            % {
+                'command_name': cmd_class.name,
+            })
 
         return [program_node, target_node]
 
@@ -330,3 +336,6 @@ def setup(app):
     app.add_directive('rbt-command', CommandDirective)
     app.add_directive('rbt-command-usage', CommandUsageDirective)
     app.add_directive('rbt-command-options', CommandOptionsDirective)
+    app.add_crossref_type(directivename=b'rbtcommand',
+                          rolename=b'rbtcommand',
+                          indextemplate=b'pair: %s; RBTools command')

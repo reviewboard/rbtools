@@ -1,3 +1,6 @@
+.. default-intersphinx:: rbt0.6
+
+
 ===========================
 RBTools 0.6.1 Release Notes
 ===========================
@@ -28,6 +31,8 @@ rbt patch
 rbt post
 --------
 
+.. program:: rbt post
+
 * Added a :option:`--depends-on` option for populating the Depends On field.
   (:bug:`3074`)
 
@@ -57,7 +62,7 @@ rbt setup-repo
 
 * Improved matching of repository paths that vary slightly.
 
-  The :command:`rbt setup-repo` command now performs a fuzzy match against
+  The :rbtcommand:`rbt setup-repo` command now performs a fuzzy match against
   repositories, in order to match when the paths contain slight differences
   (such as trailing slashes or user credentials in the path).
 
@@ -99,6 +104,8 @@ rbt patch
 rb post
 -------
 
+.. program:: rbt post
+
 * Fixed compatibility issues with older versions of Review Board.
   (:bug:`3348`)
 
@@ -121,6 +128,8 @@ rb post
 
 rbt status
 ----------
+
+.. program:: rbt status
 
 * Fixed specifying repository names using the :option:`--repository` option.
 
@@ -160,8 +169,8 @@ Mercurial
 * Fixed crashes with confusing errors when RBTools is unable to find a
   remote branch for the repository.
 
-* Fixed a crash when calling :command:`rbt post` with a merge revision ID
-  as a single parameter.
+* Fixed a crash when calling :rbtcommand:`rbt post` with a merge
+  revision ID as a single parameter.
 
   Now a proper error is displayed in this case.
 
@@ -191,8 +200,10 @@ Perforce
 Subversion
 ----------
 
+.. program:: rbt post
+
 * The :option:`-I` option was being ignored for Subversion repositories on
-  :command:`rbt post` and :command:`rbt diff`.
+  :rbtcommand:`rbt post` and :rbtcommand:`rbt diff`.
 
 
 Contributors

@@ -8,10 +8,9 @@ RBTools 0.2 Beta 1 Release Notes
 New Feature
 ===========
 
-* Added new :option:`--guess-summary` and :option:`--guess-description`
-  parameters for Git repositories that provide defaults for both the summary
-  and description based on the commit messages on the branch.  Patch by Luke
-  Lu. (:bug:`927`)
+* Added new ``--guess-summary`` and ``--guess-description`` parameters for Git
+  repositories that provide defaults for both the summary and description
+  based on the commit messages on the branch. Patch by Luke Lu. (:bug:`927`)
 
 * :command:`post-review` can now look up the Review Board server URL from
   Perforce counters. See the documentation inside post-review or on
@@ -21,8 +20,8 @@ New Feature
 Bugs Fixed
 ==========
 
-* The help output for :option:`--repository-url` and the error output used for
-  when :option:`--parent` isn't supported was referencing the wrong names for
+* The help output for ``--repository-url`` and the error output used for
+  when ``--parent`` isn't supported was referencing the wrong names for
   some parameters.
 
 * Patches generated against a git tree were broken when running

@@ -1,3 +1,6 @@
+.. default-intersphinx:: rbt0.6
+
+
 ===========================
 RBTools 0.6.3 Release Notes
 ===========================
@@ -11,11 +14,13 @@ Bug Fixes
 rbt post
 --------
 
+.. program:: rbt post
+
 * Warn about a dirty working directory when posting with Mercurial.
 
-  As with Git, :command:`rbt post` against a Mercurial repository only posts
-  committed changes. If your working directory contains uncommitted changes,
-  :command:`rbt post` will now show a warning.
+  As with Git, :rbtcommand:`rbt post` against a Mercurial repository only
+  posts committed changes. If your working directory contains uncommitted
+  changes, :rbtcommand:`rbt post` will now show a warning.
 
   Patch by Bruce Cran.
 
@@ -23,11 +28,11 @@ rbt post
   (:bug:`3428`)
 
   If any fields specified on the command line have problems and the review
-  request is created, :command:`rbt post` will now inform you that the review
-  request exists, and provide the URL.
+  request is created, :rbtcommand:`rbt post` will now inform you that the
+  review request exists, and provide the URL.
 
-* Don't fail when using :option:`--diff-filename=-` and credentials on the
-  command line. (:bug:`3313`)
+* Don't fail when using ``--diff-filename=-`` and credentials on the command
+  line. (:bug:`3313`)
 
   Passing a diff file in over stdin was broken in the case where the login
   credentials were specified on the command line.
@@ -66,7 +71,7 @@ Mercurial
 * Provide a better error message when hg upstream is empty. (:bug:`3565`)
 
   If the upstream repository is empty, it's impossible to post a diff. In this
-  case, :command:`rbt post` would print a cryptic error message. This now
+  case, :rbtcommand:`rbt post` would print a cryptic error message. This now
   explains better what went wrong.
 
   Patch by Barret Rennie.

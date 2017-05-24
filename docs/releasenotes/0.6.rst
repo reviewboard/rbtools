@@ -1,3 +1,6 @@
+.. default-intersphinx:: rbt0.6
+
+
 =========================
 RBTools 0.6 Release Notes
 =========================
@@ -20,8 +23,10 @@ New Features
 Easier Posting of Revisions
 ---------------------------
 
+.. program:: rbt post
+
 We have completely redone how you specify revisions when posting using
-:command:`rbt post` or diffing using :command:`rbt diff`.
+:rbtcommand:`rbt post` or diffing using :rbtcommand:`rbt diff`.
 
 Previously, posting individual commits (on systems like Git or Mercurial)
 required the use of :option:`--revision-range` and :option:`--parent`, often
@@ -56,7 +61,7 @@ instead of revisions. This behavior has been replaced with the new
 Filtering of Files When Posting
 -------------------------------
 
-:command:`rbt post` and :command:`rbt diff` now support :option:`-I` (or
+:rbtcommand:`rbt post` and :rbtcommand:`rbt diff` now support :option:`-I` (or
 :option:`--include`) arguments to specify exactly which files should be
 included when posting or diffing the change.
 
@@ -69,7 +74,7 @@ Automatic Guessing of Fields
 ----------------------------
 
 It's no longer necessary to pass :option:`-g` (or :option:`--guess-fields`) to
-:command:`rbt post` in order to automatically fill in the Summary and
+:rbtcommand:`rbt post` in order to automatically fill in the Summary and
 Description fields. This is now done automatically for brand new review
 requests.
 
@@ -126,7 +131,7 @@ Perforce Shelved Changes Support
 
 Users can now post changes from a Perforce shelf without first having to
 unshelve those changes. Likewise, you can diff changes using
-:command:`rbt diff`.
+:rbtcommand:`rbt diff`.
 
 :bug:`2044`
 
@@ -149,8 +154,8 @@ default, any commit descriptions posted will be automatically escaped, so that
 they won't be unintentionally interpreted as Markdown.
 
 If you happen to write your commit messages using Markdown, you can pass
-:option:`--markdown`` (or set ``MARKDOWN = True`` in :file:`.reviewboardrc`)
-to prevent the text from being escaped.
+:option:`--markdown` (or set ``MARKDOWN = True`` in
+:file:`.reviewboardrc`) to prevent the text from being escaped.
 
 
 Repository Hook Scripts
@@ -216,7 +221,7 @@ Other Changes
 * Improved the usefulness and readability of log output when using
   :option:`--debug`.
 
-* :command:`rbt post` now shows the URL to the posted diff. (:bug:`2929`)
+* :rbtcommand:`rbt post` now shows the URL to the posted diff. (:bug:`2929`)
 
   Patch by Iines Piesala.
 
@@ -224,12 +229,14 @@ Other Changes
 Removed Features
 ================
 
-* Removed :command:`post-review`.
+.. program:: rbt post
 
-  :command:`post-review` has been deprecated for a while, and now, it's
-  finally gone. Everybody should be using :command:`rbt post` to post
+* Removed :rbtcommand:`post-review`.
+
+  :rbtcommand:`post-review` has been deprecated for a while, and now,
+  it's finally gone. Everybody should be using :rbtcommand:`rbt post` to post
   new changes to Review Board now. This is better designed, maintained, and
-  has a number of usability improvements over :command:`post-review`.
+  has a number of usability improvements over :rbtcommand:`post-review`.
 
 * Removed :option:`--revision-range` in favor of the new revision syntax.
 
@@ -269,11 +276,13 @@ General
 rbt close
 ---------
 
+.. program:: rbt close
+
 * Fixed a typo when attempting to close an already closed review request.
 
   Patch by Anselina Chia.
 
-* :command:`rbt close` no longer requires a working directory with a
+* :rbtcommand:`rbt close` no longer requires a working directory with a
   :file:`.reviewboardrc` file if passing :option:`--server` on the
   command line. (:bug:`3249`)
 
@@ -282,6 +291,8 @@ rbt close
 
 rbt post
 --------
+
+.. program:: rbt post
 
 * Using :option:`-u` wasn't working if the repository was being matched
   based on a configured Mirror Path.
@@ -333,6 +344,8 @@ Mercurial
 Perforce
 --------
 
+.. program:: rbt post
+
 * git-p4 support now respects the :envvar:`P4PORT` environment variable.
 
 * Fixed conflicts in Perforce settings when using a :file:`.p4config` file
@@ -346,7 +359,7 @@ Perforce
 Subversion
 ----------
 
-* :command:`rbt post` no longer incorrectly detects copied files when
+* :rbtcommand:`rbt post` no longer incorrectly detects copied files when
   posting changelists containing only modified files. (:bug:`3248`)
 
   Patch by Vlad Romascanu.

@@ -25,9 +25,9 @@ post-review
   Support for older Review Board servers may be removed in a future release,
   but there aren't any specific plans at this point.
 
-* Added a :option:`--reopen` parameter for reopening an existing review
-  request. This requires passing the :option:`-r` parameter. Patch by Jan
-  Koprowski. (:bug:`1607`)
+* Added a ``--reopen`` parameter for reopening an existing review request.
+  This requires passing the ``-r`` parameter. Patch by Jan Koprowski.
+  (:bug:`1607`)
 
 * The debug log now contains the RBTools version and home directory, in order
   to aid debugging.
@@ -36,10 +36,10 @@ post-review
 ClearCase
 ---------
 
-* Added support for :option:`--revision-range` on ClearCase. Patch by Jan Koprowski.
+* Added support for ``--revision-range`` on ClearCase. Patch by Jan Koprowski.
   (:bug:`1588`)
 
-* Added support for :option:`--repository-url` on ClearCase. This can be used
+* Added support for ``--repository-url`` on ClearCase. This can be used
   to specify an alternate dynamic view. Patch by Jan Koprowski.
 
 * Added support for directory diffs on ClearCase. Patch by Jan Koprowski.
@@ -49,7 +49,7 @@ ClearCase
 CVS
 ---
 
-* Added support for :option:`--revision-range` and individual files for CVS.
+* Added support for ``--revision-range`` and individual files for CVS.
   Patch by Daniel LaMotte. (:bug:`1852`)
 
 
@@ -62,13 +62,13 @@ Mercurial
 * Added support for posting reviews of locally-committed changes (instead of
   requiring that all changes be uncommitted). Patch by Dan Buch.
 
-* Added support for :option:`--parent` for parent branches. Patch by Dan Buch.
+* Added support for ``--parent`` for parent branches. Patch by Dan Buch.
 
 
 Perforce
 --------
 
-* Added a new :option:`--p4-passwd` command line option.
+* Added a new ``--p4-passwd`` command line option.
 
   This allows a user to supply a Perforce Ticket or clear-text password,
   which is useful in cases where the Perforce password or ticket is not
@@ -103,9 +103,8 @@ post-review
   instead.
 
 * The login cookie is no longer used when providing the
-  :option:`--username`/:option:`--password` or :option:`--submit-as`
-  parameters. That was preventing these options from working as they should
-  have. (:bug:`762`)
+  ``--username``/``--password`` or ``--submit-as`` parameters. That was
+  preventing these options from working as they should have. (:bug:`762`)
 
 * post-review no longer crashes if the cookie can't be saved. Instead, we
   log some debug output and proceed. (:bug:`1557`)

@@ -7,6 +7,9 @@ from docutils import nodes, utils
 def setup(app):
     app.add_config_value('bugtracker_url', '', True)
     app.add_role('bug', bug_role)
+    app.add_crossref_type(directivename='rbtcommand',
+                          rolename='rbtcommand',
+                          indextemplate='pair: %s; RBTools command')
 
 
 def bug_role(role, rawtext, text, linenum, inliner, options={}, content=[]):

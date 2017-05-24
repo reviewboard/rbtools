@@ -1,3 +1,6 @@
+.. default-intersphinx:: rbt0.7
+
+
 ===========================
 RBTools 0.7.5 Release Notes
 ===========================
@@ -41,12 +44,14 @@ General
 rbt api-get
 -----------
 
-* The help output no longer mistakenly shows that `--` is required before
+* The help output no longer mistakenly shows that ``--`` is required before
   query arguments.
 
 
 rbt post
 --------
+
+.. program:: rbt post
 
 * Fixed a crash when using :option:`--diff-filename`. (:bug:`3908`)
 
@@ -89,6 +94,8 @@ Perforce
 
 Subversion
 ----------
+
+.. program:: rbt post
 
 * Fixed Unicode issues when parsing repository info when using
   :option:`--repository-url`. (:bug:`3969`)

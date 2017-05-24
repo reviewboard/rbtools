@@ -1,3 +1,6 @@
+.. default-intersphinx:: rbt0.5
+
+
 ===========================
 RBTools 0.5.1 Release Notes
 ===========================
@@ -8,29 +11,32 @@ RBTools 0.5.1 Release Notes
 New Features
 ============
 
-* Improved the readability of :command:`rbt status` output.
+.. program:: rbt post
+
+* Improved the readability of :rbtcommand:`rbt status` output.
 
   Each review request output is now indented, causing the IDs and
   draft indicators to line up.
 
 * Added a :option:`--repository-type` option to most commands.
 
-  Any :command:`rbt` commands which work with the repository, including
-  :command:`post-review`, now have a :option:`--repository-type` option. This
-  option allows the user to specify a particular repository type to be used.
+  Any :rbtcommand:`rbt` commands which work with the repository, including
+  :rbtcommand:`post-review`, now have a :option:`--repository-type` option.
+  This option allows the user to specify a particular repository type to be
+  used.
 
   This type can also be set for a repository by setting
   ``REPOSITORY_TYPE`` in :file:`.reviewboardrc`.
 
-* Added a :option:`--list-repository-types` option to :command:`post-review`.
+* Added a :option:`post-review --list-repository-types` option.
 
-  This option will cause :command:`post-review` to print the valid repository
-  types and then exit. This can be used to see valid values for the new
-  :option:`--repository-type` option.
+  This option will cause :rbtcommand:`post-review` to print the valid
+  repository types and then exit. This can be used to see valid values for the
+  new :option:`--repository-type <post-review --repository-type>` option.
 
-* Added a new :command:`rbt list-repo-types` command.
+* Added a new :rbtcommand:`rbt list-repo-types` command.
 
-  The new :command:`rbt list-repo-types` command will print the valid
+  The new :rbtcommand:`rbt list-repo-types` command will print the valid
   repository types. These values can be used for the new
   :option:`--repository-type` option.
 
@@ -87,39 +93,40 @@ Bug Fixes
 =========
 
 * Fixed crash when copying old post-review cookies for use with
-  :command:`rbt`.
+  :rbtcommand:`rbt`.
 
   An edge case existed where copying old post-review cookies to be used with
-  the :command:`rbt` command would cause a crash. Cookies will now be copied
-  properly.
+  the :rbtcommand:`rbt` command would cause a crash. Cookies will now be
+  copied properly.
 
-* :command:`rbt` commands will now properly generate diffs with moved files.
+* :rbtcommand:`rbt` commands will now properly generate diffs with moved
+  files.
 
-  The :command:`rbt` commands were not properly checking the capabilities of
-  the Review Board server, and always assumed there was no support for moved
-  file diffs. The capabilities of the server are now properly checked, and
-  diffs with moved files will be generated when appropriate.
+  The :rbtcommand:`rbt` commands were not properly checking the capabilities
+  of the Review Board server, and always assumed there was no support for
+  moved file diffs. The capabilities of the server are now properly checked,
+  and diffs with moved files will be generated when appropriate.
 
-* Fixed references to non-existent variables in :command:`rbt patch`.
+* Fixed references to non-existent variables in :rbtcommand:`rbt patch`.
 
-  The :command:`rbt patch` command would immediately crash, making it
+  The :rbtcommand:`rbt patch` command would immediately crash, making it
   unusable.  The command now functions properly.
 
   Patch by Adam Collard.
 
-* Fixed :command:`rbt post` for Perforce repositories.
+* Fixed :rbtcommand:`rbt post` for Perforce repositories.
 
   When using :command:`rbt post` with Perforce, posting an update to a review
   request using a change number would result in an error. We now properly
   update the review request instead of failing.
 
-* Fixed :command:`rbt post` and :command:`rbt diff` for Subversion and
+* Fixed :rbtcommand:`rbt post` and :command:`rbt diff` for Subversion and
   Bazaar.
 
-  A number of cases causing crashes when using :command:`rbt` with Subversion
-  and Bazaar have been fixed.
+  A number of cases causing crashes when using :rbtcommand:`rbt` with
+  Subversion and Bazaar have been fixed.
 
-* Fixed :command:`post-review` and :command:`rbt` when used for Perforce
+* Fixed :rbtcommand:`post-review` and :rbtcommand:`rbt` when used for Perforce
   paths.
 
   Posting a code review using a path no longer results in a crash.
@@ -132,8 +139,8 @@ Bug Fixes
   would just quit without any useful indication of what went wrong. We
   now use the error message from the server.
 
-  On top of this, :command:`rbt post` and :command:`post-review` now check
-  against the proper error code for the Empty Diff error.
+  On top of this, :rbtcommand:`rbt post` and :rbtcommand:`post-review` now
+  check against the proper error code for the Empty Diff error.
 
 
 Packaging Changes
