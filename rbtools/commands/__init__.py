@@ -408,7 +408,9 @@ class Command(object):
                    help='The remote tracking branch from which your local '
                         'branch is derived (Git/Mercurial only).'
                         '\n'
-                        'For Git, the default is `origin/master`.'
+                        'For Git, the default is to use the remote branch '
+                        'that the local branch is tracking, if any, falling '
+                        'back on `origin/master`.'
                         '\n'
                         'For Mercurial, the default is one of: '
                         '`reviewboard`, `origin`, `parent`, or `default`.'),
