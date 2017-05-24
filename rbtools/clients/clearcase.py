@@ -143,11 +143,12 @@ class ClearCaseClient(SCMClient):
         if "Error: " in root_path:
             raise SCMError("Failed to generate diff run rbt inside view.")
 
-        # From current working directory cut path to VOB.
-        # VOB's tag contain backslash character before VOB's name.
-        # I hope that first character of VOB's tag like '\new_proj'
-        # won't be treat as new line character but two separate:
-        # backslash and letter 'n'
+        # From current working directory cut path to VOB. On Windows
+        # and under cygwin, the VOB tag contains the VOB's path including
+        # name, e.g. `\new_proj` for a VOB `new_proj` mounted at the root
+        # of a drive. On Unix, the VOB tag is similar, but with a different
+        # path separator, e.g. `/vobs/new_proj` for our new_proj VOB mounted
+        # at `/vobs`.
         cwd = os.getcwd()
         base_path = cwd[:len(root_path) + len(vobstag)]
 
@@ -913,7 +914,7 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
         The point of this function is to find a repository on the server that
         matches self, even if the paths aren't the same. (For example, if self
         uses an 'http' path, but the server uses a 'file' path for the same
-        repository.) It does this by comparing VOB's name and uuid. If the
+        repository.) It does this by comparing the VOB's name and uuid. If the
         repositories use the same path, you'll get back self, otherwise you'll
         get a different ClearCaseRepositoryInfo object (with a different path).
         """
@@ -922,21 +923,29 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
         uuid = self._get_vobs_uuid(self.vobstag)
         logging.debug("Repository's %s uuid is %r" % (self.vobstag, uuid))
 
-        # To reduce HTTP requests (_get_repository_info call), we build an
+        # To reduce HTTP requests (_get_repository_info calls), we build an
         # ordered list of ClearCase repositories starting with the ones that
-        # have a matching vobstag.
+        # have a similar vobstag.
         repository_scan_order = deque()
 
+        # Because the VOB tag is platform-specific, we split and search
+        # for the remote name in any sub-part so this HTTP request
+        # optimization can work for users on both Windows and Unix-like
+        # platforms.
+        vob_tag_parts = self.vobstag.split(cpath.sep)
+
         # Reduce list of repositories to only ClearCase ones and sort them by
-        # repo name matching vobstag first.
+        # repo name matching vobstag (or some part of the vobstag) first.
         for repository in server.get_repositories(tool='ClearCase').all_items:
             # Ignore non-ClearCase repositories.
             if repository['tool'] != 'ClearCase':
                 continue
 
-            # Add repos where the vobstag matches at the beginning and others
-            # at the end.
-            if repository['name'] == self.vobstag:
+            repo_name = repository['name']
+
+            # Repositories with a similar VOB tag get put at the beginning and
+            # the others at the end.
+            if repo_name == self.vobstag or repo_name in vob_tag_parts:
                 repository_scan_order.appendleft(repository)
             else:
                 repository_scan_order.append(repository)
