@@ -110,3 +110,22 @@ Options
    supported values.
 
    The default can be set in ``REPOSITORY_TYPE`` in :file:`.reviewboardrc`.
+
+.. cmdoption:: --p4-client
+
+   The Perforce client name that the review is in.
+
+   The default can be set in ``P4_CLIENT`` in :file:`.reviewboardrc`.
+
+.. cmdoption:: --p4-port
+
+   The Perforce servers IP address that the review is on.
+
+   The default can be set in ``P4_PORT`` in :file:`.reviewboardrc`.
+
+.. cmdoption:: --p4-passwd
+
+   The Perforce password or ticket of the user in the P4USER environment
+   variable.
+
+   The default can be set in ``P4_PASSWD`` in :file:`.reviewboardrc`.

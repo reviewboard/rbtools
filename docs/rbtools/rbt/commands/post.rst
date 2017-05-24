@@ -695,3 +695,9 @@ Options
    supported values.
 
    The default can be set in ``REPOSITORY_TYPE`` in :file:`.reviewboardrc`.
+
+.. cmdoption:: --svn-show-copies-as-adds
+
+   Treat copied or moved files as new files.
+
+   This is only supported in Subversion 1.7+.
