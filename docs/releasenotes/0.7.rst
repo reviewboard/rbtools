@@ -239,7 +239,7 @@ rbt patch
 ---------
 
 * Fixed invoking the editor for commit messages when the command in
-  :env:`$EDITOR` contained spaces. (:bug:`3652`)
+  :envvar:`$EDITOR` contained spaces. (:bug:`3652`)
 
   Patch by Theo Belaire.
 

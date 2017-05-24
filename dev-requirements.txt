@@ -2,3 +2,4 @@ hgsubversion
 kgb
 mock
 nose
+Sphinx>=1.6.1

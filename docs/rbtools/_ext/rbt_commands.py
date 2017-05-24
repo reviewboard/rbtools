@@ -292,6 +292,7 @@ class CommandOptionsDirective(Directive):
 
     def format_content(self, content):
         content = content.replace('\n', '\n\n')
+        content = content.replace('*', '\\*')
         content = content.replace('.reviewboardrc', ':file:`.reviewboardrc`')
         content = self.CMD_REF_RE.sub(r':ref:`rbt \1 <rbt-\1>`', content)
         content = self.OPT_REF_RE.sub(r':option:`\1`', content)
