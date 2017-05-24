@@ -87,14 +87,6 @@ rbt post
   RBTools will now post using :command:`open` instead, ensuring the right
   browser is used.
 
-* Fix incomplete help output around :option:`--tracking-branch`'s default
-  behavior when using Git.
-
-  The old output said that on Git, ``origin/master`` will be used as the
-  default tracking branch if one is not otherwise specified. However, the
-  actual logic first attempts to use the remote branch that the current branch
-  tracks (if any). The help output has been fixed to reflect this.
-
 
 API
 ---
