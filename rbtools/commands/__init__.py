@@ -524,6 +524,21 @@ class Command(object):
         ]
     )
 
+    git_options = OptionGroup(
+        name='GIT Options',
+        description='Git-specific options for controlling diff '
+                    'generation.',
+        option_list=[
+            Option('--no-renames',
+                   dest='no_renames',
+                   action='store_true',
+                   default=False,
+                   help='Turn off rename detection, '
+                        'even when the configuration file '
+                        'sgives the default to do so.'),
+        ]
+    )
+
     def __init__(self):
         self.log = logging.getLogger('rb.%s' % self.name)
 

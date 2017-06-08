@@ -517,7 +517,8 @@ class GitClient(SCMClient):
                 git_cmd.extend(['-c', 'diff.noprefix=false'])
 
             if (self.capabilities is not None and
-                self.capabilities.has_capability('diffs', 'moved_files')):
+                self.capabilities.has_capability('diffs', 'moved_files') and
+                not self.options.no_renames):
                 diff_cmd_params.append('-M')
             else:
                 diff_cmd_params.append('--no-renames')
