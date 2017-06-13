@@ -962,16 +962,22 @@ class TFSClient(SCMClient):
         #     - VS2017+ tf.exe
         #     - Our custom rb-tfs wrapper, built on the TFS Java SDK
         #     - Team Explorer Everywhere's tf command
+        use_tf_exe = False
+
         try:
             tf_vc_output = execute(['tf', 'vc', 'help'], ignore_errors=True,
                                    none_on_ignored_error=True)
+
+            # VS2015 has a tf.exe but it's not good enough.
+            if 'Version Control Tool, Version 15' in tf_vc_output:
+                use_tf_exe = True
         except OSError:
-            tf_vc_output = None
+            pass
 
         helper_path = os.path.join(user_data_dir('rbtools'), 'packages', 'tfs',
                                    'rb-tfs.jar')
 
-        if tf_vc_output is not None:
+        if use_tf_exe:
             self.tf_wrapper = TFExeWrapper(config, options)
         elif os.path.exists(helper_path):
             self.tf_wrapper = TFHelperWrapper(helper_path, config, options)
