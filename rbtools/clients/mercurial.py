@@ -376,7 +376,7 @@ class MercurialClient(SCMClient):
         """Return a diff across all modified files in the given revisions."""
         self._init()
 
-        diff_cmd = ['hg', 'diff', '--hidden']
+        diff_cmd = ['hg', 'diff', '--hidden', '--nodates', '-g']
 
         if self._type == 'svn':
             diff_cmd.append('--svn')
