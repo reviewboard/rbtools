@@ -99,7 +99,8 @@ def get_review_request(review_request_id, api_root):
 def close_review_request(server_url, username, password, review_request_id,
                          description):
     """Closes the specified review request as submitted."""
-    api_client, api_root = get_api(server_url, username, password)
+    api_client, api_root = get_api(server_url, username=username,
+                                   password=password)
     review_request = get_review_request(review_request_id, api_root)
 
     if review_request.status == SUBMITTED:
@@ -120,7 +121,8 @@ def close_review_request(server_url, username, password, review_request_id,
 def get_review_request_approval(server_url, username, password,
                                 review_request_id):
     """Returns the approval information for the given review request."""
-    api_client, api_root = get_api(server_url, username, password)
+    api_client, api_root = get_api(server_url, username=username,
+                                   password=password)
     review_request = get_review_request(review_request_id, api_root)
 
     return review_request.approved, review_request.approval_failure
