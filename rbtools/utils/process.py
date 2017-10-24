@@ -79,7 +79,8 @@ def execute(command,
         # returned from stdout will be a text stream (and therefore a unicode
         # object). Otherwise, it will be a byte stream. Translate the results
         # into the desired type.
-        encoding = sys.getfilesystemencoding()
+        # encoding = sys.getfilesystemencoding()
+        encoding = "utf-8"
 
         if split_lines and len(output) > 0:
             if results_unicode and isinstance(output[0], six.binary_type):
