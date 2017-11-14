@@ -70,7 +70,8 @@ class SVNClient(SCMClient):
             svn_info_params.append(self.options.repository_url)
 
         data = self._run_svn(svn_info_params, ignore_errors=True,
-                             results_unicode=False)
+                             results_unicode=False,
+                             log_output_on_error=False)
 
         m = re.search(b'^Repository Root: (.+)$', data, re.M)
         if not m:
