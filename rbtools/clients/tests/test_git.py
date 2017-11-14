@@ -617,10 +617,9 @@ class GitClientTests(SpyAgency, SCMClientTests):
         self.client.merge('new-branch', 'master', 'message', self.AUTHOR,
                           True)
 
-        self.assertTrue(execute.spy.called_with(['git', 'merge', 'new-branch',
-                                                 '--squash', '--no-commit'],
-                                                ignore_errors=True,
-                                                return_error_code=True))
+        self.assertEqual(execute.spy.calls[-2].args[0],
+                         ['git', 'merge', 'new-branch', '--squash',
+                          '--no-commit'])
 
     def test_merge_without_squash(self):
         """Testing GitClient.merge with squash set to False.
@@ -649,10 +648,9 @@ class GitClientTests(SpyAgency, SCMClientTests):
         self.client.merge('new-branch', 'master', 'message', self.AUTHOR,
                           False)
 
-        self.assertTrue(execute.spy.called_with(['git', 'merge', 'new-branch',
-                                                 '--no-ff', '--no-commit'],
-                                                ignore_errors=True,
-                                                return_error_code=True))
+        self.assertEqual(execute.spy.calls[-2].args[0],
+                         ['git', 'merge', 'new-branch', '--no-ff',
+                          '--no-commit'])
 
     def test_create_commit_run_editor(self):
         """Testing GitClient.create_commit with run_editor set to True.
@@ -672,8 +670,9 @@ class GitClientTests(SpyAgency, SCMClientTests):
                                   ['foo.txt'])
 
         self.assertTrue(edit_text.spy.called)
-        self.assertTrue(execute.spy.last_called_with(
-            ['git', 'commit', '-m', 'new_message', '--author="name <email>"']))
+        self.assertEqual(execute.spy.last_call.args[0],
+                         ['git', 'commit', '-m', 'new_message',
+                          '--author="name <email>"'])
 
     def test_create_commit_without_run_editor(self):
         """Testing GitClient.create_commit with run_editor set to False.
@@ -695,8 +694,9 @@ class GitClientTests(SpyAgency, SCMClientTests):
                                   ['foo.txt'])
 
         self.assertFalse(edit_text.spy.called)
-        self.assertTrue(execute.spy.last_called_with(
-            ['git', 'commit', '-m', 'old_message', '--author="name <email>"']))
+        self.assertEqual(execute.spy.last_call.args[0],
+                         ['git', 'commit', '-m', 'old_message',
+                          '--author="name <email>"'])
 
     def test_create_commit_all_files(self):
         """Testing GitClient.create_commit with all_files set to True.
@@ -713,8 +713,8 @@ class GitClientTests(SpyAgency, SCMClientTests):
 
         self.client.create_commit('message', self.AUTHOR, False, [], True)
 
-        self.assertTrue(execute.spy.called_with(['git', 'add', '--all',
-                                                 ':/']))
+        self.assertEqual(execute.spy.calls[0].args[0],
+                         ['git', 'add', '--all', ':/'])
 
     def test_create_commit_without_all_files(self):
         """Testing GitClient.create_commit with all_files set to False.
@@ -732,7 +732,8 @@ class GitClientTests(SpyAgency, SCMClientTests):
         self.client.create_commit('message', self.AUTHOR, False, ['foo.txt'],
                                   False)
 
-        self.assertTrue(execute.spy.called_with(['git', 'add', 'foo.txt']))
+        self.assertEqual(execute.spy.calls[0].args[0],
+                         ['git', 'add', 'foo.txt'])
 
     def test_delete_branch_with_merged_only(self):
         """Testing GitClient.delete_branch with merged_only set to True.
@@ -747,8 +748,8 @@ class GitClientTests(SpyAgency, SCMClientTests):
         self.client.delete_branch('new-branch', True)
 
         self.assertTrue(execute.spy.called)
-        self.assertTrue(execute.spy.last_called_with(['git', 'branch', '-d',
-                                                      'new-branch']))
+        self.assertEqual(execute.spy.last_call.args[0],
+                         ['git', 'branch', '-d', 'new-branch'])
 
     def test_delete_branch_without_merged_only(self):
         """Testing GitClient.delete_branch with merged_only set to False.
@@ -763,8 +764,8 @@ class GitClientTests(SpyAgency, SCMClientTests):
         self.client.delete_branch('new-branch', False)
 
         self.assertTrue(execute.spy.called)
-        self.assertTrue(execute.spy.last_called_with(['git', 'branch', '-D',
-                                                      'new-branch']))
+        self.assertEqual(execute.spy.last_call.args[0],
+                         ['git', 'branch', '-D', 'new-branch'])
 
     def return_new_message(self, message):
         return 'new_message'

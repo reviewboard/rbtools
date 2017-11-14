@@ -226,7 +226,7 @@ class SVNRepositoryInfoTests(SpyAgency, SCMClientTests):
             info._get_relative_path('/trunk/myproject', '/trunk/myproject'),
             '/')
 
-    def _urlopen(self, request):
+    def _urlopen(self, request, **kwargs):
         url = request.get_full_url()
 
         try:
