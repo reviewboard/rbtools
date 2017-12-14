@@ -753,6 +753,12 @@ class Post(Command):
             base_commit_id = diff_info.get('base_commit_id')
             commit_id = diff_info.get('commit_id')
 
+            logging.debug('Generated diff size: %d bytes', len(diff))
+
+            if parent_diff:
+                logging.debug('Generated parent diff size: %d bytes',
+                              len(parent_diff))
+
         repository = (
             self.options.repository_name or
             self.options.repository_url or
