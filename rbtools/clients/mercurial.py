@@ -376,7 +376,10 @@ class MercurialClient(SCMClient):
         """Return a diff across all modified files in the given revisions."""
         self._init()
 
-        diff_cmd = ['hg', 'diff', '--hidden', '--nodates', '-g']
+        diff_cmd = ['hg', 'diff', '--hidden', '--nodates']
+
+        if self.supports_empty_files():
+            diff_cmd.append('-g')
 
         if self._type == 'svn':
             diff_cmd.append('--svn')
@@ -391,25 +394,11 @@ class MercurialClient(SCMClient):
             diff_cmd + ['-r', revisions['base'], '-r', revisions['tip']],
             env=self._hg_env, log_output_on_error=False, results_unicode=False)
 
-        supports_empty_files = self.supports_empty_files()
-
-        if supports_empty_files:
-            diff = self._handle_empty_files(diff, revisions['base'],
-                                            revisions['tip'],
-                                            exclude_files=exclude_patterns)
-
         if 'parent_base' in revisions:
             base_commit_id = revisions['parent_base']
             parent_diff = self._execute(
                 diff_cmd + ['-r', base_commit_id, '-r', revisions['base']],
                 env=self._hg_env, results_unicode=False)
-
-            if supports_empty_files:
-                parent_diff = self._handle_empty_files(
-                    parent_diff,
-                    base_commit_id,
-                    revisions['base'],
-                    exclude_files=exclude_patterns)
         else:
             base_commit_id = revisions['base']
             parent_diff = None
@@ -428,64 +417,9 @@ class MercurialClient(SCMClient):
             'base_commit_id': base_commit_id,
         }
 
-    def _handle_empty_files(self, diff, base, tip, exclude_files=[]):
-        """Add added and deleted 0-length files to the diff output.
-
-        Since the diff output from hg diff does not give any information on
-        0-length files, we manually add this extra information to the patch.
-        """
-        # If the files in the base and tip changesets are the same, no files
-        # (empty or otherwise) were added or deleted.
-        base_files = self._get_files_in_changeset(base)
-        tip_files = self._get_files_in_changeset(tip)
-
-        if base_files == tip_files:
-            return diff
-
-        tip_empty_files = self._get_files_in_changeset(tip, get_empty=True)
-        added_empty_files = tip_empty_files - base_files
-
-        base_empty_files = self._get_files_in_changeset(base, get_empty=True)
-        deleted_empty_files = base_empty_files - tip_files
-
-        if not (added_empty_files or deleted_empty_files):
-            return diff
-
-        dates = execute(['hg', 'log', '-r', base, '-r', tip,
-                         '--template', '{date|date}\\t'],
-                        env=self._hg_env)
-        base_date, tip_date = dates.strip().split('\t')
-
-        for filename in added_empty_files:
-            if filename not in exclude_files:
-                diff += ('diff -r %s -r %s %s\n'
-                         '--- %s\t%s\n'
-                         '+++ b/%s\t%s\n'
-                         % (base, tip, filename,
-                            self.PRE_CREATION, self.PRE_CREATION_DATE,
-                            filename, tip_date)).encode('utf-8')
-
-        for filename in deleted_empty_files:
-            if filename not in exclude_files:
-                diff += ('diff -r %s -r %s %s\n'
-                         '--- a/%s\t%s\n'
-                         '+++ %s\t%s\n'
-                         % (base, tip, filename,
-                            filename, base_date,
-                            self.PRE_CREATION,
-                            self.PRE_CREATION_DATE)).encode('utf-8')
-
-        return diff
-
-    def _get_files_in_changeset(self, rev, get_empty=False):
-        """Return a set of all files in the specified changeset.
-
-        If get_empty is True, we return only 0-length files in the changeset.
-        """
+    def _get_files_in_changeset(self, rev):
+        """Return a set of all files in the specified changeset."""
         cmd = ['hg', 'locate', '-r', rev]
-
-        if get_empty:
-            cmd.append('set:size(0)')
 
         files = execute(cmd, env=self._hg_env, ignore_errors=True,
                         none_on_ignored_error=True)
