@@ -406,6 +406,41 @@ class SVNClientTests(SCMClientTests):
         self.assertEqual(revisions['base'], 1)
         self.assertEqual(revisions['tip'], 2)
 
+    def test_get_commit_message_working_copy(self):
+        """Testing SVNClient.get_commit_message with a working copy change"""
+        revisions = self.client.parse_revision_spec()
+        message = self.client.get_commit_message(revisions)
+        self.assertIsNone(message)
+
+    def test_get_commit_message_committed_revision(self):
+        """Testing SVNClient.get_commit_message with a single committed
+        revision
+        """
+        revisions = self.client.parse_revision_spec(['2'])
+        message = self.client.get_commit_message(revisions)
+
+        self.assertTrue('summary' in message)
+        self.assertTrue('description' in message)
+
+        self.assertEqual(message['summary'],
+                         'Commit 2 -- a non-utf8 character: \xe9')
+        self.assertEqual(message['description'],
+                         'Commit 2 -- a non-utf8 character: \xe9\n')
+
+    def test_get_commit_message_committed_revisions(self):
+        """Testing SVNClient.get_commit_message with multiple committed
+        revisions
+        """
+        revisions = self.client.parse_revision_spec(['1:3'])
+        message = self.client.get_commit_message(revisions)
+
+        self.assertTrue('summary' in message)
+        self.assertTrue('description' in message)
+
+        self.assertEqual(message['summary'],
+                         'Commit 2 -- a non-utf8 character: \xe9')
+        self.assertEqual(message['description'], 'Commit 3')
+
     @svn_version_set_hash('6613644d417f7c90f83f3a2d16b1dad5',
                           '7630ea80056a7340d93a556e9af60c63',
                           '6a5339da19e60c7706e44aeebfa4da5f')
