@@ -82,7 +82,7 @@ set _PYTHON_INSTALLER=%TEMP%\python-%PYTHON_VERSION%.msi
 
 if not exist "%PYTHON_DEP%" (
     if not exist "%_PYTHON_INSTALLER%" (
-        echo Downloading Python v%PYTHON_VERSION%...
+        echo Preparing to download Python v%PYTHON_VERSION%...
         call :DownloadAndVerify %PYTHON_URL% ^
                                 "%_PYTHON_INSTALLER%" ^
                                 %PYTHON_MD5% || exit /B 1
@@ -92,8 +92,6 @@ if not exist "%PYTHON_DEP%" (
 
     echo Running the installer...
     msiexec /quiet /a "%_PYTHON_INSTALLER%" TARGETDIR="%PYTHON_DEP%"
-
-    del /F /Q "%_PYTHON_INSTALLER%"
 )
 
 goto :EOF
@@ -300,10 +298,12 @@ setlocal
 set _url=%~1
 set _dest=%~2
 
-PowerShell -Command ^
-    "(New-Object Net.WebClient).DownloadFile('%_url%', '%_dest%')"
+echo Downloading %_url% to %_dest%...
 
-if ERRORLEVEL 1 exit /B 1
+PowerShell -Command ^
+    "(New-Object Net.WebClient).DownloadFile('%_url%', '%_dest%')" || exit /B 1
+
+echo Downloaded %_url%
 
 goto :EOF
 
@@ -317,6 +317,8 @@ setlocal
 set _filename=%~1
 set _expected_hash=%~2
 
+echo Verifying that %_filename% has MD5 hash %_expected_hash%...
+
 PowerShell -Command ^
  "$md5 = New-Object Security.Cryptography.MD5CryptoServiceProvider;"^
  "$file = [System.IO.File]::ReadAllBytes('%_filename%');"^
@@ -328,9 +330,7 @@ PowerShell -Command ^
  "    Write-Host 'Invalid checksum for %_filename%.';"^
  "    Write-Host 'Got'$hash'; expected %_expected_hash%.';"^
  "    exit 1;"^
- "}"
-
-if ERRORLEVEL 1 exit /B 1
+ "}" || exit /B 1
 
 goto :EOF
 
