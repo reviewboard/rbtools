@@ -76,7 +76,8 @@ class SVNClient(SCMClient):
             svn_info_params.append(self.options.repository_url)
 
         data = self._run_svn(svn_info_params, ignore_errors=True,
-                             results_unicode=False)
+                             results_unicode=False,
+                             log_output_on_error=False)
 
         m = re.search(b'^Repository Root: (.+)$', data, re.M)
         if not m:
@@ -174,9 +175,10 @@ class SVNClient(SCMClient):
                 # It's not a revision--let's try a changelist. This only makes
                 # sense if we have a working copy.
                 if not self.options.repository_url:
-                    status = self._run_svn(['status', '--cl', str(revision),
-                                            '--ignore-externals', '--xml'],
-                                           results_unicode=False)
+                    status = self._run_svn(
+                        ['status', '--cl', six.text_type(revision),
+                         '--ignore-externals', '--xml'],
+                        results_unicode=False)
                     cl = ElementTree.fromstring(status).find('changelist')
                     if cl is not None:
                         # TODO: this should warn about mixed-revision working
@@ -255,6 +257,43 @@ class SVNClient(SCMClient):
 
         return get_url_prop(repository_info.path)
 
+    def get_raw_commit_message(self, revisions):
+        """Return the raw commit message(s) for the given revisions.
+
+        Args:
+            revisions (dict):
+                Revisions to get the commit messages for. This will contain
+                ``tip`` and ``base`` keys.
+
+        Returns:
+            unicode:
+            The commit messages for all the requested revisions.
+        """
+        base = six.text_type(revisions['base'])
+        tip = six.text_type(revisions['tip'])
+
+        if (tip == SVNClient.REVISION_WORKING_COPY or
+            tip.startswith(SVNClient.REVISION_CHANGELIST_PREFIX)):
+            return ''
+
+        command = ['-r', '%s:%s' % (base, tip)]
+
+        if getattr(self.options, 'repository_url', None):
+            command.append(self.options.repository_url)
+
+        log = self.svn_log_xml(command)
+
+        try:
+            root = ElementTree.fromstring(log)
+        except ValueError as e:
+            raise SCMError('Failed to parse svn log: %s' % e)
+
+        # We skip the first commit message, because we want commit messages
+        # corresponding to the changes that will be included in the diff.
+        messages = root.findall('.//msg')[1:]
+
+        return '\n\n'.join(message.text for message in messages)
+
     def diff(self, revisions, include_files=[], exclude_patterns=[],
              extra_args=[]):
         """
@@ -286,8 +325,8 @@ class SVNClient(SCMClient):
             'tip': None,
         }
 
-        base = str(revisions['base'])
-        tip = str(revisions['tip'])
+        base = six.text_type(revisions['base'])
+        tip = six.text_type(revisions['tip'])
 
         diff_cmd = ['diff', '--diff-cmd=diff', '--notice-ancestry']
         changelist = None

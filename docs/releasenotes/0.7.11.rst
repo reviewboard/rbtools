@@ -1,0 +1,120 @@
+.. default-intersphinx:: rbt0.7
+
+
+============================
+RBTools 0.7.11 Release Notes
+============================
+
+**Release date:** January 18, 2018
+
+
+New Features
+============
+
+rbt post
+--------
+
+.. program:: rbt post
+
+* Added support for :option:`--diff-only` on all repositories.
+
+  Previously, this option only worked for Perforce. It now works for Git,
+  Subversion, and everything else, preventing any fields either computed from
+  a commit, specified in :file:`.reviewboardrc`, or specified on the command
+  line from being considered when updating a review request.
+
+* Diff sizes are now logged when posting using :option:`--debug`.
+
+  This will help us to diagnose issues sent to us when posting changes for
+  review.
+
+
+Compatibility Changes
+=====================
+
+* Git-style diffs are now used when posting changes against Mercurial
+  repositories.
+
+  Git-style diffs contain more useful information, beyond what Mercurial-style
+  diffs provide, leading to a better experience on Review Board. Tools that
+  make use of posted Mercurial diffs may be impacted if they don't understand
+  Git-style diffs.
+
+  The diffs also no longer contain the date and time that the diff was
+  generated, so that checksums are consistent across multiple generations of
+  the same diff.
+
+  Patch by André Klitzing.
+
+
+Bug Fixes
+=========
+
+rbt post
+--------
+
+.. program:: rbt post
+
+* Fix incomplete help output around :option:`--tracking-branch`'s default
+  behavior when using Git.
+
+  The old output said that on Git, ``origin/master`` will be used as the
+  default tracking branch if one is not otherwise specified. However, the
+  actual logic first attempts to use the remote branch that the current branch
+  tracks (if any). The help output has been fixed to reflect this.
+
+* Fixed a crash that could occur when checking for Subversion repositories.
+
+  When trying to determine the type of a repository, RBTools will try to check
+  if it's running in a Subversion repository. Depending on the locales chosen,
+  this could previously result in a crash.
+
+* Fixed the :option:`--diff-only` option to only update diffs.
+
+  This option has been around a long time, and was previously only for
+  Perforce. It hasn't actually worked correctly in a long time, and a recent
+  change caused some behavior that conflicted with the option, resulting in
+  Perforce change descriptions overriding the fields on a review request.
+  The option should now work as described.
+
+* Posting Subversion commits for review now automatically fills in the
+  summary and description of the review request.
+
+  Based on work by Graham Seaman.
+
+
+rbt install
+-----------
+
+* Fixed a hash validation issue when trying to install :command:`rb-tfs` on
+  Windows.
+
+  This could happen due to the zip file containing :command:`rb-tfs` being
+  interpreted as text in some cases. We now ensure we're treating the file
+  explicitly as binary when validating the hash.
+
+
+Mercurial
+---------
+
+* Fixed generating Git-compatible diffs containing empty files. (:bug:`4600`)
+
+  Patch by André Klitzing.
+
+
+Team Foundation Server
+----------------------
+
+* :command:`tf.exe` from Visual Studio 2015 no longer takes priority over
+  :command:`rb-tfs`.
+
+  This fixes problems when using RBTools on Visual Studio 2017.
+
+
+Contributors
+============
+
+* André Klitzing
+* Christian Hammond
+* David Trowbridge
+* Graham Seaman

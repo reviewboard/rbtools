@@ -112,9 +112,10 @@ class Post(Command):
                        dest='diff_only',
                        action='store_true',
                        default=False,
-                       help='Uploads a new diff, but does not update '
-                            'fields from the change description '
-                            '(Perforce/Plastic only).'),
+                       help='Uploads a new diff, but does not automatically '
+                            'update fields from the commit message/change '
+                            'description. Fields explicitly provided by '
+                            'other options will be ignored.'),
             ]
         ),
         Command.server_options,
@@ -572,54 +573,9 @@ class Post(Command):
                     print('Could not stamp review URL onto the commit '
                           'message.')
 
-        # If the user has requested to guess the summary or description,
-        # get the commit message and override the summary and description
-        # options. The guessing takes place after stamping so that the
-        # guessed description matches the commit when rbt exits.
-        if not self.options.diff_filename:
-            self.check_guess_fields()
-
         # Update the review request draft fields based on options set
         # by the user, or configuration.
         update_fields = {}
-
-        update_fields.update(self.options.extra_fields)
-
-        if self.options.target_groups:
-            update_fields['target_groups'] = self.options.target_groups
-
-        if self.options.target_people:
-            update_fields['target_people'] = self.options.target_people
-
-        if self.options.depends_on:
-            update_fields['depends_on'] = self.options.depends_on
-
-        if self.options.summary:
-            update_fields['summary'] = self.options.summary
-
-        if self.options.branch:
-            update_fields['branch'] = self.options.branch
-
-        if self.options.bugs_closed:
-            # Append to the existing list of bugs.
-            self.options.bugs_closed = self.options.bugs_closed.strip(', ')
-            bug_set = (set(re.split('[, ]+', self.options.bugs_closed)) |
-                       set(review_request.bugs_closed))
-            self.options.bugs_closed = ','.join(bug_set)
-            update_fields['bugs_closed'] = self.options.bugs_closed
-
-        if self.options.description:
-            update_fields['description'] = self.options.description
-
-        if self.options.testing_done:
-            update_fields['testing_done'] = self.options.testing_done
-
-        if ((self.options.description or self.options.testing_done) and
-            self.options.markdown and
-            self.tool.capabilities.has_capability('text', 'markdown')):
-            # The user specified that their Description/Testing Done are
-            # valid Markdown, so tell the server so it won't escape the text.
-            update_fields['text_type'] = 'markdown'
 
         if self.options.publish:
             update_fields['public'] = True
@@ -629,23 +585,60 @@ class Post(Command):
                                                       'trivial_publish')):
                 update_fields['trivial'] = True
 
-        if self.options.change_description is not None:
-            if review_request.public:
-                update_fields['changedescription'] = \
-                    self.options.change_description
+        if not self.options.diff_only:
+            # If the user has requested to guess the summary or description,
+            # get the commit message and override the summary and description
+            # options, which we'll fill in below. The guessing takes place
+            # after stamping so that the guessed description matches the commit
+            # when rbt exits.
+            if not self.options.diff_filename:
+                self.check_guess_fields()
 
-                if (self.options.markdown and
-                    self.tool.capabilities.has_capability('text', 'markdown')):
-                    update_fields['changedescription_text_type'] = 'markdown'
+            update_fields.update(self.options.extra_fields)
+
+            if self.options.target_groups:
+                update_fields['target_groups'] = self.options.target_groups
+
+            if self.options.target_people:
+                update_fields['target_people'] = self.options.target_people
+
+            if self.options.depends_on:
+                update_fields['depends_on'] = self.options.depends_on
+
+            if self.options.summary:
+                update_fields['summary'] = self.options.summary
+
+            if self.options.branch:
+                update_fields['branch'] = self.options.branch
+
+            if self.options.bugs_closed:
+                # Append to the existing list of bugs.
+                self.options.bugs_closed = self.options.bugs_closed.strip(', ')
+                bug_set = (set(re.split('[, ]+', self.options.bugs_closed)) |
+                           set(review_request.bugs_closed))
+                self.options.bugs_closed = ','.join(bug_set)
+                update_fields['bugs_closed'] = self.options.bugs_closed
+
+            if self.options.description:
+                update_fields['description'] = self.options.description
+
+            if self.options.change_description is not None:
+                if review_request.public:
+                    update_fields['changedescription'] = \
+                        self.options.change_description
+
+                    if (self.options.markdown and
+                        self.tool.capabilities.has_capability('text',
+                                                              'markdown')):
+                        update_fields['changedescription_text_type'] = \
+                            'markdown'
+                    else:
+                        update_fields['changedescription_text_type'] = \
+                            'plain'
                 else:
-                    update_fields['changedescription_text_type'] = 'plain'
-            else:
-                logging.error(
-                    'The change description field can only be set when '
-                    'publishing an update. Use --description instead.')
-
-        if supports_posting_commit_ids and commit_id != draft.commit_id:
-            update_fields['commit_id'] = commit_id or ''
+                    logging.error(
+                        'The change description field can only be set when '
+                        'publishing an update. Use --description instead.')
 
         if update_fields:
             try:
@@ -788,6 +781,12 @@ class Post(Command):
             parent_diff = diff_info.get('parent_diff')
             base_commit_id = diff_info.get('base_commit_id')
             commit_id = diff_info.get('commit_id')
+
+            logging.debug('Generated diff size: %d bytes', len(diff))
+
+            if parent_diff:
+                logging.debug('Generated parent diff size: %d bytes',
+                              len(parent_diff))
 
         repository = (
             self.options.repository_name or

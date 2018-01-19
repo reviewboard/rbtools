@@ -114,7 +114,7 @@ class Install(Command):
             except (HTTPError, URLError) as e:
                 raise CommandError('Error when downloading file: %s' % e)
 
-            with open(zip_filename, 'r') as f:
+            with open(zip_filename, 'rb') as f:
                 our_sha = hashlib.sha256(f.read()).hexdigest()
 
             if real_sha == our_sha:
