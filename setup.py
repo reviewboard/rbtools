@@ -25,14 +25,7 @@
 
 import sys
 
-# Attempt to use currently-installed setuptools first
-try:
-    from setuptools import setup, find_packages
-except ImportError:
-    # setuptools was unavailable. Install it then try again
-    from ez_setup import use_setuptools
-    use_setuptools()
-    from setuptools import setup, find_packages
+from setuptools import setup, find_packages
 
 from rbtools import get_package_version, is_release, VERSION
 
