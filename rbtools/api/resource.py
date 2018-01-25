@@ -64,7 +64,7 @@ def _create(resource, data=None, query_args={}, *args, **kwargs):
     ``extra_data__field_name``, which will be rewritten to fields of the form
     ``extra_data.field_name``.
     """
-    request = HttpRequest(resource._links['create']['href'], method=b'POST',
+    request = HttpRequest(resource._links['create']['href'], method='POST',
                           query_args=query_args)
 
     if data is None:
@@ -575,7 +575,7 @@ class DiffUploaderMixin(object):
         The diff and parent_diff arguments should be strings containing the
         diff output.
         """
-        request = HttpRequest(self._url, method=b'POST', query_args=kwargs)
+        request = HttpRequest(self._url, method='POST', query_args=kwargs)
         request.add_file('path', 'diff', diff)
 
         if parent_diff:
@@ -659,7 +659,7 @@ class FileAttachmentListResource(ListResource):
         The content argument should contain the body of the file to be
         uploaded, in string format.
         """
-        request = HttpRequest(self._url, method=b'POST', query_args=kwargs)
+        request = HttpRequest(self._url, method='POST', query_args=kwargs)
         request.add_file('path', filename, content)
 
         if caption:
@@ -684,7 +684,7 @@ class ScreenshotListResource(ListResource):
         The content argument should contain the body of the screenshot
         to be uploaded, in string format.
         """
-        request = HttpRequest(self._url, method=b'POST', query_args=kwargs)
+        request = HttpRequest(self._url, method='POST', query_args=kwargs)
         request.add_file('path', filename, content)
 
         if caption:
@@ -746,7 +746,7 @@ class ReviewRequestResource(ItemResource):
     @request_method_decorator
     def get_or_create_draft(self, **kwargs):
         request = self.get_draft(internal=True)
-        request.method = b'POST'
+        request.method = 'POST'
 
         for name, value in six.iteritems(kwargs):
             request.add_field(name, value)

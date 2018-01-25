@@ -580,9 +580,8 @@ class ReviewBoardServer(object):
             else:
                 headers[b'Content-Length'] = '0'
 
-            r = Request(request.url.encode('utf-8'), body, headers,
-                        request.method.encode('utf-8'))
-            rsp = self._urlopen(r)
+            rsp = self._urlopen(Request(
+                request.url, body, headers, request.method))
         except HTTPError as e:
             self.process_error(e.code, e.read())
         except URLError as e:

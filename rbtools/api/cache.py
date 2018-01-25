@@ -217,10 +217,10 @@ class APICache(object):
                 response = CachedHTTPResponse(entry)
             else:
                 if entry.etag:
-                    request.add_header(b'If-None-Match', entry.etag)
+                    request.add_header('If-none-match', entry.etag)
 
                 if entry.last_modified:
-                    request.add_header(b'If-Modified-Since',
+                    request.add_header('If-modified-since',
                                        entry.last_modified)
 
                 response = HTTPResponse(self.urlopen(request))

@@ -442,10 +442,10 @@ class HttpRequestTests(TestCase):
 
         fields = self._get_fields_as_dict(ctype, content)
 
-        self.assertTrue('foo' in fields)
-        self.assertEqual(fields['foo'], konnichiwa.encode('utf-8'))
-        self.assertEqual(fields['bar'], konnichiwa.encode('utf-8'))
-        self.assertEqual(fields['baz'], b'\xff')
+        self.assertTrue(b'foo' in fields)
+        self.assertEqual(fields[b'foo'], konnichiwa.encode('utf-8'))
+        self.assertEqual(fields[b'bar'], konnichiwa.encode('utf-8'))
+        self.assertEqual(fields[b'baz'], b'\xff')
 
 
 class ReviewRequestResourceTests(TestCase):
@@ -539,7 +539,7 @@ class MockResponse(object):
 
 class MockUrlOpener(object):
     """A mock url opener that records the number of hits it gets to URL."""
-    CONTENT = 'foobar'
+    CONTENT = b'foobar'
 
     def __init__(self, endpoints):
         """Create a new MockUrlOpener given the endpoints: headers mapping."""
@@ -557,7 +557,8 @@ class MockUrlOpener(object):
         self.endpoints[url]['hit_count'] += 1
 
         headers = self.endpoints[url]['headers'].copy()
-        headers['Date'] = datetime.datetime.now()
+        headers['Date'] = datetime.datetime.utcnow().strftime(
+            '%a, %d %b %Y %H:%M:%S GMT')
 
         if 'If-none-match' in request.headers and 'ETag' in headers:
             # If the request includes an If-None-Match header, we should check
@@ -597,7 +598,7 @@ class MockUrlOpener(object):
 
 class APICacheTests(TestCase):
     """Test cases for the APICache class."""
-    content = 'foobar'
+    content = b'foobar'
     request_headers = {
         'http://high_max_age': {
             'Cache-Control': 'max-age=10000'
