@@ -10,6 +10,7 @@ from hashlib import md5
 from random import randint
 from textwrap import dedent
 
+import six
 from nose import SkipTest
 
 from rbtools.clients import RepositoryInfo
@@ -26,6 +27,12 @@ class MercurialTestBase(SCMClientTests):
     def setUp(self):
         super(MercurialTestBase, self).setUp()
         self._hg_env = {}
+
+        if six.PY3:
+            # Mercurial is working on Python 3 support but it's still quite
+            # broken, especially with any out-of-core extensions installed
+            # (like hgsubversion). Just skip it for now.
+            raise SkipTest
 
     def _run_hg(self, command, ignore_errors=False, extra_ignore_errors=()):
         # We're *not* doing `env = env or {}` here because
@@ -45,11 +52,12 @@ class MercurialTestBase(SCMClientTests):
                        translate_newlines=True)
 
     def _hg_add_file_commit(self, filename, data, msg, branch=None):
-        outfile = open(filename, 'w')
-        outfile.write(data)
-        outfile.close()
+        with open(filename, 'wb') as f:
+            f.write(data)
+
         if branch:
             self._run_hg(['branch', branch])
+
         self._run_hg(['add', filename])
         self._run_hg(['commit', '-m', msg])
 
@@ -59,6 +67,9 @@ class MercurialClientTests(MercurialTestBase):
 
     TESTSERVER = 'http://127.0.0.1:8080'
     CLONE_HGRC = dedent("""
+    [ui]
+    username = test user <user at example.com>
+
     [paths]
     default = %(hg_dir)s
     cloned = %(clone_dir)s
@@ -81,7 +92,7 @@ class MercurialClientTests(MercurialTestBase):
         self._run_hg(['clone', self.hg_dir, self.clone_dir])
         self.client = MercurialClient(options=self.options)
 
-        clone_hgrc = open(self.clone_hgrc_path, 'wb')
+        clone_hgrc = open(self.clone_hgrc_path, 'w')
         clone_hgrc.write(self.CLONE_HGRC % {
             'hg_dir': self.hg_dir,
             'clone_dir': self.clone_dir,
@@ -183,7 +194,7 @@ class MercurialClientTests(MercurialTestBase):
     def test_diff_exclude_empty(self):
         """Testing MercurialClient diff with empty file exclusion"""
         self._hg_add_file_commit('foo.txt', FOO1, 'commit 1')
-        self._hg_add_file_commit('empty.txt', '', 'commit 2')
+        self._hg_add_file_commit('empty.txt', b'', 'commit 2')
 
         revisions = self.client.parse_revision_spec([])
         result = self.client.diff(revisions, exclude_patterns=['empty.txt'])

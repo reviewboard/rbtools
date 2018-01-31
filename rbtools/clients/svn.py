@@ -50,7 +50,7 @@ class SVNClient(SCMClient):
     REVISION_WORKING_COPY = '--rbtools-working-copy'
     REVISION_CHANGELIST_PREFIX = '--rbtools-changelist:'
 
-    VERSION_NUMBER_RE = re.compile(br'(\d+)\.(\d+)\.(\d+)')
+    VERSION_NUMBER_RE = re.compile(r'(\d+)\.(\d+)\.(\d+)')
     SHOW_COPIES_AS_ADDS_MIN_VERSION = (1, 7, 0)
     PATCH_MIN_VERSION = (1, 7, 0)
 

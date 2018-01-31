@@ -8,6 +8,25 @@ import sys
 import six
 
 
+def log_command_line(fmt, command):
+    """Log a command line.
+
+    Args:
+        fmt (unicode):
+            A format string to use for the log message.
+
+        command (list):
+            A command line in list form.
+    """
+    # While most of the subprocess library can deal with bytes objects in
+    # command lines, list2cmdline can't. Decode each part if necessary.
+    logging.debug(fmt, subprocess.list2cmdline([
+        part.decode('utf-8') if isinstance(part, bytes)
+        else part
+        for part in command
+    ]))
+
+
 def execute(command,
             env=None,
             split_lines=False,
@@ -97,9 +116,9 @@ def execute(command,
     assert not (with_errors and return_errors)
 
     if isinstance(command, list):
-        logging.debug(b'Running: ' + subprocess.list2cmdline(command))
+        log_command_line('Running: %s', command)
     else:
-        logging.debug(b'Running: ' + command)
+        logging.debug('Running: %s', command)
 
     new_env = os.environ.copy()
 

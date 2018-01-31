@@ -1463,7 +1463,7 @@ class PerforceClient(SCMClient):
             if p.startswith('//'):
                 # Absolute depot patterns remain unchanged.
                 return p
-            elif pattern.startswith(os.path.sep):
+            elif p.startswith(os.path.sep):
                 # Patterns beginning with the operating system's path separator
                 # are relative to the repository root.
                 assert base_dir is not None

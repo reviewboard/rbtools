@@ -25,7 +25,7 @@ class GitClientTests(SpyAgency, SCMClientTests):
 
     TESTSERVER = "http://127.0.0.1:8080"
     AUTHOR = type(
-        b'Author',
+        str('Author'),
         (object,),
         {
             'fullname': 'name',
@@ -50,9 +50,9 @@ class GitClientTests(SpyAgency, SCMClientTests):
             msg (unicode):
                 The commit message to use.
         """
-        foo = open(filename, 'w')
-        foo.write(data)
-        foo.close()
+        with open(filename, 'wb') as f:
+            f.write(data)
+
         self._run_git(['add', filename])
         self._run_git(['commit', '-m', msg])
 
@@ -1152,7 +1152,7 @@ class GitClientTests(SpyAgency, SCMClientTests):
         we intercept the call returning a custom commit message. We then
         ensure that execute is called with that custom commit message.
         """
-        self.spy_on(edit_text, call_fake=self.return_new_message)
+        self.spy_on(edit_text, call_fake=lambda message: 'new_message')
         self.spy_on(execute)
 
         foo = open('foo.txt', 'w')
@@ -1176,7 +1176,7 @@ class GitClientTests(SpyAgency, SCMClientTests):
         not be called, we ensure that execute is called with the old commit
         message (and not the custom new one).
         """
-        self.spy_on(edit_text, call_fake=self.return_new_message)
+        self.spy_on(edit_text, call_fake=lambda message: 'new_message')
         self.spy_on(execute)
 
         foo = open('foo.txt', 'w')
@@ -1259,7 +1259,3 @@ class GitClientTests(SpyAgency, SCMClientTests):
         self.assertTrue(execute.spy.called)
         self.assertEqual(execute.spy.last_call.args[0],
                          ['git', 'branch', '-D', 'new-branch'])
-
-    @staticmethod
-    def return_new_message(content):
-        return 'new_message'

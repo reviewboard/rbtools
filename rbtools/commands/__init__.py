@@ -7,7 +7,6 @@ import logging
 import pkg_resources
 import platform
 import os
-import subprocess
 import sys
 
 import colorama
@@ -22,6 +21,7 @@ from rbtools.clients import scan_usable_client
 from rbtools.clients.errors import OptionsCheckError
 from rbtools.utils.filesystem import (cleanup_tempfiles, get_home_path,
                                       is_exe_in_path, load_config)
+from rbtools.utils.process import log_command_line
 
 
 # NOTE: This needs to be a byte string, since it's going to go in argv,
@@ -709,8 +709,7 @@ class Command(object):
             sys.exit(1)
 
         self.init_logging()
-        logging.debug('Command line: %s',
-                      subprocess.list2cmdline(argv).decode('utf8'))
+        log_command_line('Command line: %s', argv)
 
         try:
             exit_code = self.main(*args) or 0

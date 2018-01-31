@@ -277,9 +277,9 @@ class SVNClientTests(SCMClientTests):
         """Add a file to the test repo."""
         is_new = not os.path.exists(filename)
 
-        f = open(filename, 'w')
-        f.write(data)
-        f.close()
+        with open(filename, 'wb') as f:
+            f.write(data)
+
         if is_new:
             self._run_svn(['add', filename])
 
@@ -457,7 +457,6 @@ class SVNClientTests(SCMClientTests):
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
 
-        print result['diff']
         self.assertEqual(md5(result['diff']).hexdigest(), md5sum)
 
     def test_diff_exclude_in_subdir(self):
