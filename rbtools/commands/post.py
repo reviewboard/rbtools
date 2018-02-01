@@ -622,6 +622,17 @@ class Post(Command):
             if self.options.description:
                 update_fields['description'] = self.options.description
 
+            if self.options.testing_done:
+                update_fields['testing_done'] = self.options.testing_done
+
+            if ((self.options.description or self.options.testing_done) and
+                self.options.markdown and
+                self.tool.capabilities.has_capability('text', 'markdown')):
+                # The user specified that their Description/Testing Done are
+                # valid Markdown, so tell the server so it won't escape the
+                text.
+                update_fields['text_type'] = 'markdown'
+
             if self.options.change_description is not None:
                 if review_request.public:
                     update_fields['changedescription'] = \
@@ -639,6 +650,9 @@ class Post(Command):
                     logging.error(
                         'The change description field can only be set when '
                         'publishing an update. Use --description instead.')
+
+            if supports_posting_commit_ids and commit_id != draft.commit_id:
+                update_fields['commit_id'] = commit_id or ''
 
         if update_fields:
             try:
