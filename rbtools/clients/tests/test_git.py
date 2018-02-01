@@ -767,5 +767,6 @@ class GitClientTests(SpyAgency, SCMClientTests):
         self.assertEqual(execute.spy.last_call.args[0],
                          ['git', 'branch', '-D', 'new-branch'])
 
-    def return_new_message(self, message):
+    @staticmethod
+    def return_new_message(content):
         return 'new_message'
