@@ -630,7 +630,7 @@ class Post(Command):
                 self.tool.capabilities.has_capability('text', 'markdown')):
                 # The user specified that their Description/Testing Done are
                 # valid Markdown, so tell the server so it won't escape the
-                text.
+                # text.
                 update_fields['text_type'] = 'markdown'
 
             if self.options.change_description is not None:
