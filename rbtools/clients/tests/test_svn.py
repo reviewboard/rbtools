@@ -227,11 +227,12 @@ class SVNRepositoryInfoTests(SpyAgency, SCMClientTests):
             info._get_relative_path('/trunk/myproject', '/trunk/myproject'),
             '/')
 
-    def _urlopen(self, request, **kwargs):
-        url = request.get_full_url()
+    @staticmethod
+    def _urlopen(url, **kwargs):
+        url = url.get_full_url()
 
         try:
-            payload = self.payloads[url]
+            payload = SVNRepositoryInfoTests.payloads[url]
         except KeyError:
             return MockResponse(404, {}, json.dumps({
                 'rsp': {
