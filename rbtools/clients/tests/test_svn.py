@@ -174,7 +174,30 @@ class SVNRepositoryInfoTests(SpyAgency, SCMClientTests):
     def setUp(self):
         super(SVNRepositoryInfoTests, self).setUp()
 
-        self.spy_on(urlopen, call_fake=self._urlopen)
+        def _urlopen(url, **kwargs):
+            url = url.get_full_url()
+
+            try:
+                payload = self.payloads[url]
+            except KeyError:
+                return MockResponse(404, {}, json.dumps({
+                    'rsp': {
+                        'stat': 'fail',
+                        'err': {
+                            'code': 100,
+                            'msg': 'Object does not exist',
+                        },
+                    },
+                }))
+
+            return MockResponse(
+                200,
+                {
+                    'Content-Type': payload['mimetype'],
+                },
+                json.dumps(payload['rsp']))
+
+        self.spy_on(urlopen, call_fake=_urlopen)
 
         self.api_client = RBClient('http://localhost:8080/')
         self.root_resource = self.api_client.get_root()
@@ -227,30 +250,6 @@ class SVNRepositoryInfoTests(SpyAgency, SCMClientTests):
             info._get_relative_path('/trunk/myproject', '/trunk/myproject'),
             '/')
 
-    @staticmethod
-    def _urlopen(url, **kwargs):
-        url = url.get_full_url()
-
-        try:
-            payload = SVNRepositoryInfoTests.payloads[url]
-        except KeyError:
-            return MockResponse(404, {}, json.dumps({
-                'rsp': {
-                    'stat': 'fail',
-                    'err': {
-                        'code': 100,
-                        'msg': 'Object does not exist',
-                    },
-                },
-            }))
-
-        return MockResponse(
-            200,
-            {
-                'Content-Type': payload['mimetype'],
-            },
-            json.dumps(payload['rsp']))
-
 
 class SVNClientTests(SCMClientTests):
     def setUp(self):
@@ -270,8 +269,7 @@ class SVNClientTests(SCMClientTests):
 
     def _run_svn(self, command):
         return execute(['svn'] + command, env=None, split_lines=False,
-                       ignore_errors=False, extra_ignore_errors=(),
-                       translate_newlines=True)
+                       ignore_errors=False, extra_ignore_errors=())
 
     def _svn_add_file(self, filename, data, changelist=None):
         """Add a file to the test repo."""
@@ -475,7 +473,7 @@ class SVNClientTests(SCMClientTests):
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
 
-        self.assertEqual(result['diff'], '')
+        self.assertEqual(result['diff'], b'')
 
     def test_diff_exclude_root_pattern_in_subdir(self):
         """Testing SVNClient diff with repo exclude patterns in a subdir"""
@@ -493,7 +491,7 @@ class SVNClientTests(SCMClientTests):
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
 
-        self.assertEqual(result['diff'], '')
+        self.assertEqual(result['diff'], b'')
 
     @svn_version_set_hash('043befc507b8177a0f010dc2cecc4205',
                           '1b68063237c584d38a9a3ddbdf1f72a2',
@@ -551,32 +549,6 @@ class SVNClientTests(SCMClientTests):
         self._run_svn(['propset', 'svn:mime-type', 'text/plain', 'A.txt'])
 
         revisions = self.client.parse_revision_spec()
-        result = self.client.diff(revisions)
-        self.assertTrue(isinstance(result, dict))
-        self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(), md5_sum)
-
-    @svn_version_set_hash('79cbd5c4974f97d173ee87c50fa9cff2',
-                          'bfa99e54b8c23b97b1dee23d2763c4fd',
-                          '7c6a4506828826aa7043adca347ef327')
-    def test_diff_non_unicode_filename(self, md5_sum):
-        """Testing SVNClient diff with a non-utf8 filename"""
-        self.options.svn_show_copies_as_adds = 'y'
-
-        filename = '\xe2'
-        self._run_svn(['copy', 'foo.txt', filename])
-        self._run_svn(['propset', 'svn:mime-type', 'text/plain', filename])
-
-        # Generate identical diff from checkout root and via changelist.
-
-        revisions = self.client.parse_revision_spec()
-        result = self.client.diff(revisions)
-        self.assertTrue(isinstance(result, dict))
-        self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(), md5_sum)
-
-        self._run_svn(['changelist', 'cl1', filename])
-        revisions = self.client.parse_revision_spec(['cl1'])
         result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
@@ -780,4 +752,4 @@ class SVNClientTests(SCMClientTests):
         result = self.client.diff(revisions)
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
-        self.assertTrue('--- test line (test1)' in result['diff'])
+        self.assertTrue(b'--- test line (test1)' in result['diff'])

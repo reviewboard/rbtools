@@ -39,48 +39,61 @@ def execute(command,
             log_output_on_error=True,
             results_unicode=True,
             return_errors=False):
-    """Utility function to execute a command and return the output.
+    """Execute a command and return the output.
 
-    :param command:
-        The command to execute as either a string or a list of strings.
-    :param env:
-        The environment variables to pass to the called executable.
-        These variables will be added to the current set of environment
-        variables.
-    :param split_lines:
-        Determines if the program's output will be split into multiple lines.
-    :param ignore_errors:
-        If ``False``, RBTools will exit if a command returns a non-zero status.
-    :param extra_ignore_errors:
-        The set of return status codes that should be treated as if the program
-        exited with status 0.
-    :param translate_newlines:
-        If ``True``, all line endings will be translated to ``\n``.
-    :param with_errors:
-        If ``True``, the command's standard output and standard error streams
-        will be combined. This parameter is mutually exclusive with the
-        ``return_errors`` parameter.
-    :param none_on_ignored_error:
-        If ``True``, this function will return ``None`` if either
-        ``ignore_errors`` is ``True` and the program returns a non-zero exit
-        status or the program exits with a status code in
-        ``extra_ignored_errors``.
-    :param return_error_code:
-        Determines if the exit status of the executed command will also be
-        returned.
-    :param log_output_on_error:
-        Determines if the output of the executed command will be logged if it
-        returns a non-zero status code.
-    :param results_unicode:
-        Determines if the output will be interpreted as UTF-8. If ``True``,
-        the process's output will be returned as a ``six.text_type``.
-        Otherwise, it will return a ``six.binary_type``.
-    :param return_errors:
-        Determines if the standard error stream will be returned. This
-        parameter is mutually exclusive with the ``with_errors`` parameter.
+    Args:
+        command (unicode or list of unicode):
+            The command to execute.
 
-    :returns:
-        This function returns either a single value or a 2- or 3-tuple.
+        env (dict, optional):
+            Environment variables to pass to the called executable. These will
+            be added to the current environment.
+
+        split_lines (bool, optional):
+            Whether to return the output as a list of lines or a single string.
+
+        ignore_errors (bool, optional):
+            Whether to ignore errors. If ``False``, this will raise an
+            exception.
+
+        extra_ignore_errors (tuple, optional):
+            A set of errors to ignore even when ``ignore_errors`` is False.
+            This is used because some commands (such as diff) use non-zero
+            return codes even when the command was successful.
+
+        translate_newlines (bool, optional):
+            Whether to translate all newlines in the output to ``\n``. This is
+            deprecated in favor of the ``results_unicode`` argument and will be
+            removed soon.
+
+        with_errors (bool, optional):
+            Whether to combine the output and error streams of the command
+            together into a single return value. This argument is mutually
+            exclusive with the ``return_errors`` argument.
+
+        none_on_ignored_error (bool, optional):
+            Whether to return ``None`` in the case that an error was ignored
+            (instead of the output of the command).
+
+        return_error_code (bool, optional):
+            Whether to include the exit status of the executed command in
+            addition to the output
+
+        log_output_on_error (bool, optional):
+            If ``True``, the output from the command will be logged in the case
+            that the command returned a non-zero exit code.
+
+        results_unicode (bool, optional):
+            If ``True``, the output will be treated as text and returned as
+            unicode strings instead of bytes.
+
+        return_errors (bool, optional):
+            Whether to return the content of the stderr stream. This argument
+            is mutually exclusive with the ``with_errors`` argument.
+
+    Returns:
+        This returns a single value, 2-tuple, or 3-tuple depending on the
+        arguments.
 
         If ``return_error_code`` is True, the error code of the process will be
         returned as the first element of the tuple.
@@ -92,27 +105,6 @@ def execute(command,
         then the process' output will be returned. If either or both of them
         are ``True``, then this is the other element of the returned tuple.
     """
-    def post_process_output(output):
-        """Post process the given output to convert it to the desired type."""
-        # If Popen is called with universal_newlines=True, the resulting data
-        # returned from stdout will be a text stream (and therefore a unicode
-        # object). Otherwise, it will be a byte stream. Translate the results
-        # into the desired type.
-        encoding = sys.getfilesystemencoding()
-
-        if split_lines and len(output) > 0:
-            if results_unicode and isinstance(output[0], six.binary_type):
-                return [line.decode(encoding) for line in output]
-            elif not results_unicode and isinstance(output[0], six.text_type):
-                return [line.encode('utf-8') for line in output]
-        elif not split_lines:
-            if results_unicode and isinstance(output, six.binary_type):
-                return output.decode(encoding)
-            elif not results_unicode and isinstance(output, six.text_type):
-                return output.encode('utf-8')
-
-        return output
-
     assert not (with_errors and return_errors)
 
     if isinstance(command, list):
@@ -136,6 +128,16 @@ def execute(command,
     else:
         errors_output = subprocess.PIPE
 
+    popen_encoding_args = {}
+
+    if results_unicode:
+        # Popen on Python 2 doesn't support the ``encoding`` parameter, so we
+        # have to use ``universal_newlines``.
+        if six.PY3:
+            popen_encoding_args['encoding'] = 'utf-8'
+        else:
+            popen_encoding_args['universal_newlines'] = True
+
     if sys.platform.startswith('win'):
         # Convert all environment variables to byte strings, so that subprocess
         # doesn't blow up on Windows.
@@ -149,8 +151,8 @@ def execute(command,
                              stdout=subprocess.PIPE,
                              stderr=errors_output,
                              shell=False,
-                             universal_newlines=translate_newlines,
-                             env=new_env)
+                             env=new_env,
+                             **popen_encoding_args)
     else:
         p = subprocess.Popen(command,
                              stdin=subprocess.PIPE,
@@ -158,26 +160,28 @@ def execute(command,
                              stderr=errors_output,
                              shell=False,
                              close_fds=True,
-                             universal_newlines=translate_newlines,
-                             env=new_env)
+                             env=new_env,
+                             **popen_encoding_args)
 
-    errors = None
+    data, errors = p.communicate()
 
     if split_lines:
-        data = p.stdout.readlines()
+        data = data.splitlines(True)
 
-        if return_errors:
-            errors = p.stderr.readlines()
+    if return_errors:
+        if split_lines:
+            errors = errors.splitlines(True)
     else:
-        data = p.stdout.read()
-
-        if return_errors:
-            errors = p.stderr.read()
+        errors = None
 
     rc = p.wait()
 
     if rc and not ignore_errors and rc not in extra_ignore_errors:
-        raise Exception('Failed to execute command: %s\n%s' % (command, data))
+        if log_output_on_error:
+            logging.debug('Command exited with rc %s: %s\n%s---'
+                          % (rc, command, data))
+
+        raise Exception('Failed to execute command: %s' % command)
     elif rc:
         if log_output_on_error:
             logging.debug('Command exited with rc %s: %s\n%s---'
@@ -189,18 +193,11 @@ def execute(command,
     if rc and none_on_ignored_error:
         data = None
 
-    if data is not None:
-        data = post_process_output(data)
-
-    if return_errors:
-        errors = post_process_output(errors)
-
-    if return_error_code or return_errors:
-        if return_error_code and return_errors:
-            return rc, data, errors
-        elif return_error_code:
-            return rc, data
-        else:
-            return data, errors
+    if return_error_code and return_errors:
+        return rc, data, errors
+    elif return_error_code:
+        return rc, data
+    elif return_errors:
+        return data, errors
     else:
         return data

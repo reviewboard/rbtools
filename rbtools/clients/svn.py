@@ -26,6 +26,9 @@ from rbtools.utils.filesystem import (make_empty_files, make_tempfile,
 from rbtools.utils.process import execute
 
 
+_fs_encoding = sys.getfilesystemencoding()
+
+
 class SVNClient(SCMClient):
     """
     A wrapper around the svn Subversion tool that fetches repository
@@ -70,28 +73,27 @@ class SVNClient(SCMClient):
 
         # Get the SVN repository path (either via a working copy or
         # a supplied URI)
-        svn_info_params = ["info"]
+        svn_info_params = ['info']
 
         if getattr(self.options, 'repository_url', None):
             svn_info_params.append(self.options.repository_url)
 
         data = self._run_svn(svn_info_params, ignore_errors=True,
-                             results_unicode=False,
                              log_output_on_error=False)
 
-        m = re.search(b'^Repository Root: (.+)$', data, re.M)
+        m = re.search('^Repository Root: (.+)$', data, re.M)
         if not m:
             return None
 
         path = m.group(1)
 
-        m = re.search(b'^URL: (.+)$', data, re.M)
+        m = re.search('^URL: (.+)$', data, re.M)
         if not m:
             return None
 
-        base_path = m.group(1)[len(path):] or b'/'
+        base_path = m.group(1)[len(path):] or '/'
 
-        m = re.search(b'^Repository UUID: (.+)$', data, re.M)
+        m = re.search('^Repository UUID: (.+)$', data, re.M)
         if not m:
             return None
 
@@ -395,16 +397,18 @@ class SVNClient(SCMClient):
                 if self.history_scheduled_with_commit(changelist,
                                                       include_files,
                                                       exclude_patterns):
-                    sys.stderr.write("One or more files in your changeset has "
-                                     "history scheduled with commit. Please "
-                                     "try again with "
-                                     "'--svn-show-copies-as-adds=y/n'.\n")
+                    sys.stderr.write(
+                        'One or more files in your changeset has history '
+                        'scheduled with commit. Please try again with '
+                        '"--svn-show-copies-as-adds=y/n".\n')
                     sys.exit(1)
             else:
                 if svn_show_copies_as_adds in 'Yy':
                     diff_cmd.append("--show-copies-as-adds")
 
-        diff = self._run_svn(diff_cmd, split_lines=True, results_unicode=False,
+        diff = self._run_svn(diff_cmd,
+                             split_lines=True,
+                             results_unicode=False,
                              log_output_on_error=False)
         diff = self.handle_renames(diff)
 
@@ -435,11 +439,11 @@ class SVNClient(SCMClient):
         for p in self._run_svn(status_cmd, split_lines=True,
                                results_unicode=False):
             try:
-                if p[3] == b'+':
+                if p[3:4] == b'+':
                     if exclude_patterns:
                         # We found a file with history, but first we must make
                         # sure that it is not being excluded.
-                        filename = p[8:].rstrip()
+                        filename = p[8:].rstrip().decode(_fs_encoding)
 
                         should_exclude = filename_match_any_patterns(
                             filename,
@@ -458,8 +462,7 @@ class SVNClient(SCMClient):
         return False
 
     def find_copyfrom(self, path):
-        """
-        A helper function for handle_renames
+        """Find the source filename for copied files.
 
         The output of 'svn info' reports the "Copied From" header when invoked
         on the exact path that was copied. If the current file was copied as a
@@ -467,12 +470,20 @@ class SVNClient(SCMClient):
         report the origin. Thus it is needed to ascend from the path until
         either a copied path is found or there are no more path components to
         try.
+
+        Args:
+            path (unicode):
+                The filename of the copied file.
+
+        Returns:
+            unicode:
+            The filename of the source of the copy.
         """
         def smart_join(p1, p2):
             if p2:
                 return os.path.join(p1, p2)
-
-            return p1
+            else:
+                return p1
 
         path1 = path
         path2 = None
@@ -483,7 +494,7 @@ class SVNClient(SCMClient):
 
             if url:
                 root = info['Repository Root']
-                from_path1 = unquote(url[len(root):]).encode('utf-8')
+                from_path1 = unquote(url[len(root):])
                 return smart_join(from_path1, path2)
 
             if info.get('Schedule', None) != 'normal':
@@ -493,7 +504,7 @@ class SVNClient(SCMClient):
             # Strip one component from path1 to path2
             path1, tmp = os.path.split(path1)
 
-            if path1 == b'' or path1 == b'/':
+            if path1 == '' or path1 == '/':
                 path1 = None
             else:
                 path2 = smart_join(tmp, path2)
@@ -501,12 +512,17 @@ class SVNClient(SCMClient):
         return None
 
     def handle_renames(self, diff_content):
-        """
+        """Fix up diff headers to properly show renames.
+
         The output of svn diff is incorrect when the file in question came
         into being via svn mv/cp. Although the patch for these files are
         relative to its parent, the diff header doesn't reflect this.
         This function fixes the relevant section headers of the patch to
         portray this relationship.
+
+        Args:
+            diff_content (bytes):
+                The content of the diffs.
         """
 
         # svn diff against a repository URL on two revisions appears to
@@ -545,7 +561,9 @@ class SVNClient(SCMClient):
                     result.append(diff_content[i + 1])
 
                     if copied_from is not None:
-                        result.append(from_line.replace(to_file, copied_from))
+                        result.append(from_line.replace(
+                            to_file.encode(_fs_encoding),
+                            copied_from.encode(_fs_encoding)))
                     else:
                         result.append(from_line)
 
@@ -609,7 +627,7 @@ class SVNClient(SCMClient):
                     result.append(b'%s\t(deleted)\n' % index_line)
 
                     if not revisions['base'] and not revisions['tip']:
-                        tip = b'(working copy)'
+                        tip = '(working copy)'
                         info = self.svn_info(filename, ignore_errors=True)
 
                         if info and 'Revision' in info:
@@ -624,20 +642,16 @@ class SVNClient(SCMClient):
                     result.append(b'%s\t(added)\n' % index_line)
 
                     if not revisions['base'] and not revisions['tip']:
-                        base = tip = b'(revision 0)'
+                        base = tip = '(revision 0)'
                     else:
                         base = revisions['base']
                         tip = revisions['tip']
 
-                if isinstance(base, six.text_type):
-                    base = base.encode('utf-8')
-
-                if isinstance(tip, six.text_type):
-                    tip = tip.encode('utf-8')
-
                 result.append(b'%s\n' % self.INDEX_SEP)
-                result.append(b'--- %s\t%s\n' % (filename, base))
-                result.append(b'+++ %s\t%s\n' % (filename, tip))
+                result.append(b'--- %s\t%s\n' % (filename.encode(_fs_encoding),
+                                                 base.encode('utf-8')))
+                result.append(b'+++ %s\t%s\n' % (filename.encode(_fs_encoding),
+                                                 tip.encode('utf-8')))
 
                 # Skip the next line (the index separator) since we've already
                 # copied it.
@@ -649,10 +663,21 @@ class SVNClient(SCMClient):
         return result
 
     def convert_to_absolute_paths(self, diff_content, repository_info):
-        """
-        Converts relative paths in a diff output to absolute paths.
+        """Convert relative paths in a diff output to absolute paths.
+
         This handles paths that have been svn switched to other parts of the
         repository.
+
+        Args:
+            diff_content (bytes):
+                The content of the diff.
+
+            repository_info (SVNRepositoryInfo):
+                The repository info.
+
+        Returns:
+            bytes:
+            The processed diff.
         """
         result = []
 
@@ -680,41 +705,56 @@ class SVNClient(SCMClient):
                             posixpath.join(repository_info.base_path, file))
                     else:
                         info = self.svn_info(file, True)
+
                         if info is None:
                             result.append(orig_line)
                             continue
-                        url = info["URL"]
-                        root = info["Repository Root"]
+
+                        url = info['URL']
+                        root = info['Repository Root']
                         path = unquote(url[len(root):])
 
-                    line = b'%s %s%s' % (front, path, rest)
+                    line = b'%s %s%s' % (front, path.encode(_fs_encoding),
+                                         rest)
 
             result.append(line)
 
         return result
 
     def svn_info(self, path, ignore_errors=False):
-        """Return a dict which is the result of 'svn info' at a given path."""
+        """Return a dict which is the result of 'svn info' at a given path.
+
+        Args:
+            path (unicode):
+                The path to the file being accessed.
+
+            ignore_errors (bool, optional):
+                Whether to ignore errors returned by ``svn info``.
+
+        Returns:
+            dict:
+            The parsed ``svn info`` output.
+        """
         # SVN's internal path recognizers think that any file path that
         # includes an '@' character will be path@rev, and skips everything that
         # comes after the '@'. This makes it hard to do operations on files
         # which include '@' in the name (such as image@2x.png).
-        if b'@' in path and not path[-1] == b'@':
-            path += b'@'
+        if '@' in path and not path[-1] == '@':
+            path += '@'
 
         if path not in self._svn_info_cache:
-            result = self._run_svn([b"info", path],
+            result = self._run_svn(['info', path],
                                    split_lines=True,
                                    ignore_errors=ignore_errors,
-                                   none_on_ignored_error=True,
-                                   results_unicode=False)
+                                   none_on_ignored_error=True)
             if result is None:
                 self._svn_info_cache[path] = None
             else:
                 svninfo = {}
 
                 for info in result:
-                    parts = info.strip().split(b': ', 1)
+                    parts = info.strip().split(': ', 1)
+
                     if len(parts) == 2:
                         key, value = parts
                         svninfo[key] = value
@@ -723,29 +763,41 @@ class SVNClient(SCMClient):
 
         return self._svn_info_cache[path]
 
-    # Adapted from server code parser.py
-    def parse_filename_header(self, s):
+    def parse_filename_header(self, diff_line):
+        """Parse the filename header from a diff.
+
+        Args:
+            diff_line (bytes):
+                The line of the diff being parsed.
+
+        Returns:
+            tuple of (unicode, bytes):
+            The parsed header line. The filename will be decoded using the
+            system filesystem encoding.
+        """
         parts = None
-        if b'\t' in s:
+
+        if b'\t' in diff_line:
             # There's a \t separating the filename and info. This is the
             # best case scenario, since it allows for filenames with spaces
             # without much work. The info can also contain tabs after the
             # initial one; ignore those when splitting the string.
-            parts = s.split(b'\t', 1)
+            parts = diff_line.split(b'\t', 1)
 
-        # There's spaces being used to separate the filename and info.
-        # This is technically wrong, so all we can do is assume that
-        # 1) the filename won't have multiple consecutive spaces, and
-        # 2) there's at least 2 spaces separating the filename and info.
-        if b'  ' in s:
-            parts = re.split(b'  +', s)
+        if b'  ' in diff_line:
+            # There are spaces being used to separate the filename and info.
+            # This is technically wrong, so all we can do is assume that
+            # 1) the filename won't have multiple consecutive spaces, and
+            # 2) there are at least 2 spaces separating the filename and info.
+            parts = re.split(b'  +', diff_line, 1)
 
         if parts:
-            parts[1] = b'\t' + parts[1]
-            return parts
+            return (parts[0].decode(_fs_encoding),
+                    b'\t' + parts[1])
 
-        # strip off ending newline, and return it as the second component
-        return [s.split(b'\n')[0], b'\n']
+        # Strip off ending newline, and return it as the second component.
+        return (diff_line.split(b'\n')[0].decode(_fs_encoding),
+                b'\n')
 
     def _get_p_number(self, base_path, base_dir):
         """Return the argument for --strip in svn patch.
@@ -918,17 +970,17 @@ class SVNClient(SCMClient):
                                                  'empty_files'))
 
     def _run_svn(self, svn_args, *args, **kwargs):
-        cmdline = [b'svn', b'--non-interactive'] + svn_args
+        cmdline = ['svn', '--non-interactive'] + svn_args
 
         if getattr(self.options, 'svn_username', None):
-            cmdline += [b'--username', self.options.svn_username]
+            cmdline += ['--username', self.options.svn_username]
 
         if getattr(self.options, 'svn_prompt_password', None):
             self.options.svn_prompt_password = False
-            self.options.svn_password = getpass.getpass(b'SVN Password:')
+            self.options.svn_password = getpass.getpass('SVN Password:')
 
         if getattr(self.options, 'svn_password', None):
-            cmdline += [b'--password', self.options.svn_password]
+            cmdline += ['--password', self.options.svn_password]
 
         return execute(cmdline, *args, **kwargs)
 

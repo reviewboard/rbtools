@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 
 import fnmatch
 import os
+import sys
 
 
 def filename_match_any_patterns(filename, patterns, base_dir=''):
@@ -33,12 +34,13 @@ def filter_diff(diff, file_index_re, exclude_patterns, base_dir=''):
     to, which is the root of the repository in most cases.
     """
     include_file = True
+    fs_encoding = sys.getfilesystemencoding()
 
     for line in diff:
         m = file_index_re.match(line)
 
         if m:
-            filename = m.group(1).decode('utf-8')
+            filename = m.group(1).decode(fs_encoding)
             include_file = not filename_match_any_patterns(filename,
                                                            exclude_patterns,
                                                            base_dir)
