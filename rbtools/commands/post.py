@@ -228,7 +228,6 @@ class Post(Command):
                        help='The comma-separated list of bug IDs closed.'),
                 Option('--target-groups',
                        dest='target_groups',
-                       config_key='TARGET_GROUPS',
                        metavar='NAME[,...]',
                        default=None,
                        help='The names of the groups that should perform the '
@@ -236,7 +235,6 @@ class Post(Command):
                 Option('--target-people',
                        dest='target_people',
                        metavar='USERNAME[,...]',
-                       config_key='TARGET_PEOPLE',
                        default=None,
                        help='The usernames of the people who should perform '
                             'the review.'),
@@ -303,6 +301,17 @@ class Post(Command):
                 extra_fields['extra_data.%s' % key] = value
 
         self.options.extra_fields = extra_fields
+
+        # Only use default target-users / groups when creating a new review
+        # request. Otherwise we'll overwrite any user changes.
+        if not self.options.update and self.options.rid is None:
+            if (self.options.target_groups is None and
+               'TARGET_GROUPS' in self.config):
+                self.options.target_groups = self.config['TARGET_GROUPS']
+
+            if (self.options.target_people is None and
+               'TARGET_PEOPLE' in self.config):
+                self.options.target_people = self.config['TARGET_PEOPLE']
 
         # -g implies --guess-summary and --guess-description
         self.options.guess_fields = self.normalize_guess_value(

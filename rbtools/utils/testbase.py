@@ -1,10 +1,14 @@
 from __future__ import unicode_literals
 
+import contextlib
 import os
+import shutil
 import sys
+import tempfile
 import uuid
 
 from six.moves import cStringIO as StringIO
+from six import iteritems
 
 from rbtools.utils.filesystem import cleanup_tempfiles, make_tempdir
 from rbtools.testing import TestCase
@@ -65,3 +69,35 @@ class RBTestBase(TestCase):
         func()
         sys.stdout = stdout
         return outbuf.getvalue()
+
+    @contextlib.contextmanager
+    def reviewboardrc(self, data, use_temp_dir=False):
+        """Manage a temporary .reviewboardrc file.
+
+        Args:
+            data (dict)
+                A dictionary of key-value pairs to write into the
+                .reviewboardrc file.
+
+                A best effort attempt will be made to convert the value into
+                an appropriate string.
+
+            use_temp_dir (boolean)
+                A boolean that indicates if a temporary directory should be
+                created and used as the working directory for the context.
+        """
+        if use_temp_dir:
+            temp_dir = tempfile.mkdtemp()
+            cwd = os.getcwd()
+            os.chdir(temp_dir)
+
+        with open('.reviewboardrc', 'w') as fp:
+            for key, value in iteritems(data):
+                fp.write('%s = %r\n' % (key, value))
+
+        try:
+            yield
+        finally:
+            if use_temp_dir:
+                os.chdir(cwd)
+                shutil.rmtree(temp_dir)
