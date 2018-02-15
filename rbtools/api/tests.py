@@ -391,9 +391,10 @@ class HttpRequestTests(TestCase):
 
     def _get_fields_as_dict(self, ctype, content):
         """Extract the fields of a HTTP multipart request as a dictionary."""
-        m = re.match(b'^multipart/form-data; boundary=(.*)$', ctype)
+        m = re.match('^multipart/form-data; boundary=(.*)$', ctype)
         self.assertFalse(m is None)
-        fields = [l.strip() for l in content.split(b'--' + m.group(1))][1:-1]
+        boundary = b'--' + m.group(1).encode('utf-8')
+        fields = [l.strip() for l in content.split(boundary)][1:-1]
 
         d = {}
 

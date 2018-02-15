@@ -475,23 +475,23 @@ class Post(Command):
                 # Until we are Python 2.7+ only, the keys in request_data have
                 # to be bytes. See bug 3753 for details.
                 request_data = {
-                    b'repository': repository
+                    'repository': repository,
                 }
 
                 if changenum:
-                    request_data[b'changenum'] = changenum
+                    request_data['changenum'] = changenum
                 elif commit_id and supports_posting_commit_ids:
-                    request_data[b'commit_id'] = commit_id
+                    request_data['commit_id'] = commit_id
 
                 if submit_as:
-                    request_data[b'submit_as'] = submit_as
+                    request_data['submit_as'] = submit_as
 
                 if self.tool.can_bookmark:
                     bookmark = self.tool.get_current_bookmark()
-                    request_data[b'extra_data__local_bookmark'] = bookmark
+                    request_data['extra_data__local_bookmark'] = bookmark
                 elif self.tool.can_branch:
                     branch = self.tool.get_current_branch()
-                    request_data[b'extra_data__local_branch'] = branch
+                    request_data['extra_data__local_branch'] = branch
 
                 review_requests = api_root.get_review_requests(
                     only_fields='',

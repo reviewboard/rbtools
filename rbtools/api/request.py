@@ -138,7 +138,8 @@ class HttpRequest(object):
             content.write(NEWLINE)
 
         content.write(b'--' + BOUNDARY + b'--' + NEWLINE + NEWLINE)
-        content_type = b'multipart/form-data; boundary=%s' % BOUNDARY
+        content_type = ('multipart/form-data; boundary=%s'
+                        % BOUNDARY.decode('utf-8'))
 
         return content_type, content.getvalue()
 
@@ -192,8 +193,10 @@ class PresetHTTPAuthHandler(BaseHandler):
                 username, password = \
                     self.password_mgr.find_user_password('Web API', self.url)
                 raw = '%s:%s' % (username, password)
-                request.add_header(self.AUTH_HEADER,
-                                   'Basic %s' % base64.b64encode(raw).strip())
+                header = (b'Basic %s'
+                          % base64.b64encode(raw.encode('utf-8')).strip())
+
+                request.add_header(self.AUTH_HEADER, header.decode('utf-8'))
                 self.used = True
 
         return request
@@ -269,7 +272,7 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
             return None
 
         raw = '%s:%s' % (user, password)
-        auth = 'Basic %s' % base64.b64encode(raw).strip()
+        auth = b'Basic %s' % base64.b64encode(raw.encode('utf-8')).strip()
 
         if (request.headers.get(self.auth_header, None) == auth and
             (not self._needs_otp_token or
@@ -278,7 +281,7 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
             # trying again.
             return None
 
-        request.add_unredirected_header(self.auth_header, auth)
+        request.add_unredirected_header(self.auth_header, auth.decode('utf-8'))
 
         try:
             response = self.parent.open(request, timeout=request.timeout)
@@ -510,7 +513,7 @@ class ReviewBoardServer(object):
 
         opener = build_opener(*handlers)
         opener.addheaders = [
-            (b'User-agent', self.agent),
+            ('User-agent', self.agent),
         ]
         install_opener(opener)
 
@@ -574,11 +577,11 @@ class ReviewBoardServer(object):
 
             if body:
                 headers.update({
-                    b'Content-Type': content_type,
-                    b'Content-Length': str(len(body)),
+                    'Content-Type': content_type,
+                    'Content-Length': str(len(body)),
                 })
             else:
-                headers[b'Content-Length'] = '0'
+                headers['Content-Length'] = '0'
 
             rsp = self._urlopen(Request(
                 request.url, body, headers, request.method))

@@ -826,7 +826,7 @@ class Command(object):
                 username = input()
 
             if password is None:
-                password = getpass.getpass(b'Password: ')
+                password = getpass.getpass('Password: ')
 
         return username, password
 
