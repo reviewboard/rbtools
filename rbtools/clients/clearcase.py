@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import datetime
 import itertools
 import logging
@@ -46,7 +48,9 @@ class get_elements_from_label_thread(threading.Thread):
         threading.Thread.__init__(self)
 
     def run(self):
-        """Returns a dictionnary of ClearCase elements (oid + version)
+        """Run the thread.
+
+        This will store a dictionary of ClearCase elements (oid + version)
         belonging to a label and identified by path.
         """
         output = execute(
@@ -92,7 +96,7 @@ class ClearCaseClient(SCMClient):
         super(ClearCaseClient, self).__init__(**kwargs)
 
     def get_repository_info(self):
-        """Returns information on the Clear Case repository.
+        """Return information on the Clear Case repository.
 
         This will first check if the cleartool command is installed and in the
         path, and that the current working directory is inside of the view.
@@ -102,7 +106,7 @@ class ClearCaseClient(SCMClient):
                           'ClearCase')
             return None
 
-        viewname = execute(["cleartool", "pwv", "-short"]).strip()
+        viewname = execute(['cleartool', 'pwv', '-short']).strip()
         if viewname.startswith('** NONE'):
             return None
 
@@ -111,7 +115,7 @@ class ClearCaseClient(SCMClient):
         check_gnu_diff()
 
         property_lines = execute(
-            ["cleartool", "lsview", "-full", "-properties", "-cview"],
+            ['cleartool', 'lsview', '-full', '-properties', '-cview'],
             split_lines=True)
         for line in property_lines:
             properties = line.split(' ')
@@ -133,15 +137,15 @@ class ClearCaseClient(SCMClient):
                 break
 
         # Find current VOB's tag
-        vobstag = execute(["cleartool", "describe", "-short", "vob:."],
+        vobstag = execute(['cleartool', 'describe', '-short', 'vob:.'],
                           ignore_errors=True).strip()
-        if "Error: " in vobstag:
-            raise SCMError("Failed to generate diff run rbt inside vob.")
+        if 'Error: ' in vobstag:
+            raise SCMError('Failed to generate diff run rbt inside vob.')
 
-        root_path = execute(["cleartool", "pwv", "-root"],
+        root_path = execute(['cleartool', 'pwv', '-root'],
                             ignore_errors=True).strip()
-        if "Error: " in root_path:
-            raise SCMError("Failed to generate diff run rbt inside view.")
+        if 'Error: ' in root_path:
+            raise SCMError('Failed to generate diff run rbt inside view.')
 
         # From current working directory cut path to VOB. On Windows
         # and under cygwin, the VOB tag contains the VOB's path including
@@ -158,8 +162,7 @@ class ClearCaseClient(SCMClient):
                                        supports_parent_diffs=False)
 
     def _determine_branch_path(self, version_path):
-        """Determine branch path of revision.
-        """
+        """Determine branch path of revision."""
         branch_path, number = cpath.split(version_path)
         return branch_path
 
@@ -399,9 +402,9 @@ class ClearCaseClient(SCMClient):
             path, current = change.split('@@')
 
             # If a file isn't in the correct vob, then ignore it.
-            if path.find("%s/" % (repository_info.vobstag,)) == -1:
-                logging.debug("Vobstag does not match, so ignore changes on %s"
-                              % path)
+            if path.find('%s/' % (repository_info.vobstag,)) == -1:
+                logging.debug('Vobstag does not match, ignoring changes on %s',
+                              path)
                 continue
 
             version_number = self._determine_version(current)
@@ -488,16 +491,16 @@ class ClearCaseClient(SCMClient):
         version is 0 except for /main/0."""
 
         # There is no predecessor for @@/main/0, so keep current revision.
-        if file_revision.endswith("@@/main/0"):
+        if file_revision.endswith('@@/main/0'):
             return file_revision
 
-        if file_revision.endswith("/0"):
-            logging.debug("Found file %s with version 0", file_revision)
-            file_revision = execute(["cleartool",
-                                     "describe",
-                                     "-fmt", "%En@@%PSn",
+        if file_revision.endswith('/0'):
+            logging.debug('Found file %s with version 0', file_revision)
+            file_revision = execute(['cleartool',
+                                     'describe',
+                                     '-fmt', '%En@@%PSn',
                                      file_revision])
-            logging.debug("Sanitized with predecessor, new file: %s",
+            logging.debug('Sanitized with predecessor, new file: %s',
                           file_revision)
 
         return file_revision
@@ -524,7 +527,7 @@ class ClearCaseClient(SCMClient):
 
         # Get the absolute path of each element located in path, but only
         # clearcase elements => -vob_only
-        output = execute(["cleartool", "ls", "-short", "-nxname", "-vob_only",
+        output = execute(['cleartool', 'ls', '-short', '-nxname', '-vob_only',
                           path])
         lines = output.splitlines(True)
 
@@ -611,12 +614,12 @@ class ClearCaseClient(SCMClient):
 
         output = execute(
             [
-                "cleartool",
-                "find",
-                "-all",
-                "-version",
-                "brtype(%s)" % branch,
-                "-exec",
+                'cleartool',
+                'find',
+                '-all',
+                '-version',
+                'brtype(%s)' % branch,
+                '-exec',
                 'cleartool descr -fmt "%%En\t%%PVn\t%%Vn\n" %s' % CLEARCASE_XPN
             ],
             extra_ignore_errors=(1,),
@@ -696,7 +699,7 @@ class ClearCaseClient(SCMClient):
                     continue
                 seen.append(path)
 
-                # Initialize previous and current version to "/main/0"
+                # Initialize previous and current version to '/main/0'
                 changelist[path] = {
                     'previous': '/main/0',
                     'current': '/main/0',
@@ -788,22 +791,25 @@ class ClearCaseClient(SCMClient):
             except OSError:
                 pass
 
-            execute(["cleartool", "get", "-to", tmp_old_file, old_file])
-            execute(["cleartool", "get", "-to", tmp_new_file, new_file])
-            diff_cmd = ["diff", "-uN", tmp_old_file, tmp_new_file]
+            execute(['cleartool', 'get', '-to', tmp_old_file, old_file])
+            execute(['cleartool', 'get', '-to', tmp_new_file, new_file])
+            diff_cmd = ['diff', '-uN', tmp_old_file, tmp_new_file]
         else:
-            diff_cmd = ["diff", "-uN", old_file, new_file]
+            diff_cmd = ['diff', '-uN', old_file, new_file]
 
-        dl = execute(diff_cmd, extra_ignore_errors=(1, 2),
-                     translate_newlines=False)
+        dl = execute(diff_cmd,
+                     extra_ignore_errors=(1, 2),
+                     results_unicode=False)
 
         # Replace temporary file name in diff with the one in snapshot view.
-        if self.viewtype == "snapshot":
-            dl = dl.replace(tmp_old_file, old_file)
-            dl = dl.replace(tmp_new_file, new_file)
+        if self.viewtype == 'snapshot':
+            dl = dl.replace(tmp_old_file.encode('utf-8'),
+                            old_file.encode('utf-8'))
+            dl = dl.replace(tmp_new_file.encode('utf-8'),
+                            new_file.encode('utf-8'))
 
         # If the input file has ^M characters at end of line, lets ignore them.
-        dl = dl.replace('\r\r\n', '\r\n')
+        dl = dl.replace(b'\r\r\n', b'\r\n')
         dl = dl.splitlines(True)
 
         # Special handling for the output of the diff tool on binary files:
@@ -811,22 +817,29 @@ class ClearCaseClient(SCMClient):
         # and the code below expects the output to start with
         #     "Binary files "
         if (len(dl) == 1 and
-            dl[0].startswith('Files %s and %s differ' % (old_file, new_file))):
-            dl = ['Binary files %s and %s differ\n' % (old_file, new_file)]
+            dl[0].startswith(b'Files %s and %s differ'
+                             % (old_file.encode('utf-8'),
+                                new_file.encode('utf-8')))):
+            dl = [b'Binary files %s and %s differ\n'
+                  % (old_file.encode('utf-8'),
+                     new_file.encode('utf-8'))]
 
         # We need oids of files to translate them to paths on reviewboard
         # repository.
-        old_oid = execute(["cleartool", "describe", "-fmt", "%On", old_file])
-        new_oid = execute(["cleartool", "describe", "-fmt", "%On", new_file])
+        old_oid = execute(['cleartool', 'describe', '-fmt', '%On', old_file],
+                          results_unicode=False)
+        new_oid = execute(['cleartool', 'describe', '-fmt', '%On', new_file],
+                          results_unicode=False)
 
-        if dl == [] or dl[0].startswith("Binary files "):
+        if dl == [] or dl[0].startswith(b'Binary files '):
             if dl == []:
-                dl = ["File %s in your changeset is unmodified\n" % new_file]
+                dl = [b'File %s in your changeset is unmodified\n' %
+                      new_file.encode('utf-8')]
 
-            dl.insert(0, "==== %s %s ====\n" % (old_oid, new_oid))
-            dl.append('\n')
+            dl.insert(0, b'==== %s %s ====\n' % (old_oid, new_oid))
+            dl.append(b'\n')
         else:
-            dl.insert(2, "==== %s %s ====\n" % (old_oid, new_oid))
+            dl.insert(2, b'==== %s %s ====\n' % (old_oid, new_oid))
 
         return dl
 
@@ -842,21 +855,25 @@ class ClearCaseClient(SCMClient):
         old_tmp = make_tempfile(content=old_content)
         new_tmp = make_tempfile(content=new_content)
 
-        diff_cmd = ["diff", "-uN", old_tmp, new_tmp]
+        diff_cmd = ['diff', '-uN', old_tmp, new_tmp]
         dl = execute(diff_cmd,
                      extra_ignore_errors=(1, 2),
-                     translate_newlines=False,
+                     results_unicode=False,
                      split_lines=True)
 
         # Replace temporary filenames with real directory names and add ids
         if dl:
-            dl[0] = dl[0].replace(old_tmp, old_dir)
-            dl[1] = dl[1].replace(new_tmp, new_dir)
-            old_oid = execute(["cleartool", "describe", "-fmt", "%On",
-                               old_dir])
-            new_oid = execute(["cleartool", "describe", "-fmt", "%On",
-                               new_dir])
-            dl.insert(2, "==== %s %s ====\n" % (old_oid, new_oid))
+            dl[0] = dl[0].replace(old_tmp.encode('utf-8'),
+                                  old_dir.encode('utf-8'))
+            dl[1] = dl[1].replace(new_tmp.encode('utf-8'),
+                                  new_dir.encode('utf-8'))
+            old_oid = execute(['cleartool', 'describe', '-fmt', '%On',
+                               old_dir],
+                              results_unicode=False)
+            new_oid = execute(['cleartool', 'describe', '-fmt', '%On',
+                               new_dir],
+                              results_unicode=False)
+            dl.insert(2, b'==== %s %s ====\n' % (old_oid, new_oid))
 
         return dl
 
@@ -874,7 +891,7 @@ class ClearCaseClient(SCMClient):
             if self.viewtype == 'snapshot':
                 # ClearCase object path is file path + @@
                 object_path = new_file.split('@@')[0] + '@@'
-                output = execute(["cleartool", "describe", "-fmt", "%m",
+                output = execute(['cleartool', 'describe', '-fmt', '%m',
                                   object_path])
                 object_kind = output.strip()
                 isdir = object_kind == 'directory element'
@@ -886,15 +903,15 @@ class ClearCaseClient(SCMClient):
             elif cpath.exists(new_file) or self.viewtype == 'snapshot':
                 dl = self._diff_files(old_file, new_file)
             else:
-                logging.error("File %s does not exist or access is denied."
-                              % new_file)
+                logging.error('File %s does not exist or access is denied.',
+                              new_file)
                 continue
 
             if dl:
-                diff.append(''.join(dl))
+                diff.append(b''.join(dl))
 
         return {
-            'diff': ''.join(diff),
+            'diff': b''.join(diff),
         }
 
 
@@ -921,7 +938,7 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
 
         # Find VOB's family uuid based on VOB's tag
         uuid = self._get_vobs_uuid(self.vobstag)
-        logging.debug("Repository's %s uuid is %r" % (self.vobstag, uuid))
+        logging.debug('Repository vobstag %s uuid is %r', self.vobstag, uuid)
 
         # To reduce HTTP requests (_get_repository_info calls), we build an
         # ordered list of ClearCase repositories starting with the ones that
@@ -993,7 +1010,7 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
     def _get_vobs_uuid(self, vobstag):
         """Return family uuid of VOB."""
 
-        property_lines = execute(["cleartool", "lsvob", "-long", vobstag],
+        property_lines = execute(['cleartool', 'lsvob', '-long', vobstag],
                                  split_lines=True)
         for line in property_lines:
             if line.startswith('Vob family uuid:'):

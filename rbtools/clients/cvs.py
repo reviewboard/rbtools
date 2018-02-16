@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import logging
 import os
 import re
@@ -135,12 +137,15 @@ class CVSClient(SCMClient):
 
         base = revisions['base']
         tip = revisions['tip']
-        if (not (base == 'BASE' and
-                 tip == self.REVISION_WORKING_COPY)):
+        if not (base == 'BASE' and
+                tip == self.REVISION_WORKING_COPY):
             diff_cmd.extend(['-r', base, '-r', tip])
 
-        diff = execute(diff_cmd + include_files, extra_ignore_errors=(1,),
-                       log_output_on_error=False, split_lines=True)
+        diff = execute(diff_cmd + include_files,
+                       extra_ignore_errors=(1,),
+                       log_output_on_error=False,
+                       split_lines=True,
+                       results_unicode=False)
 
         if exclude_patterns:
             # CVS diffs are relative to the current working directory, so the

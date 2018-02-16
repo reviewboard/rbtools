@@ -875,6 +875,7 @@ class TFHelperWrapper(object):
 
         rc, diff, errors = self._run_helper(['diff', '--', base, tip],
                                             ignore_errors=True,
+                                            results_unicode=False,
                                             log_output_on_error=False)
 
         if rc in (0, 2):

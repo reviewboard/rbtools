@@ -49,7 +49,7 @@ class MercurialTestBase(SCMClientTests):
         return execute(['hg'] + command, env, split_lines=False,
                        ignore_errors=ignore_errors,
                        extra_ignore_errors=extra_ignore_errors,
-                       translate_newlines=True)
+                       results_unicode=False)
 
     def _hg_add_file_commit(self, filename, data, msg, branch=None):
         with open(filename, 'wb') as f:

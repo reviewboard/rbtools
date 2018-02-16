@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 from rbtools.api.cache import clear_cache
 from rbtools.commands import Command, Option
 

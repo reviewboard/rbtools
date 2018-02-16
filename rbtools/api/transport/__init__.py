@@ -1,3 +1,6 @@
+from __future__ import unicode_literals
+
+
 class Transport(object):
     """Base class for API Transport layers.
 

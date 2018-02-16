@@ -18,7 +18,7 @@ def confirm(question):
     """
     while True:
         full_question = '%s [Yes/No]: ' % question
-        answer = input(full_question.encode('utf-8')).lower()
+        answer = input(str(full_question)).lower()
         try:
             return strtobool(answer)
         except ValueError:

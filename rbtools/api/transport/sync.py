@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import logging
 
 from rbtools.api.decode import decode_response

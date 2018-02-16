@@ -34,8 +34,7 @@ class GitClientTests(SpyAgency, SCMClientTests):
 
     def _run_git(self, command):
         return execute(['git'] + command, env=None, split_lines=False,
-                       ignore_errors=False, extra_ignore_errors=(),
-                       translate_newlines=True)
+                       ignore_errors=False, extra_ignore_errors=())
 
     def _git_add_file_commit(self, filename, data, msg):
         """Add a file to a git repository.

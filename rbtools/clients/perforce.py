@@ -1206,7 +1206,7 @@ class PerforceClient(SCMClient):
 
         # Diff returns "1" if differences were found.
         dl = execute(diff_cmd, extra_ignore_errors=(1, 2),
-                     log_output_on_error=False, translate_newlines=False,
+                     log_output_on_error=False,
                      results_unicode=False)
 
         # If the input file has ^M characters at end of line, lets ignore them.
@@ -1237,17 +1237,22 @@ class PerforceClient(SCMClient):
         #     "Binary files "
         if (len(dl) == 1 and
             dl[0].startswith(b'Files %s and %s differ' %
-                             (old_file, new_file))):
-            dl = [b'Binary files %s and %s differ\n' % (old_file, new_file)]
+                             (old_file.encode('utf-8'),
+                              new_file.encode('utf-8')))):
+            dl = [b'Binary files %s and %s differ\n'
+                  % (old_file.encode('utf-8'),
+                     new_file.encode('utf-8'))]
 
         if dl == [] or dl[0].startswith(b'Binary files '):
             is_empty_and_changed = (self.supports_empty_files() and
                                     changetype_short in ('A', 'D'))
 
             if dl == [] and (is_move or is_empty_and_changed):
-                line = ('==== %s#%s ==%s== %s ====\n'
-                        % (depot_file, base_revision, changetype_short,
-                           new_local_path)).encode('utf-8')
+                line = (b'==== %s#%d ==%s== %s ====\n'
+                        % (depot_file.encode('utf-8'),
+                           base_revision,
+                           changetype_short.encode('utf-8'),
+                           new_local_path.encode('utf-8')))
                 dl.insert(0, line)
                 dl.append(b'\n')
             else:
@@ -1287,16 +1292,21 @@ class PerforceClient(SCMClient):
 
                 timestamp = '%s-%s-%s %s' % (year, month, day, timestamp)
 
-            dl[0] = ('--- %s\t%s#%s\n'
-                     % (local_path, depot_file, base_revision)).encode('utf-8')
-            dl[1] = ('+++ %s\t%s\n'
-                     % (new_local_path, timestamp)).encode('utf-8')
+            dl[0] = (b'--- %s\t%s#%d\n'
+                     % (local_path.encode('utf-8'),
+                        depot_file.encode('utf-8'),
+                        base_revision))
+            dl[1] = (b'+++ %s\t%s\n'
+                     % (new_local_path.encode('utf-8'),
+                        timestamp.encode('utf-8')))
 
             if is_move:
                 dl.insert(0,
-                          ('Moved to: %s\n' % new_depot_file).encode('utf-8'))
+                          (b'Moved to: %s\n' %
+                           new_depot_file.encode('utf-8')))
                 dl.insert(0,
-                          ('Moved from: %s\n' % depot_file).encode('utf-8'))
+                          (b'Moved from: %s\n' %
+                           depot_file.encode('utf-8')))
 
             # Not everybody has files that end in a newline (ugh). This ensures
             # that the resulting diff file isn't broken.
@@ -1313,7 +1323,7 @@ class PerforceClient(SCMClient):
         the file readonly and that causes a later call to unlink fail. So we
         make the file read/write.
         """
-        logging.debug('Writing "%s" to "%s"' % (depot_path, tmpfile))
+        logging.debug('Writing "%s" to "%s"', depot_path, tmpfile)
         self.p4.print_file(depot_path, out_file=tmpfile)
 
         # The output of 'p4 print' will be a symlink if that's what version

@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import logging
 import os
 import re
@@ -31,14 +33,14 @@ class PlasticClient(SCMClient):
             return None
 
         # Get the workspace directory, so we can strip it from the diff output
-        self.workspacedir = execute(["cm", "gwp", ".", "--format={1}"],
+        self.workspacedir = execute(['cm', 'gwp', '.', '--format={1}'],
                                     split_lines=False,
                                     ignore_errors=True).strip()
 
-        logging.debug("Workspace is %s" % self.workspacedir)
+        logging.debug('Workspace is %s', self.workspacedir)
 
         # Get the repository that the current directory is from
-        split = execute(["cm", "ls", self.workspacedir, "--format={8}"],
+        split = execute(['cm', 'ls', self.workspacedir, '--format={8}'],
                         split_lines=True, ignore_errors=True)
 
         # remove blank lines
@@ -56,7 +58,7 @@ class PlasticClient(SCMClient):
                               supports_parent_diffs=False)
 
     def parse_revision_spec(self, revisions=[]):
-        """Parses the given revision spec.
+        """Parse the given revision spec.
 
         The 'revisions' argument is a list of revisions as specified by the
         user. Items in the list do not necessarily represent a single revision,
@@ -113,6 +115,7 @@ class PlasticClient(SCMClient):
             ['cm', 'diff', tip, '--format={status} {path} rev:revid:{revid} '
                                 'rev:revid:{parentrevid} src:{srccmpath} '
                                 'dst:{dstcmpath}{newline}'],
+            results_unicode=False,
             split_lines=True)
         logging.debug('Got files: %s', diff_entries)
 
@@ -137,62 +140,62 @@ class PlasticClient(SCMClient):
             if not f:
                 continue
 
-            m = re.search(r'(?P<type>[ACMD]) (?P<file>.*) '
-                          r'(?P<revspec>rev:revid:[-\d]+) '
-                          r'(?P<parentrevspec>rev:revid:[-\d]+) '
-                          r'src:(?P<srcpath>.*) '
-                          r'dst:(?P<dstpath>.*)$',
+            m = re.search(br'(?P<type>[ACMD]) (?P<file>.*) '
+                          br'(?P<revspec>rev:revid:[-\d]+) '
+                          br'(?P<parentrevspec>rev:revid:[-\d]+) '
+                          br'src:(?P<srcpath>.*) '
+                          br'dst:(?P<dstpath>.*)$',
                           f)
             if not m:
                 raise SCMError('Could not parse "cm log" response: %s' % f)
 
-            changetype = m.group("type")
-            filename = m.group("file")
+            changetype = m.group('type')
+            filename = m.group('file')
 
-            if changetype == "M":
+            if changetype == b'M':
                 # Handle moved files as a delete followed by an add.
                 # Clunky, but at least it works
-                oldfilename = m.group("srcpath")
-                oldspec = m.group("revspec")
-                newfilename = m.group("dstpath")
-                newspec = m.group("revspec")
+                oldfilename = m.group('srcpath')
+                oldspec = m.group('revspec')
+                newfilename = m.group('dstpath')
+                newspec = m.group('revspec')
 
                 self._write_file(oldfilename, oldspec, tmp_diff_from_filename)
                 dl = self._diff_files(tmp_diff_from_filename, empty_filename,
-                                      oldfilename, "rev:revid:-1", oldspec,
+                                      oldfilename, 'rev:revid:-1', oldspec,
                                       changetype)
                 diff_lines += dl
 
                 self._write_file(newfilename, newspec, tmp_diff_to_filename)
                 dl = self._diff_files(empty_filename, tmp_diff_to_filename,
-                                      newfilename, newspec, "rev:revid:-1",
+                                      newfilename, newspec, 'rev:revid:-1',
                                       changetype)
                 diff_lines += dl
 
             else:
-                newrevspec = m.group("revspec")
-                parentrevspec = m.group("parentrevspec")
+                newrevspec = m.group('revspec')
+                parentrevspec = m.group('parentrevspec')
 
-                logging.debug("Type %s File %s Old %s New %s"
-                              % (changetype, filename, parentrevspec,
-                                 newrevspec))
+                logging.debug('Type %s File %s Old %s New %s',
+                              changetype, filename, parentrevspec, newrevspec)
 
                 old_file = new_file = empty_filename
 
-                if (changetype in ['A'] or
-                    (changetype in ['C'] and parentrevspec == "rev:revid:-1")):
+                if (changetype in [b'A'] or
+                    (changetype in [b'C'] and
+                     parentrevspec == b'rev:revid:-1')):
                     # There's only one content to show
                     self._write_file(filename, newrevspec,
                                      tmp_diff_to_filename)
                     new_file = tmp_diff_to_filename
-                elif changetype in ['C']:
+                elif changetype in [b'C']:
                     self._write_file(filename, parentrevspec,
                                      tmp_diff_from_filename)
                     old_file = tmp_diff_from_filename
                     self._write_file(filename, newrevspec,
                                      tmp_diff_to_filename)
                     new_file = tmp_diff_to_filename
-                elif changetype in ['D']:
+                elif changetype in [b'D']:
                     self._write_file(filename, parentrevspec,
                                      tmp_diff_from_filename)
                     old_file = tmp_diff_from_filename
@@ -209,32 +212,45 @@ class PlasticClient(SCMClient):
         os.unlink(tmp_diff_from_filename)
         os.unlink(tmp_diff_to_filename)
 
-        return ''.join(diff_lines)
+        return b''.join(diff_lines)
 
     def _diff_files(self, old_file, new_file, filename, newrevspec,
                     parentrevspec, changetype):
-        """
-        Do the work of producing a diff for Plastic (based on the Perforce one)
+        """Do the work of producing a diff for Plastic.
 
-        old_file - The absolute path to the "old" file.
-        new_file - The absolute path to the "new" file.
-        filename - The file in the Plastic workspace
-        newrevspec - The revid spec of the changed file
-        parentrevspecspec - The revision spec of the "old" file
-        changetype - The change type as a single character string
+        Args:
+            old_file (bytes):
+                The absolute path to the old file.
 
-        Returns a list of strings of diff lines.
+            new_file (bytes):
+                The absolute path to the new file.
+
+            filename (bytes):
+                The file in the Plastic workspace.
+
+            newrevspec (bytes):
+                The revid spec of the new file.
+
+            parentrevspec (bytes):
+                The revid spec of the old file.
+
+            changetype (bytes):
+                The change type as a single character string.
+
+        Returns:
+            list of bytes:
+            The computed diff.
         """
         if filename.startswith(self.workspacedir):
             filename = filename[len(self.workspacedir):]
 
-        diff_cmd = ["diff", "-urN", old_file, new_file]
         # Diff returns "1" if differences were found.
-        dl = execute(diff_cmd, extra_ignore_errors=(1, 2),
-                     translate_newlines = False)
+        dl = execute(['diff', '-urN', old_file, new_file],
+                     extra_ignore_errors=(1, 2),
+                     results_unicode=False)
 
         # If the input file has ^M characters at end of line, lets ignore them.
-        dl = dl.replace('\r\r\n', '\r\n')
+        dl = dl.replace(b'\r\r\n', b'\r\n')
         dl = dl.splitlines(True)
 
         # Special handling for the output of the diff tool on binary files:
@@ -242,29 +258,34 @@ class PlasticClient(SCMClient):
         # and the code below expects the output to start with
         #     "Binary files "
         if (len(dl) == 1 and
-            dl[0].startswith('Files %s and %s differ' % (old_file, new_file))):
-            dl = ['Binary files %s and %s differ\n' % (old_file, new_file)]
+            dl[0].startswith(b'Files %s and %s differ'
+                             % (old_file.encode('utf-8'),
+                                new_file.encode('utf-8')))):
+            dl = [b'Binary files %s and %s differ\n'
+                  % (old_file.encode('utf-8'),
+                     new_file.encode('utf-8'))]
 
-        if dl == [] or dl[0].startswith("Binary files "):
+        if dl == [] or dl[0].startswith(b'Binary files '):
             if dl == []:
                 return []
 
-            dl.insert(0, "==== %s (%s) ==%s==\n" % (filename, newrevspec,
-                                                    changetype))
+            dl.insert(0, b'==== %s (%s) ==%s==\n'
+                      % (filename, newrevspec, changetype))
             dl.append('\n')
         else:
-            dl[0] = "--- %s\t%s\n" % (filename, parentrevspec)
-            dl[1] = "+++ %s\t%s\n" % (filename, newrevspec)
+            dl[0] = '--- %s\t%s\n' % (filename, parentrevspec)
+            dl[1] = '+++ %s\t%s\n' % (filename, newrevspec)
 
             # Not everybody has files that end in a newline.  This ensures
             # that the resulting diff file isn't broken.
-            if dl[-1][-1] != '\n':
-                dl.append('\n')
+            if dl[-1][-1] != b'\n':
+                dl.append(b'\n')
 
         return dl
 
     def _write_file(self, filename, filespec, tmpfile):
         """ Grabs a file from Plastic and writes it to a temp file """
-        logging.debug("Writing '%s' (rev %s) to '%s'"
-                      % (filename, filespec, tmpfile))
-        execute(["cm", "cat", filespec, "--file=" + tmpfile])
+        logging.debug('Writing "%s" (rev %s) to "%s"',
+                      filename.decode('utf-8'),
+                      filespec.decode('utf-8'))
+        execute(['cm', 'cat', filespec, '--file=' + tmpfile])

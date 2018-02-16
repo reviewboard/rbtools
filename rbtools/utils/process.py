@@ -32,7 +32,6 @@ def execute(command,
             split_lines=False,
             ignore_errors=False,
             extra_ignore_errors=(),
-            translate_newlines=True,
             with_errors=True,
             none_on_ignored_error=False,
             return_error_code=False,
@@ -60,11 +59,6 @@ def execute(command,
             A set of errors to ignore even when ``ignore_errors`` is False.
             This is used because some commands (such as diff) use non-zero
             return codes even when the command was successful.
-
-        translate_newlines (bool, optional):
-            Whether to translate all newlines in the output to ``\n``. This is
-            deprecated in favor of the ``results_unicode`` argument and will be
-            removed soon.
 
         with_errors (bool, optional):
             Whether to combine the output and error streams of the command
