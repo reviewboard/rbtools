@@ -49,9 +49,8 @@ RB_COOKIE_NAME = 'rbsessionid'
 
 class HttpRequest(object):
     """High-level HTTP-request object."""
-    def __init__(self, url, method='GET', query_args={}):
+    def __init__(self, url, method='GET', query_args={}, headers={}):
         self.method = method
-        self.headers = {}
         self._fields = {}
         self._files = {}
 
@@ -62,12 +61,26 @@ class HttpRequest(object):
             for key, value in six.iteritems(query_args)
         ])
 
+        # Make sure headers are always in the native string type.
+        self.headers = {
+            str(key): str(value)
+            for key, value in six.iteritems(headers)
+        }
+
         # Add the query arguments to the url
-        url_parts = list(urlparse(url))
+        url_parts = list(urlparse(str(url)))
         query = dict(parse_qsl(url_parts[4]))
         query.update(query_args)
         url_parts[4] = urlencode(query)
         self.url = urlunparse(url_parts)
+
+    @property
+    def method(self):
+        return self._method
+
+    @method.setter
+    def method(self, method):
+        self._method = str(method)
 
     def add_field(self, name, value):
         self._fields[name] = value
@@ -157,9 +170,14 @@ class HttpRequest(object):
 
 class Request(URLRequest):
     """A request which contains a method attribute."""
-    def __init__(self, url, body='', headers={}, method='PUT'):
-        URLRequest.__init__(self, url, body, headers)
-        self.method = method
+    def __init__(self, url, body=b'', headers={}, method='PUT'):
+        normalized_headers = {
+            str(key): str(value)
+            for key, value in six.iteritems(headers)
+        }
+
+        URLRequest.__init__(self, str(url), body, normalized_headers)
+        self.method = str(method)
 
     def get_method(self):
         return self.method
@@ -513,7 +531,7 @@ class ReviewBoardServer(object):
 
         opener = build_opener(*handlers)
         opener.addheaders = [
-            ('User-agent', self.agent),
+            (str('User-agent'), str(self.agent)),
         ]
         install_opener(opener)
 

@@ -624,9 +624,9 @@ class DiffResource(ItemResource):
     @request_method_decorator
     def get_patch(self, **kwargs):
         """Retrieves the actual diff file contents."""
-        request = HttpRequest(self._url, query_args=kwargs)
-        request.headers['Accept'] = 'text/x-patch'
-        return request
+        return HttpRequest(self._url, query_args=kwargs, headers={
+            'Accept': 'text/x-patch',
+        })
 
 
 @resource_mimetype('application/vnd.reviewboard.org.file')
@@ -635,17 +635,16 @@ class FileDiffResource(ItemResource):
     @request_method_decorator
     def get_patch(self, **kwargs):
         """Retrieves the actual diff file contents."""
-        request = HttpRequest(self._url, query_args=kwargs)
-        request.headers['Accept'] = 'text/x-patch'
-        return request
+        return HttpRequest(self._url, query_args=kwargs, headers={
+            'Accept': 'text/x-patch',
+        })
 
     @request_method_decorator
     def get_diff_data(self, **kwargs):
         """Retrieves the actual raw diff data for the file."""
-        request = HttpRequest(self._url, query_args=kwargs)
-        request.headers['Accept'] = \
-            'application/vnd.reviewboard.org.diff.data+json'
-        return request
+        return HttpRequest(self._url, query_args=kwargs, headers={
+            'Accept': 'application/vnd.reviewboard.org.diff.data+json',
+        })
 
 
 @resource_mimetype('application/vnd.reviewboard.org.file-attachments')
