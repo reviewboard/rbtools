@@ -35,7 +35,8 @@ class BazaarClientTests(SCMClientTests):
         self._bzr_add_file_commit("foo.txt", FOO, "initial commit")
 
         self.child_branch = mktemp()
-        self._run_bzr(["branch", self.original_branch, self.child_branch])
+        self._run_bzr(["branch", "--use-existing-dir", self.original_branch,
+                       self.child_branch])
         self.client = BazaarClient(options=self.options)
         os.chdir(self.orig_dir)
 
@@ -228,7 +229,8 @@ class BazaarClientTests(SCMClientTests):
         self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
 
         grand_child_branch = mktemp()
-        self._run_bzr(["branch", self.child_branch, grand_child_branch])
+        self._run_bzr(["branch", "--use-existing-dir", self.child_branch,
+                       grand_child_branch])
         os.chdir(grand_child_branch)
 
         revisions = self.client.parse_revision_spec([])
@@ -245,7 +247,8 @@ class BazaarClientTests(SCMClientTests):
         self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
 
         grand_child_branch = mktemp()
-        self._run_bzr(["branch", self.child_branch, grand_child_branch])
+        self._run_bzr(["branch", "--use-existing-dir", self.child_branch,
+                       grand_child_branch])
         os.chdir(grand_child_branch)
 
         # Requesting the diff between the grand child branch and its grand
@@ -293,7 +296,8 @@ class BazaarClientTests(SCMClientTests):
         self.options.guess_description = True
 
         grand_child_branch = mktemp()
-        self._run_bzr(["branch", self.child_branch, grand_child_branch])
+        self._run_bzr(["branch", "--use-existing-dir", self.child_branch,
+                       grand_child_branch])
         os.chdir(grand_child_branch)
 
         # Requesting the diff between the grand child branch and its grand
@@ -368,7 +372,8 @@ class BazaarClientTests(SCMClientTests):
         parent_base_commit_id = self.client._get_revno()
 
         grand_child_branch = mktemp()
-        self._run_bzr(["branch", self.child_branch, grand_child_branch])
+        self._run_bzr(["branch", "--use-existing-dir", self.child_branch,
+                       grand_child_branch])
         os.chdir(grand_child_branch)
 
         base_commit_id = self.client._get_revno()
