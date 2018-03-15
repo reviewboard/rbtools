@@ -299,6 +299,13 @@ You can also use the special value of ``-`` to pipe a diff into STDIN::
 Using STDIN will require either a valid cookie, or the :option:`--username`
 and :option:`--password` options.
 
+If your diff depends on some other changes that are not yet in the
+repository, you can specify a "parent diff" (usually the diff between
+what's in the repository and whatever your pre-existing diff is based on)::
+
+    $ rbt post --diff-filename=mycode.diff --parent-diff-filename=parent.diff
+
+You cannot use the ``-`` special value here.
 
 .. _guessing-fields:
 

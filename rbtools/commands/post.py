@@ -784,6 +784,15 @@ class Post(Command):
                         diff = fp.read()
                 except IOError as e:
                     raise CommandError('Unable to open diff filename: %s' % e)
+
+            if self.options.parent_diff_filename:
+                try:
+                    diff_path = os.path.join(origcwd,
+                                             self.options.parent_diff_filename)
+                    with open(diff_path, 'rb') as fp:
+                        parent_diff = fp.read()
+                except IOError as e:
+                    raise CommandError('Unable to open parent diff filename: %s' % e)
         else:
             self.revisions = get_revisions(self.tool, self.cmd_args)
 
