@@ -521,9 +521,9 @@ class PerforceClient(SCMClient):
             raise EmptyChangeError
 
         if cl_is_shelved:
-            logging.info('Generating diff for shelved changeset %s' % tip)
+            logging.info('Generating diff for shelved changeset %s', tip)
         else:
-            logging.info('Generating diff for pending changeset %s' % tip)
+            logging.info('Generating diff for pending changeset %s', tip)
 
         diff_lines = []
 
@@ -1536,7 +1536,7 @@ class PerforceClient(SCMClient):
         # Get the changelist number from the tip revision, removing the prefix
         # if necessary. Don't allow amending submitted or default changelists.
         changelist_id = revisions['tip']
-        logging.debug('Preparing to amend change %s' % changelist_id)
+        logging.debug('Preparing to amend change %s', changelist_id)
 
         if not changelist_id.startswith(self.REVISION_PENDING_CLN_PREFIX):
             raise AmendError('Cannot modify submitted changelist %s'

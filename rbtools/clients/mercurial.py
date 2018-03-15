@@ -120,8 +120,8 @@ class MercurialClient(SCMClient):
 
                 if rc_key in self.hgrc:
                     self._remote_path = (candidate, self.hgrc[rc_key])
-                    logging.debug('Using candidate path %r: %r' %
-                                  self._remote_path)
+                    logging.debug('Using candidate path %r: %r',
+                                  self._remote_path[0], self._remote_path[1])
                     break
 
         self._initted = True
@@ -548,7 +548,7 @@ class MercurialClient(SCMClient):
             if not rev.isdigit():
                 raise Exception('Unexpected output from hg: %s' % line)
 
-            logging.debug('Found outgoing changeset %s:%s' % (rev, node))
+            logging.debug('Found outgoing changeset %s:%s', rev, node)
 
             outgoing_changesets.append((int(rev), node, branch))
 

@@ -90,7 +90,7 @@ class Stamp(Command):
             no_commit_error=self.no_commit_error)
 
         if review_request:
-            logging.debug('Found review request ID %d' % review_request.id)
+            logging.debug('Found review request ID %d', review_request.id)
             return review_request.id, review_request.absolute_url
         else:
             logging.debug('Could not find a matching review request')

@@ -172,17 +172,17 @@ def execute(command,
 
     if rc and not ignore_errors and rc not in extra_ignore_errors:
         if log_output_on_error:
-            logging.debug('Command exited with rc %s: %s\n%s---'
-                          % (rc, command, data))
+            logging.debug('Command exited with rc %s: %s\n%s---',
+                          rc, command, data)
 
         raise Exception('Failed to execute command: %s' % command)
     elif rc:
         if log_output_on_error:
-            logging.debug('Command exited with rc %s: %s\n%s---'
-                          % (rc, command, data))
+            logging.debug('Command exited with rc %s: %s\n%s---',
+                          rc, command, data)
         else:
-            logging.debug('Command exited with rc %s: %s'
-                          % (rc, command))
+            logging.debug('Command exited with rc %s: %s',
+                          rc, command)
 
     if rc and none_on_ignored_error:
         data = None

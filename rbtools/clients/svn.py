@@ -110,8 +110,7 @@ class SVNClient(SCMClient):
 
         if not m:
             logging.warn('Unable to parse SVN client version triple from '
-                         '"%s". Assuming version 0.0.0.'
-                         % ver_string.strip())
+                         '"%s". Assuming version 0.0.0.', ver_string.strip())
             self.subversion_client_version = (0, 0, 0)
         else:
             self.subversion_client_version = tuple(map(int, m.groups()))
@@ -881,8 +880,8 @@ class SVNClient(SCMClient):
                              'directory. To prevent conflicts, all files '
                              'not under the current directory have been '
                              'excluded. To apply all files in this '
-                             'patch, apply this patch from the %s directory.'
-                             % base_dir)
+                             'patch, apply this patch from the %s directory.',
+                             base_dir)
 
                 if empty:
                     logging.warn('All files were excluded from the patch.')

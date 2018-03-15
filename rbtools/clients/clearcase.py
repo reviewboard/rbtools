@@ -671,8 +671,8 @@ class ClearCaseClient(SCMClient):
                         'ClearCase label %s is not a valid label' % label)
 
             previous_label, current_label = labels
-            logging.debug('Comparison between labels %s and %s on %s' %
-                          (previous_label, current_label, comparison_path))
+            logging.debug('Comparison between labels %s and %s on %s',
+                          previous_label, current_label, comparison_path)
 
             # List ClearCase element path and version belonging to previous and
             # current labels, element path is the key of each dict.
@@ -711,10 +711,10 @@ class ClearCaseClient(SCMClient):
                 if path in previous_elements:
                     changelist[path]['previous'] = \
                         previous_elements[path]['version']
-                logging.debug('path: %s\nprevious: %s\ncurrent:  %s\n' %
-                              (path,
-                               changelist[path]['previous'],
-                               changelist[path]['current']))
+                logging.debug('path: %s\nprevious: %s\ncurrent:  %s\n',
+                              path,
+                              changelist[path]['previous'],
+                              changelist[path]['current'])
 
                 # Prevent adding identical version to comparison.
                 if changelist[path]['current'] == changelist[path]['previous']:

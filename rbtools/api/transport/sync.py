@@ -80,8 +80,8 @@ class SyncTransport(Transport):
 
     def _execute_request(self, request):
         """Execute an HTTPRequest and construct a resource from the payload"""
-        logging.debug('Making HTTP %s request to %s' % (request.method,
-                                                        request.url))
+        logging.debug('Making HTTP %s request to %s',
+                      request.method, request.url)
 
         rsp = self.server.make_request(request)
         info = rsp.info()

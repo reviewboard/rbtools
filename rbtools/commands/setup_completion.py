@@ -70,7 +70,7 @@ class SetupCompletion(Command):
             with open(dest, 'w') as f:
                 f.write(script)
         except IOError as e:
-            logging.error('I/O Error (%s): %s' % (e.errno, e.strerror))
+            logging.error('I/O Error (%s): %s', e.errno, e.strerror)
             sys.exit()
 
         print('Successfully installed %s auto-completions.' % shell)

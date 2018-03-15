@@ -555,14 +555,14 @@ class ReviewBoardServer(object):
 
             assert rsp['stat'] == 'fail'
 
-            logging.debug('Got API Error %d (HTTP code %d): %s' %
-                          (rsp['err']['code'], http_status, rsp['err']['msg']))
-            logging.debug('Error data: %r' % rsp)
+            logging.debug('Got API Error %d (HTTP code %d): %s',
+                          rsp['err']['code'], http_status, rsp['err']['msg'])
+            logging.debug('Error data: %r', rsp)
 
             raise create_api_error(http_status, rsp['err']['code'], rsp,
                                    rsp['err']['msg'])
         except ValueError:
-            logging.debug('Got HTTP error: %s: %s' % (http_status, data))
+            logging.debug('Got HTTP error: %s: %s', http_status, data)
             raise APIError(http_status, None, None, data)
 
     def make_request(self, request):

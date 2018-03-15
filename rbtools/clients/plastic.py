@@ -287,5 +287,6 @@ class PlasticClient(SCMClient):
         """ Grabs a file from Plastic and writes it to a temp file """
         logging.debug('Writing "%s" (rev %s) to "%s"',
                       filename.decode('utf-8'),
-                      filespec.decode('utf-8'))
+                      filespec.decode('utf-8'),
+                      tmpfile)
         execute(['cm', 'cat', filespec, '--file=' + tmpfile])

@@ -367,7 +367,7 @@ class RepositoryInfo(object):
         self.base_path = base_path
         self.supports_changesets = supports_changesets
         self.supports_parent_diffs = supports_parent_diffs
-        logging.debug('repository info: %s' % self)
+        logging.debug('repository info: %s', self)
 
     def __str__(self):
         return 'Path: %s, Base path: %s, Supports changesets: %s' % \
@@ -377,7 +377,7 @@ class RepositoryInfo(object):
         if not base_path.startswith('/'):
             base_path = '/' + base_path
         logging.debug('changing repository info base_path from %s to %s',
-                      (self.base_path, base_path))
+                      self.base_path, base_path)
         self.base_path = base_path
 
     def find_server_repository_info(self, server):
@@ -416,7 +416,7 @@ def scan_usable_client(config, options, client_name=None):
 
     if client_name:
         if client_name not in SCMCLIENTS:
-            logging.error('The provided repository type "%s" is invalid.' %
+            logging.error('The provided repository type "%s" is invalid.',
                           client_name)
             sys.exit(1)
         else:
@@ -427,7 +427,7 @@ def scan_usable_client(config, options, client_name=None):
         scmclients = SCMCLIENTS
 
     for name, tool in six.iteritems(scmclients):
-        logging.debug('Checking for a %s repository...' % tool.name)
+        logging.debug('Checking for a %s repository...', tool.name)
         repository_info = tool.get_repository_info()
 
         if repository_info:

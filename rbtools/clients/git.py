@@ -629,7 +629,7 @@ class GitClient(SCMClient):
                 if lines is None:
                     logging.error(
                         'Could not get diff for all files (git-diff failed '
-                        'for "%s"). Refusing to return a partial diff.' %
+                        'for "%s"). Refusing to return a partial diff.',
                         filename)
 
                     diff_lines = None
