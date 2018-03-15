@@ -395,6 +395,11 @@ class Command(object):
                    metavar='FILENAME',
                    help='Uploads an existing diff file, instead of '
                         'generating a new diff.'),
+            Option('--parent-diff-filename',
+                   dest='parent_diff_filename',
+                   default=None,
+                   metavar='FILENAME',
+                   help='Use this diff as parent of the --diff-filename.'),
         ]
     )
 
