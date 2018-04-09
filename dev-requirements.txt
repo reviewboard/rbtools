@@ -1,8 +1,6 @@
-beanbag-docutils>=1.3
-kgb>=1.0
+kgb>=2.0.1
 mock
 nose
-Sphinx>=1.6.1
 
 # Ordering here matters.
 mercurial>=4.4.2; python_version >= '2.7'
