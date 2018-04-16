@@ -562,7 +562,7 @@ class GitClient(SCMClient):
             # of the line is the name of the file that has changed.
             changed_files = remove_filenames_matching_patterns(
                 (filename.split()[-1] for filename in changed_files),
-                exclude_patterns, base_dir=self.original_cwd)
+                exclude_patterns, base_dir=self._get_root_directory())
 
             diff_lines = []
 
