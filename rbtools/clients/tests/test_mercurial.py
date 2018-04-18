@@ -11,6 +11,7 @@ from random import randint
 from textwrap import dedent
 
 import six
+from six.moves import range
 from nose import SkipTest
 
 from rbtools.clients import RepositoryInfo

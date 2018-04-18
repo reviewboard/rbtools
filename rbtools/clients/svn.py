@@ -9,6 +9,7 @@ import sys
 from xml.etree import ElementTree
 
 import six
+from six.moves import map
 from six.moves.urllib.parse import unquote
 
 from rbtools.api.errors import APIError

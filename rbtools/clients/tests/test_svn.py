@@ -10,7 +10,6 @@ from hashlib import md5
 
 from kgb import SpyAgency
 from nose import SkipTest
-from six.moves import cStringIO as StringIO
 from six.moves.urllib.request import urlopen
 
 from rbtools.api.client import RBClient
@@ -651,7 +650,7 @@ class SVNClientTests(SCMClientTests):
         self._run_svn(['copy', 'foo.txt', 'dir1'])
 
         # Squash stderr to prevent error message in test output.
-        sys.stderr = StringIO()
+        sys.stderr = open(os.devnull, 'w')
 
         # Ensure SystemExit is raised when attempting to generate diff via
         # several methods:
