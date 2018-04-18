@@ -20,8 +20,7 @@ from rbtools.utils.process import execute
 
 # This specific import is necessary to handle the paths for
 # cygwin enabled machines.
-if (sys.platform.startswith('win')
-    or sys.platform.startswith('cygwin')):
+if sys.platform.startswith(('cygwin', 'win')):
     import ntpath as cpath
 else:
     import posixpath as cpath

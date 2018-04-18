@@ -31,6 +31,7 @@ def svn_version_set_hash(svn16_hash, svn17_hash, svn19_hash):
     around that by checking the installed SVN version and passing the
     appropriate hash.
     """
+
     def decorator(f):
         @wraps(f)
         def wrapped(self):

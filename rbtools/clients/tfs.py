@@ -383,8 +383,10 @@ class TEEWrapper(object):
             # two standard install locations.
             tf_locations.extend([
                 'tf.cmd',
-                r'%programfiles(x86)%\Microsoft Visual Studio 12.0\Common7\IDE\tf.cmd',
-                r'%programfiles%\Microsoft Team Foundation Server 12.0\Tools\tf.cmd',
+                (r'%programfiles(x86)%\Microsoft Visual Studio 12.0\Common7'
+                 r'\IDE\tf.cmd'),
+                (r'%programfiles%\Microsoft Team Foundation Server 12.0\Tools'
+                 r'\tf.cmd'),
             ])
         else:
             tf_locations.append('tf')

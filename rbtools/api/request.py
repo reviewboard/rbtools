@@ -122,8 +122,9 @@ class HttpRequest(object):
             if isinstance(self._fields[key], six.binary_type):
                 content.write(self._fields[key] + NEWLINE)
             else:
-                content.write(six.text_type(self._fields[key]).encode('utf-8')
-                              + NEWLINE)
+                content.write(
+                    six.text_type(self._fields[key]).encode('utf-8') +
+                    NEWLINE)
 
         for key in self._files:
             filename = self._files[key]['filename']
@@ -138,8 +139,8 @@ class HttpRequest(object):
             content.write(b'--' + BOUNDARY + NEWLINE)
             content.write(b'Content-Disposition: form-data; name="%s"; '
                           % key.encode('utf-8'))
-            content.write(b'filename="%s"' % filename.encode('utf-8')
-                          + NEWLINE)
+            content.write(b'filename="%s"' % filename.encode('utf-8') +
+                          NEWLINE)
             content.write(b'Content-Type: %s' % mime_type + NEWLINE)
             content.write(NEWLINE)
 
@@ -393,12 +394,12 @@ def create_cookie_jar(cookie_file=None):
 
         if (not os.path.isfile(cookie_file) and
             os.path.isfile(post_review_cookies)):
-                try:
-                    shutil.copyfile(post_review_cookies, cookie_file)
-                    os.chmod(cookie_file, 0o600)
-                except IOError as e:
-                    logging.warning("There was an error while copying "
-                                    "post-review's cookies: %s", e)
+            try:
+                shutil.copyfile(post_review_cookies, cookie_file)
+                os.chmod(cookie_file, 0o600)
+            except IOError as e:
+                logging.warning("There was an error while copying "
+                                "post-review's cookies: %s", e)
 
     if not os.path.isfile(cookie_file):
         try:
