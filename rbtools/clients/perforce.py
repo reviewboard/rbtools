@@ -4,7 +4,6 @@ import logging
 import marshal
 import os
 import re
-import six
 import socket
 import stat
 import string
@@ -12,6 +11,8 @@ import subprocess
 import sys
 from fnmatch import fnmatch
 from locale import getpreferredencoding
+
+import six
 
 from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.clients.errors import (AmendError,
@@ -842,7 +843,7 @@ class PerforceClient(SCMClient):
                 try:
                     old_file, new_file = self._extract_delete_files(
                         initial_depot_file, initial_rev)
-                except ValueError:
+                except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
                         logging.warning('Skipping file %s: %s', depot_file, e)
 
@@ -855,7 +856,7 @@ class PerforceClient(SCMClient):
                 try:
                     old_file, new_file = self._extract_edit_files(
                         depot_file, local_file, initial_rev, rev, False, True)
-                except ValueError:
+                except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
                         logging.warning('Skipping file %s: %s', depot_file, e)
 
@@ -870,7 +871,7 @@ class PerforceClient(SCMClient):
                         depot_file, local_file, rev, False, False)
                     old_file_b, new_file_b = self._extract_delete_files(
                         initial_depot_file, initial_rev)
-                except ValueError:
+                except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
                         logging.warning('Skipping file %s: %s', depot_file, e)
 
@@ -1352,7 +1353,7 @@ class PerforceClient(SCMClient):
 
         try:
             return where_output[-1]['path']
-        except:
+        except KeyError:
             # XXX: This breaks on filenames with spaces.
             return where_output[-1]['data'].split(' ')[2].strip()
 

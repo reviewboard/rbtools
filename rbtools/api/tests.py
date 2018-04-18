@@ -872,10 +872,10 @@ class APICacheTests(TestCase):
 
         try:
             self.cache._save_entry(entry)
-        except:
+        except Exception:
             self.fail('Could not write binary data to the API cache.')
 
         try:
             self.cache._save_entry(entry)
-        except:
+        except Exception:
             self.fail('Could not update binary data in the API cache.')

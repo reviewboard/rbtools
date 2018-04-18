@@ -18,7 +18,6 @@ RESOURCE_MAP = {}
 LINKS_TOK = 'links'
 LINK_KEYS = set(['href', 'method', 'title'])
 _EXCLUDE_ATTRS = [LINKS_TOK, 'stat']
-
 _EXTRA_DATA_PREFIX = 'extra_data__'
 
 

@@ -7,8 +7,8 @@ import sys
 import tempfile
 import uuid
 
+import six
 from six.moves import cStringIO as StringIO
-from six import iteritems
 
 from rbtools.utils.filesystem import cleanup_tempfiles, make_tempdir
 from rbtools.testing import TestCase
@@ -92,7 +92,7 @@ class RBTestBase(TestCase):
             os.chdir(temp_dir)
 
         with open('.reviewboardrc', 'w') as fp:
-            for key, value in iteritems(data):
+            for key, value in six.iteritems(data):
                 fp.write('%s = %r\n' % (key, value))
 
         try:

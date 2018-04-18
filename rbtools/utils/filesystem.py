@@ -39,7 +39,7 @@ def cleanup_tempfiles():
     for tmpfile in tempfiles:
         try:
             os.unlink(tmpfile)
-        except:
+        except OSError:
             pass
 
     for tmpdir in tempdirs:
