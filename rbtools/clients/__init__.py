@@ -23,6 +23,7 @@ class PatchResult(object):
     conflict markers, not reject files), which files conflicted, and the
     patch output.
     """
+
     def __init__(self, applied, has_conflicts=False,
                  conflicting_files=[], patch_output=None):
         self.applied = applied
@@ -36,6 +37,7 @@ class SCMClient(object):
 
     These are used for fetching repository information and generating diffs.
     """
+
     name = None
 
     supports_diff_extra_args = False
@@ -362,6 +364,7 @@ class RepositoryInfo(object):
     """
     A representation of a source code repository.
     """
+
     def __init__(self, path=None, base_path=None, supports_changesets=False,
                  supports_parent_diffs=False):
         self.path = path

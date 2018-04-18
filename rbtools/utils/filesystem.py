@@ -137,16 +137,14 @@ def get_config_paths():
 
         filename = os.path.realpath(os.path.join(path, CONFIG_FILE))
 
-        if (os.path.exists(filename) and
-            filename not in config_paths):
+        if os.path.exists(filename) and filename not in config_paths:
             config_paths.append(filename)
 
     # ... then config files from the current or parent directories.
     for path in walk_parents(os.getcwd()):
         filename = os.path.realpath(os.path.join(path, CONFIG_FILE))
 
-        if (os.path.exists(filename) and
-            filename not in config_paths):
+        if os.path.exists(filename) and filename not in config_paths:
             config_paths.append(filename)
 
     # Finally, the user's own config file.

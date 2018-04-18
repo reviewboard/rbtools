@@ -162,7 +162,7 @@ class GitClientTests(SpyAgency, SCMClientTests):
         self.assertEqual(result['commit_id'], commit_id)
 
     def test_diff_exclude(self):
-        """Testing GitClient simple diff with file exclusion."""
+        """Testing GitClient simple diff with file exclusion"""
         self.client.get_repository_info()
         base_commit_id = self._git_get_head()
 
@@ -212,7 +212,7 @@ class GitClientTests(SpyAgency, SCMClientTests):
         self.assertEqual(result['commit_id'], commit_id)
 
     def test_diff_exclude_root_pattern_in_subdir(self):
-        """Testing GitClient diff with file exclusion in the repo root."""
+        """Testing GitClient diff with file exclusion in the repo root"""
         base_commit_id = self._git_get_head()
 
         os.mkdir('subdir')
@@ -878,7 +878,7 @@ class GitClientTests(SpyAgency, SCMClientTests):
         # `git log --graph --all --decorate --oneline` =
         #     * dadae87 (HEAD -> feature-branch) on feature-branch
         #     * bf0036b (origin/remote-branch2, origin/remote-branch1, master)
-        #                                                                 on master
+        #                                                            on master
         #     * 5f48441 (remote-branch2) on remote-branch2
         #     * eb40eaf (remote-branch1) on remote-branch1
         #     * 18c5c09 (origin/master, origin/HEAD) Commit 1
@@ -940,8 +940,8 @@ class GitClientTests(SpyAgency, SCMClientTests):
         # `git log --graph --all --decorate --oneline` =
         #     * 6e37a00 (HEAD -> feature-branch) on feature-branch
         #     * 318f050 (master) on master
-        #     | * 9ad7b1f (origin/remote-branch1, remote-branch1) on remote-branch1
-        #     |/
+        #     | * 9ad7b1f (origin/remote-branch1, remote-branch1)
+        #     |/                                on remote-branch1
         #     * 0ff6635 on master
         #     * 18c5c09 (origin/master, origin/HEAD) Commit 1
         #     * e6a3577 Initial Commit
@@ -1014,7 +1014,6 @@ class GitClientTests(SpyAgency, SCMClientTests):
         self.assertEqual(revisions['parent_base'], parent_base_commit_id)
         self.assertEqual(revisions['base'], parent_commit_id)
         self.assertEqual(revisions['tip'], tip_commit_id)
-
 
     def test_get_raw_commit_message(self):
         """Testing GitClient.get_raw_commit_message"""

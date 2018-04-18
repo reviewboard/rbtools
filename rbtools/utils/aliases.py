@@ -17,6 +17,7 @@ _arg_re = re.compile(r'\$(\d+)')
 # Prior to Python 2.7.3, the shlex module could not accept unicode input.
 _SHLEX_SUPPORTS_UNICODE = sys.version_info >= (2, 7, 3)
 
+
 def replace_arguments(cmd, args):
     """Do parameter substitution for the given command.
 

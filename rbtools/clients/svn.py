@@ -684,9 +684,9 @@ class SVNClient(SCMClient):
         for line in diff_content:
             front = None
             orig_line = line
-            if (self.DIFF_NEW_FILE_LINE_RE.match(line)
-                or self.DIFF_ORIG_FILE_LINE_RE.match(line)
-                or line.startswith(b'Index: ')):
+            if (self.DIFF_NEW_FILE_LINE_RE.match(line) or
+                self.DIFF_ORIG_FILE_LINE_RE.match(line) or
+                line.startswith(b'Index: ')):
                 front, line = line.split(b' ', 1)
 
             if front:
@@ -1020,8 +1020,8 @@ class SVNClient(SCMClient):
 
     def check_options(self):
         if getattr(self.options, 'svn_show_copies_as_adds', None):
-            if (len(self.options.svn_show_copies_as_adds) > 1
-                or self.options.svn_show_copies_as_adds not in 'YyNn'):
+            if (len(self.options.svn_show_copies_as_adds) > 1 or
+                self.options.svn_show_copies_as_adds not in 'YyNn'):
                 raise OptionsCheckError(
                     'Invalid value \'%s\' for --svn-show-copies-as-adds '
                     'option. Valid values are \'y\' or \'n\'.' %

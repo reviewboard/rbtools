@@ -16,7 +16,7 @@ from rbtools.utils.process import execute
 class PlasticClient(SCMClient):
     """
     A wrapper around the cm Plastic tool that fetches repository
-    information and generates compatible diffs
+    information and generates compatible diffs.
     """
     name = 'Plastic'
 

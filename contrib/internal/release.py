@@ -3,6 +3,7 @@
 # Performs a release of RBTools. This can only be run by the core
 # developers with release permissions.
 #
+from __future__ import print_function, unicode_literals
 
 import hashlib
 import mimetools
@@ -16,7 +17,7 @@ import urllib2
 from fabazon.s3 import S3Bucket
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-from rbtools import __version__, __version_info__, is_release
+from rbtools import __version__, __version_info__, is_release  # NoQA E402
 
 
 PY_VERSIONS = ["2.6", "2.7"]
@@ -50,10 +51,11 @@ def load_config():
     user_config = {}
 
     try:
-        execfile(filename, user_config)
-    except SyntaxError, e:
+        exec(open(filename).read(), user_config)
+    except SyntaxError as e:
         sys.stderr.write('Syntax error in config file: %s\n'
-                         'Line %i offset %i\n' % (filename, e.lineno, e.offset))
+                         'Line %i offset %i\n'
+                         % (filename, e.lineno, e.offset))
         sys.exit(1)
 
     auth_handler = urllib2.HTTPBasicAuthHandler()
@@ -67,9 +69,9 @@ def load_config():
 
 def execute(cmdline):
     if isinstance(cmdline, list):
-        print ">>> %s" % subprocess.list2cmdline(cmdline)
+        print(">>> %s" % subprocess.list2cmdline(cmdline))
     else:
-        print ">>> %s" % cmdline
+        print(">>> %s" % cmdline)
 
     p = subprocess.Popen(cmdline,
                          shell=True,
@@ -84,7 +86,7 @@ def execute(cmdline):
     rc = p.wait()
 
     if rc != 0:
-        print "!!! Error invoking command."
+        print("!!! Error invoking command.")
         sys.exit(1)
 
     return s
@@ -186,18 +188,18 @@ def register_release():
         'Content-Length': str(len(content)),
     }
 
-    print 'Posting release to reviewboard.org'
+    print('Posting release to reviewboard.org')
     try:
         f = urllib2.urlopen(urllib2.Request(url=RELEASES_API_URL, data=content,
                                             headers=headers))
         f.read()
-    except urllib2.HTTPError, e:
-        print "Error uploading. Got HTTP code %d:" % e.code
-        print e.read()
-    except urllib2.URLError, e:
+    except urllib2.HTTPError as e:
+        print("Error uploading. Got HTTP code %d:" % e.code)
+        print(e.read())
+    except urllib2.URLError as e:
         try:
-            print "Error uploading. Got URL error:" % e.code
-            print e.read()
+            print("Error uploading. Got URL error:" % e.code)
+            print(e.read())
         except AttributeError:
             pass
 

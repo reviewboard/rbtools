@@ -21,11 +21,13 @@ def DefaultDecoder(payload):
         },
     }
 
+
 DEFAULT_DECODER = DefaultDecoder
 
 
 def JsonDecoder(payload):
     return json.loads(payload)
+
 
 DECODER_MAP['application/json'] = JsonDecoder
 

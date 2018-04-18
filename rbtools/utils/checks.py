@@ -2,7 +2,6 @@ from __future__ import unicode_literals
 
 import os
 import subprocess
-import sys
 
 from rbtools.utils.process import execute
 

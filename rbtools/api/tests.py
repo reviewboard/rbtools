@@ -171,7 +171,7 @@ class TestWithPayloads(TestCase):
 
 class ResourceFactoryTests(TestWithPayloads):
     def test_token_guessing(self):
-        """Testing guessing the resource's token."""
+        """Testing guessing the resource's token"""
         r = create_resource(self.transport, self.item_payload, '')
         self.assertTrue('resource_token' not in r._fields)
 
@@ -182,7 +182,7 @@ class ResourceFactoryTests(TestWithPayloads):
         self.assertTrue('count' in r)
 
     def test_no_token_guessing(self):
-        """Testing constructing without guessing the resource token."""
+        """Testing constructing without guessing the resource token"""
         r = create_resource(self.transport, self.item_payload, '',
                             guess_token=False)
         self.assertTrue('resource_token' in r)
@@ -194,7 +194,7 @@ class ResourceFactoryTests(TestWithPayloads):
         self.assertTrue('resource_token' in r)
 
     def test_item_construction(self):
-        """Testing constructing an item resource."""
+        """Testing constructing an item resource"""
         r = create_resource(self.transport, self.item_payload, '')
         self.assertTrue(isinstance(r, ItemResource))
         self.assertEqual(r.field1,
@@ -203,18 +203,18 @@ class ResourceFactoryTests(TestWithPayloads):
                          self.item_payload['resource_token']['field2'])
 
     def test_list_construction(self):
-        """Testing constructing a list resource."""
+        """Testing constructing a list resource"""
         r = create_resource(self.transport, self.list_payload, '')
         self.assertTrue(isinstance(r, ListResource))
 
     def test_count_construction(self):
-        """Testing constructing a count resource."""
+        """Testing constructing a count resource"""
         r = create_resource(self.transport, self.count_payload, '')
         self.assertTrue(isinstance(r, CountResource))
         self.assertEqual(r.count, self.count_payload['count'])
 
     def test_resource_specific_base_class(self):
-        """Testing constructing a resource with a specific base class."""
+        """Testing constructing a resource with a specific base class"""
         r = create_resource(self.transport, self.root_payload, '')
         self.assertFalse(isinstance(r, RootResource))
         r = create_resource(
@@ -227,14 +227,14 @@ class ResourceFactoryTests(TestWithPayloads):
 
 class ResourceTests(TestWithPayloads):
     def test_item_resource_fields(self):
-        """Testing item resource fields."""
+        """Testing item resource fields"""
         r = create_resource(self.transport, self.item_payload, '')
         for field in self.item_payload['resource_token']:
             self.assertTrue(field in r)
             self.assertTrue(hasattr(r, field))
 
     def test_item_resource_links(self):
-        """Testing item resource link generation."""
+        """Testing item resource link generation"""
         r = create_resource(self.transport, self.item_payload, '')
 
         self.assertTrue(hasattr(r, 'get_self'))
@@ -286,7 +286,7 @@ class ResourceTests(TestWithPayloads):
         self.assertEqual(request._fields['extra_data.foo'], 'bar')
 
     def test_list_resource_list(self):
-        """Testing list resource lists."""
+        """Testing list resource lists"""
         r = create_resource(self.transport, self.list_payload, '')
         self.assertEqual(r.num_items, len(self.list_payload['resource_token']))
         self.assertEqual(r.total_results, self.list_payload['total_results'])
@@ -298,7 +298,7 @@ class ResourceTests(TestWithPayloads):
                     self.list_payload['resource_token'][index][field])
 
     def test_list_resource_links(self):
-        """Testing link resource link generation."""
+        """Testing link resource link generation"""
         r = create_resource(self.transport, self.list_payload, '')
 
         self.assertTrue(hasattr(r, 'get_self'))
@@ -329,7 +329,7 @@ class ResourceTests(TestWithPayloads):
         self.assertFalse(hasattr(r, 'delete'))
 
     def test_root_resource_templates(self):
-        """Testing generation of methods for the root resource uri templates."""
+        """Testing generation of methods for the root resource uri templates"""
         r = create_resource(
             self.transport,
             self.root_payload,
@@ -342,7 +342,7 @@ class ResourceTests(TestWithPayloads):
             self.assertTrue(callable(getattr(r, method_name)))
 
     def test_resource_dict_field(self):
-        """Testing access of a dictionary field."""
+        """Testing access of a dictionary field"""
         r = create_resource(self.transport, self.item_payload, '')
 
         field = r.nested_field
@@ -353,7 +353,7 @@ class ResourceTests(TestWithPayloads):
             self.item_payload['resource_token']['nested_field']['nested1'])
 
     def test_resource_dict_field_iteration(self):
-        """Testing iterating sub-fields of a dictionary field."""
+        """Testing iterating sub-fields of a dictionary field"""
         r = create_resource(self.transport, self.item_payload, '')
 
         field = r.nested_field
@@ -365,7 +365,7 @@ class ResourceTests(TestWithPayloads):
                          nested_fields.symmetric_difference(iterated_fields))
 
     def test_link_field(self):
-        """Testing access of a link field."""
+        """Testing access of a link field"""
         r = create_resource(self.transport, self.item_payload, '')
 
         field = r.link_field
@@ -383,7 +383,7 @@ class HttpRequestTests(TestCase):
         self.request = HttpRequest('/')
 
     def test_default_values(self):
-        """Testing the default values."""
+        """Testing the default values"""
         self.assertEqual(self.request.url, '/')
         self.assertEqual(self.request.method, 'GET')
         content_type, content = self.request.encode_multipart_formdata()
@@ -414,7 +414,7 @@ class HttpRequestTests(TestCase):
         return d
 
     def test_post_form_data(self):
-        """Testing the multipart form data generation."""
+        """Testing the multipart form data generation"""
         request = HttpRequest('/', 'POST')
         request.add_field('foo', 'bar')
         request.add_field('bar', 42)
@@ -514,6 +514,7 @@ class ReviewRequestResourceTests(TestCase):
 
 class MockResponse(object):
     """A mock up for a response from urllib2."""
+
     def __init__(self, code, headers, body):
         """Create a new MockResponse."""
         self.code = code
@@ -541,6 +542,7 @@ class MockResponse(object):
 
 class MockUrlOpener(object):
     """A mock url opener that records the number of hits it gets to URL."""
+
     CONTENT = b'foobar'
 
     def __init__(self, endpoints):
@@ -600,6 +602,7 @@ class MockUrlOpener(object):
 
 class APICacheTests(TestCase):
     """Test cases for the APICache class."""
+
     content = b'foobar'
     request_headers = {
         'http://high_max_age': {

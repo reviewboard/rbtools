@@ -260,7 +260,8 @@ class PerforceClient(SCMClient):
                 hostname, port = parts
 
             if not hostname:
-                raise SCMError('Path %s is not a valid Perforce P4PORT' % repository_path)
+                raise SCMError('Path %s is not a valid Perforce P4PORT'
+                               % repository_path)
 
             info = socket.gethostbyaddr(hostname)
 
@@ -628,9 +629,8 @@ class PerforceClient(SCMClient):
                         depot_file, base_revision)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
-                        logging.warning(
-                                'Skipping file %s#%s: %s',
-                                depot_file, base_revision, e)
+                        logging.warning('Skipping file %s#%s: %s',
+                                        depot_file, base_revision, e)
 
                     continue
             elif changetype_short == 'MV-a':
