@@ -5,6 +5,7 @@ import locale
 import re
 
 import six
+from six.moves import range
 
 from rbtools.api.cache import APICache, CacheEntry, CachedHTTPResponse
 from rbtools.api.capabilities import Capabilities
