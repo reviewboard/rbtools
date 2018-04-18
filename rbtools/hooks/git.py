@@ -1,8 +1,9 @@
 from __future__ import unicode_literals
 
-import six
 from collections import defaultdict
 from copy import deepcopy
+
+import six
 
 from rbtools.hooks.common import execute, get_review_request_id
 

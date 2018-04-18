@@ -1,10 +1,11 @@
 from __future__ import print_function, unicode_literals
 
 import logging
-import pkg_resources
 import re
-import six
 import sys
+
+import pkg_resources
+import six
 
 from rbtools.clients.errors import SCMError
 from rbtools.utils.process import execute

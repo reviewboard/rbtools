@@ -4,11 +4,11 @@ import datetime
 import itertools
 import logging
 import os
-import six
 import sys
 import threading
 from collections import deque
 
+import six
 from pkg_resources import parse_version
 
 from rbtools.api.errors import APIError
@@ -36,7 +36,7 @@ class get_elements_from_label_thread(threading.Thread):
         # Remove any trailing vobstag not supported by cleartool find.
         try:
             label, vobstag = label.rsplit('@', 1)
-        except:
+        except Exception:
             pass
         self.label = label
 
@@ -197,7 +197,7 @@ class ClearCaseClient(SCMClient):
         # Try to find any vobstag.
         try:
             label, label_vobstag = label.rsplit('@', 1)
-        except:
+        except Exception:
             pass
 
         # Be sure label is prefix by lbtype, required by cleartool describe.

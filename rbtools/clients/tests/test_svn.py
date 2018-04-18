@@ -10,8 +10,8 @@ from hashlib import md5
 
 from kgb import SpyAgency
 from nose import SkipTest
-from six.moves.urllib.request import urlopen
 from six.moves import cStringIO as StringIO
+from six.moves.urllib.request import urlopen
 
 from rbtools.api.client import RBClient
 from rbtools.api.tests import MockResponse

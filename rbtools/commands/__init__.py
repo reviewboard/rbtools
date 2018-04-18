@@ -4,12 +4,12 @@ import argparse
 import getpass
 import inspect
 import logging
-import pkg_resources
 import platform
 import os
 import sys
 
 import colorama
+import pkg_resources
 from six.moves import input
 from six.moves.urllib.parse import urlparse
 
@@ -552,7 +552,7 @@ class Command(object):
             try:
                 import ssl
                 ssl._create_unverified_context()
-            except:
+            except Exception:
                 raise CommandError('The --disable-ssl-verification flag is '
                                    'only available with Python 2.7.9+')
 

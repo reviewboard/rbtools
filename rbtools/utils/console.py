@@ -2,8 +2,8 @@ from __future__ import print_function, unicode_literals
 
 import os
 import subprocess
-from distutils.util import strtobool
 
+from distutils.util import strtobool
 from six.moves import input
 
 from rbtools.utils.filesystem import make_tempfile
