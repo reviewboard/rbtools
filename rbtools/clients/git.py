@@ -613,7 +613,7 @@ class GitClient(SCMClient):
             # of the line is the name of the file that has changed.
             changed_files = remove_filenames_matching_patterns(
                 (filename.split()[-1] for filename in changed_files),
-                exclude_patterns, base_dir=self.original_cwd)
+                exclude_patterns, base_dir=self._get_root_directory())
 
             diff_lines = []
 
@@ -925,14 +925,14 @@ class GitClient(SCMClient):
 
     def _get_root_directory(self):
         """Get the root directory of the repository as an absolute path."""
-        git_dir = execute([self.git, "rev-parse", "--git-dir"],
+        git_dir = execute([self.git, 'rev-parse', '--show-toplevel'],
                           ignore_errors=True).rstrip("\n")
 
         if git_dir.startswith("fatal:") or not os.path.isdir(git_dir):
             logging.error("Could not find git repository path.")
             return None
 
-        return os.path.abspath(os.path.join(git_dir, ".."))
+        return os.path.abspath(git_dir)
 
     @property
     def original_cwd(self):
