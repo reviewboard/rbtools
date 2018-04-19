@@ -262,7 +262,7 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
     def __init__(self, *args, **kwargs):
         HTTPBasicAuthHandler.__init__(self, *args, **kwargs)
         self._retried = False
-        self._lasturl = ""
+        self._lasturl = ''
         self._needs_otp_token = False
         self._otp_token_attempts = 0
 
@@ -398,8 +398,8 @@ def create_cookie_jar(cookie_file=None):
                 shutil.copyfile(post_review_cookies, cookie_file)
                 os.chmod(cookie_file, 0o600)
             except IOError as e:
-                logging.warning("There was an error while copying "
-                                "post-review's cookies: %s", e)
+                logging.warning('There was an error while copying '
+                                'legacy post-review cookies: %s', e)
 
     if not os.path.isfile(cookie_file):
         try:

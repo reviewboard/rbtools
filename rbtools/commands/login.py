@@ -16,6 +16,7 @@ class Login(Command):
 
     If the user is already logged in, this won't do anything.
     """
+
     name = 'login'
     author = 'The Review Board Project'
     option_list = [

@@ -11,6 +11,7 @@ class Logout(Command):
     The session cookie will be removed into from the .rbtools-cookies
     file. The next RBTools command you run will then prompt for credentials.
     """
+
     name = 'logout'
     author = 'The Review Board Project'
     option_list = [

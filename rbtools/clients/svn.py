@@ -139,11 +139,11 @@ class SVNClient(SCMClient):
         print). The diff for review will include the changes in (base, tip].
 
         If a single revision is passed in, this will return the parent of that
-        revision for 'base' and the passed-in revision for 'tip'.
+        revision for "base" and the passed-in revision for "tip".
 
         If zero revisions are passed in, this will return the most recently
         checked-out revision for 'base' and a special string indicating the
-        working copy for 'tip'.
+        working copy for "tip".
 
         The SVN SCMClient never fills in the 'parent_base' key. Users who are
         using other patch-stack tools who want to use parent diffs with SVN
@@ -244,13 +244,13 @@ class SVNClient(SCMClient):
 
     def scan_for_server_property(self, repository_info):
         def get_url_prop(path):
-            url = self._run_svn(["propget", "reviewboard:url", path],
+            url = self._run_svn(['propget', 'reviewboard:url', path],
                                 with_errors=False,
                                 extra_ignore_errors=(1,)).strip()
             return url or None
 
         for path in walk_parents(os.getcwd()):
-            if not os.path.exists(os.path.join(path, ".svn")):
+            if not os.path.exists(os.path.join(path, '.svn')):
                 break
 
             prop = get_url_prop(path)
@@ -404,7 +404,7 @@ class SVNClient(SCMClient):
                     sys.exit(1)
             else:
                 if svn_show_copies_as_adds in 'Yy':
-                    diff_cmd.append("--show-copies-as-adds")
+                    diff_cmd.append('--show-copies-as-adds')
 
         diff = self._run_svn(diff_cmd,
                              split_lines=True,
@@ -427,7 +427,7 @@ class SVNClient(SCMClient):
 
     def history_scheduled_with_commit(self, changelist, include_files,
                                       exclude_patterns):
-        """ Method to find if any file status has '+' in 4th column"""
+        """Method to find if any file status has '+' in 4th column"""
         status_cmd = ['status', '-q', '--ignore-externals']
 
         if changelist:

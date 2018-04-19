@@ -19,6 +19,7 @@ from rbtools.utils.review_request import (get_draft_or_current_value,
 
 class Post(Command):
     """Create and update review requests."""
+
     name = 'post'
     author = 'The Review Board Project'
     description = 'Uploads diffs to create and update review requests.'
@@ -728,7 +729,7 @@ class Post(Command):
                 pass
 
     def _ask_review_request_match(self, review_request):
-        question = ("Update Review Request #%s: '%s'? "
+        question = ('Update Review Request #%s: "%s"? '
                     % (review_request.id,
                        get_draft_or_current_value(
                            'summary', review_request)))

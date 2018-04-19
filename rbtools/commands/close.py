@@ -14,6 +14,7 @@ class Close(Command):
     By default, the command will change the status to submitted. The
     user can provide an optional description for this action.
     """
+
     name = 'close'
     author = 'The Review Board Project'
     args = '<review-request-id>'
@@ -37,7 +38,7 @@ class Close(Command):
         is wrong, the command will stop and alert the user.
         """
         if close_type not in (SUBMITTED, DISCARDED):
-            raise CommandError("%s is not valid type. Try '%s' or '%s'" % (
+            raise CommandError('%s is not valid type. Try "%s" or "%s"' % (
                 self.options.close_type, SUBMITTED, DISCARDED))
 
     def main(self, request_id):

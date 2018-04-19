@@ -45,6 +45,7 @@ class ParseError(CommandError):
 
 class SmartHelpFormatter(argparse.HelpFormatter):
     """Smartly formats help text, preserving paragraphs."""
+
     def _split_lines(self, text, width):
         # NOTE: This function depends on overriding _split_lines's behavior.
         #       It is clearly documented that this function should not be
@@ -75,6 +76,7 @@ class Option(object):
     to specify defaults which will be grabbed from the configuration
     after it is loaded.
     """
+
     def __init__(self, *opts, **attrs):
         self.opts = opts
         self.attrs = attrs
@@ -118,6 +120,7 @@ class OptionGroup(object):
     This works like argparse's argument groups, but is designed to work with
     our special Option class.
     """
+
     def __init__(self, name=None, description=None, option_list=[]):
         self.name = name
         self.description = description
@@ -138,6 +141,7 @@ class LogLevelFilter(logging.Filter):
     this filter. This prevents propagation of higher level types to lower
     log handlers.
     """
+
     def __init__(self, level):
         self.level = level
 
@@ -164,6 +168,7 @@ class Command(object):
     ``option_list`` is a list of command line options for the command.
     Each list entry should be an Option or OptionGroup instance.
     """
+
     name = ''
     author = ''
     description = ''

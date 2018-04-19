@@ -562,7 +562,7 @@ def clear_cache(cache_path=APICache.DEFAULT_CACHE_PATH):
     """Delete the HTTP cache used for the API."""
     try:
         os.unlink(cache_path)
-        print("Cleared cache in '%s'" % cache_path)
+        print('Cleared cache in "%s"' % cache_path)
     except Exception as e:
         logging.error('Could not clear cache in "%s": %s. Try manually '
                       'removing it if it exists.',

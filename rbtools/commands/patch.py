@@ -11,6 +11,7 @@ class Patch(Command):
 
     The patch file indicated by the request id is downloaded from the
     server and then applied locally."""
+
     name = 'patch'
     author = 'The Review Board Project'
     args = '<review-request-id>'

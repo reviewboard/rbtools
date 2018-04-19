@@ -594,9 +594,9 @@ class PerforceClientTests(SCMClientTests):
         client = PerforceClient(ExcludeWrapper)
 
         patterns = [
-            "//depot/path",
-            os.path.join(os.path.sep, "foo"),
-            "foo",
+            '//depot/path',
+            os.path.join(os.path.sep, 'foo'),
+            'foo',
         ]
 
         normalized_patterns = [

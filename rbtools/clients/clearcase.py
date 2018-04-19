@@ -286,7 +286,7 @@ class ClearCaseClient(SCMClient):
         if not version or version.endswith('CHECKEDOUT'):
             return path
 
-        return "%s@@%s" % (path, version)
+        return '%s@@%s' % (path, version)
 
     def _construct_revision(self, branch_path, version_number):
         """Combine revision from branch_path and version_number."""

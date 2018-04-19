@@ -25,6 +25,7 @@ class Stamp(Command):
     However, if a review request ID is specified by the user, it stamps the URL
     of that review request instead of guessing.
     """
+
     name = 'stamp'
     author = 'The Review Board Project'
     description = 'Adds the review request URL to the commit message.'
@@ -55,7 +56,7 @@ class Stamp(Command):
         raise CommandError('No existing commit to stamp on.')
 
     def _ask_review_request_match(self, review_request):
-        question = ("Stamp with Review Request #%s: '%s'? "
+        question = ('Stamp with Review Request #%s: "%s"? '
                     % (review_request.id,
                        get_draft_or_current_value(
                            'summary', review_request)))

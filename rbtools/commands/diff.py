@@ -6,6 +6,7 @@ from rbtools.commands import Command, CommandError
 
 class Diff(Command):
     """Prints a diff to the terminal."""
+
     name = 'diff'
     author = 'The Review Board Project'
     args = '[revisions]'
