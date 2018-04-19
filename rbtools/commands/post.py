@@ -2,6 +2,7 @@ from __future__ import print_function, unicode_literals
 
 import logging
 import os
+import platform
 import re
 import sys
 
@@ -473,8 +474,6 @@ class Post(Command):
         else:
             # No review_request_id, so we will create a new review request.
             try:
-                # Until we are Python 2.7+ only, the keys in request_data have
-                # to be bytes. See bug 3753 for details.
                 request_data = {
                     'repository': repository,
                 }
@@ -929,25 +928,17 @@ class Post(Command):
 
         # Load the review up in the browser if requested to.
         if self.options.open_browser:
-            if sys.platform == 'darwin':
-                # The 'webbrowser' module currently does a bunch of stuff with
-                # AppleScript, which is broken on macOS 10.12.5. See
-                # https://bugs.python.org/issue30392 for more discussion.
-                try:
-                    execute(['open', review_url])
-                except Exception as e:
-                    logging.exception('Error opening review URL %s: %s',
-                                      review_url, e)
-            else:
-                try:
+            try:
+                if (sys.platform == 'darwin' and
+                    platform.mac_ver()[0] == '10.12.5'):
+                    # The 'webbrowser' module currently does a bunch of stuff
+                    # with AppleScript, which is broken on macOS 10.12.5. This
+                    # was fixed in 10.12.6. See
+                    # https://bugs.python.org/issue30392 for more discussion.
+                    open(['open', review_url])
+                else:
                     import webbrowser
-                    if 'open_new_tab' in dir(webbrowser):
-                        # open_new_tab is only in python 2.5+
-                        webbrowser.open_new_tab(review_url)
-                    elif 'open_new' in dir(webbrowser):
-                        webbrowser.open_new(review_url)
-                    else:
-                        os.system('start %s' % review_url)
-                except Exception as e:
-                    logging.exception('Error opening review URL %s: %s',
-                                      review_url, e)
+                    webbrowser.open_new_tab(review_url)
+            except Exception as e:
+                logging.exception('Error opening review URL %s: %s',
+                                  review_url, e)

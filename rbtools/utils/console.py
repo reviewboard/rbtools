@@ -2,11 +2,31 @@ from __future__ import print_function, unicode_literals
 
 import os
 import subprocess
+import sys
 
 from distutils.util import strtobool
 from six.moves import input
 
 from rbtools.utils.filesystem import make_tempfile
+
+
+def get_input(prompt):
+    """Ask the user for input.
+
+    Args:
+        prompt (unicode):
+            The text to prompt the user with.
+
+    Returns:
+        unicode:
+        The entered user data.
+    """
+    # `input`'s usual prompt gets written to stdout, which results in really
+    # crummy behavior if stdout is redirected to a file. Because this is often
+    # paired with getpass (entering a username/password combination), we mimic
+    # the behavior there, writing the prompt to stderr.
+    sys.stderr.write(str(prompt))
+    return input()
 
 
 def confirm(question):
@@ -18,7 +38,7 @@ def confirm(question):
     """
     while True:
         full_question = '%s [Yes/No]: ' % question
-        answer = input(str(full_question)).lower()
+        answer = get_input(full_question).lower()
         try:
             return strtobool(answer)
         except ValueError:
