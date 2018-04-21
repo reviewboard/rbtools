@@ -1,3 +1,5 @@
+"""A client for Git."""
+
 from __future__ import unicode_literals
 
 import logging
@@ -20,16 +22,16 @@ from rbtools.utils.process import execute
 
 
 class GitClient(SCMClient):
-    """
-    A wrapper around git that fetches repository information and generates
-    compatible diffs. This will attempt to generate a diff suitable for the
-    remote repository, whether git, SVN or Perforce.
-    """
-    name = 'Git'
+    """A client for Git.
 
+    This is a wrapper around the git executable that fetches repository
+    information and generates compatible diffs. This will attempt to generate a
+    diff suitable for the remote repository, whether git, SVN or Perforce.
+    """
+
+    name = 'Git'
     supports_diff_exclude_patterns = True
     supports_patch_revert = True
-
     can_amend_commit = True
     can_merge = True
     can_push_upstream = True
@@ -37,6 +39,12 @@ class GitClient(SCMClient):
     can_branch = True
 
     def __init__(self, **kwargs):
+        """Initialize the client.
+
+        Args:
+            **kwargs (dict):
+                Keyword arguments to pass through to the superclass.
+        """
         super(GitClient, self).__init__(**kwargs)
         # Store the 'correct' way to invoke git, just plain old 'git' by
         # default.
@@ -45,10 +53,14 @@ class GitClient(SCMClient):
         self._original_cwd = None
 
     def _supports_git_config_flag(self):
-        """Return if the installed version of git supports the -c flag.
+        """Return whether the installed version of git supports the -c flag.
 
         This will execute ``git --version`` on the first call and cache the
         result.
+
+        Returns:
+            bool:
+            ``True`` if the user's installed git supports ``-c``.
         """
         if not hasattr(self, '_git_version_at_least_180'):
             self._git_version_least_180 = False
@@ -73,33 +85,39 @@ class GitClient(SCMClient):
 
         Args:
             revisions (list of unicode, optional):
-                The 'revisions' argument is a list of revisions as specified by
-                the user. Items in the list do not necessarily represent a
-                single revision, since the user can use SCM-native syntaxes
-                such as "r1..r2" or "r1:r2". SCMTool-specific overrides of this
-                method are expected to deal with such syntaxes.
+                A list of revisions as specified by the user. Items in the list
+                do not necessarily represent a single revision, since the user
+                can use SCM-native syntaxes such as ``r1..r2`` or ``r1:r2``.
+                SCMTool-specific overrides of this method are expected to deal
+                with such syntaxes.
 
             remote (unicode, optional):
                 This is most commonly ``origin``, but can be changed via
-                configuration or command-line options. This represents the
+                configuration or command line options. This represents the
                 remote which is configured in Review Board.
+
+        Raises:
+            rbtools.clients.errors.InvalidRevisionSpecError:
+                The given revisions could not be parsed.
+
+            rbtools.clients.errors.TooManyRevisionsError:
+                The specified revisions list contained too many revisions.
 
         Returns:
             dict:
             A dictionary with the following keys:
 
-                base (unicode):
-                    A revision to use as the base of the resulting diff.
+            ``base`` (:py:class:`unicode`):
+                A revision to use as the base of the resulting diff.
 
-                tip (unicode):
-                    A revision to use as the tip of the resulting diff.
+            ``tip`` (:py:class:`unicode`):
+                A revision to use as the tip of the resulting diff.
 
-                parent_base (unicode, optional):
-                    The revision to use as the base of a parent diff.
+            ``parent_base`` (:py:class:`unicode`, optional):
+                The revision to use as the base of a parent diff.
 
-                commit_id (unicode, optional):
-                    The ID of the single commit being posted, if not using a
-                    range.
+            ``commit_id`` (:py:class:`unicode`, optional):
+                The ID of the single commit being posted, if not using a range.
 
             These will be used to generate the diffs to upload to Review Board
             (or print). The diff for review will include the changes in (base,
@@ -117,7 +135,7 @@ class GitClient(SCMClient):
         result = {}
 
         if not remote:
-            remote_branch, _ = self.get_origin()
+            remote_branch = self._get_origin()[0]
             remote = remote_branch.split('/')[0]
 
         if n_revs == 0:
@@ -208,6 +226,10 @@ class GitClient(SCMClient):
 
         This function changes the directory to the top level directory of the
         current working tree.
+
+        Returns:
+            rbtools.clients.RepositoryInfo:
+            The repository info structure.
         """
         if not check_install(['git', '--help']):
             # CreateProcess (launched via subprocess, used by check_install)
@@ -363,14 +385,14 @@ class GitClient(SCMClient):
         url = None
         if getattr(self.options, 'repository_url', None):
             url = self.options.repository_url
-            self.upstream_branch = self.get_origin(self.upstream_branch,
-                                                   True)[0]
+            self.upstream_branch = self._get_origin(
+                self.upstream_branch, True)[0]
         else:
-            self.upstream_branch, origin_url = \
-                self.get_origin(self.upstream_branch, True)
+            self.upstream_branch, origin_url = self._get_origin(
+                self.upstream_branch, True)
 
             if not origin_url or origin_url.startswith('fatal:'):
-                self.upstream_branch, origin_url = self.get_origin()
+                self.upstream_branch, origin_url = self._get_origin()
 
             url = origin_url.rstrip('/')
 
@@ -389,13 +411,31 @@ class GitClient(SCMClient):
         return None
 
     def _strip_heads_prefix(self, ref):
-        """Strips prefix from ref name, if possible."""
+        """Strip the heads prefix off of a reference name.
+
+        Args:
+            ref (unicode):
+                The full name of a branch.
+
+        Returns:
+            unicode:
+            The bare name of the branch without the ``refs/heads/`` prefix.
+        """
         return re.sub(r'^refs/heads/', '', ref)
 
-    def get_origin(self, default_upstream_branch=None, ignore_errors=False):
-        """Get upstream remote origin from options or parameters.
+    def _get_origin(self, default_upstream_branch=None, ignore_errors=False):
+        """Return the upstream remote origin from options or parameters.
 
-        Returns a tuple: (upstream_branch, remote_url)
+        Args:
+            default_upstream_branch (unicode, optional):
+                The default for the upstream branch name.
+
+            ignore_errors (bool, optional):
+                Whether to ignore errors when running :command:`git config`.
+
+        Returns:
+            tuple of unicode:
+            A 2-tuple, containing the upstream branch name and the remote URL.
         """
         upstream_branch = (getattr(self.options, 'tracking', None) or
                            default_upstream_branch or
@@ -407,6 +447,16 @@ class GitClient(SCMClient):
         return (upstream_branch, origin_url)
 
     def scan_for_server(self, repository_info):
+        """Find the Review Board server matching this repository.
+
+        Args:
+            repository_info (rbtools.clients.RepositoryInfo):
+                The repository information structure.
+
+        Returns:
+            unicode:
+            The Review Board server URL, if available.
+        """
         # Scan first for dot files, since it's faster and will cover the
         # user's $HOME/.reviewboardrc
         server_url = super(GitClient, self).scan_for_server(repository_info)
@@ -436,14 +486,28 @@ class GitClient(SCMClient):
         return None
 
     def get_raw_commit_message(self, revisions):
-        """Extracts the commit message based on the provided revision range."""
+        """Extract the commit message based on the provided revision range.
+
+        Args:
+            revisions (dict):
+                A dictionary containing ``base`` and ``tip`` keys.
+
+        Returns:
+            unicode:
+            The commit messages of all commits between (base, tip].
+        """
         return execute(
             [self.git, 'log', '--reverse', '--pretty=format:%s%n%n%b',
              '^%s' % revisions['base'], revisions['tip']],
             ignore_errors=True).strip()
 
     def get_parent_branch(self):
-        """Returns the parent branch."""
+        """Return the parent branch.
+
+        Returns:
+            unicode:
+            The name of the current parent branch.
+        """
         parent_branch = getattr(self.options, 'parent_branch', None)
 
         if self.type == 'perforce':
@@ -452,16 +516,27 @@ class GitClient(SCMClient):
         return parent_branch
 
     def get_head_ref(self):
-        """Returns the HEAD reference."""
-        head_ref = 'HEAD'
+        """Return the HEAD reference.
 
-        if self.head_ref:
-            head_ref = self.head_ref
-
-        return head_ref
+        Returns:
+            unicode:
+            The name of the HEAD reference.
+        """
+        return self.head_ref or 'HEAD'
 
     def _rev_parse(self, revisions):
-        """Runs `git rev-parse` and returns a list of revisions."""
+        """Parse a git symbolic reference.
+
+        Args:
+            revisions (unicode or list):
+                A set of revisions passed in by the user. This can either be a
+                single revision name or a range.
+
+        Returns:
+            list of unicode:
+            A list of the parsed revision data. This can be either 1, 2, or 3
+            elements long, depending on the exact string provided.
+        """
         if not isinstance(revisions, list):
             revisions = [revisions]
 
@@ -476,7 +551,7 @@ class GitClient(SCMClient):
 
             remote (unicode):
                 This is most commonly ``origin``, but can be changed via
-                configuration or command-line options. This represents the
+                configuration or command line options. This represents the
                 remote which is configured in Review Board.
 
         Returns:
@@ -495,10 +570,10 @@ class GitClient(SCMClient):
             return local_branch
 
         local_commit = local_commits[-1]
-        youngest_remote_commit = self._rev_parse('%s^' % local_commit)
+        youngest_remote_commit = self._rev_parse('%s^' % local_commit)[0]
         logging.debug('Found youngest remote git commit %s',
                       youngest_remote_commit)
-        return youngest_remote_commit[0]
+        return youngest_remote_commit
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
              extra_args=[]):
@@ -510,9 +585,43 @@ class GitClient(SCMClient):
         specific change. If two revisions are specified, this will do a diff
         between those two revisions.
 
-        If a parent branch is specified via the command-line options, or would
+        If a parent branch is specified via the command line options, or would
         make sense given the requested revisions and the tracking branch, this
         will also return a parent diff.
+
+        Args:
+            revisions (dict):
+                A dictionary of revisions, as returned by
+                :py:meth:`parse_revision_spec`.
+
+            include_files (list of unicode, optional):
+                A list of files to whitelist during the diff generation.
+
+            exclude_patterns (list of unicode, optional):
+                A list of shell-style glob patterns to blacklist during diff
+                generation.
+
+            extra_args (list, unused):
+                Additional arguments to be passed to the diff generation.
+                Unused for git.
+
+        Returns:
+            dict:
+            A dictionary containing the following keys:
+
+            ``diff`` (:py:class:`bytes`):
+                The contents of the diff to upload.
+
+            ``parent_diff`` (:py:class:`bytes`, optional):
+                The contents of the parent diff, if available.
+
+            ``commit_id`` (:py:class:`unicode`, optional):
+                The commit ID to include when posting, if available.
+
+            ``base_commit_id` (:py:class:`unicode`, optional):
+                The ID of the commit that the change is based on, if available.
+                This is necessary for some hosting services that don't provide
+                individual file access.
         """
         exclude_patterns = normalize_patterns(exclude_patterns,
                                               self._get_root_directory(),
@@ -550,7 +659,30 @@ class GitClient(SCMClient):
 
     def make_diff(self, merge_base, base, tip, include_files,
                   exclude_patterns):
-        """Performs a diff on a particular branch range."""
+        """Perform a diff on a particular branch range.
+
+        Args:
+            merge_base (unicode):
+                The ID of the merge base commit. This is only used when
+                creating diffs with git-svn or git-p4 clones.
+
+            base (unicode):
+                The ID of the base commit for the diff.
+
+            tip (unicode):
+                The ID of the tip commit for the diff.
+
+            include_files (list of unicode):
+                A list of files to whitelist during the diff generation.
+
+            exclude_patterns (list of unicode):
+                A list of shell-style glob patterns to blacklist during diff
+                generation.
+
+        Returns:
+            bytes:
+            The diff between (base, tip].
+        """
         rev_range = '%s..%s' % (base, tip)
 
         if include_files:
@@ -655,10 +787,24 @@ class GitClient(SCMClient):
             return b''.join(diff_lines)
 
     def make_svn_diff(self, merge_base, diff_lines):
-        """
-        Formats the output of git diff such that it's in a form that
-        svn diff would generate. This is needed so the SVNTool in Review
-        Board can properly parse this diff.
+        """Format a git-svn diff to apply correctly against an SVN repository.
+
+        This reformats the diff from a git-svn clone to look like it came from
+        :command:`svn diff`. This is needed so that the SVNTool in Review Board
+        can properly parse the diff.
+
+        Args:
+            merge_base (unicode):
+                The ID of the merge base commit. This is only used when
+                creating diffs with :command:`git svn` or :command:`git p4`
+                clones.
+
+            diff_lines (list of bytes):
+                The lines of the diff.
+
+        Returns:
+            bytes:
+            The reformatted diff contents.
         """
         rev = execute([self.git, 'svn', 'find-rev', merge_base]).strip()
 
@@ -714,7 +860,25 @@ class GitClient(SCMClient):
         return diff_data
 
     def make_perforce_diff(self, merge_base, diff_lines):
-        """Format the output of git diff to look more like perforce's."""
+        """Format a git-p4 diff to apply correctly against a P4 repository.
+
+        This reformats the diff from a :command:`git p4` clone to look like it
+        came from a Perforce repository. This is needed so that the
+        PerforceTool in Review Board can properly parse the diff.
+
+        Args:
+            merge_base (unicode):
+                The ID of the merge base commit. This is only used when
+                creating diffs with :command:`git svn` or
+                :command:`git p4` clones.
+
+            diff_lines (list of bytes):
+                The lines of the diff.
+
+        Returns:
+            bytes:
+            The reformatted diff contents.
+        """
         diff_data = b''
         filename = b''
         p4rev = b''
@@ -770,10 +934,12 @@ class GitClient(SCMClient):
         return diff_data
 
     def has_pending_changes(self):
-        """Checks if there are changes waiting to be committed.
+        """Check if there are changes waiting to be committed.
 
-        Returns True if the working directory has been modified or if changes
-        have been staged in the index, otherwise returns False.
+        Returns:
+            bool:
+            ``True`` if the working directory has been modified or if changes
+            have been staged in the index.
         """
         status = execute(['git', 'status', '--porcelain',
                           '--untracked-files=no', '--ignore-submodules=dirty'])
@@ -782,9 +948,19 @@ class GitClient(SCMClient):
     def amend_commit_description(self, message, revisions):
         """Update a commit message to the given string.
 
-        Since git can amend only the most recent commit, an AmendError will be
-        raised if revisions points to a commit other than the the most recent
-        commit.
+        Args:
+            message (unicode):
+                The commit message to use when amending the commit.
+
+            revisions (dict):
+                A dictionary of revisions, as returned by
+                :py:meth:`parse_revision_spec`.
+
+        Raises:
+            rbtools.clients.errors.AmendError:
+                The requested revision tip was not the most recent commit.
+                Unless rewriting the entire series of commits, git can only
+                amend the latest commit on the branch.
         """
         if revisions and revisions['tip']:
             commit_ids = execute([self.git, 'rev-parse', 'HEAD',
@@ -804,6 +980,29 @@ class GitClient(SCMClient):
 
         This will take the given patch file and apply it to the index,
         scheduling all changes for commit.
+
+        Args:
+            patch_file (unicode):
+                The name of the patch file to apply.
+
+            base_path (unicode, unused):
+                The base path that the diff was generated in. All git diffs are
+                absolute to the repository root, so this is unused.
+
+            base_dir (unicode, unused):
+                The path of the current working directory relative to the root
+                of the repository. All git diffs are absolute to the repository
+                root, so this is unused.
+
+            p (unicode, optional):
+                The prefix level of the diff.
+
+            revert (bool, optional):
+                Whether the patch should be reverted rather than applied.
+
+        Returns:
+            rbtools.clients.PatchResult:
+            The result of the patch operation.
         """
         cmd = ['git', 'apply', '-3']
 
@@ -815,7 +1014,8 @@ class GitClient(SCMClient):
 
         cmd.append(patch_file)
 
-        rc, data = self._execute(cmd, with_errors=True, return_error_code=True)
+        rc, data = execute(cmd, ignore_errors=True, with_errors=True,
+                           return_error_code=True)
 
         if rc == 0:
             return PatchResult(applied=True, patch_output=data)
@@ -834,11 +1034,30 @@ class GitClient(SCMClient):
 
     def create_commit(self, message, author, run_editor,
                       files=[], all_files=False):
-        """Commits the given modified files.
+        """Commit the given modified files.
 
         This is expected to be called after applying a patch. This commits the
         patch using information from the review request, opening the commit
-        message in $EDITOR to allow the user to update it.
+        message in :envvar:`$EDITOR` to allow the user to update it.
+
+        Args:
+            message (unicode):
+                The commit message to use.
+
+            author (object):
+                The author of the commit. This is expected to have ``fullname``
+                and ``email`` attributes.
+
+            run_editor (bool):
+                Whether to run the user's editor on the commmit message before
+                committing.
+
+            files (list of unicode, optional):
+                The list of filenames to commit.
+
+            all_files (bool, optional):
+                Whether to commit all changed files, ignoring the ``files``
+                argument.
         """
         if run_editor:
             modified_message = edit_text(message)
@@ -854,10 +1073,15 @@ class GitClient(SCMClient):
                  '--author="%s <%s>"' % (author.fullname, author.email)])
 
     def delete_branch(self, branch_name, merged_only=True):
-        """Deletes the specified branch.
+        """Delete the specified branch.
 
-        If merged_only is False, then the branch will be deleted even if not
-        yet merged into an upstream branch.
+        Args:
+            branch_name (unicode):
+                The name of the branch to delete.
+
+            merged_only (bool, optional):
+                Whether to limit branch deletion to only those branches which
+                have been merged into the current HEAD.
         """
         if merged_only:
             delete_flag = '-d'
@@ -868,7 +1092,33 @@ class GitClient(SCMClient):
 
     def merge(self, target, destination, message, author, squash=False,
               run_editor=False):
-        """Merges the target branch with destination branch."""
+        """Merge the target branch with destination branch.
+
+        Args:
+            target (unicode):
+                The name of the branch to merge.
+
+            destination (unicode):
+                The name of the branch to merge into.
+
+            message (unicode):
+                The commit message to use.
+
+            author (object):
+                The author of the commit. This is expected to have ``fullname``
+                and ``email`` attributes.
+
+            squash (bool, optional):
+                Whether to squash the commits or do a plain merge.
+
+            run_editor (bool, optional):
+                Whether to run the user's editor on the commmit message before
+                committing.
+
+        Raises:
+            rbtools.clients.errors.MergeError:
+                An error occurred while merging the branch.
+        """
         rc, output = execute(
             ['git', 'checkout', destination],
             ignore_errors=True,
@@ -895,8 +1145,17 @@ class GitClient(SCMClient):
         self.create_commit(message, author, run_editor)
 
     def push_upstream(self, remote_branch):
-        """Pushes the current branch to upstream."""
-        origin_url = self.get_origin()[1]
+        """Push the current branch to upstream.
+
+        Args:
+            remote_branch (unicode):
+                The name of the branch to push to.
+
+        Raises:
+            rbtools.client.errors.PushError:
+                The branch was unable to be pushed.
+        """
+        origin_url = self._get_origin()[1]
         rc, output = execute(
             ['git', 'pull', '--rebase', origin_url, remote_branch],
             ignore_errors=True,
@@ -918,14 +1177,21 @@ class GitClient(SCMClient):
         """Return the name of the current branch.
 
         Returns:
-            bytes:
+            unicode:
             A string with the name of the current branch.
         """
         return execute([self.git, 'rev-parse', '--abbrev-ref', 'HEAD'],
                        ignore_errors=True).strip()
 
     def _get_root_directory(self):
-        """Get the root directory of the repository as an absolute path."""
+        """Return the root directory of the repository as an absolute path.
+
+        Returns:
+            unicode:
+            The name of the directory corresponding to the root of the current
+            working directory (whether a plain checkout or a git worktree). If
+            no repository can be found, this will return None.
+        """
         git_dir = execute([self.git, 'rev-parse', '--show-toplevel'],
                           ignore_errors=True).rstrip('\n')
 
@@ -937,7 +1203,7 @@ class GitClient(SCMClient):
 
     @property
     def original_cwd(self):
-        """Get the original current working directory."""
+        """The original working directory of the process."""
         if self._original_cwd is None:
             # If this is None, then we haven't called get_repository_info and
             # shouldn't have changed directories.

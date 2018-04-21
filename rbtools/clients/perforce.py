@@ -1,3 +1,5 @@
+"""A client for Perforce."""
+
 from __future__ import print_function, unicode_literals
 
 import logging
@@ -32,36 +34,110 @@ class P4Wrapper(object):
     separation between all the standard SCMClient logic and any parsing
     and handling of p4 invocation and results.
     """
+
     KEYVAL_RE = re.compile('^([^:]+): (.+)$')
     COUNTERS_RE = re.compile('^([^ ]+) = (.+)$')
 
     def __init__(self, options):
+        """Initialize the wrapper.
+
+        Args:
+            options (argparse.Namespace):
+                The parsed command line options.
+        """
         self.options = options
 
     def is_supported(self):
+        """Check whether the p4 command is usable.
+
+        Returns:
+            bool:
+            ``True`` if there's an executable p4.
+        """
         return check_install(['p4', 'help'])
 
     def counters(self):
+        """Return the Perforce counters.
+
+        Returns:
+            dict:
+            The parsed Perforce counters.
+        """
         lines = self.run_p4(['counters'], split_lines=True)
         return self._parse_keyval_lines(lines, self.COUNTERS_RE)
 
-    def change(self, changenum, marshalled=True, password=None):
+    def change(self, changenum, marshalled=True):
+        """Return the contents of a p4 change description.
+
+        Args:
+            changenum (int):
+                The number of the changeset to list.
+
+            marshalled (bool, optional):
+                Whether to return the data in marshalled form.
+
+        Returns:
+            object:
+            The contents of the change description, either as a unicode
+            object or a list depending on the value of ``marshalled``.
+        """
         return self.run_p4(['change', '-o', str(changenum)],
-                           password=password, ignore_errors=True,
+                           ignore_errors=True,
                            none_on_ignored_error=True,
                            marshalled=marshalled)
 
     def modify_change(self, new_change_spec):
-        """new_change_spec must contain the changelist number."""
-        return self.run_p4(['change', '-i'], input_string=new_change_spec)
+        """Modify a change description.
+
+        Args:
+            new_change_spec (unicode):
+                The new changeset description. This must contain the changelist
+                number.
+        """
+        self.run_p4(['change', '-i'], input_string=new_change_spec)
 
     def files(self, path):
+        """Return the opened files within the given path.
+
+        Args:
+            path (unicode):
+                The Perforce path to check. This can be a mix of file paths
+                (``//...``) and revisions (``...@X``).
+
+        Returns:
+            list:
+            A list of the opened files.
+        """
         return self.run_p4(['files', path], marshalled=True)
 
     def filelog(self, path):
+        """Return a list of all the changed files within the given path.
+
+        Args:
+            path (unicode):
+                The Perforce path to check. This is expected to be a path with
+                two revision markers (``//...@X,Y``).
+
+        Returns:
+            list:
+            A list of the various changed files and how they were changed.
+        """
         return self.run_p4(['filelog', path], marshalled=True)
 
     def fstat(self, depot_path, fields=[]):
+        """Run p4 fstat on a given depot path.
+
+        Args:
+            depot_path (unicode):
+                The file path to stat.
+
+            fields (list of unicode, optional):
+                The fields to fetch.
+
+        Returns:
+            dict:
+            The file stat info.
+        """
         args = ['fstat']
 
         if fields:
@@ -82,6 +158,12 @@ class P4Wrapper(object):
         return stat_info
 
     def info(self):
+        """Run p4 info and return the results.
+
+        Returns:
+            dict:
+                The parsed output from :command:`p4 info`.
+        """
         lines = self.run_p4(['info'],
                             ignore_errors=True,
                             split_lines=True)
@@ -89,10 +171,34 @@ class P4Wrapper(object):
         return self._parse_keyval_lines(lines)
 
     def opened(self, changenum):
+        """Return the list of opened files in the given changeset.
+
+        Args:
+            changenum (int):
+                The number of the changeset.
+
+        Returns:
+            list:
+            A list of the opened files in the given changeset.
+        """
         return self.run_p4(['opened', '-c', str(changenum)],
                            marshalled=True)
 
     def print_file(self, depot_path, out_file=None):
+        """Print the contents of the given file.
+
+        Args:
+            depot_path (unicode):
+                A Perforce path, including filename and revision.
+
+            out_files (unicode, optional):
+                A filename to write to. If not specified, the data will be
+                returned.
+
+        Returns:
+            unicode:
+            The output of the print operation.
+        """
         cmd = ['print']
 
         if out_file:
@@ -103,15 +209,50 @@ class P4Wrapper(object):
         return self.run_p4(cmd)
 
     def where(self, depot_path):
+        """Return the local path for a depot path.
+
+        Args:
+            depot_path (unicode):
+                A Perforce path to a file in the depot.
+
+        Returns:
+            list:
+            A marshalled representation of the data showing where the file
+            exists in the local client.
+        """
         return self.run_p4(['where', depot_path], marshalled=True)
 
-    def run_p4(self, p4_args, marshalled=False, password=None,
-               ignore_errors=False, input_string=None, *args, **kwargs):
+    def run_p4(self, p4_args, marshalled=False, ignore_errors=False,
+               input_string=None, *args, **kwargs):
         """Invoke p4.
 
         In the current implementation, the arguments 'marshalled' and
         'input_string' cannot be used together, i.e. this command doesn't
         allow inputting and outputting at the same time.
+
+        Args:
+            p4_args (list):
+                Additional arguments to pass to :command:`p4`.
+
+            marshalled (bool, optional):
+                Whether to return the data in marshalled format. This will
+                return a more computer-readable version.
+
+            ignore_errors (bool, optional):
+                Whether to ignore return codes that typically indicate error
+                conditions.
+
+            input_string (unicode, optional):
+                A string to pass to :command:`p4` on stdin.
+
+            *args (list):
+                Additional arguments to pass through to
+                :py:func:`rbtools.utils.process.execute`.
+
+
+            **kwargs (dict):
+                Additional keyword arguments to pass through to
+                :py:func:`rbtools.utils.process.execute`.
         """
         cmd = ['p4']
 
@@ -128,9 +269,6 @@ class P4Wrapper(object):
             cmd += ['-P', self.options.p4_passwd]
 
         cmd += p4_args
-
-        if password is not None:
-            cmd += ['-P', password]
 
         if marshalled:
             p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
@@ -173,6 +311,19 @@ class P4Wrapper(object):
         return result
 
     def _parse_keyval_lines(self, lines, regex=KEYVAL_RE):
+        """Parse a set of key:value lines into a dictionary.
+
+        Args:
+            lines (list of unicode):
+                The set of lines to parse.
+
+            regex (re.RegexObject, optional):
+                A regular expression to use to parse each line.
+
+        Returns:
+            dict:
+            The parsed key/value pairs.
+        """
         keyvals = {}
 
         for line in lines:
@@ -187,12 +338,13 @@ class P4Wrapper(object):
 
 
 class PerforceClient(SCMClient):
-    """
-    A wrapper around the p4 Perforce tool that fetches repository information
-    and generates compatible diffs.
-    """
-    name = 'Perforce'
+    """A client for Perforce.
 
+    This is a wrapper around the :command:`p4` executable that fetches
+    repository information and generates compatible diffs.
+    """
+
+    name = 'Perforce'
     can_amend_commit = True
     supports_diff_exclude_patterns = True
     supports_diff_extra_args = True
@@ -212,10 +364,25 @@ class PerforceClient(SCMClient):
                                   re.M)
 
     def __init__(self, p4_class=P4Wrapper, **kwargs):
+        """Initialize the client.
+
+        Args:
+            p4_class (type, optional):
+                The class type to use for the wrapper.
+
+            **kwargs (dict):
+                Keyword arguments to pass through to the superclass.
+        """
         super(PerforceClient, self).__init__(**kwargs)
         self.p4 = p4_class(self.options)
 
     def get_repository_info(self):
+        """Return repository information for the current Perforce working tree.
+
+        Returns:
+            rbtools.clients.RepositoryInfo:
+            The repository info structure.
+        """
         if not self.p4.is_supported():
             logging.debug('Unable to execute "p4 help": skipping Perforce')
             return None
@@ -307,31 +474,47 @@ class PerforceClient(SCMClient):
         return RepositoryInfo(path=repository_path, supports_changesets=True)
 
     def parse_revision_spec(self, revisions=[]):
-        """Parses the given revision spec.
+        """Parse the given revision spec.
 
-        The 'revisions' argument is a list of revisions as specified by the
-        user. Items in the list do not necessarily represent a single revision,
-        since the user can use SCM-native syntaxes such as "r1..r2" or "r1:r2".
-        SCMTool-specific overrides of this method are expected to deal with
-        such syntaxes.
+        Args:
+            revisions (list of unicode, optional):
+                A list of revisions as specified by the user. Items in the list
+                do not necessarily represent a single revision, since the user
+                can use SCM-native syntaxes such as ``r1..r2`` or ``r1:r2``.
+                SCMTool-specific overrides of this method are expected to deal
+                with such syntaxes.
 
-        This will return a dictionary with the following keys:
-            'base':        A revision to use as the base of the resulting diff.
-            'tip':         A revision to use as the tip of the resulting diff.
+        Raises:
+            rbtools.clients.errors.InvalidRevisionSpecError:
+                The given revisions could not be parsed.
 
-        These will be used to generate the diffs to upload to Review Board (or
-        print). The diff for review will include the changes in (base, tip].
+            rbtools.clients.errors.TooManyRevisionsError:
+                The specified revisions list contained too many revisions.
 
-        If zero revisions are passed in, this will return the 'default'
-        changelist.
+        Returns:
+            dict:
+            A dictionary with the following keys:
 
-        If a single revision is passed in, this will return the parent of that
-        revision for "base" and the passed-in revision for "tip". The result
-        may have special internal revisions or prefixes based on whether the
-        changeset is submitted, pending, or shelved.
+            ``base`` (:py:class:`unicode`):
+                A revision to use as the base of the resulting diff.
 
-        If two revisions are passed in, they need to both be submitted
-        changesets.
+            ``tip`` (:py:class:`unicode`):
+                A revision to use as the tip of the resulting diff.
+
+            These will be used to generate the diffs to upload to Review Board
+            (or print). The diff for review will include the changes in (base,
+            tip].
+
+            If zero revisions are passed in, this will return the current sync
+            changelist as "tip", and the upstream branch as "base". The result
+            may have special internal revisions or prefixes based on whether
+            the changeset is submitted, pending, or shelved.
+
+            If a single revision is passed in, this will return the parent of
+            that revision for "base" and the passed-in revision for "tip".
+
+            If two revisions are passed in, they need to both be submitted
+            changesets.
         """
         n_revs = len(revisions)
 
@@ -417,6 +600,17 @@ class PerforceClient(SCMClient):
             raise TooManyRevisionsError
 
     def _get_changelist_status(self, changelist):
+        """Return the status of a changelist.
+
+        Args:
+            changelist (int):
+                The changelist to check.
+
+        Returns:
+            unicode:
+            The current status of the changelist (such as "pending" or
+            "submitted").
+        """
         if changelist == self.REVISION_DEFAULT_CLN:
             return 'pending'
         else:
@@ -427,6 +621,16 @@ class PerforceClient(SCMClient):
         return None
 
     def scan_for_server(self, repository_info):
+        """Find the Review Board server matching this repository.
+
+        Args:
+            repository_info (rbtools.clients.RepositoryInfo):
+                The repository information structure.
+
+        Returns:
+            unicode:
+            The Review Board server URL, if available.
+        """
         # Scan first for dot files, since it's faster and will cover the
         # user's $HOME/.reviewboardrc
         server_url = \
@@ -438,15 +642,26 @@ class PerforceClient(SCMClient):
         return self.scan_for_server_counter(repository_info)
 
     def scan_for_server_counter(self, repository_info):
-        """
-        Checks the Perforce counters to see if the Review Board server's url
-        is specified. Since Perforce only started supporting non-numeric
+        """Find if a Review Board server has been defined in the p4 counters.
+
+        This checks the Perforce counters to see if the Review Board server's
+        URL is specified. Since Perforce only started supporting non-numeric
         counter values in server version 2008.1, we support both a normal
-        counter 'reviewboard.url' with a string value and embedding the url in
-        a counter name like 'reviewboard.url.http:||reviewboard.example.com'.
-        Note that forward slashes aren't allowed in counter names, so
-        pipe ('|') characters should be used. These should be safe because they
-        should not be used unencoded in urls.
+        counter ``reviewboard.url`` with a string value and embedding the URL
+        in a counter name like
+        ``reviewboard.url.http:||reviewboard.example.com``. Note that forward
+        slashes aren't allowed in counter names, so pipe ('|') characters
+        should be used. These should be safe because they should not be used
+        unencoded in URLs.
+
+
+        Args:
+            repository_info (rbtools.clients.RepositoryInfo):
+                The repository information structure.
+
+        Returns:
+            unicode:
+            The Review Board server URL, if available.
         """
         counters = self.p4.counters()
 
@@ -468,10 +683,38 @@ class PerforceClient(SCMClient):
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
              extra_args=[]):
-        """
-        Goes through the hard work of generating a diff on Perforce in order
-        to take into account adds/deletes and to provide the necessary
+        """Perform a diff using the given revisions.
+
+        This goes through the hard work of generating a diff on Perforce in
+        order to take into account adds/deletes and to provide the necessary
         revision information.
+
+        Args:
+            revisions (dict):
+                A dictionary of revisions, as returned by
+                :py:meth:`parse_revision_spec`.
+
+            include_files (list of unicode, optional):
+                A list of files to whitelist during the diff generation.
+
+            exclude_patterns (list of unicode, optional):
+                A list of shell-style glob patterns to blacklist during diff
+                generation.
+
+            extra_args (list, unused):
+                Additional arguments to be passed to the diff generation.
+                Unused for git.
+
+        Returns:
+            dict:
+            A dictionary containing the following keys:
+
+            ``diff`` (:py:class:`bytes`):
+                The contents of the diff to upload.
+
+            ``changenum`` (:py:class:`unicode`):
+                The number of the changeset being posted (if ``revisions``
+                represents a single changeset).
         """
         exclude_patterns = self.normalize_exclude_patterns(exclude_patterns)
 
@@ -482,7 +725,7 @@ class PerforceClient(SCMClient):
             return self._path_diff(extra_args, exclude_patterns)
 
         # Support both //depot/... paths and local filenames. For the moment,
-        # this does *not* support any of perforce's traversal literals like ...
+        # this does *not* support any of Perforce's traversal literals like ...
         depot_include_files = []
         local_include_files = []
         for filename in include_files:
@@ -549,7 +792,7 @@ class PerforceClient(SCMClient):
             action_mapping['move/delete'] = 'MV'
         else:
             # The Review Board server doesn't support moved files for
-            # perforce--create a diff that shows moved files as adds and
+            # Perforce--create a diff that shows moved files as adds and
             # deletes.
             action_mapping['move/add'] = 'A'
             action_mapping['move/delete'] = 'D'
@@ -697,6 +940,28 @@ class PerforceClient(SCMClient):
         compute the full set of changes contained therein. Just looking at the
         two trees isn't enough, since files may have moved around and we want
         to include that information.
+
+        Args:
+            base (unicode):
+                The base of the revision range.
+
+            tip (unicode):
+                The tip of the revision range.
+
+            depot_include_files (list of unicode):
+                A list of depot paths to whitelist during diff generation.
+
+            local_include_files (list of unicode):
+                A list of local filesystem paths to whitelist during diff
+                generation.
+
+            exclude_patterns (list of unicode):
+                A list of shell-style glob patterns to blacklist during diff
+                generation.
+
+        Returns:
+            dict:
+            A dictionary with a single ``diff`` key.
         """
         # Start by looking at the filelog to get a history of all the changes
         # within the changeset range. This processing step is done because in
@@ -903,7 +1168,18 @@ class PerforceClient(SCMClient):
         }
 
     def _accumulate_range_change(self, file_entry, change):
-        """Compute the effects of a given change on a given file"""
+        """Compute the effects of a given change on a given file.
+
+        Args:
+            file_entry (dict):
+                A dictionary containing information about the accumulated state
+                of the given file. The results of this method will write the
+                data back out to this dict.
+
+            change (dict):
+                A dictionary containing information about the new change to be
+                applied to the given file.
+        """
         old_action = file_entry['action']
         current_action = change['action']
 
@@ -948,12 +1224,37 @@ class PerforceClient(SCMClient):
 
     def _extract_edit_files(self, depot_file, local_file, rev_a, rev_b,
                             cl_is_shelved, cl_is_submitted):
-        """Extract the 'old' and 'new' files for an edit operation.
+        """Extract the "old" and "new" files for an edit operation.
 
-        Returns a tuple of (old filename, new filename). This can raise a
-        ValueError if the extraction fails.
+        Args:
+            depot_file (unicode):
+                The depot path of the file.
+
+            local_file (unicode):
+                The local filesystem path of the file.
+
+            rev_a (unicode):
+                The original revision of the file.
+
+            rev_b (unicode):
+                The new revision of the file.
+
+            cl_is_shelved (bool):
+                Whether the containing changeset is shelved.
+
+            cl_is_submitted (bool):
+                Whether the containing changeset is submitted.
+
+        Returns:
+            tuple:
+            A 2-tuple containing the filenames of the old version and new
+            version.
+
+        Raises:
+            ValueError:
+                The file extraction failed.
         """
-        # Get the old version out of perforce
+        # Get the old version out of Perforce
         old_filename = make_tempfile()
         self._write_file('%s#%s' % (depot_file, rev_a), old_filename)
 
@@ -971,10 +1272,33 @@ class PerforceClient(SCMClient):
 
     def _extract_add_files(self, depot_file, local_file, revision,
                            cl_is_shelved, cl_is_pending):
-        """Extract the 'old' and 'new' files for an add operation.
+        """Extract the "old" and "new" files for an add operation.
 
-        Returns a tuple of (old filename, new filename). This can raise a
-        ValueError if the extraction fails.
+        Args:
+            depot_file (unicode):
+                The depot path of the file.
+
+            local_file (unicode):
+                The local filesystem path of the file.
+
+            revision (unicode):
+                The new revision of the file.
+
+            cl_is_shelved (bool):
+                Whether the containing changeset is shelved.
+
+            cl_is_pending (bool):
+                Whether the containing changeset is pending.
+
+        Returns:
+            tuple:
+            A 2-tuple containing the filenames of the old version and new
+            version. Because this is an add operation, the old filename will
+            contain an empty file.
+
+        Raises:
+            ValueError:
+                The file extraction failed.
         """
         # Make an empty tempfile for the old file
         old_filename = make_tempfile()
@@ -992,12 +1316,29 @@ class PerforceClient(SCMClient):
         return old_filename, new_filename
 
     def _extract_delete_files(self, depot_file, revision):
-        """Extract the 'old' and 'new' files for a delete operation.
+        """Extract the "old" and "new" files for a delete operation.
 
         Returns a tuple of (old filename, new filename). This can raise a
         ValueError if extraction fails.
+
+        Args:
+            depot_file (unicode):
+                The depot path of the file.
+
+            revision (unicode):
+                The old revision of the file.
+
+        Returns:
+            tuple:
+            A 2-tuple containing the filenames of the old version and new
+            version. Because this is a delete operation, the new filename will
+            contain an empty file.
+
+        Raises:
+            ValueError:
+                The file extraction failed.
         """
-        # Get the old version out of perforce
+        # Get the old version out of Perforce
         old_filename = make_tempfile()
         self._write_file('%s#%s' % (depot_file, revision), old_filename)
 
@@ -1008,12 +1349,34 @@ class PerforceClient(SCMClient):
 
     def _extract_move_files(self, old_depot_file, tip, base_revision,
                             cl_is_shelved):
-        """Extract the 'old' and 'new' files for a move operation.
+        """Extract the "old" and "new" files for a move operation.
 
         Returns a tuple of (old filename, new filename, new depot path). This
         can raise a ValueError if extraction fails.
+
+        Args:
+            old_depot_file (unicode):
+                The depot path of the old version of the file.
+
+            tip (unicode):
+                The new revision of the file.
+
+            base_revision (unicode):
+                The old revision of the file.
+
+            cl_is_shelved (bool):
+                Whether the containing changeset is shelved.
+
+        Returns:
+            tuple:
+            A 2-tuple containing the filenames of the old version and new
+            version.
+
+        Raises:
+            ValueError:
+                The file extraction failed.
         """
-        # XXX: fstat *ought* to work, but perforce doesn't supply the movedFile
+        # XXX: fstat *ought* to work, but Perforce doesn't supply the movedFile
         # field in fstat (or apparently anywhere else) when a change is
         # shelved. For now, _diff_pending will avoid calling this method at all
         # for shelved changes, and instead treat them as deletes and adds.
@@ -1052,27 +1415,36 @@ class PerforceClient(SCMClient):
         return old_filename, new_filename, new_depot_file
 
     def _path_diff(self, args, exclude_patterns):
-        """
-        Process a path-style diff. This allows people to post individual files
-        in various ways.
+        """Process a path-style diff.
 
-        Multiple paths may be specified in `args`.  The path styles supported
-        are:
+        This allows people to post individual files in various ways.
 
-        //path/to/file
-        Upload file as a "new" file.
+        Args:
+            args (list of unicode):
+                A list of paths to add. The path styles supported are:
 
-        //path/to/dir/...
-        Upload all files as "new" files.
+                ``//path/to/file``:
+                    Upload file as a "new" file.
 
-        //path/to/file[@#]rev
-        Upload file from that rev as a "new" file.
+                ``//path/to/dir/...``:
+                    Upload all files as "new" files.
 
-        //path/to/file[@#]rev,[@#]rev
-        Upload a diff between revs.
+                ``//path/to/file[@#]rev``:
+                    Upload file from that rev as a "new" file.
 
-        //path/to/dir/...[@#]rev,[@#]rev
-        Upload a diff of all files between revs in that directory.
+                ``//path/to/file[@#]rev,[@#]rev``:
+                    Upload a diff between revs.
+
+                ``//path/to/dir/...[@#]rev,[@#]rev``:
+                    Upload a diff of all files between revs in that directory.
+
+            exclude_patterns (list of unicode):
+                A list of shell-style glob patterns to blacklist during diff
+                generation.
+
+        Returns:
+            dict:
+            A dictionary containing a ``diff`` key.
         """
         r_revision_range = re.compile(r'^(?P<path>//[^@#]+)' +
                                       r'(?P<revision1>[#@][^,]+)?' +
@@ -1185,20 +1557,34 @@ class PerforceClient(SCMClient):
 
     def _do_diff(self, old_file, new_file, depot_file, base_revision,
                  new_depot_file, changetype_short, ignore_unmodified=False):
-        """
-        Do the work of producing a diff for Perforce.
+        """Create a diff of a single file.
 
-        old_file - The absolute path to the "old" file.
-        new_file - The absolute path to the "new" file.
-        depot_file - The depot path in Perforce for this file.
-        base_revision - The base perforce revision number of the old file as
-            an integer.
-        new_depot_file - Location of the new file. Only used for moved files.
-        changetype_short - The change type as a short string.
-        ignore_unmodified - If True, will return an empty list if the file
-            is not changed.
+        Args:
+            old_file (unicode):
+                The absolute path of the "old" file.
 
-        Returns a list of strings of diff lines.
+            new_file (unicode):
+                The absolute path of the "new" file.
+
+            depot_file (unicode):
+                The depot path in Perforce for this file.
+
+            base_revision (int):
+                The base Perforce revision number of the old file.
+
+            new_depot_file (unicode):
+                The depot path in Perforce for the new location of this ifle.
+                Only used if the file was moved.
+
+            changetype_short (unicode):
+                The change type provided by Perforce.
+
+            ignore_unmodified (bool, optional):
+                Whether to return an empty list if the file was not changed.
+
+        Returns:
+            list of bytes:
+            The diff, split into lines.
         """
         if hasattr(os, 'uname') and os.uname()[0] == 'SunOS':
             diff_cmd = ['gdiff', '-urNp', old_file, new_file]
@@ -1319,10 +1705,14 @@ class PerforceClient(SCMClient):
         return dl
 
     def _write_file(self, depot_path, tmpfile):
-        """
-        Grabs a file from Perforce and writes it to a temp file. p4 print sets
-        the file readonly and that causes a later call to unlink fail. So we
-        make the file read/write.
+        """Grab a file from Perforce and writes it to a temp file.
+
+        Args:
+            depot_path (unicode):
+                The depot path (including revision) of the file to write.
+
+            tmpfile (unicode):
+                The name of a temporary file to write to.
         """
         logging.debug('Writing "%s" to "%s"', depot_path, tmpfile)
         self.p4.print_file(depot_path, out_file=tmpfile)
@@ -1341,13 +1731,26 @@ class PerforceClient(SCMClient):
         if os.path.islink(tmpfile):
             raise ValueError('"%s" is a symlink' % depot_path)
         else:
+            # p4 print sets the file readonly and that causes a later call to
+            # unlink fail. Change permissions so we can delete it when we're
+            # done.
             os.chmod(tmpfile, stat.S_IREAD | stat.S_IWRITE)
 
     def _depot_to_local(self, depot_path):
-        """
+        """Convert a depot path to a local path.
+
         Given a path in the depot return the path on the local filesystem to
         the same file.  If there are multiple results, take only the last
         result from the where command.
+
+        Args:
+            depot_path (unicode):
+                The path of a file within the Perforce depot.
+
+        Returns:
+            unicode:
+            The location of that same file within the local client, if
+            available.
         """
         where_output = self.p4.where(depot_path)
 
@@ -1360,8 +1763,16 @@ class PerforceClient(SCMClient):
     def get_raw_commit_message(self, revisions):
         """Extract the commit message based on the provided revision range.
 
-        Since local changelists in perforce are not ordered with respect to
+        Since local changelists in Perforce are not ordered with respect to
         one another, this implementation looks at only the tip revision.
+
+        Args:
+            revisions (dict):
+                A dictionary containing ``base`` and ``tip`` keys.
+
+        Returns:
+            unicode:
+            The commit messages of all commits between (base, tip].
         """
         changelist = revisions['tip']
 
@@ -1385,10 +1796,22 @@ class PerforceClient(SCMClient):
             return ''
 
     def apply_patch_for_empty_files(self, patch, p_num, revert=False):
-        """Returns True if any empty files in the patch are applied.
+        """Return whether any empty files in the patch are applied.
 
-        If there are no empty files in the patch or if an error occurs while
-        applying the patch, we return False.
+        Args:
+            patch (bytes):
+                The contents of the patch.
+
+            p_num (unicode):
+                The prefix level of the diff.
+
+            revert (bool, optional):
+                Whether the patch should be reverted rather than applied.
+
+        Returns:
+            ``True`` if there are empty files in the patch. ``False`` if there
+            were no empty files, or if an error occurred while applying the
+            patch.
         """
         patched_empty_files = False
 
@@ -1429,12 +1852,24 @@ class PerforceClient(SCMClient):
         return patched_empty_files
 
     def _supports_moves(self):
+        """Return whether the Review Board server supports moved files.
+
+        Returns:
+            bool:
+            ``True`` if the Review Board server can support showing moves.
+        """
         return (self.capabilities and
                 self.capabilities.has_capability('scmtools', 'perforce',
                                                  'moved_files'))
 
     def _supports_empty_files(self):
-        """Checks if the RB server supports added/deleted empty files."""
+        """Return whether the Review Board server supports empty files.
+
+        Returns:
+            bool:
+            ``True`` if the Review Board server can support showing empty
+            files.
+        """
         return (self.capabilities and
                 self.capabilities.has_capability('scmtools', 'perforce',
                                                  'empty_files'))
@@ -1447,7 +1882,20 @@ class PerforceClient(SCMClient):
         matched against the depot_file. Otherwise, it will be matched against
         the local file.
 
-        This function expects `exclude_patterns` to be normalized.
+        Args:
+            local_file (unicode):
+                The local filename of the file.
+
+            depot_file (unicode):
+                The Perforce path of the file.
+
+            exclude_patterns (list of unicode):
+                A list of shell-style glob patterns to blacklist during diff
+                generation. This is expected to have already been normalized.
+
+        Returns:
+            bool:
+            ``True`` if the given file should be excluded.
         """
         for pattern in exclude_patterns:
             if pattern.startswith('//'):
@@ -1466,6 +1914,15 @@ class PerforceClient(SCMClient):
         relative to the Perforce client root. All other paths are interpreted
         as being relative to the current working directory. Non-depot paths are
         transformed into absolute paths.
+
+        Args:
+            patterns (list of unicode):
+                A list of shell-style glob patterns to blacklist during diff
+                generation.
+
+        Returns:
+            list of unicode:
+            The normalized patterns.
         """
         cwd = os.getcwd()
         base_dir = self.p4.info().get('Client root')
@@ -1492,9 +1949,16 @@ class PerforceClient(SCMClient):
                                                 new_description):
         """Replace the description in the given changelist spec.
 
-        old_spec is a formatted p4 changelist spec string (the raw output from
-        p4 change). This method replaces the existing description with
-        new_description, and returns the new changelist spec.
+        Args:
+            old_spec (unicode):
+                The p4 changelist spec string (the raw output from p4 change).
+
+            new_description (unicode):
+                The new description text to use.
+
+        Returns:
+            unicode:
+            The new changelist spec.
         """
         new_spec = ''
         whitespace = tuple(string.whitespace)
@@ -1531,8 +1995,20 @@ class PerforceClient(SCMClient):
     def amend_commit_description(self, message, revisions):
         """Update a commit message to the given string.
 
-        Since local changelists on perforce have no ordering with respect to
+        Since local changelists on Perforce have no ordering with respect to
         each other, the revisions argument is mandatory.
+
+        Args:
+            message (unicode):
+                The commit message to use when amending the commit.
+
+            revisions (dict):
+                A dictionary of revisions, as returned by
+                :py:meth:`parse_revision_spec`.
+
+        Raises:
+            rbtools.clients.errors.AmendError:
+                The given changelist could not be amended.
         """
         # Get the changelist number from the tip revision, removing the prefix
         # if necessary. Don't allow amending submitted or default changelists.

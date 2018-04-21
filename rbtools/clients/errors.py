@@ -1,3 +1,5 @@
+"""Error definitions for SCMClient implementations."""
+
 from __future__ import unicode_literals
 
 
@@ -22,7 +24,7 @@ class AmendError(Exception):
 
 
 class OptionsCheckError(Exception):
-    """An error for when command-line options are used incorrectly."""
+    """An error for when command line options are used incorrectly."""
 
 
 class InvalidRevisionSpecError(Exception):
@@ -37,6 +39,7 @@ class TooManyRevisionsError(InvalidRevisionSpecError):
     """An error for when too many revisions were specified."""
 
     def __init__(self):
+        """Initialize the error."""
         super(TooManyRevisionsError, self).__init__(
             'Too many revisions specified')
 
@@ -45,5 +48,6 @@ class EmptyChangeError(Exception):
     """An error for when there are no changed files."""
 
     def __init__(self):
+        """Initialize the error."""
         super(EmptyChangeError, self).__init__(
             "Couldn't find any affected files for this change.")
