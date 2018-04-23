@@ -29,6 +29,7 @@ def log_command_line(fmt, command):
 
 def execute(command,
             env=None,
+            cwd=None,
             split_lines=False,
             ignore_errors=False,
             extra_ignore_errors=(),
@@ -47,6 +48,10 @@ def execute(command,
         env (dict, optional):
             Environment variables to pass to the called executable. These will
             be added to the current environment.
+
+        cwd (unicode, optional):
+            An optional working directory to change to before executing the
+            process.
 
         split_lines (bool, optional):
             Whether to return the output as a list of lines or a single string.
@@ -146,6 +151,7 @@ def execute(command,
                              stderr=errors_output,
                              shell=False,
                              env=new_env,
+                             cwd=cwd,
                              **popen_encoding_args)
     else:
         p = subprocess.Popen(command,
@@ -155,6 +161,7 @@ def execute(command,
                              shell=False,
                              close_fds=True,
                              env=new_env,
+                             cwd=cwd,
                              **popen_encoding_args)
 
     data, errors = p.communicate()

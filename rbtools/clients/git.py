@@ -46,11 +46,11 @@ class GitClient(SCMClient):
                 Keyword arguments to pass through to the superclass.
         """
         super(GitClient, self).__init__(**kwargs)
+
         # Store the 'correct' way to invoke git, just plain old 'git' by
         # default.
         self.git = 'git'
-
-        self._original_cwd = None
+        self._git_toplevel = None
 
     def _supports_git_config_flag(self):
         """Return whether the installed version of git supports the -c flag.
@@ -202,8 +202,8 @@ class GitClient(SCMClient):
             elif n_parsed_revs == 3 and parsed[2].startswith('^'):
                 # Revision spec is diff-since-merge. Find the merge-base of the
                 # two revs to use as base.
-                merge_base = execute([self.git, 'merge-base', parsed[0],
-                                      parsed[1]]).strip()
+                merge_base = self._execute([self.git, 'merge-base', parsed[0],
+                                            parsed[1]]).strip()
                 result = {
                     'base': merge_base,
                     'tip': parsed[0],
@@ -224,9 +224,6 @@ class GitClient(SCMClient):
     def get_repository_info(self):
         """Get repository information for the current Git working tree.
 
-        This function changes the directory to the top level directory of the
-        current working tree.
-
         Returns:
             rbtools.clients.RepositoryInfo:
             The repository info structure.
@@ -243,8 +240,8 @@ class GitClient(SCMClient):
                               '--help": skipping Git')
                 return None
 
-        git_dir = execute([self.git, 'rev-parse', '--git-dir'],
-                          ignore_errors=True).rstrip('\n')
+        git_dir = self._execute([self.git, 'rev-parse', '--git-dir'],
+                                ignore_errors=True).rstrip('\n')
 
         if git_dir.startswith('fatal:') or not os.path.isdir(git_dir):
             return None
@@ -254,13 +251,6 @@ class GitClient(SCMClient):
         bare = execute([self.git, 'config', 'core.bare'],
                        ignore_errors=True).strip()
         self.bare = bare in ('true', '1')
-
-        # If we are not working in a bare repository, then we will change
-        # directory to the top level working tree lose our original position.
-        # However, we need the original working directory for file exclusion
-        # patterns, so we save it here.
-        if self._original_cwd is None:
-            self._original_cwd = os.getcwd()
 
         # Running in directories other than the top level of
         # of a work-tree would result in broken diffs on the server
@@ -274,10 +264,11 @@ class GitClient(SCMClient):
                 not os.path.isdir(git_dir)):
                 git_top = git_dir
 
-            os.chdir(os.path.abspath(git_top))
+            self._git_toplevel = os.path.abspath(git_top)
 
-        self.head_ref = execute([self.git, 'symbolic-ref', '-q',
-                                 'HEAD'], ignore_errors=True).strip()
+        self.head_ref = self._execute(
+            [self.git, 'symbolic-ref', '-q', 'HEAD'],
+            ignore_errors=True).strip()
 
         # We know we have something we can work with. Let's find out
         # what it is. We'll try SVN first, but only if there's a .git/svn
@@ -289,7 +280,7 @@ class GitClient(SCMClient):
         if (not getattr(self.options, 'repository_url', None) and
             os.path.isdir(git_svn_dir) and
             len(os.listdir(git_svn_dir)) > 0):
-            data = execute([self.git, 'svn', 'info'], ignore_errors=True)
+            data = self._execute([self.git, 'svn', 'info'], ignore_errors=True)
 
             m = re.search(r'^Repository Root: (.+)$', data, re.M)
 
@@ -309,8 +300,9 @@ class GitClient(SCMClient):
                         if getattr(self.options, 'tracking', None):
                             self.upstream_branch = self.options.tracking
                         else:
-                            data = execute([self.git, 'svn', 'rebase', '-n'],
-                                           ignore_errors=True)
+                            data = self._execute(
+                                [self.git, 'svn', 'rebase', '-n'],
+                                ignore_errors=True)
                             m = re.search(r'^Remote Branch:\s*(.+)$', data,
                                           re.M)
 
@@ -331,11 +323,11 @@ class GitClient(SCMClient):
                 # 'git svn info'.  If we fail because of an older git install,
                 # here, figure out what version of git is installed and give
                 # the user a hint about what to do next.
-                version = execute([self.git, 'svn', '--version'],
-                                  ignore_errors=True)
+                version = self._execute([self.git, 'svn', '--version'],
+                                        ignore_errors=True)
                 version_parts = re.search('version (\d+)\.(\d+)\.(\d+)',
                                           version)
-                svn_remote = execute(
+                svn_remote = self._execute(
                     [self.git, 'config', '--get', 'svn-remote.svn.url'],
                     ignore_errors=True)
 
@@ -350,8 +342,8 @@ class GitClient(SCMClient):
         # Okay, maybe Perforce (git-p4).
         git_p4_ref = os.path.join(git_dir, 'refs', 'remotes', 'p4', 'master')
         if os.path.exists(git_p4_ref):
-            data = execute([self.git, 'config', '--get', 'git-p4.port'],
-                           ignore_errors=True)
+            data = self._execute([self.git, 'config', '--get', 'git-p4.port'],
+                                 ignore_errors=True)
             m = re.search(r'(.+)', data)
             if m:
                 port = m.group(1)
@@ -370,12 +362,12 @@ class GitClient(SCMClient):
         self.upstream_branch = ''
         if self.head_ref:
             short_head = self._strip_heads_prefix(self.head_ref)
-            merge = execute([self.git, 'config', '--get',
-                             'branch.%s.merge' % short_head],
-                            ignore_errors=True).strip()
-            remote = execute([self.git, 'config', '--get',
-                              'branch.%s.remote' % short_head],
-                             ignore_errors=True).strip()
+            merge = self._execute(
+                [self.git, 'config', '--get', 'branch.%s.merge' % short_head],
+                ignore_errors=True).strip()
+            remote = self._execute(
+                [self.git, 'config', '--get', 'branch.%s.remote' % short_head],
+                ignore_errors=True).strip()
 
             merge = self._strip_heads_prefix(merge)
 
@@ -441,7 +433,7 @@ class GitClient(SCMClient):
                            default_upstream_branch or
                            'origin/master')
         upstream_remote = upstream_branch.split('/')[0]
-        origin_url = execute(
+        origin_url = self._execute(
             [self.git, 'config', '--get', 'remote.%s.url' % upstream_remote],
             ignore_errors=True).rstrip('\n')
         return (upstream_branch, origin_url)
@@ -465,8 +457,8 @@ class GitClient(SCMClient):
             return server_url
 
         # TODO: Maybe support a server per remote later? Is that useful?
-        url = execute([self.git, 'config', '--get', 'reviewboard.url'],
-                      ignore_errors=True).strip()
+        url = self._execute([self.git, 'config', '--get', 'reviewboard.url'],
+                            ignore_errors=True).strip()
         if url:
             return url
 
@@ -496,7 +488,7 @@ class GitClient(SCMClient):
             unicode:
             The commit messages of all commits between (base, tip].
         """
-        return execute(
+        return self._execute(
             [self.git, 'log', '--reverse', '--pretty=format:%s%n%n%b',
              '^%s' % revisions['base'], revisions['tip']],
             ignore_errors=True).strip()
@@ -540,7 +532,8 @@ class GitClient(SCMClient):
         if not isinstance(revisions, list):
             revisions = [revisions]
 
-        return execute([self.git, 'rev-parse'] + revisions).strip().split('\n')
+        revisions = self._execute([self.git, 'rev-parse'] + revisions)
+        return revisions.strip().split('\n')
 
     def _rev_list_youngest_remote_ancestor(self, local_branch, remote):
         """Return the youngest ancestor of ``local_branch`` on ``remote``.
@@ -561,8 +554,9 @@ class GitClient(SCMClient):
             be reached from local_branch by following the least number of
             parent links).
         """
-        local_commits = execute([self.git, 'rev-list', local_branch, '--not',
-                                 '--remotes=%s' % remote])
+        local_commits = self._execute(
+            [self.git, 'rev-list', local_branch, '--not',
+             '--remotes=%s' % remote])
         local_commits = local_commits.split()
 
         if local_commits == []:
@@ -624,8 +618,8 @@ class GitClient(SCMClient):
                 individual file access.
         """
         exclude_patterns = normalize_patterns(exclude_patterns,
-                                              self._get_root_directory(),
-                                              cwd=self.original_cwd)
+                                              self._git_toplevel,
+                                              cwd=os.getcwd())
 
         try:
             merge_base = revisions['parent_base']
@@ -733,7 +727,7 @@ class GitClient(SCMClient):
             elif self.type == 'git':
                 changed_files_cmd.append('-r')
 
-            changed_files = execute(
+            changed_files = self._execute(
                 changed_files_cmd + [rev_range] + include_files,
                 split_lines=True,
                 with_errors=False,
@@ -746,18 +740,18 @@ class GitClient(SCMClient):
             # of the line is the name of the file that has changed.
             changed_files = remove_filenames_matching_patterns(
                 (filename.split()[-1] for filename in changed_files),
-                exclude_patterns, base_dir=self._get_root_directory())
+                exclude_patterns, base_dir=self._git_toplevel)
 
             diff_lines = []
 
             for filename in changed_files:
-                lines = execute(diff_cmd + [rev_range, '--', filename],
-                                split_lines=True,
-                                with_errors=False,
-                                ignore_errors=True,
-                                none_on_ignored_error=True,
-                                log_output_on_error=False,
-                                results_unicode=False)
+                lines = self._execute(diff_cmd + [rev_range, '--', filename],
+                                      split_lines=True,
+                                      with_errors=False,
+                                      ignore_errors=True,
+                                      none_on_ignored_error=True,
+                                      log_output_on_error=False,
+                                      results_unicode=False)
 
                 if lines is None:
                     logging.error(
@@ -771,13 +765,13 @@ class GitClient(SCMClient):
                 diff_lines += lines
 
         else:
-            diff_lines = execute(diff_cmd + [rev_range] + include_files,
-                                 split_lines=True,
-                                 with_errors=False,
-                                 ignore_errors=True,
-                                 none_on_ignored_error=True,
-                                 log_output_on_error=False,
-                                 results_unicode=False)
+            diff_lines = self._execute(diff_cmd + [rev_range] + include_files,
+                                       split_lines=True,
+                                       with_errors=False,
+                                       ignore_errors=True,
+                                       none_on_ignored_error=True,
+                                       log_output_on_error=False,
+                                       results_unicode=False)
 
         if self.type == 'svn':
             return self.make_svn_diff(merge_base, diff_lines)
@@ -806,7 +800,7 @@ class GitClient(SCMClient):
             bytes:
             The reformatted diff contents.
         """
-        rev = execute([self.git, 'svn', 'find-rev', merge_base]).strip()
+        rev = self._execute([self.git, 'svn', 'find-rev', merge_base]).strip()
 
         if not rev:
             return None
@@ -884,7 +878,7 @@ class GitClient(SCMClient):
         p4rev = b''
 
         # Find which depot changelist we're based on
-        log = execute([self.git, 'log', merge_base], ignore_errors=True)
+        log = self._execute([self.git, 'log', merge_base], ignore_errors=True)
 
         for line in log:
             m = re.search(br'[rd]epo.-paths = "(.+)": change = (\d+).*\]',
@@ -910,7 +904,7 @@ class GitClient(SCMClient):
                 pass
             elif (line.startswith(b'--- ') and i + 1 < len(diff_lines) and
                   diff_lines[i + 1].startswith(b'+++ ')):
-                data = execute(
+                data = self._execute(
                     ['p4', 'files', base_path + filename + '@' + p4rev],
                     ignore_errors=True, results_unicode=False)
                 m = re.search(br'^%s%s#(\d+).*$' % (re.escape(base_path),
@@ -941,8 +935,9 @@ class GitClient(SCMClient):
             ``True`` if the working directory has been modified or if changes
             have been staged in the index.
         """
-        status = execute(['git', 'status', '--porcelain',
-                          '--untracked-files=no', '--ignore-submodules=dirty'])
+        status = self._execute(['git', 'status', '--porcelain',
+                                '--untracked-files=no',
+                                '--ignore-submodules=dirty'])
         return status != ''
 
     def amend_commit_description(self, message, revisions):
@@ -963,8 +958,9 @@ class GitClient(SCMClient):
                 amend the latest commit on the branch.
         """
         if revisions and revisions['tip']:
-            commit_ids = execute([self.git, 'rev-parse', 'HEAD',
-                                  revisions['tip']], split_lines=True)
+            commit_ids = self._execute(
+                [self.git, 'rev-parse', 'HEAD', revisions['tip']],
+                split_lines=True)
             head_id = commit_ids[0].strip()
             revision_id = commit_ids[1].strip()
 
@@ -972,7 +968,7 @@ class GitClient(SCMClient):
                 raise AmendError('Commit "%s" is not the latest commit, '
                                  'and thus cannot be modified' % revision_id)
 
-        execute([self.git, 'commit', '--amend', '-m', message])
+        self._execute([self.git, 'commit', '--amend', '-m', message])
 
     def apply_patch(self, patch_file, base_path=None, base_dir=None, p=None,
                     revert=False):
@@ -1014,8 +1010,8 @@ class GitClient(SCMClient):
 
         cmd.append(patch_file)
 
-        rc, data = execute(cmd, ignore_errors=True, with_errors=True,
-                           return_error_code=True)
+        rc, data = self._execute(cmd, ignore_errors=True, with_errors=True,
+                                 return_error_code=True)
 
         if rc == 0:
             return PatchResult(applied=True, patch_output=data)
@@ -1065,12 +1061,12 @@ class GitClient(SCMClient):
             modified_message = message
 
         if all_files:
-            execute(['git', 'add', '--all', ':/'])
+            self._execute(['git', 'add', '--all', ':/'])
         elif files:
-            execute(['git', 'add'] + files)
+            self._execute(['git', 'add'] + files)
 
-        execute(['git', 'commit', '-m', modified_message,
-                 '--author="%s <%s>"' % (author.fullname, author.email)])
+        self._execute(['git', 'commit', '-m', modified_message,
+                       '--author="%s <%s>"' % (author.fullname, author.email)])
 
     def delete_branch(self, branch_name, merged_only=True):
         """Delete the specified branch.
@@ -1088,7 +1084,7 @@ class GitClient(SCMClient):
         else:
             delete_flag = '-D'
 
-        execute(['git', 'branch', delete_flag, branch_name])
+        self._execute(['git', 'branch', delete_flag, branch_name])
 
     def merge(self, target, destination, message, author, squash=False,
               run_editor=False):
@@ -1119,7 +1115,7 @@ class GitClient(SCMClient):
             rbtools.clients.errors.MergeError:
                 An error occurred while merging the branch.
         """
-        rc, output = execute(
+        rc, output = self._execute(
             ['git', 'checkout', destination],
             ignore_errors=True,
             return_error_code=True)
@@ -1133,7 +1129,7 @@ class GitClient(SCMClient):
         else:
             method = '--no-ff'
 
-        rc, output = execute(
+        rc, output = self._execute(
             ['git', 'merge', target, method, '--no-commit'],
             ignore_errors=True,
             return_error_code=True)
@@ -1156,7 +1152,7 @@ class GitClient(SCMClient):
                 The branch was unable to be pushed.
         """
         origin_url = self._get_origin()[1]
-        rc, output = execute(
+        rc, output = self._execute(
             ['git', 'pull', '--rebase', origin_url, remote_branch],
             ignore_errors=True,
             return_error_code=True)
@@ -1164,7 +1160,7 @@ class GitClient(SCMClient):
         if rc:
             raise PushError('Could not pull changes from upstream.')
 
-        rc, output = execute(
+        rc, output = self._execute(
             ['git', 'push', origin_url, remote_branch],
             ignore_errors=True,
             return_error_code=True)
@@ -1178,35 +1174,30 @@ class GitClient(SCMClient):
 
         Returns:
             unicode:
-            A string with the name of the current branch.
-        """
-        return execute([self.git, 'rev-parse', '--abbrev-ref', 'HEAD'],
-                       ignore_errors=True).strip()
-
-    def _get_root_directory(self):
-        """Return the root directory of the repository as an absolute path.
-
-        Returns:
-            unicode:
             The name of the directory corresponding to the root of the current
             working directory (whether a plain checkout or a git worktree). If
             no repository can be found, this will return None.
         """
-        git_dir = execute([self.git, 'rev-parse', '--show-toplevel'],
-                          ignore_errors=True).rstrip('\n')
+        return self._execute([self.git, 'rev-parse', '--abbrev-ref', 'HEAD'],
+                             ignore_errors=True).strip()
 
-        if git_dir.startswith('fatal:') or not os.path.isdir(git_dir):
-            logging.error('Could not find git repository path.')
-            return None
+    def _execute(self, cmdline, *args, **kwargs):
+        """Execute a git command within the correct cwd.
 
-        return os.path.abspath(git_dir)
+        Args:
+            cmdline (list of unicode):
+                A command-line to execute.
 
-    @property
-    def original_cwd(self):
-        """The original working directory of the process."""
-        if self._original_cwd is None:
-            # If this is None, then we haven't called get_repository_info and
-            # shouldn't have changed directories.
-            self._original_cwd = os.getcwd()
+            *args (list):
+                Positional arguments to pass through to
+                :py:func:`rbtools.utils.process.execute`.
 
-        return self._original_cwd
+            *kwargs (dict):
+                Keyword arguments to pass through to
+                :py:func:`rbtools.utils.process.execute`.
+
+        Returns:
+            tuple:
+            The result from the execute call.
+        """
+        return execute(cmdline, cwd=self._git_toplevel, *args, **kwargs)

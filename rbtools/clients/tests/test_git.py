@@ -33,8 +33,9 @@ class GitClientTests(SpyAgency, SCMClientTests):
         })
 
     def _run_git(self, command):
-        return execute(['git'] + command, env=None, split_lines=False,
-                       ignore_errors=False, extra_ignore_errors=())
+        return execute(['git'] + command, env=None, cwd=self.clone_dir,
+                       split_lines=False, ignore_errors=False,
+                       extra_ignore_errors=())
 
     def _git_add_file_commit(self, filename, data, msg):
         """Add a file to a git repository.
@@ -189,9 +190,9 @@ class GitClientTests(SpyAgency, SCMClientTests):
 
         os.mkdir('subdir')
         self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
-        os.chdir('subdir')
-        self._git_add_file_commit('exclude.txt', FOO2, 'commit 2')
+        self._git_add_file_commit('subdir/exclude.txt', FOO2, 'commit 2')
 
+        os.chdir('subdir')
         self.client.get_repository_info()
 
         commit_id = self._git_get_head()
