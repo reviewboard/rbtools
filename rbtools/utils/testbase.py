@@ -22,15 +22,15 @@ class RBTestBase(TestCase):
     tests employ file I/O operations."""
     def setUp(self):
         self._old_cwd = os.getcwd()
+        self.old_home = os.environ['HOME']
         self.set_user_home_tmp()
 
     def tearDown(self):
         os.chdir(self._old_cwd)
         cleanup_tempfiles()
 
-    def create_tmp_dir(self):
-        """Creates and returns a temporary directory."""
-        return make_tempdir()
+        if self.old_home:
+            os.environ['HOME'] = self.old_home
 
     def chdir_tmp(self, dir=None):
         """Changes current directory to a temporary directory."""

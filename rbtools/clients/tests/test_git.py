@@ -60,10 +60,10 @@ class GitClientTests(SpyAgency, SCMClientTests):
         return self._run_git(['rev-parse', 'HEAD']).strip()
 
     def setUp(self):
-        super(GitClientTests, self).setUp()
-
         if not is_exe_in_path('git'):
             raise SkipTest('git not found in path')
+
+        super(GitClientTests, self).setUp()
 
         self.set_user_home(
             os.path.join(self.testdata_dir, 'homedir'))
@@ -93,14 +93,12 @@ class GitClientTests(SpyAgency, SCMClientTests):
 
     def test_scan_for_server_reviewboardrc(self):
         """Testing GitClient scan_for_server, .reviewboardrc case"""
-        rc = open(os.path.join(self.clone_dir, '.reviewboardrc'), 'w')
-        rc.write('REVIEWBOARD_URL = "%s"' % self.TESTSERVER)
-        rc.close()
-        self.client.config = load_config()
+        with self.reviewboardrc({'REVIEWBOARD_URL': self.TESTSERVER}):
+            self.client.config = load_config()
 
-        ri = self.client.get_repository_info()
-        server = self.client.scan_for_server(ri)
-        self.assertEqual(server, self.TESTSERVER)
+            ri = self.client.get_repository_info()
+            server = self.client.scan_for_server(ri)
+            self.assertEqual(server, self.TESTSERVER)
 
     def test_scan_for_server_property(self):
         """Testing GitClient scan_for_server using repo property"""
