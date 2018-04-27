@@ -408,13 +408,15 @@ class PerforceClient(SCMClient):
             not sys.platform.startswith('win')):
             norm_cwd = os.path.normcase(os.path.realpath(os.getcwd()) +
                                         os.path.sep)
-            norm_client_root = os.path.normcase(os.path.realpath(client_root) +
-                                                os.path.sep)
+            local_path = os.path.normcase(os.path.realpath(client_root) +
+                                          os.path.sep)
 
             # Don't accept the repository if the current directory
             # is outside the root of the Perforce client.
-            if not norm_cwd.startswith(norm_client_root):
+            if not norm_cwd.startswith(local_path):
                 return None
+        else:
+            local_path = None
 
         try:
             parts = repository_path.split(':')
@@ -471,7 +473,9 @@ class PerforceClient(SCMClient):
         # installed, and error out if we don't.
         check_gnu_diff()
 
-        return RepositoryInfo(path=repository_path, supports_changesets=True)
+        return RepositoryInfo(path=repository_path,
+                              local_path=local_path,
+                              supports_changesets=True)
 
     def parse_revision_spec(self, revisions=[]):
         """Parse the given revision spec.

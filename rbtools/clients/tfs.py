@@ -60,7 +60,9 @@ class TFExeWrapper(object):
         # error out if we don't.
         check_gnu_diff()
 
-        return RepositoryInfo(unquote(m.group(1)))
+        path = unquote(m.group(1))
+
+        return RepositoryInfo(path=path, local_path=path)
 
     def parse_revision_spec(self, revisions):
         """Parse the given revision spec.
@@ -426,7 +428,7 @@ class TEEWrapper(object):
 
         path = unquote(m.group(1))
 
-        return RepositoryInfo(path)
+        return RepositoryInfo(path=path, local_path=path)
 
     def parse_revision_spec(self, revisions):
         """Parse the given revision spec.

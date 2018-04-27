@@ -161,7 +161,9 @@ class MercurialClient(SCMClient):
                 path = self._remote_path[1]
                 base_path = ''
 
-            return RepositoryInfo(path=path, base_path=base_path,
+            return RepositoryInfo(path=path,
+                                  base_path=base_path,
+                                  local_path=self.hg_root,
                                   supports_parent_diffs=True)
 
     def parse_revision_spec(self, revisions=[]):
@@ -392,7 +394,9 @@ class MercurialClient(SCMClient):
                            '', '', ''])
         base_path = url.path[len(path):]
 
-        return RepositoryInfo(path=root, base_path=base_path,
+        return RepositoryInfo(path=root,
+                              base_path=base_path,
+                              local_path=self.hg_root,
                               supports_parent_diffs=True)
 
     def _load_hgrc(self):

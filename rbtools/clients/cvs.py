@@ -64,7 +64,8 @@ class CVSClient(SCMClient):
                 logging.error('failed to get fqdn for %s, msg=%s',
                               host, msg)
 
-        return RepositoryInfo(path=repository_path)
+        return RepositoryInfo(path=repository_path,
+                              local_path=repository_path)
 
     def parse_revision_spec(self, revisions=[]):
         """Parse the given revision spec.

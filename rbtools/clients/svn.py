@@ -103,6 +103,13 @@ class SVNClient(SCMClient):
 
         path = m.group(1)
 
+        m = re.search('^Working Copy Root Path: (.+)$', data, re.M)
+
+        if m:
+            local_path = m.group(1)
+        else:
+            local_path = None
+
         m = re.search('^URL: (.+)$', data, re.M)
         if not m:
             return None
@@ -131,9 +138,11 @@ class SVNClient(SCMClient):
         else:
             self.subversion_client_version = tuple(map(int, m.groups()))
 
-        self._svn_repository_info_cache = SVNRepositoryInfo(path,
-                                                            base_path,
-                                                            uuid)
+        self._svn_repository_info_cache = SVNRepositoryInfo(
+            path=path,
+            base_path=base_path,
+            local_path=local_path,
+            uuid=uuid)
 
         return self._svn_repository_info_cache
 
@@ -292,6 +301,7 @@ class SVNClient(SCMClient):
         # Scan first for dot files, since it's faster and will cover the
         # user's $HOME/.reviewboardrc
         server_url = super(SVNClient, self).scan_for_server(repository_info)
+
         if server_url:
             return server_url
 
@@ -1265,8 +1275,8 @@ class SVNRepositoryInfo(RepositoryInfo):
             UUID of the Subversion repository.
     """
 
-    def __init__(self, path, base_path, uuid, supports_parent_diffs=False,
-                 repository_id=None):
+    def __init__(self, path=None, base_path=None, uuid=None, local_path=None,
+                 supports_parent_diffs=False, repository_id=None):
         """Initialize the repository information.
 
         Args:
@@ -1275,6 +1285,11 @@ class SVNRepositoryInfo(RepositoryInfo):
 
             base_path (unicode):
                 Root of the Subversion repository.
+
+            local_path (unicode):
+                The local filesystem path for the repository. This can
+                sometimes be the same as ``path``, but may not be (since that
+                can contain a remote repository path).
 
             uuid (unicode):
                 UUID of the Subversion repository.
@@ -1287,7 +1302,10 @@ class SVNRepositoryInfo(RepositoryInfo):
                 testing purposes, and is not guaranteed to be set.
         """
         super(SVNRepositoryInfo, self).__init__(
-            path, base_path, supports_parent_diffs=supports_parent_diffs)
+            path=path,
+            base_path=base_path,
+            local_path=local_path,
+            supports_parent_diffs=supports_parent_diffs)
 
         self.uuid = uuid
         self.repository_id = repository_id
@@ -1352,8 +1370,12 @@ class SVNRepositoryInfo(RepositoryInfo):
             relpath = self._get_relative_path(self.base_path, repos_base_path)
 
             if relpath:
-                return SVNRepositoryInfo(info['url'], relpath, self.uuid,
-                                         repository_id=repository.id)
+                return SVNRepositoryInfo(
+                    path=info['url'],
+                    base_path=relpath,
+                    local_path=self.local_path,
+                    uuid=self.uuid,
+                    repository_id=repository.id)
 
         # We didn't find a matching repository on the server. We'll just return
         # self and hope for the best. In reality, we'll likely fail, but we

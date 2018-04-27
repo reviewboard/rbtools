@@ -68,7 +68,8 @@ class PlasticClient(SCMClient):
 
         path = m.group(1)
 
-        return RepositoryInfo(path,
+        return RepositoryInfo(path=path,
+                              local_path=path,
                               supports_changesets=True,
                               supports_parent_diffs=False)
 

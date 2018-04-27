@@ -228,6 +228,11 @@ class GitClient(SCMClient):
             rbtools.clients.RepositoryInfo:
             The repository info structure.
         """
+        # Temporarily reset the toplevel. This is necessary for making things
+        # work correctly in unit tests where we may be moving the cwd around a
+        # lot.
+        self._git_toplevel = None
+
         if not check_install(['git', '--help']):
             # CreateProcess (launched via subprocess, used by check_install)
             # does not automatically append .cmd for things it finds in PATH.
@@ -314,8 +319,17 @@ class GitClient(SCMClient):
                                                  'to "master"\n')
                                 self.upstream_branch = 'master'
 
+                        m = re.search(r'Working Copy Root Path: (.+)$', data,
+                                      re.M)
+
+                        if m:
+                            local_path = m.group(1)
+                        else:
+                            local_path = self._git_toplevel
+
                         return SVNRepositoryInfo(path=path,
                                                  base_path=base_path,
+                                                 local_path=local_path,
                                                  uuid=uuid,
                                                  supports_parent_diffs=True)
             else:
@@ -355,6 +369,7 @@ class GitClient(SCMClient):
                 self.upstream_branch = 'remotes/p4/master'
                 return RepositoryInfo(path=port,
                                       base_path='',
+                                      local_path=self._git_toplevel,
                                       supports_parent_diffs=True)
 
         # Nope, it's git then.
@@ -398,7 +413,9 @@ class GitClient(SCMClient):
 
         if url:
             self.type = 'git'
-            return RepositoryInfo(path=url, base_path='',
+            return RepositoryInfo(path=url,
+                                  base_path='',
+                                  local_path=self._git_toplevel,
                                   supports_parent_diffs=True)
         return None
 

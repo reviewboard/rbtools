@@ -68,7 +68,8 @@ class BazaarClient(SCMClient):
 
             repository_info = RepositoryInfo(
                 path=path,
-                base_path='/',    # Diffs are always relative to the root.
+                base_path='/',  # Diffs are always relative to the root.
+                local_path=path,
                 supports_parent_diffs=True)
 
         return repository_info

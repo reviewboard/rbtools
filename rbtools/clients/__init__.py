@@ -3,6 +3,7 @@
 from __future__ import print_function, unicode_literals
 
 import logging
+import os
 import re
 import sys
 
@@ -641,8 +642,8 @@ class SCMClient(object):
 class RepositoryInfo(object):
     """A representation of a source code repository."""
 
-    def __init__(self, path=None, base_path=None, supports_changesets=False,
-                 supports_parent_diffs=False):
+    def __init__(self, path=None, base_path=None, local_path=None,
+                 supports_changesets=False, supports_parent_diffs=False):
         """Initialize the object.
 
         Args:
@@ -652,6 +653,11 @@ class RepositoryInfo(object):
             base_path (unicode, optional):
                 The relative path between the current working directory and the
                 repository root.
+
+            local_path (unicode, optional):
+                The local filesystem path for the repository. This can
+                sometimes be the same as ``path``, but may not be (since that
+                can contain a remote repository path).
 
             supports_changesets (bool, optional):
                 Whether the repository type supports changesets that store
@@ -663,9 +669,10 @@ class RepositoryInfo(object):
         """
         self.path = path
         self.base_path = base_path
+        self.local_path = local_path
         self.supports_changesets = supports_changesets
         self.supports_parent_diffs = supports_parent_diffs
-        logging.debug('repository info: %s', self)
+        logging.debug('Repository info: %s', self)
 
     def __str__(self):
         """Return a string representation of the repository info.
@@ -774,14 +781,48 @@ def scan_usable_client(config, options, client_name=None):
     else:
         scmclients = SCMCLIENTS
 
+    candidate_repos = []
+
     for name, tool in six.iteritems(scmclients):
         logging.debug('Checking for a %s repository...', tool.name)
         repository_info = tool.get_repository_info()
 
         if repository_info:
-            break
+            candidate_repos.append((repository_info, tool))
 
-    if not repository_info:
+    if candidate_repos:
+        if len(candidate_repos) == 1:
+            repository_info, tool = candidate_repos[0]
+        else:
+            logging.debug('Finding deepest repository of multiple matching '
+                          'repository types.')
+
+            deepest_repo_len = 0
+            deepest_repo_info = None
+            deepest_repo_tool = None
+
+            for repo, tool in candidate_repos:
+                if (repo.local_path and
+                    len(os.path.normpath(repo.local_path)) > deepest_repo_len):
+                    deepest_repo_len = len(repo.local_path)
+                    deepest_repo_info = repo
+                    deepest_repo_tool = tool
+
+            if deepest_repo_info:
+                repository_info = deepest_repo_info
+                tool = deepest_repo_tool
+
+                logging.warn('Multiple matching repositories were found. '
+                             'Using %s repository at %s.',
+                             tool.name, repository_info.local_path)
+                logging.warn('Define REPOSITORY_TYPE in .reviewboardrc if '
+                             'you wish to use a different repository.')
+            else:
+                # If finding the deepest repository fails (for example, when
+                # posting against a remote SVN repository there will be no
+                # local path), just default to the first repository found
+                repository_info, tool = candidate_repos[0]
+    else:
         if client_name:
             logging.error('The provided repository type was not detected '
                           'in the current directory.')
