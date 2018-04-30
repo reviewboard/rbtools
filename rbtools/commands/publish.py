@@ -38,16 +38,21 @@ class Publish(Command):
                added_in='0.8.0'),
     ]
 
-    def main(self, request_id):
+    def main(self, review_request_id):
         """Run the command."""
         repository_info, tool = self.initialize_scm_tool(
             client_name=self.options.repository_type)
         server_url = self.get_server_url(repository_info, tool)
         api_client, api_root = self.get_api(server_url)
 
-        review_request = get_review_request(request_id, api_root,
-                                            only_fields='public',
-                                            only_links='draft')
+        try:
+            review_request = api_root.get_review_request(
+                review_request_id=review_request_id
+                only_fields='public',
+                only_links='draft')
+        except APIError as e:
+            raise CommandError('Error getting review request %s: %s'
+                               % (review_request_id, e))
 
         self.setup_tool(tool, api_root)
 
@@ -82,4 +87,4 @@ class Publish(Command):
             raise CommandError('Error publishing review request (it may '
                                'already be published): %s' % e)
 
-        print('Review request #%s is published.' % request_id)
+        print('Review request #%s is published.' % review_request_id)

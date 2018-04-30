@@ -4,7 +4,6 @@ import os
 
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option
-from rbtools.utils.commands import get_review_request
 
 
 class Attach(Command):
@@ -26,13 +25,18 @@ class Attach(Command):
         Command.repository_options,
     ]
 
-    def main(self, request_id, path_to_file):
+    def main(self, review_request_id, path_to_file):
         self.repository_info, self.tool = self.initialize_scm_tool(
             client_name=self.options.repository_type)
         server_url = self.get_server_url(self.repository_info, self.tool)
         api_client, api_root = self.get_api(server_url)
 
-        request = get_review_request(request_id, api_root)
+        try:
+            review_request = api_root.get_review_request(
+                review_request_id=review_request_id)
+        except APIError as e:
+            raise CommandError('Error getting review request %s: %s'
+                               % (review_request_id, e))
 
         try:
             with open(path_to_file, 'rb') as f:
@@ -45,10 +49,10 @@ class Attach(Command):
         filename = self.options.filename or os.path.basename(path_to_file)
 
         try:
-            request.get_file_attachments().upload_attachment(
+            review_request.get_file_attachments().upload_attachment(
                 filename, content, self.options.caption)
         except APIError as e:
             raise CommandError('Error uploading file: %s' % e)
 
         print('Uploaded %s to review request %s.' %
-              (path_to_file, request_id))
+              (path_to_file, review_request_id))

@@ -2,7 +2,8 @@ from __future__ import print_function, unicode_literals
 
 import logging
 
-from rbtools.commands import Command
+from rbtools.api.errors import AuthorizationError
+from rbtools.commands import Command, CommandError
 from rbtools.utils.users import get_authenticated_session
 
 
@@ -32,9 +33,12 @@ class Login(Command):
         was_authenticated = session.authenticated
 
         if not was_authenticated:
-            session = get_authenticated_session(api_client, api_root,
-                                                auth_required=True,
-                                                session=session)
+            try:
+                session = get_authenticated_session(api_client, api_root,
+                                                    auth_required=True,
+                                                    session=session)
+            except AuthorizationError:
+                raise CommandError('Unable to log in to Review Board.')
 
         if session.authenticated:
             if not was_authenticated or (self.options.username and

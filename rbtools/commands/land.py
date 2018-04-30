@@ -4,6 +4,7 @@ import logging
 
 import six
 
+from rbtools.api.errors import APIError
 from rbtools.clients.errors import MergeError, PushError
 from rbtools.commands import Command, CommandError, Option, RB_MAIN
 from rbtools.utils.commands import (build_rbtools_cmd_argv,
@@ -244,16 +245,19 @@ class Land(Command):
             is_local = branch_name is not None
             review_request_id = self.options.rid
         else:
-            review_request = guess_existing_review_request(
-                repository_info,
-                self.options.repository_name,
-                api_root,
-                api_client,
-                self.tool,
-                get_revisions(self.tool, self.cmd_args),
-                guess_summary=False,
-                guess_description=False,
-                is_fuzzy_match_func=self._ask_review_request_match)
+            try:
+                review_request = guess_existing_review_request(
+                    repository_info,
+                    self.options.repository_name,
+                    api_root,
+                    api_client,
+                    self.tool,
+                    get_revisions(self.tool, self.cmd_args),
+                    guess_summary=False,
+                    guess_description=False,
+                    is_fuzzy_match_func=self._ask_review_request_match)
+            except ValueError as e:
+                raise CommandError(six.text_type(e))
 
             if not review_request or not review_request.id:
                 raise CommandError('Could not determine the existing review '
@@ -262,7 +266,12 @@ class Land(Command):
             review_request_id = review_request.id
             is_local = True
 
-        review_request = get_review_request(review_request_id, api_root)
+        try:
+            review_request = api_root.get_review_request(
+                review_request_id=review_request_id)
+        except APIError as e:
+            raise CommandError('Error getting review request %s: %s'
+                               % (review_request_id, e))
 
         if self.options.is_local is not None:
             is_local = self.options.is_local

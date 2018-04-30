@@ -7,7 +7,6 @@ import sys
 from six.moves import range
 
 from rbtools.api.errors import AuthorizationError
-from rbtools.commands import CommandError
 from rbtools.utils.console import get_input
 
 
@@ -35,17 +34,18 @@ def get_authenticated_session(api_client, api_root, auth_required=False,
         # to hang.
         if not sys.stdin.isatty():
             logging.error('Authentication is required but input is not a tty.')
+
             if sys.platform == 'win32':
                 logging.info('Check that you are not running this script '
                              'from a Cygwin terminal emulator (or use '
                              'Cygwin Python to run it).')
 
-            raise CommandError('Unable to log in to Review Board.')
+            raise AuthorizationError(http_status=None, error_code=None)
 
         logging.info('Please log in to the Review Board server at %s',
                      api_client.domain)
 
-        for i in range(num_retries):
+        for i in range(num_retries + 1):
             username = get_input('Username: ')
             password = getpass.getpass('Password: ')
             api_client.login(username, password)
@@ -56,11 +56,11 @@ def get_authenticated_session(api_client, api_root, auth_required=False,
             except AuthorizationError:
                 sys.stderr.write('\n')
 
-                if i < num_retries - 1:
-                    logging.error('The username or password was incorrect. '
-                                  'Please try again.')
-                else:
-                    raise CommandError('Unable to log in to Review Board.')
+                if i == num_retries:
+                    raise
+
+                logging.error('The username or password was incorrect. '
+                              'Please try again.')
 
     return session
 
