@@ -1,6 +1,7 @@
 from __future__ import print_function, unicode_literals
 
 import logging
+import re
 
 import texttable as tt
 from backports.shutil_get_terminal_size import get_terminal_size
@@ -17,6 +18,23 @@ class Status(Command):
     description = 'Output a list of your pending review requests.'
     args = ''
     option_list = [
+        Option('--format',
+               dest='format',
+               default=None,
+               help='Set the output format. The format is in the form of '
+                    '%%(field_name)s, where field_name is one of: id, status,'
+                    'summary, or description.\n'
+                    'A character escape can be included via \\xXX where XX is '
+                    'the hex code of a character.\n'
+                    'For example: --format="%%(id)s\\x09%%(summary)s"\n'
+                    'This option will print out the id and summary tab-'
+                    'separated.'),
+        Option('-z',
+               dest='format_nul',
+               default=False,
+               action='store_true',
+               help='Null-terminate each entry. Otherwise, the entries will '
+                    'be newline-terminated.'),
         Option('--all',
                dest='all_repositories',
                action='store_true',
@@ -34,25 +52,27 @@ class Status(Command):
     # The number of spaces after the end of the request's summary.
     PADDING = 5
 
-    def tabulate(self, request_stats):
+    _HEX_RE = re.compile(r'\\x([0-9a-fA-f]{2})')
+
+    def tabulate(self, review_requests):
         """Print review request summary and status in a table.
 
         Args:
-            request_stats (dict):
-                A dict that contains statistics about each review request.
+            review_requests (list of dict):
+                A list that contains statistics about each review request.
         """
-        if len(request_stats):
+        if len(review_requests):
             has_branches = False
             has_bookmarks = False
 
             table = tt.Texttable(get_terminal_size().columns)
             header = ['Status', 'Review Request']
 
-            for request in request_stats:
-                if 'branch' in request:
+            for info in review_requests:
+                if 'branch' in info:
                     has_branches = True
 
-                if 'bookmark' in request:
+                if 'bookmark' in info:
                     has_bookmarks = True
 
             if has_branches:
@@ -63,14 +83,17 @@ class Status(Command):
 
             table.header(header)
 
-            for request in request_stats:
-                row = [request['status'], request['summary']]
+            for info in review_requests:
+                row = [
+                    info['status'],
+                    'r/%s - %s' % (info['id'], info['summary']),
+                ]
 
                 if has_branches:
-                    row.append(request.get('branch') or '')
+                    row.append(info.get('branch') or '')
 
                 if has_bookmarks:
-                    row.append(request.get('bookmark') or '')
+                    row.append(info.get('bookmark') or '')
 
                 table.add_row(row)
 
@@ -91,7 +114,6 @@ class Status(Command):
             list: A list whose elements are dicts of each request's statistics.
         """
         requests_stats = []
-        request_stats = {}
 
         for request in requests.all_items:
             if request.draft:
@@ -103,19 +125,21 @@ class Status(Command):
             else:
                 status = 'Pending'
 
-            request_stats = {
+            info = {
+                'id':  request.id,
                 'status': status,
-                'summary': 'r/%s - %s' % (request.id, request.summary)
+                'summary': request.summary,
+                'description': request.description,
             }
 
             if 'local_branch' in request.extra_data:
-                request_stats['branch'] = \
+                info['branch'] = \
                     request.extra_data['local_branch']
             elif 'local_bookmark' in request.extra_data:
-                request_stats['bookmark'] = \
+                info['bookmark'] = \
                     request.extra_data['local_bookmark']
 
-            requests_stats.append(request_stats)
+            requests_stats.append(info)
 
         return requests_stats
 
@@ -150,6 +174,30 @@ class Status(Command):
                                 'the Review Board server. Displaying review '
                                 'requests from all repositories.')
 
-        requests = api_root.get_review_requests(**query_args)
-        request_stats = self.get_data(requests)
-        self.tabulate(request_stats)
+        review_requests = api_root.get_review_requests(**query_args)
+        review_request_info = self.get_data(review_requests)
+
+        if self.options.format:
+            self.format_results(review_request_info)
+        else:
+            self.tabulate(review_request_info)
+
+    def format_results(self, review_requests):
+        """Print formatted information about the review requests.
+
+        Args:
+            review_requests (list of dict):
+                The information about the review requests.
+        """
+        fmt = self._HEX_RE.sub(
+            lambda m: chr(int(m.group(1), 16)),
+            self.options.format,
+        )
+
+        if self.options.format_nul:
+            end = '\x00'
+        else:
+            end = '\n'
+
+        for info in review_requests:
+            print(fmt % info, end=end)
