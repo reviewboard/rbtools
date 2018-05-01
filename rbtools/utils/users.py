@@ -4,10 +4,11 @@ import getpass
 import logging
 import sys
 
-from six.moves import input, range
+from six.moves import range
 
 from rbtools.api.errors import AuthorizationError
 from rbtools.commands import CommandError
+from rbtools.utils.console import get_input
 
 
 def get_authenticated_session(api_client, api_root, auth_required=False,
@@ -45,8 +46,7 @@ def get_authenticated_session(api_client, api_root, auth_required=False,
                      api_client.domain)
 
         for i in range(num_retries):
-            sys.stderr.write('Username: ')
-            username = input()
+            username = get_input('Username: ')
             password = getpass.getpass('Password: ')
             api_client.login(username, password)
 

@@ -226,10 +226,11 @@ class PresetHTTPAuthHandler(BaseHandler):
 class ReviewBoardHTTPErrorProcessor(HTTPErrorProcessor):
     """Processes HTTP error codes.
 
-    Python 2.6 gets HTTP error code processing right, but 2.4 and 2.5 only
-    accepts HTTP 200 and 206 as success codes. This handler ensures that
-    anything in the 200 range, as well as 304, is a success.
+    Python's built-in error processing understands 2XX responses as successful,
+    but processes 3XX as an error. This handler ensures that all valid
+    responses from the API are processed as such.
     """
+
     def http_response(self, request, response):
         if not (200 <= response.code < 300 or
                 response.code == NOT_MODIFIED):
@@ -262,7 +263,7 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
     def __init__(self, *args, **kwargs):
         HTTPBasicAuthHandler.__init__(self, *args, **kwargs)
         self._retried = False
-        self._lasturl = ""
+        self._lasturl = ''
         self._needs_otp_token = False
         self._otp_token_attempts = 0
 
@@ -336,14 +337,8 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
 
 
 class ReviewBoardHTTPPasswordMgr(HTTPPasswordMgr):
-    """Adds HTTP authentication support for URLs.
+    """Adds HTTP authentication support for URLs."""
 
-    Python 2.4's password manager has a bug in http authentication
-    when the target server uses a non-standard port.  This works
-    around that bug on Python 2.4 installs.
-
-    See: http://bugs.python.org/issue974757
-    """
     def __init__(self, reviewboard_url, rb_user=None, rb_pass=None,
                  api_token=None, auth_callback=None, otp_token_callback=None):
         HTTPPasswordMgr.__init__(self)
@@ -398,8 +393,8 @@ def create_cookie_jar(cookie_file=None):
                 shutil.copyfile(post_review_cookies, cookie_file)
                 os.chmod(cookie_file, 0o600)
             except IOError as e:
-                logging.warning("There was an error while copying "
-                                "post-review's cookies: %s", e)
+                logging.warning('There was an error while copying '
+                                'legacy post-review cookies: %s', e)
 
     if not os.path.isfile(cookie_file):
         try:

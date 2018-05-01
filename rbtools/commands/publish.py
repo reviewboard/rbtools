@@ -9,6 +9,7 @@ from rbtools.utils.commands import get_review_request
 
 class Publish(Command):
     """Publish a specific review request from a draft."""
+
     name = 'publish'
     author = 'The Review Board Project'
     args = '<review-request-id>'

@@ -92,7 +92,7 @@ class BazaarClient(SCMClient):
         and the parent diff (if necessary) will include (parent, base].
 
         If a single revision is passed in, this will return the parent of that
-        revision for 'base' and the passed-in revision for 'tip'.
+        revision for "base" and the passed-in revision for "tip".
 
         If zero revisions are passed in, this will return the current HEAD as
         'tip', and the upstream branch as 'base', taking into account parent

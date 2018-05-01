@@ -26,6 +26,7 @@ class SetupRepo(Command):
     If the client supports it, it attempts to guess the branch name on the
     server.
     """
+
     name = 'setup-repo'
     author = 'The Review Board Project'
     description = ('Configure a repository to point to a Review Board server '

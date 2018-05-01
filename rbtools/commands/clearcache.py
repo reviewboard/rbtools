@@ -6,6 +6,7 @@ from rbtools.commands import Command, Option
 
 class ClearCache(Command):
     """Delete the HTTP cache used for the API."""
+
     name = 'clear-cache'
     author = 'The Review Board Project'
     description = 'Delete the HTTP cache used for the API.'

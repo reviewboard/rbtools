@@ -31,11 +31,11 @@ class BazaarClientTests(SCMClientTests):
         self.orig_dir = os.getcwd()
 
         self.original_branch = self.chdir_tmp()
-        self._run_bzr(["init", "."])
-        self._bzr_add_file_commit("foo.txt", FOO, "initial commit")
+        self._run_bzr(['init', '.'])
+        self._bzr_add_file_commit('foo.txt', FOO, 'initial commit')
 
         self.child_branch = mktemp()
-        self._run_bzr(["branch", "--use-existing-dir", self.original_branch,
+        self._run_bzr(['branch', '--use-existing-dir', self.original_branch,
                        self.child_branch])
         self.client = BazaarClient(options=self.options)
         os.chdir(self.orig_dir)
@@ -50,8 +50,8 @@ class BazaarClientTests(SCMClientTests):
         and commit with msg."""
         with open(file, 'w') as foo:
             foo.write(data)
-        self._run_bzr(["add", file])
-        self._run_bzr(["commit", "-m", msg, '--author', 'Test User'])
+        self._run_bzr(['add', file])
+        self._run_bzr(['commit', '-m', msg, '--author', 'Test User'])
 
     def _compare_diffs(self, filename, full_diff, expected_diff_digest,
                        change_type='modified'):
@@ -119,7 +119,7 @@ class BazaarClientTests(SCMClientTests):
         """Testing BazaarClient simple diff case"""
         os.chdir(self.child_branch)
 
-        self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
+        self._bzr_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
 
         revisions = self.client.parse_revision_spec([])
         result = self.client.diff(revisions)
@@ -133,8 +133,8 @@ class BazaarClientTests(SCMClientTests):
         """Testing BazaarClient diff with file exclusion"""
         os.chdir(self.child_branch)
 
-        self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
-        self._bzr_add_file_commit("exclude.txt", FOO2, "commit 2")
+        self._bzr_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._bzr_add_file_commit('exclude.txt', FOO2, 'commit 2')
 
         revisions = self.client.parse_revision_spec([])
         result = self.client.diff(revisions, exclude_patterns=['exclude.txt'])
@@ -196,8 +196,8 @@ class BazaarClientTests(SCMClientTests):
         """Testing BazaarClient diff with specific files"""
         os.chdir(self.child_branch)
 
-        self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
-        self._bzr_add_file_commit("bar.txt", "baz", "added bar")
+        self._bzr_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
+        self._bzr_add_file_commit('bar.txt', 'baz', 'added bar')
 
         revisions = self.client.parse_revision_spec([])
         result = self.client.diff(revisions, ['foo.txt'])
@@ -211,9 +211,9 @@ class BazaarClientTests(SCMClientTests):
         """Testing BazaarClient simple diff with multiple commits case"""
         os.chdir(self.child_branch)
 
-        self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
-        self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
-        self._bzr_add_file_commit("foo.txt", FOO3, "commit 3")
+        self._bzr_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._bzr_add_file_commit('foo.txt', FOO2, 'commit 2')
+        self._bzr_add_file_commit('foo.txt', FOO3, 'commit 3')
 
         revisions = self.client.parse_revision_spec([])
         result = self.client.diff(revisions)
@@ -226,10 +226,10 @@ class BazaarClientTests(SCMClientTests):
     def test_diff_parent(self):
         """Testing BazaarClient diff with changes only in the parent branch"""
         os.chdir(self.child_branch)
-        self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
+        self._bzr_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
 
         grand_child_branch = mktemp()
-        self._run_bzr(["branch", "--use-existing-dir", self.child_branch,
+        self._run_bzr(['branch', '--use-existing-dir', self.child_branch,
                        grand_child_branch])
         os.chdir(grand_child_branch)
 
@@ -244,10 +244,10 @@ class BazaarClientTests(SCMClientTests):
         """Testing BazaarClient diff with changes between a 2nd level
         descendant"""
         os.chdir(self.child_branch)
-        self._bzr_add_file_commit("foo.txt", FOO1, "delete and modify stuff")
+        self._bzr_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
 
         grand_child_branch = mktemp()
-        self._run_bzr(["branch", "--use-existing-dir", self.child_branch,
+        self._run_bzr(['branch', '--use-existing-dir', self.child_branch,
                        grand_child_branch])
         os.chdir(grand_child_branch)
 
@@ -260,43 +260,43 @@ class BazaarClientTests(SCMClientTests):
         self.assertTrue(isinstance(result, dict))
         self.assertTrue('diff' in result)
 
-        self._compare_diffs("foo.txt", result['diff'],
+        self._compare_diffs('foo.txt', result['diff'],
                             'a6326b53933f8b255a4b840485d8e210')
 
     def test_guessed_summary_and_description(self):
         """Testing BazaarClient guessing summary and description"""
         os.chdir(self.child_branch)
 
-        self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
-        self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
-        self._bzr_add_file_commit("foo.txt", FOO3, "commit 3")
+        self._bzr_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._bzr_add_file_commit('foo.txt', FOO2, 'commit 2')
+        self._bzr_add_file_commit('foo.txt', FOO3, 'commit 3')
 
         self.options.guess_summary = True
         self.options.guess_description = True
         revisions = self.client.parse_revision_spec([])
         commit_message = self.client.get_commit_message(revisions)
 
-        self.assertEqual("commit 3", commit_message['summary'])
+        self.assertEqual('commit 3', commit_message['summary'])
 
         description = commit_message['description']
-        self.assertTrue("commit 1" in description)
-        self.assertTrue("commit 2" in description)
-        self.assertFalse("commit 3" in description)
+        self.assertTrue('commit 1' in description)
+        self.assertTrue('commit 2' in description)
+        self.assertFalse('commit 3' in description)
 
     def test_guessed_summary_and_description_in_grand_parent_branch(self):
         """Testing BazaarClient guessing summary and description for grand
         parent branch"""
         os.chdir(self.child_branch)
 
-        self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
-        self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
-        self._bzr_add_file_commit("foo.txt", FOO3, "commit 3")
+        self._bzr_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._bzr_add_file_commit('foo.txt', FOO2, 'commit 2')
+        self._bzr_add_file_commit('foo.txt', FOO3, 'commit 3')
 
         self.options.guess_summary = True
         self.options.guess_description = True
 
         grand_child_branch = mktemp()
-        self._run_bzr(["branch", "--use-existing-dir", self.child_branch,
+        self._run_bzr(['branch', '--use-existing-dir', self.child_branch,
                        grand_child_branch])
         os.chdir(grand_child_branch)
 
@@ -307,29 +307,29 @@ class BazaarClientTests(SCMClientTests):
         revisions = self.client.parse_revision_spec([])
         commit_message = self.client.get_commit_message(revisions)
 
-        self.assertEqual("commit 3", commit_message['summary'])
+        self.assertEqual('commit 3', commit_message['summary'])
 
         description = commit_message['description']
-        self.assertTrue("commit 1" in description)
-        self.assertTrue("commit 2" in description)
-        self.assertFalse("commit 3" in description)
+        self.assertTrue('commit 1' in description)
+        self.assertTrue('commit 2' in description)
+        self.assertFalse('commit 3' in description)
 
     def test_guessed_summary_and_description_with_revision_range(self):
         """Testing BazaarClient guessing summary and description with a
         revision range"""
         os.chdir(self.child_branch)
 
-        self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
-        self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
-        self._bzr_add_file_commit("foo.txt", FOO3, "commit 3")
+        self._bzr_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._bzr_add_file_commit('foo.txt', FOO2, 'commit 2')
+        self._bzr_add_file_commit('foo.txt', FOO3, 'commit 3')
 
         self.options.guess_summary = True
         self.options.guess_description = True
         revisions = self.client.parse_revision_spec(['2..3'])
         commit_message = self.client.get_commit_message(revisions)
 
-        self.assertEqual("commit 2", commit_message['summary'])
-        self.assertEqual("commit 2", commit_message['description'])
+        self.assertEqual('commit 2', commit_message['summary'])
+        self.assertEqual('commit 2', commit_message['description'])
 
     def test_parse_revision_spec_no_args(self):
         """Testing BazaarClient.parse_revision_spec with no specified
@@ -337,7 +337,7 @@ class BazaarClientTests(SCMClientTests):
         os.chdir(self.child_branch)
 
         base_commit_id = self.client._get_revno()
-        self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
+        self._bzr_add_file_commit('foo.txt', FOO1, 'commit 1')
         tip_commit_id = self.client._get_revno()
 
         revisions = self.client.parse_revision_spec()
@@ -354,7 +354,7 @@ class BazaarClientTests(SCMClientTests):
         os.chdir(self.child_branch)
 
         base_commit_id = self.client._get_revno()
-        self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
+        self._bzr_add_file_commit('foo.txt', FOO1, 'commit 1')
         tip_commit_id = self.client._get_revno()
 
         revisions = self.client.parse_revision_spec([tip_commit_id])
@@ -372,12 +372,12 @@ class BazaarClientTests(SCMClientTests):
         parent_base_commit_id = self.client._get_revno()
 
         grand_child_branch = mktemp()
-        self._run_bzr(["branch", "--use-existing-dir", self.child_branch,
+        self._run_bzr(['branch', '--use-existing-dir', self.child_branch,
                        grand_child_branch])
         os.chdir(grand_child_branch)
 
         base_commit_id = self.client._get_revno()
-        self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
+        self._bzr_add_file_commit('foo.txt', FOO2, 'commit 2')
         tip_commit_id = self.client._get_revno()
 
         self.options.parent_branch = self.child_branch
@@ -395,9 +395,9 @@ class BazaarClientTests(SCMClientTests):
         """Testing BazaarClient.parse_revision_spec with R1..R2 syntax"""
         os.chdir(self.child_branch)
 
-        self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
+        self._bzr_add_file_commit('foo.txt', FOO1, 'commit 1')
         base_commit_id = self.client._get_revno()
-        self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
+        self._bzr_add_file_commit('foo.txt', FOO2, 'commit 2')
         tip_commit_id = self.client._get_revno()
 
         revisions = self.client.parse_revision_spec(
@@ -413,9 +413,9 @@ class BazaarClientTests(SCMClientTests):
         """Testing BazaarClient.parse_revision_spec with two revisions"""
         os.chdir(self.child_branch)
 
-        self._bzr_add_file_commit("foo.txt", FOO1, "commit 1")
+        self._bzr_add_file_commit('foo.txt', FOO1, 'commit 1')
         base_commit_id = self.client._get_revno()
-        self._bzr_add_file_commit("foo.txt", FOO2, "commit 2")
+        self._bzr_add_file_commit('foo.txt', FOO2, 'commit 2')
         tip_commit_id = self.client._get_revno()
 
         revisions = self.client.parse_revision_spec(

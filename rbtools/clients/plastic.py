@@ -200,8 +200,7 @@ class PlasticClient(SCMClient):
                                      tmp_diff_from_filename)
                     old_file = tmp_diff_from_filename
                 else:
-                    raise SCMError("Don't know how to handle change type "
-                                   "'%s' for %s"
+                    raise SCMError('Unknown change type "%s" for %s'
                                    % (changetype, filename))
 
                 dl = self._diff_files(old_file, new_file, filename,

@@ -107,10 +107,10 @@ class GitClient(SCMClient):
             base].
 
             If a single revision is passed in, this will return the parent of
-            that revision for 'base' and the passed-in revision for 'tip'.
+            that revision for "base" and the passed-in revision for "tip".
 
             If zero revisions are passed in, this will return the current HEAD
-            as 'tip', and the upstream branch as 'base', taking into account
+            as "tip", and the upstream branch as "base", taking into account
             parent branches explicitly specified via --parent.
         """
         n_revs = len(revisions)
@@ -221,10 +221,10 @@ class GitClient(SCMClient):
                               '--help": skipping Git')
                 return None
 
-        git_dir = execute([self.git, "rev-parse", "--git-dir"],
-                          ignore_errors=True).rstrip("\n")
+        git_dir = execute([self.git, 'rev-parse', '--git-dir'],
+                          ignore_errors=True).rstrip('\n')
 
-        if git_dir.startswith("fatal:") or not os.path.isdir(git_dir):
+        if git_dir.startswith('fatal:') or not os.path.isdir(git_dir):
             return None
 
         # Sometimes core.bare is not set, and generates an error, so ignore
@@ -243,8 +243,8 @@ class GitClient(SCMClient):
         # Running in directories other than the top level of
         # of a work-tree would result in broken diffs on the server
         if not self.bare:
-            git_top = execute([self.git, "rev-parse", "--show-toplevel"],
-                              ignore_errors=True).rstrip("\n")
+            git_top = execute([self.git, 'rev-parse', '--show-toplevel'],
+                              ignore_errors=True).rstrip('\n')
 
             # Top level might not work on old git version se we use git dir
             # to find it.
@@ -267,7 +267,7 @@ class GitClient(SCMClient):
         if (not getattr(self.options, 'repository_url', None) and
             os.path.isdir(git_svn_dir) and
             len(os.listdir(git_svn_dir)) > 0):
-            data = execute([self.git, "svn", "info"], ignore_errors=True)
+            data = execute([self.git, 'svn', 'info'], ignore_errors=True)
 
             m = re.search(r'^Repository Root: (.+)$', data, re.M)
 
@@ -276,18 +276,18 @@ class GitClient(SCMClient):
                 m = re.search(r'^URL: (.+)$', data, re.M)
 
                 if m:
-                    base_path = m.group(1)[len(path):] or "/"
+                    base_path = m.group(1)[len(path):] or '/'
                     m = re.search(r'^Repository UUID: (.+)$', data, re.M)
 
                     if m:
                         uuid = m.group(1)
-                        self.type = "svn"
+                        self.type = 'svn'
 
                         # Get SVN tracking branch
                         if getattr(self.options, 'tracking', None):
                             self.upstream_branch = self.options.tracking
                         else:
-                            data = execute([self.git, "svn", "rebase", "-n"],
+                            data = execute([self.git, 'svn', 'rebase', '-n'],
                                            ignore_errors=True)
                             m = re.search(r'^Remote Branch:\s*(.+)$', data,
                                           re.M)
@@ -309,12 +309,12 @@ class GitClient(SCMClient):
                 # 'git svn info'.  If we fail because of an older git install,
                 # here, figure out what version of git is installed and give
                 # the user a hint about what to do next.
-                version = execute([self.git, "svn", "--version"],
+                version = execute([self.git, 'svn', '--version'],
                                   ignore_errors=True)
                 version_parts = re.search('version (\d+)\.(\d+)\.(\d+)',
                                           version)
                 svn_remote = execute(
-                    [self.git, "config", "--get", "svn-remote.svn.url"],
+                    [self.git, 'config', '--get', 'svn-remote.svn.url'],
                     ignore_errors=True)
 
                 if (version_parts and svn_remote and
@@ -369,7 +369,7 @@ class GitClient(SCMClient):
             self.upstream_branch, origin_url = \
                 self.get_origin(self.upstream_branch, True)
 
-            if not origin_url or origin_url.startswith("fatal:"):
+            if not origin_url or origin_url.startswith('fatal:'):
                 self.upstream_branch, origin_url = self.get_origin()
 
             url = origin_url.rstrip('/')
@@ -383,7 +383,7 @@ class GitClient(SCMClient):
                 self.upstream_branch = self.upstream_branch.split('/')[-1]
 
         if url:
-            self.type = "git"
+            self.type = 'git'
             return RepositoryInfo(path=url, base_path='',
                                   supports_parent_diffs=True)
         return None
@@ -402,8 +402,8 @@ class GitClient(SCMClient):
                            'origin/master')
         upstream_remote = upstream_branch.split('/')[0]
         origin_url = execute(
-            [self.git, "config", "--get", "remote.%s.url" % upstream_remote],
-            ignore_errors=True).rstrip("\n")
+            [self.git, 'config', '--get', 'remote.%s.url' % upstream_remote],
+            ignore_errors=True).rstrip('\n')
         return (upstream_branch, origin_url)
 
     def scan_for_server(self, repository_info):
@@ -415,12 +415,12 @@ class GitClient(SCMClient):
             return server_url
 
         # TODO: Maybe support a server per remote later? Is that useful?
-        url = execute([self.git, "config", "--get", "reviewboard.url"],
+        url = execute([self.git, 'config', '--get', 'reviewboard.url'],
                       ignore_errors=True).strip()
         if url:
             return url
 
-        if self.type == "svn":
+        if self.type == 'svn':
             # Try using the reviewboard:url property on the SVN repo, if it
             # exists.
             prop = SVNClient().scan_for_server_property(repository_info)
@@ -453,7 +453,7 @@ class GitClient(SCMClient):
 
     def get_head_ref(self):
         """Returns the HEAD reference."""
-        head_ref = "HEAD"
+        head_ref = 'HEAD'
 
         if self.head_ref:
             head_ref = self.head_ref
@@ -551,7 +551,7 @@ class GitClient(SCMClient):
     def make_diff(self, merge_base, base, tip, include_files,
                   exclude_patterns):
         """Performs a diff on a particular branch range."""
-        rev_range = "%s..%s" % (base, tip)
+        rev_range = '%s..%s' % (base, tip)
 
         if include_files:
             include_files = ['--'] + include_files
@@ -660,7 +660,7 @@ class GitClient(SCMClient):
         svn diff would generate. This is needed so the SVNTool in Review
         Board can properly parse this diff.
         """
-        rev = execute([self.git, "svn", "find-rev", merge_base]).strip()
+        rev = execute([self.git, 'svn', 'find-rev', merge_base]).strip()
 
         if not rev:
             return None
@@ -875,7 +875,7 @@ class GitClient(SCMClient):
             return_error_code=True)
 
         if rc:
-            raise MergeError("Could not checkout to branch '%s'.\n\n%s" %
+            raise MergeError('Could not checkout to branch "%s".\n\n%s' %
                              (destination, output))
 
         if squash:
@@ -889,7 +889,7 @@ class GitClient(SCMClient):
             return_error_code=True)
 
         if rc:
-            raise MergeError("Could not merge branch '%s' into '%s'.\n\n%s" %
+            raise MergeError('Could not merge branch "%s" into "%s".\n\n%s' %
                              (target, destination, output))
 
         self.create_commit(message, author, run_editor)
@@ -911,7 +911,7 @@ class GitClient(SCMClient):
             return_error_code=True)
 
         if rc:
-            raise PushError("Could not push branch '%s' to upstream" %
+            raise PushError('Could not push branch "%s" to upstream' %
                             remote_branch)
 
     def get_current_branch(self):
@@ -921,16 +921,16 @@ class GitClient(SCMClient):
             bytes:
             A string with the name of the current branch.
         """
-        return execute([self.git, "rev-parse", "--abbrev-ref", "HEAD"],
+        return execute([self.git, 'rev-parse', '--abbrev-ref', 'HEAD'],
                        ignore_errors=True).strip()
 
     def _get_root_directory(self):
         """Get the root directory of the repository as an absolute path."""
         git_dir = execute([self.git, 'rev-parse', '--show-toplevel'],
-                          ignore_errors=True).rstrip("\n")
+                          ignore_errors=True).rstrip('\n')
 
-        if git_dir.startswith("fatal:") or not os.path.isdir(git_dir):
-            logging.error("Could not find git repository path.")
+        if git_dir.startswith('fatal:') or not os.path.isdir(git_dir):
+            logging.error('Could not find git repository path.')
             return None
 
         return os.path.abspath(git_dir)

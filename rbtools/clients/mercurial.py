@@ -176,11 +176,11 @@ class MercurialClient(SCMClient):
         from the parent of the working directory.
 
         If a single revision is passed in, this will return the parent of that
-        revision for 'base' and the passed-in revision for 'tip'. This will
+        revision for "base" and the passed-in revision for "tip". This will
         result in generating a diff for the changeset specified.
 
-        If two revisions are passed in, they will be used for the 'base'
-        and 'tip' revisions, respectively.
+        If two revisions are passed in, they will be used for the "base"
+        and "tip" revisions, respectively.
 
         In all cases, a parent base will be calculated automatically from
         changesets not present on the remote.
@@ -334,8 +334,8 @@ class MercurialClient(SCMClient):
             return None
 
         scheme, netloc, path, _, _ = root
-        root = urlunparse([scheme, root.netloc.split("@")[-1], path,
-                           "", "", ""])
+        root = urlunparse([scheme, root.netloc.split('@')[-1], path,
+                           '', '', ''])
         base_path = url.path[len(path):]
 
         return RepositoryInfo(path=root, base_path=base_path,
@@ -522,7 +522,7 @@ class MercurialClient(SCMClient):
 
         outgoing_changesets = []
         args = ['hg', '-q', 'outgoing', '--template',
-                "{rev}\\t{node|short}\\t{branch}\\n",
+                '{rev}\\t{node|short}\\t{branch}\\n',
                 remote]
         if rev:
             args.extend(['-r', rev])
@@ -562,7 +562,7 @@ class MercurialClient(SCMClient):
 
         for rev, node, branch in reversed(outgoing_changesets):
             parents = execute(
-                ["hg", "log", "-r", str(rev), "--template", "{parents}"],
+                ['hg', 'log', '-r', str(rev), '--template', '{parents}'],
                 env=self._hg_env)
             parents = re.split(':[^\s]+\s*', parents)
             parents = [int(p) for p in parents if p != '']
@@ -588,7 +588,7 @@ class MercurialClient(SCMClient):
         if not server_url and self.hgrc.get('reviewboard.url'):
             server_url = self.hgrc.get('reviewboard.url').strip()
 
-        if not server_url and self._type == "svn":
+        if not server_url and self._type == 'svn':
             # Try using the reviewboard:url property on the SVN repo, if it
             # exists.
             prop = SVNClient().scan_for_server_property(repository_info)

@@ -86,7 +86,7 @@ class TFExeWrapper(object):
         and the parent diff (if necessary) will include (parent, base].
 
         If a single revision is passed in, this will return the parent of that
-        revision for 'base' and the passed-in revision for 'tip'.
+        revision for "base" and the passed-in revision for "tip".
 
         If zero revisions are passed in, this will return revisions relevant
         for the "current change" (changes in the work folder which have not yet
@@ -451,7 +451,7 @@ class TEEWrapper(object):
         and the parent diff (if necessary) will include (parent, base].
 
         If a single revision is passed in, this will return the parent of that
-        revision for 'base' and the passed-in revision for 'tip'.
+        revision for "base" and the passed-in revision for "tip".
 
         If zero revisions are passed in, this will return revisions relevant
         for the "current change" (changes in the work folder which have not yet
@@ -812,7 +812,7 @@ class TFHelperWrapper(object):
         and the parent diff (if necessary) will include (parent, base].
 
         If a single revision is passed in, this will return the parent of that
-        revision for 'base' and the passed-in revision for 'tip'.
+        revision for "base" and the passed-in revision for "tip".
 
         If zero revisions are passed in, this will return revisions relevant
         for the "current change" (changes in the work folder which have not yet
@@ -1023,7 +1023,7 @@ class TFSClient(SCMClient):
         and the parent diff (if necessary) will include (parent, base].
 
         If a single revision is passed in, this will return the parent of that
-        revision for 'base' and the passed-in revision for 'tip'.
+        revision for "base" and the passed-in revision for "tip".
 
         If zero revisions are passed in, this will return revisions relevant
         for the "current change" (changes in the work folder which have not yet

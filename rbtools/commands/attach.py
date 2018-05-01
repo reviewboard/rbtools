@@ -9,6 +9,7 @@ from rbtools.utils.commands import get_review_request
 
 class Attach(Command):
     """Attach a file to a review request."""
+
     name = 'attach'
     author = 'The Review Board Project'
     args = '<review-request-id> <file>'

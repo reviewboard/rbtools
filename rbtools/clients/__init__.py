@@ -107,7 +107,7 @@ class SCMClient(object):
         and the parent diff (if necessary) will include (parent, base].
 
         If a single revision is passed in, this will return the parent of that
-        revision for 'base' and the passed-in revision for 'tip'.
+        revision for "base" and the passed-in revision for "tip".
 
         If zero revisions are passed in, this will return revisions relevant
         for the "current change". The exact definition of what "current" means

@@ -10,7 +10,6 @@ import sys
 
 import colorama
 import pkg_resources
-from six.moves import input
 from six.moves.urllib.parse import urlparse
 
 from rbtools import get_version_string
@@ -19,6 +18,7 @@ from rbtools.api.client import RBClient
 from rbtools.api.errors import APIError, ServerInterfaceError
 from rbtools.clients import scan_usable_client
 from rbtools.clients.errors import OptionsCheckError
+from rbtools.utils.console import get_input
 from rbtools.utils.filesystem import (cleanup_tempfiles, get_home_path,
                                       is_exe_in_path, load_config)
 from rbtools.utils.process import log_command_line
@@ -45,6 +45,7 @@ class ParseError(CommandError):
 
 class SmartHelpFormatter(argparse.HelpFormatter):
     """Smartly formats help text, preserving paragraphs."""
+
     def _split_lines(self, text, width):
         # NOTE: This function depends on overriding _split_lines's behavior.
         #       It is clearly documented that this function should not be
@@ -75,6 +76,7 @@ class Option(object):
     to specify defaults which will be grabbed from the configuration
     after it is loaded.
     """
+
     def __init__(self, *opts, **attrs):
         self.opts = opts
         self.attrs = attrs
@@ -118,6 +120,7 @@ class OptionGroup(object):
     This works like argparse's argument groups, but is designed to work with
     our special Option class.
     """
+
     def __init__(self, name=None, description=None, option_list=[]):
         self.name = name
         self.description = description
@@ -138,6 +141,7 @@ class LogLevelFilter(logging.Filter):
     this filter. This prevents propagation of higher level types to lower
     log handlers.
     """
+
     def __init__(self, level):
         self.level = level
 
@@ -164,6 +168,7 @@ class Command(object):
     ``option_list`` is a list of command line options for the command.
     Each list entry should be an Option or OptionGroup instance.
     """
+
     name = ''
     author = ''
     description = ''
@@ -819,11 +824,8 @@ class Command(object):
             print('Please log in to the Review Board server at %s.' %
                   urlparse(uri)[1])
 
-            # getpass will write its prompt to stderr but input
-            # writes to stdout. See bug 2831.
             if username is None:
-                sys.stderr.write('Username: ')
-                username = input()
+                username = get_input('Username: ')
 
             if password is None:
                 password = getpass.getpass('Password: ')

@@ -326,7 +326,7 @@ class PerforceClient(SCMClient):
         changelist.
 
         If a single revision is passed in, this will return the parent of that
-        revision for 'base' and the passed-in revision for 'tip'. The result
+        revision for "base" and the passed-in revision for "tip". The result
         may have special internal revisions or prefixes based on whether the
         changeset is submitted, pending, or shelved.
 

@@ -68,8 +68,8 @@ def help(args, parser):
         if command not in common_commands:
             print('  %s' % command)
 
-    print("See '%s help <command>' for more information on a specific "
-          "command." % RB_MAIN)
+    print('See "%s help <command>" for more information on a specific '
+          'command.' % RB_MAIN)
     sys.exit(0)
 
 

@@ -15,12 +15,12 @@ class UtilitiesTest(RBTestBase):
     Any new modules created under rbtools/api should be tested here.
     """
     def test_check_install(self):
-        """Testing 'check_install' method."""
+        """Testing "check_install" method."""
         self.assertTrue(checks.check_install([sys.executable, ' --version']))
         self.assertFalse(checks.check_install([self.gen_uuid()]))
 
     def test_make_tempfile(self):
-        """Testing 'make_tempfile' method."""
+        """Testing "make_tempfile" method."""
         fname = filesystem.make_tempfile()
 
         self.assertTrue(os.path.isfile(fname))
@@ -28,7 +28,7 @@ class UtilitiesTest(RBTestBase):
         self.assertTrue(os.access(fname, os.R_OK | os.W_OK))
 
     def test_make_empty_files(self):
-        """Testing 'make_empty_files' method."""
+        """Testing "make_empty_files" method."""
         # Use make_tempdir to get a unique directory name
         tmpdir = filesystem.make_tempdir()
         self.assertTrue(os.path.isdir(tmpdir))
@@ -44,12 +44,12 @@ class UtilitiesTest(RBTestBase):
         shutil.rmtree(tmpdir, ignore_errors=True)
 
     def test_execute(self):
-        """Testing 'execute' method."""
+        """Testing "execute" method."""
         self.assertTrue(re.match('.*?%d.%d.%d' % sys.version_info[:3],
                         process.execute([sys.executable, '-V'])))
 
     def test_is_valid_version(self):
-        """Testing 'is_valid_version' method."""
+        """Testing "is_valid_version" method."""
         self.assertTrue(checks.is_valid_version((1, 0, 0), (1, 0, 0)))
         self.assertTrue(checks.is_valid_version((1, 1, 0), (1, 0, 0)))
         self.assertTrue(checks.is_valid_version((1, 0, 1), (1, 0, 0)))
