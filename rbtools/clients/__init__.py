@@ -215,8 +215,17 @@ class SCMClient(object):
         if revert:
             cmd.append('-R')
 
-        if p_num >= 0:
-            cmd.append('-p%d' % p_num)
+        try:
+            p_num = int(p_num)
+        except ValueError:
+            p_num = 0
+            logging.warn('Invalid -p value: %s; assuming zero.', p_num)
+
+        if p_num is not None:
+            if p_num >= 0:
+                cmd.append('-p%d' % p_num)
+            else:
+                logging.warn('Unsupported -p value: %d; assuming zero.', p_num)
 
         cmd.extend(['-i', six.text_type(patch_file)])
 
