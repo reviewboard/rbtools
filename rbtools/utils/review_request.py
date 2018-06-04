@@ -4,7 +4,6 @@ import logging
 
 from rbtools.api.errors import APIError
 from rbtools.clients.errors import InvalidRevisionSpecError
-from rbtools.commands import CommandError
 from rbtools.utils.match_score import Score
 from rbtools.utils.repository import get_repository_id
 from rbtools.utils.users import get_user
@@ -174,12 +173,12 @@ def guess_existing_review_request(repository_info, repository_name,
             show_all_unpublished=True)
 
         if not review_requests:
-            raise CommandError('No existing review requests to update for '
-                               'user %s.'
-                               % username)
+            raise ValueError('No existing review requests to update for '
+                             'user %s'
+                             % username)
     except APIError as e:
-        raise CommandError('Error getting review requests for user '
-                           '%s: %s' % (username, e))
+        raise ValueError('Error getting review requests for user %s: %s'
+                         % (username, e))
 
     summary = None
     description = None
@@ -197,7 +196,7 @@ def guess_existing_review_request(repository_info, repository_name,
             elif callable(no_commit_error):
                 no_commit_error()
         except NotImplementedError:
-            raise CommandError('--summary and --description are required.')
+            raise ValueError('--summary and --description are required.')
 
     if not summary and not description:
         return None

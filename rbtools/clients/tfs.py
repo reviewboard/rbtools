@@ -1,3 +1,5 @@
+"""A client for Team Foundation Server."""
+
 from __future__ import unicode_literals
 
 import logging
@@ -32,7 +34,7 @@ class TFExeWrapper(object):
                 The loaded configuration.
 
             options (argparse.Namespace, optional):
-                The command-line options.
+                The command line options.
         """
         self.config = config
         self.options = options
@@ -58,49 +60,21 @@ class TFExeWrapper(object):
         # error out if we don't.
         check_gnu_diff()
 
-        return RepositoryInfo(unquote(m.group(1)))
+        path = unquote(m.group(1))
+
+        return RepositoryInfo(path=path, local_path=path)
 
     def parse_revision_spec(self, revisions):
         """Parse the given revision spec.
 
-        The ``revisions`` argument is a list of revisions as specified by the
-        user. Items in the list do not necessarily represent a single revision,
-        since the user can use the TFS-native syntax of "r1~r2". Versions
-        passed in can be any versionspec, such as a changeset number,
-        ``L``-prefixed label name, ``W`` (latest workspace version), or ``T``
-        (latest upstream version).
-
-        This will return a dictionary with the following keys:
-
-        ``base``:
-            A revision to use as the base of the resulting diff.
-
-        ``tip``:
-            A revision to use as the tip of the resulting diff.
-
-        ``parent_base`` (optional):
-            The revision to use as the base of a parent diff.
-
-        These will be used to generate the diffs to upload to Review Board (or
-        print). The diff for review will include the changes in (base, tip],
-        and the parent diff (if necessary) will include (parent, base].
-
-        If a single revision is passed in, this will return the parent of that
-        revision for "base" and the passed-in revision for "tip".
-
-        If zero revisions are passed in, this will return revisions relevant
-        for the "current change" (changes in the work folder which have not yet
-        been checked in).
-
         Args:
             revisions (list of unicode):
-                The revision spec to parse.
-
-        Returns:
-            dict:
-            A dictionary with ``base`` and ``tip`` keys, each of which is a
-            string describing the revision. These may be special internal
-            values.
+                A list of revisions as specified by the user. Items in the list
+                do not necessarily represent a single revision, since the user
+                can use the TFS-native syntax of ``r1~r2``. Versions passed in
+                can be any versionspec, such as a changeset number,
+                ``L``-prefixed label name, ``W`` (latest workspace version), or
+                ``T`` (latest upstream version).
 
         Raises:
             rbtools.clients.errors.TooManyRevisionsError:
@@ -108,6 +82,31 @@ class TFExeWrapper(object):
 
             rbtools.clients.errors.InvalidRevisionSpecError:
                 The given revision spec could not be parsed.
+
+        Returns:
+            dict:
+            A dictionary with the following keys:
+
+            ``base`` (:py:class:`unicode`):
+                A revision to use as the base of the resulting diff.
+
+            ``tip`` (:py:class:`unicode`):
+                A revision to use as the tip of the resulting diff.
+
+            ``parent_base`` (:py:class:`unicode`, optional):
+                The revision to use as the base of a parent diff.
+
+            These will be used to generate the diffs to upload to Review Board
+            (or print). The diff for review will include the changes in (base,
+            tip], and the parent diff (if necessary) will include (parent,
+            base].
+
+            If a single revision is passed in, this will return the parent of
+            that revision for "base" and the passed-in revision for "tip".
+
+            If zero revisions are passed in, this will return revisions
+            relevant for the "current change" (changes in the work folder which
+            have not yet been checked in).
         """
         n_revisions = len(revisions)
 
@@ -188,9 +187,15 @@ class TFExeWrapper(object):
 
         Returns:
             dict:
-            A dictionary containing ``diff``, ``parent_diff``, and
-            ``base_commit_id`` keys. In the case of TFS, the parent diff key
-            will always be ``None``.
+            A dictionary containing the following keys:
+
+            ``diff`` (:py:class:`bytes`):
+                The contents of the diff to upload.
+
+            ``base_commit_id` (:py:class:`unicode`, optional):
+                The ID of the commit that the change is based on, if available.
+                This is necessary for some hosting services that don't provide
+                individual file access.
         """
         base = str(revisions['base'])
         tip = str(revisions['tip'])
@@ -367,7 +372,7 @@ class TEEWrapper(object):
                 The loaded configuration.
 
             options (argparse.Namespace, optional):
-                The command-line options.
+                The command line options.
         """
         self.config = config
         self.options = options
@@ -423,49 +428,44 @@ class TEEWrapper(object):
 
         path = unquote(m.group(1))
 
-        return RepositoryInfo(path)
+        return RepositoryInfo(path=path, local_path=path)
 
     def parse_revision_spec(self, revisions):
         """Parse the given revision spec.
 
-        The ``revisions`` argument is a list of revisions as specified by the
-        user. Items in the list do not necessarily represent a single revision,
-        since the user can use the TFS-native syntax of "r1~r2". Versions
-        passed in can be any versionspec, such as a changeset number,
-        ``L``-prefixed label name, ``W`` (latest workspace version), or ``T``
-        (latest upstream version).
-
-        This will return a dictionary with the following keys:
-
-        ``base``:
-            A revision to use as the base of the resulting diff.
-
-        ``tip``:
-            A revision to use as the tip of the resulting diff.
-
-        ``parent_base`` (optional):
-            The revision to use as the base of a parent diff.
-
-        These will be used to generate the diffs to upload to Review Board (or
-        print). The diff for review will include the changes in (base, tip],
-        and the parent diff (if necessary) will include (parent, base].
-
-        If a single revision is passed in, this will return the parent of that
-        revision for "base" and the passed-in revision for "tip".
-
-        If zero revisions are passed in, this will return revisions relevant
-        for the "current change" (changes in the work folder which have not yet
-        been checked in).
-
         Args:
             revisions (list of unicode):
-                The revision spec to parse.
+                A list of revisions as specified by the user. Items in the list
+                do not necessarily represent a single revision, since the user
+                can use the TFS-native syntax of ``r1~r2``. Versions passed in
+                can be any versionspec, such as a changeset number,
+                ``L``-prefixed label name, ``W`` (latest workspace version), or
+                ``T`` (latest upstream version).
 
         Returns:
             dict:
-            A dictionary with ``base`` and ``tip`` keys, each of which is a
-            string describing the revision. These may be special internal
-            values.
+            A dictionary with the following keys:
+
+            ``base`` (:py:class:`unicode`):
+                A revision to use as the base of the resulting diff.
+
+            ``tip`` (:py:class:`unicode`):
+                A revision to use as the tip of the resulting diff.
+
+            ``parent_base`` (:py:class:`unicode`, optional):
+                The revision to use as the base of a parent diff.
+
+            These will be used to generate the diffs to upload to Review Board
+            (or print). The diff for review will include the changes in (base,
+            tip], and the parent diff (if necessary) will include (parent,
+            base].
+
+            If a single revision is passed in, this will return the parent of
+            that revision for "base" and the passed-in revision for "tip".
+
+            If zero revisions are passed in, this will return revisions
+            relevant for the "current change" (changes in the work folder which
+            have not yet been checked in).
 
         Raises:
             rbtools.clients.errors.TooManyRevisionsError:
@@ -568,9 +568,15 @@ class TEEWrapper(object):
 
         Returns:
             dict:
-            A dictionary containing ``diff``, ``parent_diff``, and
-            ``base_commit_id`` keys. In the case of TFS, the parent diff key
-            will always be ``None``.
+            A dictionary containing the following keys:
+
+            ``diff`` (:py:class:`bytes`):
+                The contents of the diff to upload.
+
+            ``base_commit_id` (:py:class:`unicode`, optional):
+                The ID of the commit that the change is based on, if available.
+                This is necessary for some hosting services that don't provide
+                individual file access.
         """
         base = str(revisions['base'])
         tip = str(revisions['tip'])
@@ -764,7 +770,7 @@ class TFHelperWrapper(object):
                 The loaded configuration.
 
             options (argparse.Namespace, optional):
-                The command-line options.
+                The command line options.
         """
         self.helper_path = helper_path
         self.config = config
@@ -789,44 +795,39 @@ class TFHelperWrapper(object):
     def parse_revision_spec(self, revisions):
         """Parse the given revision spec.
 
-        The ``revisions`` argument is a list of revisions as specified by the
-        user. Items in the list do not necessarily represent a single revision,
-        since the user can use the TFS-native syntax of "r1~r2". Versions
-        passed in can be any versionspec, such as a changeset number,
-        ``L``-prefixed label name, ``W`` (latest workspace version), or ``T``
-        (latest upstream version).
-
-        This will return a dictionary with the following keys:
-
-        ``base``:
-            A revision to use as the base of the resulting diff.
-
-        ``tip``:
-            A revision to use as the tip of the resulting diff.
-
-        ``parent_base`` (optional):
-            The revision to use as the base of a parent diff.
-
-        These will be used to generate the diffs to upload to Review Board (or
-        print). The diff for review will include the changes in (base, tip],
-        and the parent diff (if necessary) will include (parent, base].
-
-        If a single revision is passed in, this will return the parent of that
-        revision for "base" and the passed-in revision for "tip".
-
-        If zero revisions are passed in, this will return revisions relevant
-        for the "current change" (changes in the work folder which have not yet
-        been checked in).
-
         Args:
             revisions (list of unicode):
-                The revision spec to parse.
+                A list of revisions as specified by the user. Items in the list
+                do not necessarily represent a single revision, since the user
+                can use the TFS-native syntax of ``r1~r2``. Versions passed in
+                can be any versionspec, such as a changeset number,
+                ``L``-prefixed label name, ``W`` (latest workspace version), or
+                ``T`` (latest upstream version).
 
         Returns:
             dict:
-            A dictionary with ``base`` and ``tip`` keys, each of which is a
-            string describing the revision. These may be special internal
-            values.
+            A dictionary with the following keys:
+
+            ``base`` (:py:class:`unicode`):
+                A revision to use as the base of the resulting diff.
+
+            ``tip`` (:py:class:`unicode`):
+                A revision to use as the tip of the resulting diff.
+
+            ``parent_base`` (:py:class:`unicode`, optional):
+                The revision to use as the base of a parent diff.
+
+            These will be used to generate the diffs to upload to Review Board
+            (or print). The diff for review will include the changes in (base,
+            tip], and the parent diff (if necessary) will include (parent,
+            base].
+
+            If a single revision is passed in, this will return the parent of
+            that revision for "base" and the passed-in revision for "tip".
+
+            If zero revisions are passed in, this will return revisions
+            relevant for the "current change" (changes in the work folder which
+            have not yet been checked in).
 
         Raises:
             rbtools.clients.errors.TooManyRevisionsError:
@@ -864,9 +865,15 @@ class TFHelperWrapper(object):
 
         Returns:
             dict:
-            A dictionary containing ``diff``, ``parent_diff``, and
-            ``base_commit_id`` keys. In the case of TFS, the parent diff key
-            will always be ``None``.
+            A dictionary containing the following keys:
+
+            ``diff`` (:py:class:`bytes`):
+                The contents of the diff to upload.
+
+            ``base_commit_id` (:py:class:`unicode`, optional):
+                The ID of the commit that the change is based on, if available.
+                This is necessary for some hosting services that don't provide
+                individual file access.
 
         Raises:
             rbtools.clients.errors.SCMError:
@@ -956,7 +963,7 @@ class TFSClient(SCMClient):
                 The loaded configuration.
 
             options (argparse.Namespace, optional):
-                The command-line options.
+                The command line options.
         """
         super(TFSClient, self).__init__(config, options)
 
@@ -1000,44 +1007,39 @@ class TFSClient(SCMClient):
     def parse_revision_spec(self, revisions):
         """Parse the given revision spec.
 
-        The ``revisions`` argument is a list of revisions as specified by the
-        user. Items in the list do not necessarily represent a single revision,
-        since the user can use the TFS-native syntax of "r1~r2". Versions
-        passed in can be any versionspec, such as a changeset number,
-        ``L``-prefixed label name, ``W`` (latest workspace version), or ``T``
-        (latest upstream version).
-
-        This will return a dictionary with the following keys:
-
-        ``base``:
-            A revision to use as the base of the resulting diff.
-
-        ``tip``:
-            A revision to use as the tip of the resulting diff.
-
-        ``parent_base`` (optional):
-            The revision to use as the base of a parent diff.
-
-        These will be used to generate the diffs to upload to Review Board (or
-        print). The diff for review will include the changes in (base, tip],
-        and the parent diff (if necessary) will include (parent, base].
-
-        If a single revision is passed in, this will return the parent of that
-        revision for "base" and the passed-in revision for "tip".
-
-        If zero revisions are passed in, this will return revisions relevant
-        for the "current change" (changes in the work folder which have not yet
-        been checked in).
-
         Args:
             revisions (list of unicode):
-                The revision spec to parse.
+                A list of revisions as specified by the user. Items in the list
+                do not necessarily represent a single revision, since the user
+                can use the TFS-native syntax of ``r1~r2``. Versions passed in
+                can be any versionspec, such as a changeset number,
+                ``L``-prefixed label name, ``W`` (latest workspace version), or
+                ``T`` (latest upstream version).
 
         Returns:
             dict:
-            A dictionary with ``base`` and ``tip`` keys, each of which is a
-            string describing the revision. These may be special internal
-            values.
+            A dictionary with the following keys:
+
+            ``base`` (:py:class:`unicode`):
+                A revision to use as the base of the resulting diff.
+
+            ``tip`` (:py:class:`unicode`):
+                A revision to use as the tip of the resulting diff.
+
+            ``parent_base`` (:py:class:`unicode`, optional):
+                The revision to use as the base of a parent diff.
+
+            These will be used to generate the diffs to upload to Review Board
+            (or print). The diff for review will include the changes in (base,
+            tip], and the parent diff (if necessary) will include (parent,
+            base].
+
+            If a single revision is passed in, this will return the parent of
+            that revision for "base" and the passed-in revision for "tip".
+
+            If zero revisions are passed in, this will return revisions
+            relevant for the "current change" (changes in the work folder which
+            have not yet been checked in).
 
         Raises:
             rbtools.clients.errors.TooManyRevisionsError:
@@ -1067,8 +1069,14 @@ class TFSClient(SCMClient):
 
         Returns:
             dict:
-            A dictionary containing ``diff``, ``parent_diff``, and
-            ``base_commit_id`` keys. In the case of TFS, the parent diff key
-            will always be ``None``.
+            A dictionary containing the following keys:
+
+            ``diff`` (:py:class:`bytes`):
+                The contents of the diff to upload.
+
+            ``base_commit_id` (:py:class:`unicode`, optional):
+                The ID of the commit that the change is based on, if available.
+                This is necessary for some hosting services that don't provide
+                individual file access.
         """
         return self.tf_wrapper.diff(revisions, include_files, exclude_patterns)

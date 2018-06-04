@@ -1,3 +1,5 @@
+"""A client for Bazaar."""
+
 from __future__ import unicode_literals
 
 import logging
@@ -15,17 +17,14 @@ USING_PARENT_PREFIX = 'Using parent branch '
 
 
 class BazaarClient(SCMClient):
-    """
-    Bazaar client wrapper that fetches repository information and generates
+    """A client for Bazaar.
+
+    This is a wrapper that fetches repository information and generates
     compatible diffs.
-
-    The :class:`RepositoryInfo` object reports whether the repository supports
-    parent diffs (every branch with a parent supports them).
     """
+
     name = 'Bazaar'
-
     supports_diff_exclude_patterns = True
-
     can_branch = True
 
     INDEX_FILE_RE = re.compile(b"===.+'(.+?)'\n")
@@ -44,9 +43,11 @@ class BazaarClient(SCMClient):
     REVISION_SEPARATOR_REGEX = re.compile(r'\.\.(?![\\/])')
 
     def get_repository_info(self):
-        """
-        Find out information about the current Bazaar branch (if any) and
-        return it.
+        """Return repository information for the current working tree.
+
+        Returns:
+            rbtools.clients.RepositoryInfo:
+            The repository info structure.
         """
         if not check_install(['bzr', 'help']):
             logging.debug('Unable to execute "bzr help": skipping Bazaar')
@@ -67,36 +68,54 @@ class BazaarClient(SCMClient):
 
             repository_info = RepositoryInfo(
                 path=path,
-                base_path='/',    # Diffs are always relative to the root.
+                base_path='/',  # Diffs are always relative to the root.
+                local_path=path,
                 supports_parent_diffs=True)
 
         return repository_info
 
     def parse_revision_spec(self, revisions=[]):
-        """Parses the given revision spec.
+        """Parse the given revision spec.
 
-        The 'revisions' argument is a list of revisions as specified by the
-        user. Items in the list do not necessarily represent a single revision,
-        since the user can use SCM-native syntaxes such as "r1..r2" or "r1:r2".
-        SCMTool-specific overrides of this method are expected to deal with
-        such syntaxes.
+        Args:
+            revisions (list of unicode, optional):
+                A list of revisions as specified by the user. Items in the
+                list do not necessarily represent a single revision, since the
+                user can use SCM-native syntaxes such as ``r1..r2`` or
+                ``r1:r2``. SCMTool-specific overrides of this method are
+                expected to deal with such syntaxes.
 
-        This will return a dictionary with the following keys:
-            'base':        A revision to use as the base of the resulting diff.
-            'tip':         A revision to use as the tip of the resulting diff.
-            'parent_base': (optional) The revision to use as the base of a
-                           parent diff.
+        Raises:
+            rbtools.clients.errors.InvalidRevisionSpecError:
+                The given revisions could not be parsed.
 
-        These will be used to generate the diffs to upload to Review Board (or
-        print). The diff for review will include the changes in (base, tip],
-        and the parent diff (if necessary) will include (parent, base].
+            rbtools.clients.errors.TooManyRevisionsError:
+                The specified revisions list contained too many revisions.
 
-        If a single revision is passed in, this will return the parent of that
-        revision for "base" and the passed-in revision for "tip".
+        Returns:
+            dict:
+            A dictionary with the following keys:
 
-        If zero revisions are passed in, this will return the current HEAD as
-        'tip', and the upstream branch as 'base', taking into account parent
-        branches explicitly specified via --parent.
+            ``base`` (:py:class:`unicode`):
+                A revision to use as the base of the resulting diff.
+
+            ``tip`` (:py:class:`unicode`):
+                A revision to use as the tip of the resulting diff.
+
+            ``parent_base`` (:py:class:`unicode`, optional):
+                The revision to use as the base of a parent diff.
+
+            These will be used to generate the diffs to upload to Review Board
+            (or print). The diff for review will include the changes in (base,
+            tip], and the parent diff (if necessary) will include (parent,
+            base].
+
+            If a single revision is passed in, this will return the parent of
+            that revision for "base" and the passed-in revision for "tip".
+
+            If zero revisions are passed in, this will return the current HEAD
+            as 'tip', and the upstream branch as 'base', taking into account
+            parent branches explicitly specified via --parent.
         """
         n_revs = len(revisions)
         result = {}
@@ -141,6 +160,17 @@ class BazaarClient(SCMClient):
         return result
 
     def _get_revno(self, revision_spec=None):
+        """Convert a revision spec to a revision number.
+
+        Args:
+            revision_spec (unicode, optional):
+                The revision spec to convert.
+
+        Returns:
+            unicode:
+            A new revision spec that contains a revision number instead of a
+            symbolic revision.
+        """
         command = ['bzr', 'revno']
         if revision_spec:
             command += ['-r', revision_spec]
@@ -155,7 +185,7 @@ class BazaarClient(SCMClient):
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
              extra_args=[]):
-        """Returns the diff for the given revision spec.
+        """Perform a diff using the given revisions.
 
         If the revision spec is empty, this returns the diff of the current
         branch with respect to its parent. If a single revision is passed in,
@@ -163,7 +193,31 @@ class BazaarClient(SCMClient):
         revisions are passed in, this will do a diff between those two
         revisions.
 
-        The summary and description are set if guessing is enabled.
+        Args:
+            revisions (dict):
+                A dictionary of revisions, as returned by
+                :py:meth:`parse_revision_spec`.
+
+            include_files (list of unicode, optional):
+                A list of files to whitelist during the diff generation.
+
+            exclude_patterns (list of unicode, optional):
+                A list of shell-style glob patterns to blacklist during diff
+                generation.
+
+            extra_args (list, unused):
+                Additional arguments to be passed to the diff generation.
+                Unused for Bazaar.
+
+        Returns:
+            dict:
+            A dictionary containing the following keys:
+
+            ``diff`` (:py:class:`bytes`):
+                The contents of the diff to upload.
+
+            ``parent_diff`` (:py:class:`bytes`, optional):
+                The contents of the parent diff, if available.
         """
         exclude_patterns = normalize_patterns(exclude_patterns,
                                               self.get_repository_info().path)
@@ -184,7 +238,26 @@ class BazaarClient(SCMClient):
         }
 
     def _get_range_diff(self, base, tip, include_files, exclude_patterns=[]):
-        """Return the diff between 'base' and 'tip'."""
+        """Return the diff between 'base' and 'tip'.
+
+        Args:
+            base (unicode):
+                The name of the base revision.
+
+            tip (unicode):
+                The name of the tip revision.
+
+            include_files (list of unicode):
+                A list of files to whitelist during the diff generation.
+
+            exclude_patterns (list of unicode, optional):
+                A list of shell-style glob patterns to blacklist during diff
+                generation.
+
+        Returns:
+            bytes:
+            The generated diff contents.
+        """
         diff_cmd = ['bzr', 'diff', '-q', '-r',
                     '%s..%s' % (base, tip)] + include_files
         diff = execute(diff_cmd, ignore_errors=True, log_output_on_error=False,
@@ -200,6 +273,16 @@ class BazaarClient(SCMClient):
             return None
 
     def get_raw_commit_message(self, revisions):
+        """Extract the commit message based on the provided revision range.
+
+        Args:
+            revisions (dict):
+                A dictionary containing ``base`` and ``tip`` keys.
+
+        Returns:
+            unicode:
+            The commit messages of all commits between (base, tip].
+        """
         # The result is content in the form of:
         #
         # 2014-01-02  First Name  <email@address>
@@ -240,7 +323,7 @@ class BazaarClient(SCMClient):
         """Return the name of the current branch.
 
         Returns:
-            bytes:
+            unicode:
             A string with the name of the current branch.
         """
         return execute(['bzr', 'nick'], ignore_errors=True).strip()

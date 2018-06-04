@@ -33,8 +33,9 @@ class GitClientTests(SpyAgency, SCMClientTests):
         })
 
     def _run_git(self, command):
-        return execute(['git'] + command, env=None, split_lines=False,
-                       ignore_errors=False, extra_ignore_errors=())
+        return execute(['git'] + command, env=None, cwd=self.clone_dir,
+                       split_lines=False, ignore_errors=False,
+                       extra_ignore_errors=())
 
     def _git_add_file_commit(self, filename, data, msg):
         """Add a file to a git repository.
@@ -59,10 +60,10 @@ class GitClientTests(SpyAgency, SCMClientTests):
         return self._run_git(['rev-parse', 'HEAD']).strip()
 
     def setUp(self):
-        super(GitClientTests, self).setUp()
-
         if not is_exe_in_path('git'):
             raise SkipTest('git not found in path')
+
+        super(GitClientTests, self).setUp()
 
         self.set_user_home(
             os.path.join(self.testdata_dir, 'homedir'))
@@ -92,14 +93,12 @@ class GitClientTests(SpyAgency, SCMClientTests):
 
     def test_scan_for_server_reviewboardrc(self):
         """Testing GitClient scan_for_server, .reviewboardrc case"""
-        rc = open(os.path.join(self.clone_dir, '.reviewboardrc'), 'w')
-        rc.write('REVIEWBOARD_URL = "%s"' % self.TESTSERVER)
-        rc.close()
-        self.client.config = load_config()
+        with self.reviewboardrc({'REVIEWBOARD_URL': self.TESTSERVER}):
+            self.client.config = load_config()
 
-        ri = self.client.get_repository_info()
-        server = self.client.scan_for_server(ri)
-        self.assertEqual(server, self.TESTSERVER)
+            ri = self.client.get_repository_info()
+            server = self.client.scan_for_server(ri)
+            self.assertEqual(server, self.TESTSERVER)
 
     def test_scan_for_server_property(self):
         """Testing GitClient scan_for_server using repo property"""
@@ -189,9 +188,9 @@ class GitClientTests(SpyAgency, SCMClientTests):
 
         os.mkdir('subdir')
         self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
-        os.chdir('subdir')
-        self._git_add_file_commit('exclude.txt', FOO2, 'commit 2')
+        self._git_add_file_commit('subdir/exclude.txt', FOO2, 'commit 2')
 
+        os.chdir('subdir')
         self.client.get_repository_info()
 
         commit_id = self._git_get_head()

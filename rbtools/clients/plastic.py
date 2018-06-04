@@ -1,3 +1,5 @@
+"""A client for Plastic SCM."""
+
 from __future__ import unicode_literals
 
 import logging
@@ -14,20 +16,33 @@ from rbtools.utils.process import execute
 
 
 class PlasticClient(SCMClient):
-    """
-    A wrapper around the cm Plastic tool that fetches repository
+    """A client for Plastic SCM.
+
+    This is a wrapper around the cm executable that fetches repository
     information and generates compatible diffs.
     """
-    name = 'Plastic'
 
+    name = 'Plastic'
     supports_patch_revert = True
 
     REVISION_CHANGESET_PREFIX = 'cs:'
 
     def __init__(self, **kwargs):
+        """Initialize the client.
+
+        Args:
+            **kwargs (dict):
+                Keyword arguments to pass through to the superclass.
+        """
         super(PlasticClient, self).__init__(**kwargs)
 
     def get_repository_info(self):
+        """Return repository information for the current working tree.
+
+        Returns:
+            rbtools.clients.RepositoryInfo:
+            The repository info structure.
+        """
         if not check_install(['cm', 'version']):
             logging.debug('Unable to execute "cm version": skipping Plastic')
             return None
@@ -53,28 +68,43 @@ class PlasticClient(SCMClient):
 
         path = m.group(1)
 
-        return RepositoryInfo(path,
+        return RepositoryInfo(path=path,
+                              local_path=path,
                               supports_changesets=True,
                               supports_parent_diffs=False)
 
     def parse_revision_spec(self, revisions=[]):
         """Parse the given revision spec.
 
-        The 'revisions' argument is a list of revisions as specified by the
-        user. Items in the list do not necessarily represent a single revision,
-        since the user can use SCM-native syntaxes such as "r1..r2" or "r1:r2".
-        SCMTool-specific overrides of this method are expected to deal with
-        such syntaxes.
+        Args:
+            revisions (list of unicode, optional):
+                A list of revisions as specified by the user. Items in the list
+                do not necessarily represent a single revision, since the user
+                can use SCM-native syntaxes such as ``r1..r2`` or ``r1:r2``.
+                SCMTool-specific overrides of this method are expected to deal
+                with such syntaxes.
 
-        This will return a dictionary with the following keys:
-            'base': Always None.
-            'tip':  A revision string representing either a changeset or a
-                    branch.
+        Raises:
+            rbtools.clients.errors.InvalidRevisionSpecError:
+                The given revisions could not be parsed.
 
-        These will be used to generate the diffs to upload to Review Board (or
-        print). The Plastic implementation requires that one and only one
-        revision is passed in. The diff for review will include the changes in
-        the given changeset or branch.
+            rbtools.clients.errors.TooManyRevisionsError:
+                The specified revisions list contained too many revisions.
+
+        Returns:
+            dict:
+            A dictionary with the following keys:
+
+            ``base`` (:py:class:`NoneType`):
+                Always None.
+
+            ``tip`` (:py:class:`unicode`):
+                A revision to use as the tip of the resulting diff.
+
+            These will be used to generate the diffs to upload to Review Board
+            (or print). The Plastic implementation requires that one and only
+            one revision is passed in. The diff for review will include the
+            changes in the given changeset or branch.
         """
         n_revisions = len(revisions)
 
@@ -91,10 +121,35 @@ class PlasticClient(SCMClient):
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
              extra_args=[]):
-        """
-        Performs a diff across all modified files in a Plastic workspace
+        """Perform a diff across all modified files in a Plastic workspace.
 
         Parent diffs are not supported (the second value in the tuple).
+
+        Args:
+            revisions (dict):
+                A dictionary of revisions, as returned by
+                :py:meth:`parse_revision_spec`.
+
+            include_files (list of unicode, optional):
+                A list of files to whitelist during the diff generation.
+
+            exclude_patterns (list of unicode, optional):
+                A list of shell-style glob patterns to blacklist during diff
+                generation.
+
+            extra_args (list, unused):
+                Additional arguments to be passed to the diff generation.
+
+        Returns:
+            dict:
+            A dictionary containing the following keys:
+
+            ``diff`` (:py:class:`bytes`):
+                The contents of the diff to upload.
+
+            ``changenum`` (:py:class:`unicode`):
+                The number of the changeset being posted (if ``revisions``
+                represents a single changeset).
         """
         # TODO: use 'files'
         changenum = None
@@ -117,7 +172,6 @@ class PlasticClient(SCMClient):
                                 'dst:{dstcmpath}{newline}'],
             results_unicode=False,
             split_lines=True)
-        logging.debug('Got files: %s', diff_entries)
 
         diff = self._process_diffs(diff_entries)
 
@@ -126,15 +180,24 @@ class PlasticClient(SCMClient):
             'changenum': changenum,
         }
 
-    def _process_diffs(self, my_diff_entries):
-        # Diff generation based on perforce client
+    def _process_diffs(self, diff_entries):
+        """Process the given diff entries.
+
+        Args:
+            diff_entries (list):
+                The list of diff entries.
+
+        Returns:
+            bytes:
+            The processed diffs.
+        """
         diff_lines = []
 
         empty_filename = make_tempfile()
         tmp_diff_from_filename = make_tempfile()
         tmp_diff_to_filename = make_tempfile()
 
-        for f in my_diff_entries:
+        for f in diff_entries:
             f = f.strip()
 
             if not f:
@@ -283,7 +346,18 @@ class PlasticClient(SCMClient):
         return dl
 
     def _write_file(self, filename, filespec, tmpfile):
-        """ Grabs a file from Plastic and writes it to a temp file """
+        """Retrieve a file from Plastic and write it to a temp file.
+
+        Args:
+            filename (bytes):
+                The filename to fetch.
+
+            filespec (bytes):
+                The revision of the file to fetch.
+
+            tmpfile (unicode):
+                The name of the temporary file to write to.
+        """
         logging.debug('Writing "%s" (rev %s) to "%s"',
                       filename.decode('utf-8'),
                       filespec.decode('utf-8'),

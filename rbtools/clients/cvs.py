@@ -1,3 +1,5 @@
+"""A client for CVS."""
+
 from __future__ import unicode_literals
 
 import logging
@@ -14,12 +16,13 @@ from rbtools.utils.process import execute
 
 
 class CVSClient(SCMClient):
-    """
-    A wrapper around the cvs tool that fetches repository
+    """A client for CVS.
+
+    This is a wrapper around the cvs executable that fetches repository
     information and generates compatible diffs.
     """
-    name = 'CVS'
 
+    name = 'CVS'
     supports_diff_exclude_patterns = True
     supports_patch_revert = True
 
@@ -27,10 +30,13 @@ class CVSClient(SCMClient):
 
     REVISION_WORKING_COPY = '--rbtools-working-copy'
 
-    def __init__(self, **kwargs):
-        super(CVSClient, self).__init__(**kwargs)
-
     def get_repository_info(self):
+        """Return repository information for the current working tree.
+
+        Returns:
+            rbtools.clients.RepositoryInfo:
+            The repository info structure.
+        """
         if not check_install(['cvs']):
             logging.debug('Unable to execute "cvs": skipping CVS')
             return None
@@ -58,42 +64,60 @@ class CVSClient(SCMClient):
                 logging.error('failed to get fqdn for %s, msg=%s',
                               host, msg)
 
-        return RepositoryInfo(path=repository_path)
+        return RepositoryInfo(path=repository_path,
+                              local_path=repository_path)
 
     def parse_revision_spec(self, revisions=[]):
-        """Parses the given revision spec.
+        """Parse the given revision spec.
 
-        The 'revisions' argument is a list of revisions as specified by the
-        user. Items in the list do not necessarily represent a single revision,
-        since the user can use SCM-native syntaxes such as "r1..r2" or "r1:r2".
-        SCMTool-specific overrides of this method are expected to deal with
-        such syntaxes.
+        Args:
+            revisions (list of unicode, optional):
+                A list of revisions as specified by the user. Items in the list
+                do not necessarily represent a single revision, since the user
+                can use SCM-native syntaxes such as ``r1..r2`` or ``r1:r2``.
+                SCMTool-specific overrides of this method are expected to deal
+                with such syntaxes.
 
-        This will return a dictionary with the following keys:
-            'base':        A revision to use as the base of the resulting diff.
-            'tip':         A revision to use as the tip of the resulting diff.
+        Raises:
+            rbtools.clients.errors.InvalidRevisionSpecError:
+                The given revisions could not be parsed.
 
-        These will be used to generate the diffs to upload to Review Board (or
-        print). The diff for review will include the changes in (base, tip].
+            rbtools.clients.errors.TooManyRevisionsError:
+                The specified revisions list contained too many revisions.
 
-        If a single revision is passed in, this will raise an exception,
-        because CVS doesn't have a repository-wide concept of "revision", so
-        selecting an individual "revision" doesn't make sense.
+        Returns:
+            dict:
+            A dictionary with the following keys:
 
-        With two revisions, this will treat those revisions as tags and do a
-        diff between those tags.
+            ``base`` (:py:class:`unicode`):
+                A revision to use as the base of the resulting diff.
 
-        If zero revisions are passed in, this will return revisions relevant
-        for the "current change". The exact definition of what "current" means
-        is specific to each SCMTool backend, and documented in the
-        implementation classes.
+            ``tip`` (:py:class:`unicode`):
+                A revision to use as the tip of the resulting diff.
 
-        The CVS SCMClient never fills in the 'parent_base' key. Users who are
-        using other patch-stack tools who want to use parent diffs with CVS
-        will have to generate their diffs by hand.
+            These will be used to generate the diffs to upload to Review Board
+            (or print). The diff for review will include the changes in (base,
+            tip].
 
-        Because `cvs diff` uses multiple arguments to define multiple tags,
-        there's no single-argument/multiple-revision syntax available.
+            If a single revision is passed in, this will raise an exception,
+            because CVS doesn't have a repository-wide concept of "revision",
+            so selecting an individual "revision" doesn't make sense.
+
+            With two revisions, this will treat those revisions as tags and do
+            a diff between those tags.
+
+            If zero revisions are passed in, this will return revisions
+            relevant for the "current change". The exact definition of what
+            "current" means is specific to each SCMTool backend, and documented
+            in the implementation classes.
+
+            The CVS SCMClient never fills in the 'parent_base' key. Users who
+            are using other patch-stack tools who want to use parent diffs with
+            CVS will have to generate their diffs by hand.
+
+            Because :command:`cvs diff` uses multiple arguments to define
+            multiple tags, there's no single-argument/multiple-revision syntax
+            available.
         """
         n_revs = len(revisions)
 
@@ -120,11 +144,34 @@ class CVSClient(SCMClient):
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
              extra_args=[]):
-        """Get the diff for the given revisions.
+        """Perform a diff using the given revisions.
 
-        If revision_spec is empty, this will return the diff for the modified
-        files in the working directory. If it's not empty and contains two
-        revisions, this will do a diff between those revisions.
+        If no revisions are specified, this will return the diff for the
+        modified files in the working directory. If it's not empty and contains
+        two revisions, this will do a diff between those revisions.
+
+        Args:
+            revisions (dict):
+                A dictionary of revisions, as returned by
+                :py:meth:`parse_revision_spec`.
+
+            include_files (list of unicode, optional):
+                A list of files to whitelist during the diff generation.
+
+            exclude_patterns (list of unicode, optional):
+                A list of shell-style glob patterns to blacklist during diff
+                generation.
+
+            extra_args (list, unused):
+                Additional arguments to be passed to the diff generation.
+                Unused for CVS.
+
+        Returns:
+            dict:
+            A dictionary containing the following keys:
+
+            ``diff`` (:py:class:`bytes`):
+                The contents of the diff to upload.
         """
         # CVS paths are always relative to the current working directory.
         cwd = os.getcwd()

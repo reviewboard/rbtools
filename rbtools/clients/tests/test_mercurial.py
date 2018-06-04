@@ -18,7 +18,7 @@ from rbtools.clients import RepositoryInfo
 from rbtools.clients.mercurial import MercurialClient
 from rbtools.clients.tests import (FOO, FOO1, FOO2, FOO3, FOO4, FOO5, FOO6,
                                    SCMClientTests)
-from rbtools.utils.filesystem import is_exe_in_path, load_config
+from rbtools.utils.filesystem import is_exe_in_path, load_config, make_tempdir
 from rbtools.utils.process import execute
 
 
@@ -26,14 +26,14 @@ class MercurialTestBase(SCMClientTests):
     """Base class for all Mercurial unit tests."""
 
     def setUp(self):
-        super(MercurialTestBase, self).setUp()
-        self._hg_env = {}
-
         if six.PY3:
             # Mercurial is working on Python 3 support but it's still quite
             # broken, especially with any out-of-core extensions installed
             # (like hgsubversion). Just skip it for now.
             raise SkipTest
+
+        super(MercurialTestBase, self).setUp()
+        self._hg_env = {}
 
     def _run_hg(self, command, ignore_errors=False, extra_ignore_errors=()):
         # We're *not* doing `env = env or {}` here because
@@ -147,14 +147,12 @@ class MercurialClientTests(MercurialTestBase):
 
     def test_scan_for_server_reviewboardrc(self):
         """Testing MercurialClient scan_for_server when in .reviewboardrc"""
-        rc = open(os.path.join(self.clone_dir, '.reviewboardrc'), 'w')
-        rc.write('REVIEWBOARD_URL = "%s"' % self.TESTSERVER)
-        rc.close()
-        self.client.config = load_config()
+        with self.reviewboardrc({'REVIEWBOARD_URL': self.TESTSERVER}):
+            self.client.config = load_config()
 
-        ri = self.client.get_repository_info()
-        server = self.client.scan_for_server(ri)
-        self.assertEqual(self.TESTSERVER, server)
+            ri = self.client.get_repository_info()
+            server = self.client.scan_for_server(ri)
+            self.assertEqual(self.TESTSERVER, server)
 
     def test_diff_simple(self):
         """Testing MercurialClient diff, simple case"""
@@ -481,7 +479,7 @@ class MercurialSubversionClientTests(MercurialTestBase):
                            'giving up!')
 
         if not self._tmpbase:
-            self._tmpbase = self.create_tmp_dir()
+            self._tmpbase = make_tempdir()
 
         self._create_svn_repo()
         self._fire_up_svnserve()
@@ -529,7 +527,7 @@ class MercurialSubversionClientTests(MercurialTestBase):
             self._svnserve_port = str(randint(30000, 40000))
 
         pid_file = os.path.join(self._tmpbase, 'svnserve.pid')
-        execute(['svnserve', '--pid-file', pid_file, '-d',
+        execute(['svnserve', '--single-thread', '--pid-file', pid_file, '-d',
                  '--listen-port', self._svnserve_port, '-r', self._tmpbase])
 
         for i in range(0, self._max_svnserve_pid_tries):
@@ -611,16 +609,13 @@ class MercurialSubversionClientTests(MercurialTestBase):
 
     def testScanForServerReviewboardrc(self):
         """Testing MercurialClient (+svn) scan_for_server in .reviewboardrc"""
-        rc_filename = os.path.join(self.clone_dir, '.reviewboardrc')
-        rc = open(rc_filename, 'w')
-        rc.write('REVIEWBOARD_URL = "%s"' % self.TESTSERVER)
-        rc.close()
-        self.client.config = load_config()
+        with self.reviewboardrc({'REVIEWBOARD_URL': self.TESTSERVER}):
+            self.client.config = load_config()
 
-        ri = self.client.get_repository_info()
-        server = self.client.scan_for_server(ri)
+            ri = self.client.get_repository_info()
+            server = self.client.scan_for_server(ri)
 
-        self.assertEqual(self.TESTSERVER, server)
+            self.assertEqual(self.TESTSERVER, server)
 
     def testScanForServerProperty(self):
         """Testing MercurialClient (+svn) scan_for_server in svn property"""

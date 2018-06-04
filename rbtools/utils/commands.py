@@ -2,9 +2,6 @@ from __future__ import unicode_literals
 
 import six
 
-from rbtools.api.errors import APIError
-from rbtools.commands import CommandError
-
 
 DEFAULT_OPTIONS_MAP = {
     'debug': '--debug',
@@ -29,20 +26,8 @@ DEFAULT_OPTIONS_MAP = {
 STAMP_STRING_FORMAT = 'Reviewed at %s'
 
 
-class AlreadyStampedError(CommandError):
+class AlreadyStampedError(Exception):
     """An error indicating the change has already been stamped."""
-
-
-def get_review_request(review_request_id, api_root, **kwargs):
-    """Returns the review request resource for the given ID."""
-    try:
-        review_request = api_root.get_review_request(
-            review_request_id=review_request_id, **kwargs)
-    except APIError as e:
-        raise CommandError('Error getting review request %s: %s'
-                           % (review_request_id, e))
-
-    return review_request
 
 
 def extract_commit_message(review_request):

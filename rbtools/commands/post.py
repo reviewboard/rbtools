@@ -6,10 +6,11 @@ import platform
 import re
 import sys
 
+import six
+
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option, OptionGroup
 from rbtools.utils.commands import (AlreadyStampedError,
-                                    get_review_request,
                                     stamp_commit_with_review_url)
 from rbtools.utils.console import confirm
 from rbtools.utils.process import execute
@@ -461,10 +462,14 @@ class Post(Command):
                                                   'commit_ids')
 
         if review_request_id:
-            review_request = get_review_request(
-                review_request_id, api_root,
-                only_fields='absolute_url,bugs_closed,id,status,public',
-                only_links='diffs,draft')
+            try:
+                review_request = api_root.get_review_request(
+                    review_request_id=review_request_id,
+                    only_fields='absolute_url,bugs_closed,id,status,public',
+                    only_links='diffs,draft')
+            except APIError as e:
+                raise CommandError('Error getting review request %s: %s'
+                                   % (review_request_id, e))
 
             if review_request.status == 'submitted':
                 raise CommandError(
@@ -886,12 +891,15 @@ class Post(Command):
         commit_id = changenum or commit_id
 
         if self.options.update and self.revisions:
-            review_request = guess_existing_review_request(
-                repository_info, self.options.repository_name, api_root,
-                api_client, self.tool, self.revisions,
-                guess_summary=False, guess_description=False,
-                is_fuzzy_match_func=self._ask_review_request_match,
-                submit_as=self.options.submit_as)
+            try:
+                review_request = guess_existing_review_request(
+                    repository_info, self.options.repository_name, api_root,
+                    api_client, self.tool, self.revisions,
+                    guess_summary=False, guess_description=False,
+                    is_fuzzy_match_func=self._ask_review_request_match,
+                    submit_as=self.options.submit_as)
+            except ValueError as e:
+                raise CommandError(six.text_type(e))
 
             if not review_request or not review_request.id:
                 raise CommandError('Could not determine the existing review '

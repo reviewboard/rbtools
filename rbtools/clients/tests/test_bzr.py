@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 
 import os
 from hashlib import md5
-from tempfile import mktemp
 
 from nose import SkipTest
 
@@ -12,7 +11,7 @@ from rbtools.clients import RepositoryInfo
 from rbtools.clients.bazaar import BazaarClient
 from rbtools.clients.errors import TooManyRevisionsError
 from rbtools.clients.tests import FOO, FOO1, FOO2, FOO3, SCMClientTests
-from rbtools.utils.filesystem import is_exe_in_path
+from rbtools.utils.filesystem import is_exe_in_path, make_tempdir
 from rbtools.utils.process import execute
 
 
@@ -20,38 +19,64 @@ class BazaarClientTests(SCMClientTests):
     """Unit tests for BazaarClient."""
 
     def setUp(self):
-        super(BazaarClientTests, self).setUp()
-
         if not is_exe_in_path('bzr'):
             raise SkipTest('bzr not found in path')
+
+        super(BazaarClientTests, self).setUp()
 
         self.set_user_home(
             os.path.join(self.testdata_dir, 'homedir'))
 
-        self.orig_dir = os.getcwd()
+        self.original_branch = make_tempdir()
+        self._run_bzr(['init', '.'], cwd=self.original_branch)
+        self._bzr_add_file_commit('foo.txt', FOO, 'initial commit',
+                                  cwd=self.original_branch)
 
-        self.original_branch = self.chdir_tmp()
-        self._run_bzr(['init', '.'])
-        self._bzr_add_file_commit('foo.txt', FOO, 'initial commit')
-
-        self.child_branch = mktemp()
+        self.child_branch = make_tempdir()
         self._run_bzr(['branch', '--use-existing-dir', self.original_branch,
-                       self.child_branch])
+                       self.child_branch],
+                      cwd=self.original_branch)
         self.client = BazaarClient(options=self.options)
-        os.chdir(self.orig_dir)
 
         self.options.parent_branch = None
 
     def _run_bzr(self, command, *args, **kwargs):
         return execute(['bzr'] + command, *args, **kwargs)
 
-    def _bzr_add_file_commit(self, file, data, msg):
-        """Add a file to a Bazaar repository with the content of data
-        and commit with msg."""
-        with open(file, 'w') as foo:
-            foo.write(data)
-        self._run_bzr(['add', file])
-        self._run_bzr(['commit', '-m', msg, '--author', 'Test User'])
+    def _bzr_add_file_commit(self, filename, data, msg, cwd=None, *args,
+                             **kwargs):
+        """Add a file to a Bazaar repository.
+
+        Args:
+            filename (unicode):
+                The name of the file to add.
+
+            data (bytes):
+                The data to write to the file.
+
+            msg (unicode):
+                The commit message to use.
+
+            cwd (unicode, optional):
+                A working directory to use when running the bzr commands.
+
+            *args (list):
+                Positional arguments to pass through to
+                :py:func:`rbtools.utils.process.execute`.
+
+            **kwargs (dict):
+                Keyword arguments to pass through to
+                :py:func:`rbtools.utils.process.execute`.
+        """
+        if cwd is not None:
+            filename = os.path.join(cwd, filename)
+
+        with open(filename, 'w') as f:
+            f.write(data)
+
+        self._run_bzr(['add', filename], cwd=cwd, *args, **kwargs)
+        self._run_bzr(['commit', '-m', msg, '--author', 'Test User'],
+                      cwd=cwd, *args, **kwargs)
 
     def _compare_diffs(self, filename, full_diff, expected_diff_digest,
                        change_type='modified'):
@@ -225,12 +250,13 @@ class BazaarClientTests(SCMClientTests):
 
     def test_diff_parent(self):
         """Testing BazaarClient diff with changes only in the parent branch"""
-        os.chdir(self.child_branch)
-        self._bzr_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
+        self._bzr_add_file_commit('foo.txt', FOO1, 'delete and modify stuff',
+                                  cwd=self.child_branch)
 
-        grand_child_branch = mktemp()
+        grand_child_branch = make_tempdir()
         self._run_bzr(['branch', '--use-existing-dir', self.child_branch,
-                       grand_child_branch])
+                       grand_child_branch],
+                      cwd=self.child_branch)
         os.chdir(grand_child_branch)
 
         revisions = self.client.parse_revision_spec([])
@@ -243,12 +269,13 @@ class BazaarClientTests(SCMClientTests):
     def test_diff_grand_parent(self):
         """Testing BazaarClient diff with changes between a 2nd level
         descendant"""
-        os.chdir(self.child_branch)
-        self._bzr_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
+        self._bzr_add_file_commit('foo.txt', FOO1, 'delete and modify stuff',
+                                  cwd=self.child_branch)
 
-        grand_child_branch = mktemp()
+        grand_child_branch = make_tempdir()
         self._run_bzr(['branch', '--use-existing-dir', self.child_branch,
-                       grand_child_branch])
+                       grand_child_branch],
+                      cwd=self.child_branch)
         os.chdir(grand_child_branch)
 
         # Requesting the diff between the grand child branch and its grand
@@ -286,18 +313,20 @@ class BazaarClientTests(SCMClientTests):
     def test_guessed_summary_and_description_in_grand_parent_branch(self):
         """Testing BazaarClient guessing summary and description for grand
         parent branch"""
-        os.chdir(self.child_branch)
-
-        self._bzr_add_file_commit('foo.txt', FOO1, 'commit 1')
-        self._bzr_add_file_commit('foo.txt', FOO2, 'commit 2')
-        self._bzr_add_file_commit('foo.txt', FOO3, 'commit 3')
+        self._bzr_add_file_commit('foo.txt', FOO1, 'commit 1',
+                                  cwd=self.child_branch)
+        self._bzr_add_file_commit('foo.txt', FOO2, 'commit 2',
+                                  cwd=self.child_branch)
+        self._bzr_add_file_commit('foo.txt', FOO3, 'commit 3',
+                                  cwd=self.child_branch)
 
         self.options.guess_summary = True
         self.options.guess_description = True
 
-        grand_child_branch = mktemp()
+        grand_child_branch = make_tempdir()
         self._run_bzr(['branch', '--use-existing-dir', self.child_branch,
-                       grand_child_branch])
+                       grand_child_branch],
+                      cwd=self.child_branch)
         os.chdir(grand_child_branch)
 
         # Requesting the diff between the grand child branch and its grand
@@ -371,7 +400,7 @@ class BazaarClientTests(SCMClientTests):
         os.chdir(self.original_branch)
         parent_base_commit_id = self.client._get_revno()
 
-        grand_child_branch = mktemp()
+        grand_child_branch = make_tempdir()
         self._run_bzr(['branch', '--use-existing-dir', self.child_branch,
                        grand_child_branch])
         os.chdir(grand_child_branch)

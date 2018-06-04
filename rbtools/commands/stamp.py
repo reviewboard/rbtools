@@ -2,9 +2,11 @@ from __future__ import print_function, unicode_literals
 
 import logging
 
+import six
+
+from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option, OptionGroup
-from rbtools.utils.commands import (get_review_request,
-                                    stamp_commit_with_review_url)
+from rbtools.utils.commands import stamp_commit_with_review_url
 from rbtools.utils.console import confirm
 from rbtools.utils.review_request import (find_review_request_by_change_id,
                                           get_draft_or_current_value,
@@ -84,11 +86,16 @@ class Stamp(Command):
         # if no suitable review request is found.
         logging.debug('Attempting to guess review request based on '
                       'summary and description')
-        review_request = guess_existing_review_request(
-            repository_info, repository_name, api_root, api_client, self.tool,
-            revisions, guess_summary=False, guess_description=False,
-            is_fuzzy_match_func=self._ask_review_request_match,
-            no_commit_error=self.no_commit_error)
+
+        try:
+            review_request = guess_existing_review_request(
+                repository_info, repository_name, api_root, api_client,
+                self.tool, revisions, guess_summary=False,
+                guess_description=False,
+                is_fuzzy_match_func=self._ask_review_request_match,
+                no_commit_error=self.no_commit_error)
+        except ValueError as e:
+            raise CommandError(six.text_type(e))
 
         if review_request:
             logging.debug('Found review request ID %d', review_request.id)
@@ -121,8 +128,15 @@ class Stamp(Command):
 
         # Use the ID from the command line options if present.
         if self.options.rid:
-            review_request = get_review_request(self.options.rid, api_root)
             review_request_id = self.options.rid
+
+            try:
+                review_request = api_root.get_review_request(
+                    review_request_id=review_request_id)
+            except APIError as e:
+                raise CommandError('Error getting review request %s: %s'
+                                   % (review_request_id, e))
+
             review_request_url = review_request.absolute_url
         else:
             review_request_id, review_request_url = \
