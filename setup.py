@@ -97,6 +97,7 @@ rb_commands = [
     'setup-repo = rbtools.commands.setup_repo:SetupRepo',
     'stamp = rbtools.commands.stamp:Stamp',
     'status = rbtools.commands.status:Status',
+    'status-update = rbtools.commands.status_update:StatusUpdate',
 ]
 
 scm_clients = [
