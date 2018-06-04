@@ -47,7 +47,7 @@ class Publish(Command):
 
         try:
             review_request = api_root.get_review_request(
-                review_request_id=review_request_id
+                review_request_id=review_request_id,
                 only_fields='public',
                 only_links='draft')
         except APIError as e:
