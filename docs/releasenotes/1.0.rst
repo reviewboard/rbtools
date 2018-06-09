@@ -1,0 +1,225 @@
+.. default-intersphinx:: rbt1.0 rb-latest
+
+
+=========================
+RBTools 1.0 Release Notes
+=========================
+
+**Release date:** TBD
+
+
+Compatibility Notes
+===================
+
+When running on Python 2, RBTools now requires Python 2.7.
+
+RBTools also now supports Python 3.5+.
+
+
+New Features and Bug Fixes
+==========================
+
+Colorized Output
+----------------
+
+RBTools commands can now use color in their output. This will only be used
+when the commands are sending their output directly to a terminal.
+
+Patch by Daniel Arteaga.
+
+
+Bash and Zsh Auto-Completion
+----------------------------
+
+RBTools now includes scripts to enable shell completion for commands. To set
+this up, run :command:`rbt setup-completion`.
+
+
+Better Repository Detection
+---------------------------
+
+In the case where repositories are nested inside one another (for example, if
+one's home directory is a Git repository and there's a Subversion checkout
+inside of it), RBTools wouldn't always detect the nested repository type,
+requiring specifying ``REPOSITORY_TYPE`` explicitly. In RBTools 1.0, the
+deepest repository will be detected. This can still be overridden in
+:file:`.reviewboardrc` if desired.
+
+Patch by Maram El-Salamouny.
+
+
+Publishing With Change Descriptions
+-----------------------------------
+
+.. program:: rbt publish
+
+:command:`rbt post` and :command:`rbt publish` can now include a change
+description, using :option:`-m`. The :option:`--markdown` flag used for
+review request descriptions will apply to this as well.
+
+
+Publishing Without Sending E-Mail
+---------------------------------
+
+:command:`rbt post` and :command:`rbt publish` can now publish review requests
+without sending e-mail to reviewers. This is particularly useful for small
+corrections and updates that do not require re-notifying reviewers. The options
+for this are :command:`rbt post --trivial-publish` and
+:command:`rbt publish --trivial`.
+
+
+rbt alias
+---------
+
+.. program:: rbt alias
+
+:command:`rbt alias` is a new command for managing aliases defined in
+:file:`.reviewboardrc`. It can list the defined aliases, as well as do a "dry
+run" which can show what command would be executed when running a given alias.
+
+
+rbt land
+--------
+
+.. program:: rbt land
+
+* Added recursive landing support.
+
+  The :command:`rbt land` command can now land review requests recursively;
+  that is, it can now land all the unlanded review requests in the same
+  repository that the review request depends on. It also does this in the
+  correct order so that they should apply successfully.
+
+* Fixed reporting errors.
+
+
+rbt patch
+---------
+
+* Fixed reporting errors via the console and exit code.
+
+
+rbt post
+--------
+
+.. program:: rbt post
+
+* Allow :option:`--submit-as` to be used when updating existing review
+  requests.
+
+  When granted the proper permission, the :option:`--submit-as` option allows
+  posting review requests as a user other than the one authenticated with
+  RBTools. This is typically used with automation to post review requests on
+  behalf of the authors of the change. :command:`rbt post` can now use this
+  same option when updating an existing review request.
+
+  Patch by Halvor Lund
+
+* Don't overwrite reviewers from .reviewboardrc when updating a review request.
+
+  When initially creating a review request, the reviewers can be set via the
+  ``TARGET_GROUPS`` and ``TARGET_PEOPLE`` configuration keys. If the list of
+  reviewers was then changed in the web UI, subsequent uses of :command:`rbt
+  post` to update the review request would overwrite this. These config keys
+  are now only used when initially creating a review request.
+
+  Patch by Ryan Wooster.
+
+
+rbt status
+----------
+
+.. program:: rbt status
+
+* Added the current review status to :command:`rbt status`.
+
+  In addition to just listing the review request ID and summary of each open
+  review request, the status table now includes the current state of each. This
+  can show whether it is pending review, has open issues (and how many), has a
+  ship it (and how many), or if there's an unpublished draft.
+
+  Patch by Justin Wu.
+
+* Added local branch information to :command:`rbt status`.
+
+  The local branch name corresponding to each open review request is now
+  listed in the status table.
+
+  Patch by Evan Hunzinger.
+
+
+rbt status-update
+-----------------
+
+.. program:: rbt status-update
+
+The new :command:`rbt status-update` command allows creating and updating
+status updates in Review Board 3.0. This allows writing tools that can do some
+analysis on a review request or diff and post the results back in a simple
+format. For more details about status reports, see
+:ref:`status-updates`.
+
+Patch by Brian LeBlanc
+
+
+Git
+---
+
+* Added a smarter parent-base finding algorithm.
+
+  When posting revision ranges, RBTools may create a "parent diff" which
+  contains the delta between the upstream code and the initial revision in the
+  range. Depending on the configuration of the ``TRACKING_BRANCH``, these
+  parent diffs could be very large, even if there were more recent revisions
+  upstream. RBTools will now attempt to find the most recent commit available
+  upstream, instead of just blindly using the tracking branch.
+
+  Patch by Shaurya Sengar.
+
+
+Subversion
+----------
+
+* Fixed a few bugs relating to treatment of non-ASCII characters in diffs.
+
+* Improved performance for detecting and interfacing with SVN repositories.
+
+  Patches by Griffin Myers.
+
+
+Python API
+----------
+
+* Removed calls to ``die()`` from utility code.
+
+  Some of the API utilities would cause the program to exit. These now will
+  raise exceptions instead of exiting, allowing callers to handle the problem.
+
+* Added pagination helpers to list resources.
+
+  Instead of iterating through all pages of a resource manually, callers can
+  now iterate over the :py:attr:`all_pages` and :py:attr:`all_items` attributes
+  to get all pages and all items, respectively.
+
+* Allow setting extra data fields in item resource update and create methods.
+
+  Extra data fields can now be set in the update and create methods by including
+  keyword arguments in the form of :samp:`extra_data__{field_name}`.
+
+
+Contributors
+------------
+
+* Barret Rennie
+* Brian LeBlanc
+* Christian Hammond
+* Daniel Arteaga
+* David Trowbridge
+* Evan Hunzinger
+* Griffin Myers
+* Halvor Lund
+* Joshua Olson
+* Justin Wu
+* Maram El-Salamouny
+* Ryan Wooster
+* Shaurya Sengar

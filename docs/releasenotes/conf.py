@@ -221,11 +221,12 @@ else:
 
 intersphinx_mapping = {
     'python': ('https://docs.python.org/2.7', None),
-    'rb-latest': ('%s/docs/rbtools/latest/' % rbwebsite_url, None),
+    'rb-latest': ('%s/docs/manual/dev/' % rbwebsite_url, None),
     'rb2.0': ('%s/docs/manual/2.0/' % rbwebsite_url, None),
     'rb2.5': ('%s/docs/manual/2.5/' % rbwebsite_url, None),
     'rbt0.5': ('%s/docs/rbtools/0.5/' % rbwebsite_url, None),
     'rbt0.6': ('%s/docs/rbtools/0.6/' % rbwebsite_url, None),
     'rbt0.7': ('%s/docs/rbtools/0.7/' % rbwebsite_url, None),
+    'rbt1.0': ('%s/docs/rbtools/1.0/' % rbwebsite_url, None),
     'rbt-latest': ('%s/docs/rbtools/latest/' % rbwebsite_url, None),
 }
