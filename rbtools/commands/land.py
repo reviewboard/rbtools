@@ -8,8 +8,7 @@ from rbtools.api.errors import APIError
 from rbtools.clients.errors import MergeError, PushError
 from rbtools.commands import Command, CommandError, Option, RB_MAIN
 from rbtools.utils.commands import (build_rbtools_cmd_argv,
-                                    extract_commit_message,
-                                    get_review_request)
+                                    extract_commit_message)
 from rbtools.utils.console import confirm
 from rbtools.utils.graphs import toposort
 from rbtools.utils.process import execute

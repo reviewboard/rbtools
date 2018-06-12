@@ -4,7 +4,6 @@ import logging
 
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option
-from rbtools.utils.commands import get_review_request
 
 
 class Publish(Command):
