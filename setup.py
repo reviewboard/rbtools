@@ -32,24 +32,6 @@ from setuptools import setup, find_packages
 from rbtools import get_package_version, is_release, VERSION
 
 
-PACKAGE_NAME = 'RBTools'
-
-if is_release():
-    download_url = "http://downloads.reviewboard.org/releases/%s/%s.%s/" % \
-                   (PACKAGE_NAME, VERSION[0], VERSION[1])
-else:
-    download_url = "http://downloads.reviewboard.org/nightlies/"
-
-
-install_requires = [
-    'backports.shutil_get_terminal_size',
-    'colorama',
-    'six>=1.8.0',
-    'texttable',
-    'tqdm',
-]
-
-
 # Make sure this is a version of Python we are compatible with. This should
 # prevent people on older versions from unintentionally trying to install
 # the source tarball, and failing.
@@ -71,12 +53,12 @@ elif sys.hexversion < 0x02070000:
         'Please install RBTools 0.7.x or upgrade Python to at least '
         '2.7.x.\n' % get_package_version())
     sys.exit(1)
-    install_requires.append('argparse')
 elif 0x03000000 <= sys.hexversion < 0x03050000:
     sys.stderr.write(
         'RBTools %s is incompatible with your version of Python.\n'
         'Please use either Python 2.7 or 3.5+.\n'
         % get_package_version())
+    sys.exit(1)
 
 
 rb_commands = [
@@ -112,33 +94,60 @@ scm_clients = [
     'tfs = rbtools.clients.tfs:TFSClient',
 ]
 
-setup(name=PACKAGE_NAME,
-      version=get_package_version(),
-      license="MIT",
-      description="Command line tools for use with Review Board",
-      entry_points={
-          'console_scripts': [
-              'rbt = rbtools.commands.main:main',
-          ],
-          'rbtools_commands': rb_commands,
-          'rbtools_scm_clients': scm_clients,
-      },
-      install_requires=install_requires,
-      dependency_links=[
-          download_url,
-      ],
-      packages=find_packages(),
-      include_package_data=True,
-      maintainer="Christian Hammond",
-      maintainer_email="chipx86@chipx86.com",
-      url="http://www.reviewboard.org/",
-      download_url=download_url,
-      classifiers=[
-          "Development Status :: 4 - Beta",
-          "Environment :: Console",
-          "Intended Audience :: Developers",
-          "License :: OSI Approved :: MIT License",
-          "Operating System :: OS Independent",
-          "Programming Language :: Python",
-          "Topic :: Software Development",
-      ])
+
+PACKAGE_NAME = 'RBTools'
+
+with open('README.md') as fp:
+    long_description = fp.read()
+
+
+setup(
+    name=PACKAGE_NAME,
+    version=get_package_version(),
+    license='MIT',
+    description=(
+        'Command line tools and API for working with code and document '
+        'reviews on Review Board'
+    ),
+    long_description=long_description,
+    long_description_content_type='text/markdown',
+    author='Beanbag, Inc.',
+    author_email='reviewboard@googlegroups.com',
+    entry_points={
+        'console_scripts': [
+            'rbt = rbtools.commands.main:main',
+        ],
+        'rbtools_commands': rb_commands,
+        'rbtools_scm_clients': scm_clients,
+    },
+    install_requires=[
+        'backports.shutil_get_terminal_size',
+        'colorama',
+        'six>=1.8.0',
+        'texttable',
+        'tqdm',
+    ],
+    packages=find_packages(exclude=['tests']),
+    include_package_data=True,
+    url='https://www.reviewboard.org/downloads/rbtools/',
+    download_url=('https://downloads.reviewboard.org/releases/%s/%s.%s/'
+                  % (PACKAGE_NAME, VERSION[0], VERSION[1])),
+    python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*',
+    classifiers=[
+        'Development Status :: 5 - Production/Stable',
+        'Environment :: Console',
+        'Framework :: Review Board',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: MIT License',
+        'Natural Language :: English',
+        'Operating System :: OS Independent',
+        'Programming Language :: Python',
+        'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
+        'Topic :: Software Development',
+        'Topic :: Software Development :: Quality Assurance',
+    ],
+)
