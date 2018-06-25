@@ -4,6 +4,8 @@
 alias
 =====
 
+.. versionadded:: 1.0
+
 :command:`rbt alias` is used to display any
 :ref:`aliases <rbtools-aliases>` configured by the user
 or repository. It can list them or perform a "dry run" that shows what would

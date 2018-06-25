@@ -21,7 +21,7 @@ class Publish(Command):
                default=False,
                help='Publish the review request without sending an e-mail '
                     'notification.',
-               added_in='0.8.0'),
+               added_in='1.0'),
         Option('--markdown',
                dest='markdown',
                action='store_true',
@@ -29,12 +29,12 @@ class Publish(Command):
                default=False,
                help='Specifies if the change description should should be '
                     'interpreted as Markdown-formatted text.',
-               added_in='0.8.0'),
+               added_in='1.0'),
         Option('-m', '--change-description',
                dest='change_description',
                default=None,
                help='The change description to use for the publish.',
-               added_in='0.8.0'),
+               added_in='1.0'),
     ]
 
     def main(self, review_request_id):
