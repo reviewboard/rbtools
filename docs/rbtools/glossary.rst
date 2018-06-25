@@ -40,6 +40,12 @@ Glossary
        criteria, such as being on an access list for a group or repository.
        See :ref:`access-control` for more information.
 
+   topological sort
+       An ordering of a set of items that depend on one another such that no
+       item will be ordered before its dependencies. For more information, see
+       `the Wikipedia article on topological sorting
+       <https://en.wikipedia.org/wiki/Topological_sorting>`_.
+
    unified diff
        A type of :term:`diff file` designed to be easy to parse and easy
        to read by humans. This is the format supported by Review Board.
