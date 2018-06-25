@@ -5,7 +5,7 @@
 RBTools 1.0 Release Notes
 =========================
 
-**Release date:** TBD
+**Release date:** June 28, 2018
 
 
 Compatibility Notes
