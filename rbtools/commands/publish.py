@@ -4,7 +4,6 @@ import logging
 
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option
-from rbtools.utils.commands import get_review_request
 
 
 class Publish(Command):
@@ -22,7 +21,7 @@ class Publish(Command):
                default=False,
                help='Publish the review request without sending an e-mail '
                     'notification.',
-               added_in='0.8.0'),
+               added_in='1.0'),
         Option('--markdown',
                dest='markdown',
                action='store_true',
@@ -30,12 +29,12 @@ class Publish(Command):
                default=False,
                help='Specifies if the change description should should be '
                     'interpreted as Markdown-formatted text.',
-               added_in='0.8.0'),
+               added_in='1.0'),
         Option('-m', '--change-description',
                dest='change_description',
                default=None,
                help='The change description to use for the publish.',
-               added_in='0.8.0'),
+               added_in='1.0'),
     ]
 
     def main(self, review_request_id):
@@ -47,7 +46,7 @@ class Publish(Command):
 
         try:
             review_request = api_root.get_review_request(
-                review_request_id=review_request_id
+                review_request_id=review_request_id,
                 only_fields='public',
                 only_links='draft')
         except APIError as e:

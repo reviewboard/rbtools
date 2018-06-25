@@ -3,11 +3,11 @@
 # Builds RBTools installers for macOS.
 #
 # This will build an installer that users can download and use on
-# Snow Leopard and higher.
+# El Capitan or higher.
 #
-# This package ships both Python 2.6 and 2.7 modules, in order to be
-# compatible with any custom or third-party scripts that want to use the
-# API.
+# This package ships modules for all versions of Python supported in modern
+# versions of macOS, in order to be compatible with any custom or third-party
+# scripts that want to use the API.
 #
 # By default, this will attempt to sign the installer with the official
 # certificate. This requires that the private key for the certificate exists
@@ -25,25 +25,28 @@ if test ! -e "$PWD/setup.py"; then
     exit 1
 fi
 
-which python2.7 >/dev/null || {
-    echo "python2.7 could not be found." >&2
-    exit 1
-}
 
-which pip2.6 >/dev/null || {
-    echo "pip2.6 could not be found." >&2
-    exit 1
-}
+# As of macOS High Sierra (10.13), only Python 2.7 is available natively.
+# Python 3.x is not available.
+PYTHON_VERSIONS=(
+    2.7
+)
 
-which pip2.7 >/dev/null || {
-    echo "pip2.7 could not be found." >&2
-    exit 1
-}
+for pyver in "${PYTHON_VERSIONS[@]}"; do
+    which python${pyver} >/dev/null || {
+        echo "python${pyver} could not be found." >&2
+        exit 1
+    }
+
+    which pip${pyver} >/dev/null || {
+        echo "pip${pyver} could not be found." >&2
+        exit 1
+    }
+done
+
 
 PACKAGE_NAME=RBTools
 IDENTIFIER=org.reviewboard.rbtools
-
-PYTHON_VERSIONS=(2.6 2.7)
 
 # Figure out the version of the package.
 VERSION=`PYTHONPATH=. python -c 'import rbtools; print rbtools.get_package_version()'`
@@ -82,34 +85,32 @@ $MKDIR -p $PKG_SRC $PKG_PYBUILD $PKG_BUILD $PKG_RESOURCES $PKG_DEST
 # Install RBTools and dependencies.
 #
 # We start off by building a wheel distribution, which we can build in
-# "release" package mode, fixing egg filenames. We'll build one per Python
-# version, in order to ensure we're packaging version-specific dependencies
-# correctly. Then we install that using pip, ensuring we have modern packages
-# with all dependencies installed.
+# "release" package mode. It's a universal wheel, so we'll build just one.
+# Then we install that using pip for each version of Python, ensuring we
+# have modern packages with all dependencies installed.
+echo
+echo
+echo == Building Wheel package ==
+echo
+/usr/bin/python2.7 ./setup.py release bdist_wheel \
+    -b ${PKG_PYBUILD}/build \
+    -d ${PKG_PYBUILD}/dist
+
+RBTOOLS_PACKAGE_FILENAME=${PKG_PYBUILD}/dist/RBTools-*-py2.py3-none-any.whl
+
 for pyver in "${PYTHON_VERSIONS[@]}"; do
-    echo
-    echo
-    echo == Building package for Python ${pyver} ==
-    echo
-    /usr/bin/python${pyver} ./setup.py release bdist_wheel \
-        -b ${PKG_PYBUILD}/build \
-        -d ${PKG_PYBUILD}/dist
-
-    RBTOOLS_PY2_FILENAME=${PKG_PYBUILD}/dist/RBTools-*-py2-none-any.whl
-
-    # Build the package, and set the PYTHONPATH to the location used for
-    # the upstream Python installer builds, so that if upstream Python is
-    # installed, we'll make use of the newer modules there (like pip) instead
-    # of the system Python.
+    # Set the PYTHONPATH to the location used for the upstream Python installer
+    # builds, so that if upstream Python is installed, we'll make use of the
+    # newer modules there (like pip) instead of the system Python.
     #
-    # We're also going to invoke pip as a module, to avoid having to figure
-    # out the right file path.
+    # We're also going to invoke pip as a module, to avoid having to figure out
+    # the right file path.
     PYTHONPATH=/Library/Frameworks/Python.framework/Versions/${pyver}/lib/python${pyver}/site-packages \
     /usr/bin/python${pyver} -m pip.__main__ install \
         $PIP_INSTALL_ARGS \
-        $RBTOOLS_PY2_FILENAME
+        $RBTOOLS_PACKAGE_FILENAME
 
-    rm $RBTOOLS_PY2_FILENAME
+    rm $RBTOOLS_PACKAGE_FILENAME
 done
 
 # Fix up the /usr/local/bin/rbt script to try to use the version of Python in
@@ -119,8 +120,8 @@ done
 # If the user has a custom Python installed (from the official Python
 # installers or from Homebrew), this will favor those.
 #
-# If they have Python 3 as the default for "python", then they're going to
-# have a bad time.
+# If they have Python 3 as the default for "python" (which must be an explicit
+# choice on their end), then they're going to have a bad time.
 echo "#!/usr/bin/env python
 
 # -*- coding: utf-8 -*-

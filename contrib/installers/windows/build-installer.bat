@@ -3,9 +3,8 @@
 ::
 :: This will fetch Python and build a WiX package for RBTools.
 ::
-:: This can be run in an automated fashion, but it must be run manually the
-:: first time in order to handle the installation of Portable Python (since
-:: there's no way to do a minimal silent install).
+:: This requires that curl for Windows (and its ca-bundle) are properly
+:: installed and working in order to download files.
 ::
 @echo off
 setlocal
@@ -39,9 +38,9 @@ call :SetMSBuildPath || goto :Abort
 ::-------------------------------------------------------------------------
 :: Dependencies
 ::-------------------------------------------------------------------------
-set PYTHON_VERSION=2.7.13
-set PYTHON_URL=http://python.org/ftp/python/2.7.13/python-2.7.13.msi
-set PYTHON_MD5=0f057ab4490e63e528eaa4a70df711d9
+set PYTHON_VERSION=2.7.15
+set PYTHON_URL=https://www.python.org/ftp/python/%PYTHON_VERSION%/python-%PYTHON_VERSION%.msi
+set PYTHON_MD5=023e49c9fba54914ebc05c4662a93ffe
 set PYTHON_DEP=%DEPS_DIR%\python-%PYTHON_VERSION%
 
 
@@ -300,8 +299,7 @@ set _dest=%~2
 
 echo Downloading %_url% to %_dest%...
 
-PowerShell -Command ^
-    "(New-Object Net.WebClient).DownloadFile('%_url%', '%_dest%')" || exit /B 1
+curl "%_url%" -o "%_dest%" || exit /B 1
 
 echo Downloaded %_url%
 
@@ -324,13 +322,15 @@ PowerShell -Command ^
  "$file = [System.IO.File]::ReadAllBytes('%_filename%');"^
  "$hash = [System.BitConverter]::ToString($md5.ComputeHash($file));"^
  "$hash = $hash.toLower().Replace('-', '');"^
+ "Write-Host '%_filename% has hash $hash.;"^
  "if ($hash -eq '%_expected_hash%') {"^
  "    exit 0;"^
  "} else {"^
  "    Write-Host 'Invalid checksum for %_filename%.';"^
- "    Write-Host 'Got'$hash'; expected %_expected_hash%.';"^
  "    exit 1;"^
  "}" || exit /B 1
+
+echo Hash verified.
 
 goto :EOF
 

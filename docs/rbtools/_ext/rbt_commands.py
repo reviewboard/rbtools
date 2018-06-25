@@ -5,9 +5,9 @@ import re
 import sys
 
 from docutils import nodes
+from docutils.parsers.rst import Directive
 from docutils.statemachine import ViewList
 from six.moves import range
-from sphinx.util.compat import Directive
 
 from rbtools import commands
 from rbtools.commands import OptionGroup, Option

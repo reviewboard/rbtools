@@ -115,4 +115,42 @@ The default behavior can be changed by specifying
 selectively enabled by passing :option:`--delete-branch`.
 
 
+Landing review requests recursively
+===================================
+
+If you wish to land a series of review requests, each of which depends on the
+previous review request, you can use the :option:`--recursive` option to land
+them all at once, provided they have all been approved. For example if you have
+review requests ``1``, ``2``, and ``3`` where ``3`` depends on ``2`` and ``2``
+depends on ``1``, the following command::
+
+    rbt land --recursive -r 3
+
+is equivalent to the following series of commands::
+
+    rbt land -r 1
+    rbt land -r 2
+    rbt land -r 3
+
+
+In the case where multiple review requests depend on a review request, the
+review requests will be landed in an order that preserves this relationship
+(known as a :term:`topological sort`). For example, if review requests ``2``
+and ``3`` both depend on review request ``1`` and ``4`` depends on ``3`` and
+``2``, then the following command::
+
+    rbt land --recursive -r 4
+
+is equivalent to the following series of commands::
+
+    rbt land -r 1
+    rbt land -r 2  # or rbt land -r 3
+    rbt land -r 3  # or rbt land -r 2
+    rbt land -r 4
+
+In this case, the order that review requests ``2`` and ``3`` landed is not
+guaranteed, except that they will land after review request ``1`` and before
+review request ``4``.
+
+
 .. rbt-command-options::

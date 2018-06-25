@@ -8,8 +8,7 @@ from rbtools.api.errors import APIError
 from rbtools.clients.errors import MergeError, PushError
 from rbtools.commands import Command, CommandError, Option, RB_MAIN
 from rbtools.utils.commands import (build_rbtools_cmd_argv,
-                                    extract_commit_message,
-                                    get_review_request)
+                                    extract_commit_message)
 from rbtools.utils.console import confirm
 from rbtools.utils.graphs import toposort
 from rbtools.utils.process import execute
@@ -113,7 +112,7 @@ class Land(Command):
                     'specified review request depends on. This is equivalent '
                     'to calling "rbt patch" for each of those review '
                     'requests.',
-               added_in='0.8.0'),
+               added_in='1.0'),
         Command.server_options,
         Command.repository_options,
         Command.branch_options,

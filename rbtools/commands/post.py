@@ -75,7 +75,7 @@ class Post(Command):
                        help='Publish the review request immediately after '
                             'posting, but without sending an e-mail '
                             'notification.',
-                       added_in='0.8.0'),
+                       added_in='1.0'),
                 Option('-o', '--open',
                        dest='open_browser',
                        action='store_true',

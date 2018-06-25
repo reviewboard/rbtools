@@ -979,7 +979,8 @@ class TFSClient(SCMClient):
                                    none_on_ignored_error=True)
 
             # VS2015 has a tf.exe but it's not good enough.
-            if 'Version Control Tool, Version 15' in tf_vc_output:
+            if (tf_vc_output and
+                'Version Control Tool, Version 15' in tf_vc_output):
                 use_tf_exe = True
         except OSError:
             pass

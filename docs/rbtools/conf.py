@@ -41,6 +41,8 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.doctest',
     'sphinx.ext.intersphinx',
+    'beanbag_docutils.sphinx.ext.extlinks',
+    'beanbag_docutils.sphinx.ext.ref_utils',
     'rbt_commands',
 ]
 
@@ -235,4 +237,8 @@ intersphinx_mapping = {
     'rb2.0': ('%s/docs/manual/2.0/' % rbwebsite_url, None),
     'rb2.5': ('%s/docs/manual/2.5/' % rbwebsite_url, None),
     'rb': ('%s/docs/manual/latest/' % rbwebsite_url, None),
+}
+
+extlinks = {
+    'rbintegration': ('https://www.reviewboard.org/integrations/%s', ''),
 }

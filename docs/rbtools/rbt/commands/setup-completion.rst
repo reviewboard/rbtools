@@ -4,7 +4,7 @@
 setup-completion
 ================
 
-.. versionadded:: 0.8
+.. versionadded:: 1.0
 
 :command:`rbt setup-completion` currently supports Bash and Zsh for
 auto-completions. The command will detect your login shell and install the
