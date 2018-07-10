@@ -2,7 +2,6 @@
 
 from __future__ import unicode_literals
 
-import getpass
 import logging
 import os
 import posixpath
@@ -22,6 +21,7 @@ from rbtools.clients.errors import (AuthenticationError,
                                     SCMError, TooManyRevisionsError)
 from rbtools.utils.checks import (check_gnu_diff, check_install,
                                   is_valid_version)
+from rbtools.utils.console import get_pass
 from rbtools.utils.diffs import (filename_match_any_patterns, filter_diff,
                                  normalize_patterns)
 from rbtools.utils.filesystem import (make_empty_files, make_tempfile,
@@ -1180,7 +1180,7 @@ class SVNClient(SCMClient):
 
         if getattr(self.options, 'svn_prompt_password', None):
             self.options.svn_prompt_password = False
-            self.options.svn_password = getpass.getpass('SVN Password:')
+            self.options.svn_password = get_pass('SVN Password: ')
 
         if getattr(self.options, 'svn_password', None):
             cmdline += ['--password', self.options.svn_password]
