@@ -1,7 +1,6 @@
 from __future__ import print_function, unicode_literals
 
 import argparse
-import getpass
 import inspect
 import logging
 import platform
@@ -18,7 +17,7 @@ from rbtools.api.client import RBClient
 from rbtools.api.errors import APIError, ServerInterfaceError
 from rbtools.clients import scan_usable_client
 from rbtools.clients.errors import OptionsCheckError
-from rbtools.utils.console import get_input
+from rbtools.utils.console import get_input, get_pass
 from rbtools.utils.filesystem import (cleanup_tempfiles, get_home_path,
                                       is_exe_in_path, load_config)
 from rbtools.utils.process import log_command_line
@@ -828,7 +827,7 @@ class Command(object):
                 username = get_input('Username: ')
 
             if password is None:
-                password = getpass.getpass('Password: ')
+                password = get_pass('Password: ')
 
         return username, password
 
@@ -861,7 +860,7 @@ class Command(object):
 
         print()
 
-        return getpass.getpass(b'Token: ')
+        return get_pass('Token: ')
 
     def _make_api_client(self, server_url):
         """Return an RBClient object for the server.

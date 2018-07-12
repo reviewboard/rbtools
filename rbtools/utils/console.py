@@ -1,5 +1,6 @@
 from __future__ import print_function, unicode_literals
 
+import getpass
 import os
 import subprocess
 import sys
@@ -27,6 +28,20 @@ def get_input(prompt):
     # the behavior there, writing the prompt to stderr.
     sys.stderr.write(str(prompt))
     return input()
+
+
+def get_pass(prompt):
+    """Ask the user for a password.
+
+    Args:
+        prompt (unicode):
+            The text to prompt the user with.
+
+    Returns:
+        bytes:
+        The entered password.
+    """
+    return getpass.getpass(str(prompt))
 
 
 def confirm(question):

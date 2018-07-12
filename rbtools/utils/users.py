@@ -1,13 +1,12 @@
 from __future__ import unicode_literals
 
-import getpass
 import logging
 import sys
 
 from six.moves import range
 
 from rbtools.api.errors import AuthorizationError
-from rbtools.utils.console import get_input
+from rbtools.utils.console import get_input, get_pass
 
 
 def get_authenticated_session(api_client, api_root, auth_required=False,
@@ -47,7 +46,7 @@ def get_authenticated_session(api_client, api_root, auth_required=False,
 
         for i in range(num_retries + 1):
             username = get_input('Username: ')
-            password = getpass.getpass('Password: ')
+            password = get_pass('Password: ')
             api_client.login(username, password)
 
             try:
