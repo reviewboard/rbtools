@@ -38,6 +38,10 @@ class GitClient(SCMClient):
     can_delete_branch = True
     can_branch = True
 
+    TYPE_GIT = 0
+    TYPE_GIT_SVN = 1
+    TYPE_GIT_P4 = 2
+
     def __init__(self, **kwargs):
         """Initialize the client.
 
@@ -51,6 +55,7 @@ class GitClient(SCMClient):
         # default.
         self.git = 'git'
         self._git_toplevel = None
+        self._type = None
 
     def _supports_git_config_flag(self):
         """Return whether the installed version of git supports the -c flag.
@@ -299,7 +304,7 @@ class GitClient(SCMClient):
 
                     if m:
                         uuid = m.group(1)
-                        self.type = 'svn'
+                        self._type = self.TYPE_GIT_SVN
 
                         # Get SVN tracking branch
                         if getattr(self.options, 'tracking', None):
@@ -365,7 +370,7 @@ class GitClient(SCMClient):
                 port = os.getenv('P4PORT')
 
             if port:
-                self.type = 'perforce'
+                self._type = self.TYPE_GIT_P4
                 self.upstream_branch = 'remotes/p4/master'
                 return RepositoryInfo(path=port,
                                       base_path='',
@@ -412,7 +417,7 @@ class GitClient(SCMClient):
                 self.upstream_branch = self.upstream_branch.split('/')[-1]
 
         if url:
-            self.type = 'git'
+            self._type = self.TYPE_GIT
             return RepositoryInfo(path=url,
                                   base_path='',
                                   local_path=self._git_toplevel,
@@ -479,14 +484,14 @@ class GitClient(SCMClient):
         if url:
             return url
 
-        if self.type == 'svn':
+        if self._type == self.TYPE_GIT_SVN:
             # Try using the reviewboard:url property on the SVN repo, if it
             # exists.
             prop = SVNClient().scan_for_server_property(repository_info)
 
             if prop:
                 return prop
-        elif self.type == 'perforce':
+        elif self._type == self.TYPE_GIT_P4:
             prop = PerforceClient().scan_for_server(repository_info)
 
             if prop:
@@ -519,7 +524,7 @@ class GitClient(SCMClient):
         """
         parent_branch = getattr(self.options, 'parent_branch', None)
 
-        if self.type == 'perforce':
+        if self._type == self.TYPE_GIT_P4:
             parent_branch = parent_branch or 'p4'
 
         return parent_branch
@@ -704,9 +709,9 @@ class GitClient(SCMClient):
         if self._supports_git_config_flag():
             git_cmd.extend(['-c', 'core.quotepath=false'])
 
-        if self.type in ('svn', 'perforce'):
+        if self._type in (self.TYPE_GIT_SVN, self.TYPE_GIT_P4):
             diff_cmd_params = ['--no-color', '--no-prefix', '-r', '-u']
-        elif self.type == 'git':
+        elif self._type == self.TYPE_GIT:
             diff_cmd_params = ['--no-color', '--full-index',
                                '--ignore-submodules']
 
@@ -736,12 +741,12 @@ class GitClient(SCMClient):
             # individually.
             changed_files_cmd = git_cmd + ['diff-tree'] + diff_cmd_params
 
-            if self.type in ('svn', 'perforce'):
+            if self._type in (self.TYPE_GIT_SVN, self.TYPE_GIT_P4):
                 # We don't want to send -u along to git diff-tree because it
                 # will generate diff information along with the list of
                 # changed files.
                 changed_files_cmd.remove('-u')
-            elif self.type == 'git':
+            elif self._type == self.TYPE_GIT:
                 changed_files_cmd.append('-r')
 
             changed_files = self._execute(
@@ -790,9 +795,9 @@ class GitClient(SCMClient):
                                        log_output_on_error=False,
                                        results_unicode=False)
 
-        if self.type == 'svn':
+        if self._type == self.TYPE_GIT_SVN:
             return self.make_svn_diff(merge_base, diff_lines)
-        elif self.type == 'perforce':
+        elif self._type == self.TYPE_GIT_P4:
             return self.make_perforce_diff(merge_base, diff_lines)
         else:
             return b''.join(diff_lines)
