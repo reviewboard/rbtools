@@ -56,6 +56,7 @@ class GitClient(SCMClient):
         self.git = 'git'
         self._git_toplevel = None
         self._type = None
+        self._upstream_branch = None
 
     def _supports_git_config_flag(self):
         """Return whether the installed version of git supports the -c flag.
@@ -85,7 +86,7 @@ class GitClient(SCMClient):
 
         return self._git_version_at_least_180
 
-    def parse_revision_spec(self, revisions=[], remote=None):
+    def parse_revision_spec(self, revisions=[]):
         """Parse the given revision spec.
 
         Args:
@@ -95,11 +96,6 @@ class GitClient(SCMClient):
                 can use SCM-native syntaxes such as ``r1..r2`` or ``r1:r2``.
                 SCMTool-specific overrides of this method are expected to deal
                 with such syntaxes.
-
-            remote (unicode, optional):
-                This is most commonly ``origin``, but can be changed via
-                configuration or command line options. This represents the
-                remote which is configured in Review Board.
 
         Raises:
             rbtools.clients.errors.InvalidRevisionSpecError:
@@ -138,10 +134,6 @@ class GitClient(SCMClient):
         """
         n_revs = len(revisions)
         result = {}
-
-        if not remote:
-            remote_branch = self._get_origin()[0]
-            remote = remote_branch.split('/')[0]
 
         if n_revs == 0:
             # No revisions were passed in. Start with HEAD, and find the
@@ -276,7 +268,7 @@ class GitClient(SCMClient):
 
             self._git_toplevel = os.path.abspath(git_top)
 
-        self.head_ref = self._execute(
+        self._head_ref = self._execute(
             [self.git, 'symbolic-ref', '-q', 'HEAD'],
             ignore_errors=True).strip()
 
@@ -308,7 +300,7 @@ class GitClient(SCMClient):
 
                         # Get SVN tracking branch
                         if getattr(self.options, 'tracking', None):
-                            self.upstream_branch = self.options.tracking
+                            self._upstream_branch = self.options.tracking
                         else:
                             data = self._execute(
                                 [self.git, 'svn', 'rebase', '-n'],
@@ -317,12 +309,12 @@ class GitClient(SCMClient):
                                           re.M)
 
                             if m:
-                                self.upstream_branch = m.group(1)
+                                self._upstream_branch = m.group(1)
                             else:
                                 sys.stderr.write('Failed to determine SVN '
                                                  'tracking branch. Defaulting'
                                                  'to "master"\n')
-                                self.upstream_branch = 'master'
+                                self._upstream_branch = 'master'
 
                         m = re.search(r'Working Copy Root Path: (.+)$', data,
                                       re.M)
@@ -371,7 +363,7 @@ class GitClient(SCMClient):
 
             if port:
                 self._type = self.TYPE_GIT_P4
-                self.upstream_branch = 'remotes/p4/master'
+                self._upstream_branch = 'remotes/p4/master'
                 return RepositoryInfo(path=port,
                                       base_path='',
                                       local_path=self._git_toplevel,
@@ -379,9 +371,10 @@ class GitClient(SCMClient):
 
         # Nope, it's git then.
         # Check for a tracking branch and determine merge-base
-        self.upstream_branch = ''
-        if self.head_ref:
-            short_head = self._strip_heads_prefix(self.head_ref)
+        if getattr(self.options, 'tracking', None):
+            self._upstream_branch = self.options.tracking
+        elif self._head_ref:
+            short_head = self._strip_heads_prefix(self._head_ref)
             merge = self._execute(
                 [self.git, 'config', '--get', 'branch.%s.merge' % short_head],
                 ignore_errors=True).strip()
@@ -392,21 +385,20 @@ class GitClient(SCMClient):
             merge = self._strip_heads_prefix(merge)
 
             if remote and remote != '.' and merge:
-                self.upstream_branch = '%s/%s' % (remote, merge)
+                self._upstream_branch = '%s/%s' % (remote, merge)
+
+        if not self._upstream_branch:
+            self._upstream_branch = 'origin/master'
 
         url = None
         if getattr(self.options, 'repository_url', None):
             url = self.options.repository_url
-            self.upstream_branch = self._get_origin(
-                self.upstream_branch, True)[0]
         else:
-            self.upstream_branch, origin_url = self._get_origin(
-                self.upstream_branch, True)
+            url = self._get_origin(self._upstream_branch).rstrip('/')
 
-            if not origin_url or origin_url.startswith('fatal:'):
-                self.upstream_branch, origin_url = self._get_origin()
-
-            url = origin_url.rstrip('/')
+            if url.startswith('fatal:'):
+                raise SCMError('Could not determine remote URL for upstream '
+                               'branch %s' % self._upstream_branch)
 
             # Central bare repositories don't have origin URLs.
             # We return git_dir instead and hope for the best.
@@ -414,7 +406,7 @@ class GitClient(SCMClient):
                 url = os.path.abspath(git_dir)
 
                 # There is no remote, so skip this part of upstream_branch.
-                self.upstream_branch = self.upstream_branch.split('/')[-1]
+                self._upstream_branch = self._upstream_branch.split('/')[-1]
 
         if url:
             self._type = self.TYPE_GIT
@@ -437,28 +429,21 @@ class GitClient(SCMClient):
         """
         return re.sub(r'^refs/heads/', '', ref)
 
-    def _get_origin(self, default_upstream_branch=None, ignore_errors=False):
-        """Return the upstream remote origin from options or parameters.
+    def _get_origin(self, upstream_branch):
+        """Return the remote URL for the given upstream branch.
 
         Args:
-            default_upstream_branch (unicode, optional):
-                The default for the upstream branch name.
-
-            ignore_errors (bool, optional):
-                Whether to ignore errors when running :command:`git config`.
+            upstream_branch (unicode):
+                The name of the upstream branch.
 
         Returns:
             tuple of unicode:
             A 2-tuple, containing the upstream branch name and the remote URL.
         """
-        upstream_branch = (getattr(self.options, 'tracking', None) or
-                           default_upstream_branch or
-                           'origin/master')
         upstream_remote = upstream_branch.split('/')[0]
-        origin_url = self._execute(
+        return self._execute(
             [self.git, 'config', '--get', 'remote.%s.url' % upstream_remote],
             ignore_errors=True).rstrip('\n')
-        return (upstream_branch, origin_url)
 
     def scan_for_server(self, repository_info):
         """Find the Review Board server matching this repository.
@@ -536,7 +521,7 @@ class GitClient(SCMClient):
             unicode:
             The name of the HEAD reference.
         """
-        return self.head_ref or 'HEAD'
+        return self._head_ref or 'HEAD'
 
     def _rev_parse(self, revisions):
         """Parse a git symbolic reference.
@@ -1162,20 +1147,30 @@ class GitClient(SCMClient):
 
         self.create_commit(message, author, run_editor)
 
-    def push_upstream(self, remote_branch):
+    def push_upstream(self, local_branch):
         """Push the current branch to upstream.
 
         Args:
-            remote_branch (unicode):
-                The name of the branch to push to.
+            local_branch (unicode):
+                The name of the branch to push.
 
         Raises:
             rbtools.client.errors.PushError:
                 The branch was unable to be pushed.
         """
-        origin_url = self._get_origin()[1]
         rc, output = self._execute(
-            ['git', 'pull', '--rebase', origin_url, remote_branch],
+            ['git', 'config', '--get', 'branch.%s.remote' % local_branch],
+            ignore_errors=True,
+            return_error_code=True)
+
+        if rc:
+            raise PushError('Could not determine remote for branch "%s".'
+                            % local_branch)
+        else:
+            origin = output.strip()
+
+        rc, output = self._execute(
+            ['git', 'pull', '--rebase', origin, local_branch],
             ignore_errors=True,
             return_error_code=True)
 
@@ -1183,13 +1178,13 @@ class GitClient(SCMClient):
             raise PushError('Could not pull changes from upstream.')
 
         rc, output = self._execute(
-            ['git', 'push', origin_url, remote_branch],
+            ['git', 'push', origin, local_branch],
             ignore_errors=True,
             return_error_code=True)
 
         if rc:
-            raise PushError('Could not push branch "%s" to upstream' %
-                            remote_branch)
+            raise PushError('Could not push branch "%s" to upstream.' %
+                            local_branch)
 
     def get_current_branch(self):
         """Return the name of the current branch.
