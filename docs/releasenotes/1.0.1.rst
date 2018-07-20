@@ -1,0 +1,36 @@
+.. default-intersphinx:: rbt1.0
+
+
+===========================
+RBTools 1.0.1 Release Notes
+===========================
+
+**Release date:** TBD
+
+
+Bug Fixes
+=========
+
+* Fixed ``putch`` errors when requesting password input on Windows
+  (:bug:`4711`).
+
+  A regression in 1.0 caused password prompts to fail when running with Python
+  2.7.x on Windows. This has been fixed.
+
+* Fixed tracking branch detection with Git.
+
+  RBTools 1.0 introduced a new mechanism for minimizing the amount of data sent
+  to Review Board when posting dependent changes, but it was too aggressive
+  when the branch being posted was pushed to the remote, overriding the
+  configured tracking branch. This could result in errors about there being no
+  diffs.
+
+  This has been fixed to always respect the configured parent or tracking
+  branch, and the diff size minimization algorithm is only used when
+  determining the merge base for the remote.
+
+
+Contributors
+============
+
+* David Trowbridge
