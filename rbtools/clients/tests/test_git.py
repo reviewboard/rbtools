@@ -74,6 +74,7 @@ class GitClientTests(SpyAgency, SCMClientTests):
         self.client = GitClient(options=self.options)
 
         self.options.parent_branch = None
+        self.options.tracking = None
 
     def test_get_repository_info_simple(self):
         """Testing GitClient get_repository_info, simple case"""
@@ -412,13 +413,14 @@ class GitClientTests(SpyAgency, SCMClientTests):
         self._run_git(['fetch', 'origin'])
         self._run_git(['checkout', '-b', 'parent-branch', '--track',
                        'origin/not-master'])
-
         parent_base_commit_id = self._git_get_head()
+
+        self._git_add_file_commit('foo.txt', FOO2, 'Commit 2')
         base_commit_id = self._git_get_head()
 
         self._run_git(['checkout', '-b', 'topic-branch'])
 
-        self._git_add_file_commit('foo.txt', FOO2, 'Commit 2')
+        self._git_add_file_commit('foo.txt', FOO3, 'Commit 3')
         tip_commit_id = self._git_get_head()
 
         self.options.parent_branch = 'parent-branch'
@@ -581,6 +583,7 @@ class GitClientTests(SpyAgency, SCMClientTests):
         self._run_git(['fetch', 'origin'])
         self._run_git(['checkout', '-b', 'not-master',
                        '--track', 'origin/not-master'])
+        self.options.tracking = 'origin/not-master'
         parent_commit_id = self._git_get_head()
         self._run_git(['checkout', '-b', 'feature-branch'])
         self._git_add_file_commit('foo.txt', FOO3, 'on feature-branch')
@@ -754,6 +757,7 @@ class GitClientTests(SpyAgency, SCMClientTests):
         self._git_add_file_commit('foo.txt', FOO2, 'on master')
         self._run_git(['checkout', '-b', 'not-master',
                        '--track', 'origin/not-master'])
+        self.options.tracking = 'origin/not-master'
         self._run_git(['merge', 'origin/master'])
         parent_commit_id = self._git_get_head()
         self._run_git(['checkout', '-b', 'feature-branch'])
@@ -1027,25 +1031,20 @@ class GitClientTests(SpyAgency, SCMClientTests):
         """Testing GitClient.push_upstream with an invalid remote branch"""
         # It must raise a PushError exception because the 'git pull' from an
         # invalid upstream branch will fail.
-        try:
+        with self.assertRaisesRegexp(PushError,
+                                     'Could not determine remote for branch '
+                                     '"non-existent-branch".'):
             self.client.push_upstream('non-existent-branch')
-        except PushError as e:
-            self.assertEqual(six.text_type(e),
-                             'Could not pull changes from upstream.')
-        else:
-            self.fail('Expected PushError')
 
     def test_push_upstream_no_push_exception(self):
         """Testing GitClient.push_upstream with 'git push' disabled"""
-
-        # We set the push url to be an invalid one, which should normally cause
-        # the 'git push' to fail. However, push_upstream() must not fail (must
-        # not raise a PushError) because it gets its origin_url from the Git
-        # config, which still contains a valid fetch url.
+        # Set the push url to be an invalid one.
         self._run_git(['remote', 'set-url', '--push', 'origin', 'bad-url'])
 
-        # This line should not raise an exception.
-        self.client.push_upstream('master')
+        with self.assertRaisesRegexp(PushError,
+                                     'Could not push branch "master" to '
+                                     'upstream\.'):
+            self.client.push_upstream('master')
 
     def test_merge_invalid_destination(self):
         """Testing GitClient.merge with an invalid destination branch"""
