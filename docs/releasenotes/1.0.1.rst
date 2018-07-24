@@ -5,7 +5,7 @@
 RBTools 1.0.1 Release Notes
 ===========================
 
-**Release date:** TBD
+**Release date:** July 24, 2018
 
 
 Bug Fixes
