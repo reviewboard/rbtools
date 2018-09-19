@@ -177,7 +177,10 @@ class Patch(Command):
             self.options.diff_revision)
 
         if self.options.patch_stdout:
-            print(diff_body)
+            if isinstance(diff_body, bytes):
+                print(diff_body.decode('utf-8'))
+            else:
+                print(diff_body)
         else:
             try:
                 if tool.has_pending_changes():
