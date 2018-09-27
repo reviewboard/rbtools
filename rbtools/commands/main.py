@@ -151,7 +151,7 @@ def main():
         aliases = load_config().get('ALIASES', {})
 
         if command_name in aliases:
-            sys.exit(run_alias(aliases[command_name], args))
+            sys.exit(run_alias(command_name, aliases[command_name], args))
         else:
             parser.error('"%s" is not a command' % command_name)
 
