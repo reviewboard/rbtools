@@ -130,7 +130,7 @@ def expand_alias(alias, args):
         * Whether or not the command should be passed to the shell or not
           (:py:class:`boolean`).
     """
-    cmd, use_shell = expand_alias(alias, args)
+    use_shell = alias.startswith('!')
 
     if use_shell:
         command = ' '.join(replace_arguments(alias[1:], args, posix=True))
