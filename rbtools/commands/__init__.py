@@ -9,6 +9,7 @@ import sys
 
 import colorama
 import pkg_resources
+import six
 from six.moves.urllib.parse import urlparse
 
 from rbtools import get_version_string
@@ -696,7 +697,10 @@ class Command(object):
         args = self.options.args
 
         # Check that the proper number of arguments have been provided.
-        argspec = inspect.getargspec(self.main)
+        if six.PY3:
+            argspec = inspect.getfullargspec(self.main)
+        else:
+            argspec = inspect.getargspec(self.main)
         minargs = len(argspec[0]) - 1
         maxargs = minargs
 

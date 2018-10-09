@@ -18,10 +18,14 @@ def check_install(command):
     instance, 'svn help' or 'git --version').
     """
     try:
-        subprocess.Popen(command,
+        p = subprocess.Popen(command,
                          stdin=subprocess.PIPE,
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE)
+        p.wait()
+        p.stderr.close()
+        p.stdin.close()
+        p.stdout.close()
         return True
     except (OSError, ValueError):
         # We catch ValueError exceptions here to work around bug in the
