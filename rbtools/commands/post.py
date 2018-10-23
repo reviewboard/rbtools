@@ -8,6 +8,7 @@ import sys
 from collections import namedtuple
 
 import six
+from six.moves import zip
 from tqdm import tqdm
 
 from rbtools.api.errors import APIError
@@ -100,11 +101,15 @@ SquashedDiff = namedtuple(
 #:         The ID of the commit that the diff and parent diff are relative to.
 #:         This is required for SCMs like Mercurial that do not use blob IDs
 #:         for files.
+#:
+#:     validation_info (list of unicode):
+#:         Validation metadata from the commit validation resource.
 DiffHistory = namedtuple(
     'History', (
         'entries',
         'parent_diff',
         'base_commit_id',
+        'validation_info',
     ))
 
 
@@ -1052,55 +1057,22 @@ class Post(Command):
             (diff_history is not None and len(diff_history.entries) == 0)):
             raise CommandError("There don't seem to be any diffs!")
 
-        if squashed_diff:
-            # Validate the diffs to ensure that they can be parsed and that
-            # all referenced files can be found.
-            #
-            # Review Board 2.0.14+ (with the diffs.validation.base_commit_ids
-            # capability) is required to successfully validate against hosting
-            # services that need a base_commit_id. This is basically due to
-            # the limitations of a couple Git-specific hosting services
-            # (Beanstalk, Bitbucket, and Unfuddle).
-            #
-            # In order to validate, we need to either not be dealing with a
-            # base commit ID (--diff-filename), or be on a new enough version
-            # of Review Board, or be using a non-Git repository.
-            can_validate_base_commit_ids = \
-                self.tool.capabilities.has_capability('diffs', 'validation',
-                                                      'base_commit_ids')
+        try:
+            if squashed_diff:
+                self._validate_squashed_diff(api_root, repository,
+                                             squashed_diff)
+            else:
+                diff_history = self._validate_diff_history(api_root,
+                                                           repository,
+                                                           diff_history)
+        except APIError as e:
+            msg_prefix = ''
 
-            if (not squashed_diff.base_commit_id or
-                can_validate_base_commit_ids or
-                self.tool.name != 'Git'):
-                # We can safely validate this diff before posting it, but we
-                # need to ensure we only pass base_commit_id if the capability
-                # is set.
-                validate_kwargs = {}
+            if e.error_code == 207:
+                msg_prefix = '%s: ' % e.rsp['file']
 
-                if can_validate_base_commit_ids:
-                    validate_kwargs['base_commit_id'] = \
-                        squashed_diff.base_commit_id
-
-                try:
-                    diff_validator = api_root.get_diff_validation()
-                    diff_validator.validate_diff(
-                        repository,
-                        squashed_diff.diff,
-                        parent_diff=squashed_diff.parent_diff,
-                        base_dir=squashed_diff.base_dir,
-                        **validate_kwargs)
-                except APIError as e:
-                    msg_prefix = ''
-
-                    if e.error_code == 207:
-                        msg_prefix = '%s: ' % e.rsp['file']
-
-                    raise CommandError('Error validating diff\n\n%s%s' %
-                                       (msg_prefix, e))
-                except AttributeError:
-                    # The server doesn't have a diff validation resource. Post
-                    # as normal.
-                    pass
+            raise CommandError('Error validating diff\n\n%s%s'
+                               % (msg_prefix, e))
 
         review_request_id, review_request_url = self.post_request(
             repository_info,
@@ -1304,7 +1276,8 @@ class Post(Command):
 
         return DiffHistory(entries=history_entries,
                            parent_diff=parent_diff,
-                           base_commit_id=base_commit_id)
+                           base_commit_id=base_commit_id,
+                           validation_info=None)
 
     def _get_squashed_diff(self, repository_info, extra_args):
         """Return the squashed diff for the requested revisions.
@@ -1375,13 +1348,144 @@ class Post(Command):
                                   only_links='draft_commits')
         commits = diff.get_draft_commits()
 
-        tqdm_kwargs = {
-            'bar_format': '{desc} {bar} [{n_fmt}/{total_fmt}]',
-            'desc': 'Uploading commits...',
-            'iterable': diff_history.entries,
-            'ncols': 80,
-        }
+        iterable = self._show_progress(
+            iterable=zip(diff_history.entries,
+                         diff_history.validation_info),
+            desc='Uploading commits... ',
+            total=len(diff_history.entries))
 
-        for history_entry in tqdm(**tqdm_kwargs):
-            commits.upload_commit(parent_diff=diff_history.parent_diff,
+        for history_entry, validation_info in iterable:
+            commits.upload_commit(validation_info,
+                                  parent_diff=diff_history.parent_diff,
                                   **history_entry)
+
+    def _validate_squashed_diff(self, api_root, repository, squashed_diff):
+        """Validate the diff to ensure that it can be parsed and files exist.
+
+        Args:
+            api_root (rbtools.api.resource.RootResource):
+                The root API resource.
+
+            repository (unicode):
+                The name of the repository.
+
+            squashed_diff (SquashedDiff):
+                The squashed diff and metadata.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                An error occurred during validation.
+        """
+        # Review Board 2.0.14+ (with the diffs.validation.base_commit_ids
+        # capability) is required to successfully validate against hosting
+        # services that need a base_commit_id. This is basically due to
+        # the limitations of a couple Git-specific hosting services
+        # (Beanstalk, Bitbucket, and Unfuddle).
+        #
+        # In order to validate, we need to either not be dealing with a
+        # base commit ID (--diff-filename), or be on a new enough version
+        # of Review Board, or be using a non-Git repository.
+        can_validate_base_commit_ids = self.tool.capabilities.has_capability(
+            'diffs', 'validation', 'base_commit_ids')
+
+        if (not squashed_diff.base_commit_id or
+            can_validate_base_commit_ids or
+            self.tool.name != 'Git'):
+            # We can safely validate this diff before posting it, but we
+            # need to ensure we only pass base_commit_id if the capability
+            # is set.
+            validate_kwargs = {}
+
+            try:
+                validator = api_root.get_diff_validation()
+            except AttributeError:
+                # The server doesn't have a diff validation resource.
+                return
+
+            if can_validate_base_commit_ids:
+                validate_kwargs['base_commit_id'] = \
+                    squashed_diff.base_commit_id
+
+            validator.validate_diff(
+                repository,
+                squashed_diff.diff,
+                parent_diff=squashed_diff.parent_diff,
+                base_dir=squashed_diff.base_dir,
+                **validate_kwargs)
+
+    def _validate_diff_history(self, api_root, repository, diff_history):
+        """Validate the diffs.
+
+        This will ensure that the diffs can be parsed and that all files
+        mentioned exist.
+
+        Args:
+            api_root (rbtools.api.resource.RootResource):
+                The root API resource.
+
+            repository (unicode):
+                The name of the repository.
+
+            diff_history (DiffHistory):
+                The history to validate.
+
+        Returns:
+            diff_history:
+            The updated history, with validation information.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                An error occurred during validation.
+        """
+        validator = api_root.get_commit_validation()
+        validation_info = None
+        validation_info_list = [None]
+
+        for history_entry in self._show_progress(iterable=diff_history.entries,
+                                                 desc='Validating commits...'):
+            validation_rsp = validator.validate_commit(
+                repository=repository,
+                diff=history_entry['diff'],
+                commit_id=history_entry['commit_id'],
+                parent_id=history_entry['parent_id'],
+                parent_diff=diff_history.parent_diff,
+                base_commit_id=diff_history.base_commit_id,
+                validation_info=validation_info)
+
+            validation_info = validation_rsp.validation_info
+            validation_info_list.append(validation_info)
+
+        return diff_history._replace(validation_info=validation_info_list)
+
+    def _show_progress(self, iterable, desc, total=None):
+        """Show a progress bar for commit validation and upload.
+
+        Args:
+            iterable (iterable of object):
+                What will be iterated.
+
+            desc (unicode):
+                The bar description.
+
+            total (int, optional):
+                The size of the iterable, which is used to determine progress.
+                This is only required if ``iterable`` does not imp;ement
+                ``__len__``.
+
+        Returns:
+            tqdm.tqdm:
+            The progress bar.
+        """
+        if total is None:
+            try:
+                total = len(iterable)
+            except TypeError:
+                pass
+
+        return tqdm(**{
+            'iterable': iterable,
+            'bar_format': '{desc} {bar} [{n_fmt}/{total_fmt}]',
+            'desc': desc,
+            'ncols': 80,
+            'total': total,
+        })

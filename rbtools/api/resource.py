@@ -578,13 +578,17 @@ class DraftDiffCommitListResource(ListResource):
     """
 
     @request_method_decorator
-    def upload_commit(self, diff, commit_id, parent_id, author_name,
-                      author_email, author_date, commit_message,
+    def upload_commit(self, validation_info, diff, commit_id, parent_id,
+                      author_name, author_email, author_date, commit_message,
                       committer_name=None, committer_email=None,
                       committer_date=None, parent_diff=None, **kwargs):
         """Upload a commit.
 
         Args:
+            validation_info (unicode):
+                The validation info, or ``None`` if this is the first commit in
+                a series.
+
             diff (bytes):
                 The diff contents.
 
@@ -637,6 +641,9 @@ class DraftDiffCommitListResource(ListResource):
         request.add_field('author_name', author_name)
         request.add_field('author_email', author_email)
         request.add_field('author_date', author_date)
+
+        if validation_info:
+            request.add_field('validation_info', validation_info)
 
         if committer_name and committer_email and committer_date:
             request.add_field('committer_name', committer_name)
@@ -952,5 +959,62 @@ class ValidateDiffResource(DiffUploaderMixin, ItemResource):
 
         if base_commit_id:
             request.add_field('base_commit_id', base_commit_id)
+
+        return request
+
+
+@resource_mimetype('application/vnd.reviewboard.org.commit-validation')
+class ValidateDiffCommitResource(ItemResource):
+    """The commit validation resource specific base class."""
+
+    @request_method_decorator
+    def validate_commit(self, repository, diff, commit_id, parent_id,
+                        parent_diff=None, base_commit_id=None,
+                        validation_info=None, **kwargs):
+        """Validate the diff for a commit.
+
+        Args:
+            repository (unicode):
+                The name of the repository.
+
+            diff (bytes):
+                The contents of the diff to validate.
+
+            commit_id (unicode):
+                The ID of the commit being validated.
+
+            parent_id (unicode):
+                The ID of the parent commit.
+
+            parent_diff (bytes, optional):
+                The contents of the parent diff.
+
+            base_commit_id (unicode, optional):
+                The base commit ID.
+
+            validation_info (unicode, optional):
+                Validation information from a previous call to this resource.
+
+            **kwargs (dict):
+                Keyword arguments used to build the querystring.
+
+        Returns:
+            ValidateDiffCommitResource:
+            The validation result.
+        """
+        request = HttpRequest(self._url, method=b'POST', query_args=kwargs)
+        request.add_file('diff', 'diff', diff)
+        request.add_field('repository', repository)
+        request.add_field('commit_id', commit_id)
+        request.add_field('parent_id', parent_id)
+
+        if parent_diff:
+            request.add_file('parent_diff', 'parent_diff', parent_diff)
+
+        if base_commit_id:
+            request.add_field('base_commit_id', base_commit_id)
+
+        if validation_info:
+            request.add_field('validation_info', validation_info)
 
         return request
