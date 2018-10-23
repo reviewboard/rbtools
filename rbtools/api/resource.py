@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 
+import logging
 import re
 from collections import defaultdict, deque
 
@@ -563,6 +564,97 @@ class RootResource(ItemResource):
         return HttpRequest(url, query_args=kwargs)
 
 
+@resource_mimetype('application/vnd.reviewboard.org.draft-commit')
+class DraftDiffCommitItemResource(ItemResource):
+    """The draft commit resource-specific class."""
+    pass
+
+
+@resource_mimetype('application/vnd.reviewboard.org.draft-commits')
+class DraftDiffCommitListResource(ListResource):
+    """The draft commit list resource-specific class.
+
+    Provides additional functionality in the uploading of new commits.
+    """
+
+    @request_method_decorator
+    def upload_commit(self, diff, commit_id, parent_id, author_name,
+                      author_email, author_date, commit_message,
+                      committer_name=None, committer_email=None,
+                      committer_date=None, parent_diff=None, **kwargs):
+        """Upload a commit.
+
+        Args:
+            diff (bytes):
+                The diff contents.
+
+            commit_id (unicode):
+                The ID of the commit being uploaded.
+
+            parent_id (unicode):
+                The ID of the parent commit.
+
+            author_name (unicode):
+                The name of the author.
+
+            author_email (unicode):
+                The e-mail address of the author.
+
+            author_date (unicode):
+                The date and time the commit was authored in ISO 8601 format.
+
+            committer_name (unicode, optional):
+                The name of the committer (if applicable).
+
+            committer_email (unicode, optional):
+                The e-mail address of the committer (if applicable).
+
+            committer_date (unicode, optional):
+                The date and time the commit was committed in ISO 8601 format
+                (if applicable).
+
+            parent_diff (bytes, optional):
+                The contents of the parent diff.
+
+            **kwargs (dict):
+                Keyword argument used to build the querystring for the request
+                URL.
+
+        Returns:
+            DraftDiffCommitItemResource:
+            The created resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                An error occurred while uploading the commit.
+        """
+        request = HttpRequest(self._url, method=b'POST', query_args=kwargs)
+
+        request.add_file('diff', 'diff', diff)
+        request.add_field('commit_id', commit_id)
+        request.add_field('parent_id', parent_id)
+        request.add_field('commit_message', commit_message)
+        request.add_field('author_name', author_name)
+        request.add_field('author_email', author_email)
+        request.add_field('author_date', author_date)
+
+        if committer_name and committer_email and committer_date:
+            request.add_field('committer_name', committer_name)
+            request.add_field('committer_email', committer_email)
+            request.add_field('committer_date', committer_date)
+        elif committer_name or committer_email or committer_name:
+            logging.warning(
+                'Either all or none of committer_name, committer_email, and '
+                'committer_date must be provided to upload_commit. None of '
+                'these fields will be submitted.'
+            )
+
+        if parent_diff:
+            request.add_file('parent_diff', 'parent_diff', parent_diff)
+
+        return request
+
+
 class DiffUploaderMixin(object):
     """A mixin for uploading diffs to a resource."""
 
@@ -611,6 +703,28 @@ class DiffListResource(DiffUploaderMixin, ListResource):
             base_dir=base_dir,
             base_commit_id=base_commit_id,
             **kwargs)
+
+    @request_method_decorator
+    def create_empty(self, base_commit_id=None, **kwargs):
+        """Create an empty DiffSet that commits can be added to.
+
+        Args:
+            base_commit_id (unicode, optional):
+                The base commit ID of the diff.
+
+            **kwargs (dict):
+                Keyword arguments to encode into the querystring of the request
+                URL.
+        Returns:
+            DiffItemResource:
+            The created resource.
+        """
+        request = HttpRequest(self._url, method=b'POST', query_args=kwargs)
+
+        if base_commit_id:
+            request.add_field('base_commit_id', base_commit_id)
+
+        return request
 
 
 @resource_mimetype('application/vnd.reviewboard.org.diff')

@@ -132,7 +132,7 @@ def guess_existing_review_request(repository_info, repository_name,
                                   guess_summary, guess_description,
                                   is_fuzzy_match_func=None,
                                   no_commit_error=None,
-                                  submit_as=None):
+                                  submit_as=None, additional_fields=None):
     """Try to guess the existing review request ID if it is available.
 
     The existing review request is guessed by comparing the existing
@@ -149,7 +149,13 @@ def guess_existing_review_request(repository_info, repository_name,
     paramater, thus the returned review request will contain only the fields
     specified by the only_fields variable.
     """
-    only_fields = 'id,summary,description,draft,url,absolute_url'
+    only_fields = [
+        'id', 'summary', 'description', 'draft', 'url', 'absolute_url',
+        'bugs_closed', 'status', 'public'
+    ]
+
+    if additional_fields:
+        only_fields += additional_fields
 
     if submit_as:
         username = submit_as
@@ -168,8 +174,8 @@ def guess_existing_review_request(repository_info, repository_name,
             from_user=username,
             status='pending',
             expand='draft',
-            only_fields=only_fields,
-            only_links='draft',
+            only_fields=','.join(only_fields),
+            only_links='diffs,draft',
             show_all_unpublished=True)
 
         if not review_requests:

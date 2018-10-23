@@ -5,18 +5,107 @@ import os
 import platform
 import re
 import sys
+from collections import namedtuple
 
 import six
+from tqdm import tqdm
 
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option, OptionGroup
 from rbtools.utils.commands import (AlreadyStampedError,
                                     stamp_commit_with_review_url)
 from rbtools.utils.console import confirm
-from rbtools.utils.process import execute
 from rbtools.utils.review_request import (get_draft_or_current_value,
                                           get_revisions,
                                           guess_existing_review_request)
+
+
+#: A squashed diff that may be the product of one or more revisions.
+#:
+#: Attributes:
+#:     diff (bytes):
+#:         The contents of the diff.
+#:
+#:     parent_diff (bytes):
+#:         The contents of the parent diff.
+#:
+#:     base_commit_id (unicode):
+#:         The ID of the commit that the diff and parent diff are relative to.
+#:         This is required for SCMs like Mercurial that do not use blob IDs
+#:         for files.
+#:
+#:     base_dir (unicode):
+#:         The directory that the diff is relative to.
+#:
+#:     commit_id (unicode):
+#:         The ID of the commit the diff corresponds to (if applicable).
+#:
+#:     changenum (unicode):
+#:         For SCMs such as Perforce, this is the change number that the diff
+#:         corresponds to. This is ``None`` for other SCMs.
+SquashedDiff = namedtuple(
+    'SquashedDiff', (
+        'diff',
+        'parent_diff',
+        'base_commit_id',
+        'base_dir',
+        'commit_id',
+        'changenum',
+    ))
+
+
+#: A series of diffs that each correspond to a single revision.
+#:
+#: Attributes:
+#:     entries (list of dict):
+#:         A list of the history entries. Each of these is a dict with the
+#:         following keys:
+#:
+#:         ``commit_id`` (:py:class:`unicode`):
+#:             The unique identifier for the commit. For an SCM like Git, this
+#:             is a SHA-1 hash.
+#:
+#:         ``parent_id`` (:py:class:`unicode`):
+#:             The unique identifier of the parent commit.
+#:
+#:         ``diff`` (:py:class:`bytes`):
+#:             The contents of the diff.
+#:
+#:         ``commit_message`` (:py:class:`unicode`):
+#:             The message associated with the commit.
+#:
+#:         ``author_name`` (:py:class:`unicode`):
+#:             The name of the author.
+#:
+#:         ``author_email`` (:py:class:`unicode`):
+#:             The e-mail address of the author.
+#:
+#:         ``author_date`` (:py:class:`unicode`):
+#:             The date and time the commit was authored in ISO 8601 format.
+#:
+#:         ``committer_name`` (:py:class:`unicode`):
+#:             The name of the committer (if applicable).
+#:
+#:         ``committer_email`` (:py:class:`unicode`):
+#:             The e-mail address of the committer (if applicable).
+#:
+#:         ``committer_date`` (:py:class:`unicode`):
+#:             The date and time the commit was committed in ISO 8601 format
+#:             (if applicable).
+#:
+#:     parent_diff (bytes):
+#:             The contents of the parent diff.
+#:
+#:     base_commit_id (unicode):
+#:         The ID of the commit that the diff and parent diff are relative to.
+#:         This is required for SCMs like Mercurial that do not use blob IDs
+#:         for files.
+DiffHistory = namedtuple(
+    'History', (
+        'entries',
+        'parent_diff',
+        'base_commit_id',
+    ))
 
 
 class Post(Command):
@@ -119,6 +208,23 @@ class Post(Command):
                             'update fields from the commit message/change '
                             'description. Fields explicitly provided by '
                             'other options will be ignored.'),
+                Option('-S', '--squash-history',
+                       dest='squash_history',
+                       action='store_true',
+                       config_key='SQUASH_HISTORY',
+                       default=False,
+                       help='Force the review request to be created without '
+                            'history, even if the server supports it. '
+                            'Uploaded diffs will be squashed together.'),
+                Option('-H', '--with-history',
+                       dest='with_history',
+                       action='store_true',
+                       default=False,
+                       help='Force the review request to be created with '
+                            'history if the server supports it.\n\n'
+                            'This option overrides the SQUASH_HISTORY '
+                            '.reviewboardrc option and the -S command line '
+                            'option.'),
             ]
         ),
         Command.server_options,
@@ -399,6 +505,20 @@ class Post(Command):
         if self.options.trivial_publish:
             self.options.publish = True
 
+        if self.options.with_history:
+            if self.options.diff_filename:
+                raise CommandError(
+                    'The -H/--with-history and --diff-filename options '
+                    'cannot both be provided.')
+            elif self.options.basedir:
+                raise CommandError(
+                    'The -H/--with-history and --basedir options cannot both '
+                    'be provided.')
+            elif self.options.stamp_when_posting:
+                raise CommandError(
+                    'The -H/--with-history and -s/--stamp options cannot both '
+                    'be provided.')
+
     def normalize_guess_value(self, guess, arg_name):
         if guess in self.GUESS_YES_INPUT_VALUES:
             return self.GUESS_YES
@@ -449,44 +569,81 @@ class Post(Command):
         return repository_info.path
 
     def post_request(self, repository_info, repository, server_url, api_root,
-                     review_request_id=None, changenum=None, diff_content=None,
-                     parent_diff_content=None, commit_id=None,
-                     base_commit_id=None,
-                     submit_as=None, retries=3, base_dir=None):
-        """Creates or updates a review request, and uploads a diff.
+                     review_request=None, diff_history=None,
+                     squashed_diff=None, submit_as=None):
+        """Create or update a review request, uploading a diff in the process.
 
-        On success the review request id and url are returned.
+        Args:
+            repository_info (rbtools.clients.RepositoryInfo):
+                The repository info.
+
+            repository (unicode):
+                The name of the repository.
+
+            server_url (unicode):
+                The URL of the Review Board server.
+
+            api_root (rbtools.api.resource.RootResource):
+                The API root resource.
+
+            review_request (rbtools.api.resources.ReviewRequestResource,
+                            optional):
+                The review request to update.
+
+                If not provided, a new review request will be created.
+
+            diff_history (DiffHistory, optional):
+                The diff history to post for multi-commit review requests.
+
+                Exactly one of ``diff_history`` and ``squashed_diff` must be
+                specified.
+
+            squashed_diff (SquashedDiff, optional):
+                The squashed diff information to upload when uploading a
+                traditional-style review request.
+
+                Exactly one of ``diff_history`` and ``squashed_diff` must be
+                specified.
+
+            submit_as (unicode, optional):
+                The username to submit the review request as.
+
+        Returns:
+            tuple:
+            A 2-tuple of:
+
+            * The review request ID.
+            * The review request URL.
+
+        Raises:
+            rbtools.commands.CommandError:
+                An error ocurred while posting the review request.
         """
+        if ((diff_history is not None and squashed_diff is not None) or
+            (diff_history is None and squashed_diff is None)):
+            raise ValueError(
+                'Exactly one of "diff_history" or "squashed_diff" must be '
+                'provided to "Post.post_request()".')
+
         supports_posting_commit_ids = \
             self.tool.capabilities.has_capability('review_requests',
                                                   'commit_ids')
 
-        if review_request_id:
-            try:
-                review_request = api_root.get_review_request(
-                    review_request_id=review_request_id,
-                    only_fields='absolute_url,bugs_closed,id,status,public',
-                    only_links='diffs,draft')
-            except APIError as e:
-                raise CommandError('Error getting review request %s: %s'
-                                   % (review_request_id, e))
-
-            if review_request.status == 'submitted':
-                raise CommandError(
-                    'Review request %s is marked as %s. In order to update '
-                    'it, please reopen the review request and try again.'
-                    % (review_request_id, review_request.status))
-        else:
-            # No review_request_id, so we will create a new review request.
+        if not review_request:
             try:
                 request_data = {
                     'repository': repository,
                 }
 
-                if changenum:
-                    request_data['changenum'] = changenum
-                elif commit_id and supports_posting_commit_ids:
-                    request_data['commit_id'] = commit_id
+                if squashed_diff:
+                    if squashed_diff.changenum:
+                        request_data['changenum'] = squashed_diff.changenum
+                    elif (squashed_diff.commit_id and
+                          supports_posting_commit_ids):
+                        request_data['commit_id'] = squashed_diff.commit_id
+                else:
+                    request_data['create_with_history'] = True
+
 
                 if submit_as:
                     request_data['submit_as'] = submit_as
@@ -503,59 +660,74 @@ class Post(Command):
                     only_links='create')
                 review_request = review_requests.create(**request_data)
             except APIError as e:
-                if e.error_code == 204 and changenum:
+                if (e.error_code == 204 and
+                    squashed_diff and
+                    squashed_diff.changenum):
                     # The change number is already in use. Get the review
                     # request for that change and update it instead.
-                    rid = e.rsp['review_request']['id']
-                    review_request = api_root.get_review_request(
-                        review_request_id=rid,
-                        only_fields='absolute_url,bugs_closed,id,status',
-                        only_links='diffs,draft')
+                    #
+                    # Since this tool is using a changenum, we know it doesn't
+                    # use DVCS support, so we don't have to check if the review
+                    # request was created with history.
+                    review_request_id = e.rsp['review_request']['id']
+
+                    try:
+                        review_request = api_root.get_review_request(
+                            review_request_id=rid,
+                            only_fields='absolute_url,bugs_closed,id,status',
+                            only_links='diffs,draft')
+                    except APIError as e:
+                        raise CommandError(
+                            'Error getting review request %s: %s'
+                            % (review_request_id, e))
                 else:
                     raise CommandError('Error creating review request: %s' % e)
 
-        if (not repository_info.supports_changesets or
-            not self.options.change_only):
-            try:
+        try:
+            if diff_history:
+                self._post_diff_history(review_request, diff_history)
+            elif (not repository_info.supports_changesets or
+                  not self.options.change_only):
                 diff_kwargs = {
-                    'parent_diff': parent_diff_content,
-                    'base_dir': base_dir,
+                    'parent_diff': squashed_diff.parent_diff,
+                    'base_dir': squashed_diff.base_dir,
                 }
 
-                if (base_commit_id and
+                if (squashed_diff.base_commit_id and
                     self.tool.capabilities.has_capability('diffs',
                                                           'base_commit_ids')):
                     # Both the Review Board server and SCMClient support
                     # base commit IDs, so pass that along when creating
                     # the diff.
-                    diff_kwargs['base_commit_id'] = base_commit_id
+                    diff_kwargs['base_commit_id'] = \
+                        squashed_diff.base_commit_id
 
                 review_request.get_diffs(only_fields='').upload_diff(
-                    diff_content, **diff_kwargs)
-            except APIError as e:
-                error_msg = [
-                    u'Error uploading diff\n\n',
-                ]
+                    squashed_diff.diff, **diff_kwargs)
+        except APIError as e:
+            error_msg = [
+                u'Error uploading diff\n\n',
+            ]
 
-                if e.error_code == 101 and e.http_status == 403:
-                    error_msg.append(
-                        u'You do not have permissions to modify '
-                        u'this review request\n')
-                elif e.error_code == 219:
-                    error_msg.append(
-                        u'The generated diff file was empty. This '
-                        u'usually means no files were\n'
-                        u'modified in this change.\n')
-                else:
-                    error_msg.append(str(e).decode('utf-8') + u'\n')
-
+            if e.error_code == 101 and e.http_status == 403:
                 error_msg.append(
-                    u'Your review request still exists, but the diff is '
-                    u'not attached.\n')
+                    u'You do not have permissions to modify '
+                    u'this review request\n')
+            elif e.error_code == 219:
+                error_msg.append(
+                    u'The generated diff file was empty. This '
+                    u'usually means no files were\n'
+                    u'modified in this change.\n')
+            else:
+                error_msg.append(str(e).decode('utf-8') + u'\n')
 
-                error_msg.append(u'%s\n' % review_request.absolute_url)
+            error_msg.append(
+                u'Your review request still exists, but the diff is '
+                u'not attached.\n')
 
-                raise CommandError(u'\n'.join(error_msg))
+            error_msg.append(u'%s\n' % review_request.absolute_url)
+
+            raise CommandError(u'\n'.join(error_msg))
 
         try:
             draft = review_request.get_draft(only_fields='commit_id')
@@ -568,9 +740,13 @@ class Post(Command):
         # present on the review if the user has chosen to publish immediately
         # upon posting.
         if self.options.stamp_when_posting:
-            if not self.tool.can_amend_commit:
-                print('Cannot stamp review URL onto the commit message; '
-                      'stamping is not supported with %s.' % self.tool.name)
+            if diff_history:
+                print('Cannot stamp review request URL when posting with '
+                      'history.')
+            elif not self.tool.can_amend_commit:
+                print('Cannot stamp review rquest URL onto the commit '
+                      'message; stamping is not supported with %s.'
+                      % self.tool.name)
 
             else:
                 try:
@@ -584,7 +760,7 @@ class Post(Command):
                     logging.debug('Caught exception while stamping the '
                                   'commit message. Proceeding to post '
                                   'without stamping.', exc_info=True)
-                    print('Could not stamp review URL onto the commit '
+                    print('Could not stamp review request URL onto the commit '
                           'message.')
 
         # Update the review request draft fields based on options set
@@ -665,8 +841,9 @@ class Post(Command):
                         'The change description field can only be set when '
                         'publishing an update. Use --description instead.')
 
-            if supports_posting_commit_ids and commit_id != draft.commit_id:
-                update_fields['commit_id'] = commit_id or ''
+            if (squashed_diff and supports_posting_commit_ids and
+                squashed_diff.commit_id != draft.commit_id):
+                update_fields['commit_id'] = squashed_diff.commit_id or ''
 
         if update_fields:
             try:
@@ -741,7 +918,16 @@ class Post(Command):
         return confirm(question)
 
     def main(self, *args):
-        """Create and update review requests."""
+        """Create and update review requests.
+
+        Args:
+            *args (tuple):
+                Command line arguments.
+
+        Raises:
+            rbtools.commands.CommandError:
+                An error occurred while posting.
+        """
         # The 'args' tuple must be made into a list for some of the
         # SCM Clients code. The way arguments were structured in
         # post-review meant this was a list, and certain parts of
@@ -751,188 +937,185 @@ class Post(Command):
         self.cmd_args = list(args)
 
         self.post_process_options()
-        origcwd = os.path.abspath(os.getcwd())
+
+        orig_cwd = os.path.abspath(os.getcwd())
+
         repository_info, self.tool = self.initialize_scm_tool(
             client_name=self.options.repository_type)
+
         server_url = self.get_server_url(repository_info, self.tool)
         api_client, api_root = self.get_api(server_url)
         self.setup_tool(self.tool, api_root=api_root)
 
         if (self.options.exclude_patterns and
             not self.tool.supports_diff_exclude_patterns):
-
             raise CommandError(
                 'The %s backend does not support excluding files via the '
-                '-X/--exclude commandline options or the EXCLUDE_PATTERNS '
+                '-X/--exclude command line options or the EXCLUDE_PATTERNS '
                 '.reviewboardrc option.' % self.tool.name)
 
-        # Check if repository info on reviewboard server match local ones.
         repository_info = repository_info.find_server_repository_info(api_root)
-
-        if self.options.diff_filename:
-            self.revisions = None
-            parent_diff = None
-            base_commit_id = None
-            commit_id = None
-
-            if self.options.diff_filename == '-':
-                if hasattr(sys.stdin, 'buffer'):
-                    # Make sure we get bytes on Python 3.x
-                    diff = sys.stdin.buffer.read()
-                else:
-                    diff = sys.stdin.read()
-            else:
-                try:
-                    diff_path = os.path.join(origcwd,
-                                             self.options.diff_filename)
-                    with open(diff_path, 'rb') as fp:
-                        diff = fp.read()
-                except IOError as e:
-                    raise CommandError('Unable to open diff filename: %s' % e)
-        else:
-            self.revisions = get_revisions(self.tool, self.cmd_args)
-
-            if self.revisions:
-                extra_args = None
-            else:
-                extra_args = self.cmd_args
-
-            # Generate a diff against the revisions or arguments, filtering
-            # by the requested files if provided.
-            diff_info = self.tool.diff(
-                revisions=self.revisions,
-                include_files=self.options.include_files or [],
-                exclude_patterns=self.options.exclude_patterns or [],
-                extra_args=extra_args)
-
-            diff = diff_info['diff']
-            parent_diff = diff_info.get('parent_diff')
-            base_commit_id = diff_info.get('base_commit_id')
-            commit_id = diff_info.get('commit_id')
-
-            logging.debug('Generated diff size: %d bytes', len(diff))
-
-            if parent_diff:
-                logging.debug('Generated parent diff size: %d bytes',
-                              len(parent_diff))
 
         repository = (
             self.options.repository_name or
             self.options.repository_url or
-            self.get_repository_path(repository_info, api_root))
-
-        base_dir = self.options.basedir or repository_info.base_path
+            self.get_repository_path(repository_info, api_root)
+        )
 
         if repository is None:
             raise CommandError('Could not find the repository on the Review '
                                'Board server.')
 
-        if len(diff) == 0:
+        server_supports_history = self.tool.capabilities.has_capability(
+            'review_requests', 'supports_history')
+
+        # If we are passing --diff-filename, we attempt to read the diff before
+        # we normally would. This allows us to exit early if the file does not
+        # exist or cannot be read and save several network requetss.
+        if self.options.diff_filename:
+            if self.options.diff_filename == '-':
+                if hasattr(sys.stdin, 'buffer'):
+                    # Make sure we get bytes on Python 3.x.
+                    diff = sys.stdin.buffer.read()
+                else:
+                    diff = sys.stdin.read()
+            else:
+                diff_path = os.path.join(orig_cwd,
+                                         self.options.diff_filename)
+
+                try:
+                    with open(diff_path, 'rb') as f:
+                        diff = f.read()
+                except IOError as e:
+                    raise CommandError('Unable to open diff filename: %s' % e)
+
+            squashed_diff = SquashedDiff(
+                diff=diff,
+                prent_diff=None,
+                base_commit_id=None,
+                commit_id=None,
+                changenum=None,
+                base_dir=(self.options.basedir or repository_info.base_path))
+        else:
+            self.revisions = get_revisions(self.tool, self.cmd_args)
+
+        review_request = self._get_review_request_to_update(
+            repository_info,
+            api_root,
+            api_client,
+            server_supports_history=server_supports_history)
+
+        if server_supports_history and review_request:
+            with_history = review_request.created_with_history
+
+            if self.options.with_history:
+                if review_request.created_with_history:
+                    logging.info(
+                        'The -H/--with-history option is not required when '
+                        'updating an existing review request.')
+                else:
+                    logging.warning(
+                        'The review request was not created with history. The '
+                        'uploaded diff will be squashed.')
+        elif server_supports_history:
+            with_history = self._should_post_with_history(
+                server_supports_history=server_supports_history)
+        else:
+            with_history = False
+
+        # We now have enough information to generate our diff.
+        #
+        # If we provided --diff-filename, we already computed the diff above
+        # so that we could save round trips to the server in case of IO errors.
+        if not self.options.diff_filename:
+            if self.revisions:
+                extra_args = None
+            else:
+                extra_args = self.cmd_args
+
+            if with_history:
+                squashed_diff = None
+                diff_history = self._get_diff_history(extra_args)
+                parent_diff = (diff_history.entries and
+                               diff_history.entries[0].get('parent_diff'))
+            else:
+                squashed_diff = self._get_squashed_diff(repository_info,
+                                                        extra_args)
+                diff_history = None
+                parent_diff = squashed_diff.parent_diff
+
+            if parent_diff:
+                logging.debug('Generated parent diff size: %d bytes',
+                              len(parent_diff))
+
+        if ((squashed_diff is not None and len(squashed_diff.diff) == 0) or
+            (diff_history is not None and len(diff_history.entries) == 0)):
             raise CommandError("There don't seem to be any diffs!")
 
-        # Validate the diffs to ensure that they can be parsed and that
-        # all referenced files can be found.
-        #
-        # Review Board 2.0.14+ (with the diffs.validation.base_commit_ids
-        # capability) is required to successfully validate against hosting
-        # services that need a base_commit_id. This is basically due to
-        # the limitations of a couple Git-specific hosting services
-        # (Beanstalk, Bitbucket, and Unfuddle).
-        #
-        # In order to validate, we need to either not be dealing with a
-        # base commit ID (--diff-filename), or be on a new enough version
-        # of Review Board, or be using a non-Git repository.
-        can_validate_base_commit_ids = \
-            self.tool.capabilities.has_capability('diffs', 'validation',
-                                                  'base_commit_ids')
+        if squashed_diff:
+            # Validate the diffs to ensure that they can be parsed and that
+            # all referenced files can be found.
+            #
+            # Review Board 2.0.14+ (with the diffs.validation.base_commit_ids
+            # capability) is required to successfully validate against hosting
+            # services that need a base_commit_id. This is basically due to
+            # the limitations of a couple Git-specific hosting services
+            # (Beanstalk, Bitbucket, and Unfuddle).
+            #
+            # In order to validate, we need to either not be dealing with a
+            # base commit ID (--diff-filename), or be on a new enough version
+            # of Review Board, or be using a non-Git repository.
+            can_validate_base_commit_ids = \
+                self.tool.capabilities.has_capability('diffs', 'validation',
+                                                      'base_commit_ids')
 
-        if (not base_commit_id or
-            can_validate_base_commit_ids or
-            self.tool.name != 'Git'):
-            # We can safely validate this diff before posting it, but we
-            # need to ensure we only pass base_commit_id if the capability
-            # is set.
-            validate_kwargs = {}
+            if (not squashed_diff.base_commit_id or
+                can_validate_base_commit_ids or
+                self.tool.name != 'Git'):
+                # We can safely validate this diff before posting it, but we
+                # need to ensure we only pass base_commit_id if the capability
+                # is set.
+                validate_kwargs = {}
 
-            if can_validate_base_commit_ids:
-                validate_kwargs['base_commit_id'] = base_commit_id
+                if can_validate_base_commit_ids:
+                    validate_kwargs['base_commit_id'] = \
+                        squashed_diff.base_commit_id
 
-            try:
-                diff_validator = api_root.get_diff_validation()
-                diff_validator.validate_diff(
-                    repository,
-                    diff,
-                    parent_diff=parent_diff,
-                    base_dir=base_dir,
-                    **validate_kwargs)
-            except APIError as e:
-                msg_prefix = ''
+                try:
+                    diff_validator = api_root.get_diff_validation()
+                    diff_validator.validate_diff(
+                        repository,
+                        squashed_diff.diff,
+                        parent_diff=squashed_diff.parent_diff,
+                        base_dir=squashed_diff.base_dir,
+                        **validate_kwargs)
+                except APIError as e:
+                    msg_prefix = ''
 
-                if e.error_code == 207:
-                    msg_prefix = '%s: ' % e.rsp['file']
+                    if e.error_code == 207:
+                        msg_prefix = '%s: ' % e.rsp['file']
 
-                raise CommandError('Error validating diff\n\n%s%s' %
-                                   (msg_prefix, e))
-            except AttributeError:
-                # The server doesn't have a diff validation resource. Post as
-                # normal.
-                pass
+                    raise CommandError('Error validating diff\n\n%s%s' %
+                                       (msg_prefix, e))
+                except AttributeError:
+                    # The server doesn't have a diff validation resource. Post
+                    # as normal.
+                    pass
 
-        if (repository_info.supports_changesets and
-            not self.options.diff_filename and
-            'changenum' in diff_info):
-            changenum = diff_info['changenum']
-        else:
-            changenum = self.tool.get_changenum(self.revisions)
-
-        # Not all scm clients support get_changenum, so if get_changenum
-        # returns None (the default for clients that don't have changenums),
-        # we'll prefer the existing commit_id.
-        commit_id = changenum or commit_id
-
-        if self.options.update and self.revisions:
-            try:
-                review_request = guess_existing_review_request(
-                    repository_info, self.options.repository_name, api_root,
-                    api_client, self.tool, self.revisions,
-                    guess_summary=False, guess_description=False,
-                    is_fuzzy_match_func=self._ask_review_request_match,
-                    submit_as=self.options.submit_as)
-            except ValueError as e:
-                raise CommandError(six.text_type(e))
-
-            if not review_request or not review_request.id:
-                raise CommandError('Could not determine the existing review '
-                                   'request to update.')
-
-            self.options.rid = review_request.id
-
-        # If only certain files within a commit are being submitted for review,
-        # do not include the commit id. This prevents conflicts if multiple
-        # files from the same commit are posted for review separately.
-        if self.options.include_files or self.options.exclude_patterns:
-            commit_id = None
-
-        request_id, review_url = self.post_request(
+        review_request_id, review_request_url = self.post_request(
             repository_info,
             repository,
             server_url,
             api_root,
-            self.options.rid,
-            changenum=changenum,
-            diff_content=diff,
-            parent_diff_content=parent_diff,
-            commit_id=commit_id,
-            base_commit_id=base_commit_id,
-            submit_as=self.options.submit_as,
-            base_dir=base_dir)
+            review_request=review_request,
+            diff_history=diff_history,
+            squashed_diff=squashed_diff,
+            submit_as=self.options.submit_as)
 
-        diff_review_url = review_url + 'diff/'
-
-        print('Review request #%s posted.' % request_id)
+        print('Review request #%s posted.' % review_request_id)
         print()
-        print(review_url)
-        print(diff_review_url)
+        print(review_request_url)
+        print('%sdiff/' % review_request_url)
 
         # Load the review up in the browser if requested to.
         if self.options.open_browser:
@@ -943,10 +1126,262 @@ class Post(Command):
                     # with AppleScript, which is broken on macOS 10.12.5. This
                     # was fixed in 10.12.6. See
                     # https://bugs.python.org/issue30392 for more discussion.
-                    open(['open', review_url])
+                    open(['open', review_request_url])
                 else:
                     import webbrowser
-                    webbrowser.open_new_tab(review_url)
+                    webbrowser.open_new_tab(review_request_url)
             except Exception as e:
                 logging.exception('Error opening review URL %s: %s',
-                                  review_url, e)
+                                  review_request_url, e)
+
+    def _should_post_with_history(self, server_supports_history=False):
+        """Determine whether or not we should post with history.
+
+        This method requires :py:meth:`setup_tool` to have been called.
+
+        Args:
+            server_supports_history (bool, optional):
+                Whether or not the Review Board server supports posting with
+                history.
+
+        Returns:
+            bool:
+            Whether or not we should post with history.
+
+        Raises:
+            rbtools.commands.CommandError:
+                Using history has been specifically requested, but either the
+                server or the tool does not support it.
+        """
+        with_history = False
+
+        if self.tool.supports_commit_history:
+            if self.options.with_history and not server_supports_history:
+                raise CommandError(
+                    'The Review Board server at %s does not support posting '
+                    'with the -H/--with-history command line option. Re-run  '
+                    'this command without it.')
+
+            with_history = (
+                server_supports_history and
+                (not self.options.squash_history or
+                 self.options.with_history)
+            )
+        elif self.options.with_history:
+            # We have specifically requested to use history, but the tool does
+            # not support it.
+            raise CommandError(
+                'The %s backend does not support review requests with history '
+                'using the -H/--with-history command line option.')
+
+        return with_history
+
+    def _get_review_request_to_update(self, repository_info, api_root,
+                                      api_client,
+                                      server_supports_history=False):
+        """Retrieve and return the review request to update.
+
+        This method requires :py:meth:`setup_tool` to have been called.
+
+        Args:
+            repository_info (rbtools.clients.RepositoryInfo):
+                The repository info.
+
+            api_root (rbtools.api.resources.RootResource):
+                The API root resource.
+
+            api_client (rbtools.api.client.RBClient):
+                The API client.
+
+            server_supports_history (bool, optional):
+                Whether or not the server supports posting with history.
+
+        Returns:
+            rbtools.api.resources.ReviewRequestResource:
+            The review request to update, or ``None`` if we are not updating an
+            existing review request.
+
+        Raises:
+            rbtools.commands.CommandError:
+                An error occurred while posting.
+        """
+        review_request = None
+        additional_fields = []
+
+        # If we are updating an existing review request, we need to know
+        # whether or not it was created with history support so that we can
+        # either (1) generate a list of history (if it was) or (2) generate
+        # just a diff.
+        if server_supports_history:
+            additional_fields.append('created_with_history')
+
+        if self.options.update and self.revisions:
+            try:
+                review_request = guess_existing_review_request(
+                    repository_info,
+                    self.options.repository_name,
+                    api_root,
+                    api_client,
+                    self.tool,
+                    self.revisions,
+                    guess_summary=False,
+                    guess_description=False,
+                    is_fuzzy_match_func=self._ask_review_request_match,
+                    submit_as=self.options.submit_as,
+                    additional_fields=additional_fields)
+            except ValueError as e:
+                raise CommandError(six.text_type(e))
+
+            if not review_request or not review_request.id:
+                raise CommandError('Could not determine existing review '
+                                   'request to update.')
+
+            self.options.rid = review_request.id
+        elif self.options.rid:
+            only_fields = [
+                'absolute_url',
+                'bugs_closed',
+                'id',
+                'status',
+                'public',
+            ]
+            only_fields += additional_fields
+
+            try:
+                review_request = api_root.get_review_request(
+                    review_request_id=self.options.rid,
+                    only_fields=','.join(only_fields),
+                    only_links='diffs,draft')
+            except APIError as e:
+                raise CommandError('Error getting review request %s: %s'
+                                   % (self.options.rid, e))
+
+        if review_request and review_request.status == 'submitted':
+            raise CommandError(
+                'Review request %s is marked as submitted. In order to '
+                'update it, please re-open the review request and try '
+                'again.'
+                % review_request.id)
+
+        return review_request
+
+    def _get_diff_history(self, extra_args):
+        """Compute and return the diff history of the selected revisions.
+
+        Args:
+            extra_args (list):
+                Extra arguments to pass to the underlying tool.
+
+        Returns:
+            DiffHistory:
+            The computed history.
+        """
+        history_entries = self.tool.get_commit_history(self.revisions)
+        base_commit_id = None
+        parent_diff = None
+
+        for i, history_entry in enumerate(history_entries):
+            revisions = {
+                'base': history_entry['parent_id'],
+                'tip': history_entry['commit_id'],
+            }
+
+            if i == 0 and 'parent_base' in self.revisions:
+                revisions['parent_base'] = self.revisions['parent_base']
+
+            diff_info = self.tool.diff(
+                revisions=revisions,
+                extra_args=extra_args,
+                include_files=self.options.include_files or [],
+                exclude_patterns=self.options.exclude_patterns or [],
+                with_parent_diff=(i == 0))
+
+            history_entry['diff'] = diff_info['diff']
+
+            if i == 0:
+                base_commit_id = diff_info.get('base_commit_id')
+                parent_diff = diff_info.get('parent_diff')
+
+        return DiffHistory(entries=history_entries,
+                           parent_diff=parent_diff,
+                           base_commit_id=base_commit_id)
+
+    def _get_squashed_diff(self, repository_info, extra_args):
+        """Return the squashed diff for the requested revisions.
+
+        Args:
+            repository_info (rbtools.clients.RepositoryInfo):
+                Information about the repository.
+
+            extra_args (list):
+                Extra arguments to pass to the underlying tool.
+
+        Returns:
+            SquashedDiff:
+            The squashed diff and associated metadata.
+        """
+        diff_info = self.tool.diff(
+            revisions=self.revisions,
+            include_files=self.options.include_files or [],
+            exclude_patterns=self.options.exclude_patterns or [],
+            extra_args=extra_args)
+
+        # If only certain files within a commit are being submitted for review,
+        # do not include the commit id. This prevents conflicts if multiple
+        # files from the same commit are posted for review separately.
+        if self.options.include_files or self.options.exclude_patterns:
+            diff_info['commit_id'] = None
+
+        if (repository_info.supports_changesets and
+            not self.options.diff_filename and
+            'changenum' in diff_info):
+            changenum = diff_info['changenum']
+        else:
+            changenum = self.tool.get_changenum(self.revisions)
+
+        return SquashedDiff(
+            diff=diff_info['diff'],
+            parent_diff=diff_info.get('parent_diff'),
+            base_commit_id=diff_info.get('base_commit_id'),
+            commit_id=diff_info.get('commit_id'),
+            changenum=changenum,
+            base_dir=self.options.basedir or repository_info.base_path)
+
+    def _post_diff_history(self, review_request, diff_history):
+        """Post the diff history to the review request.
+
+        Args:
+            review_request (rbtools.api.resource.ReviewRequestResource):
+                The review request to upload the diffs to.
+
+            diff_history (DiffHistory):
+                The diff history.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                An error occurred while communicating with the API.
+        """
+        draft = review_request.get_or_create_draft(only_fields='',
+                                                   only_links='draft_diffs')
+        diffs = draft.get_draft_diffs(only_fields='', only_links='')
+
+        if self.tool.capabilities.has_capability('diffs', 'base_commit_ids'):
+            base_commit_id = diff_history.base_commit_id
+        else:
+            base_commit_id = None
+
+        diff = diffs.create_empty(base_commit_id=base_commit_id,
+                                  only_fields='',
+                                  only_links='draft_commits')
+        commits = diff.get_draft_commits()
+
+        tqdm_kwargs = {
+            'bar_format': '{desc} {bar} [{n_fmt}/{total_fmt}]',
+            'desc': 'Uploading commits...',
+            'iterable': diff_history.entries,
+            'ncols': 80,
+        }
+
+        for history_entry in tqdm(**tqdm_kwargs):
+            commits.upload_commit(parent_diff=diff_history.parent_diff,
+                                  **history_entry)

@@ -7,6 +7,9 @@ import os
 import re
 import sys
 
+import six
+from six.moves import zip
+
 from rbtools.clients import PatchResult, SCMClient, RepositoryInfo
 from rbtools.clients.errors import (AmendError, MergeError, PushError,
                                     InvalidRevisionSpecError,
@@ -30,8 +33,11 @@ class GitClient(SCMClient):
     """
 
     name = 'Git'
+
+    supports_commit_history = True
     supports_diff_exclude_patterns = True
     supports_patch_revert = True
+
     can_amend_commit = True
     can_merge = True
     can_push_upstream = True
@@ -41,6 +47,9 @@ class GitClient(SCMClient):
     TYPE_GIT = 0
     TYPE_GIT_SVN = 1
     TYPE_GIT_P4 = 2
+
+    _NUL = '\x00'
+    _FIELD_SEP = '\x1f'
 
     def __init__(self, **kwargs):
         """Initialize the client.
@@ -571,7 +580,7 @@ class GitClient(SCMClient):
         return youngest_remote_commit
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
-             extra_args=[]):
+             extra_args=[], with_parent_diff=True):
         """Perform a diff using the given revisions.
 
         If no revisions are specified, this will do a diff of the contents of
@@ -599,6 +608,9 @@ class GitClient(SCMClient):
             extra_args (list, unused):
                 Additional arguments to be passed to the diff generation.
                 Unused for git.
+
+            with_parent_diff (bool, optional):
+                Whether or not to compute a parent diff.
 
         Returns:
             dict:
@@ -633,7 +645,7 @@ class GitClient(SCMClient):
                                     include_files,
                                     exclude_patterns)
 
-        if 'parent_base' in revisions:
+        if 'parent_base' in revisions and with_parent_diff:
             parent_diff_lines = self.make_diff(merge_base,
                                                revisions['parent_base'],
                                                revisions['base'],
@@ -1212,3 +1224,103 @@ class GitClient(SCMClient):
             The result from the execute call.
         """
         return execute(cmdline, cwd=self._git_toplevel, *args, **kwargs)
+
+    def get_commit_history(self, revisions):
+        """Return the commit history specified by the revisions.
+
+        Args:
+            revisions (dict):
+                A dictionary of revisions to generate history for, as returned
+                by :py:meth:`parse_revision_spec`.
+
+        Returns:
+            list of dict:
+            The list of history entries, in order. The dictionaries have the
+            following keys:
+
+            ``commit_id``:
+                The unique identifier of the commit.
+
+            ``parent_id``:
+                The unique identifier of the parent commit.
+
+            ``author_name``:
+                The name of the commit's author.
+
+            ``author_email``:
+                The e-mail address of the commit's author.
+
+            ``author_date``:
+                The date the commit was authored.
+
+            ``committer_name``:
+                The committer's name.
+
+            ``committer_email``:
+                The e-mail address of the committer.
+
+            ``committer_date``:
+                The date the commit was committed.
+
+            ``commit_message``:
+                The commit's message.
+
+        Raises:
+            rbtools.clients.errors.SCMError:
+                The history is non-linear or there is a commit with no parents.
+        """
+        log_fields = {
+            'commit_id': b'%H',
+            'parent_id': b'%P',
+            'author_name': b'%an',
+            'author_email': b'%ae',
+            'author_date': b'%ad',
+            'committer_name': b'%cn',
+            'committer_email': b'%ce',
+            'committer_date': b'%cd',
+            'commit_message': b'%B',
+        }
+
+        # 0x1f is the ASCII field separator. It is a non-printable character
+        # that should not appear in any field in `git log`.
+        log_format = b'%x1f'.join(six.itervalues(log_fields))
+
+        log_entries = execute(
+            [
+                self.git,
+                b'log',
+                b'-z',
+                b'--reverse',
+                b'--pretty=format:%s' % log_format,
+                b'--date=iso8601-strict',
+                b'%s..%s' % (bytes(revisions['base']),
+                             bytes(revisions['tip'])),
+            ],
+            ignore_errors=True,
+            none_on_ignored_error=True,
+            results_unicode=True)
+
+        if not log_entries:
+            return None
+
+        history = []
+        field_names = six.viewkeys(log_fields)
+
+        for log_entry in log_entries.split(self._NUL):
+            fields = log_entry.split(self._FIELD_SEP)
+            entry = dict(zip(field_names, fields))
+
+            parents = entry['parent_id'].split()
+
+            if len(parents) > 1:
+                raise SCMError(
+                    'The Git SCMClient only supports posting commit histories '
+                    'that are entirely linear.')
+            elif len(parents) == 0:
+                raise SCMError(
+                    'The Git SCMClient only supports posting commits that '
+                    'have exactly one parent.')
+
+            history.append(entry)
+
+        return history

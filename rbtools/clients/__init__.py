@@ -58,6 +58,8 @@ class SCMClient(object):
 
     name = None
 
+    #: Whether or not the SCM client can generate a commit history.
+    supports_commit_history = False
     supports_diff_extra_args = False
     supports_diff_exclude_patterns = False
     supports_patch_revert = False
@@ -248,6 +250,22 @@ class SCMClient(object):
             'commit_id': None,
             'base_commit_id': None,
         }
+
+    def get_commit_history(self, revisions):
+        """Return the commit history between the given revisions.
+
+        Derived classes must override this method if they support posting with
+        history.
+
+        Args:
+            revisions (dict):
+                The parsed revision spec to use to generate the history.
+
+        Returns:
+            list of dict:
+            The history entries.
+        """
+        raise NotImplementedError
 
     def _get_server_from_config(self, config, repository_info):
         """Return the Review Board server URL in the config.
