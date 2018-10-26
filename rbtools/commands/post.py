@@ -1057,9 +1057,16 @@ class Post(Command):
                 logging.debug('Generated parent diff size: %d bytes',
                               len(parent_diff))
 
-        if ((squashed_diff is not None and len(squashed_diff.diff) == 0) or
-            (diff_history is not None and len(diff_history.entries) == 0)):
-            raise CommandError("There don't seem to be any diffs!")
+        if squashed_diff is not None:
+            if not squashed_diff.diff:
+                raise CommandError("There don't seem to be any diffs!")
+        else:
+            for entry in diff_history.entries:
+                if not entry['diff']:
+                    raise CommandError(
+                        'Your history contains an empty diff at commit %s, '
+                        'which is not supported.'
+                        % entry['commit_id'])
 
         try:
             if squashed_diff:
@@ -1251,8 +1258,15 @@ class Post(Command):
         Returns:
             DiffHistory:
             The computed history.
+
+        Raises:
+            rbtools.commands.CommandError:
+                The diff history is empty.
         """
         history_entries = self.tool.get_commit_history(self.revisions)
+
+        if history_entries is None:
+            raise CommandError("There don't seem to be any diffs.")
 
         cumulative_diff_info = self.tool.diff(
             revisions=self.revisions,
