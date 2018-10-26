@@ -748,6 +748,50 @@ class DiffResource(ItemResource):
             'Accept': 'text/x-patch',
         })
 
+    @request_method_decorator
+    def finalize_commit_series(self, cumulative_diff, validation_info,
+                               parent_diff=None):
+        """Finalize a commit series.
+
+        Args:
+            cumulative_diff (bytes):
+                The cumulative diff of the entire commit series.
+
+            validation_info (unicode):
+                The validation information returned by validatin the last
+                commit in the series with the
+                :py:class:`ValidateDiffCommitResource`.
+
+            parent_diff (bytes, optional):
+                An optional parent diff.
+
+                This will be the same parent diff uploaded with each commit.
+
+        Returns:
+            DiffItemResource:
+            The finalized diff resource.
+        """
+        if not isinstance(cumulative_diff, bytes):
+            raise TypeError('cumulative_diff must be byte string, not %s'
+                            % type(cumulative_diff))
+
+        if parent_diff is not None and not isinstance(parent_diff, bytes):
+            raise TypeError('parent_diff must be byte string, not %s'
+                            % type(cumulative_diff))
+
+        request = HttpRequest(self.links['self']['href'],
+                              method='PUT')
+
+        request.add_field('finalize_commit_series', True)
+        request.add_file('cumulative_diff', 'cumulative_diff',
+                         cumulative_diff)
+        request.add_field('validation_info', validation_info)
+
+        if parent_diff is not None:
+            request.add_file('parent_diff', 'parent_diff', parent_diff)
+
+        return request
+
 
 @resource_mimetype('application/vnd.reviewboard.org.file')
 class FileDiffResource(ItemResource):

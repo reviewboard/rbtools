@@ -104,12 +104,16 @@ SquashedDiff = namedtuple(
 #:
 #:     validation_info (list of unicode):
 #:         Validation metadata from the commit validation resource.
+#:
+#:     cumulative_diff (bytes):
+#:         The cumulative diff of the entire history.
 DiffHistory = namedtuple(
     'History', (
         'entries',
         'parent_diff',
         'base_commit_id',
         'validation_info',
+        'cumulative_diff',
     ))
 
 
@@ -1249,8 +1253,10 @@ class Post(Command):
             The computed history.
         """
         history_entries = self.tool.get_commit_history(self.revisions)
-        base_commit_id = None
-        parent_diff = None
+
+        cumulative_diff_info = self.tool.diff(
+            revisions=self.revisions,
+            extra_args=extra_args)
 
         for i, history_entry in enumerate(history_entries):
             revisions = {
@@ -1258,26 +1264,21 @@ class Post(Command):
                 'tip': history_entry['commit_id'],
             }
 
-            if i == 0 and 'parent_base' in self.revisions:
-                revisions['parent_base'] = self.revisions['parent_base']
-
             diff_info = self.tool.diff(
                 revisions=revisions,
                 extra_args=extra_args,
                 include_files=self.options.include_files or [],
                 exclude_patterns=self.options.exclude_patterns or [],
-                with_parent_diff=(i == 0))
+                with_parent_diff=False)
 
             history_entry['diff'] = diff_info['diff']
 
-            if i == 0:
-                base_commit_id = diff_info.get('base_commit_id')
-                parent_diff = diff_info.get('parent_diff')
-
-        return DiffHistory(entries=history_entries,
-                           parent_diff=parent_diff,
-                           base_commit_id=base_commit_id,
-                           validation_info=None)
+        return DiffHistory(
+            base_commit_id=cumulative_diff_info.get('base_commit_id'),
+            cumulative_diff=cumulative_diff_info['diff'],
+            entries=history_entries,
+            parent_diff=cumulative_diff_info.get('parent_diff'),
+            validation_info=None)
 
     def _get_squashed_diff(self, repository_info, extra_args):
         """Return the squashed diff for the requested revisions.
@@ -1345,7 +1346,7 @@ class Post(Command):
 
         diff = diffs.create_empty(base_commit_id=base_commit_id,
                                   only_fields='',
-                                  only_links='draft_commits')
+                                  only_links='self,draft_commits')
         commits = diff.get_draft_commits()
 
         iterable = self._show_progress(
@@ -1358,6 +1359,11 @@ class Post(Command):
             commits.upload_commit(validation_info,
                                   parent_diff=diff_history.parent_diff,
                                   **history_entry)
+
+        diff.finalize_commit_series(
+            cumulative_diff=diff_history.cumulative_diff,
+            parent_diff=diff_history.parent_diff,
+            validation_info=diff_history.validation_info[-1])
 
     def _validate_squashed_diff(self, api_root, repository, squashed_diff):
         """Validate the diff to ensure that it can be parsed and files exist.
