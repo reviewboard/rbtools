@@ -7,6 +7,7 @@ import os
 import re
 import uuid
 
+import six
 from six.moves.urllib.parse import urlsplit, urlunparse
 
 from rbtools.clients import PatchResult, SCMClient, RepositoryInfo
@@ -28,12 +29,34 @@ class MercurialClient(SCMClient):
     """
 
     name = 'Mercurial'
-    supports_diff_exclude_patterns = True
-    can_branch = True
+
     can_bookmark = True
+    can_branch = True
+    supports_commit_history = True
+    supports_diff_exclude_patterns = True
 
     PRE_CREATION = '/dev/null'
     PRE_CREATION_DATE = 'Thu Jan 01 00:00:00 1970 +0000'
+    NO_PARENT = '0' * 40
+
+    # The ASCII field seperator.
+    _FIELD_SEP = b'\x1f'
+
+    # The ASCII field separator as an escape sequence.
+    #
+    # This is passed to Mercurial, where it is interpreted and transformed into
+    # the actual character.
+    _FIELD_SEP_ESC = br'\x1f'
+
+    # The ASCII record separator.
+    _RECORD_SEP = b'\x1e'
+
+    # The ASCII record separator as an escape sequence.
+    #
+    # This is passed to Mercurial, where it is interpreted and transformed into
+    # the actual character.
+    _RECORD_SEP_ESC = br'\x1e'
+
 
     def __init__(self, **kwargs):
         """Initialize the client.
@@ -133,6 +156,78 @@ class MercurialClient(SCMClient):
                     break
 
         self._initted = True
+
+    def get_commit_history(self, revisions):
+        """Return the commit history specified by the revisions.
+
+        Args:
+            revisions (dict):
+                A dictionary of revisions to generate history for, as returned
+                by :py:meth:`parse_revision_spec`.
+
+        Returns:
+            list of dict:
+            This list of history entries, in order.
+
+        Raises:
+            rbtools.clients.errors.SCMError:
+                The history is non-linear or there is a commit with no parents.
+        """
+        log_fields = {
+            'commit_id': b'{node}',
+            'parent_id': b'{p1node}',
+            'author_name': b'{author|person}',
+            'author_email': b'{author|email}',
+            'author_date': b'{date|rfc3339date}',
+            'parent2': b'{p2node}',
+            'commit_message': b'{desc}',
+        }
+        log_format = self._FIELD_SEP_ESC.join(six.itervalues(log_fields))
+
+        log_entries = execute(
+            [
+                b'hg',
+                b'log',
+                b'--template',
+                br'%s%s' % (log_format, self._RECORD_SEP_ESC),
+                b'-r',
+                b'%(base)s::%(tip)s and not %(base)s' % revisions,
+            ],
+            ignore_errors=True,
+            none_on_ignored_error=True,
+            results_unicode=True)
+
+        if not log_entries:
+            return None
+
+        history = []
+        field_names = six.viewkeys(log_fields)
+
+        # The ASCII record separator will be appended to every record, so if we
+        # attempt to split the entire output by the record separator, we will
+        # end up with an empty ``log_entry`` at the end, which will cause
+        # errors.
+        for log_entry in log_entries[:-1].split(self._RECORD_SEP):
+            fields = log_entry.split(self._FIELD_SEP)
+            entry = dict(zip(field_names, fields))
+
+            # We do not want `parent2` to be included in the entry because
+            # the entry's items are used as the keyword arguments to the
+            # method that uploads a commit and it would be unexpected.
+            if entry.pop('parent2') != self.NO_PARENT:
+                raise SCMError(
+                    'The Mercurial SCMClient only supports posting commit '
+                    'histories that are entirely linear.'
+                )
+            elif entry['parent_id'] == self.NO_PARENT:
+                raise SCMError(
+                    'The Mercurial SCMClient only supports posting commits '
+                    'that have exactly one parent.'
+                )
+
+            history.append(entry)
+
+        return history
 
     def get_repository_info(self):
         """Return the repository info object.
@@ -443,7 +538,7 @@ class MercurialClient(SCMClient):
         return b'\n\n'.join([desc.strip() for desc in descs])
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
-             extra_args=[]):
+             extra_args=[], with_parent_diff=True):
         """Perform a diff using the given revisions.
 
         Args:
@@ -461,6 +556,9 @@ class MercurialClient(SCMClient):
             extra_args (list, unused):
                 Additional arguments to be passed to the diff generation.
                 Unused for mercurial.
+
+            with_parent_diff (bool, optional):
+                Whether or not to include the parent diff in the result.
 
         Returns:
             dict:
@@ -500,7 +598,7 @@ class MercurialClient(SCMClient):
             diff_cmd + ['-r', revisions['base'], '-r', revisions['tip']],
             env=self._hg_env, log_output_on_error=False, results_unicode=False)
 
-        if 'parent_base' in revisions:
+        if with_parent_diff and 'parent_base' in revisions:
             base_commit_id = revisions['parent_base']
             parent_diff = self._execute(
                 diff_cmd + ['-r', base_commit_id, '-r', revisions['base']],
