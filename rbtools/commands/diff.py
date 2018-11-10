@@ -1,5 +1,7 @@
 from __future__ import print_function, unicode_literals
 
+import sys
+
 from rbtools.clients.errors import InvalidRevisionSpecError
 from rbtools.commands import Command, CommandError
 
@@ -71,5 +73,8 @@ class Diff(Command):
 
         diff = diff_info['diff']
 
+        if sys.version_info >= (3,0):
+            diff = diff.decode('utf-8')
+
         if diff:
-            print(diff.decode('utf-8'))
+            print(diff)
