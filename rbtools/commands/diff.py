@@ -72,4 +72,4 @@ class Diff(Command):
         diff = diff_info['diff']
 
         if diff:
-            print(diff)
+            print(diff.decode('utf-8'))
