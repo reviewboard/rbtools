@@ -564,6 +564,29 @@ class RootResource(ItemResource):
         return HttpRequest(url, query_args=kwargs)
 
 
+@resource_mimetype('application/vnd.reviewboard.org.commit')
+class DiffCommitItemResource(ItemResource):
+    """The commit resource-specific class."""
+
+    @request_method_decorator
+    def get_patch(self, **kwargs):
+        """Retrieve the actual diff file contents.
+
+        Args:
+            **kwargs (dict):
+                Query args to pass to
+                :py:meth:`~rbtools.api.request.HttpRequest.__init__`.
+
+        Returns:
+            ItemResource:
+            A resource payload whose :py:attr:`~ItemResource.data` attribute is
+            the requested patch.
+        """
+        return HttpRequest(self._url, query_args=kwargs, headers={
+            'Accept': 'text/x-patch',
+        })
+
+
 @resource_mimetype('application/vnd.reviewboard.org.draft-commit')
 class DraftDiffCommitItemResource(ItemResource):
     """The draft commit resource-specific class."""

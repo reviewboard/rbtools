@@ -1,9 +1,16 @@
+"""The rbt patch command."""
+
 from __future__ import print_function, unicode_literals
+
+import logging
 
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option
 from rbtools.utils.commands import extract_commit_message
 from rbtools.utils.filesystem import make_tempfile
+
+
+logger = logging.getLogger(__name__)
 
 
 class Patch(Command):
@@ -57,39 +64,161 @@ class Patch(Command):
                     'This feature does not work with Bazaar or Mercurial '
                     'repositories.',
                added_in='0.7.3'),
+        Option('--commit-id',
+               dest='commit_id',
+               default=None,
+               help='The commit ID of the patch to apply.\n'
+                    'This only applies to review requests created with commit '
+                    'history.'),
         Command.server_options,
         Command.repository_options,
     ]
 
-    def get_patch(self, request_id, api_root, diff_revision=None):
-        """Return the diff as a string, the used diff revision and its basedir.
+    def __init__(self):
+        """Initialize the patch command."""
+        super(Patch, self).__init__()
+
+        self.tool = None
+
+    def get_patch(self, tool, api_root, review_request_id, diff_revision=None,
+                  commit_id=None):
+        """Return the requested patch and its metadata.
 
         If a diff revision is not specified, then this will look at the most
         recent diff.
-        """
-        try:
-            diffs = api_root.get_diffs(review_request_id=request_id)
-        except APIError as e:
-            raise CommandError('Error getting diffs: %s' % e)
 
-        # Use the latest diff if a diff revision was not given.
-        # Since diff revisions start a 1, increment by one, and
-        # never skip a number, the latest diff revisions number
-        # should be equal to the number of diffs.
+        Args:
+            tool (rbtools.clients.SCMClient):
+                The SCM tool for the current repository.
+
+            api_root (rbtools.api.resource.RootResource):
+                The root resource of the Review Board server.
+
+            request_id (int):
+                The ID of the review request.
+
+            diff_revision (int, optional):
+                The diff revision to apply.
+
+                The latest revision will be used if not provided.
+
+            commit_id (unicode, optional):
+                The specific commit to apply.
+
+                This argument is required if the review request was created
+                with commit history.
+
+        Returns:
+            dict:
+            A dictionary with the following keys:
+
+            ``basedir`` (py:class:`unicode`):
+                The base directory of the returned patch.
+
+            ``diff`` (py:class:`bytes`):
+                The actual patch contents.
+
+            ``revision`` (py:class:`int`):
+                The revision of the returned patch.
+
+            ``commit_meta`` (:py:class:`dict`):
+                Metadata about the requested commit if one was requested.
+                Otherwise, this will be ``None``.
+
+        Raises:
+            rbtools.command.CommandError:
+                One of the following occurred:
+
+                * The patch could not be retrieved or does not exist
+                * The review request was created with history support and
+                  ``commit_id`` was not provided.
+                * The review request was created without history support and
+                  ``commit_id`` was provided.
+                * The requested commit does not exist.
+        """
+        server_supports_history = tool.capabilities.has_capability(
+            'review_requests', 'supports_history')
+
+        if commit_id is not None and not server_supports_history:
+            logger.warn('This server does not support review requests with '
+                        'history; ignoring --commit-id=...')
+            commit_id = None
+
         if diff_revision is None:
+            try:
+                diffs = api_root.get_diffs(review_request_id=review_request_id,
+                                           only_fields='', only_links='')
+            except APIError as e:
+                raise CommandError('Error getting diffs: %s' % e)
+
+            # Use the latest diff if a diff revision was not given.
+            # Since diff revisions start a 1, increment by one, and
+            # never skip a number, the latest diff revisions number
+            # should be equal to the number of diffs.
             diff_revision = diffs.total_results
 
-        try:
-            diff = diffs.get_item(diff_revision)
-            diff_body = diff.get_patch().data
-            base_dir = getattr(diff, 'basedir', None) or ''
-        except APIError:
-            raise CommandError('The specified diff revision does not exist.')
+        result = {
+            'revision': diff_revision,
+        }
 
-        return diff_body, diff_revision, base_dir
+        if commit_id is None:
+            try:
+                diff = api_root.get_diff(review_request_id=review_request_id,
+                                         diff_revision=diff_revision)
+            except APIError:
+                raise CommandError('The specified diff revision does not '
+                                   'exist.')
+
+            commit_count = getattr(diff, 'commit_count', 0)
+
+            if commit_count > 0:
+                raise CommandError('A commit ID is required.')
+
+            patch_content = diff.get_patch().data
+            commit_meta = None
+            base_dir = getattr(diff, 'basedir', '')
+        else:
+            try:
+                commit = api_root.get_commit(
+                    review_request_id=review_request_id,
+                    diff_revision=diff_revision,
+                    commit_id=commit_id)
+            except APIError:
+                # Since we skipped fetching the diff resource earlier, we need
+                # to see if the diff exists so we can report the correct error.
+                try:
+                    api_root.get_diff(review_request_id=review_request_id,
+                                      diff_revision=diff_revision)
+                except APIError:
+                    raise CommandError('The specified diff revision does not '
+                                       'exist.')
+                else:
+                    raise CommandError('The specified commit does not exist.')
+
+            # DiffSets on review requests created with history support *always*
+            # have an empty base dir.
+            base_dir = ''
+            commit_meta = {
+                'author_date': commit.author_date,
+                'author_email': commit.author_email,
+                'author_name': commit.author_name,
+                'committer_date': commit.committer_date,
+                'commiter_email': commit.committer_email,
+                'committer_name': commit.committer_name,
+                'message': commit.commit_message,
+            }
+            patch_content = commit.get_patch().data
+
+        result.update({
+            'commit_meta': commit_meta,
+            'diff': patch_content,
+            'base_dir': base_dir,
+        })
+
+        return result
 
     def apply_patch(self, repository_info, tool, request_id, diff_revision,
-                    diff_file_path, base_dir, revert=False):
+                    diff_file_path, base_dir, revert=False, meta=None):
         """Apply patch patch_file and display results to user."""
         if revert:
             print('Patch is being reverted from request %s with diff revision '
@@ -147,19 +276,18 @@ class Patch(Command):
 
             return True
 
-    def main(self, request_id):
+    def main(self, review_request_id):
         """Run the command."""
+        repository_info, tool = self.initialize_scm_tool(
+            client_name=self.options.repository_type)
+
         if self.options.patch_stdout and self.options.server:
             server_url = self.options.server
         else:
-            repository_info, tool = self.initialize_scm_tool(
-                client_name=self.options.repository_type)
-
+            server_url = self.get_server_url(repository_info, tool)
             if self.options.revert_patch and not tool.supports_patch_revert:
                 raise CommandError('The %s backend does not support reverting '
                                    'patches.' % tool.name)
-
-            server_url = self.get_server_url(repository_info, tool)
 
         api_client, api_root = self.get_api(server_url)
 
@@ -171,10 +299,16 @@ class Patch(Command):
                 api_root)
 
         # Get the patch, the used patch ID and base dir for the diff
-        diff_body, diff_revision, base_dir = self.get_patch(
-            request_id,
+        patch_data = self.get_patch(
+            tool,
             api_root,
-            self.options.diff_revision)
+            review_request_id,
+            self.options.diff_revision,
+            self.options.commit_id)
+
+        diff_body = patch_data['diff']
+        diff_revision = patch_data['revision']
+        base_dir = patch_data['base_dir']
 
         if self.options.patch_stdout:
             if isinstance(diff_body, bytes):
@@ -195,24 +329,38 @@ class Patch(Command):
 
             tmp_patch_file = make_tempfile(diff_body)
 
-            success = self.apply_patch(repository_info, tool, request_id,
-                                       diff_revision, tmp_patch_file, base_dir,
-                                       revert=self.options.revert_patch)
+            success = self.apply_patch(
+                repository_info, tool, review_request_id, diff_revision,
+                tmp_patch_file, base_dir, revert=self.options.revert_patch)
 
             if not success:
                 raise CommandError('Could not apply patch')
 
             if self.options.commit or self.options.commit_no_edit:
-                try:
-                    review_request = api_root.get_review_request(
-                        review_request_id=request_id,
-                        force_text_type='plain')
-                except APIError as e:
-                    raise CommandError('Error getting review request %s: %s'
-                                       % (request_id, e))
+                if patch_data['commit_meta'] is not None:
+                    # We are patching a commit so we already have the metadata
+                    # required without making additional HTTP requests.
+                    meta = patch_data['commit_meta']
+                    message = meta['message']
 
-                message = extract_commit_message(review_request)
-                author = review_request.get_submitter()
+                    # Fun fact: object does not have a __dict__ so you cannot
+                    # call setattr() on them. We need this ability so we are
+                    # creating a type that does.
+                    author = type('Author', (object,), {})()
+                    author.fullname = meta['author_name']
+                    author.email = meta['author_email']
+
+                else:
+                    try:
+                        review_request = api_root.get_review_request(
+                            review_request_id=review_request_id,
+                            force_text_type='plain')
+                    except APIError as e:
+                        raise CommandError('Error getting review request %s: %s'
+                                           % (request_id, e))
+
+                    message = extract_commit_message(review_request)
+                    author = review_request.get_submitter()
 
                 try:
                     tool.create_commit(message, author,

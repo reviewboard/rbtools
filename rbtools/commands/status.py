@@ -14,10 +14,11 @@ from rbtools.utils.users import get_username
 class Status(Command):
     """Display review requests for the current repository."""
 
+
     name = 'status'
     author = 'The Review Board Project'
     description = 'Output a list of your pending review requests.'
-    args = ''
+    args = '[review-request [revision]]'
     option_list = [
         Option('--format',
                dest='format',
