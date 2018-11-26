@@ -805,12 +805,14 @@ class PerforceClient(SCMClient):
             depot_file = f['depotFile']
             local_file = self._depot_to_local(depot_file)
             new_depot_file = ''
+
             try:
                 base_revision = int(f['rev'])
             except ValueError:
                 # For actions like deletes, there won't be any "current
                 # revision". Just pass through whatever was there before.
                 base_revision = f['rev']
+
             action = f['action']
 
             if ((depot_include_files and
@@ -1634,11 +1636,13 @@ class PerforceClient(SCMClient):
                   % (old_file.encode('utf-8'),
                      new_file.encode('utf-8'))]
 
-        if dl == [] or dl[0].startswith(b'Binary files '):
+        is_binary = dl != [] and dl[0].startswith(b'Binary files ')
+
+        if dl == [] or is_binary:
             is_empty_and_changed = (self.supports_empty_files() and
                                     changetype_short in ('A', 'D'))
 
-            if dl == [] and (is_move or is_empty_and_changed):
+            if (dl == [] and (is_move or is_empty_and_changed)) or is_binary:
                 line = (b'==== %s#%d ==%s== %s ====\n'
                         % (depot_file.encode('utf-8'),
                            base_revision,

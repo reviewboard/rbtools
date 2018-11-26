@@ -1078,8 +1078,20 @@ class GitClient(SCMClient):
         elif files:
             self._execute(['git', 'add'] + files)
 
-        self._execute(['git', 'commit', '-m', modified_message,
-                       '--author="%s <%s>"' % (author.fullname, author.email)])
+        cmd = ['git', 'commit', '-m', modified_message]
+
+        try:
+            cmd.append('--author="%s <%s>"'
+                       % (author.fullname, author.email))
+        except AttributeError:
+            # Users who have marked their profile as private won't include the
+            # fullname or email fields in the API payload. Just commit as the
+            # user running RBTools.
+            logging.warning('The author has marked their Review Board profile '
+                            'information as private. Committing without '
+                            'author attribution.')
+
+        self._execute(cmd)
 
     def delete_branch(self, branch_name, merged_only=True):
         """Delete the specified branch.

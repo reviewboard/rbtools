@@ -3,6 +3,8 @@ from __future__ import print_function, unicode_literals
 from rbtools.clients.errors import InvalidRevisionSpecError
 from rbtools.commands import Command, CommandError
 
+import six
+
 
 class Diff(Command):
     """Prints a diff to the terminal."""
@@ -72,4 +74,7 @@ class Diff(Command):
         diff = diff_info['diff']
 
         if diff:
-            print(diff)
+            if six.PY2:
+                print(diff)
+            else:
+                print(diff.decode('utf-8'))

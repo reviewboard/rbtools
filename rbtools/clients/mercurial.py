@@ -716,8 +716,17 @@ class MercurialClient(SCMClient):
         else:
             modified_message = message
 
-        hg_command = ['hg', 'commit', '-m', modified_message,
-                      '-u %s <%s>' % (author.fullname, author.email)]
+        hg_command = ['hg', 'commit', '-m', modified_message]
+
+        try:
+            hg_command.append('-u %s <%s>' % (author.fullname, author.email))
+        except AttributeError:
+            # Users who have marked their profile as private won't include the
+            # fullname or email fields in the API payload. Just commit as the
+            # user running RBTools.
+            logging.warning('The author has marked their Review Board profile '
+                            'information as private. Committing without '
+                            'author attribution.')
 
         execute(hg_command + files)
 

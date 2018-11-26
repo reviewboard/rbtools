@@ -7,6 +7,8 @@ import sys
 
 import six
 
+from rbtools.utils.encoding import force_unicode
+
 
 def log_command_line(fmt, command):
     """Log a command line.
@@ -21,9 +23,7 @@ def log_command_line(fmt, command):
     # While most of the subprocess library can deal with bytes objects in
     # command lines, list2cmdline can't. Decode each part if necessary.
     logging.debug(fmt, subprocess.list2cmdline([
-        part.decode('utf-8') if isinstance(part, bytes)
-        else part
-        for part in command
+        force_unicode(part) for part in command
     ]))
 
 
@@ -131,7 +131,7 @@ def execute(command,
 
     if results_unicode:
         # Popen on Python 2 doesn't support the ``encoding`` parameter, so we
-        # have to use ``universal_newlines``.
+        # have to use ``universal_newlines`` and then decode later.
         if six.PY3:
             popen_encoding_args['encoding'] = 'utf-8'
         else:
@@ -165,6 +165,9 @@ def execute(command,
                              **popen_encoding_args)
 
     data, errors = p.communicate()
+
+    if results_unicode and six.PY2:
+        data = force_unicode(data)
 
     if split_lines:
         data = data.splitlines(True)
