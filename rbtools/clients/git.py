@@ -138,10 +138,12 @@ class GitClient(SCMClient):
             # No revisions were passed in. Start with HEAD, and find the
             # tracking branch automatically.
             head_ref = self._rev_parse(self.get_head_ref())[0]
-            parent_ref = self._rev_parse(self._get_parent_branch())[0]
+            parent_branch = self._get_parent_branch()
+            remote = self._find_remote(parent_branch)
+            parent_ref = self._rev_parse(parent_branch)[0]
 
             merge_base = self._rev_list_youngest_remote_ancestor(
-                parent_ref, 'origin')
+                parent_ref, remote)
 
             result = {
                 'base': parent_ref,
@@ -207,8 +209,11 @@ class GitClient(SCMClient):
                 raise InvalidRevisionSpecError(
                     'Unexpected result while parsing revision spec')
 
+            parent_branch = self._get_parent_branch()
+            remote = self._find_remote(parent_branch)
             parent_base = self._rev_list_youngest_remote_ancestor(
-                result['base'], 'origin')
+                result['base'], remote)
+
             if parent_base != result['base']:
                 result['parent_base'] = parent_base
         else:
@@ -490,16 +495,11 @@ class GitClient(SCMClient):
         elif self._type == self.TYPE_GIT:
             if self._head_ref:
                 short_head = self._strip_heads_prefix(self._head_ref)
-                merge = self._execute(
+                merge = self._strip_heads_prefix(self._execute(
                     [self.git, 'config', '--get',
                      'branch.%s.merge' % short_head],
-                    ignore_errors=True).strip()
-                remote = self._execute(
-                    [self.git, 'config', '--get',
-                     'branch.%s.remote' % short_head],
-                    ignore_errors=True).strip()
-
-                merge = self._strip_heads_prefix(merge)
+                    ignore_errors=True).strip())
+                remote = self._get_remote(short_head)
 
                 if remote and remote != '.' and merge:
                     return '%s/%s' % (remote, merge)
@@ -1164,19 +1164,14 @@ class GitClient(SCMClient):
             rbtools.client.errors.PushError:
                 The branch was unable to be pushed.
         """
-        rc, output = self._execute(
-            ['git', 'config', '--get', 'branch.%s.remote' % local_branch],
-            ignore_errors=True,
-            return_error_code=True)
+        remote = self._get_remote(local_branch)
 
-        if rc:
+        if remote is None:
             raise PushError('Could not determine remote for branch "%s".'
                             % local_branch)
-        else:
-            origin = output.strip()
 
         rc, output = self._execute(
-            ['git', 'pull', '--rebase', origin, local_branch],
+            ['git', 'pull', '--rebase', remote, local_branch],
             ignore_errors=True,
             return_error_code=True)
 
@@ -1184,7 +1179,7 @@ class GitClient(SCMClient):
             raise PushError('Could not pull changes from upstream.')
 
         rc, output = self._execute(
-            ['git', 'push', origin, local_branch],
+            ['git', 'push', remote, local_branch],
             ignore_errors=True,
             return_error_code=True)
 
@@ -1224,3 +1219,74 @@ class GitClient(SCMClient):
             The result from the execute call.
         """
         return execute(cmdline, cwd=self._git_toplevel, *args, **kwargs)
+
+    def _get_remote(self, local_branch):
+        """Return the remote for a given branch.
+
+        Args:
+            local_branch (unicode):
+                The name of the local branch.
+
+        Returns:
+            unicode:
+            The name of the remote corresponding to the local branch. May
+            return None if there is no remote.
+        """
+        rc, output = self._execute(
+            ['git', 'config', '--get', 'branch.%s.remote' % local_branch],
+            ignore_errors=True,
+            return_error_code=True)
+
+        if rc == 0:
+            return output.strip()
+        else:
+            return None
+
+    def _find_remote(self, local_or_remote_branch):
+        """Find the remote given a branch name.
+
+        This takes in a branch name which can be either a local or remote
+        branch, and attempts to determine the name of the remote.
+
+        Args:
+            local_or_remote_branch (unicode):
+                The name of a branch to find the remote for.
+
+        Returns:
+            unicode:
+            The name of the remote for the given branch. Returns ``origin`` if
+            no associated remote can be found.
+
+        Raises:
+            rbtools.clients.errors.SCMError:
+                The current repository did not have any remotes configured.
+        """
+        all_remote_branches = [
+            branch.strip()
+            for branch in self._execute(['git', 'branch', '--remotes'],
+                                        split_lines=True)
+        ]
+
+        if local_or_remote_branch in all_remote_branches:
+            return local_or_remote_branch.split('/', 1)[0]
+
+        remote = self._get_remote(local_or_remote_branch)
+
+        if remote:
+            return remote
+
+        all_remotes = self._execute(['git', 'remote'], split_lines=True)
+
+        if len(all_remotes) >= 1:
+            # We prefer "origin" if it's present, otherwise just choose at
+            # random.
+            if 'origin' in all_remotes:
+                return 'origin'
+            else:
+                logging.warning('Could not determine specific upstream remote '
+                                'to use for diffs. We recommend setting '
+                                'TRACKING_BRANCH in reviewboardrc to your '
+                                'nearest upstream remote branch.')
+                return all_remotes[0]
+        else:
+            raise SCMError('This clone has no configured remotes.')
