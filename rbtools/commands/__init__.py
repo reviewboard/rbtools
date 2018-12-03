@@ -893,6 +893,7 @@ class Command(object):
             server_url = '%s%s' % ('http://', server_url)
 
         api_client = self._make_api_client(server_url)
+        api_root = None
 
         try:
             api_root = api_client.get_root()
@@ -900,7 +901,28 @@ class Command(object):
             raise CommandError('Could not reach the Review Board '
                                'server at %s: %s' % (server_url, e))
         except APIError as e:
-            raise CommandError('Unexpected API Error: %s' % e)
+            if e.http_status != 404:
+                raise CommandError('Unexpected API Error: %s' % e)
+
+        # If we either couldn't find an API endpoint or its contents don't
+        # appear to be from Review Board, we should provide helpful
+        # instructions to the user.
+        if api_root is None or not hasattr(api_root, 'get_review_requests'):
+            if server_url.rstrip('/') == 'https://rbcommons.com':
+                raise CommandError(
+                    'RBTools must be configured to point to your RBCommons '
+                    'team account. For example: '
+                    'https://rbcommons.com/s/<myteam>/')
+            elif server_url.startswith('https://rbcommons.com/s/'):
+                raise CommandError(
+                    'Your configured RBCommons team account could not be '
+                    'found. Make sure the team name is correct and the team '
+                    'is still active.')
+            else:
+                raise CommandError(
+                    'The configured Review Board server URL (%s) does not '
+                    'appear to be correct.'
+                    % server_url)
 
         return api_client, api_root
 
