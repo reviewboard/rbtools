@@ -564,6 +564,13 @@ class ReviewBoardServer(object):
 
     def process_error(self, http_status, data):
         """Processes an error, raising an APIError with the information."""
+        # In Python 3, the data can be bytes, not str
+        # and json.loads explicitly requires decoded strings
+        try:
+            data = data.decode('utf-8')
+        except AttributeError:  # Already a string
+            pass
+
         try:
             rsp = json_loads(data)
 

@@ -26,6 +26,12 @@ DEFAULT_DECODER = DefaultDecoder
 
 
 def JsonDecoder(payload):
+    # In Python 3, the payload can be bytes, not str
+    # and json.loads explicitly requires decoded strings
+    try:
+        payload = payload.decode('utf-8')
+    except AttributeError:  # Already a string
+        pass
     return json.loads(payload)
 
 

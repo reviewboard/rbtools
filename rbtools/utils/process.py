@@ -130,9 +130,9 @@ def execute(command,
     popen_encoding_args = {}
 
     if results_unicode:
-        # Popen on Python 2 doesn't support the ``encoding`` parameter, so we
-        # have to use ``universal_newlines`` and then decode later.
-        if six.PY3:
+        # Popen before Python 3.6 doesn't support the ``encoding`` parameter,
+        # so we have to use ``universal_newlines`` and then decode later.
+        if six.PY3 and sys.version_info.minor >= 6:
             popen_encoding_args['encoding'] = 'utf-8'
         else:
             popen_encoding_args['universal_newlines'] = True
