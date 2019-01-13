@@ -492,7 +492,11 @@ class ListResource(Resource):
 
         while True:
             yield page
-            page = page.get_next()
+
+            try:
+                page = page.get_next()
+            except StopIteration:
+                break
 
     @property
     def all_items(self):

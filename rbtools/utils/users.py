@@ -45,8 +45,8 @@ def get_authenticated_session(api_client, api_root, auth_required=False,
                      api_client.domain)
 
         for i in range(num_retries + 1):
-            username = get_input('Username: ')
-            password = get_pass('Password: ')
+            username = get_input('Username: ', require=True)
+            password = get_pass('Password: ', require=True)
             api_client.login(username, password)
 
             try:

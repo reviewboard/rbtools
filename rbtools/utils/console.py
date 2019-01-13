@@ -11,37 +11,69 @@ from six.moves import input
 from rbtools.utils.filesystem import make_tempfile
 
 
-def get_input(prompt):
+def get_input(prompt, require=False):
     """Ask the user for input.
 
     Args:
         prompt (unicode):
             The text to prompt the user with.
 
+        require (bool, optional):
+            Whether to require a result. If ``True``, this will keep prompting
+            until a non-empty value is entered.
+
     Returns:
         unicode:
         The entered user data.
     """
-    # `input`'s usual prompt gets written to stdout, which results in really
-    # crummy behavior if stdout is redirected to a file. Because this is often
-    # paired with getpass (entering a username/password combination), we mimic
-    # the behavior there, writing the prompt to stderr.
-    sys.stderr.write(str(prompt))
-    return input()
+    def _get_input():
+        # `input`'s usual prompt gets written to stdout, which results in
+        # really crummy behavior if stdout is redirected to a file. Because
+        # this is often paired with getpass (entering a username/password
+        # combination), we mimic the behavior there, writing the prompt to
+        # stderr.
+        sys.stderr.write(prompt)
+        return input()
+
+    prompt = str(prompt)
+
+    if require:
+        value = None
+
+        while not value:
+            value = _get_input()
+    else:
+        value = _get_input()
+
+    return value
 
 
-def get_pass(prompt):
+def get_pass(prompt, require=False):
     """Ask the user for a password.
 
     Args:
         prompt (unicode):
             The text to prompt the user with.
 
+        require (bool, optional):
+            Whether to require a result. If ``True``, this will keep prompting
+            until a non-empty value is entered.
+
     Returns:
         bytes:
         The entered password.
     """
-    return getpass.getpass(str(prompt))
+    prompt = str(prompt)
+
+    if require:
+        password = None
+
+        while not password:
+            password = getpass.getpass(prompt)
+    else:
+        password = getpass.getpass(prompt)
+
+    return password
 
 
 def confirm(question):
