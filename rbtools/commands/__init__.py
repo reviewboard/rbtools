@@ -858,7 +858,7 @@ class Command(object):
 
         print()
 
-        return get_pass('Token: ')
+        return get_pass('Token: ', require=True)
 
     def _make_api_client(self, server_url):
         """Return an RBClient object for the server.

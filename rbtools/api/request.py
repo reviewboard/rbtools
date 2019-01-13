@@ -257,83 +257,162 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
     a mobile device. In this case, the client will prompt up to a set
     number of times until a valid token is entered.
     """
+
     OTP_TOKEN_HEADER = 'X-ReviewBoard-OTP'
-    MAX_OTP_TOKEN_ATTEMPTS = 5
+    MAX_OTP_TOKEN_ATTEMPTS = 2
 
     def __init__(self, *args, **kwargs):
+        """Initialize the Basic Auth handler.
+
+        Args:
+            *args (tuple):
+                Positional arguments to pass to the parent class.
+
+            **kwargs (dict):
+                Keyword arguments to pass to the parent class.
+        """
         HTTPBasicAuthHandler.__init__(self, *args, **kwargs)
-        self._retried = False
-        self._lasturl = ''
-        self._needs_otp_token = False
+
+        self._tried_login = False
+        self._otp_token_method = None
         self._otp_token_attempts = 0
+        self._last_otp_token = None
 
-    def retry_http_basic_auth(self, host, request, realm, *args, **kwargs):
-        if self._lasturl != host:
-            self._retried = False
+    def http_error_auth_reqed(self, authreq, host, req, headers):
+        """Handle an HTTP 401 Unauthorized from an API request.
 
-        self._lasturl = host
+        This will start by checking whether a two-factor authentication
+        token is required by the server, and which method it will be sent
+        by (SMS or token generator application), before handing back to the
+        parent class, which will then call into our custom
+        :py:meth:`retry_http_basic_auth`.
 
-        if self._retried:
+        Args:
+            authreq (unicode):
+                The authentication request type.
+
+            host (unicode):
+                The URL being accessed.
+
+            req (rbtools.api.request.Request):
+                The API request being made.
+
+            headers (dict):
+                The headers sent in the Unauthorized error response.
+
+        Returns:
+            httplib.HTTPResponse:
+            If attempting another request, this will be the HTTP response
+            from that request. This will be ``None`` if not making another
+            request.
+
+        Raises:
+            urllib2.URLError:
+                The HTTP request resulted in an error. If this is an
+                :http:`401`, it may be handled by this class again.
+        """
+        otp_header = headers.get(self.OTP_TOKEN_HEADER, '')
+
+        if otp_header and otp_header.startswith('required'):
+            try:
+                self._otp_token_method = otp_header.split(';')[1].strip()
+            except IndexError:
+                logging.error('Invalid %s header value: "%s". This header '
+                              'is needed for two-factor authentication to '
+                              'work. Please report this!',
+                              self.OTP_TOKEN_HEADER, otp_header)
+                return None
+
+        return HTTPBasicAuthHandler.http_error_auth_reqed(
+            self, authreq, host, req, headers)
+
+    def retry_http_basic_auth(self, host, request, realm):
+        """Attempt another HTTP Basic Auth request.
+
+        This will determine if another request should be made (based on
+        previous attempts and 2FA requirements. Based on this, it may make
+        another attempt.
+
+        Args:
+            host (unicode):
+                The URL being accessed.
+
+            request (rbtools.api.request.Request):
+                The API request being made.
+
+            realm (unicode):
+                The Basic Auth realm, which will be used to look up any
+                stored passwords.
+
+        Returns:
+            httplib.HTTPResponse:
+            If attempting another request, this will be the HTTP response
+            from that request. This will be ``None`` if not making another
+            request.
+
+        Raises:
+            urllib2.URLError:
+                The HTTP request resulted in an error. If this is an
+                :http:`401`, it may be handled by this class again.
+        """
+        # First, check if we even want to try again. If two-factor
+        # authentication is disabled and we've made one username/password
+        # attempt, or it's enabled and we've made too many 2FA token attempts,
+        # we're done.
+        if (self._otp_token_attempts > self.MAX_OTP_TOKEN_ATTEMPTS or
+            (not self._otp_token_method and self._tried_login)):
             return None
 
-        self._retried = True
-
-        response = self._do_http_basic_auth(host, request, realm)
-
-        if response and response.code != UNAUTHORIZED:
-            self._retried = False
-
-        return response
-
-    def _do_http_basic_auth(self, host, request, realm):
-        user, password = self.passwd.find_user_password(realm, host)
+        # Next, figure out what credentials we'll be working with.
+        if self._otp_token_attempts > 0:
+            # We've made at least one 2FA attempt. Reuse the login and
+            # password so we don't prompt for it again.
+            user = self.passwd.rb_user
+            password = self.passwd.rb_pass
+        else:
+            # We don't have a login and password recorded for this request.
+            # Request one from the user.
+            user, password = self.passwd.find_user_password(realm, host)
 
         if password is None:
             return None
 
+        # If the response had sent a X-ReviewBoard-OTP header stating that
+        # a 2FA token is required, request it from the user.
+        if self._otp_token_method:
+            otp_token = (
+                self.passwd.get_otp_token(request.get_full_url(),
+                                          self._otp_token_method)
+                .encode('utf-8')
+            )
+        else:
+            otp_token = None
+
+        # Prepare some auth headers and then check if we've already made an
+        # attempt with them.
         raw = '%s:%s' % (user, password)
         auth = b'Basic %s' % base64.b64encode(raw.encode('utf-8')).strip()
 
-        if (request.headers.get(self.auth_header, None) == auth and
-            (not self._needs_otp_token or
-             self._otp_token_attempts > self.MAX_OTP_TOKEN_ATTEMPTS)):
-            # We've already tried with these credentials. No point
-            # trying again.
+        if (request.get_header(self.auth_header) == auth and
+            (not otp_token or otp_token == self._last_otp_token)):
+            # We've already tried with these credentials/token, and the
+            # attempt failed. No point trying again and wasting a login
+            # attempt.
             return None
 
+        # Based on the above, set the headers for the next login attempt and
+        # try again. If it fails, we'll end up back in http_error_auth_reqed(),
+        # starting again but with the recorded state.
         request.add_unredirected_header(self.auth_header, auth.decode('utf-8'))
 
-        try:
-            response = self.parent.open(request, timeout=request.timeout)
-            return response
-        except HTTPError as e:
-            if e.code == UNAUTHORIZED:
-                headers = e.info()
-                otp_header = headers.get(self.OTP_TOKEN_HEADER, '')
+        if otp_token:
+            request.add_unredirected_header(self.OTP_TOKEN_HEADER, otp_token)
+            self._otp_token_attempts += 1
+            self._last_otp_token = otp_token
 
-                if otp_header.startswith('required'):
-                    self._needs_otp_token = True
+        self._tried_login = True
 
-                    # The server has requested a one-time password token, sent
-                    # through an external channel (cell phone or application).
-                    # Request this token from the user.
-                    required, token_method = otp_header.split(';')
-
-                    token = self.passwd.get_otp_token(request.get_full_url(),
-                                                      token_method.strip())
-
-                    if not token:
-                        return None
-
-                    request.add_unredirected_header(self.OTP_TOKEN_HEADER,
-                                                    token)
-                    self._otp_token_attempts += 1
-
-                    return self._do_http_basic_auth(host, request, realm)
-
-            raise
-
-        return None
+        return self.parent.open(request, timeout=request.timeout)
 
 
 class ReviewBoardHTTPPasswordMgr(HTTPPasswordMgr):
