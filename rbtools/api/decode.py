@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 import json
 
 from rbtools.api.utils import parse_mimetype
+from rbtools.utils.encoding import force_unicode
 
 
 DECODER_MAP = {}
@@ -26,7 +27,9 @@ DEFAULT_DECODER = DefaultDecoder
 
 
 def JsonDecoder(payload):
-    return json.loads(payload)
+    # In Python 3, the payload can be bytes, not str, and json.loads explicitly
+    # requires decoded strings.
+    return json.loads(force_unicode(payload))
 
 
 DECODER_MAP['application/json'] = JsonDecoder
