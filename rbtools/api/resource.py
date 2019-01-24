@@ -238,7 +238,9 @@ class ResourceDictField(object):
         if name in self._fields:
             return self._resource._wrap_field(self._fields[name])
         else:
-            raise AttributeError
+            raise AttributeError('This dictionary resource for %s does not '
+                                 'have an attribute "%s".'
+                                 % (self._resource.__class__.__name__, name))
 
     def __getitem__(self, key):
         try:
@@ -342,7 +344,8 @@ class ItemResource(Resource):
         if name in self._fields:
             return self._wrap_field(self._fields[name])
         else:
-            raise AttributeError
+            raise AttributeError('This %s does not have an attribute "%s".'
+                                 % (self.__class__.__name__, name))
 
     def __getitem__(self, key):
         try:
