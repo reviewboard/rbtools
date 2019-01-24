@@ -1219,8 +1219,14 @@ class Post(Command):
                 raise CommandError('Could not determine existing review '
                                    'request to update.')
 
+            # We found a match, but the review request object we got back only
+            # has partial information. We now need to re-fetch the review
+            # request. To do so, we're going to plug the resulting ID back
+            # into the options and query the way we would if -r was passed on
+            # the command line.
             self.options.rid = review_request.id
-        elif self.options.rid:
+
+        if self.options.rid:
             only_fields = [
                 'absolute_url',
                 'bugs_closed',
