@@ -31,6 +31,7 @@ from six.moves.urllib.request import (
 from rbtools import get_package_version
 from rbtools.api.cache import APICache
 from rbtools.api.errors import APIError, create_api_error, ServerInterfaceError
+from rbtools.utils.encoding import force_unicode
 from rbtools.utils.filesystem import get_home_path
 
 # Python 2.7.9+ added strict HTTPS certificate validation (finally). These APIs
@@ -643,6 +644,10 @@ class ReviewBoardServer(object):
 
     def process_error(self, http_status, data):
         """Processes an error, raising an APIError with the information."""
+        # In Python 3, the data can be bytes, not str, and json.loads
+        # explicitly requires decoded strings.
+        data = force_unicode(data)
+
         try:
             rsp = json_loads(data)
 
