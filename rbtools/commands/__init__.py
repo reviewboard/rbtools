@@ -330,6 +330,14 @@ class Command(object):
         description='Options for choosing what gets included in a diff, '
                     'and how the diff is generated.',
         option_list=[
+            Option('--no-renames',
+                   dest='no_renames',
+                   action='store_true',
+                   help='Add the --no-renames option to the git when '
+                        'generating diff.'
+                        '\n'
+                        'Supported by: Git',
+                   added_in='0.7.11'),
             Option('--revision-range',
                    dest='revision_range',
                    metavar='REV1:REV2',

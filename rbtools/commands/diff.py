@@ -65,10 +65,15 @@ class Diff(Command):
                 '-X/--exclude commandline options or the EXCLUDE_PATTERNS '
                 '.reviewboardrc option.' % tool.name)
 
+        if self.options.no_renames and not tool.supports_no_renames:
+            raise CommandError('The %s SCM tool does not support diffs '
+                               'without renames.', tool.type)
+
         diff_info = tool.diff(
             revisions=revisions,
             include_files=self.options.include_files or [],
             exclude_patterns=self.options.exclude_patterns or [],
+            no_renames=self.options.no_renames,
             extra_args=extra_args)
 
         diff = diff_info['diff']
