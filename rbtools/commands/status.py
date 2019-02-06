@@ -3,7 +3,10 @@ from __future__ import print_function, unicode_literals
 import logging
 
 import texttable as tt
-from backports.shutil_get_terminal_size import get_terminal_size
+try:
+    from backports.shutil_get_terminal_size import get_terminal_size
+except ImportError:
+    from shutil import get_terminal_size
 
 from rbtools.commands import Command, Option
 from rbtools.utils.repository import get_repository_id
