@@ -143,7 +143,7 @@ class CVSClient(SCMClient):
         }
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
-             no_renames=False, extra_args=[]):
+             extra_args=[], **kwargs):
         """Perform a diff using the given revisions.
 
         If no revisions are specified, this will return the diff for the
@@ -165,6 +165,9 @@ class CVSClient(SCMClient):
             extra_args (list, unused):
                 Additional arguments to be passed to the diff generation.
                 Unused for CVS.
+
+            **kwargs (dict, unused):
+                Unused keyword arguments.
 
         Returns:
             dict:

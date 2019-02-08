@@ -686,7 +686,7 @@ class PerforceClient(SCMClient):
         return None
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
-             no_renames=False, extra_args=[]):
+             extra_args=[], **kwargs):
         """Perform a diff using the given revisions.
 
         This goes through the hard work of generating a diff on Perforce in
@@ -708,6 +708,9 @@ class PerforceClient(SCMClient):
             extra_args (list, unused):
                 Additional arguments to be passed to the diff generation.
                 Unused for git.
+
+            **kwargs (dict, unused):
+                Unused keyword arguments.
 
         Returns:
             dict:

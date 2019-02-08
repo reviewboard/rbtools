@@ -172,7 +172,7 @@ class TFExeWrapper(object):
             raise InvalidRevisionSpecError(
                 '"%s" does not appear to be a valid versionspec' % revision)
 
-    def diff(self, revisions, include_files, exclude_patterns):
+    def diff(self, revisions, include_files, exclude_patterns, **kwargs):
         """Return the generated diff.
 
         Args:
@@ -184,6 +184,9 @@ class TFExeWrapper(object):
 
             exclude_patterns (list):
                 A list of file paths to exclude from the diff.
+
+            **kwargs (dict, unused):
+                Unused keyword arguments.
 
         Returns:
             dict:

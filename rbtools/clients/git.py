@@ -581,7 +581,8 @@ class GitClient(SCMClient):
         return youngest_remote_commit
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
-             no_renames=False, extra_args=[], with_parent_diff=True):
+             no_renames=False, extra_args=[], with_parent_diff=True,
+             git_find_renames_threshold=None, **kwargs):
         """Perform a diff using the given revisions.
 
         If no revisions are specified, this will do a diff of the contents of
@@ -606,12 +607,21 @@ class GitClient(SCMClient):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
 
+            no_renames (bool, optional):
+                Whether to avoid rename detection.
+
             extra_args (list, unused):
                 Additional arguments to be passed to the diff generation.
                 Unused for git.
 
             with_parent_diff (bool, optional):
                 Whether or not to compute a parent diff.
+
+            git_find_renames_threshold (unicode, optional):
+                The threshold to pass to ``--find-renames``, if any.
+
+            **kwargs (dict, unused):
+                Unused keyword arguments.
 
         Returns:
             dict:
@@ -640,20 +650,24 @@ class GitClient(SCMClient):
         except KeyError:
             merge_base = revisions['base']
 
-        diff_lines = self.make_diff(merge_base,
-                                    revisions['base'],
-                                    revisions['tip'],
-                                    include_files,
-                                    exclude_patterns,
-                                    no_renames)
+        diff_lines = self.make_diff(
+            merge_base,
+            revisions['base'],
+            revisions['tip'],
+            include_files,
+            exclude_patterns,
+            no_renames,
+            find_renames_threshold=git_find_renames_threshold)
 
         if 'parent_base' in revisions and with_parent_diff:
-            parent_diff_lines = self.make_diff(merge_base,
-                                               revisions['parent_base'],
-                                               revisions['base'],
-                                               include_files,
-                                               exclude_patterns,
-                                               no_renames)
+            parent_diff_lines = self.make_diff(
+                merge_base,
+                revisions['parent_base'],
+                revisions['base'],
+                include_files,
+                exclude_patterns,
+                no_renames,
+                find_renames_threshold=git_find_renames_threshold)
 
             base_commit_id = revisions['parent_base']
         else:
@@ -668,7 +682,7 @@ class GitClient(SCMClient):
         }
 
     def make_diff(self, merge_base, base, tip, include_files,
-                  exclude_patterns, no_renames=False):
+                  exclude_patterns, no_renames, find_renames_threshold):
         """Perform a diff on a particular branch range.
 
         Args:
@@ -688,6 +702,12 @@ class GitClient(SCMClient):
             exclude_patterns (list of unicode):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
+
+            no_renames (bool, optional):
+                Whether to skip rename detection.
+
+            find_renames_threshold (unicode, optional):
+                The threshhold to pass to ``--find-renames``, if any.
 
         Returns:
             bytes:
@@ -715,7 +735,12 @@ class GitClient(SCMClient):
             if (not no_renames and
                 self.capabilities is not None and
                 self.capabilities.has_capability('diffs', 'moved_files')):
-                diff_cmd_params.append('-M')
+
+                if find_renames_threshold is not None:
+                    diff_cmd_params.append('--find-renames=%s'
+                                           % find_renames_threshold)
+                else:
+                    diff_cmd_params.append('--find-renames')
             else:
                 diff_cmd_params.append('--no-renames')
         else:

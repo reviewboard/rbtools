@@ -935,7 +935,7 @@ class ClearCaseClient(SCMClient):
         return changeset
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
-             no_renames=False, extra_args=[]):
+             extra_args=[], **kwargs):
         """Perform a diff using the given revisions.
 
         Args:
@@ -953,6 +953,9 @@ class ClearCaseClient(SCMClient):
             extra_args (list, unused):
                 Additional arguments to be passed to the diff generation.
                 Unused for ClearCase.
+
+            **kwargs (dict, optional):
+                Unused keyword arguments.
 
         Returns:
             dict:

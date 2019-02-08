@@ -376,7 +376,7 @@ class SVNClient(SCMClient):
         return '\n\n'.join(message.text for message in messages)
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
-             no_renames=False, extra_args=[]):
+             extra_args=[], **kwargs):
         """Perform a diff in a Subversion repository.
 
         If the given revision spec is empty, this will do a diff of the
@@ -403,6 +403,9 @@ class SVNClient(SCMClient):
             extra_args (list, unused):
                 Additional arguments to be passed to the diff generation.
                 Unused for SVN.
+
+            **kwargs (dict, unused):
+                Unused keyword arguments.
 
         Returns:
             dict:

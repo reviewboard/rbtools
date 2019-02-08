@@ -429,6 +429,20 @@ class Command(object):
         ]
     )
 
+    git_options = OptionGroup(
+        name='Git Options',
+        description='Git-specific options for diff generation.',
+        option_list=[
+            Option('--git-find-renames-threshold',
+                   dest='git_find_renames_threshold',
+                   metavar='THRESHOLD',
+                   default=None,
+                   help='The threshold to pass to `--find-renames` when '
+                        'generating a git diff.'
+                        '\n'
+                        'For more information, see `git help diff`.'),
+        ])
+
     perforce_options = OptionGroup(
         name='Perforce Options',
         description='Perforce-specific options for selecting the '

@@ -379,6 +379,7 @@ class Post(Command):
         ),
         Command.diff_options,
         Command.branch_options,
+        Command.git_options,
         Command.perforce_options,
         Command.subversion_options,
         Command.tfs_options,
@@ -1274,9 +1275,16 @@ class Post(Command):
         if history_entries is None:
             raise CommandError("There don't seem to be any diffs.")
 
+        diff_kwargs = {}
+
+        if self.options.git_find_renames_threshold is not None:
+            diff_kwargs['git_find_renames_threshold'] = \
+                self.options.git_find_renames_threshold
+
         cumulative_diff_info = self.tool.diff(
             revisions=self.revisions,
-            extra_args=extra_args)
+            extra_args=extra_args,
+            **diff_kwargs)
 
         for i, history_entry in enumerate(history_entries):
             revisions = {
@@ -1284,12 +1292,15 @@ class Post(Command):
                 'tip': history_entry['commit_id'],
             }
 
+            # Generate a diff against the revisions or arguments, filtering
+            # by the requested files if provided.
             diff_info = self.tool.diff(
                 revisions=revisions,
                 extra_args=extra_args,
                 include_files=self.options.include_files or [],
                 exclude_patterns=self.options.exclude_patterns or [],
-                with_parent_diff=False)
+                with_parent_diff=False,
+                **diff_kwargs)
 
             history_entry['diff'] = diff_info['diff']
 
@@ -1314,11 +1325,18 @@ class Post(Command):
             SquashedDiff:
             The squashed diff and associated metadata.
         """
+        diff_kwargs = {}
+
+        if self.options.git_find_renames_threshold is not None:
+            diff_kwargs['git_find_renames_threshold'] = \
+                self.options.git_find_renames_threshold
+
         diff_info = self.tool.diff(
             revisions=self.revisions,
             include_files=self.options.include_files or [],
             exclude_patterns=self.options.exclude_patterns or [],
-            extra_args=extra_args)
+            extra_args=extra_args,
+            **diff_kwargs)
 
         # If only certain files within a commit are being submitted for review,
         # do not include the commit id. This prevents conflicts if multiple

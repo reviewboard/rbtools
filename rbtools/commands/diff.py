@@ -17,6 +17,7 @@ class Diff(Command):
         Command.diff_options,
         Command.branch_options,
         Command.repository_options,
+        Command.git_options,
         Command.perforce_options,
         Command.subversion_options,
         Command.tfs_options,
@@ -65,16 +66,25 @@ class Diff(Command):
                 '-X/--exclude commandline options or the EXCLUDE_PATTERNS '
                 '.reviewboardrc option.' % tool.name)
 
-        if self.options.no_renames and not tool.supports_no_renames:
-            raise CommandError('The %s SCM tool does not support diffs '
-                               'without renames.', tool.type)
+        diff_kwargs = {}
+
+        if self.options.no_renames:
+            if not tool.supports_no_renames:
+                raise CommandError('The %s SCM tool does not support diffs '
+                                   'without renames.', tool.type)
+
+            diff_kwargs['no_renames'] = True
+
+        if self.options.git_find_renames_threshold is not None:
+            diff_kwargs['git_find_renames_threshold'] = \
+                self.options.git_find_renames_threshold
 
         diff_info = tool.diff(
             revisions=revisions,
             include_files=self.options.include_files or [],
             exclude_patterns=self.options.exclude_patterns or [],
-            no_renames=self.options.no_renames,
-            extra_args=extra_args)
+            extra_args=extra_args,
+            **diff_kwargs)
 
         diff = diff_info['diff']
 

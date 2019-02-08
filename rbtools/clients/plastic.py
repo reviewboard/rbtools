@@ -120,7 +120,7 @@ class PlasticClient(SCMClient):
             raise TooManyRevisionsError
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
-             no_renames=False, extra_args=[]):
+             extra_args=[], **kwargs):
         """Perform a diff across all modified files in a Plastic workspace.
 
         Parent diffs are not supported (the second value in the tuple).
@@ -139,6 +139,9 @@ class PlasticClient(SCMClient):
 
             extra_args (list, unused):
                 Additional arguments to be passed to the diff generation.
+
+            **kwargs (dict, unused):
+                Unused keyword arguments.
 
         Returns:
             dict:
