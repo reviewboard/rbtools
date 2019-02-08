@@ -1052,7 +1052,7 @@ class TFSClient(SCMClient):
         return self.tf_wrapper.parse_revision_spec(revisions)
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
-             extra_args=[]):
+             no_renames=False, extra_args=[]):
         """Return the generated diff.
 
         Args:

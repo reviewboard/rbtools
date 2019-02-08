@@ -184,7 +184,7 @@ class BazaarClient(SCMClient):
             return 'revno:%s:%s' % (result[1], branch)
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
-             extra_args=[]):
+             no_renames=False, extra_args=[]):
         """Perform a diff using the given revisions.
 
         If the revision spec is empty, this returns the diff of the current

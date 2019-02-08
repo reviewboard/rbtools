@@ -376,7 +376,7 @@ class SVNClient(SCMClient):
         return '\n\n'.join(message.text for message in messages)
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
-             extra_args=[]):
+             no_renames=False, extra_args=[]):
         """Perform a diff in a Subversion repository.
 
         If the given revision spec is empty, this will do a diff of the

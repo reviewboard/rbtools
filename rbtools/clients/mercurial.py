@@ -538,7 +538,7 @@ class MercurialClient(SCMClient):
         return b'\n\n'.join([desc.strip() for desc in descs])
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
-             extra_args=[], with_parent_diff=True):
+             no_renames=False, extra_args=[], with_parent_diff=True):
         """Perform a diff using the given revisions.
 
         Args:

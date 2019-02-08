@@ -122,7 +122,7 @@ setup(
         'rbtools_scm_clients': scm_clients,
     },
     install_requires=[
-        'backports.shutil_get_terminal_size',
+        'backports.shutil_get_terminal_size; python_version<"3.0"',
         'colorama',
         'six>=1.8.0',
         'texttable',

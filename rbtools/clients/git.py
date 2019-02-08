@@ -36,6 +36,7 @@ class GitClient(SCMClient):
 
     supports_commit_history = True
     supports_diff_exclude_patterns = True
+    supports_no_renames = True
     supports_patch_revert = True
 
     can_amend_commit = True
@@ -580,7 +581,7 @@ class GitClient(SCMClient):
         return youngest_remote_commit
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
-             extra_args=[], with_parent_diff=True):
+             no_renames=False, extra_args=[], with_parent_diff=True):
         """Perform a diff using the given revisions.
 
         If no revisions are specified, this will do a diff of the contents of
@@ -643,14 +644,16 @@ class GitClient(SCMClient):
                                     revisions['base'],
                                     revisions['tip'],
                                     include_files,
-                                    exclude_patterns)
+                                    exclude_patterns,
+                                    no_renames)
 
         if 'parent_base' in revisions and with_parent_diff:
             parent_diff_lines = self.make_diff(merge_base,
                                                revisions['parent_base'],
                                                revisions['base'],
                                                include_files,
-                                               exclude_patterns)
+                                               exclude_patterns,
+                                               no_renames)
 
             base_commit_id = revisions['parent_base']
         else:
@@ -665,7 +668,7 @@ class GitClient(SCMClient):
         }
 
     def make_diff(self, merge_base, base, tip, include_files,
-                  exclude_patterns):
+                  exclude_patterns, no_renames=False):
         """Perform a diff on a particular branch range.
 
         Args:
@@ -709,7 +712,8 @@ class GitClient(SCMClient):
             if self._supports_git_config_flag():
                 git_cmd.extend(['-c', 'diff.noprefix=false'])
 
-            if (self.capabilities is not None and
+            if (not no_renames and
+                self.capabilities is not None and
                 self.capabilities.has_capability('diffs', 'moved_files')):
                 diff_cmd_params.append('-M')
             else:
