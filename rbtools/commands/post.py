@@ -1001,7 +1001,7 @@ class Post(Command):
 
             squashed_diff = SquashedDiff(
                 diff=diff,
-                prent_diff=None,
+                parent_diff=None,
                 base_commit_id=None,
                 commit_id=None,
                 changenum=None,
@@ -1032,6 +1032,8 @@ class Post(Command):
                 server_supports_history=server_supports_history)
         else:
             with_history = False
+
+        diff_history = None
 
         # We now have enough information to generate our diff.
         #
