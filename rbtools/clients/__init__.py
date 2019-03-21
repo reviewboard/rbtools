@@ -758,7 +758,8 @@ def load_scmclients(config, options):
             logging.exception('Could not load SCM Client "%s"', ep.name)
 
 
-def scan_usable_client(config, options, client_name=None):
+def scan_usable_client(config, options, client_name=None,
+                       require_repository_info=True):
     """Scan for a usable SCMClient.
 
     Args:
@@ -772,6 +773,11 @@ def scan_usable_client(config, options, client_name=None):
             A specific client name, which can come from the configuration. This
             can be used to disambiguate if there are nested repositories, or to
             speed up detection.
+
+        require_repository_info (bool, optional):
+            Whether information on a repository is required. This is the
+            default. If disabled, this will return ``None`` for the repository
+            information if a matching repository could not be found.
 
     Returns:
         tuple:
@@ -841,7 +847,28 @@ def scan_usable_client(config, options, client_name=None):
                 # posting against a remote SVN repository there will be no
                 # local path), just default to the first repository found
                 repository_info, tool = candidate_repos[0]
-    else:
+
+    if repository_info is not None:
+        # Verify that options specific to an SCM Client have not been mis-used.
+        if (getattr(options, 'change_only', False) and
+            not repository_info.supports_changesets):
+            logging.error('The --change-only option is not valid for the '
+                          'current SCM client.\n')
+            sys.exit(1)
+
+        if (getattr(options, 'parent_branch', None) and
+            not repository_info.supports_parent_diffs):
+            logging.error('The --parent option is not valid for the '
+                          'current SCM client.')
+            sys.exit(1)
+
+        if (not isinstance(tool, PerforceClient) and
+            (getattr(options, 'p4_client', None) or
+             getattr(options, 'p4_port', None))):
+            logging.error('The --p4-client and --p4-port options are not '
+                          'valid for the current SCM client.\n')
+            sys.exit(1)
+    elif require_repository_info:
         if client_name:
             logging.error('The provided repository type was not detected '
                           'in the current directory.')
@@ -854,27 +881,7 @@ def scan_usable_client(config, options, client_name=None):
 
         sys.exit(1)
 
-    # Verify that options specific to an SCM Client have not been mis-used.
-    if (getattr(options, 'change_only', False) and
-        not repository_info.supports_changesets):
-        sys.stderr.write('The --change-only option is not valid for the '
-                         'current SCM client.\n')
-        sys.exit(1)
-
-    if (getattr(options, 'parent_branch', None) and
-        not repository_info.supports_parent_diffs):
-        sys.stderr.write('The --parent option is not valid for the '
-                         'current SCM client.\n')
-        sys.exit(1)
-
-    if (not isinstance(tool, PerforceClient) and
-        (getattr(options, 'p4_client', None) or
-         getattr(options, 'p4_port', None))):
-        sys.stderr.write('The --p4-client and --p4-port options are not valid '
-                         'for the current SCM client.\n')
-        sys.exit(1)
-
-    return (repository_info, tool)
+    return repository_info, tool
 
 
 def print_clients(config, options):

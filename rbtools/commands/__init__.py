@@ -9,6 +9,7 @@ import sys
 
 import colorama
 import pkg_resources
+import six
 from six.moves.urllib.parse import urlparse
 
 from rbtools import get_version_string
@@ -761,16 +762,37 @@ class Command(object):
         cleanup_tempfiles()
         sys.exit(exit_code)
 
-    def initialize_scm_tool(self, client_name=None):
-        """Initialize the SCM tool for the current working directory."""
-        repository_info, tool = scan_usable_client(self.config,
-                                                   self.options,
-                                                   client_name=client_name)
+    def initialize_scm_tool(self, client_name=None,
+                            require_repository_info=True):
+        """Initialize the SCM tool for the current working directory.
+
+        Args:
+            client_name (unicode, optional):
+                A specific client name, which can come from the configuration.
+                This can be used to disambiguate if there are nested
+                repositories, or to speed up detection.
+
+            require_repository_info (bool, optional):
+                Whether information on a repository is required. This is the
+                default. If disabled, this will return ``None`` for the
+                repository information if a matching repository could not be
+                found.
+
+        Returns:
+            tuple:
+            A 2-tuple, containing the repository info structure and the tool
+            instance.
+        """
+        repository_info, tool = scan_usable_client(
+            self.config,
+            self.options,
+            client_name=client_name,
+            require_repository_info=require_repository_info)
 
         try:
             tool.check_options()
         except OptionsCheckError as e:
-            raise CommandError('%s\n' % e)
+            raise CommandError(six.text_type(e))
 
         return repository_info, tool
 
@@ -798,7 +820,7 @@ class Command(object):
         """
         if self.options.server:
             server_url = self.options.server
-        elif tool:
+        elif tool and repository_info is not None:
             server_url = tool.scan_for_server(repository_info)
         else:
             server_url = None

@@ -3,6 +3,7 @@
 from __future__ import print_function, unicode_literals
 
 import logging
+from gettext import gettext as _
 
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option
@@ -277,24 +278,39 @@ class Patch(Command):
             return True
 
     def main(self, review_request_id):
-        """Run the command."""
-        repository_info, tool = self.initialize_scm_tool(
-            client_name=self.options.repository_type)
+        """Run the command.
 
-        if self.options.patch_stdout and self.options.server:
-            server_url = self.options.server
-        else:
-            server_url = self.get_server_url(repository_info, tool)
-            if self.options.revert_patch and not tool.supports_patch_revert:
-                raise CommandError('The %s backend does not support reverting '
-                                   'patches.' % tool.name)
+        Args:
+            review_request_id (int):
+                The ID of the review request to patch from.
+
+        Raises:
+            rbtools.command.CommandError:
+                Patching the tree has failed.
+        """
+        patch_stdout = self.options.patch_stdout
+        revert = self.options.revert_patch
+
+        if patch_stdout and revert:
+            raise CommandError(_('--print and --revert cannot both be used.'))
+
+        repository_info, tool = self.initialize_scm_tool(
+            client_name=self.options.repository_type,
+            require_repository_info=not patch_stdout)
+
+        if revert and not tool.supports_patch_revert:
+            raise CommandError(
+                _('The %s backend does not support reverting patches.')
+                % tool.name)
+
+        server_url = self.get_server_url(repository_info, tool)
 
         api_client, api_root = self.get_api(server_url)
+        self.setup_tool(tool, api_root=api_root)
 
-        if not self.options.patch_stdout:
-            self.setup_tool(tool, api_root=api_root)
-
-            # Check if repository info on reviewboard server match local ones.
+        if not patch_stdout:
+            # Check if the repository info on the Review Board server matches
+            # the local checkout.
             repository_info = repository_info.find_server_repository_info(
                 api_root)
 
