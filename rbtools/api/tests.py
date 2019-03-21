@@ -14,8 +14,10 @@ from rbtools.api.request import HttpRequest, Request
 from rbtools.api.resource import (CountResource,
                                   ItemResource,
                                   ListResource,
+                                  RESOURCE_MAP,
                                   ResourceDictField,
                                   ResourceLinkField,
+                                  ResourceListField,
                                   ReviewRequestResource,
                                   RootResource)
 from rbtools.api.transport import Transport
@@ -225,7 +227,115 @@ class ResourceFactoryTests(TestWithPayloads):
         self.assertTrue(isinstance(r, RootResource))
 
 
-class ResourceTests(TestWithPayloads):
+class ExpandedItemResource(ItemResource):
+    pass
+
+
+class ItemResourceTests(TestWithPayloads):
+    """Unit tests for rbtools.api.resource.ItemResource."""
+
+    expanded_item_payload = {
+        'obj': {
+            '_expanded': {
+                'item1': {
+                    'item_mimetype': 'application/vnd.test.item+json',
+                },
+                'other-item': {
+                    'item_mimetype': 'application/vnd.test.other-item+json',
+                },
+            },
+            'item1': {
+                'links': {
+                    'self': {
+                        'href': 'http://localhost:8080/api/items/1/',
+                        'method': 'GET',
+                    },
+                },
+                'name': 'My Item 1',
+            },
+            'item2': {
+                'links': {
+                    'self': {
+                        'href': 'http://localhost:8080/api/items/2/',
+                        'method': 'GET',
+                    },
+                },
+                'name': 'My Item 2',
+            },
+            'other-item': {
+                'links': {
+                    'self': {
+                        'href': 'http://localhost:8080/api/other-items/2/',
+                        'method': 'GET',
+                    },
+                },
+                'name': 'Other Item',
+            },
+        },
+        'stat': 'ok',
+    }
+
+    expanded_list_payload = {
+        'obj': {
+            '_expanded': {
+                'list1': {
+                    'list_mimetype': 'application/vnd.test.list+json',
+                    'item_mimetype': 'application/vnd.test.item+json',
+                    'list_url': 'http://localhost:8080/api/items/',
+                },
+                'other-list': {
+                    'list_mimetype': 'application/vnd.test.other-list+json',
+                    'item_mimetype': 'application/vnd.test.other-item+json',
+                    'list_url': 'http://localhost:8080/api/other-items/',
+                },
+            },
+            'list1': [
+                {
+                    'links': {
+                        'self': {
+                            'href': 'http://localhost:8080/api/items/1/',
+                            'method': 'GET',
+                        },
+                    },
+                    'name': 'My Item',
+                },
+            ],
+            'list2': [
+                {
+                    'links': {
+                        'self': {
+                            'href': 'http://localhost:8080/api/items/1/',
+                            'method': 'GET',
+                        },
+                    },
+                    'name': 'My Item',
+                },
+            ],
+            'other-list': [
+                {
+                    'links': {
+                        'self': {
+                            'href': 'http://localhost:8080/api/other-items/1/',
+                            'method': 'GET',
+                        },
+                    },
+                    'name': 'Other Item',
+                },
+            ],
+        },
+        'stat': 'ok',
+    }
+
+    def setUp(self):
+        super(ItemResourceTests, self).setUp()
+
+        RESOURCE_MAP['application/vnd.test.item'] = ExpandedItemResource
+
+    def tearDown(self):
+        super(ItemResourceTests, self).setUp()
+
+        RESOURCE_MAP.pop('application/vnd.test.item', None)
+
     def test_item_resource_fields(self):
         """Testing item resource fields"""
         r = create_resource(self.transport, self.item_payload, '')
@@ -271,6 +381,60 @@ class ResourceTests(TestWithPayloads):
 
         self.assertFalse(hasattr(r, 'create'))
 
+    def test_getattr_with_expanded_item_resource(self):
+        """Testing ItemResource.__getattr__ with field as expanded item
+        resource
+        """
+        r = create_resource(transport=self.transport,
+                            payload=self.expanded_item_payload,
+                            url='')
+
+        self.assertIsInstance(r['item1'], ExpandedItemResource)
+        self.assertIsInstance(r['item2'], ResourceDictField)
+        self.assertIsInstance(r['other-item'], ResourceDictField)
+
+    def test_getattr_with_expanded_list_resource(self):
+        """Testing ItemResource.__getattr__ with field as expanded list
+        resource
+        """
+        r = create_resource(transport=self.transport,
+                            payload=self.expanded_list_payload,
+                            url='')
+
+        self.assertIsInstance(r['list1'], ResourceListField)
+        self.assertIsInstance(r['list1'][0], ExpandedItemResource)
+        self.assertIsInstance(r['list2'], ResourceListField)
+        self.assertIsInstance(r['list2'][0], ResourceDictField)
+        self.assertIsInstance(r['other-list'], ResourceListField)
+        self.assertIsInstance(r['other-list'][0], ResourceDictField)
+
+    def test_iteritems_with_expanded_item_resource(self):
+        """Testing ItemResource.iteritems with field as expanded item resource
+        """
+        r = create_resource(transport=self.transport,
+                            payload=self.expanded_item_payload,
+                            url='')
+        items = dict(r.iteritems())
+
+        self.assertIsInstance(items['item1'], ExpandedItemResource)
+        self.assertIsInstance(items['item2'], ResourceDictField)
+        self.assertIsInstance(items['other-item'], ResourceDictField)
+
+    def test_iteritems_with_expanded_list_resource(self):
+        """Testing ItemResource.iteritems with field as expanded list resource
+        """
+        r = create_resource(transport=self.transport,
+                            payload=self.expanded_list_payload,
+                            url='')
+        items = dict(r.iteritems())
+
+        self.assertIsInstance(items['list1'], ResourceListField)
+        self.assertIsInstance(items['list1'][0], ExpandedItemResource)
+        self.assertIsInstance(items['list2'], ResourceListField)
+        self.assertIsInstance(items['list2'][0], ResourceDictField)
+        self.assertIsInstance(items['other-list'], ResourceListField)
+        self.assertIsInstance(items['other-list'][0], ResourceDictField)
+
     def test_extra_data_rewriting_create(self):
         """Testing rewriting of extra_data__ parameters to create"""
         r = create_resource(self.transport, self.list_payload, '')
@@ -284,6 +448,10 @@ class ResourceTests(TestWithPayloads):
         request = r.update(extra_data__foo='bar')
         self.assertTrue('extra_data.foo' in request._fields)
         self.assertEqual(request._fields['extra_data.foo'], 'bar')
+
+
+class ListResourceTests(TestWithPayloads):
+    """Unit tests for rbtools.api.resource.ListResource."""
 
     def test_list_resource_list(self):
         """Testing list resource lists"""

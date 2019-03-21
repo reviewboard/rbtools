@@ -12,13 +12,15 @@ from six.moves.urllib.parse import urljoin
 from rbtools.api.cache import MINIMUM_VERSION
 from rbtools.api.decorators import request_method_decorator
 from rbtools.api.request import HttpRequest
+from rbtools.api.utils import rem_mime_format
 from rbtools.utils.graphs import path_exists
 
 
 RESOURCE_MAP = {}
 LINKS_TOK = 'links'
-LINK_KEYS = set(['href', 'method', 'title'])
-_EXCLUDE_ATTRS = [LINKS_TOK, 'stat']
+EXPANDED_TOKEN = '_expanded'
+LINK_KEYS = set(['href', 'method', 'title', 'mimetype'])
+_EXCLUDE_ATTRS = [LINKS_TOK, EXPANDED_TOKEN, 'stat']
 _EXTRA_DATA_PREFIX = 'extra_data__'
 
 
@@ -47,6 +49,42 @@ def _preprocess_fields(fields):
             name = 'extra_data.%s' % name[len(_EXTRA_DATA_PREFIX):]
 
         yield name, value
+
+
+def _create_resource_for_field(parent_resource, field_payload,
+                               mimetype, item_mimetype=None, url=None):
+    """Create a resource instance based on field data.
+
+    This will construct a resource instance for the payload of a field,
+    using the given mimetype to identify it. This is intended for use with
+    expanded resources or items in lists.
+
+    Args:
+        parent_resource (Resource):
+            The resource containing the field payload.
+
+        field_payload (dict):
+            The field payload to use as the new resource's payload.
+
+        mimetype (unicode):
+            The mimetype of the resource.
+
+        item_mimetype (unicode, optional):
+            The mimetype of any items in the resource, if this resource
+            represents a list.
+
+        url (unicode, optional):
+            The URL of the resource, if one is available.
+    """
+    # We need to import this here to avoid circular imports.
+    from rbtools.api.factory import create_resource
+
+    return create_resource(transport=parent_resource._transport,
+                           payload=field_payload,
+                           url=url,
+                           mime_type=mimetype,
+                           item_mime_type=item_mimetype,
+                           guess_token=False)
 
 
 @request_method_decorator
@@ -158,7 +196,7 @@ class Resource(object):
         self._transport = transport
         self._token = token
         self._payload = payload
-        self._excluded_attrs = self._excluded_attrs + _EXCLUDE_ATTRS
+        self._excluded_attrs = set(self._excluded_attrs + _EXCLUDE_ATTRS)
 
         # Determine where the links live in the payload. This
         # can either be at the root, or inside the resources
@@ -171,6 +209,17 @@ class Resource(object):
         else:
             self._payload[LINKS_TOK] = {}
             self._links = {}
+
+        # If we've expanded any fields, we'll try to convert the expanded
+        # payloads into resources. We can only do this if talking to
+        # Review Board 4.0+.
+        if EXPANDED_TOKEN in self._payload:
+            self._expanded_info = self._payload[EXPANDED_TOKEN]
+        elif (token and isinstance(self._payload[token], dict) and
+              EXPANDED_TOKEN in self._payload[token]):
+            self._expanded_info = self._payload[token][EXPANDED_TOKEN]
+        else:
+            self._expanded_info = {}
 
         # Add a method for each supported REST operation, and
         # for retrieving 'self'.
@@ -190,19 +239,77 @@ class Resource(object):
                         lambda resource=self, url=body['href'], **kwargs: (
                             self._get_url(url, **kwargs)))
 
-    def _wrap_field(self, field):
-        if isinstance(field, dict):
-            dict_keys = set(field.keys())
+    def _wrap_field(self, field_payload, field_url=None, field_mimetype=None,
+                    list_item_mimetype=None, force_resource=False):
+        """Wrap the value of a field in a resource or field object.
 
-            if ('href' in dict_keys and
-                len(dict_keys.difference(LINK_KEYS)) == 0):
-                return ResourceLinkField(self, field)
+        This determines a suitable wrapper for a field, turning it into
+        a resource or a wrapper with utility methods that can be used to
+        interact with the field or perform additional queries.
+
+        Args:
+            field_payload (object):
+                The payload of the field. The type of value determines the
+                way in which this is wrapped.
+
+            field_url (unicode, optional):
+                The URL representing the payload in the field, if one is
+                available. If not provided, one may be computed, depending
+                on the type and contents of the field.
+
+            field_mimetype (unicode, optional):
+                The mimetype used to represent the field. If provided, this
+                may result in the wrapper being a :py:class:`Resource`
+                subclass.
+
+            list_item_mimetype (unicode, optional):
+                The mimetype used or any items within the field, if the
+                field is a list.
+
+            force_resource (bool, optional):
+                Force the return of a resource, even a generic one, instead
+                of a field wrapper.
+
+        Returns:
+            object:
+            A wrapper, or the field payload. This may be one of:
+
+            1. A subclass of :py:class:`Resource`.
+            2. A field wrapper (:py:class:`ResourceDictField`,
+               :py:class:`ResourceLinkField`, or
+               :py:class:`ResourceListField`).
+            3. The field payload itself, if no wrapper is needed.
+        """
+        if isinstance(field_payload, dict):
+            if (force_resource or
+                (field_mimetype and
+                 rem_mime_format(field_mimetype) in RESOURCE_MAP)):
+                # We have a resource backing this mimetype. Try to create
+                # an instance of the resource for this payload.
+                if not field_url:
+                    try:
+                        field_url = field_payload['links']['self']['href']
+                    except KeyError:
+                        field_url = ''
+
+                return _create_resource_for_field(parent_resource=self,
+                                                  field_payload=field_payload,
+                                                  mimetype=field_mimetype,
+                                                  url=field_url)
             else:
-                return ResourceDictField(self, field)
-        elif isinstance(field, list):
-            return ResourceListField(self, field)
+                # If the payload consists solely of link-supported keys,
+                # then we'll return a special ResourceLinkField. Anything
+                # else is treated as a standard dictionary.
+                if ('href' in field_payload and
+                    not set(field_payload.keys()) - LINK_KEYS):
+                    return ResourceLinkField(self, field_payload)
+                else:
+                    return ResourceDictField(self, field_payload)
+        elif isinstance(field_payload, list):
+            return ResourceListField(self, field_payload,
+                                     item_mimetype=list_item_mimetype)
         else:
-            return field
+            return field_payload
 
     @property
     def links(self):
@@ -293,21 +400,27 @@ class ResourceListField(list):
 
     Acts as a normal list, but wraps any returned items.
     """
-    def __init__(self, resource, list_field):
+    def __init__(self, resource, list_field, item_mimetype=None):
         super(ResourceListField, self).__init__(list_field)
+
         self._resource = resource
+        self._item_mimetype = item_mimetype
 
     def __getitem__(self, key):
         item = super(ResourceListField, self).__getitem__(key)
-        return self._resource._wrap_field(item)
+        return self._resource._wrap_field(item,
+                                          field_mimetype=self._item_mimetype)
 
     def __iter__(self):
         for item in super(ResourceListField, self).__iter__():
-            yield self._resource._wrap_field(item)
+            yield self._resource._wrap_field(
+                item,
+                field_mimetype=self._item_mimetype)
 
     def __repr__(self):
-        return '%s(resource=%r, list_field=%s)' % (
+        return '%s(resource=%r, item_mimetype=%s, list_field=%s)' % (
             self.__class__.__name__,
+            self._item_mimetype,
             self._resource,
             super(ResourceListField, self).__repr__())
 
@@ -342,11 +455,50 @@ class ItemResource(Resource):
                 self._fields[name] = value
 
     def __getattr__(self, name):
-        if name in self._fields:
-            return self._wrap_field(self._fields[name])
-        else:
+        """Return the value for an attribute on the resource.
+
+        If the attribute represents an expanded resource, and there's
+        information available on the expansion (available in Review Board
+        4.0+), then a resource instance will be returned.
+
+        If the attribute otherwise represents a dictionary, list, or a link,
+        a wrapper may be returned.
+
+        Args:
+            name (str):
+                The name of the attribute.
+
+        Returns:
+            object:
+            The attribute value, or a wrapper or resource representing that
+            value.
+
+        Raises:
+            AttributeError:
+                A field with the given attribute name was not found.
+        """
+        try:
+            field_payload = self._fields[name]
+        except KeyError:
             raise AttributeError('This %s does not have an attribute "%s".'
                                  % (self.__class__.__name__, name))
+
+        expand_info = self._expanded_info.get(name, {})
+
+        if isinstance(field_payload, dict):
+            value = self._wrap_field(
+                field_payload=field_payload,
+                field_mimetype=expand_info.get('item_mimetype'))
+        elif isinstance(field_payload, list):
+            value = self._wrap_field(
+                field_payload=field_payload,
+                field_url=expand_info.get('list_url'),
+                field_mimetype=expand_info.get('list_mimetype'),
+                list_item_mimetype=expand_info.get('item_mimetype'))
+        else:
+            value = self._wrap_field(field_payload)
+
+        return value
 
     def __getitem__(self, key):
         try:
@@ -362,8 +514,14 @@ class ItemResource(Resource):
             yield key
 
     def iteritems(self):
-        for key, value in six.iteritems(self._fields):
-            yield (key, self._wrap_field(value))
+        """Iterate through all field/value pairs in the resource.
+
+        Yields:
+            tuple:
+            A tuple in ``(field_name, value)`` form.
+        """
+        for key in self.iterfields():
+            yield key, self.__getattr__(key)
 
     def __repr__(self):
         return '%s(transport=%r, payload=%r, url=%r, token=%r)' % (
@@ -441,24 +599,24 @@ class ListResource(Resource):
     def __bool__(self):
         return True
 
-    def __getitem__(self, key):
-        payload = self._item_list[key]
+    def __getitem__(self, index):
+        """Return the item at the specified index.
 
-        # TODO: Should try and guess the url based on the parent url,
-        # and the id number if the self link doesn't exist.
-        try:
-            url = payload['links']['self']['href']
-        except KeyError:
-            url = ''
+        Args:
+            index (int):
+                The index of the item to retrieve.
 
-        # We need to import this here because of the mutual imports.
-        from rbtools.api.factory import create_resource
+        Returns:
+            object:
+            The item at the specified index.
 
-        return create_resource(self._transport,
-                               payload,
-                               url,
-                               mime_type=self._item_mime_type,
-                               guess_token=False)
+        Raises:
+            IndexError:
+                The index is out of range.
+        """
+        return self._wrap_field(self._item_list[index],
+                                field_mimetype=self._item_mime_type,
+                                force_resource=True)
 
     def __iter__(self):
         for i in range(self.num_items):
