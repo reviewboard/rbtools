@@ -891,7 +891,7 @@ class SVNClient(SCMClient):
                 svninfo = {}
 
                 for info in result:
-                    parts = info.strip().split(': ', 1)
+                    parts = info.strip().decode('ascii', errors='replace').split(': ', 1)
 
                     if len(parts) == 2:
                         key, value = parts
