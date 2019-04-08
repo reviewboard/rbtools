@@ -509,7 +509,7 @@ class SCMClient(object):
         # Try to pull the body of the commit out of the full commit
         # description, so that we can skip the summary.
         if len(lines) >= 3 and lines[0] and not lines[1]:
-            result['description'] = '\n'.join(lines[2:]).strip()
+            result['description'] = '\n'.join(x.decode('utf-8') for x in lines[2:]).strip()
         else:
             result['description'] = commit_message
 
