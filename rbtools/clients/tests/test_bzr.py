@@ -71,7 +71,7 @@ class BazaarClientTests(SCMClientTests):
         if cwd is not None:
             filename = os.path.join(cwd, filename)
 
-        with open(filename, 'w') as f:
+        with open(filename, 'wb') as f:
             f.write(data)
 
         self._run_bzr(['add', filename], cwd=cwd, *args, **kwargs)
@@ -222,7 +222,7 @@ class BazaarClientTests(SCMClientTests):
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
-        self._bzr_add_file_commit('bar.txt', 'baz', 'added bar')
+        self._bzr_add_file_commit('bar.txt', b'baz', 'added bar')
 
         revisions = self.client.parse_revision_spec([])
         result = self.client.diff(revisions, ['foo.txt'])
