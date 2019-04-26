@@ -1,0 +1,143 @@
+.. default-intersphinx:: rbt1.0
+
+
+===========================
+RBTools 1.0.2 Release Notes
+===========================
+
+**Release date:** April 25, 2019
+
+
+Packaging
+=========
+
+* The ``backports.shutil`` package is no longer needed or installed on Python
+  3.x.
+
+  Patch by Stephen Gallagher.
+
+
+New Features
+============
+
+.. program:: rbt post
+
+* Added helpful instructions when configuring RBTools to use the wrong
+  Review Board server URL.
+
+  When encountering a bad URL, RBTools will try to determine the mistake
+  and offer advice for fixing it. For instance, if it appears to be an
+  RBCommons_ URL, it will notify if the URL is constructed correctly or if
+  the team could not be found.
+
+  Ultimately, this avoids confusion and frustration we've seen when first
+  getting going with RBTools.
+
+* Reworked Two-Factor Authentication support for RBCommons_.
+
+  This release will be needed going forward in order to support two-factor
+  authentication with RBCommons accounts.
+
+* Added a :option:`--no-renames` flag for removing rename information from
+  Git diffs.
+
+  This is used to override the default behavior in which we have Git look
+  for file changes that could be renames. It's useful when Git is finding
+  changes that should be seen as entirely new files and turning them into
+  renamed files.
+
+  Patch by Brian LeBlanc.
+
+
+.. _RBCommons: https://rbcommons.com/
+
+
+Bug Fixes
+=========
+
+General
+-------
+
+* Fixed several general Python 3.x compatibility issues.
+
+  This includes fixes for executing external processes and retrieving output,
+  executing aliases, custom RBTools commands, iterating through resources in
+  the API, and errors in some help output.
+
+
+Aliases
+-------
+
+* Fixed parsing of shell-based aliases.
+
+  When using aliases that make use of shell-based commands (ones starting with
+  ``!``), RBTools no longer strips any quotes in the command or evaluates
+  escape sequences, instead allowing the shell to handle this.
+
+  Patch by Barret Rennie.
+
+
+API
+---
+
+* Fixed Python 3.x compatibility issues with iterating through pages of
+  resources.
+
+* Improved error output when encountering missing resources.
+
+
+Git
+---
+
+* Fixed working with Git clones that don't have an ``origin`` remote.
+
+  RBTools will now try to determine an appropriate remote. If
+  :option:`--tracking-branch` was provided, that remote will be used,
+  otherwise the remote configured for the current branch will be used. If
+  a suitable remote could not be found, the first configured remote (or
+  ``origin`` if not found) will be used, and a warning will be shown.
+
+
+Perforce
+--------
+
+* Fixed including information on binary files in diffs. (:bug:`3659`)
+
+
+rbt diff
+--------
+
+* Fixed Unicode compatibility issues on Python 3.x. (:bug:`4754`)
+
+
+rbt patch
+---------
+
+* Fixed applying patches from users with private profiles.
+
+  If a user has marked their profile private, their full name and e-mail
+  address wouldn't be available, causing :command:`rbt patch` to crash.
+
+* Fixed :option:`rbt patch --print` on Python 3.x. (:bug:`4736`)
+
+  Patch by Basil Crow.
+
+
+rbt post
+--------
+
+* Fixed compatibility with Python 3.5. (:bug:`4762`)
+
+  Patch by David Cain.
+
+
+Contributors
+============
+
+* Barret Rennie
+* Basil Crow
+* Brian LeBlanc
+* Christian Hammond
+* David Cain
+* David Trowbridge
+* Stephen Gallagher
