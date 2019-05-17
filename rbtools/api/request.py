@@ -7,6 +7,7 @@ import os
 import random
 import shutil
 import sys
+from collections import OrderedDict
 from io import BytesIO
 from json import loads as json_loads
 
@@ -31,7 +32,7 @@ from six.moves.urllib.request import (
 from rbtools import get_package_version
 from rbtools.api.cache import APICache
 from rbtools.api.errors import APIError, create_api_error, ServerInterfaceError
-from rbtools.utils.encoding import force_unicode
+from rbtools.utils.encoding import force_bytes, force_unicode
 from rbtools.utils.filesystem import get_home_path
 
 # Python 2.7.9+ added strict HTTPS certificate validation (finally). These APIs
@@ -49,18 +50,57 @@ RB_COOKIE_NAME = 'rbsessionid'
 
 
 class HttpRequest(object):
-    """High-level HTTP-request object."""
+    """A high-level HTTP request.
+
+    This is used to construct an HTTP request to a Review Board server.
+    It takes in the URL, HTTP method, any query arguments and headers
+    needed to perform the request, and provides methods for building a
+    request payload compatible with the Review Board API.
+
+    Instances are intentionally generic and not tied to :py:mod:`urllib2`,
+    providing API stability and a path toward eventually interfacing with
+    other HTTP backends.
+
+    Attributes:
+        headers (dict):
+            Any HTTP headers to provide in the request.
+
+        url (unicode):
+            The URL to request.
+    """
+
     def __init__(self, url, method='GET', query_args={}, headers={}):
+        """Initialize the HTTP request.
+
+        Args:
+            url (bytes or unicode):
+                The URL to request.
+
+            method (bytes or unicode, optional):
+                The HTTP method to send to the server.
+
+            query_args (dict, optional):
+                Any query arguments to add to the URL.
+
+                All keys and values are expected to be strings (either
+                byte strings or unicode strings).
+
+            headers (dict, optional):
+                Any HTTP headers to provide in the request.
+
+                All keys and values are expected to be strings (either
+                byte strings or unicode strings).
+        """
         self.method = method
-        self._fields = {}
-        self._files = {}
+        self._fields = OrderedDict()
+        self._files = OrderedDict()
 
         # Replace all underscores in each query argument
         # key with dashes.
-        query_args = dict([
-            (key.replace('_', '-'), value)
+        query_args = {
+            force_unicode(key).replace('_', '-'): force_unicode(value)
             for key, value in six.iteritems(query_args)
-        ])
+        }
 
         # Make sure headers are always in the native string type.
         self.headers = {
@@ -77,35 +117,78 @@ class HttpRequest(object):
 
     @property
     def method(self):
+        """The HTTP method to send to the server."""
         return self._method
 
     @method.setter
     def method(self, method):
+        """The HTTP method to send to the server.
+
+        Args:
+            method (bytes or unicode):
+                The HTTP method to send to the server.
+        """
         self._method = str(method)
 
     def add_field(self, name, value):
-        self._fields[name] = value
+        """Add a form-data field for the request.
 
-    def add_file(self, name, filename, content):
-        self._files[name] = {
-            'filename': filename,
-            'content': content,
+        Args:
+            name (bytes or unicode):
+                The name of the field.
+
+            value (bytes or unicode):
+                The value to send for the field.
+
+                For backwards-compatibility, other values will be
+                converted to strings. This may turn into a warning in
+                future releases. Callers are encouraged to only send
+                strings.
+        """
+        if not isinstance(value, (bytes, six.text_type)):
+            value = str(value)
+
+        self._fields[force_bytes(name)] = force_bytes(value)
+
+    def add_file(self, name, filename, content, mimetype=None):
+        """Add an uploaded file for the request.
+
+        Args:
+            name (bytes or unicode):
+                The name of the field representing the file.
+
+            filename (bytes or unicode):
+                The filename.
+
+            content (bytes or unicode):
+                The contents of the file.
+
+            mimetype (bytes or unicode, optional):
+                The optional mimetype of the content. If not provided, it
+                will be guessed.
+        """
+        mimetype = force_bytes(
+            mimetypes.guess_type(force_unicode(filename))[0] or
+            b'application/octet-stream')
+
+        self._files[force_bytes(name)] = {
+            'filename': force_bytes(filename),
+            'content': force_bytes(content),
+            'mimetype': mimetype,
         }
 
-    def del_field(self, name):
-        del self._fields[name]
-
-    def del_file(self, filename):
-        del self._files[filename]
-
     def encode_multipart_formdata(self):
-        """Encodes data for use in an HTTP request.
+        """Encode the request into a multi-aprt form-data payload.
 
-        Parameters:
-            fields - the fields to be encoded.  This should be a dict in a
-                     key:value format
-            files  - the files to be encoded.  This should be a dict in a
-                     key:dict, filename:value and content:value format
+        Returns:
+            tuple:
+            A tuple containing:
+
+            * The content type (:py:class:`unicode`)
+            * The form-data payload (:py:class:`bytes`)
+
+            If there are no fields or files in the request, both values will
+            be ``None``.
         """
         if not (self._fields or self._files):
             return None, None
@@ -114,45 +197,26 @@ class HttpRequest(object):
         BOUNDARY = self._make_mime_boundary()
         content = BytesIO()
 
-        for key in self._fields:
-            content.write(b'--' + BOUNDARY + NEWLINE)
-            content.write(b'Content-Disposition: form-data; '
-                          b'name="%s"' % key.encode('utf-8'))
-            content.write(NEWLINE + NEWLINE)
-
-            if isinstance(self._fields[key], six.binary_type):
-                content.write(self._fields[key] + NEWLINE)
-            else:
-                content.write(
-                    six.text_type(self._fields[key]).encode('utf-8') +
-                    NEWLINE)
-
-        for key in self._files:
-            filename = self._files[key]['filename']
-            value = self._files[key]['content']
-
-            mime_type = mimetypes.guess_type(filename)[0]
-            if mime_type:
-                mime_type = mime_type.encode('utf-8')
-            else:
-                mime_type = b'application/octet-stream'
-
-            content.write(b'--' + BOUNDARY + NEWLINE)
-            content.write(b'Content-Disposition: form-data; name="%s"; '
-                          % key.encode('utf-8'))
-            content.write(b'filename="%s"' % filename.encode('utf-8') +
-                          NEWLINE)
-            content.write(b'Content-Type: %s' % mime_type + NEWLINE)
+        for key, value in six.iteritems(self._fields):
+            content.write(b'--%s%s' % (BOUNDARY, NEWLINE))
+            content.write(b'Content-Disposition: form-data; name="%s"%s'
+                          % (key, NEWLINE))
+            content.write(NEWLINE)
+            content.write(value)
             content.write(NEWLINE)
 
-            if isinstance(value, six.text_type):
-                content.write(value.encode('utf-8'))
-            else:
-                content.write(value)
-
+        for key, file_info in six.iteritems(self._files):
+            content.write(b'--%s%s' % (BOUNDARY, NEWLINE))
+            content.write(b'Content-Disposition: form-data; name="%s"; ' % key)
+            content.write(b'filename="%s"%s' % (file_info['filename'],
+                                                NEWLINE))
+            content.write(b'Content-Type: %s%s' % (file_info['mimetype'],
+                                                   NEWLINE))
+            content.write(NEWLINE)
+            content.write(file_info['content'])
             content.write(NEWLINE)
 
-        content.write(b'--' + BOUNDARY + b'--' + NEWLINE + NEWLINE)
+        content.write(b'--%s--%s%s' % (BOUNDARY, NEWLINE, NEWLINE))
         content_type = ('multipart/form-data; boundary=%s'
                         % BOUNDARY.decode('utf-8'))
 
@@ -161,9 +225,13 @@ class HttpRequest(object):
     def _make_mime_boundary(self):
         """Create a mime boundary.
 
-        This exists because mimetools.choose_boundary() is gone in Python 3.x,
-        and email.generator._make_boundary isn't really appropriate to use
-        here.
+        This exists because :py:func:`mimetools.choose_boundary` is gone in
+        Python 3.x, and :py:func:`email.generator._make_boundary` isn't really
+        appropriate to use here.
+
+        Returns:
+            bytes:
+            The generated boundary.
         """
         fmt = '%%0%dd' % len(repr(sys.maxsize - 1))
         token = random.randrange(sys.maxsize)

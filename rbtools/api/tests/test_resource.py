@@ -229,15 +229,15 @@ class ItemResourceTests(TestWithPayloads):
         """Testing rewriting of extra_data__ parameters to create"""
         r = create_resource(self.transport, self.list_payload, '')
         request = r.create(extra_data__foo='bar')
-        self.assertTrue('extra_data.foo' in request._fields)
-        self.assertEqual(request._fields['extra_data.foo'], 'bar')
+        self.assertTrue(b'extra_data.foo' in request._fields)
+        self.assertEqual(request._fields[b'extra_data.foo'], b'bar')
 
     def test_extra_data_rewriting_update(self):
         """Testing rewriting of exta_data__ parameters to update"""
         r = create_resource(self.transport, self.item_payload, '')
         request = r.update(extra_data__foo='bar')
-        self.assertTrue('extra_data.foo' in request._fields)
-        self.assertEqual(request._fields['extra_data.foo'], 'bar')
+        self.assertTrue(b'extra_data.foo' in request._fields)
+        self.assertEqual(request._fields[b'extra_data.foo'], b'bar')
 
 
 class ListResourceTests(TestWithPayloads):
