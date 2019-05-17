@@ -138,10 +138,10 @@ def execute(command,
             popen_encoding_args['universal_newlines'] = True
 
     if sys.platform.startswith('win'):
-        # Convert all environment variables to byte strings, so that subprocess
-        # doesn't blow up on Windows.
+        # Convert all environment variables to the native string type, so that
+        # subprocess doesn't blow up on Windows.
         new_env = dict(
-            (six.binary_type(key), six.binary_type(value))
+            (str(key), str(value))
             for key, value in six.iteritems(new_env)
         )
 
