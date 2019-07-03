@@ -17,13 +17,17 @@
 # out serve to show the default.
 
 
+from __future__ import unicode_literals
+
+
 # If your extensions are in another directory, add it here. If the
 # directory is relative to the documentation root, use os.path.abspath
 # to make it absolute, like shown here.
 import os
 import sys
-sys.path.append(os.path.abspath('_ext'))
+from datetime import datetime
 
+sys.path.append(os.path.abspath('_ext'))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 import rbtools
 
@@ -54,16 +58,17 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Release Notes'
-copyright = u'2009-2013, Beanbag, Inc.'
-bugtracker_url = 'http://www.reviewboard.org/bugs/%s'
+project = 'Release Notes'
+copyright = '2009-%s, Beanbag, Inc.' % datetime.now().year
+bugtracker_url = 'https://www.reviewboard.org/bugs/%s'
 
 # The version info for the project you're documenting, acts as
 # replacement for |version| and |release|, also used in various other
 # places throughout the built documents.
 #
 # The short X.Y version.
-version = '.'.join([str(i) for i in rbtools.VERSION[:-1][:2]])
+version = '.'.join(str(i) for i in rbtools.VERSION[:-1][:2])
+
 # The full version, including alpha/beta/rc tags.
 release = rbtools.get_version_string()
 
@@ -106,16 +111,16 @@ pygments_style = 'sphinx'
 # Options for HTML output
 # -----------------------
 
-html_theme = 'default'
+html_theme = 'classic'
 
 # The style sheet to use for HTML and HTML Help pages. A file of that
 # name must exist either in Sphinx' static/ path, or in one of the
 # custom paths given in html_static_path.
-html_style = 'default.css'
+html_style = 'classic.css'
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
-html_title = "Release Notes"
+html_title = 'Release Notes'
 
 # A shorter title for the navigation bar.  Default is the same as
 # html_title.
@@ -190,8 +195,13 @@ htmlhelp_basename = 'ReleaseNotes'
 # start file, target name, title, author, document class
 # [howto/manual]).
 latex_documents = [
-    ('contents', 'ReleaseNotes.tex', ur'Release Notes',
-     ur'Christian Hammond', 'manual'),
+    (
+        'contents',
+        'ReleaseNotes.tex',
+        'Release Notes',
+        'Beanbag, Inc.',
+        'manual'
+    ),
 ]
 
 # The name of an image file (relative to this directory) to place at
