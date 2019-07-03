@@ -16,8 +16,11 @@
 # All configuration values have a default; values that are commented
 # out serve to show the default.
 
+from __future__ import unicode_literals
+
 import os
 import sys
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 sys.path.insert(0, os.path.abspath(os.path.join(__file__, '..', '..', '..')))
@@ -60,15 +63,16 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'RBTools Documentation'
-copyright = u'2013, Beanbag, Inc.'
+project = 'RBTools Documentation'
+copyright = '2009-%s, Beanbag, Inc.' % datetime.now().year
 
 # The version info for the project you're documenting, acts as
 # replacement for |version| and |release|, also used in various other
 # places throughout the built documents.
 #
 # The short X.Y version.
-version = '.'.join([str(i) for i in rbtools.VERSION[:-1][:2]])
+version = '.'.join(str(i) for i in rbtools.VERSION[:-1][:2])
+
 # The full version, including alpha/beta/rc tags.
 release = rbtools.get_version_string()
 
@@ -111,10 +115,12 @@ pygments_style = 'sphinx'
 # Options for HTML output
 # -----------------------
 
+html_theme = 'classic'
+
 # The style sheet to use for HTML and HTML Help pages. A file of that
 # name must exist either in Sphinx' static/ path, or in one of the
 # custom paths given in html_static_path.
-html_style = 'default.css'
+html_style = 'classic.css'
 
 # The name for this set of Sphinx documents. If None, it defaults to
 # "<project> v<release> documentation".
@@ -196,8 +202,8 @@ latex_documents = [
     (
         'index',
         'RBtools.tex',
-        ur'RBTools Documentation',
-        ur'Steven MacLeod',
+        'RBTools Documentation',
+        'Beanbag, Inc.',
         'manual'
     ),
 ]

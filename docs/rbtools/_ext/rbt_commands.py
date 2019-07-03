@@ -44,7 +44,7 @@ class CommandDirective(Directive):
 
         try:
             cmd_class = self.get_command_class(class_name)
-        except CommandClassNotFound, e:
+        except CommandClassNotFound as e:
             return e.error_node
 
         # Add the class's file, this extension, and the file containing the
@@ -336,6 +336,6 @@ def setup(app):
     app.add_directive('rbt-command', CommandDirective)
     app.add_directive('rbt-command-usage', CommandUsageDirective)
     app.add_directive('rbt-command-options', CommandOptionsDirective)
-    app.add_crossref_type(directivename=b'rbtcommand',
-                          rolename=b'rbtcommand',
-                          indextemplate=b'pair: %s; RBTools command')
+    app.add_crossref_type(directivename=str('rbtcommand'),
+                          rolename=str('rbtcommand'),
+                          indextemplate=str('pair: %s; RBTools command'))
