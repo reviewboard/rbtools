@@ -423,7 +423,7 @@ class MercurialClient(SCMClient):
                 A dictionary containing ``base`` and ``tip`` keys.
 
         Returns:
-            bytes:
+            unicode:
             The commit messages of all commits between (base, tip].
         """
         rev1 = revisions['base']
@@ -433,14 +433,14 @@ class MercurialClient(SCMClient):
         descs = self._execute(
             ['hg', 'log', '--hidden', '-r', '%s::%s' % (rev1, rev2),
              '--template', '{desc}%s' % delim],
-            env=self._hg_env,
-            results_unicode=False)
+            env=self._hg_env)
+
         # This initial element in the base changeset, which we don't
         # care about. The last element is always empty due to the string
         # ending with <delim>.
         descs = descs.split(delim)[1:-1]
 
-        return b'\n\n'.join([desc.strip() for desc in descs])
+        return '\n\n'.join(desc.strip() for desc in descs)
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
              no_renames=False, extra_args=[]):

@@ -18,6 +18,7 @@ from rbtools.clients import RepositoryInfo
 from rbtools.clients.mercurial import MercurialClient
 from rbtools.clients.tests import (FOO, FOO1, FOO2, FOO3, FOO4, FOO5, FOO6,
                                    SCMClientTests)
+from rbtools.utils.encoding import force_unicode
 from rbtools.utils.filesystem import is_exe_in_path, load_config, make_tempdir
 from rbtools.utils.process import execute
 
@@ -26,12 +27,6 @@ class MercurialTestBase(SCMClientTests):
     """Base class for all Mercurial unit tests."""
 
     def setUp(self):
-        if six.PY3:
-            # Mercurial is working on Python 3 support but it's still quite
-            # broken, especially with any out-of-core extensions installed
-            # (like hgsubversion). Just skip it for now.
-            raise SkipTest
-
         super(MercurialTestBase, self).setUp()
         self._hg_env = {}
 
@@ -104,7 +99,7 @@ class MercurialClientTests(MercurialTestBase):
         self.options.parent_branch = None
 
     def _hg_get_tip(self):
-        return self._run_hg(['identify']).split()[0]
+        return force_unicode(self._run_hg(['identify']).split()[0])
 
     @property
     def clone_hgrc_path(self):
@@ -501,7 +496,7 @@ class MercurialSubversionClientTests(MercurialTestBase):
         except OSError:
             return False
 
-        return not re.search('unknown command [\'"]svn[\'"]', output, re.I)
+        return not re.search(b'unknown command [\'"]svn[\'"]', output, re.I)
 
     def tearDown(self):
         super(MercurialSubversionClientTests, self).tearDown()
@@ -509,9 +504,8 @@ class MercurialSubversionClientTests(MercurialTestBase):
         os.kill(self._svnserve_pid, 9)
 
     def _svn_add_file_commit(self, filename, data, msg, add_file=True):
-        outfile = open(filename, 'w')
-        outfile.write(data)
-        outfile.close()
+        with open(filename, 'wb') as fp:
+            fp.write(data)
 
         if add_file:
             execute(['svn', 'add', filename], ignore_errors=True)
