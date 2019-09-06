@@ -53,27 +53,71 @@ def _load_python_file(filename, config):
         return config
 
 
-def make_tempfile(content=None):
-    """Creates a temporary file and returns the path.
+def make_tempfile(content=None, prefix='rbtools.', suffix=None, filename=None):
+    """Create a temporary file and return the path.
 
-    The path is stored in an array for later cleanup.
+    If not manually removed, then the resulting temp file will be removed when
+    RBTools exits (or if :py:func:`cleanup_tempfiles` is called).
+
+    This can be given an explicit name for a temporary file, in which case
+    the file will be created inside of a temporary directory (created with
+    :py:func:`make_tempdir`. In this case, the parent directory will only
+    be deleted when :py:func:`cleanup_tempfiles` is called.
+
+    Args:
+        content (bytes, optional):
+            The content for the text file.
+
+        prefix (bool, optional):
+            The prefix for the temp filename. This defaults to ``rbtools.``.
+
+        suffix (bool, optional):
+            The suffix for the temp filename.
+
+        filename (unicode, optional):
+            An explicit name of the file. If provided, this will override
+            ``suffix`` and ``prefix``.
+
+    Returns:
+        unicode:
+        The temp file path.
     """
-    fd, tmpfile = tempfile.mkstemp()
+    if filename is not None:
+        tmpdir = make_tempdir()
+        tmpfile = os.path.join(tmpdir, filename)
 
-    if content:
-        os.write(fd, content)
+        with open(tmpfile, 'wb') as fp:
+            if content:
+                fp.write(content)
+    else:
+        with tempfile.NamedTemporaryFile(prefix=prefix,
+                                         suffix=suffix,
+                                         delete=False) as fp:
+            tmpfile = fp.name
 
-    os.close(fd)
+            if content:
+                fp.write(content)
+
     tempfiles.append(tmpfile)
+
     return tmpfile
 
 
 def make_tempdir(parent=None):
-    """Creates a temporary directory and returns the path.
+    """Create a temporary directory and return the path.
 
     The path is stored in an array for later cleanup.
+
+    Args:
+        parent (unicode, optional):
+            An optional parent directory to create the path in.
+
+    Returns:
+        unicode:
+        The name of the new temporary directory.
     """
-    tmpdir = tempfile.mkdtemp(dir=parent)
+    tmpdir = tempfile.mkdtemp(prefix='rbtools.',
+                              dir=parent)
     tempdirs.append(tmpdir)
 
     return tmpdir

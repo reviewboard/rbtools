@@ -5,52 +5,24 @@ import re
 import shutil
 import sys
 
-from rbtools.utils import checks, filesystem, process
+from rbtools.utils import checks, filesystem
 from rbtools.utils.aliases import replace_arguments
+from rbtools.utils.filesystem import (cleanup_tempfiles, make_empty_files,
+                                      make_tempdir, make_tempfile)
+from rbtools.utils.process import execute
 from rbtools.utils.testbase import RBTestBase
 
 
-class UtilitiesTest(RBTestBase):
-    """Tests for rbtools.api units.
+class ChecksTests(RBTestBase):
+    """Unit tests for rbtools.utils.checks."""
 
-    Any new modules created under rbtools/api should be tested here.
-    """
     def test_check_install(self):
-        """Testing "check_install" method."""
+        """Testing check_install"""
         self.assertTrue(checks.check_install([sys.executable, ' --version']))
         self.assertFalse(checks.check_install([self.gen_uuid()]))
 
-    def test_make_tempfile(self):
-        """Testing "make_tempfile" method."""
-        fname = filesystem.make_tempfile()
-
-        self.assertTrue(os.path.isfile(fname))
-        self.assertEqual(os.stat(fname).st_uid, os.geteuid())
-        self.assertTrue(os.access(fname, os.R_OK | os.W_OK))
-
-    def test_make_empty_files(self):
-        """Testing "make_empty_files" method."""
-        # Use make_tempdir to get a unique directory name
-        tmpdir = filesystem.make_tempdir()
-        self.assertTrue(os.path.isdir(tmpdir))
-        filesystem.cleanup_tempfiles()
-
-        fname = os.path.join(tmpdir, 'file')
-        filesystem.make_empty_files([fname])
-        self.assertTrue(os.path.isdir(tmpdir))
-        self.assertTrue(os.path.isfile(fname))
-        self.assertEqual(os.stat(fname).st_uid, os.geteuid())
-        self.assertTrue(os.access(fname, os.R_OK | os.W_OK))
-
-        shutil.rmtree(tmpdir, ignore_errors=True)
-
-    def test_execute(self):
-        """Testing "execute" method."""
-        self.assertTrue(re.match('.*?%d.%d.%d' % sys.version_info[:3],
-                        process.execute([sys.executable, '-V'])))
-
     def test_is_valid_version(self):
-        """Testing "is_valid_version" method."""
+        """Testing is_valid_version"""
         self.assertTrue(checks.is_valid_version((1, 0, 0), (1, 0, 0)))
         self.assertTrue(checks.is_valid_version((1, 1, 0), (1, 0, 0)))
         self.assertTrue(checks.is_valid_version((1, 0, 1), (1, 0, 0)))
@@ -61,6 +33,81 @@ class UtilitiesTest(RBTestBase):
         self.assertFalse(checks.is_valid_version((0, 9, 9), (1, 0, 0)))
         self.assertFalse(checks.is_valid_version((1, 0, 9), (1, 1, 0)))
         self.assertFalse(checks.is_valid_version((1, 1, 0), (1, 1, 1)))
+
+
+class FilesystemTests(RBTestBase):
+    """Unit tests for rbtools.utils.filesystem."""
+
+    def test_make_tempfile(self):
+        """Testing make_tempfile"""
+        filename = make_tempfile()
+        self.assertIn(filename, filesystem.tempfiles)
+
+        self.assertTrue(os.path.isfile(filename))
+        self.assertTrue(os.path.basename(filename).startswith('rbtools.'))
+        self.assertEqual(os.stat(filename).st_uid, os.geteuid())
+        self.assertTrue(os.access(filename, os.R_OK | os.W_OK))
+
+    def test_make_tempfile_with_prefix(self):
+        """Testing make_tempfile with prefix"""
+        filename = make_tempfile(prefix='supertest-')
+
+        self.assertIn(filename, filesystem.tempfiles)
+        self.assertTrue(os.path.isfile(filename))
+        self.assertTrue(os.path.basename(filename).startswith('supertest-'))
+        self.assertEqual(os.stat(filename).st_uid, os.geteuid())
+        self.assertTrue(os.access(filename, os.R_OK | os.W_OK))
+
+    def test_make_tempfile_with_suffix(self):
+        """Testing make_tempfile with suffix"""
+        filename = make_tempfile(suffix='.xyz')
+
+        self.assertIn(filename, filesystem.tempfiles)
+        self.assertTrue(os.path.isfile(filename))
+        self.assertTrue(os.path.basename(filename).startswith('rbtools.'))
+        self.assertTrue(os.path.basename(filename).endswith('.xyz'))
+        self.assertEqual(os.stat(filename).st_uid, os.geteuid())
+        self.assertTrue(os.access(filename, os.R_OK | os.W_OK))
+
+    def test_make_tempfile_with_filename(self):
+        """Testing make_tempfile with filename"""
+        filename = make_tempfile(filename='TEST123')
+
+        self.assertIn(filename, filesystem.tempfiles)
+        self.assertEqual(os.path.basename(filename), 'TEST123')
+        self.assertTrue(os.path.isfile(filename))
+        self.assertTrue(os.access(filename, os.R_OK | os.W_OK))
+        self.assertEqual(os.stat(filename).st_uid, os.geteuid())
+
+        parent_dir = os.path.dirname(filename)
+        self.assertIn(parent_dir, filesystem.tempdirs)
+        self.assertTrue(os.access(parent_dir, os.R_OK | os.W_OK | os.X_OK))
+        self.assertEqual(os.stat(parent_dir).st_uid, os.geteuid())
+
+    def test_make_empty_files(self):
+        """Testing make_empty_files"""
+        # Use make_tempdir to get a unique directory name
+        tmpdir = make_tempdir()
+        self.assertTrue(os.path.isdir(tmpdir))
+        cleanup_tempfiles()
+
+        fname = os.path.join(tmpdir, 'file')
+        make_empty_files([fname])
+        self.assertTrue(os.path.isdir(tmpdir))
+        self.assertTrue(os.path.isfile(fname))
+        self.assertEqual(os.stat(fname).st_uid, os.geteuid())
+        self.assertTrue(os.access(fname, os.R_OK | os.W_OK))
+
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+class ProcessTests(RBTestBase):
+    """Unit tests for rbtools.utils.process."""
+
+    def test_execute(self):
+        """Testing execute"""
+        self.assertTrue(re.match('.*?%d.%d.%d' % sys.version_info[:3],
+                        execute([sys.executable, '-V'])))
 
 
 class AliasTests(RBTestBase):
