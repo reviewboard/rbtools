@@ -10,7 +10,8 @@ from kgb import SpyAgency
 from nose import SkipTest
 
 from rbtools.clients import RepositoryInfo
-from rbtools.clients.errors import (MergeError,
+from rbtools.clients.errors import (CreateCommitError,
+                                    MergeError,
                                     PushError,
                                     TooManyRevisionsError)
 from rbtools.clients.git import GitClient
@@ -1130,80 +1131,107 @@ class GitClientTests(SpyAgency, SCMClientTests):
                          ['git', 'merge', 'new-branch', '--no-ff',
                           '--no-commit'])
 
-    def test_create_commit_run_editor(self):
+    def test_create_commit_with_run_editor_true(self):
         """Testing GitClient.create_commit with run_editor set to True"""
-        # We use a KGB function spy to check if edit_text is called, and then
-        # we intercept the call returning a custom commit message. We then
-        # ensure that execute is called with that custom commit message.
-        self.spy_on(edit_text, call_fake=lambda message: 'new_message')
         self.spy_on(execute)
 
-        foo = open('foo.txt', 'w')
-        foo.write('change')
-        foo.close()
+        with open('foo.txt', 'w') as fp:
+            fp.write('change')
 
-        self.client.create_commit('old_message', self.AUTHOR, True,
-                                  ['foo.txt'])
+        self.client.create_commit(message='Test commit message.',
+                                  author=self.AUTHOR,
+                                  run_editor=True,
+                                  files=['foo.txt'])
 
-        self.assertTrue(edit_text.spy.called)
-        self.assertEqual(execute.spy.last_call.args[0],
-                         ['git', 'commit', '-m', 'new_message',
-                          '--author="name <email>"'])
+        self.assertTrue(execute.last_called_with(
+            ['git', 'commit', '-m', 'TEST COMMIT MESSAGE.',
+             '--author', 'name <email>']))
 
-    def test_create_commit_without_run_editor(self):
+    def test_create_commit_with_run_editor_false(self):
         """Testing GitClient.create_commit with run_editor set to False"""
-        # We use a KGB function spy to check if edit_text is not called. We set
-        # it up so that if edit_text was called, we intercept the call returning
-        # a custom commit message. However, since we are expecting edit_text to
-        # not be called, we ensure that execute is called with the old commit
-        # message (and not the custom new one).
-        self.spy_on(edit_text, call_fake=lambda message: 'new_message')
         self.spy_on(execute)
 
-        foo = open('foo.txt', 'w')
-        foo.write('change')
-        foo.close()
+        with open('foo.txt', 'w') as fp:
+            fp.write('change')
 
-        self.client.create_commit('old_message', self.AUTHOR, False,
-                                  ['foo.txt'])
+        self.client.create_commit(message='Test commit message.',
+                                  author=self.AUTHOR,
+                                  run_editor=False,
+                                  files=['foo.txt'])
 
-        self.assertFalse(edit_text.spy.called)
-        self.assertEqual(execute.spy.last_call.args[0],
-                         ['git', 'commit', '-m', 'old_message',
-                          '--author="name <email>"'])
+        self.assertTrue(execute.last_called_with(
+            ['git', 'commit', '-m', 'Test commit message.',
+             '--author', 'name <email>']))
 
-    def test_create_commit_all_files(self):
+    def test_create_commit_with_all_files_true(self):
         """Testing GitClient.create_commit with all_files set to True"""
-        # We use a KGB function spy to check if execute is called with the
-        # right arguments i.e. with 'git add --all :/' (and not with 'git add
-        # <filenames>').
         self.spy_on(execute)
 
-        foo = open('foo.txt', 'w')
-        foo.write('change')
-        foo.close()
+        with open('foo.txt', 'w') as fp:
+            fp.write('change')
 
-        self.client.create_commit('message', self.AUTHOR, False, [], True)
+        self.client.create_commit(message='message',
+                                  author=self.AUTHOR,
+                                  run_editor=False,
+                                  files=[],
+                                  all_files=True)
 
-        self.assertEqual(execute.spy.calls[0].args[0],
-                         ['git', 'add', '--all', ':/'])
+        self.assertTrue(execute.calls[0].called_with(
+            ['git', 'add', '--all', ':/']))
+        self.assertTrue(execute.last_called_with(
+            ['git', 'commit', '-m', 'message',
+             '--author', 'name <email>']))
 
-    def test_create_commit_without_all_files(self):
+    def test_create_commit_with_all_files_false(self):
         """Testing GitClient.create_commit with all_files set to False"""
-        # We use a KGB function spy to check if execute is called with the
-        # right arguments i.e. with 'git add <filenames>' (and not with 'git add
-        # --all :/').
         self.spy_on(execute)
 
-        foo = open('foo.txt', 'w')
-        foo.write('change')
-        foo.close()
+        with open('foo.txt', 'w') as fp:
+            fp.write('change')
 
-        self.client.create_commit('message', self.AUTHOR, False, ['foo.txt'],
-                                  False)
+        self.client.create_commit(message='message',
+                                  author=self.AUTHOR,
+                                  run_editor=False,
+                                  files=['foo.txt'],
+                                  all_files=False)
 
-        self.assertEqual(execute.spy.calls[0].args[0],
-                         ['git', 'add', 'foo.txt'])
+        self.assertTrue(execute.calls[0].called_with(
+            ['git', 'add', 'foo.txt']))
+        self.assertTrue(execute.last_called_with(
+            ['git', 'commit', '-m', 'message',
+             '--author', 'name <email>']))
+
+    def test_create_commit_with_empty_commit_message(self):
+        """Testing GitClient.create_commit with empty commit message"""
+        with open('foo.txt', 'w') as fp:
+            fp.write('change')
+
+        message = (
+            "A commit message wasn't provided. The patched files are in "
+            "your tree and are staged for commit, but haven't been "
+            "committed. Run `git commit` to commit them."
+        )
+
+        with self.assertRaisesMessage(CreateCommitError, message):
+            self.client.create_commit(message='',
+                                      author=self.AUTHOR,
+                                      run_editor=True,
+                                      files=['foo.txt'])
+
+    def test_create_commit_without_author(self):
+        """Testing GitClient.create_commit without author information"""
+        self.spy_on(execute)
+
+        with open('foo.txt', 'w') as fp:
+            fp.write('change')
+
+        self.client.create_commit(message='Test commit message.',
+                                  author=None,
+                                  run_editor=True,
+                                  files=['foo.txt'])
+
+        self.assertTrue(execute.last_called_with(
+            ['git', 'commit', '-m', 'TEST COMMIT MESSAGE.']))
 
     def test_delete_branch_with_merged_only(self):
         """Testing GitClient.delete_branch with merged_only set to True"""
