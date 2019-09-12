@@ -19,8 +19,12 @@ class RBTestBase(TestCase):
 
     Its side effect in that it change home directory before test suit will
     run. This is because RBTools actively works with files and almost all
-    tests employ file I/O operations."""
+    tests employ file I/O operations.
+    """
+
     def setUp(self):
+        super(RBTestBase, self).setUp()
+
         self._old_cwd = os.getcwd()
         self.old_home = os.environ['HOME']
         self.set_user_home_tmp()
