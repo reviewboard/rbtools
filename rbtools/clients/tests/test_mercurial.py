@@ -16,8 +16,8 @@ from nose import SkipTest
 from six.moves import range
 
 from rbtools.clients import RepositoryInfo
-from rbtools.clients.errors import CreateCommitError
-from rbtools.clients.mercurial import MercurialClient
+from rbtools.clients.errors import CreateCommitError, MergeError
+from rbtools.clients.mercurial import MercurialClient, MercurialRefType
 from rbtools.clients.tests import (FOO, FOO1, FOO2, FOO3, FOO4, FOO5, FOO6,
                                    SCMClientTests)
 from rbtools.utils.encoding import force_unicode
@@ -63,31 +63,45 @@ class MercurialTestBase(SCMClientTests):
                        results_unicode=False,
                        **kwargs)
 
-    def hg_add_file_commit(self, filename, data, msg, branch=None):
+    def hg_add_file_commit(self, filename='test.txt', data=b'Test',
+                           msg='Test commit', branch=None,
+                           bookmark=None, tag=None):
         """Add a file to the repository and commit it.
 
         This can also optionally construct a branch for the commit.
 
         Args:
-            filename (unicode):
+            filename (unicode, optional):
                 The name of the file to write.
 
-            data (bytes):
+            data (bytes, optional):
                 The data to write to the file.
 
-            msg (unicode):
+            msg (unicode, optional):
                 The commit message.
 
             branch (unicode, optional):
                 The optional branch to create.
-        """
-        with open(filename, 'wb') as f:
-            f.write(data)
 
+            bookmark (unicode, optional):
+                The optional bookmark to create.
+
+            tag (unicode, optional):
+                The optional tag to create.
+        """
         if branch:
             self.run_hg(['branch', branch])
 
+        if bookmark:
+            self.run_hg(['bookmark', bookmark])
+
+        with open(filename, 'wb') as f:
+            f.write(data)
+
         self.run_hg(['commit', '-A', '-m', msg, filename])
+
+        if tag:
+            self.run_hg(['tag', tag])
 
 
 class MercurialClientTests(SpyAgency, MercurialTestBase):
@@ -496,6 +510,24 @@ class MercurialClientTests(SpyAgency, MercurialTestBase):
                 'parent_base': start_base,
             })
 
+    def test_get_hg_ref_type(self):
+        """Testing MercurialClient.get_hg_ref_type"""
+        self.hg_add_file_commit(branch='test-branch',
+                                bookmark='test-bookmark',
+                                tag='test-tag')
+        tip = self._hg_get_tip()
+
+        self.assertEqual(self.client.get_hg_ref_type('test-branch'),
+                         MercurialRefType.BRANCH)
+        self.assertEqual(self.client.get_hg_ref_type('test-bookmark'),
+                         MercurialRefType.BOOKMARK)
+        self.assertEqual(self.client.get_hg_ref_type('test-tag'),
+                         MercurialRefType.TAG)
+        self.assertEqual(self.client.get_hg_ref_type(tip),
+                         MercurialRefType.REVISION)
+        self.assertEqual(self.client.get_hg_ref_type('something-invalid'),
+                         MercurialRefType.UNKNOWN)
+
     def test_get_commit_message_with_one_commit_in_range(self):
         """Testing MercurialClient.get_commit_message with range containing
         only one commit
@@ -652,6 +684,183 @@ class MercurialClientTests(SpyAgency, MercurialTestBase):
 
         self.assertTrue(self.client._execute.last_called_with(
             ['hg', 'commit', '-m', 'TEST COMMIT MESSAGE.', 'foo.txt']))
+
+    def test_merge_with_branch_and_close_branch_false(self):
+        """Testing MercurialClient.merge with target branch and
+        close_branch=False
+        """
+        self.hg_add_file_commit(branch='test-branch')
+
+        self.spy_on(self.client._execute)
+        self.client.merge(target='test-branch',
+                          destination='default',
+                          message='My merge commit',
+                          author=self.AUTHOR,
+                          close_branch=False)
+
+        calls = self.client._execute.calls
+        self.assertEqual(len(calls), 5)
+        self.assertTrue(calls[0].called_with(['hg', 'log', '-ql1', '-r',
+                                              'bookmark(test-branch)']))
+        self.assertTrue(calls[1].called_with(['hg', 'branches', '-q']))
+        self.assertTrue(calls[2].called_with(['hg', 'update', 'default']))
+        self.assertTrue(calls[3].called_with(['hg', 'merge', 'test-branch']))
+        self.assertTrue(calls[4].called_with(['hg', 'commit', '-m',
+                                              'My merge commit',
+                                              '-u', 'name <email>']))
+
+    def test_merge_with_branch_and_close_branch_true(self):
+        """Testing MercurialClient.merge with target branch and
+        close_branch=True
+        """
+        self.hg_add_file_commit(branch='test-branch')
+
+        self.spy_on(self.client._execute)
+        self.client.merge(target='test-branch',
+                          destination='default',
+                          message='My merge commit',
+                          author=self.AUTHOR,
+                          close_branch=True)
+
+        calls = self.client._execute.calls
+        self.assertEqual(len(calls), 7)
+        self.assertTrue(calls[0].called_with(['hg', 'log', '-ql1', '-r',
+                                              'bookmark(test-branch)']))
+        self.assertTrue(calls[1].called_with(['hg', 'branches', '-q']))
+        self.assertTrue(calls[2].called_with(['hg', 'update', 'test-branch']))
+        self.assertTrue(calls[3].called_with(['hg', 'commit', '-m',
+                                              'My merge commit',
+                                              '--close-branch']))
+        self.assertTrue(calls[4].called_with(['hg', 'update', 'default']))
+        self.assertTrue(calls[5].called_with(['hg', 'merge', 'test-branch']))
+        self.assertTrue(calls[6].called_with(['hg', 'commit', '-m',
+                                              'My merge commit',
+                                              '-u', 'name <email>']))
+
+    def test_merge_with_bookmark_and_close_branch_false(self):
+        """Testing MercurialClient.merge with target bookmark and
+        close_branch=False
+        """
+        self.run_hg(['branch', 'feature-work'])
+        self.hg_add_file_commit(bookmark='test-bookmark')
+
+        self.spy_on(self.client._execute)
+        self.client.merge(target='test-bookmark',
+                          destination='default',
+                          message='My merge commit',
+                          author=self.AUTHOR,
+                          close_branch=False)
+
+        calls = self.client._execute.calls
+        self.assertEqual(len(calls), 4)
+        self.assertTrue(calls[0].called_with(['hg', 'log', '-ql1', '-r',
+                                              'bookmark(test-bookmark)']))
+        self.assertTrue(calls[1].called_with(['hg', 'update', 'default']))
+        self.assertTrue(calls[2].called_with(['hg', 'merge', 'test-bookmark']))
+        self.assertTrue(calls[3].called_with(['hg', 'commit', '-m',
+                                              'My merge commit',
+                                              '-u', 'name <email>']))
+
+    def test_merge_with_bookmark_and_close_branch_true(self):
+        """Testing MercurialClient.merge with target bookmark and
+        close_branch=True
+        """
+        self.run_hg(['branch', 'feature-work'])
+        self.hg_add_file_commit(bookmark='test-bookmark')
+
+        self.spy_on(self.client._execute)
+        self.client.merge(target='test-bookmark',
+                          destination='default',
+                          message='My merge commit',
+                          author=self.AUTHOR,
+                          close_branch=True)
+
+        calls = self.client._execute.calls
+        self.assertEqual(len(calls), 5)
+        self.assertTrue(calls[0].called_with(['hg', 'log', '-ql1', '-r',
+                                              'bookmark(test-bookmark)']))
+        self.assertTrue(calls[1].called_with(['hg', 'update', 'default']))
+        self.assertTrue(calls[2].called_with(['hg', 'merge', 'test-bookmark']))
+        self.assertTrue(calls[3].called_with(['hg', 'commit', '-m',
+                                              'My merge commit',
+                                              '-u', 'name <email>']))
+        self.assertTrue(calls[4].called_with(['hg', 'bookmark', '-d',
+                                              'test-bookmark']))
+
+    def test_merge_with_tag(self):
+        """Testing MercurialClient.merge with target tag"""
+        self.run_hg(['branch', 'feature-work'])
+        self.hg_add_file_commit(tag='test-tag')
+
+        self.spy_on(self.client._execute)
+        self.client.merge(target='test-tag',
+                          destination='default',
+                          message='My merge commit',
+                          author=self.AUTHOR,
+                          close_branch=True)
+
+        calls = self.client._execute.calls
+        self.assertEqual(len(calls), 6)
+        self.assertTrue(calls[0].called_with(['hg', 'log', '-ql1', '-r',
+                                              'bookmark(test-tag)']))
+        self.assertTrue(calls[1].called_with(['hg', 'branches', '-q']))
+        self.assertTrue(calls[2].called_with(['hg', 'log', '-ql1', '-r',
+                                              'tag(test-tag)']))
+        self.assertTrue(calls[3].called_with(['hg', 'update', 'default']))
+        self.assertTrue(calls[4].called_with(['hg', 'merge', 'test-tag']))
+        self.assertTrue(calls[5].called_with(['hg', 'commit', '-m',
+                                              'My merge commit',
+                                              '-u', 'name <email>']))
+
+    def test_merge_with_revision(self):
+        """Testing MercurialClient.merge with target revision"""
+        self.run_hg(['branch', 'feature-work'])
+        self.hg_add_file_commit()
+        tip = self._hg_get_tip()
+
+        self.spy_on(self.client._execute)
+        self.client.merge(target=tip,
+                          destination='default',
+                          message='My merge commit',
+                          author=self.AUTHOR,
+                          close_branch=True)
+
+        calls = self.client._execute.calls
+        self.assertEqual(len(calls), 7)
+        self.assertTrue(calls[0].called_with(['hg', 'log', '-ql1', '-r',
+                                              'bookmark(%s)' % tip]))
+        self.assertTrue(calls[1].called_with(['hg', 'branches', '-q']))
+        self.assertTrue(calls[2].called_with(['hg', 'log', '-ql1', '-r',
+                                              'tag(%s)' % tip]))
+        self.assertTrue(calls[3].called_with(['hg', 'identify', '-r', tip]))
+        self.assertTrue(calls[4].called_with(['hg', 'update', 'default']))
+        self.assertTrue(calls[5].called_with(['hg', 'merge', tip]))
+        self.assertTrue(calls[6].called_with(['hg', 'commit', '-m',
+                                              'My merge commit',
+                                              '-u', 'name <email>']))
+
+    def test_merge_with_invalid_target(self):
+        """Testing MercurialClient.merge with an invalid target"""
+        expected_message = (
+            'Could not find a valid branch, tag, bookmark, or revision called '
+            '"invalid".'
+        )
+
+        with self.assertRaisesMessage(MergeError, expected_message):
+            self.client.merge(target='invalid',
+                              destination='default',
+                              message='commit message',
+                              author=self.AUTHOR)
+
+    def test_merge_with_invalid_destination(self):
+        """Testing MercurialClient.merge with an invalid destination branch"""
+        expected_message = 'Could not switch to branch "non-existent-branch".'
+
+        with self.assertRaisesMessage(MergeError, expected_message):
+            self.client.merge(target='default',
+                              destination='non-existent-branch',
+                              message='commit message',
+                              author=self.AUTHOR)
 
     def _hg_get_tip(self):
         """Return the revision at the tip of the branch.

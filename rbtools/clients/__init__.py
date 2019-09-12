@@ -70,6 +70,9 @@ class SCMClient(object):
     can_branch = False
     can_bookmark = False
 
+    #: Whether commits can be squashed during merge.
+    can_squash_merges = False
+
     def __init__(self, config=None, options=None):
         """Initialize the client.
 
@@ -519,7 +522,7 @@ class SCMClient(object):
         raise NotImplementedError
 
     def merge(self, target, destination, message, author, squash=False,
-              run_editor=False):
+              run_editor=False, close_branch=True):
         """Merge the target branch with destination branch.
 
         Args:
@@ -542,6 +545,9 @@ class SCMClient(object):
             run_editor (bool, optional):
                 Whether to run the user's editor on the commmit message before
                 committing.
+
+            close_branch (bool, optional):
+                Whether to close/delete the merged branch.
 
         Raises:
             rbtools.clients.errors.MergeError:

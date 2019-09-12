@@ -44,6 +44,7 @@ class GitClient(SCMClient):
     can_push_upstream = True
     can_delete_branch = True
     can_branch = True
+    can_squash_merges = True
 
     TYPE_GIT = 0
     TYPE_GIT_SVN = 1
@@ -1130,7 +1131,7 @@ class GitClient(SCMClient):
         self._execute(['git', 'branch', delete_flag, branch_name])
 
     def merge(self, target, destination, message, author, squash=False,
-              run_editor=False):
+              run_editor=False, close_branch=False, **kwargs):
         """Merge the target branch with destination branch.
 
         Args:
@@ -1153,6 +1154,12 @@ class GitClient(SCMClient):
             run_editor (bool, optional):
                 Whether to run the user's editor on the commmit message before
                 committing.
+
+            close_branch (bool, optional):
+                Whether to delete the branch after merging.
+
+            **kwargs (dict, unused):
+                Additional keyword arguments passed, for future expansion.
 
         Raises:
             rbtools.clients.errors.MergeError:
@@ -1182,6 +1189,9 @@ class GitClient(SCMClient):
                              (target, destination, output))
 
         self.create_commit(message, author, run_editor)
+
+        if close_branch:
+            self.delete_branch(target, merged_only=False)
 
     def push_upstream(self, local_branch):
         """Push the current branch to upstream.

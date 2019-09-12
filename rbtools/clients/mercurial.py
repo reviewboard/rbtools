@@ -13,14 +13,34 @@ from six.moves.urllib.parse import urlsplit, urlunparse
 from rbtools.clients import PatchResult, SCMClient, RepositoryInfo
 from rbtools.clients.errors import (CreateCommitError,
                                     InvalidRevisionSpecError,
-                                    TooManyRevisionsError,
-                                    SCMError)
+                                    MergeError,
+                                    SCMError,
+                                    TooManyRevisionsError)
 from rbtools.clients.svn import SVNClient
 from rbtools.utils.checks import check_install
 from rbtools.utils.console import edit_file
 from rbtools.utils.errors import EditorError
 from rbtools.utils.filesystem import make_empty_files, make_tempfile
 from rbtools.utils.process import execute
+
+
+class MercurialRefType(object):
+    """Types of references in Mercurial."""
+
+    #: Revision hashes.
+    REVISION = 'revision'
+
+    #: Branch names.
+    BRANCH = 'branch'
+
+    #: Bookmark names.
+    BOOKMARK = 'bookmark'
+
+    #: Tag names.
+    TAG = 'tag'
+
+    #: Unknown references.
+    UNKNOWN = 'unknown'
 
 
 class MercurialClient(SCMClient):
@@ -32,8 +52,9 @@ class MercurialClient(SCMClient):
 
     name = 'Mercurial'
     supports_diff_exclude_patterns = True
-    can_branch = True
     can_bookmark = True
+    can_branch = True
+    can_merge = True
 
     PRE_CREATION = '/dev/null'
     PRE_CREATION_DATE = 'Thu Jan 01 00:00:00 1970 +0000'
@@ -415,6 +436,59 @@ class MercurialClient(SCMClient):
 
             self.hgrc[key] = value.strip()
 
+    def get_hg_ref_type(self, ref):
+        """Return the type of a reference in Mercurial.
+
+        This can be used to determine if something is a bookmark, branch,
+        tag, or revision.
+
+        Args:
+            ref (unicode):
+                The reference to return the type for.
+
+        Returns:
+            unicode:
+            The reference type. This will be a value in
+            :py:class:`MercurialRefType`.
+        """
+        # Check for any bookmarks matching ref.
+        rc, output = self._execute(['hg', 'log', '-ql1', '-r',
+                                    'bookmark(%s)' % ref],
+                                   ignore_errors=True,
+                                   return_error_code=True)
+
+        if rc == 0:
+            return MercurialRefType.BOOKMARK
+
+        # Check for any bookmarks matching ref.
+        #
+        # Ideally, we'd use the same sort of log call we'd use for bookmarks
+        # and tags, but it works differently for branches, and will
+        # incorrectly match tags.
+        branches = self._execute(['hg', 'branches', '-q']).split()
+
+        if ref in branches:
+            return MercurialRefType.BRANCH
+
+        # Check for any tags matching ref.
+        rc, output = self._execute(['hg', 'log', '-ql1', '-r',
+                                    'tag(%s)' % ref],
+                                   ignore_errors=True,
+                                   return_error_code=True)
+
+        if rc == 0:
+            return MercurialRefType.TAG
+
+        # Now just check that it exists at all. We'll assume it's a revision.
+        rc, output = self._execute(['hg', 'identify', '-r', ref],
+                                   ignore_errors=True,
+                                   return_error_code=True)
+
+        if rc == 0:
+            return MercurialRefType.REVISION
+
+        return MercurialRefType.UNKNOWN
+
     def get_raw_commit_message(self, revisions):
         """Return the raw commit message.
 
@@ -664,6 +738,86 @@ class MercurialClient(SCMClient):
             self._execute(hg_command)
         except Exception as e:
             raise CreateCommitError(six.text_type(e))
+
+    def merge(self, target, destination, message, author, squash=False,
+              run_editor=False, close_branch=False, **kwargs):
+        """Merge the target branch with destination branch.
+
+        Args:
+            target (unicode):
+                The name of the branch to merge.
+
+            destination (unicode):
+                The name of the branch to merge into.
+
+            message (unicode):
+                The commit message to use.
+
+            author (object):
+                The author of the commit. This is expected to have ``fullname``
+                and ``email`` attributes.
+
+            squash (bool, optional):
+                Whether to squash the commits or do a plain merge. This is not
+                used for Mercurial.
+
+            run_editor (bool, optional):
+                Whether to run the user's editor on the commmit message before
+                committing.
+
+            close_branch (bool, optional):
+                Whether to delete the branch after merging.
+
+            **kwargs (dict, unused):
+                Additional keyword arguments passed, for future expansion.
+
+        Raises:
+            rbtools.clients.errors.MergeError:
+                An error occurred while merging the branch.
+        """
+        ref_type = self.get_hg_ref_type(target)
+
+        if ref_type == MercurialRefType.UNKNOWN:
+            raise MergeError('Could not find a valid branch, tag, bookmark, '
+                             'or revision called "%s".'
+                             % target)
+
+        if close_branch and ref_type == MercurialRefType.BRANCH:
+            try:
+                self._execute(['hg', 'update', target])
+            except Exception as e:
+                raise MergeError('Could not switch to branch "%s".\n\n%s'
+                                 % (target, e))
+
+            try:
+                self._execute(['hg', 'commit', '-m', message,
+                               '--close-branch'])
+            except Exception as e:
+                raise MergeError('Could not close branch "%s".\n\n%s'
+                                 % (target, e))
+
+        try:
+            self._execute(['hg', 'update', destination])
+        except Exception as e:
+            raise MergeError('Could not switch to branch "%s".\n\n%s'
+                             % (destination, e))
+
+        try:
+            self._execute(['hg', 'merge', target])
+        except Exception as e:
+            raise MergeError('Could not merge %s "%s" into "%s".\n\n%s'
+                             % (ref_type, target, destination, e))
+
+        self.create_commit(message=message,
+                           author=author,
+                           run_editor=run_editor)
+
+        if close_branch and ref_type == MercurialRefType.BOOKMARK:
+            try:
+                self._execute(['hg', 'bookmark', '-d', target])
+            except Exception as e:
+                raise MergeError('Could not delete bookmark "%s".\n\n%s'
+                                 % (target, e))
 
     def _get_current_branch(self):
         """Return the current branch of this repository.
