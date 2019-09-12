@@ -30,6 +30,8 @@ class RBTestBase(TestCase):
         self.set_user_home_tmp()
 
     def tearDown(self):
+        super(RBTestBase, self).tearDown()
+
         os.chdir(self._old_cwd)
         cleanup_tempfiles()
 
