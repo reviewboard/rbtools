@@ -1,6 +1,9 @@
 from __future__ import print_function, unicode_literals
 
+import six
+
 from rbtools.api.errors import APIError
+from rbtools.clients.errors import CreateCommitError
 from rbtools.commands import Command, CommandError, Option
 from rbtools.utils.commands import extract_commit_message
 from rbtools.utils.filesystem import make_tempfile
@@ -215,9 +218,13 @@ class Patch(Command):
                 author = review_request.get_submitter()
 
                 try:
-                    tool.create_commit(message, author,
-                                       not self.options.commit_no_edit)
+                    tool.create_commit(
+                        message=message,
+                        author=author,
+                        run_editor=not self.options.commit_no_edit)
                     print('Changes committed to current branch.')
+                except CreateCommitError as e:
+                    raise CommandError(six.text_type(e))
                 except NotImplementedError:
                     raise CommandError('--commit is not supported with %s'
                                        % tool.name)

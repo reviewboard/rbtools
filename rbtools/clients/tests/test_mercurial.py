@@ -11,10 +11,12 @@ from random import randint
 from textwrap import dedent
 
 import six
-from six.moves import range
+from kgb import SpyAgency
 from nose import SkipTest
+from six.moves import range
 
 from rbtools.clients import RepositoryInfo
+from rbtools.clients.errors import CreateCommitError
 from rbtools.clients.mercurial import MercurialClient
 from rbtools.clients.tests import (FOO, FOO1, FOO2, FOO3, FOO4, FOO5, FOO6,
                                    SCMClientTests)
@@ -58,7 +60,7 @@ class MercurialTestBase(SCMClientTests):
         self._run_hg(['commit', '-m', msg])
 
 
-class MercurialClientTests(MercurialTestBase):
+class MercurialClientTests(SpyAgency, MercurialTestBase):
     """Unit tests for MercurialClient."""
 
     TESTSERVER = 'http://127.0.0.1:8080'
@@ -77,8 +79,17 @@ class MercurialClientTests(MercurialTestBase):
     git = true
     """).rstrip()
 
+    AUTHOR = type(
+        str('Author'),
+        (object,),
+        {
+            'fullname': 'name',
+            'email': 'email',
+        })
+
     def setUp(self):
         super(MercurialClientTests, self).setUp()
+
         if not is_exe_in_path('hg'):
             raise SkipTest('hg not found in path')
 
@@ -430,6 +441,103 @@ class MercurialClientTests(MercurialTestBase):
 
         self.assertEqual(commit_message['summary'], 'commit 2')
         self.assertEqual(commit_message['description'], 'desc2')
+
+    def test_create_commit_with_run_editor_true(self):
+        """Testing MercurialClient.create_commit with run_editor set to True"""
+        self.spy_on(self.client._execute)
+
+        with open('foo.txt', 'w') as fp:
+            fp.write('change')
+
+        self.client.create_commit(message='Test commit message.',
+                                  author=self.AUTHOR,
+                                  run_editor=True,
+                                  files=['foo.txt'])
+
+        self.assertTrue(self.client._execute.last_called_with(
+            ['hg', 'commit', '-m', 'TEST COMMIT MESSAGE.', '-u',
+             'name <email>', 'foo.txt']))
+
+    def test_create_commit_with_run_editor_false(self):
+        """Testing MercurialClient.create_commit with run_editor set to False
+        """
+        self.spy_on(self.client._execute)
+
+        with open('foo.txt', 'w') as fp:
+            fp.write('change')
+
+        self.client.create_commit(message='Test commit message.',
+                                  author=self.AUTHOR,
+                                  run_editor=False,
+                                  files=['foo.txt'])
+
+        self.assertTrue(self.client._execute.last_called_with(
+            ['hg', 'commit', '-m', 'Test commit message.', '-u',
+             'name <email>', 'foo.txt']))
+
+    def test_create_commit_with_all_files_true(self):
+        """Testing MercurialClient.create_commit with all_files set to True"""
+        self.spy_on(self.client._execute)
+
+        with open('foo.txt', 'w') as fp:
+            fp.write('change')
+
+        self.client.create_commit(message='message',
+                                  author=self.AUTHOR,
+                                  run_editor=False,
+                                  files=[],
+                                  all_files=True)
+
+        self.assertTrue(self.client._execute.last_called_with(
+            ['hg', 'commit', '-m', 'message', '-u', 'name <email>', '-A']))
+
+    def test_create_commit_with_all_files_false(self):
+        """Testing MercurialClient.create_commit with all_files set to False"""
+        self.spy_on(self.client._execute)
+
+        with open('foo.txt', 'w') as fp:
+            fp.write('change')
+
+        self.client.create_commit(message='message',
+                                  author=self.AUTHOR,
+                                  run_editor=False,
+                                  files=['foo.txt'],
+                                  all_files=False)
+
+        self.assertTrue(self.client._execute.last_called_with(
+            ['hg', 'commit', '-m', 'message', '-u', 'name <email>',
+             'foo.txt']))
+
+    def test_create_commit_with_empty_commit_message(self):
+        """Testing MercurialClient.create_commit with empty commit message"""
+        with open('foo.txt', 'w') as fp:
+            fp.write('change')
+
+        message = (
+            "A commit message wasn't provided. The patched files are in "
+            "your tree but haven't been committed."
+        )
+
+        with self.assertRaisesMessage(CreateCommitError, message):
+            self.client.create_commit(message='',
+                                      author=self.AUTHOR,
+                                      run_editor=True,
+                                      files=['foo.txt'])
+
+    def test_create_commit_without_author(self):
+        """Testing MercurialClient.create_commit without author information"""
+        self.spy_on(self.client._execute)
+
+        with open('foo.txt', 'w') as fp:
+            fp.write('change')
+
+        self.client.create_commit(message='Test commit message.',
+                                  author=None,
+                                  run_editor=True,
+                                  files=['foo.txt'])
+
+        self.assertTrue(self.client._execute.last_called_with(
+            ['hg', 'commit', '-m', 'TEST COMMIT MESSAGE.', 'foo.txt']))
 
 
 class MercurialSubversionClientTests(MercurialTestBase):

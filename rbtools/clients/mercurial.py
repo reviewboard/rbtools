@@ -7,16 +7,19 @@ import os
 import re
 import uuid
 
+import six
 from six.moves.urllib.parse import urlsplit, urlunparse
 
 from rbtools.clients import PatchResult, SCMClient, RepositoryInfo
-from rbtools.clients.errors import (InvalidRevisionSpecError,
+from rbtools.clients.errors import (CreateCommitError,
+                                    InvalidRevisionSpecError,
                                     TooManyRevisionsError,
                                     SCMError)
 from rbtools.clients.svn import SVNClient
 from rbtools.utils.checks import check_install
-from rbtools.utils.filesystem import make_empty_files
-from rbtools.utils.console import edit_text
+from rbtools.utils.console import edit_file
+from rbtools.utils.errors import EditorError
+from rbtools.utils.filesystem import make_empty_files, make_tempfile
 from rbtools.utils.process import execute
 
 
@@ -612,16 +615,38 @@ class MercurialClient(SCMClient):
             all_files (bool, optional):
                 Whether to commit all changed files, ignoring the ``files``
                 argument.
+
+        Raises:
+            rbtools.clients.errors.CreateCommitError:
+                The commit message could not be created. It may have been
+                aborted by the user.
         """
         if run_editor:
-            modified_message = edit_text(message)
+            filename = make_tempfile(message.encode('utf-8'),
+                                     prefix='hg-editor-',
+                                     suffix='.txt')
+
+            try:
+                modified_message = edit_file(filename)
+            except EditorError as e:
+                raise CreateCommitError(six.text_type(e))
+            finally:
+                try:
+                    os.unlink(filename)
+                except OSError:
+                    pass
         else:
             modified_message = message
+
+        if not modified_message.strip():
+            raise CreateCommitError(
+                "A commit message wasn't provided. The patched files are in "
+                "your tree but haven't been committed.")
 
         hg_command = ['hg', 'commit', '-m', modified_message]
 
         try:
-            hg_command.append('-u %s <%s>' % (author.fullname, author.email))
+            hg_command += ['-u', '%s <%s>' % (author.fullname, author.email)]
         except AttributeError:
             # Users who have marked their profile as private won't include the
             # fullname or email fields in the API payload. Just commit as the
@@ -630,7 +655,15 @@ class MercurialClient(SCMClient):
                             'information as private. Committing without '
                             'author attribution.')
 
-        execute(hg_command + files)
+        if all_files:
+            hg_command.append('-A')
+        else:
+            hg_command += files
+
+        try:
+            self._execute(hg_command)
+        except Exception as e:
+            raise CreateCommitError(six.text_type(e))
 
     def _get_current_branch(self):
         """Return the current branch of this repository.
@@ -805,16 +838,20 @@ class MercurialClient(SCMClient):
             tuple:
             The result of the execute call.
         """
+        # Don't modify the original arguments passed in. This interferes
+        # with testing and could mess up callers.
+        cmd = list(cmd)
+
         if not self.hidden_changesets_supported and '--hidden' in cmd:
             cmd = [p for p in cmd if p != '--hidden']
 
         # Add our extension which normalizes settings. This is the easiest
         # way to normalize settings since it doesn't require us to chase
         # a tail of diff-related config options.
-        cmd.extend([
+        cmd += [
             '--config',
             'extensions.rbtoolsnormalize=%s' % self._hgext_path
-        ])
+        ]
 
         return execute(cmd, *args, **kwargs)
 

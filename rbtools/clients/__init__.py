@@ -459,6 +459,14 @@ class SCMClient(object):
             all_files (bool, optional):
                 Whether to commit all changed files, ignoring the ``files``
                 argument.
+
+        Raises:
+            NotImplementedError:
+                The client does not support creating commits.
+
+            rbtools.clients.errors.CreateCommitError:
+                The commit message could not be created. It may have been
+                aborted by the user.
         """
         raise NotImplementedError
 
