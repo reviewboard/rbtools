@@ -11,7 +11,10 @@ import six
 from six.moves import zip
 
 from rbtools.clients import PatchResult, SCMClient, RepositoryInfo
-from rbtools.clients.errors import (AmendError, MergeError, PushError,
+from rbtools.clients.errors import (AmendError,
+                                    CreateCommitError,
+                                    MergeError,
+                                    PushError,
                                     InvalidRevisionSpecError,
                                     TooManyRevisionsError,
                                     SCMError)
@@ -21,6 +24,7 @@ from rbtools.utils.checks import check_install, is_valid_version
 from rbtools.utils.console import edit_text
 from rbtools.utils.diffs import (normalize_patterns,
                                  remove_filenames_matching_patterns)
+from rbtools.utils.errors import EditorError
 from rbtools.utils.process import execute
 
 
@@ -44,6 +48,7 @@ class GitClient(SCMClient):
     can_push_upstream = True
     can_delete_branch = True
     can_branch = True
+    can_squash_merges = True
 
     TYPE_GIT = 0
     TYPE_GIT_SVN = 1
@@ -1096,22 +1101,39 @@ class GitClient(SCMClient):
             all_files (bool, optional):
                 Whether to commit all changed files, ignoring the ``files``
                 argument.
+
+        Raises:
+            rbtools.clients.errors.CreateCommitError:
+                The commit message could not be created. It may have been
+                aborted by the user.
         """
+        try:
+            if all_files:
+                self._execute(['git', 'add', '--all', ':/'])
+            elif files:
+                self._execute(['git', 'add'] + files)
+        except Exception as e:
+            raise CreateCommitError(six.text_type(e))
+
         if run_editor:
-            modified_message = edit_text(message)
+            try:
+                modified_message = edit_text(message,
+                                             filename='COMMIT_EDITMSG')
+            except EditorError as e:
+                raise CreateCommitError(six.text_type(e))
         else:
             modified_message = message
 
-        if all_files:
-            self._execute(['git', 'add', '--all', ':/'])
-        elif files:
-            self._execute(['git', 'add'] + files)
+        if not modified_message.strip():
+            raise CreateCommitError(
+                "A commit message wasn't provided. The patched files are in "
+                "your tree and are staged for commit, but haven't been "
+                "committed. Run `git commit` to commit them.")
 
         cmd = ['git', 'commit', '-m', modified_message]
 
         try:
-            cmd.append('--author="%s <%s>"'
-                       % (author.fullname, author.email))
+            cmd += ['--author', '%s <%s>' % (author.fullname, author.email)]
         except AttributeError:
             # Users who have marked their profile as private won't include the
             # fullname or email fields in the API payload. Just commit as the
@@ -1120,7 +1142,10 @@ class GitClient(SCMClient):
                             'information as private. Committing without '
                             'author attribution.')
 
-        self._execute(cmd)
+        try:
+            self._execute(cmd)
+        except Exception as e:
+            raise CreateCommitError(six.text_type(e))
 
     def delete_branch(self, branch_name, merged_only=True):
         """Delete the specified branch.
@@ -1141,7 +1166,7 @@ class GitClient(SCMClient):
         self._execute(['git', 'branch', delete_flag, branch_name])
 
     def merge(self, target, destination, message, author, squash=False,
-              run_editor=False):
+              run_editor=False, close_branch=False, **kwargs):
         """Merge the target branch with destination branch.
 
         Args:
@@ -1164,6 +1189,12 @@ class GitClient(SCMClient):
             run_editor (bool, optional):
                 Whether to run the user's editor on the commmit message before
                 committing.
+
+            close_branch (bool, optional):
+                Whether to delete the branch after merging.
+
+            **kwargs (dict, unused):
+                Additional keyword arguments passed, for future expansion.
 
         Raises:
             rbtools.clients.errors.MergeError:
@@ -1193,6 +1224,9 @@ class GitClient(SCMClient):
                              (target, destination, output))
 
         self.create_commit(message, author, run_editor)
+
+        if close_branch:
+            self.delete_branch(target, merged_only=False)
 
     def push_upstream(self, local_branch):
         """Push the current branch to upstream.

@@ -1,6 +1,7 @@
 from __future__ import print_function, unicode_literals
 
 import getpass
+import logging
 import os
 import subprocess
 import sys
@@ -8,7 +9,12 @@ import sys
 from distutils.util import strtobool
 from six.moves import input
 
+from rbtools.utils.encoding import force_unicode
+from rbtools.utils.errors import EditorError
 from rbtools.utils.filesystem import make_tempfile
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_input(prompt, require=False):
@@ -92,23 +98,80 @@ def confirm(question):
             print('%s is not a valid answer.' % answer)
 
 
-def edit_text(content):
-    """Allows a user to edit a block of text and returns the saved result.
+def edit_file(filename):
+    """Run a user-configured editor to edit an existing file.
 
-    The environment's default text editor is used if available, otherwise
-    vi is used.
+    This will run a configured text editor (trying the :envvar:`VISUAL` or
+    :envvar:`EDITOR` environment variables, falling back on :program:`vi`)
+    to request text for use in a commit message or some other purpose.
+
+    Args:
+        filename (unicode):
+            The file to edit.
+
+    Returns:
+        unicode:
+        The resulting content.
+
+    Raises:
+        rbcommons.utils.errors.EditorError:
+            The configured editor could not be run, or it failed with an
+            error.
     """
-    tempfile = make_tempfile(content.encode('utf8'))
-    editor = os.environ.get('VISUAL') or os.environ.get('EDITOR') or 'vi'
+    if not os.path.exists(filename):
+        raise EditorError('The file "%s" does not exist or is not accessible.'
+                          % filename)
+
+    editor = force_unicode(
+        os.environ.get(str('RBTOOLS_EDITOR')) or
+        os.environ.get(str('VISUAL')) or
+        os.environ.get(str('EDITOR')) or
+        'vi'
+    )
+
     try:
-        subprocess.call(editor.split() + [tempfile])
+        subprocess.call(editor.split() + [filename])
     except OSError:
-        print('No editor found. Set EDITOR environment variable or install '
-              'vi.')
-        raise
+        raise EditorError('The editor "%s" was not found or could not be run. '
+                          'Make sure the EDITOR environment variable is set '
+                          'to your preferred editor.'
+                          % editor)
 
-    f = open(tempfile)
-    result = f.read()
-    f.close()
+    try:
+        with open(filename, 'r') as fp:
+            return force_unicode(fp.read())
+    except IOError:
+        raise EditorError('The edited file "%s" was deleted during edit.'
+                          % filename)
 
-    return result.decode('utf8')
+
+def edit_text(content='', filename=None):
+    """Run a user-configured editor to prompt for text.
+
+    This will run a configured text editor (trying the :envvar:`VISUAL` or
+    :envvar:`EDITOR` environment variables, falling back on :program:`vi`)
+    to request text for use in a commit message or some other purpose.
+
+    Args:
+        content (unicode, optional):
+            Existing content to edit.
+
+        filename (unicode, optional):
+            The optional name of the temp file to edit. This can be used to
+            help the editor provide a proper editing environment for the
+            file.
+
+    Returns:
+        unicode:
+        The resulting content.
+
+    Raises:
+        rbcommons.utils.errors.EditorError:
+            The configured editor could not be run, or it failed with an
+            error.
+    """
+    tempfile = make_tempfile(content.encode('utf8'), filename=filename)
+    result = edit_file(tempfile)
+    os.unlink(tempfile)
+
+    return result

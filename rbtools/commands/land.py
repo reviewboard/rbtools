@@ -175,7 +175,34 @@ class Land(Command):
 
     def land(self, destination_branch, review_request, source_branch=None,
              squash=False, edit=False, delete_branch=True, dry_run=False):
-        """Land an individual review request."""
+        """Land an individual review request.
+
+        Args:
+            destination_branch (unicode):
+                The destination branch that the change will be committed or
+                merged to.
+
+            review_request (rbtools.api.resource.ReviewRequestResource):
+                The review request containing the change to land.
+
+            source_branch (unicode, optional):
+                The source branch to land, if landing from a local branch.
+
+            squash (bool, optional):
+                Whether to squash the changes on the branch, for repositories
+                that support it.
+
+            edit (bool, optional):
+                Whether to edit the commit message before landing.
+
+            delete_branch (bool, optional):
+                Whether to delete/close the branch, if landing from a local
+                branch.
+
+            dry_run (bool, optional):
+                Whether to simulate landing without actually changing the
+                repository.
+        """
         if source_branch:
             review_commit_message = extract_commit_message(review_request)
             author = review_request.get_submitter()
@@ -189,20 +216,15 @@ class Land(Command):
 
             if not dry_run:
                 try:
-                    self.tool.merge(source_branch,
-                                    destination_branch,
-                                    review_commit_message,
-                                    author,
-                                    squash,
-                                    edit)
+                    self.tool.merge(target=source_branch,
+                                    destination=destination_branch,
+                                    message=review_commit_message,
+                                    author=author,
+                                    squash=squash,
+                                    run_editor=edit,
+                                    close_branch=delete_branch)
                 except MergeError as e:
                     raise CommandError(six.text_type(e))
-
-            if delete_branch:
-                print('Deleting merged branch "%s".' % source_branch)
-
-                if not dry_run:
-                    self.tool.delete_branch(source_branch, merged_only=False)
         else:
             print('Applying patch from review request %s.' % review_request.id)
 
@@ -228,10 +250,12 @@ class Land(Command):
         # Check if repository info on reviewboard server match local ones.
         repository_info = repository_info.find_server_repository_info(api_root)
 
-        if (not self.tool.can_merge or
-            not self.tool.can_push_upstream or
-            not self.tool.can_delete_branch):
+        if not self.tool.can_merge:
             raise CommandError('This command does not support %s repositories.'
+                               % self.tool.name)
+
+        if self.options.push and not self.tool.can_push_upstream:
+            raise CommandError('--push is not supported for %s repositories.'
                                % self.tool.name)
 
         if self.tool.has_pending_changes():
@@ -240,18 +264,22 @@ class Land(Command):
         if not self.options.destination_branch:
             raise CommandError('Please specify a destination branch.')
 
+        if not self.tool.can_squash_merges:
+            # If the client doesn't support squashing, then never squash.
+            self.options.squash = False
+
         if self.options.rid:
             is_local = branch_name is not None
             review_request_id = self.options.rid
         else:
             try:
                 review_request = guess_existing_review_request(
-                    repository_info,
-                    self.options.repository_name,
-                    api_root,
-                    api_client,
-                    self.tool,
-                    get_revisions(self.tool, self.cmd_args),
+                    repository_info=repository_info,
+                    repository_name=self.options.repository_name,
+                    api_root=api_root,
+                    api_client=api_client,
+                    tool=self.tool,
+                    revisions=get_revisions(self.tool, self.cmd_args),
                     guess_summary=False,
                     guess_description=False,
                     is_fuzzy_match_func=self._ask_review_request_match)
@@ -292,6 +320,14 @@ class Land(Command):
             raise CommandError('Cannot land review request %s: %s'
                                % (review_request_id, land_error))
 
+        land_kwargs = {
+            'delete_branch': self.options.delete_branch,
+            'destination_branch': self.options.destination_branch,
+            'dry_run': self.options.dry_run,
+            'edit': self.options.edit,
+            'squash': self.options.squash,
+        }
+
         if self.options.recursive:
             # The dependency graph shows us which review requests depend on
             # which other ones. What we are actually after is the order to land
@@ -316,21 +352,11 @@ class Land(Command):
                             % (review_request_id, dependency.id, land_error))
 
                 for dependency in reversed(dependencies):
-                    self.land(self.options.destination_branch,
-                              dependency,
-                              None,
-                              self.options.squash,
-                              self.options.edit,
-                              self.options.delete_branch,
-                              self.options.dry_run)
+                    self.land(review_request=dependency, **land_kwargs)
 
-        self.land(self.options.destination_branch,
-                  review_request,
-                  branch_name,
-                  self.options.squash,
-                  self.options.edit,
-                  self.options.delete_branch,
-                  self.options.dry_run)
+        self.land(review_request=review_request,
+                  source_branch=branch_name,
+                  **land_kwargs)
 
         if self.options.push:
             print('Pushing branch "%s" upstream'

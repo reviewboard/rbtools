@@ -11,6 +11,10 @@ class AuthenticationError(Exception):
     """An error for when authentication fails."""
 
 
+class CreateCommitError(Exception):
+    """The creation of a commit has failed or was aborted."""
+
+
 class MergeError(Exception):
     """An error for when merging two branches fails."""
 
