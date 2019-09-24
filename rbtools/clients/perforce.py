@@ -23,6 +23,7 @@ from rbtools.clients.errors import (AmendError,
                                     SCMError,
                                     TooManyRevisionsError)
 from rbtools.utils.checks import check_gnu_diff, check_install
+from rbtools.utils.encoding import force_unicode
 from rbtools.utils.filesystem import make_empty_files, make_tempfile
 from rbtools.utils.process import execute
 
@@ -253,6 +254,22 @@ class P4Wrapper(object):
             **kwargs (dict):
                 Additional keyword arguments to pass through to
                 :py:func:`rbtools.utils.process.execute`.
+
+        Returns:
+            object:
+            If passing ``marshalled=True``, then this will be a list of
+            dictionaries containing results from the command.
+
+            If passing ``input_string``, this will always return ``None``.
+
+            In all other cases, this will return the result of
+            :py:func:`~rbtools.utils.process.execute`, depending on the
+            arguments provided.
+
+        Raises:
+            rbtools.clients.errors.SCMError:
+                There was an error with the call to Perforce. Details are in
+                the error message.
         """
         cmd = ['p4']
 
@@ -277,12 +294,39 @@ class P4Wrapper(object):
 
             while 1:
                 try:
-                    data = marshal.load(p.stdout)
+                    decoded_data = marshal.load(p.stdout)
                 except EOFError:
                     break
                 else:
+                    # According to the Perforce documentation, we should always
+                    # expect the decoded data to come back as a dictionary.
+                    # Let's double-check this.
+                    if not isinstance(decoded_data, dict):
+                        logging.debug('Unexpected decoded data from Perforce '
+                                      'command: %r',
+                                      decoded_data)
+                        raise SCMError('Expected a dictionary from Perforce, '
+                                       'but got back a %s instead. Please '
+                                       'file a bug about this.'
+                                       % type(decoded_data))
+
+                    # The dictionary data should consist of byte strings.
+                    # We need to convert these over to Unicode.
+                    data = {}
+
+                    for key, value in six.iteritems(decoded_data):
+                        key = force_unicode(key)
+
+                        # Values are typically strings, but error payloads
+                        # contain integers as well.
+                        if isinstance(value, bytes):
+                            value = force_unicode(value)
+
+                        data[key] = value
+
                     result.append(data)
-                    if data.get('code', None) == 'error':
+
+                    if data.get('code') == 'error':
                         has_error = True
 
             rc = p.wait()
@@ -292,19 +336,17 @@ class P4Wrapper(object):
                     if 'data' in record:
                         print(record['data'])
 
-                raise SCMError('Failed to execute command: %s\n' % cmd)
+                raise SCMError('Failed to execute command: %s' % cmd)
 
             return result
-
         elif input_string is not None:
             p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
             p.communicate(input_string)  # Send input, wait, set returncode
 
             if not ignore_errors and p.returncode:
-                raise SCMError('Failed to execute command: %s\n' % cmd)
+                raise SCMError('Failed to execute command: %s' % cmd)
 
             return None
-
         else:
             result = execute(cmd, ignore_errors=ignore_errors, *args, **kwargs)
 
@@ -1799,7 +1841,7 @@ class PerforceClient(SCMClient):
         change = self.p4.change(changelist)
 
         if len(change) == 1 and 'Description' in change[0]:
-            return change[0]['Description'].decode(getpreferredencoding())
+            return change[0]['Description']
         else:
             return ''
 
