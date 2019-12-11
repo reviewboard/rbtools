@@ -1315,7 +1315,11 @@ class GitClient(SCMClient):
         if remote:
             return remote
 
-        all_remotes = self._execute(['git', 'remote'], split_lines=True)
+        all_remotes = [
+            _remote.strip()
+            for _remote in self._execute(['git', 'remote'],
+                                         split_lines=True)
+        ]
 
         if len(all_remotes) >= 1:
             # We prefer "origin" if it's present, otherwise just choose at
