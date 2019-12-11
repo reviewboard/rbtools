@@ -91,7 +91,7 @@ def make_tempfile(content=None, prefix='rbtools.', suffix=None, filename=None):
                 fp.write(content)
     else:
         with tempfile.NamedTemporaryFile(prefix=prefix,
-                                         suffix=suffix,
+                                         suffix=suffix or '',
                                          delete=False) as fp:
             tmpfile = fp.name
 
