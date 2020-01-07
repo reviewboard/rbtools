@@ -2,6 +2,8 @@ from __future__ import unicode_literals
 
 import six
 
+from rbtools.utils.encoding import force_unicode
+
 
 class APIError(Exception):
     def __init__(self, http_status, error_code, rsp=None, *args, **kwargs):
@@ -49,7 +51,13 @@ class ServerInterfaceError(Exception):
         self.msg = msg
 
     def __str__(self):
-        return self.msg
+        """Return the error message as a unicode string.
+
+        Returns:
+            unicode:
+            The error message as a unicode string.
+        """
+        return force_unicode(self.msg)
 
 
 API_ERROR_TYPE = {
