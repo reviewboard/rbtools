@@ -98,7 +98,7 @@ class HttpRequest(object):
         # Replace all underscores in each query argument
         # key with dashes.
         query_args = {
-            self.encode_url_key(key): self.encode_url_value(value)
+            self.encode_url_key(key): self.encode_url_value(key, value)
             for key, value in six.iteritems(query_args)
         }
 
