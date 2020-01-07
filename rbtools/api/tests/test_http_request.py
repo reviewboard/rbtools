@@ -137,3 +137,78 @@ class HttpRequestTests(SpyAgency, TestCase):
             b'\xff'
             b'\r\n'
             b'--BOUNDARY--\r\n\r\n')
+
+    def test_encode_query_args(self):
+        """Testing the encoding of query arguments"""
+        request = HttpRequest(
+            url='/',
+            method='GET',
+            query_args={
+                'long_arg': 'long',
+                'float': 1.2,
+                'int': 5,
+                'byte': b'binary',
+                'true': True,
+                'false': False,
+            })
+
+        query_args = dict(parse_qsl(urlparse(request.url).query))
+
+        self.assertEqual(
+            query_args,
+            {
+                'long-arg': 'long',
+                'float': '1.2',
+                'int': '5',
+                'byte': 'binary',
+                'true': '1',
+                'false': '0',
+            })
+
+        for key, value in six.iteritems(query_args):
+            self.assertIsInstance(key, six.text_type)
+            self.assertIsInstance(value, six.text_type)
+
+    def test_encode_query_args_invalid(self):
+        """Testing the encoding of query arguments with invalid keys and
+        values
+        """
+        with self.assertRaises(ValueError):
+            HttpRequest(
+                url='/',
+                method='GET',
+                query_args={
+                    1: 'value',
+                })
+
+        with self.assertRaises(ValueError):
+            HttpRequest(
+                url='/',
+                method='GET',
+                query_args={
+                    1.2: 'value',
+                })
+
+        with self.assertRaises(ValueError):
+            HttpRequest(
+                url='/',
+                method='GET',
+                query_args={
+                    True: 'value',
+                })
+
+        with self.assertRaises(ValueError):
+            HttpRequest(
+                url='/',
+                method='GET',
+                query_args={
+                    'key': {'adsf': 'jkl;'},
+                })
+
+        with self.assertRaises(ValueError):
+            HttpRequest(
+                url='/',
+                method='GET',
+                query_args={
+                    'key': ['a', 'b', 'c'],
+                })
