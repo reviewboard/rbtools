@@ -98,7 +98,7 @@ class HttpRequest(object):
         # Replace all underscores in each query argument
         # key with dashes.
         query_args = {
-            force_unicode(key).replace('_', '-'): force_unicode(value)
+            self.encode_url_key(key): self.encode_url_value(key, value)
             for key, value in six.iteritems(query_args)
         }
 
@@ -114,6 +114,59 @@ class HttpRequest(object):
         query.update(query_args)
         url_parts[4] = urlencode(query)
         self.url = urlunparse(url_parts)
+
+    def encode_url_key(self, key):
+        """Encode the given key for inclusion in a URL.
+
+        Args:
+            key (unicode):
+                The key that is being encoded.
+
+        Raises:
+            ValueError:
+                The given key was neither a unicode string or byte string.
+
+        Returns:
+            unicode:
+            The key encoded as a unicode string.
+        """
+        return force_unicode(key).replace('_', '-')
+
+    def encode_url_value(self, key, value):
+        """Encode the given value for inclusion in a URL.
+
+        Args:
+            key (unicode):
+                The field name for which the value is being encoded.
+                This argument is only used to generate an error message.
+            value (object):
+                The value to be encoded.
+
+        Raises:
+            ValueError:
+                The given value could not be encoded.
+
+        Returns:
+            unicode:
+            The value encoded as a unicode string.
+        """
+        if isinstance(value, bool):
+            if value:
+                value = '1'
+            else:
+                value = '0'
+        elif isinstance(value, six.integer_types + (float,)):
+            value = six.text_type(value)
+        elif isinstance(value, (bytes, six.text_type)):
+            value = force_unicode(value)
+        else:
+            raise ValueError(
+                'Could not encode value %r for key %s: expected int, float, '
+                'bool, or string type; got %s instead'
+                % (key, value, type(value).__name__)
+            )
+
+        return value
 
     @property
     def method(self):

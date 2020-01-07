@@ -820,7 +820,7 @@ class DraftDiffCommitListResource(ListResource):
             rbtools.api.errors.APIError:
                 An error occurred while uploading the commit.
         """
-        request = HttpRequest(self._url, method=b'POST', query_args=kwargs)
+        request = HttpRequest(self._url, method='POST', query_args=kwargs)
 
         request.add_file('diff', 'diff', diff)
         request.add_field('commit_id', commit_id)
@@ -914,7 +914,7 @@ class DiffListResource(DiffUploaderMixin, ListResource):
             DiffItemResource:
             The created resource.
         """
-        request = HttpRequest(self._url, method=b'POST', query_args=kwargs)
+        request = HttpRequest(self._url, method='POST', query_args=kwargs)
 
         if base_commit_id:
             request.add_field('base_commit_id', base_commit_id)
@@ -1234,7 +1234,7 @@ class ValidateDiffCommitResource(ItemResource):
             ValidateDiffCommitResource:
             The validation result.
         """
-        request = HttpRequest(self._url, method=b'POST', query_args=kwargs)
+        request = HttpRequest(self._url, method='POST', query_args=kwargs)
         request.add_file('diff', 'diff', diff)
         request.add_field('repository', repository)
         request.add_field('commit_id', commit_id)
