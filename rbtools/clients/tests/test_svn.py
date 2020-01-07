@@ -13,7 +13,7 @@ from nose import SkipTest
 from six.moves.urllib.request import urlopen
 
 from rbtools.api.client import RBClient
-from rbtools.api.tests import MockResponse
+from rbtools.api.tests.base import MockResponse
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError)
 from rbtools.clients.svn import SVNRepositoryInfo, SVNClient
