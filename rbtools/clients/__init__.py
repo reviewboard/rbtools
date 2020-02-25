@@ -18,6 +18,34 @@ from rbtools.utils.process import execute
 SCMCLIENTS = None
 
 
+class PatchAuthor(object):
+    """The author of a patch or commit.
+
+    This wraps the full name and e-mail address of a commit or patch's
+    author primarily for use in :py:meth:`SCMClient.apply_patch`.
+
+    Attributes:
+        fullname (unicode):
+            The full name of the author.
+
+        email (unicode):
+            The e-mail address of the author.
+    """
+
+    def __init__(self, full_name, email):
+        """Initialize the author information.
+
+        Args:
+            full_name (unicode):
+                The full name of the author.
+
+            email (unicode):
+                The e-mail address of the author.
+        """
+        self.fullname = full_name
+        self.email = email
+
+
 class PatchResult(object):
     """The result of a patch operation.
 
