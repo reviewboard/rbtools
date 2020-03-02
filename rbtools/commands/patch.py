@@ -184,18 +184,17 @@ class Patch(Command):
             # should be equal to the number of diffs.
             diff_revision = diffs.total_results
 
-        # Fetch the main diff and (unless we're squashing) any commits within.
-        if squashed:
-            expand = None
-        else:
-            expand = 'commits'
-
-        # This will patch with the squashed version of the diff.
         try:
-            diff = self._api_root.get_diff(
-                review_request_id=self._review_request_id,
-                diff_revision=diff_revision,
-                expand=expand)
+            # Fetch the main diff and (unless we're squashing) any commits within.
+            if squashed:
+                diff = self._api_root.get_diff(
+                    review_request_id=self._review_request_id,
+                    diff_revision=diff_revision)
+            else:
+                diff = self._api_root.get_diff(
+                    review_request_id=self._review_request_id,
+                    diff_revision=diff_revision,
+                    expand='commits')
         except APIError:
             raise CommandError('The specified diff revision does not '
                                'exist.')
@@ -203,7 +202,11 @@ class Patch(Command):
         # Begin to gather results.
         patches = []
 
-        if squashed:
+        if squashed or len(diff.commits) == 0:
+            # Either this was a review request created before we had
+            # multi-commit, or the user requested to squash everything. Return
+            # a single patch.
+
             try:
                 diff_content = diff.get_patch().data
             except APIError:
@@ -571,7 +574,7 @@ class Patch(Command):
             # If the user wants to commit, then we'll be committing every
             # patch individually, unless the user wants to squash commits in
             # which case we'll only do this on the final commit.
-            if will_commit and (not squash or patch_num == total_patches - 1):
+            if will_commit and (not squash or patch_num == total_patches):
                 meta = patch_data.get('commit_meta')
 
                 if meta is not None and not squash:
