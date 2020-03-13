@@ -122,7 +122,7 @@ class ItemResourceTests(TestWithPayloads):
         RESOURCE_MAP['application/vnd.test.item'] = ExpandedItemResource
 
     def tearDown(self):
-        super(ItemResourceTests, self).setUp()
+        super(ItemResourceTests, self).tearDown()
 
         RESOURCE_MAP.pop('application/vnd.test.item', None)
 

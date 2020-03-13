@@ -3,6 +3,7 @@
 from __future__ import unicode_literals
 
 import six
+from six.moves.urllib.parse import parse_qsl, urlparse
 
 from kgb import SpyAgency
 
@@ -166,8 +167,8 @@ class HttpRequestTests(SpyAgency, TestCase):
             })
 
         for key, value in six.iteritems(query_args):
-            self.assertIsInstance(key, six.text_type)
-            self.assertIsInstance(value, six.text_type)
+            self.assertIsInstance(key, str)
+            self.assertIsInstance(value, str)
 
     def test_encode_query_args_invalid(self):
         """Testing the encoding of query arguments with invalid keys and

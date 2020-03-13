@@ -924,7 +924,7 @@ class MercurialSubversionClientTests(MercurialTestBase):
         super(MercurialSubversionClientTests, cls).setUpClass()
 
         # Don't do any of the following expensive stuff if we know we're just
-        # going to skip all the tests
+        # going to skip all the tests.
         if cls._skip_reason:
             return
 
@@ -989,6 +989,8 @@ class MercurialSubversionClientTests(MercurialTestBase):
 
         if self._skip_reason:
             raise SkipTest(self._skip_reason)
+
+        home_dir = self.get_user_home()
 
         try:
             self.clone_dir = os.path.join(home_dir, 'checkout.hg')
