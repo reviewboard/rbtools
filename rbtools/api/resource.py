@@ -658,7 +658,8 @@ class FileDiffResource(ItemResource):
 class FileAttachmentListResource(ListResource):
     """The File Attachment List resource specific base class."""
     @request_method_decorator
-    def upload_attachment(self, filename, content, caption=None, **kwargs):
+    def upload_attachment(self, filename, content, caption=None,
+                          attachment_history=None, **kwargs):
         """Uploads a new attachment.
 
         The content argument should contain the body of the file to be
@@ -669,6 +670,9 @@ class FileAttachmentListResource(ListResource):
 
         if caption:
             request.add_field('caption', caption)
+
+        if attachment_history:
+            request.add_field('attachment_history', attachment_history)
 
         return request
 
