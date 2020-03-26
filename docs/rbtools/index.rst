@@ -24,8 +24,8 @@ What's in RBTools
 
 .. _rbt:
 
-rbt Command
------------
+The "rbt" Command
+-----------------
 
 All the RBTools commands are invoked through the :command:`rbt` tool. This
 runs on Windows, Linux, and MacOS X, and contains a number of useful
@@ -46,9 +46,24 @@ Some of the most commonly-used commands include:
 * :ref:`rbt-land` - Lands a change in a local branch or on a review request
 * :ref:`rbt-patch` - Patches your tree with a change on a review request
 * :ref:`rbt-setup-repo` - Sets up RBTools to talk to your repository
+* :ref:`rbt-status` - Display the status of your outgoing review requests
 
-There are many other commands you may find useful. See the
-:ref:`full list of commands <rbt-commands>`.
+There's a whole suite of additional commands that might also be useful:
+
+* :ref:`rbt-alias` - Create custom aliases for commands and operations
+* :ref:`rbt-api-get` - Retrieve structured information from the API
+* :ref:`rbt-attach` - Upload and attach files to a review request
+* :ref:`rbt-clear-cache` - Clear your local RBTools caches
+* :ref:`rbt-close` - Close a review request
+* :ref:`rbt-install` - Install special components for third-party integrations
+* :ref:`rbt-list-repo-types` - List all repository types supported by RBTools
+* :ref:`rbt-login` - Create a Review Board login session for RBTools
+* :ref:`rbt-logout` - Log RBTools out of Review Board
+* :ref:`rbt-publish` - Publish a review request
+* :ref:`rbt-setup-completion` - Set up shell integration/auto-completion
+* :ref:`rbt-stamp` - Stamp a local commit with a review request URL
+* :ref:`rbt-status-update` - Register or update a "status update" on a review
+  request, for automatic code review
 
 
 Python API
@@ -67,28 +82,40 @@ Installation
 ============
 
 To install RBTools, simply visit the `RBTools Downloads`_ page and follow the
-instructions for your operating system. If you are using MacOS X or Windows,
-just run the installer and you'll be set.
+instructions for your operating system.
 
 .. _`RBTools Downloads`: https://www.reviewboard.org/downloads/rbtools/
 
-If you're using Microsoft's Team Foundation Server, there's some extra
-:ref:`installation or configuration <rbtools-tfs>` that may be necessary.
+.. admonition:: Using Microsoft Team Foundation Server?
+
+   You will need to install and configure some additional tools as well. See
+   the our guide on :ref:`configuring TFS <rbtools-tfs>`.
 
 
 Configuration
 =============
 
-Once you've installed RBTools, you'll want to configure it to
-:ref:`work with your repositories <rbtools-repo-config>`. This is the first
-step to allow any of your developers to easily post changes using RBTools.
+Repositories
+------------
 
-There's also a number of
-:ref:`user-configurable options <rbtools-user-config>` as well, including
-customizable defaults for parameters and
-:ref:`custom aliases <rbtools-aliases>` for common operations or sets of
-flags. Auto-completions are also available and can be installed by using the
-command :ref:`rbt setup-completion <rbt-setup-completion>`.
+Once you've installed RBTools, you'll want to configure it to work with each
+of your repositories. This is done with a :file:`.reviewboardrc` file. This is
+the first step to allow any of your developers to easily post changes using
+RBTools.
+
+* :ref:`Configure your repositories <rbtools-repo-config>`
+
+
+User Environments
+-----------------
+
+There's a number of options available to RBTools users, from command line
+argument defaults to custom aliases and shell integration. We've broken this
+into multiple guides:
+
+* :ref:`Configurable options and environment variables <rbtools-user-config>`
+* :ref:`Creating custom aliases <rbtools-aliases>`
+* :ref:`Shell integration/auto-completion <rbt-setup-completion>`
 
 
 Indices, Glossary and Tables
