@@ -118,6 +118,12 @@ into multiple guides:
 * :ref:`Shell integration/auto-completion <rbt-setup-completion>`
 
 
+RBTools Workflows
+=================
+
+* :ref:`rbtools-workflow-git`
+
+
 Indices, Glossary and Tables
 ============================
 
@@ -129,4 +135,5 @@ Indices, Glossary and Tables
 
    rbt/index
    api/index
+   workflows/index
    glossary
