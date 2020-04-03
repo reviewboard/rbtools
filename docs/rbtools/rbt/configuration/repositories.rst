@@ -19,6 +19,8 @@ that point to your server, but those don't support some of the more advanced
 features of :file:`.reviewboardrc`.
 
 
+.. _rbtools-reviewboardrc:
+
 .reviewboardrc
 --------------
 
@@ -68,6 +70,8 @@ as a value. For example::
     REVIEWBOARD_URL = "https://reviewboard.example.com"
 
 
+.. _rbtools-reviewboardrc-tracking-branch:
+
 TRACKING_BRANCH
 ~~~~~~~~~~~~~~~
 
@@ -84,6 +88,8 @@ For example::
 
     TRACKING_BRANCH = "origin/release-2.0.x"
 
+
+.. _rbtools-reviewboardrc-branch:
 
 BRANCH
 ~~~~~~

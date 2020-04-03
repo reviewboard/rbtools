@@ -88,10 +88,10 @@ File Attachment List Resource Functionality
 The resource object for a :ref:`webapi2.0-file-attachment-list-resource`
 provides the following additional methods.
 
-.. py:method:: FileAttachmentListResource.upload_attachment(filename, content, caption=None)
+.. py:method:: FileAttachmentListResource.upload_attachment(filename, content, caption=None, attachment_history=None)
 
    Uploads a new attachment containing ``content``, named ``filename``, with
-   the optional ``caption``.
+   the optional ``caption`` and optional ``attachment_history``.
 
 
 .. _draft-file-attachment-list-resource-specific-functionality:
@@ -102,10 +102,10 @@ Draft File Attachment List Resource Functionality
 The resource object for a :ref:`webapi2.0-draft-file-attachment-list-resource`
 provides the following additional methods.
 
-.. py:method:: DraftFileAttachmentListResource.upload_attachment(filename, content, caption=None)
+.. py:method:: DraftFileAttachmentListResource.upload_attachment(filename, content, caption=None, attachment_history=None)
 
    Uploads a new attachment containing ``content``, named ``filename``, with
-   the optional ``caption``.
+   the optional ``caption`` and optional ``attachment_history``.
 
 
 .. _screenshot-list-resource-specific-functionality:
