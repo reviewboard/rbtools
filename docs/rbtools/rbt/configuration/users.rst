@@ -43,6 +43,40 @@ Or, you can disable usage of your HTTP proxy on any command by setting::
 Check out the documentation for the different commands to see what you can do.
 
 
+.. _rbtools-env:
+
+Environment Variables
+=====================
+
+You can set the following environment variables to customize the RBTools
+experience:
+
+.. envvar:: RBTOOLS_CONFIG_PATH
+
+   A list of paths to check for :file:`.reviewboardrc` files. These paths
+   will be checked before any other location.
+
+   Each path should be separated using the native environment path separator
+   on your platform (``:`` on Linux/UNIX/macOS, ``;`` on Windows).
+
+
+.. envvar:: RBTOOLS_EDITOR
+.. envvar:: VISUAL
+.. envvar:: EDITOR
+
+   These specify a text editor to use to edit commits or other content. The
+   given editor is invoked when running commands like
+   :option:`rbt land --edit` or :option:`rbt patch --commit`.
+
+   We recommending using :envvar:`RBTOOLS_EDITOR`, but any of the above
+   environment variables are supported for compatibility purposes. They order
+   of precedence is the order shown above.
+
+   .. versionadded:: 1.0.3
+
+      Added support for :envvar:`RBTOOLS_EDITOR`.
+
+
 .. _rbtools-aliases:
 
 Aliases
