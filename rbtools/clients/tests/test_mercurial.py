@@ -21,7 +21,7 @@ from rbtools.clients.mercurial import MercurialClient, MercurialRefType
 from rbtools.clients.tests import (FOO, FOO1, FOO2, FOO3, FOO4, FOO5, FOO6,
                                    SCMClientTests)
 from rbtools.utils.encoding import force_unicode
-from rbtools.utils.filesystem import is_exe_in_path, load_config
+from rbtools.utils.filesystem import is_exe_in_path, load_config, make_tempdir
 from rbtools.utils.process import execute
 
 
@@ -879,18 +879,54 @@ class MercurialSubversionClientTests(MercurialTestBase):
 
     SVNSERVE_MAX_RETRIES = 12
 
-    hg_env = {'FOO': 'BAR'}
+    _svnserve_pid = None
+    _svn_temp_base_path = None
+    _skip_reason = None
 
     @classmethod
     def setUpClass(cls):
-        super(MercurialSubversionClientTests, cls).setUpClass()
-
         for exe in ('svnadmin', 'svnserve', 'svn'):
             if not is_exe_in_path(exe):
-                raise SkipTest('%s is not available on the system. Skipping.'
-                               % exe)
+                cls._skip_reason = '%s is not available on the system.' % exe
+                break
+        else:
+            has_hgsubversion = False
 
-        cls._has_hgsubversion = None
+            hgrcpath = os.path.join(make_tempdir(), '.hgrc')
+            cls.hg_env['HGRCPATH'] = hgrcpath
+
+            # Make sure hgsubversion is enabled.
+            #
+            # This will modify the .hgrc in the temp home directory created for
+            # these tests.
+            #
+            # The "hgsubversion =" tells Mercurial to check for hgsubversion in
+            # the default PYTHONPATH
+            with open(hgrcpath, 'w') as fp:
+                fp.write('[extensions]\n')
+                fp.write('hgsubversion =\n')
+
+            try:
+                output = execute(['hg', 'svn', '--help'],
+                                 env=cls.hg_env,
+                                 ignore_errors=True,
+                                 extra_ignore_errors=(255))
+                has_hgsubversion = \
+                    not re.search('unknown command [\'"]svn[\'"]',
+                                  output, re.I)
+            except OSError:
+                has_hgsubversion = False
+
+            if not has_hgsubversion:
+                cls._skip_reason = \
+                    'hgsubversion is not available or cannot be used.'
+
+        super(MercurialSubversionClientTests, cls).setUpClass()
+
+        # Don't do any of the following expensive stuff if we know we're just
+        # going to skip all the tests.
+        if cls._skip_reason:
+            return
 
         # Create the repository that we'll be populating and later cloning.
         temp_base_path = tempfile.mkdtemp(prefix='rbtools.')
@@ -918,7 +954,6 @@ class MercurialSubversionClientTests(MercurialTestBase):
                                     add_file=(i == 0))
 
         # Launch svnserve so Mercurial can pull from it.
-        cls._svnserve_pid = None
         svnserve_port = (os.environ.get('SVNSERVE_PORT') or
                          str(randint(30000, 40000)))
 
@@ -944,30 +979,18 @@ class MercurialSubversionClientTests(MercurialTestBase):
         if cls._svnserve_pid:
             os.kill(cls._svnserve_pid, 9)
 
-        shutil.rmtree(cls._svn_temp_base_path, ignore_errors=True)
+        if cls._svn_temp_base_path:
+            shutil.rmtree(cls._svn_temp_base_path, ignore_errors=True)
 
         super(MercurialSubversionClientTests, cls).tearDownClass()
 
     def setUp(self):
-        print(os.getcwd())
         super(MercurialSubversionClientTests, self).setUp()
 
-        # Make sure hgsubversion is enabled.
-        #
-        # This will modify the .hgrc in the temp home directory created
-        # for these tests.
-        #
-        # The "hgsubversion =" tells Mercurial to check for hgsubversion
-        # in the default PYTHONPATH.
+        if self._skip_reason:
+            raise SkipTest(self._skip_reason)
+
         home_dir = self.get_user_home()
-
-        with open(os.path.join(home_dir, '.hgrc'), 'w') as fp:
-            fp.write('[extensions]\n')
-            fp.write('hgsubversion =\n')
-
-        if not self.has_hgsubversion:
-            raise SkipTest('hgsubversion is not available or cannot be used. '
-                           'Skipping.')
 
         try:
             self.clone_dir = os.path.join(home_dir, 'checkout.hg')
@@ -979,26 +1002,6 @@ class MercurialSubversionClientTests(MercurialTestBase):
         os.chdir(self.clone_dir)
         self.options.parent_branch = None
         self.client = MercurialClient(options=self.options)
-
-    @property
-    def has_hgsubversion(self):
-        """Whether hgsubversion is installed and usable."""
-        cls = type(self)
-        has_hgsubversion = cls._has_hgsubversion
-
-        if has_hgsubversion is None:
-            try:
-                output = self.run_hg(['svn', '--help'], ignore_errors=True,
-                                      extra_ignore_errors=(255))
-                has_hgsubversion = \
-                    not re.search(b'unknown command [\'"]svn[\'"]',
-                                  output, re.I)
-            except OSError:
-                has_hgsubversion = False
-
-            cls._has_hgsubversion = has_hgsubversion
-
-        return has_hgsubversion
 
     @classmethod
     def svn_add_file_commit(self, filename, data, msg, add_file=True):
