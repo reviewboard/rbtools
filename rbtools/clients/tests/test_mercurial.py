@@ -28,9 +28,6 @@ from rbtools.utils.process import execute
 class MercurialTestBase(SCMClientTests):
     """Base class for all Mercurial unit tests."""
 
-    #: Environment variables to use by default when calling Mercurial.
-    hg_env = {}
-
     def run_hg(self, command, **kwargs):
         """Run a Mercurial command.
 
@@ -46,22 +43,14 @@ class MercurialTestBase(SCMClientTests):
             object:
             The result of :py:func:`~rbtools.utils.process.execute`.
         """
-        # We're *not* doing `env = env or {}` here because we want the caller
-        # to be able to enable reading of user and system-level hgrc
-        # configuration.
-        env = self.hg_env.copy()
-
-        if not env:
-            env = {
-                'HGRCPATH': os.devnull,
+        return execute(
+            ['hg'] + command,
+            env={
                 'HGPLAIN': '1',
-            }
-
-        return execute(['hg'] + command,
-                       env,
-                       split_lines=False,
-                       results_unicode=False,
-                       **kwargs)
+            },
+            split_lines=False,
+            results_unicode=False,
+            **kwargs)
 
     def hg_add_file_commit(self, filename='test.txt', data=b'Test',
                            msg='Test commit', branch=None,
@@ -892,25 +881,12 @@ class MercurialSubversionClientTests(MercurialTestBase):
         else:
             has_hgsubversion = False
 
-            hgrcpath = os.path.join(make_tempdir(), '.hgrc')
-            cls.hg_env['HGRCPATH'] = hgrcpath
-
-            # Make sure hgsubversion is enabled.
-            #
-            # This will modify the .hgrc in the temp home directory created for
-            # these tests.
-            #
-            # The "hgsubversion =" tells Mercurial to check for hgsubversion in
-            # the default PYTHONPATH
-            with open(hgrcpath, 'w') as fp:
-                fp.write('[extensions]\n')
-                fp.write('hgsubversion =\n')
-
             try:
-                output = execute(['hg', 'svn', '--help'],
-                                 env=cls.hg_env,
-                                 ignore_errors=True,
-                                 extra_ignore_errors=(255))
+                output = execute(
+                    ['hg', '--config', 'extensions.hgsubversion=',
+                     'svn', '--help'],
+                    ignore_errors=True,
+                    extra_ignore_errors=(255,))
                 has_hgsubversion = \
                     not re.search('unknown command [\'"]svn[\'"]',
                                   output, re.I)
@@ -991,6 +967,18 @@ class MercurialSubversionClientTests(MercurialTestBase):
             raise SkipTest(self._skip_reason)
 
         home_dir = self.get_user_home()
+        hgrc_path = os.path.join(home_dir, '.hgrc')
+
+        # Make sure hgsubversion is enabled.
+        #
+        # This will modify the .hgrc in the temp home directory created for
+        # these tests.
+        #
+        # The "hgsubversion =" tells Mercurial to check for hgsubversion in
+        # the default PYTHONPATH
+        with open(hgrc_path, 'w') as fp:
+            fp.write('[extensions]\n')
+            fp.write('hgsubversion =\n')
 
         try:
             self.clone_dir = os.path.join(home_dir, 'checkout.hg')
