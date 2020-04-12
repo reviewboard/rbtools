@@ -56,7 +56,7 @@ There's a few useful tips to keep in mind when posting commits for review:
    use one of the above examples, depending on whether you have one or more
    commits in your branch.
 
-3. **You might want to specify an explicit tracking branch.**
+2. **You might want to specify an explicit tracking branch.**
 
    RBTools will *try* to find the "correct" upstream remote branch, but if
    you're not using tracking branches and you're using something other than

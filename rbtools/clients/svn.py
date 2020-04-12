@@ -1422,6 +1422,8 @@ class SVNRepositoryInfo(RepositoryInfo):
         # Split on slashes, but ignore multiple slashes and throw away any
         # trailing slashes.
         split = re.split('/+', path)
+
         if split[-1] == '':
-            split = split[0:-1]
+            split = split[:-1]
+
         return split
