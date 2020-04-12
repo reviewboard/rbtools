@@ -22,6 +22,18 @@ class RBTestBase(TestCase):
     tests employ file I/O operations.
     """
 
+    @classmethod
+    def setUpClass(cls):
+        super(RBTestBase, cls).setUpClass()
+
+        cls._cls_old_cwd = os.getcwd()
+
+    @classmethod
+    def tearDownClass(cls):
+        os.chdir(cls._cls_old_cwd)
+
+        super(RBTestBase, cls).tearDownClass()
+
     def setUp(self):
         super(RBTestBase, self).setUp()
 
