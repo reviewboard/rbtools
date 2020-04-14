@@ -5,7 +5,19 @@
 RBTools 1.0.3 Release Notes
 ===========================
 
-**Release date:** TBD
+**Release date:** April 14, 2020
+
+
+Installers
+==========
+
+* Updated the Windows installer to bundle Python 2.7.17, the latest 2.7.x
+  release.
+
+  While Python 2.7.x has reached end-of-life, there are environments out
+  there using the Windows installer that depend on Python 2.7 for RBTools.
+  We plan to update to Python 3 for RBTools 2.0. In the meantime, if you
+  want to use Python 3, you can install RBTools via :command:`pip`.
 
 
 New Features
