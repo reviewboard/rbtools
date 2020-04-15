@@ -38,16 +38,16 @@ call :SetMSBuildPath || goto :Abort
 ::-------------------------------------------------------------------------
 :: Dependencies
 ::-------------------------------------------------------------------------
-set PYTHON_VERSION=2.7.15
+set PYTHON_VERSION=2.7.17
 set PYTHON_URL=https://www.python.org/ftp/python/%PYTHON_VERSION%/python-%PYTHON_VERSION%.msi
-set PYTHON_MD5=023e49c9fba54914ebc05c4662a93ffe
+set PYTHON_MD5=4cc27e99ad41cd3e0f2a50d9b6a34f79
 set PYTHON_DEP=%DEPS_DIR%\python-%PYTHON_VERSION%
 
 
 ::-------------------------------------------------------------------------
 :: Signing certificate
 ::-------------------------------------------------------------------------
-set CERT_THUMBPRINT=61ce7f9111bdfe3a264f36c7b62571e10acc8822
+set CERT_THUMBPRINT=deee311acc700a6f797018a6cf4075131b6f7198
 
 
 ::-------------------------------------------------------------------------
@@ -322,7 +322,7 @@ PowerShell -Command ^
  "$file = [System.IO.File]::ReadAllBytes('%_filename%');"^
  "$hash = [System.BitConverter]::ToString($md5.ComputeHash($file));"^
  "$hash = $hash.toLower().Replace('-', '');"^
- "Write-Host '%_filename% has hash $hash.;"^
+ "Write-Host '%_filename% has hash $hash.';"^
  "if ($hash -eq '%_expected_hash%') {"^
  "    exit 0;"^
  "} else {"^

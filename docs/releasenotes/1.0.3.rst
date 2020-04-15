@@ -1,0 +1,118 @@
+.. default-intersphinx:: rbt1.0
+
+
+===========================
+RBTools 1.0.3 Release Notes
+===========================
+
+**Release date:** April 14, 2020
+
+
+Installers
+==========
+
+* Updated the Windows installer to bundle Python 2.7.17, the latest 2.7.x
+  release.
+
+  While Python 2.7.x has reached end-of-life, there are environments out
+  there using the Windows installer that depend on Python 2.7 for RBTools.
+  We plan to update to Python 3 for RBTools 2.0. In the meantime, if you
+  want to use Python 3, you can install RBTools via :command:`pip`.
+
+
+New Features
+============
+
+* Added support for landing Mercurial commits using
+  :ref:`rbt land <rbt-land>`.
+
+  :command:`rbt land` can now land changes from a local branch or bookmark,
+  or from a review request, into a destination branch/bookmark in Mercurial.
+  Any commit histories are preserved, and the local branch can be
+  automatically closed (if using :option:`rbt land --delete-branch`).
+
+* Improved the commit message editing experience when patching or landing
+  changes.
+
+  Editing a commit during patching (:option:`rbt patch -c`) or landing
+  (:option:`rbt land -e`) used to be a sub-par experience. We've completely
+  revamped it to better fit the workflows you're already used to.
+
+  On Git and Mercurial, we now specify a standardized filename when editing
+  the commit message that should turn on syntax highlighting and line wrapping
+  in most editors, giving people a more familiar experience.
+
+  Deleting all the text in the editor will cancel out any patching/landing
+  operation.
+
+  The default editor to use could previously be set through the
+  :envvar:`VISUAL` or :envvar:`EDITOR` environment variables. We now also
+  support :envvar:`RBTOOLS_EDITOR`, which will take precedence, and can be
+  used to choose an editor specific to RBTools (or to in some way wrap
+  and influence the editing experience).
+
+
+Bug Fixes
+=========
+
+General
+-------
+
+* Fixed specifying ``--help`` as the last argument on Python 3.
+
+  On Python 2, it was possible to run either ``rbt --help <command>`` or
+  ``rbt <command> --help`` to get a command's help. On Python 3, only the
+  former worked. We now once again support either form on Python 2 and 3.
+
+  Patch by Katherine Patenio.
+
+* Fixed encoding issues with environment variables when running some
+  third-party command line tools on Windows. (:bug:`4818`)
+
+* Fixed encoding issues when invoking an editor for commit messages on
+  Python 3.
+
+* Fixed encoding issues with deserializing error messages from the Review
+  Board API on Python 3.
+
+  Patch by Barret Rennie.
+
+
+Git
+---
+
+* Fixed looking up available Git remotes for a branch when the branch was not
+  set up as a tracking branch.
+
+  Patch by Joshua Olson.
+
+
+Mercurial
+---------
+
+* Fixed Python 3 compatibility issues when running Mercurial.
+
+  This impacted reading commit messages when posting changes for review.
+
+
+Perforce
+--------
+
+* Fixed Python 3 compatibility issues when loading data provided by a Perforce
+  command. (:bug:`4819`)
+
+
+Subversion
+----------
+
+* Fixed Subversion path/URL normalization on Python 3.7+.
+
+
+Contributors
+============
+
+* Barret Rennie
+* Christian Hammond
+* David Trowbridge
+* Joshua Olson
+* Katherine Patenio
