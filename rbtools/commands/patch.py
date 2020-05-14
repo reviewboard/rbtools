@@ -488,13 +488,14 @@ class Patch(Command):
         revert = self.options.revert_patch
         commit_no_edit = self.options.commit_no_edit
         will_commit = self.options.commit or commit_no_edit
+        total_patches = len(patches)
 
         # Check if we're planning to commit and have any patch without
         # metadata, in which case we'll need to fetch the review request so we
         # can generate a commit message.
-        needs_review_request = (squash or will_commit) and any(
-            patch_data['commit_meta'] is None
-            for patch_data in patches
+        needs_review_request = will_commit and (
+            squash or total_patches == 1 or
+            any(patch_data['commit_meta'] is None for patch_data in patches)
         )
 
         if needs_review_request:
@@ -519,10 +520,9 @@ class Patch(Command):
             default_author = None
             default_commit_message = None
 
-        total_patches = len(patches)
+        # Display a summary of what's about to be applied.
         diff_revision = patches[0]['revision']
 
-        # Display a summary of what's about to be applied.
         if revert:
             summary = ngettext(
                 ('Reverting 1 patch from review request '
@@ -577,7 +577,7 @@ class Patch(Command):
             if will_commit and (not squash or patch_num == total_patches):
                 meta = patch_data.get('commit_meta')
 
-                if meta is not None and not squash:
+                if meta is not None and not squash and total_patches > 1:
                     # We are patching a commit so we already have the metadata
                     # required without making additional HTTP requests.
                     message = meta['message']
