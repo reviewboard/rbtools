@@ -14,6 +14,7 @@ from json import loads as json_loads
 import six
 from six.moves.http_client import UNAUTHORIZED, NOT_MODIFIED
 from six.moves.http_cookiejar import Cookie, CookieJar, MozillaCookieJar
+from six.moves.http_client import HTTPSConnection
 from six.moves.urllib.error import HTTPError, URLError
 from six.moves.urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from six.moves.urllib.request import (
@@ -623,7 +624,8 @@ class ReviewBoardServer(object):
     def __init__(self, url, cookie_file=None, username=None, password=None,
                  api_token=None, agent=None, session=None, disable_proxy=False,
                  auth_callback=None, otp_token_callback=None,
-                 verify_ssl=True, save_cookies=True, ext_auth_cookies=None):
+                 verify_ssl=True, save_cookies=True, ext_auth_cookies=None,
+                 ca_certs=None, client_key=None, client_cert=None):
         if not url.endswith('/'):
             url += '/'
 
@@ -709,6 +711,12 @@ class ReviewBoardServer(object):
         if not verify_ssl:
             context = ssl._create_unverified_context()
             handlers.append(HTTPSHandler(context=context))
+        else:
+            context = ssl.create_default_context(cafile=ca_certs)
+            if client_key is not None:
+                handlers.append(HTTPSClientAuthHandler(client_key, client_cert, context=context))
+            else:
+                handlers.append(HTTPSHandler(context=context))
 
         if disable_proxy:
             handlers.append(ProxyHandler({}))
@@ -816,3 +824,21 @@ class ReviewBoardServer(object):
                 pass
 
         return rsp
+
+
+class HTTPSClientAuthHandler(HTTPSHandler):
+    def __init__(self, key, cert, *args, **kwargs):
+        HTTPSHandler.__init__(self, *args, **kwargs)
+        self.key = key
+        self.cert = cert
+        self.args = args
+        self.kwargs = kwargs
+
+    def https_open(self, req):
+        # Rather than pass in a reference to a connection class, we pass in
+        # a reference to a function which, for all intents and purposes,
+        # will behave as a constructor
+        return self.do_open(self.getConnection, req)
+
+    def getConnection(self, host, timeout=300):
+        return HTTPSConnection(host, key_file=self.key, cert_file=self.cert, *self.args, **self.kwargs)
