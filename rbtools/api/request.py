@@ -12,9 +12,8 @@ from io import BytesIO
 from json import loads as json_loads
 
 import six
-from six.moves.http_client import UNAUTHORIZED, NOT_MODIFIED
+from six.moves.http_client import UNAUTHORIZED, NOT_MODIFIED, HTTPSConnection
 from six.moves.http_cookiejar import Cookie, CookieJar, MozillaCookieJar
-from six.moves.http_client import HTTPSConnection
 from six.moves.urllib.error import HTTPError, URLError
 from six.moves.urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from six.moves.urllib.request import (
