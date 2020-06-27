@@ -273,12 +273,6 @@ class P4Wrapper(object):
         """
         cmd = ['p4']
 
-        if input_string:
-            try:
-                input_string = input_string.encode('utf8')
-            except (UnicodeEncodeError, AttributeError):
-                pass
-            
         if marshalled:
             cmd += ['-G']
 
@@ -346,6 +340,9 @@ class P4Wrapper(object):
 
             return result
         elif input_string is not None:
+            if not isinstance(bytes, input_string):
+                input_string = input_string.encode('utf8')
+
             p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
             p.communicate(input_string)  # Send input, wait, set returncode
 
