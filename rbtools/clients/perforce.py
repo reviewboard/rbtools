@@ -273,6 +273,12 @@ class P4Wrapper(object):
         """
         cmd = ['p4']
 
+        if input_string:
+            try:
+                input_string = input_string.encode('utf8')
+            except (UnicodeEncodeError, AttributeError):
+                pass
+            
         if marshalled:
             cmd += ['-G']
 
