@@ -340,6 +340,9 @@ class P4Wrapper(object):
 
             return result
         elif input_string is not None:
+            if not isinstance(input_string, bytes):
+                input_string = input_string.encode('utf8')
+
             p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
             p.communicate(input_string)  # Send input, wait, set returncode
 
