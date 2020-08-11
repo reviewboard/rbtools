@@ -207,6 +207,7 @@ class MercurialClient(SCMClient):
         }
         log_format = self._FIELD_SEP_ESC.join(six.itervalues(log_fields))
 
+        log_entry_revisions = '%(base)s::%(tip)s and not %(base)s' % revisions
         log_entries = execute(
             [
                 b'hg',
@@ -214,7 +215,7 @@ class MercurialClient(SCMClient):
                 b'--template',
                 br'%s%s' % (log_format, self._RECORD_SEP_ESC),
                 b'-r',
-                b'%(base)s::%(tip)s and not %(base)s' % revisions,
+                log_entry_revisions.encode('utf-8')
             ],
             ignore_errors=True,
             none_on_ignored_error=True,
@@ -347,6 +348,7 @@ class MercurialClient(SCMClient):
             n_revisions = len(revisions)
 
         result = {}
+
         if n_revisions == 0:
             # No revisions: Find the outgoing changes. Only consider the
             # working copy revision and ancestors because that makes sense.
