@@ -577,6 +577,37 @@ class MercurialClientTests(SpyAgency, MercurialTestBase):
         self.assertEqual(commit_message['summary'], 'commit 2')
         self.assertEqual(commit_message['description'], 'desc2')
 
+    def test_commit_history(self):
+        """Testing MercurialClient.get_commit_history"""
+        self.hg_add_file_commit(filename='foo.txt',
+                                data=FOO1,
+                                msg='commit 1\n\ndesc1')
+        self.hg_add_file_commit(filename='foo.txt',
+                                data=FOO2,
+                                msg='commit 2\n\ndesc2')
+        self.hg_add_file_commit(filename='foo.txt',
+                                data=FOO3,
+                                msg='commit 3\n\ndesc3')
+
+        revisions = self.client.parse_revision_spec([])
+        commit_history = self.client.get_commit_history(revisions)
+
+        self.assertEqual(len(commit_history), 3)
+        self.assertEqual(commit_history[0]['commit_message'],
+                         'commit 1\n\ndesc1')
+        self.assertEqual(commit_history[0]['author_name'],
+                         'test user <user at example.com>')
+
+        self.assertEqual(commit_history[1]['commit_message'],
+                         'commit 2\n\ndesc2')
+        self.assertEqual(commit_history[1]['author_name'],
+                         'test user <user at example.com>')
+
+        self.assertEqual(commit_history[2]['commit_message'],
+                         'commit 3\n\ndesc3')
+        self.assertEqual(commit_history[2]['author_name'],
+                         'test user <user at example.com>')
+
     def test_create_commit_with_run_editor_true(self):
         """Testing MercurialClient.create_commit with run_editor set to True"""
         self.spy_on(self.client._execute)

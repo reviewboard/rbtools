@@ -63,22 +63,22 @@ class MercurialClient(SCMClient):
     NO_PARENT = '0' * 40
 
     # The ASCII field seperator.
-    _FIELD_SEP = b'\x1f'
+    _FIELD_SEP = '\x1f'
 
     # The ASCII field separator as an escape sequence.
     #
     # This is passed to Mercurial, where it is interpreted and transformed into
     # the actual character.
-    _FIELD_SEP_ESC = br'\x1f'
+    _FIELD_SEP_ESC = r'\x1f'
 
     # The ASCII record separator.
-    _RECORD_SEP = b'\x1e'
+    _RECORD_SEP = '\x1e'
 
     # The ASCII record separator as an escape sequence.
     #
     # This is passed to Mercurial, where it is interpreted and transformed into
     # the actual character.
-    _RECORD_SEP_ESC = br'\x1e'
+    _RECORD_SEP_ESC = r'\x1e'
 
 
     def __init__(self, **kwargs):
@@ -197,25 +197,24 @@ class MercurialClient(SCMClient):
                 The history is non-linear or there is a commit with no parents.
         """
         log_fields = {
-            'commit_id': b'{node}',
-            'parent_id': b'{p1node}',
-            'author_name': b'{author|person}',
-            'author_email': b'{author|email}',
-            'author_date': b'{date|rfc3339date}',
-            'parent2': b'{p2node}',
-            'commit_message': b'{desc}',
+            'commit_id': '{node}',
+            'parent_id': '{p1node}',
+            'author_name': '{author|person}',
+            'author_email': '{author|email}',
+            'author_date': '{date|rfc3339date}',
+            'parent2': '{p2node}',
+            'commit_message': '{desc}',
         }
         log_format = self._FIELD_SEP_ESC.join(six.itervalues(log_fields))
 
-        log_entry_revisions = '%(base)s::%(tip)s and not %(base)s' % revisions
         log_entries = execute(
             [
-                b'hg',
-                b'log',
-                b'--template',
-                br'%s%s' % (log_format, self._RECORD_SEP_ESC),
-                b'-r',
-                log_entry_revisions.encode('utf-8')
+                'hg',
+                'log',
+                '--template',
+                '%s%s' % (log_format, self._RECORD_SEP_ESC),
+                '-r',
+                '%(base)s::%(tip)s and not %(base)s' % revisions,
             ],
             ignore_errors=True,
             none_on_ignored_error=True,
