@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 
 import logging
+import re
 
 from rbtools.api.errors import APIError
 from rbtools.clients.errors import InvalidRevisionSpecError
@@ -231,3 +232,29 @@ def num_exact_matches(possible_matches):
             count += 1
 
     return count
+
+
+def parse_review_request_url(url):
+    """Parse a review request URL and return its component parts.
+
+    Args:
+        url (unicode):
+            The URL to parse.
+
+    Returns:
+        tuple:
+        A 3-tuple consisting of the server URL, the review request ID, and the
+        diff revision.
+    """
+    regex = (r'^(?P<server_url>https?:\/\/.*\/(?:\/s\/[^\/]+\/)?)'
+             r'r\/(?P<review_request_id>\d+)'
+             r'\/?(diff\/(?P<diff_id>\d+-?\d*))?\/?')
+    match = re.match(regex, url)
+
+    if match:
+        server_url = match.group('server_url')
+        request_id = match.group('review_request_id')
+        diff_id = match.group('diff_id')
+        return (server_url, request_id, diff_id)
+
+    return (None, None, None)

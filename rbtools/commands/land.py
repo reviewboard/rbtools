@@ -14,7 +14,8 @@ from rbtools.utils.graphs import toposort
 from rbtools.utils.process import execute
 from rbtools.utils.review_request import (get_draft_or_current_value,
                                           get_revisions,
-                                          guess_existing_review_request)
+                                          guess_existing_review_request,
+                                          parse_review_request_url)
 
 
 class Land(Command):
@@ -271,6 +272,11 @@ class Land(Command):
         if self.options.rid:
             is_local = branch_name is not None
             review_request_id = self.options.rid
+
+            if review_request_id.startswith('http'):
+                (server_url,
+                 review_request_id,
+                 diff_revision) = parse_review_request_url(review_request_id)
         else:
             try:
                 review_request = guess_existing_review_request(
