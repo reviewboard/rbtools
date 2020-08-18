@@ -47,9 +47,8 @@ class SetupRepo(Command):
         """
         # Go through each matching repo and prompt for a selection. If a
         # selection is made, immediately return the selected repo.
+        repo_paths = {}
         for repository_page in api_root.get_repositories().all_pages:
-            repo_paths = {}
-
             for repository in repository_page:
                 if repository.tool != tool_name:
                     continue
@@ -59,17 +58,17 @@ class SetupRepo(Command):
                 if 'mirror_path' in repository:
                     repo_paths[repository['mirror_path']] = repository
 
-            closest_path = difflib.get_close_matches(repository_info.path,
-                                                     six.iterkeys(repo_paths),
-                                                     n=4, cutoff=0.4)
+        closest_path = difflib.get_close_matches(repository_info.path,
+                                                 six.iterkeys(repo_paths),
+                                                 n=4, cutoff=0.4)
 
-            for path in closest_path:
-                repo = repo_paths[path]
-                question = ('Use the %s repository "%s" (%s)?'
-                            % (tool_name, repo['name'], repo['path']))
+        for path in closest_path:
+            repo = repo_paths[path]
+            question = ('Use the %s repository "%s" (%s)?'
+                        % (tool_name, repo['name'], repo['path']))
 
-                if confirm(question):
-                    return repo
+            if confirm(question):
+                return repo
 
         return None
 
