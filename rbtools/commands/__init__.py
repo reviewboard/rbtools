@@ -273,6 +273,24 @@ class Command(object):
                    default=None,
                    help='The file to use for the API cache database.',
                    added_in='0.7.3'),
+            Option('--ca-certs',
+                   dest='ca_certs',
+                   metavar='FILE',
+                   config_key='CA_CERTS',
+                   default=None,
+                   help='Additional TLS CA bundle.'),
+            Option('--client-key',
+                   dest='client_key',
+                   metavar='FILE',
+                   config_key='CLIENT_KEY',
+                   default=None,
+                   help='Key for TLS client authentication.'),
+            Option('--client-cert',
+                   dest='client_cert',
+                   metavar='FILE',
+                   config_key='CLIENT_CERT',
+                   default=None,
+                   help='Certificate for TLS client authentication.'),
         ]
     )
 
@@ -923,7 +941,10 @@ class Command(object):
             cache_location=self.options.cache_location,
             in_memory_cache=self.options.in_memory_cache,
             save_cookies=self.options.save_cookies,
-            ext_auth_cookies=self.options.ext_auth_cookies)
+            ext_auth_cookies=self.options.ext_auth_cookies,
+            ca_certs=self.options.ca_certs,
+            client_key=self.options.client_key,
+            client_cert=self.options.client_cert)
 
     def get_api(self, server_url):
         """Returns an RBClient instance and the associated root resource.
