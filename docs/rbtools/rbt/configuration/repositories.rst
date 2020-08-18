@@ -60,6 +60,8 @@ page. For example::
     REPOSITORY = 'RBTools'
 
 
+.. _rbtools-reviewboard-url:
+
 REVIEWBOARD_URL
 ~~~~~~~~~~~~~~~
 

@@ -98,6 +98,39 @@ def confirm(question):
             print('%s is not a valid answer.' % answer)
 
 
+def confirm_select(question, options_length):
+    """Interactively prompt for a specific answer from a list of options.
+
+    Accepted answers are integers starting from 1 until an integer n
+    representing the nth of element within options.
+
+    Args:
+        question (unicode):
+            The prompt to be displayed.
+
+        options_length (int):
+            The number of available options that the user can choose a
+            response from.
+
+    Returns:
+        unicode:
+        The user's chosen response. If the user decides to cancel the
+        prompt, None is returned.
+    """
+    while True:
+        answer = get_input('%s [1-%i]: ' % (question, options_length))
+
+        try:
+            int_answer = int(answer)
+
+            if 1 <= int_answer <= options_length:
+                return int_answer
+
+            raise ValueError
+        except ValueError:
+            print('%s is not a valid answer.' % answer)
+
+
 def edit_file(filename):
     """Run a user-configured editor to edit an existing file.
 

@@ -43,6 +43,7 @@ class MockTransport(Transport):
 
 class TestWithPayloads(TestCase):
     transport = MockTransport()
+
     item_payload = {
         'resource_token': {
             'field1': 1,
@@ -64,7 +65,7 @@ class TestWithPayloads(TestCase):
             'link_field': {
                 'href': 'http://localhost:8080/api/',
                 'method': 'GET',
-                'title': 'Link Field'
+                'title': 'Link Field',
             },
         },
         'links': {
@@ -87,6 +88,7 @@ class TestWithPayloads(TestCase):
         },
         'stat': 'ok',
     }
+
     list_payload = {
         'resource_token': [
             {
@@ -98,6 +100,9 @@ class TestWithPayloads(TestCase):
                         'method': 'GET',
                     },
                 },
+                'name': 'testname1',
+                'path': 'testpath1',
+                'tool': 'Git',
             },
             {
                 'field1': 1,
@@ -108,6 +113,9 @@ class TestWithPayloads(TestCase):
                         'method': 'GET',
                     },
                 },
+                'name': 'testname2',
+                'path': 'testpath2',
+                'tool': 'Git',
             },
         ],
         'links': {
@@ -127,10 +135,32 @@ class TestWithPayloads(TestCase):
         'total_results': 10,
         'stat': 'ok',
     }
+
+    list_payload_no_repos = {
+        'resource_token': [],
+        'links': {
+            'self': {
+                'href': 'http://localhost:8080/api/',
+                'method': 'GET',
+            },
+            'create': {
+                'href': 'http://localhost:8080/api/',
+                'method': 'POST',
+            },
+            'other_link': {
+                'href': 'http://localhost:8080/api/',
+                'method': 'GET',
+            },
+        },
+        'total_results': 10,
+        'stat': 'ok',
+    }
+
     count_payload = {
         'count': 10,
-        'stat': 'ok'
+        'stat': 'ok',
     }
+
     root_payload = {
         'uri_templates': {
             'reviews': ('http://localhost:8080/api/review-requests/'
@@ -145,6 +175,10 @@ class TestWithPayloads(TestCase):
                 'href': 'http://localhost:8080/api/groups',
                 'method': 'GET',
             },
+            'repositories': {
+                'href': 'http://localhost:8080/api/repositories/',
+                'method': 'GET',
+            }
         },
         'stat': 'ok',
     }
