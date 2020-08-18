@@ -210,7 +210,7 @@ class MercurialClient(SCMClient):
 
         log_entries = execute(
             [
-                'hg',
+                self._exe,
                 'log',
                 '--template',
                 '%s%s' % (log_format, self._RECORD_SEP_ESC),
