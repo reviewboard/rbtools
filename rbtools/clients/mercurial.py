@@ -143,11 +143,11 @@ class MercurialClient(SCMClient):
         returns None.
         """
         if not hasattr(self, '_hg_root'):
-            root = execute([self._exe, 'root'], env=self._hg_env,
-                           ignore_errors=True)
+            self._load_hgrc()
 
-            if not root.startswith('abort:'):
-                self._hg_root = root.strip()
+            key = 'bundle.mainreporoot'
+            if key in self.hgrc:
+                self._hg_root = self.hgrc[key]
             else:
                 self._hg_root = None
 
@@ -157,8 +157,6 @@ class MercurialClient(SCMClient):
         """Initialize the client."""
         if self._initted or not self.hg_root:
             return
-
-        self._load_hgrc()
 
         if 'extensions.hgsubversion' in self.hgrc:
             svn_info = execute([self._exe, 'svn', 'info'], ignore_errors=True)
@@ -524,7 +522,8 @@ class MercurialClient(SCMClient):
 
     def _load_hgrc(self):
         """Load the hgrc file."""
-        for line in execute([self._exe, 'showconfig'], split_lines=True):
+        for line in execute([self._exe, 'showconfig'],
+                            env=self._hg_env, split_lines=True):
             line = line.split('=', 1)
 
             if len(line) == 2:
