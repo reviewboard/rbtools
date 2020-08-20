@@ -160,9 +160,12 @@ class MercurialClient(SCMClient):
 
         self._load_hgrc()
 
-        svn_info = execute([self._exe, 'svn', 'info'], ignore_errors=True)
+        if 'extensions.hgsubversion' in self.hgrc:
+            svn_info = execute([self._exe, 'svn', 'info'], ignore_errors=True)
+        else:
+            svn_info = None
 
-        if (not svn_info.startswith('abort:') and
+        if (svn_info and not svn_info.startswith('abort:') and
             not svn_info.startswith('hg: unknown command') and
             not svn_info.lower().startswith('not a child of')):
             self._type = 'svn'
