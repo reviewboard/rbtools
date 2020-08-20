@@ -2,6 +2,7 @@
 
 from __future__ import unicode_literals
 
+import os.path
 import sys
 
 from rbtools import get_version_string
@@ -88,8 +89,19 @@ class VersionCommandTests(RBTestBase):
     def test_version_command(self):
         """Testing RBT commands when running 'rbt --version' and 'rbt -v"
         """
-        self._check_version_output(['rbt', '--version'])
-        self._check_version_output(['rbt', '-v'])
+        # Unlike most of the other tests that can invoke `rbt` directly and
+        # expect reasonable results, we need to make sure that this one is
+        # executed using the same version of Python as we're currently using.
+        rbt_path = None
+
+        for dir in os.environ['PATH'].split(os.pathsep):
+            path = os.path.join(dir, 'rbt')
+
+            if os.path.exists(path):
+                rbt_path = path
+
+        self._check_version_output([sys.executable, rbt_path, '--version'])
+        self._check_version_output([sys.executable, rbt_path, '-v'])
 
     def _check_version_output(self, command):
         """Check if a correct rbt version and python version exist in test output.
