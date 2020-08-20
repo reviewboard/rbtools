@@ -694,9 +694,13 @@ class MercurialClient(SCMClient):
         # If reviewboard requests a relative revision via hgweb it will fail
         # since hgweb does not support the relative revision syntax (^1, -1).
         # Rewrite this relative node id to an absolute node id.
-        base_commit_id = self._execute(
-            [self._exe, 'log', '-r', base_commit_id, '--template', '{node}'],
-            env=self._hg_env, results_unicode=False)
+        match = re.match(r'[a-z|A-Z|0-9]*', base_commit_id)
+
+        if not match:
+            base_commit_id = self._execute(
+                [self._exe, 'log', '-r', base_commit_id,
+                 '--template', '{node}'],
+                env=self._hg_env, results_unicode=False)
 
         return {
             'diff': diff,
