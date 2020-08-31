@@ -970,6 +970,7 @@ class Post(Command):
         repository = (
             self.options.repository_name or
             self.options.repository_url or
+            repository_info.name or
             self.get_repository_path(repository_info, api_root)
         )
 

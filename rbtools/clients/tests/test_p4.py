@@ -145,6 +145,9 @@ class PerforceClientTests(SCMClientTests):
             def is_supported(self):
                 return True
 
+            def counters(self):
+                return {}
+
             def info(self):
                 return {
                     'Client root': os.getcwd(),
@@ -156,8 +159,9 @@ class PerforceClientTests(SCMClientTests):
         client = PerforceClient(TestWrapper)
         info = client.get_repository_info()
 
-        self.assertNotEqual(info, None)
+        self.assertIsNotNone(info)
         self.assertEqual(info.path, SERVER_PATH)
+        self.assertIsNone(info.name)
         self.assertEqual(client.p4d_version, (2012, 2))
 
     def test_repository_info_with_broker_address(self):
@@ -168,6 +172,9 @@ class PerforceClientTests(SCMClientTests):
         class TestWrapper(P4Wrapper):
             def is_supported(self):
                 return True
+
+            def counters(self):
+                return {}
 
             def info(self):
                 return {
@@ -183,6 +190,7 @@ class PerforceClientTests(SCMClientTests):
 
         self.assertIsNotNone(info)
         self.assertEqual(info.path, BROKER_PATH)
+        self.assertIsNone(info.name)
         self.assertEqual(client.p4d_version, (2012, 2))
 
     def test_repository_info_with_server_address_and_encrypted(self):
@@ -193,6 +201,9 @@ class PerforceClientTests(SCMClientTests):
         class TestWrapper(P4Wrapper):
             def is_supported(self):
                 return True
+
+            def counters(self):
+                return {}
 
             def info(self):
                 return {
@@ -211,6 +222,7 @@ class PerforceClientTests(SCMClientTests):
             'ssl:%s' % SERVER_PATH,
             SERVER_PATH,
         ])
+        self.assertIsNone(info.name)
         self.assertEqual(client.p4d_version, (2012, 2))
 
     def test_repository_info_with_broker_address_and_encrypted(self):
@@ -222,6 +234,9 @@ class PerforceClientTests(SCMClientTests):
         class TestWrapper(P4Wrapper):
             def is_supported(self):
                 return True
+
+            def counters(self):
+                return {}
 
             def info(self):
                 return {
@@ -241,6 +256,38 @@ class PerforceClientTests(SCMClientTests):
             'ssl:%s' % BROKER_PATH,
             BROKER_PATH,
         ])
+        self.assertIsNone(info.name)
+        self.assertEqual(client.p4d_version, (2012, 2))
+
+    def test_repository_info_with_repository_name_counter(self):
+        """Testing PerforceClient.get_repository_info with repository name
+        counter
+        """
+        SERVER_PATH = 'perforce.example.com:1666'
+
+        class TestWrapper(P4Wrapper):
+            def is_supported(self):
+                return True
+
+            def counters(self):
+                return {
+                    'reviewboard.repository_name': 'myrepo',
+                }
+
+            def info(self):
+                return {
+                    'Client root': os.getcwd(),
+                    'Server address': SERVER_PATH,
+                    'Server version': 'P4D/FREEBSD60X86_64/2012.2/525804 '
+                                      '(2012/09/18)',
+                }
+
+        client = PerforceClient(TestWrapper)
+        info = client.get_repository_info()
+
+        self.assertNotEqual(info, None)
+        self.assertEqual(info.path, SERVER_PATH)
+        self.assertEqual(info.name, 'myrepo')
         self.assertEqual(client.p4d_version, (2012, 2))
 
     def test_repository_info_outside_client_root(self):

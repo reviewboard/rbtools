@@ -546,12 +546,17 @@ class PerforceClient(SCMClient):
         if len(repository_paths) == 1:
             repository_paths = repository_paths[0]
 
+        # Check if there's a counter available containing a repository name.
+        counters = self.p4.counters()
+        name = counters.get('reviewboard.repository_name', None)
+
         # Now that we know it's Perforce, make sure we have GNU diff
         # installed, and error out if we don't.
         check_gnu_diff()
 
         return RepositoryInfo(path=repository_paths,
                               local_path=local_path,
+                              name=name,
                               supports_changesets=True)
 
     def parse_revision_spec(self, revisions=[]):

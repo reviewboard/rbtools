@@ -703,7 +703,7 @@ class SCMClient(object):
 class RepositoryInfo(object):
     """A representation of a source code repository."""
 
-    def __init__(self, path=None, base_path=None, local_path=None,
+    def __init__(self, path=None, base_path=None, local_path=None, name=None,
                  supports_changesets=False, supports_parent_diffs=False):
         """Initialize the object.
 
@@ -721,6 +721,10 @@ class RepositoryInfo(object):
                 sometimes be the same as ``path``, but may not be (since that
                 can contain a remote repository path).
 
+            name (unicode, optional):
+                The name of the repository, as configured on Review Board.
+                This might be available through some repository metadata.
+
             supports_changesets (bool, optional):
                 Whether the repository type supports changesets that store
                 their data server-side.
@@ -732,6 +736,7 @@ class RepositoryInfo(object):
         self.path = path
         self.base_path = base_path
         self.local_path = local_path
+        self.name = name
         self.supports_changesets = supports_changesets
         self.supports_parent_diffs = supports_parent_diffs
         logging.debug('Repository info: %s', self)
