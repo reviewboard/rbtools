@@ -434,91 +434,123 @@ class PerforceClient(SCMClient):
 
         p4_info = self.p4.info()
 
-        # For the repository path, we first prefer p4 brokers, then the
-        # upstream p4 server. If neither of those are found, just return None.
-        repository_path = (p4_info.get('Broker address') or
-                           p4_info.get('Server address'))
-
-        if repository_path is None:
-            return None
-
-        client_root = p4_info.get('Client root')
-
-        if client_root is None:
-            return None
-
-        # A 'null' client root is a valid configuration on Windows
-        # client, so don't enforce the repository directory check.
-        if (client_root.lower() != 'null' or
-            not sys.platform.startswith('win')):
-            norm_cwd = os.path.normcase(os.path.realpath(os.getcwd()) +
-                                        os.path.sep)
-            local_path = os.path.normcase(os.path.realpath(client_root) +
-                                          os.path.sep)
-
-            # Don't accept the repository if the current directory
-            # is outside the root of the Perforce client.
-            if not norm_cwd.startswith(local_path):
-                return None
-        else:
-            local_path = None
-
-        try:
-            parts = repository_path.split(':')
-            hostname = None
-
-            if len(parts) == 3 and parts[0] == 'ssl':
-                hostname = parts[1]
-                port = parts[2]
-            elif len(parts) == 2:
-                hostname, port = parts
-
-            if not hostname:
-                raise SCMError('Path %s is not a valid Perforce P4PORT'
-                               % repository_path)
-
-            info = socket.gethostbyaddr(hostname)
-
-            # Build the list of repository paths we want to tr to look up.
-            servers = [hostname]
-
-            if info[0] != hostname:
-                servers.append(info[0])
-
-            # If aliases exist for hostname, create a list of alias:port
-            # strings for repository_path.
-            if info[1]:
-                servers += info[1]
-
-            repository_path = ['%s:%s' % (server, port)
-                               for server in servers]
-
-            # If there's only one repository path found, then we don't
-            # need to do a more expensive lookup of all registered
-            # paths. We can look up just this path directly.
-            if len(repository_path) == 1:
-                repository_path = repository_path[0]
-        except (socket.gaierror, socket.herror):
-            pass
-
-        server_version = p4_info.get('Server version', None)
+        # Check the server address. If we don't get something we expect here,
+        # we'll want to bail early.
+        server_version = p4_info.get('Server version')
 
         if not server_version:
             return None
 
         m = re.search(r'[^ ]*/([0-9]+)\.([0-9]+)/[0-9]+ .*$',
                       server_version, re.M)
-        if m:
-            self.p4d_version = int(m.group(1)), int(m.group(2))
-        else:
-            # Gracefully bail if we don't get a match
+
+        if not m:
+            # Gracefully bail if we don't get a match.
             return None
+
+        self.p4d_version = int(m.group(1)), int(m.group(2))
+
+        # Get the client root and see if we're currently within that root.
+        # Since `p4 info` can return a result when we're nowhere near the
+        # checkout directory, we need to do this in order to ensure we're not
+        # going to be trying to build diffs in the wrong place.
+        client_root = p4_info.get('Client root')
+
+        if client_root is None:
+            return None
+
+        # A 'null' client root is a valid configuration on Windows client,
+        # so don't enforce the repository directory check.
+        if client_root.lower() != 'null' or not sys.platform.startswith('win'):
+            norm_cwd = os.path.normcase(os.path.realpath(os.getcwd()) +
+                                        os.path.sep)
+            local_path = os.path.normcase(os.path.realpath(client_root) +
+                                          os.path.sep)
+
+            # Don't accept the repository if the current directory is outside
+            # the root of the Perforce client.
+            if not norm_cwd.startswith(local_path):
+                return None
+        else:
+            local_path = None
+
+        # For the repository path, we first prefer p4 brokers, then the
+        # upstream p4 server. If neither of those are found, just return None.
+        server_address = p4_info.get('Broker address')
+
+        if server_address:
+            # We're connecting to a broker.
+            encryption_state = p4_info.get('Broker encryption')
+        else:
+            # We're connecting directly to a server.
+            server_address = p4_info.get('Server address')
+            encryption_state = p4_info.get('Server encryption')
+
+        if server_address is None:
+            return None
+
+        use_ssl = (encryption_state == 'encrypted')
+
+        # Validate the repository path we got above to see if it's something
+        # that makes sense.
+        parts = server_address.split(':')
+        hostname = None
+
+        if len(parts) == 3 and parts[0] == 'ssl':
+            hostname = parts[1]
+            port = parts[2]
+
+            # We should have known above that SSL was an option, but in case,
+            # force it here.
+            use_ssl = True
+        elif len(parts) == 2:
+            hostname, port = parts
+
+        if not hostname:
+            raise SCMError('Path %s is not a valid Perforce P4PORT'
+                           % server_address)
+
+        # Begin building the list of repository paths we want to try to look
+        # up. We'll start with the parsed hostname, and then grab any aliases
+        # (if we can).
+        servers = [hostname]
+
+        try:
+            info = socket.gethostbyaddr(hostname)
+
+            if info[0] != hostname:
+                servers.append(info[0])
+
+            if info[1]:
+                servers += info[1]
+        except (socket.gaierror, socket.herror):
+            # We couldn't resolve it. This might be a temporary error, or
+            # a network disconnect, or it might just be a unit test.
+            pass
+
+        # Build the final list of repository paths.
+        repository_paths = []
+
+        for server in servers:
+            repository_path = '%s:%s' % (server, port)
+
+            # Prioritize SSL-based addresses.
+            if use_ssl:
+                repository_paths.append('ssl:%s' % repository_path)
+
+            repository_paths.append(repository_path)
+
+        # If there's only one repository path found, just simplify this to
+        # a string. This doesn't have any impact on performance these days,
+        # but the result is more consistent with other SCMs.
+        if len(repository_paths) == 1:
+            repository_paths = repository_paths[0]
 
         # Now that we know it's Perforce, make sure we have GNU diff
         # installed, and error out if we don't.
         check_gnu_diff()
 
-        return RepositoryInfo(path=repository_path,
+        return RepositoryInfo(path=repository_paths,
                               local_path=local_path,
                               supports_changesets=True)
 

@@ -708,8 +708,9 @@ class RepositoryInfo(object):
         """Initialize the object.
 
         Args:
-            path (unicode, optional):
-                The path of the repository.
+            path (unicode or list of unicode, optional):
+                The path of the repository, or a list of possible paths
+                (with the primary one appearing first).
 
             base_path (unicode, optional):
                 The relative path between the current working directory and the
