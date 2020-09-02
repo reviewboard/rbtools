@@ -131,6 +131,7 @@ class MercurialClientTests(SpyAgency, MercurialTestBase):
         self.clone_hgrc_path = os.path.join(self.clone_dir, '.hg', 'hgrc')
 
         self.run_hg(['clone', '--stream', self.hg_dir, self.clone_dir])
+
         self.client = MercurialClient(options=self.options)
 
         with open(self.clone_hgrc_path, 'w') as fp:
@@ -187,20 +188,60 @@ class MercurialClientTests(SpyAgency, MercurialTestBase):
 
     def test_diff(self):
         """Testing MercurialClient.diff"""
+        client = self.client
+
+        base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO1,
                                 msg='delete and modify stuff')
+        commit_id = self._hg_get_tip()
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions)
+        revisions = client.parse_revision_spec([])
+
+        spy = self.spy_on(client._execute)
+        result = client.diff(revisions)
+
+        self.assertSpyCalledWith(
+            spy,
+            ['hg', 'diff', '--hidden', '--nodates', '-g',
+             '-r', base_commit_id, '-r', commit_id],
+            env={
+                'HGPLAIN': '1',
+            },
+            log_output_on_error=False,
+            results_unicode=False)
 
         self.assertIsInstance(result, dict)
-        self.assertIn('diff', result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '68c2bdccf52a4f0baddd0ac9f2ecb7d2')
+        self.assertEqual(result, {
+            'base_commit_id': base_commit_id,
+            'commit_id': commit_id,
+            'diff': (
+                b'# HG changeset patch\n'
+                b'# Node ID %(commit_id)s\n'
+                b'# Parent  %(base_commit_id)s\n'
+                b'diff --git a/foo.txt b/foo.txt\n'
+                b'--- a/foo.txt\n'
+                b'+++ b/foo.txt\n'
+                b'@@ -6,7 +6,4 @@\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'-quidve dolens, regina deum tot volvere casus\n'
+                b'-insignem pietate virum, tot adire labores\n'
+                b'-impulerit. Tantaene animis caelestibus irae?\n'
+                b' \n'
+            ) % {
+                b'base_commit_id': base_commit_id.encode('utf-8'),
+                b'commit_id': commit_id.encode('utf-8'),
+            },
+            'parent_diff': None,
+        })
 
-    def test_diff_with_multiple(self):
+    def test_diff_with_multiple_commits(self):
         """Testing MercurialClient.diff with multiple commits"""
+        client = self.client
+
+        base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO1,
                                 msg='commit 1')
@@ -210,152 +251,597 @@ class MercurialClientTests(SpyAgency, MercurialTestBase):
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO3,
                                 msg='commit 3')
+        commit_id = self._hg_get_tip()
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions)
+        revisions = client.parse_revision_spec([])
 
-        self.assertIsInstance(result, dict)
-        self.assertIn('diff', result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '9c8796936646be5c7349973b0fceacbd')
+        spy = self.spy_on(client._execute)
+        result = client.diff(revisions)
+
+        self.assertSpyCalledWith(
+            spy,
+            ['hg', 'diff', '--hidden', '--nodates', '-g',
+             '-r', base_commit_id, '-r', commit_id],
+            env={
+                'HGPLAIN': '1',
+            },
+            log_output_on_error=False,
+            results_unicode=False)
+
+        self.assertEqual(result, {
+            'base_commit_id': base_commit_id,
+            'commit_id': commit_id,
+            'diff': (
+                b'# HG changeset patch\n'
+                b'# Node ID %(commit_id)s\n'
+                b'# Parent  %(base_commit_id)s\n'
+                b'diff --git a/foo.txt b/foo.txt\n'
+                b'--- a/foo.txt\n'
+                b'+++ b/foo.txt\n'
+                b'@@ -1,12 +1,11 @@\n'
+                b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                b' Italiam, fato profugus, Laviniaque venit\n'
+                b' litora, multum ille et terris iactatus et alto\n'
+                b' vi superum saevae memorem Iunonis ob iram;\n'
+                b'-multa quoque et bello passus, dum conderet urbem,\n'
+                b'+dum conderet urbem,\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b'+Albanique patres, atque altae moenia Romae.\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'-quidve dolens, regina deum tot volvere casus\n'
+                b'-insignem pietate virum, tot adire labores\n'
+                b'-impulerit. Tantaene animis caelestibus irae?\n'
+                b' \n'
+            ) % {
+                b'base_commit_id': base_commit_id.encode('utf-8'),
+                b'commit_id': commit_id.encode('utf-8'),
+            },
+            'parent_diff': None,
+        })
 
     def test_diff_with_exclude_patterns(self):
         """Testing MercurialClient.diff with exclude_patterns"""
+        client = self.client
+
+        base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO1,
                                 msg='commit 1')
         self.hg_add_file_commit(filename='exclude.txt',
                                 data=FOO2,
                                 msg='commit 2')
+        commit_id = self._hg_get_tip()
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions, exclude_patterns=['exclude.txt'])
+        revisions = client.parse_revision_spec([])
 
-        self.assertIsInstance(result, dict)
-        self.assertIn('diff', result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '68c2bdccf52a4f0baddd0ac9f2ecb7d2')
+        spy = self.spy_on(client._execute)
+        result = client.diff(revisions, exclude_patterns=['exclude.txt'])
 
-    def test_diff_with_exclude_patterns_no_matches(self):
-        """Testing MercurialClient.diff with exclude_patterns and no matched
-        files
+        self.assertSpyCalledWith(
+            spy,
+            ['hg', 'diff', '--hidden', '--nodates', '-g',
+             '-X', 'exclude.txt', '-r', base_commit_id, '-r', commit_id],
+            env={
+                'HGPLAIN': '1',
+            },
+            log_output_on_error=False,
+            results_unicode=False)
+
+        self.assertEqual(result, {
+            'base_commit_id': base_commit_id,
+            'commit_id': commit_id,
+            'diff': (
+                b'# HG changeset patch\n'
+                b'# Node ID %(commit_id)s\n'
+                b'# Parent  %(base_commit_id)s\n'
+                b'diff --git a/foo.txt b/foo.txt\n'
+                b'--- a/foo.txt\n'
+                b'+++ b/foo.txt\n'
+                b'@@ -6,7 +6,4 @@\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'-quidve dolens, regina deum tot volvere casus\n'
+                b'-insignem pietate virum, tot adire labores\n'
+                b'-impulerit. Tantaene animis caelestibus irae?\n'
+                b' \n'
+            ) % {
+                b'base_commit_id': base_commit_id.encode('utf-8'),
+                b'commit_id': commit_id.encode('utf-8'),
+            },
+            'parent_diff': None,
+        })
+
+    def test_diff_with_exclude_patterns_with_empty_file(self):
+        """Testing MercurialClient.diff with exclude_patterns matching empty
+        file
         """
+        client = self.client
+
+        base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO1,
                                 msg='commit 1')
         self.hg_add_file_commit(filename='empty.txt',
                                 data=b'',
                                 msg='commit 2')
+        commit_id = self._hg_get_tip()
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions, exclude_patterns=['empty.txt'])
+        revisions = client.parse_revision_spec([])
 
-        self.assertIsInstance(revisions, dict)
-        self.assertIn('diff', result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '68c2bdccf52a4f0baddd0ac9f2ecb7d2')
+        spy = self.spy_on(client._execute)
+        result = client.diff(revisions, exclude_patterns=['empty.txt'])
+
+        self.assertSpyCalledWith(
+            spy,
+            ['hg', 'diff', '--hidden', '--nodates', '-g',
+             '-X', 'empty.txt', '-r', base_commit_id, '-r', commit_id],
+            env={
+                'HGPLAIN': '1',
+            },
+            log_output_on_error=False,
+            results_unicode=False)
+
+        self.assertEqual(result, {
+            'base_commit_id': base_commit_id,
+            'commit_id': commit_id,
+            'diff': (
+                b'# HG changeset patch\n'
+                b'# Node ID %(commit_id)s\n'
+                b'# Parent  %(base_commit_id)s\n'
+                b'diff --git a/foo.txt b/foo.txt\n'
+                b'--- a/foo.txt\n'
+                b'+++ b/foo.txt\n'
+                b'@@ -6,7 +6,4 @@\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'-quidve dolens, regina deum tot volvere casus\n'
+                b'-insignem pietate virum, tot adire labores\n'
+                b'-impulerit. Tantaene animis caelestibus irae?\n'
+                b' \n'
+            ) % {
+                b'base_commit_id': base_commit_id.encode('utf-8'),
+                b'commit_id': commit_id.encode('utf-8'),
+            },
+            'parent_diff': None,
+        })
 
     def test_diff_with_diverged_branch(self):
         """Testing MercurialClient.diff with diverged branch"""
+        client = self.client
+
+        base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO1,
                                 msg='commit 1')
+        commit_id1 = self._hg_get_tip()
 
+        # Create a "diverged" branch and make a commit there. We'll start by
+        # generating a diff for this commit.
         self.run_hg(['branch', 'diverged'])
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO2,
                                 msg='commit 2')
+        commit_id2 = self._hg_get_tip()
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions)
+        revisions = client.parse_revision_spec([])
 
-        self.assertIsInstance(result, dict)
-        self.assertIn('diff', result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '6b12723baab97f346aa938005bc4da4d')
+        spy = self.spy_on(client._execute)
+        result = client.diff(revisions)
 
+        self.assertEqual(len(spy.calls), 2)
+        self.assertSpyCalledWith(
+            spy,
+            ['hg', 'diff', '--hidden', '--nodates', '-g',
+             '-r', base_commit_id, '-r', commit_id1],
+            env={
+                'HGPLAIN': '1',
+            },
+            log_output_on_error=False,
+            results_unicode=False)
+        self.assertSpyCalledWith(
+            spy,
+            ['hg', 'diff', '--hidden', '--nodates', '-g',
+             '-r', commit_id1, '-r', commit_id2],
+            env={
+                'HGPLAIN': '1',
+            },
+            log_output_on_error=False,
+            results_unicode=False)
+
+        self.assertEqual(result, {
+            'base_commit_id': base_commit_id,
+            'commit_id': commit_id2,
+            'diff': (
+                b'# HG changeset patch\n'
+                b'# Node ID %(commit_id)s\n'
+                b'# Parent  %(base_commit_id)s\n'
+                b'diff --git a/foo.txt b/foo.txt\n'
+                b'--- a/foo.txt\n'
+                b'+++ b/foo.txt\n'
+                b'@@ -1,3 +1,5 @@\n'
+                b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                b' Italiam, fato profugus, Laviniaque venit\n'
+                b' litora, multum ille et terris iactatus et alto\n'
+            ) % {
+                b'base_commit_id': commit_id1.encode('utf-8'),
+                b'commit_id': commit_id2.encode('utf-8'),
+            },
+            'parent_diff': (
+                b'# HG changeset patch\n'
+                b'# Node ID %(commit_id)s\n'
+                b'# Parent  %(base_commit_id)s\n'
+                b'diff --git a/foo.txt b/foo.txt\n'
+                b'--- a/foo.txt\n'
+                b'+++ b/foo.txt\n'
+                b'@@ -6,7 +6,4 @@\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'-quidve dolens, regina deum tot volvere casus\n'
+                b'-insignem pietate virum, tot adire labores\n'
+                b'-impulerit. Tantaene animis caelestibus irae?\n'
+                b' \n'
+            ) % {
+                b'base_commit_id': base_commit_id.encode('utf-8'),
+                b'commit_id': commit_id1.encode('utf-8'),
+            },
+        })
+
+        # Switch back to the default branch.
         self.run_hg(['update', '-C', 'default'])
+        self.assertEqual(commit_id1, self._hg_get_tip())
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions)
+        revisions = client.parse_revision_spec([])
 
-        self.assertIsInstance(result, dict)
-        self.assertIn('diff', result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '68c2bdccf52a4f0baddd0ac9f2ecb7d2')
+        spy.reset_calls()
+        result = client.diff(revisions)
+
+        self.assertSpyCalledWith(
+            spy,
+            ['hg', 'diff', '--hidden', '--nodates', '-g',
+             '-r', base_commit_id, '-r', commit_id1],
+            env={
+                'HGPLAIN': '1',
+            },
+            log_output_on_error=False,
+            results_unicode=False)
+
+        self.assertEqual(len(spy.calls), 1)
+        self.assertEqual(result, {
+            'base_commit_id': base_commit_id,
+            'commit_id': commit_id1,
+            'diff': (
+                b'# HG changeset patch\n'
+                b'# Node ID %(commit_id)s\n'
+                b'# Parent  %(base_commit_id)s\n'
+                b'diff --git a/foo.txt b/foo.txt\n'
+                b'--- a/foo.txt\n'
+                b'+++ b/foo.txt\n'
+                b'@@ -6,7 +6,4 @@\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'-quidve dolens, regina deum tot volvere casus\n'
+                b'-insignem pietate virum, tot adire labores\n'
+                b'-impulerit. Tantaene animis caelestibus irae?\n'
+                b' \n'
+            ) % {
+                b'base_commit_id': base_commit_id.encode('utf-8'),
+                b'commit_id': commit_id1.encode('utf-8'),
+            },
+            'parent_diff': None,
+        })
 
     def test_diff_with_parent_diff(self):
         """Testing MercurialClient.diff with parent diffs"""
+        client = self.client
+
+        base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO1,
                                 msg='commit 1')
+
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO2,
                                 msg='commit 2')
+        commit_id2 = self._hg_get_tip()
+
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO3,
                                 msg='commit 3')
+        commit_id3 = self._hg_get_tip()
 
-        revisions = self.client.parse_revision_spec(['2', '3'])
-        result = self.client.diff(revisions)
+        revisions = client.parse_revision_spec(['2', '3'])
 
-        self.assertIsInstance(result, dict)
-        self.assertIn('parent_diff', result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '7a897f68a9dc034fc1e42fe7a33bb808')
-        self.assertEqual(md5(result['parent_diff']).hexdigest(),
-                         '5cacbd79800a9145f982dcc0908b6068')
+        spy = self.spy_on(client._execute)
+        result = client.diff(revisions)
+
+        self.assertEqual(len(spy.calls), 2)
+        self.assertSpyCalledWith(
+            spy,
+            ['hg', 'diff', '--hidden', '--nodates', '-g',
+             '-r', commit_id2, '-r', commit_id3],
+            env={
+                'HGPLAIN': '1',
+            },
+            log_output_on_error=False,
+            results_unicode=False)
+        self.assertSpyCalledWith(
+            spy,
+            ['hg', 'diff', '--hidden', '--nodates', '-g',
+             '-r', base_commit_id, '-r', commit_id2],
+            env={
+                'HGPLAIN': '1',
+            },
+            log_output_on_error=False,
+            results_unicode=False)
+
+        self.assertEqual(result, {
+            'base_commit_id': base_commit_id,
+            'commit_id': None,
+            'diff': (
+                b'# HG changeset patch\n'
+                b'# Node ID %(commit_id)s\n'
+                b'# Parent  %(base_commit_id)s\n'
+                b'diff --git a/foo.txt b/foo.txt\n'
+                b'--- a/foo.txt\n'
+                b'+++ b/foo.txt\n'
+                b'@@ -1,11 +1,11 @@\n'
+                b'-ARMA virumque cano, Troiae qui primus ab oris\n'
+                b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                b' Italiam, fato profugus, Laviniaque venit\n'
+                b' litora, multum ille et terris iactatus et alto\n'
+                b' vi superum saevae memorem Iunonis ob iram;\n'
+                b'-multa quoque et bello passus, dum conderet urbem,\n'
+                b'+dum conderet urbem,\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b'+Albanique patres, atque altae moenia Romae.\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b' \n'
+            ) % {
+                b'base_commit_id': commit_id2.encode('utf-8'),
+                b'commit_id': commit_id3.encode('utf-8'),
+            },
+            'parent_diff': (
+                b'# HG changeset patch\n'
+                b'# Node ID %(commit_id)s\n'
+                b'# Parent  %(base_commit_id)s\n'
+                b'diff --git a/foo.txt b/foo.txt\n'
+                b'--- a/foo.txt\n'
+                b'+++ b/foo.txt\n'
+                b'@@ -1,3 +1,5 @@\n'
+                b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                b' Italiam, fato profugus, Laviniaque venit\n'
+                b' litora, multum ille et terris iactatus et alto\n'
+                b'@@ -6,7 +8,4 @@\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'-quidve dolens, regina deum tot volvere casus\n'
+                b'-insignem pietate virum, tot adire labores\n'
+                b'-impulerit. Tantaene animis caelestibus irae?\n'
+                b' \n'
+            ) % {
+                b'base_commit_id': base_commit_id.encode('utf-8'),
+                b'commit_id': commit_id2.encode('utf-8'),
+            },
+        })
 
     def test_diff_with_parent_diff_and_diverged_branch(self):
         """Testing MercurialClient.diff with parent diffs and diverged branch
         """
         # This test is very similar to test_diff_with_parent_diff except we
         # throw a branch into the mix.
+        client = self.client
+
+        base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO1,
                                 msg='commit 1')
+
         self.run_hg(['branch', 'diverged'])
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO2,
                                 msg='commit 2')
+        commit_id2 = self._hg_get_tip()
+
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO3,
                                 msg='commit 3')
+        commit_id3 = self._hg_get_tip()
 
-        revisions = self.client.parse_revision_spec(['2', '3'])
-        result = self.client.diff(revisions)
+        revisions = client.parse_revision_spec(['2', '3'])
 
-        self.assertIn('parent_diff', result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '7a897f68a9dc034fc1e42fe7a33bb808')
-        self.assertEqual(md5(result['parent_diff']).hexdigest(),
-                         '5cacbd79800a9145f982dcc0908b6068')
+        spy = self.spy_on(client._execute)
+        result = client.diff(revisions)
+
+        self.assertEqual(len(spy.calls), 2)
+        self.assertSpyCalledWith(
+            spy,
+            ['hg', 'diff', '--hidden', '--nodates', '-g',
+             '-r', commit_id2, '-r', commit_id3],
+            env={
+                'HGPLAIN': '1',
+            },
+            log_output_on_error=False,
+            results_unicode=False)
+        self.assertSpyCalledWith(
+            spy,
+            ['hg', 'diff', '--hidden', '--nodates', '-g',
+             '-r', base_commit_id, '-r', commit_id2],
+            env={
+                'HGPLAIN': '1',
+            },
+            log_output_on_error=False,
+            results_unicode=False)
+
+        self.assertEqual(result, {
+            'base_commit_id': base_commit_id,
+            'commit_id': None,
+            'diff': (
+                b'# HG changeset patch\n'
+                b'# Node ID %(commit_id)s\n'
+                b'# Parent  %(base_commit_id)s\n'
+                b'diff --git a/foo.txt b/foo.txt\n'
+                b'--- a/foo.txt\n'
+                b'+++ b/foo.txt\n'
+                b'@@ -1,11 +1,11 @@\n'
+                b'-ARMA virumque cano, Troiae qui primus ab oris\n'
+                b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                b' Italiam, fato profugus, Laviniaque venit\n'
+                b' litora, multum ille et terris iactatus et alto\n'
+                b' vi superum saevae memorem Iunonis ob iram;\n'
+                b'-multa quoque et bello passus, dum conderet urbem,\n'
+                b'+dum conderet urbem,\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b'+Albanique patres, atque altae moenia Romae.\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b' \n'
+            ) % {
+                b'base_commit_id': commit_id2.encode('utf-8'),
+                b'commit_id': commit_id3.encode('utf-8'),
+            },
+            'parent_diff': (
+                b'# HG changeset patch\n'
+                b'# Node ID %(commit_id)s\n'
+                b'# Parent  %(base_commit_id)s\n'
+                b'diff --git a/foo.txt b/foo.txt\n'
+                b'--- a/foo.txt\n'
+                b'+++ b/foo.txt\n'
+                b'@@ -1,3 +1,5 @@\n'
+                b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                b' Italiam, fato profugus, Laviniaque venit\n'
+                b' litora, multum ille et terris iactatus et alto\n'
+                b'@@ -6,7 +8,4 @@\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'-quidve dolens, regina deum tot volvere casus\n'
+                b'-insignem pietate virum, tot adire labores\n'
+                b'-impulerit. Tantaene animis caelestibus irae?\n'
+                b' \n'
+            ) % {
+                b'base_commit_id': base_commit_id.encode('utf-8'),
+                b'commit_id': commit_id2.encode('utf-8'),
+            },
+        })
 
     def test_diff_with_parent_diff_using_option(self):
         """Testing MercurialClient.diff with parent diffs using --parent"""
         # This test is very similar to test_diff_with_parent_diff except we
         # use the --parent option to post without explicit revisions
+        client = self.client
+
+        base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO1,
                                 msg='commit 1')
+
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO2,
                                 msg='commit 2')
+        commit_id2 = self._hg_get_tip()
+
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO3,
                                 msg='commit 3')
+        commit_id3 = self._hg_get_tip()
 
         self.options.parent_branch = '2'
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions)
+        revisions = client.parse_revision_spec([])
 
-        self.assertIsInstance(result, dict)
-        self.assertIn('parent_diff', result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '7a897f68a9dc034fc1e42fe7a33bb808')
-        self.assertEqual(md5(result['parent_diff']).hexdigest(),
-                         '5cacbd79800a9145f982dcc0908b6068')
+        spy = self.spy_on(client._execute)
+        result = client.diff(revisions)
+
+        self.assertEqual(len(spy.calls), 2)
+        self.assertSpyCalledWith(
+            spy,
+            ['hg', 'diff', '--hidden', '--nodates', '-g',
+             '-r', commit_id2, '-r', commit_id3],
+            env={
+                'HGPLAIN': '1',
+            },
+            log_output_on_error=False,
+            results_unicode=False)
+        self.assertSpyCalledWith(
+            spy,
+            ['hg', 'diff', '--hidden', '--nodates', '-g',
+             '-r', base_commit_id, '-r', commit_id2],
+            env={
+                'HGPLAIN': '1',
+            },
+            log_output_on_error=False,
+            results_unicode=False)
+
+        self.assertEqual(result, {
+            'base_commit_id': base_commit_id,
+            'commit_id': commit_id3,
+            'diff': (
+                b'# HG changeset patch\n'
+                b'# Node ID %(commit_id)s\n'
+                b'# Parent  %(base_commit_id)s\n'
+                b'diff --git a/foo.txt b/foo.txt\n'
+                b'--- a/foo.txt\n'
+                b'+++ b/foo.txt\n'
+                b'@@ -1,11 +1,11 @@\n'
+                b'-ARMA virumque cano, Troiae qui primus ab oris\n'
+                b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                b' Italiam, fato profugus, Laviniaque venit\n'
+                b' litora, multum ille et terris iactatus et alto\n'
+                b' vi superum saevae memorem Iunonis ob iram;\n'
+                b'-multa quoque et bello passus, dum conderet urbem,\n'
+                b'+dum conderet urbem,\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b'+Albanique patres, atque altae moenia Romae.\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b' \n'
+            ) % {
+                b'base_commit_id': commit_id2.encode('utf-8'),
+                b'commit_id': commit_id3.encode('utf-8'),
+            },
+            'parent_diff': (
+                b'# HG changeset patch\n'
+                b'# Node ID %(commit_id)s\n'
+                b'# Parent  %(base_commit_id)s\n'
+                b'diff --git a/foo.txt b/foo.txt\n'
+                b'--- a/foo.txt\n'
+                b'+++ b/foo.txt\n'
+                b'@@ -1,3 +1,5 @@\n'
+                b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                b' Italiam, fato profugus, Laviniaque venit\n'
+                b' litora, multum ille et terris iactatus et alto\n'
+                b'@@ -6,7 +8,4 @@\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'-quidve dolens, regina deum tot volvere casus\n'
+                b'-insignem pietate virum, tot adire labores\n'
+                b'-impulerit. Tantaene animis caelestibus irae?\n'
+                b' \n'
+            ) % {
+                b'base_commit_id': base_commit_id.encode('utf-8'),
+                b'commit_id': commit_id2.encode('utf-8'),
+            },
+        })
 
     def test_parse_revision_spec_with_no_args(self):
         """Testing MercurialClient.parse_revision_spec with no arguments"""
