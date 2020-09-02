@@ -2,6 +2,10 @@
 
 from __future__ import unicode_literals
 
+import os.path
+import sys
+
+from rbtools import get_version_string
 from rbtools.utils.process import execute
 from rbtools.utils.testbase import RBTestBase
 
@@ -77,3 +81,42 @@ class HelpCommandTests(RBTestBase):
             self.assertIn('No help found for %s' % subcommand, output)
         else:
             self.assertIn('usage: rbt %s [options]' % subcommand, output)
+
+
+class VersionCommandTests(RBTestBase):
+    """Tests for RBT --version command and rbt command version options."""
+
+    def test_version_command(self):
+        """Testing RBT commands when running 'rbt --version' and 'rbt -v"
+        """
+        # Unlike most of the other tests that can invoke `rbt` directly and
+        # expect reasonable results, we need to make sure that this one is
+        # executed using the same version of Python as we're currently using.
+        rbt_path = None
+
+        for dir in os.environ['PATH'].split(os.pathsep):
+            path = os.path.join(dir, 'rbt')
+
+            if os.path.exists(path):
+                rbt_path = path
+
+        self._check_version_output([sys.executable, rbt_path, '--version'])
+        self._check_version_output([sys.executable, rbt_path, '-v'])
+
+    def _check_version_output(self, command):
+        """Check if a correct rbt version and python version exist in test output.
+
+        Args:
+            command (list of unicode):
+                The rbt command used for testing.
+        """
+        try:
+            output = execute(command)
+        except Exception as e:
+            self.fail(e)
+
+        self.assertEqual('RBTools %s (Python %d.%d.%d)\n' % (
+            get_version_string(),
+            sys.version_info[:3][0],
+            sys.version_info[:3][1],
+            sys.version_info[:3][2]), output)

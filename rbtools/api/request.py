@@ -623,7 +623,8 @@ class ReviewBoardServer(object):
     def __init__(self, url, cookie_file=None, username=None, password=None,
                  api_token=None, agent=None, session=None, disable_proxy=False,
                  auth_callback=None, otp_token_callback=None,
-                 verify_ssl=True, save_cookies=True, ext_auth_cookies=None):
+                 verify_ssl=True, save_cookies=True, ext_auth_cookies=None,
+                 ca_certs=None, client_key=None, client_cert=None):
         if not url.endswith('/'):
             url += '/'
 
@@ -708,7 +709,13 @@ class ReviewBoardServer(object):
 
         if not verify_ssl:
             context = ssl._create_unverified_context()
-            handlers.append(HTTPSHandler(context=context))
+        else:
+            context = ssl.create_default_context(cafile=ca_certs)
+
+        if client_cert or client_key:
+            context.load_cert_chain(client_cert, client_key)
+
+        handlers.append(HTTPSHandler(context=context))
 
         if disable_proxy:
             handlers.append(ProxyHandler({}))

@@ -14,6 +14,7 @@ from rbtools.clients.errors import CreateCommitError
 from rbtools.commands import Command, CommandError, Option
 from rbtools.utils.commands import extract_commit_message
 from rbtools.utils.filesystem import make_tempfile
+from rbtools.utils.review_request import parse_review_request_url
 
 
 logger = logging.getLogger(__name__)
@@ -399,12 +400,25 @@ class Patch(Command):
             client_name=self.options.repository_type,
             require_repository_info=not patch_stdout)
 
+        server_url = self.get_server_url(repository_info, tool)
+        diff_revision = None
+
+        if review_request_id.startswith('http'):
+            (server_url,
+             review_request_id,
+             diff_revision) = parse_review_request_url(review_request_id)
+
+            if diff_revision and '-' in diff_revision:
+                raise CommandError('Interdiff patches not supported: %s.'
+                                   % diff_revision)
+
+        if diff_revision is None:
+            diff_revision = self.options.diff_revision
+
         if revert and not tool.supports_patch_revert:
             raise CommandError(
                 _('The %s backend does not support reverting patches.')
                 % tool.name)
-
-        server_url = self.get_server_url(repository_info, tool)
 
         api_client, api_root = self.get_api(server_url)
         self.setup_tool(tool, api_root=api_root)
@@ -448,7 +462,7 @@ class Patch(Command):
         # Fetch the patches from the review request, based on the requested
         # options.
         patches = self.get_patches(
-            diff_revision=self.options.diff_revision,
+            diff_revision=diff_revision,
             commit_ids=commit_ids,
             squashed=self.options.squash,
             reverted=revert)

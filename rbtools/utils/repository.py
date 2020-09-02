@@ -1,13 +1,33 @@
+"""Utility functions for working with repositories."""
+
 from __future__ import unicode_literals
 
 
 def get_repository_id(repository_info, api_root, repository_name=None):
-    """Get the repository ID from the server.
+    """Return the ID of a repostiory from the server.
 
-    This will compare the paths returned by the SCM client
-    with those on the server, and return the id of the first
-    match.
+    This will look up all accessible repositories on the server and try to
+    find the ID of one that matches the provided repository information.
+
+    Args:
+        repository_info (rbtools.clients.RepositoryInfo):
+            The scanned repository information.
+
+        api_root (rbtools.api.resource.RootResource):
+            The root resource for the API.
+
+        repository_name (unicode, optional):
+            An explicit repository name provided by local configuration. If
+            this is not provided, :py:attr:`RepositoryInfo.name
+            <rbtools.clients.RepositoryInfo.name>` will be used, if available.
+
+    Returns:
+        int:
+        The ID of the repository, or ``None`` if not found.
     """
+    if repository_name is None:
+        repository_name = repository_info.name
+
     detected_paths = repository_info.path
 
     if not isinstance(detected_paths, list):

@@ -684,7 +684,7 @@ class Post(Command):
 
                     try:
                         review_request = api_root.get_review_request(
-                            review_request_id=rid,
+                            review_request_id=review_request_id,
                             only_fields='absolute_url,bugs_closed,id,status',
                             only_links='diffs,draft')
                     except APIError as e:
@@ -730,7 +730,7 @@ class Post(Command):
                     'usually means no files were'
                     'modified in this change.')
             else:
-                error_msg.append(force_unicode(e))
+                error_msg.append(force_unicode(str(e)))
 
             error_msg.append(
                 'Your review request still exists, but the diff is '
@@ -970,6 +970,7 @@ class Post(Command):
         repository = (
             self.options.repository_name or
             self.options.repository_url or
+            repository_info.name or
             self.get_repository_path(repository_info, api_root)
         )
 

@@ -16,6 +16,7 @@ from rbtools import get_version_string
 from rbtools.api.capabilities import Capabilities
 from rbtools.api.client import RBClient
 from rbtools.api.errors import APIError, ServerInterfaceError
+from rbtools.api.transport.sync import SyncTransport
 from rbtools.clients import scan_usable_client
 from rbtools.clients.errors import OptionsCheckError
 from rbtools.utils.console import get_input, get_pass
@@ -273,6 +274,24 @@ class Command(object):
                    default=None,
                    help='The file to use for the API cache database.',
                    added_in='0.7.3'),
+            Option('--ca-certs',
+                   dest='ca_certs',
+                   metavar='FILE',
+                   config_key='CA_CERTS',
+                   default=None,
+                   help='Additional TLS CA bundle.'),
+            Option('--client-key',
+                   dest='client_key',
+                   metavar='FILE',
+                   config_key='CLIENT_KEY',
+                   default=None,
+                   help='Key for TLS client authentication.'),
+            Option('--client-cert',
+                   dest='client_cert',
+                   metavar='FILE',
+                   config_key='CLIENT_CERT',
+                   default=None,
+                   help='Certificate for TLS client authentication.'),
         ]
     )
 
@@ -553,8 +572,19 @@ class Command(object):
         ]
     )
 
-    def __init__(self):
+    default_transport_cls = SyncTransport
+
+    def __init__(self, transport_cls=SyncTransport):
+        """Initialize the base functionality for the command.
+
+        Args:
+            transport_cls (rbtools.api.transport.Transport, optional):
+                The transport class used for all API communication. By default,
+                this uses the transport defined in
+                :py:attr:`default_transport_cls`.
+        """
         self.log = logging.getLogger('rb.%s' % self.name)
+        self.transport_cls = transport_cls or self.default_transport_cls
 
     def create_parser(self, config, argv=[]):
         """Create and return the argument parser for this command."""
@@ -923,7 +953,11 @@ class Command(object):
             cache_location=self.options.cache_location,
             in_memory_cache=self.options.in_memory_cache,
             save_cookies=self.options.save_cookies,
-            ext_auth_cookies=self.options.ext_auth_cookies)
+            ext_auth_cookies=self.options.ext_auth_cookies,
+            ca_certs=self.options.ca_certs,
+            client_key=self.options.client_key,
+            client_cert=self.options.client_cert,
+            transport_cls=self.transport_cls)
 
     def get_api(self, server_url):
         """Returns an RBClient instance and the associated root resource.
