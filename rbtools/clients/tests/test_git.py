@@ -1260,3 +1260,19 @@ class GitClientTests(SpyAgency, SCMClientTests):
         self.assertTrue(execute.spy.called)
         self.assertEqual(execute.spy.last_call.args[0],
                          ['git', 'branch', '-D', 'new-branch'])
+
+    def test_get_parent_branch_with_non_master_default(self):
+        """Testing GitClient._get_parent_branch with a non-master default
+        branch
+        """
+        # Make a clone of the clone so we can update the "upstream"
+        self.git_dir = os.getcwd()
+        self.clone_dir = self.chdir_tmp()
+        self._run_git(['clone', self.git_dir, self.clone_dir])
+
+        self._run_git(['branch', '-m', 'master', 'main'])
+        self._run_git(['push', '-u', 'origin', 'main'])
+
+        self.client.get_repository_info()
+
+        self.assertEqual(self.client._get_parent_branch(), 'origin/main')

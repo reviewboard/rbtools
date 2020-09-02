@@ -260,10 +260,9 @@ class GitClient(SCMClient):
                               '--help": skipping Git')
                 return None
 
-        git_dir = self._execute([self.git, 'rev-parse', '--git-dir'],
-                                ignore_errors=True).rstrip('\n')
+        git_dir = self._get_git_dir()
 
-        if git_dir.startswith('fatal:') or not os.path.isdir(git_dir):
+        if git_dir is None:
             return None
 
         # Sometimes core.bare is not set, and generates an error, so ignore
@@ -395,6 +394,32 @@ class GitClient(SCMClient):
                                   supports_parent_diffs=True)
         return None
 
+    def _get_git_dir(self):
+        """Return the current git directory.
+
+        This will return the :file:`.git` directory corresponding to the full
+        checkout, traversing up in the case of worktrees.
+
+        Returns:
+            unicode:
+            The path to the :file:`.git` directory for the repository.
+        """
+        git_dir = self._execute([self.git, 'rev-parse', '--git-dir'],
+                                ignore_errors=True).rstrip('\n')
+
+        if git_dir.startswith('fatal:') or not os.path.isdir(git_dir):
+            return None
+
+        try:
+            # In the case of a worktree, find the common gitdir.
+            with open(os.path.join(git_dir, 'commondir')) as f:
+                common_dir = f.read().strip()
+                git_dir = os.path.abspath(os.path.join(git_dir, common_dir))
+        except IOError:
+            pass
+
+        return git_dir
+
     def _strip_heads_prefix(self, ref):
         """Strip the heads prefix off of a reference name.
 
@@ -519,6 +544,22 @@ class GitClient(SCMClient):
                 if remote and remote != '.' and merge:
                     return '%s/%s' % (remote, merge)
 
+            # As of Git 2.28, users can configure a default main branch name.
+            # In most cases, this will be handled by the _get_remote call
+            # above. This here is a fallback to a fallback, and assumes that if
+            # they're operating with a bare checkout with a non-standard main
+            # branch name, they're configured correctly.
+            defaultBranch = self._execute([self.git, 'config', '--global',
+                                           '--get', 'init.defaultBranch'],
+                                          ignore_errors=True).strip()
+
+            if (defaultBranch and
+                os.path.exists(os.path.join(self._get_git_dir(), 'refs',
+                                            'remotes', 'origin',
+                                            defaultBranch))):
+                return 'origin/%s' % defaultBranch
+
+            # Finally, just fall back to the old standard.
             return 'origin/master'
         else:
             raise ValueError('Unknown git client type %s' % self._type)
