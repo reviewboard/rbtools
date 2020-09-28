@@ -1,0 +1,195 @@
+.. default-intersphinx:: rbt2.0 rb-latest
+
+
+=========================
+RBTools 2.0 Release Notes
+=========================
+
+**Release date:** TBD
+
+
+New Features and Bug Fixes
+==========================
+
+DVCS Support
+------------
+
+RBTools 2.0 now supports posting review requests that include multiple commits
+when using Review Board 4.0 Beta 1 or newer. This is supported for Git and
+Mercurial repositories.
+
+While RBTools could always post review requests spanning more than one commit,
+the resulting diff would have all of the commits squashed into a single
+change. Review Board is now capable of showing all the commits separately.
+
+
+Python API
+----------
+
+* Added support for new field expansion information in API payloads.
+
+  Review Board 4.0 introduces metadata for expanded fields, which makes it more
+  flexible when making API requests. The Python API now supports this and
+  accessing an expanded field from a resource will return the resource object
+  for the field instead of just a simple field wrapper. Attribute accesses work
+  the same as before, but the resource object also allows invoking methods.
+
+
+Custom CA and Certificates
+--------------------------
+
+RBTools now allows specifying a custom certificate authority bundle and custom
+TLS certificate and key for authenticating to a Review Board server using
+self-signed certificates. This is done by specifying the :option:`--ca-certs`,
+:option:`--client-key`, and :option:`--client-cert` arguments.
+
+Patch by Alessandro.
+
+
+rbt land
+--------
+
+.. program:: rbt land
+
+* Allow specifying the review request as a URL instead of just the ID.
+
+
+rbt patch
+---------
+
+.. program:: rbt patch
+
+* Allowed :command:`rbt patch --print` to operate outside of a source
+  repository (:bug:`4628`).
+
+  Normally, RBTools commands must be run from within a checkout. The
+  :command:`rbt patch --print` command just fetches data from the server and
+  prints it, and as such no longer requires a local checkout.
+
+* Allow specifying the review request as a URL instead of just the ID.
+
+  Patch by André Klitzing.
+
+
+rbt status
+----------
+
+.. program:: rbt status
+
+* Added custom formatting.
+
+  The new :option:`--format` and :option:`-z` options allow specifying a custom
+  format for the status output, making it more suitable for scripting.
+
+
+rbt setup-repo
+--------------
+
+.. program:: rbt setup-repo
+
+* Updated :command:`rbt setup-repo` to better guide through the setup process.
+
+  We've had several reports of confusion about what exactly :command:`rbt
+  setup-repo` is for, and complaints that it wasn't clear what was happening.
+  We've reworked the command to better explain what information is being asked
+  for, and show what the command will do.
+
+  Patch by Katherine Patenio.
+
+* Fixed fuzzy matching when there are a lot of repositories.
+
+  When there are many pages of repositories available in the API, setup-repo
+  was selecting a fuzzy match from an early page when an exact match was
+  available on a later page. This has been fixed to fetch all the repositories
+  before attempting a match.
+
+  Patch by Boris Krasnovskiy.
+
+
+rbt version
+-----------
+
+.. program:: rbt version
+
+* Added the Python version to the :command:`rbt version` output.
+
+  In order to facilitate debugging of issues across different Python versions,
+  the :command:`rbt version` output now includes the Python version as well.
+
+  Patch by Xiaole Zeng.
+
+
+Git
+---
+
+.. program:: rbt post
+
+* Added :option:`--git-find-renames-threshold` for :command:`rbt diff` and
+  :command:`rbt post`.
+
+  Git diffs will attempt to detect when files have been renamed, but the
+  default threshold may not correctly identify renamed files if many changes
+  have been made to the file. This option allows customizing the threshold to
+  make it either more or less strict when creating the diff.
+
+* Added support for Git's new ``init.defaultBranch`` config option.
+
+  Git has a new config option for specifying the name of the default branch
+  used in new repositories, and it's likely that more and more people will
+  start to use names other than ``master``. This worked in most situations, but
+  additional fallbacks have been added to try to detect the correct branch name
+  in unusual situations.
+
+
+Mercurial
+---------
+
+* Add the ability for the Mercurial client in the API to use a custom
+  hg executable.
+
+  Mercurial provides a command-server that can be used for faster operations.
+  This requires invoking :command:`chg` rather than :command:`hg`. When using
+  the client via the Python API, callers can now pass in a custom executable
+  name or path.
+
+  Patch by André Klitzing.
+
+* Fixed posting changes that included files that were moved in a parent diff.
+
+* Made a variety of performance improvements in repository detection.
+
+  Patches by André Klitzing.
+
+
+Perforce
+--------
+
+* Added a new ``reviewboard.repository_name`` counter.
+
+  For large projects that use Perforce but for some reason don't want to
+  include a :file:`.reviewboardrc` in their repository, the Perforce admin
+  could create a counter to point to the server, but RBTools still would
+  perform expensive repository detection every time it was invoked. This new
+  counter can be used in place of the ``REPOSITORY`` config key in
+  :file:`.reviewboardrc` to speed up this process.
+
+  Though this is available, committing a :file:`.reviewboardrc` file to the
+  repository or branch root is still our recommended way of setting up RBTools.
+
+* Fixed repository information detection for Perforce repositories which use
+  different SSL configurations.
+
+
+Contributors
+------------
+
+* Allessandro
+* André Klitzing
+* Barret Rennie
+* Boris Krasnovskiy
+* Christian Hammond
+* David Trowbridge
+* Joshua Olson
+* Katherine Patenio
+* Keith Kelly
+* Xiaole Zeng
