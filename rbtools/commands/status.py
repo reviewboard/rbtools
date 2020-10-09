@@ -130,10 +130,15 @@ class Status(Command):
             else:
                 status = 'Pending'
 
+            if request.draft:
+                summary = request.draft[0]['summary']
+            else:
+                summary = request.summary
+
             info = {
                 'id':  request.id,
                 'status': status,
-                'summary': request.summary,
+                'summary': summary,
                 'description': request.description,
             }
 
