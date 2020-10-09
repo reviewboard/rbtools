@@ -81,6 +81,10 @@ rbt status
   The new :option:`--format` and :option:`-z` options allow specifying a custom
   format for the status output, making it more suitable for scripting.
 
+* Show the correct summary for draft review requests (:bug:`4855`)
+
+  Patch by Cecilia Wei
+
 
 rbt setup-repo
 --------------
@@ -187,6 +191,7 @@ Contributors
 * André Klitzing
 * Barret Rennie
 * Boris Krasnovskiy
+* Cecilia Wei
 * Christian Hammond
 * David Trowbridge
 * Joshua Olson
