@@ -107,9 +107,14 @@ class Status(Command):
             else:
                 status = 'Pending'
 
+            if request.draft:
+                summary = request.draft[0]['summary']
+            else:
+                summary = request.summary
+
             request_stats = {
                 'status': status,
-                'summary': 'r/%s - %s' % (request.id, request.summary)
+                'summary': 'r/%s - %s' % (request.id, summary),
             }
 
             if 'local_branch' in request.extra_data:
