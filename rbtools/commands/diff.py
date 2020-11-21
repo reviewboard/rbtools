@@ -1,5 +1,7 @@
 from __future__ import print_function, unicode_literals
 
+import sys
+
 from rbtools.clients.errors import InvalidRevisionSpecError
 from rbtools.commands import Command, CommandError
 
@@ -92,4 +94,6 @@ class Diff(Command):
             if six.PY2:
                 print(diff)
             else:
-                print(diff.decode('utf-8'))
+                # Write the non-decoded binary diff to standard out
+                sys.stdout.buffer.write(diff)
+                print()

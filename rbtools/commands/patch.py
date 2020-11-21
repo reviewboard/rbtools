@@ -5,6 +5,7 @@ from __future__ import print_function, unicode_literals
 import logging
 import os
 import re
+import sys
 from gettext import gettext as _, ngettext
 
 import six
@@ -340,7 +341,15 @@ class Patch(Command):
 
         if result.patch_output:
             print()
-            print(result.patch_output.strip())
+
+            patch_output = result.patch_output.strip()
+
+            if six.PY2:
+                print(patch_output)
+            else:
+                sys.stdout.buffer.write(patch_output)
+                print()
+
             print()
 
         if not result.applied:
@@ -483,9 +492,13 @@ class Patch(Command):
             diff_body = patch_data['diff']
 
             if isinstance(diff_body, bytes):
-                logger.info(diff_body.decode('utf-8'))
+                if six.PY3:
+                    sys.stdout.buffer.write(diff_body)
+                    print()
+                else:
+                    print(diff_body.decode('utf-8'))
             else:
-                logger.info(diff_body)
+                print(diff_body)
 
     def _apply_patches(self, patches):
         """Apply a list of patches to the tree.
