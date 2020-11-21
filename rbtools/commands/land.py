@@ -119,8 +119,20 @@ class Land(Command):
         Command.branch_options,
     ]
 
-    def patch(self, review_request_id):
-        """Patch a single review request's diff using rbt patch."""
+    def patch(self, review_request_id, squash=False):
+        """Patch a single review request's diff using rbt patch.
+
+        Args:
+            review_request_id (int):
+                The ID of the review request to patch.
+
+            squash (bool, optional):
+                Whether to squash multiple commits into a single commit.
+
+        Raises:
+            rbtools.commands.CommandError:
+                There was an error applying the patch.
+        """
         patch_command = [RB_MAIN, 'patch']
         patch_command.extend(build_rbtools_cmd_argv(self.options))
 
@@ -128,6 +140,9 @@ class Land(Command):
             patch_command.append('-c')
         else:
             patch_command.append('-C')
+
+        if squash:
+            patch_command.append('--squash')
 
         patch_command.append(six.text_type(review_request_id))
 
@@ -230,7 +245,8 @@ class Land(Command):
             print('Applying patch from review request %s.' % review_request.id)
 
             if not dry_run:
-                self.patch(review_request.id)
+                self.patch(review_request.id,
+                           squash=squash)
 
         print('Review request %s has landed on "%s".' %
               (review_request.id, self.options.destination_branch))
