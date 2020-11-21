@@ -1098,8 +1098,11 @@ class GitClient(SCMClient):
 
         cmd.append(patch_file)
 
-        rc, data = self._execute(cmd, ignore_errors=True, with_errors=True,
-                                 return_error_code=True)
+        rc, data = self._execute(cmd,
+                                 ignore_errors=True,
+                                 with_errors=True,
+                                 return_error_code=True,
+                                 results_unicode=False)
 
         if rc == 0:
             return PatchResult(applied=True, patch_output=data)

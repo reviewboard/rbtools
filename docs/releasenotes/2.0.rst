@@ -46,6 +46,14 @@ self-signed certificates. This is done by specifying the :option:`--ca-certs`,
 Patch by Alessandro.
 
 
+rbt diff
+--------
+
+* Fixed outputting diffs that contained non-UTF-8 content on Python 3.
+
+  Patch by Daniel Fox.
+
+
 rbt land
 --------
 
@@ -69,6 +77,10 @@ rbt patch
 * Allow specifying the review request as a URL instead of just the ID.
 
   Patch by André Klitzing.
+
+* Fixed outputting diffs that contained non-UTF-8 content on Python 3.
+
+  Patch by Daniel Fox.
 
 
 rbt status
@@ -193,6 +205,7 @@ Contributors
 * Boris Krasnovskiy
 * Cecilia Wei
 * Christian Hammond
+* Daniel Fox
 * David Trowbridge
 * Joshua Olson
 * Katherine Patenio

@@ -769,7 +769,8 @@ class SVNClient(SCMClient):
 
                     if not revisions['base'] and not revisions['tip']:
                         tip = '(working copy)'
-                        info = self.svn_info(filename, ignore_errors=True)
+                        info = self.svn_info(filename.decode('utf-8'),
+                                             ignore_errors=True)
 
                         if info and 'Revision' in info:
                             base = '(revision %s)' % info['Revision']
@@ -789,9 +790,9 @@ class SVNClient(SCMClient):
                         tip = revisions['tip']
 
                 result.append(b'%s\n' % self.INDEX_SEP)
-                result.append(b'--- %s\t%s\n' % (filename.encode(_fs_encoding),
+                result.append(b'--- %s\t%s\n' % (filename,
                                                  base.encode('utf-8')))
-                result.append(b'+++ %s\t%s\n' % (filename.encode(_fs_encoding),
+                result.append(b'+++ %s\t%s\n' % (filename,
                                                  tip.encode('utf-8')))
 
                 # Skip the next line (the index separator) since we've already
