@@ -30,9 +30,9 @@ Custom Option Defaults
 Most options to RBTools commands allow for custom defaults. Each command has
 documentation on what to set to change the default.
 
-For instance, if you look at the :ref:`rbt-post` documentation, you'll see
-that you can automatically open your browser when posting a review request by
-setting::
+For instance, if you look at the :rbtcommand:`rbt post` documentation, you'll
+see that you can automatically open your browser when posting a review request
+by setting::
 
     OPEN_BROWSER = True
 
@@ -40,7 +40,445 @@ Or, you can disable usage of your HTTP proxy on any command by setting::
 
     ENABLE_PROXY = False
 
-Check out the documentation for the different commands to see what you can do.
+The following options might be useful to set in your own
+:file:`.reviewboardrc` file. This can also contain anything normally found in
+a :ref:`repository's .reviewboardrc <rbtools-reviewboardrc>`.
+
+
+.. rbtconfig:: API_TOKEN
+
+API_TOKEN
+---------
+
+**Type:** String
+
+**Default:** Unset
+
+Your Review Board API token, for logging into Review Board.
+
+This can also be provided by passing :option:`--api-token` to any command.
+
+.. warning::
+
+   We recommend that you provide your credentials only on demand, rather
+   than setting this in a file. However, this can be useful for specialized
+   automation in a locked-down environment.
+
+
+.. rbtconfig:: CACHE_LOCATION
+
+CACHE_LOCATION
+--------------
+
+**Type:** String
+
+**Default:** See :ref:`rbtools-user-cache`
+
+A custom path used to store any cached HTTP responses.
+
+Example::
+
+    CACHE_LOCATION = "/tmp/rbtools-cache"
+
+This can also be provided by passing :option:`--cache-location` to any
+command.
+
+
+.. rbtconfig:: DEBUG
+
+DEBUG
+-----
+
+**Type:** Boolean
+
+**Default:** ``False``
+
+If enabled, RBTools commands will output extra debug information.
+
+Example::
+
+    DEBUG = True
+
+This can also be provided by passing :option:`--debug` to any command.
+
+
+.. rbtconfig:: DISABLE_CACHE
+
+DISABLE_CACHE
+-------------
+
+**Type:** Boolean
+
+**Default:** ``False``
+
+If enabled, HTTP responses will be cached (either in memory or saved to a
+local cache -- see :rbtconfig:`IN_MEMORY_CACHE`), speeding up subsequent
+requests.
+
+If diasbled, RBTools always perform full HTTP requests.
+
+Example::
+
+    DISABLE_CACHE = True
+
+This can also be disabled by passing :option:`--disable-cache` to any command.
+
+
+.. rbtconfig:: DISABLE_SSL_VERIFICATION
+
+DISABLE_SSL_VERIFICATION
+------------------------
+
+**Type:** Boolean
+
+**Default:** ``False``
+
+If enabled, SSL certificates won't be verified.
+
+Example::
+
+    DISABLE_SSL_VERIFICATION = True
+
+.. warning::
+
+   Disabling SSL verification presents a security risk. We instead recommend
+   using :rbtconfig:`CA_CERTS`.
+
+This can also be disabled by passing :option:`--disable-ssl-verification` to
+any command.
+
+
+.. rbtconfig:: EXT_AUTH_COOKIES
+
+EXT_AUTH_COOKIES
+----------------
+
+**Type:** String
+
+**Default:** Unset
+
+This can be set to a local file path to use an existing pre-fetched cookie
+store, which can be useful for automation. This file must be compatible with
+Python's urllib2 cookie
+
+Example::
+
+    EXT_AUTH_COOKIES = "/opt/scripts/rbtools/cookies.txt"
+
+This can also be provided by passing :option:`--ext-auth-cookies` to any
+command.
+
+
+.. rbtconfig:: GUESS_FIELDS
+
+GUESS_FIELDS
+------------
+
+**Commands:** :rbtcommand:`rbt post`
+
+**Type:** String
+
+**Default:** ``"auto"``
+
+The default behavior for guessing the value for the review request's intended
+summary and description based on the posted commit's message (on repositories
+that support posting from an existing commit). This can be set to ``"yes"``,
+``"no"``, or ``"auto"``.
+
+If set to ``"yes"``, then the review request's fields will always be set,
+overriding any manual changes you've made the next time you run
+:rbtcommand:`rbt post`.
+
+If set to ``"no"``, then the review request's fields will never be updated.
+
+If set to ``"auto"`` (the default), then only newly-posted review requests
+will have their fields updated. Updates to an existing review request won't
+override any fields.
+
+See :ref:`guessing-behavior` for more information.
+
+For example::
+
+    GUESS_FIELDS = "yes"
+
+This can also be provided by using :option:`rbt post --guess-fields`.
+
+
+.. rbtconfig:: GUESS_DESCRIPTION
+
+GUESS_DESCRIPTION
+-----------------
+
+**Commands:** :rbtcommand:`rbt post`
+
+**Type:** String
+
+**Default:** Value of :rbtconfig:`GUESS_FIELDS`
+
+The default behavior for guessing a review request's intended description
+based on the posted commit's message.
+
+Most of the time, you'll just want to use :rbtconfig:`GUESS_FIELDS`. See
+:ref:`guessing-behavior` for additional information.
+
+Example::
+
+    GUESS_DESCRIPTION = "no"
+
+This can also be provided by using :option:`rbt post --guess-description`.
+
+
+.. rbtconfig:: GUESS_SUMMARY
+
+GUESS_SUMMARY
+-------------
+
+**Commands:** :rbtcommand:`rbt post`
+
+**Type:** String
+
+**Default:** Value of :rbtconfig:`GUESS_FIELDS`
+
+The default behavior for guessing a review request's intended summary based on
+the posted commit's message.
+
+Most of the time, you'll just want to use :rbtconfig:`GUESS_FIELDS`. See
+:ref:`guessing-behavior` for additional information.
+
+Example::
+
+    GUESS_DESCRIPTION = "yes"
+
+This can also be provided by using :option:`rbt post --guess-summary`.
+
+
+.. rbtconfig:: IN_MEMORY_CACHE
+
+IN_MEMORY_CACHE
+---------------
+
+**Type:** Boolean
+
+**Default:** ``False``
+
+If enabled, any cached HTTP responses will be stored only in local memory, and
+not saved to disk.
+
+If diasbled, and :rbtconfig:`DISABLE_CACHE` isn't used, HTTP responses will be
+saved locally.
+
+See :rbtconfig:`CACHE_LOCATION` for configuring the cache location.
+
+Example::
+
+    IN_MEMORY_CACHE = True
+
+This can also be enabled by passing :option:`--disable-cache` to any command.
+
+
+.. rbtconfig:: OPEN_BROWSER
+
+OPEN_BROWSER
+------------
+
+**Commands:** :rbtcommand:`rbt post`
+
+**Type:** Boolean
+
+**Default:** ``False``
+
+If set, a web browser will be opened to the review request after running
+:rbtcommand:`rbt post`.
+
+Example::
+
+    OPEN_BROWSER = True
+
+This can also be provided by using :option:`rbt post --open`.
+
+
+.. rbtconfig:: P4_CLIENT
+
+P4_CLIENT
+---------
+
+**Type:** String
+
+**Default:** Unset
+
+The Perforce client name to use, overriding the default for your local
+setup.
+
+Example::
+
+    P4_CLIENT = "my-client"
+
+This can also be provided by passing :option:`--p4-client` to most commands.
+
+
+.. rbtconfig:: P4_PASSWD
+
+P4_PASSWD
+---------
+
+**Type:** String
+
+**Default:** Unset
+
+The password or ticket for your Perforce user, corresponding to the user
+set in the :envvar:`P4USER` environment variable.
+
+Example::
+
+    P4_PASSWD = "ticket123"
+
+This can also be provided by passing :option:`--p4-user` to most commands.
+
+.. warning::
+
+   We recommend that you provide your credentials through a
+   :command:`p4 login`, rather than setting this in a file. However, this can
+   be useful for specialized automation in a locked-down environment.
+
+
+.. rbtconfig:: PASSWORD
+
+PASSWORD
+--------
+
+**Type:** String
+
+**Default:** Unset
+
+Your password, for logging into Review Board.
+
+Example::
+
+    PASSWORD = "s3cr3t"
+
+This can also be provided by passing :option:`--password` to any command.
+
+.. warning::
+
+   We recommend that you provide your credentials only on demand, rather
+   than setting this in a file. However, this can be useful for specialized
+   automation in a locked-down environment.
+
+
+.. rbtconfig:: PUBLISH
+
+PUBLISH
+-------
+
+**Commands:** :rbtcommand:`rbt post`
+
+**Type:** Boolean
+
+**Default:** ``False``
+
+If set, any new review request drafts will be automatically published. This
+does require all fields on the review request to be provided.
+
+Example::
+
+    PUBLISH = True
+
+This can also be provided by using :option:`rbt post --publish`.
+
+
+.. rbtconfig:: SAVE_COOKIES
+
+SAVE_COOKIES
+------------
+
+**Type:** Boolean
+
+**Default:** ``True``
+
+If enabled, cookies will be saved after logging in (see
+:ref:`rbtools-user-cookies` for cookie store location).
+
+If diasbled, no cookies will be stored, and the next RBTools command will
+require logging in again.
+
+Example::
+
+    SAVE_COOKIES = False
+
+This can also be disabled by passing :option:`--disable-cookie-storage` to any
+command.
+
+
+.. rbtconfig:: STAMP_WHEN_POSTING
+
+STAMP_WHEN_POSTING
+------------------
+
+**Commands:** :rbtcommand:`rbt post`
+
+**Type:** Boolean
+
+**Default:** ``False``
+
+If enabled, the latest commit for a review request will be stamped with the
+review request URL when posting the commit for review.
+
+Example::
+
+    STAMP_WHEN_POSTING = True
+
+This can also be enabled by using :option:`rbt post --stamp-when-posting`.
+
+
+.. rbtconfig:: SUBMIT_AS
+
+SUBMIT_AS
+---------
+
+**Commands:** :rbtcommand:`rbt post`
+
+**Type:** String
+
+**Default:** Unset
+
+The username to use instead of the logged-in user when posting a change for
+review. This is useful for automation, enabling a script to post changes on
+behalf of users.
+
+This requires that the logged-in user is either an administrator or has the
+``reviews.can_submit_as`` permission set.
+
+Most of the time, it won't make much sense to put this in
+:file:`.reviewboardrc`. Using :option:`rbt post --submit-as` might be a better
+option.
+
+Example::
+
+    SUBMIT_AS = "other-user"
+
+
+.. rbtconfig:: USERNAME
+
+USERNAME
+--------
+
+**Type:** String
+
+**Default:** Unset
+
+Your username, for logging into Review Board.
+
+Example::
+
+    USERNAME = "myuser"
+
+This can also be provided by passing :option:`--username` to any command.
+
+.. warning::
+
+   We recommend that you provide your credentials only on demand, rather
+   than setting this in a file. However, this can be useful for specialized
+   automation in a locked-down environment.
 
 
 .. _rbtools-env:
@@ -159,6 +597,8 @@ handled by the shell.
 Special Files
 =============
 
+.. _rbtools-user-cookies:
+
 Cookies
 -------
 
@@ -171,6 +611,8 @@ If the file is missing, RBTools will check for a legacy
 old :command:`post-review` command.
 
 
+.. _rbtools-user-cache:
+
 Cache Database
 --------------
 
@@ -178,11 +620,13 @@ The :command:`rbt` command stores cached API request responses in a SQLite
 database in a cache directory. This is to reduce the time it takes to perform
 certain API requests.
 
-On MacOS X, this is in :file:`~/Library/Caches/rbtools/apicache.db`.
+On macOS, this is in :file:`~/Library/Caches/rbtools/apicache.db`.
 
 On Linux, this is in :file:`~/.cache/.rbtools/apicache.db`.
 
 On Windows, this is in :file:`%APPDATA%\\rbtools\\rbtools\\apicache.db`.
 
+This location can be controlled by setting :rbtconfig:`CACHE_LOCATION`.
+
 To delete the cache, either remove this file, or call
-:ref:`rbt clear-cache <rbt-clear-cache>`.
+:rbtcommand:`rbt clear-cache`.
