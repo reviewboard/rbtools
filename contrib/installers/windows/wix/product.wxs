@@ -24,12 +24,6 @@
    </Condition>
   <?endif ?>
 
-  <?if $(var.Platform) = x86 ?>
-   <Condition Message="!(loc.x64VersionRequired)">
-    <![CDATA[NOT VersionNT64]]>
-   </Condition>
-  <?endif ?>
-
   <Feature Id="ProductFeature"
            Title="!(loc.ProductName)"
            Description="!(loc.RBToolsDescription)"
