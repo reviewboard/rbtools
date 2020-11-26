@@ -27,21 +27,22 @@ set DEPS_DIR=%BUILD_BASE%\deps
 
 
 ::-------------------------------------------------------------------------
+:: Dependencies
+::-------------------------------------------------------------------------
+set PYTHON_VERSION=3.8.6
+set PYTHON_FILENAME=python-%PYTHON_VERSION%-amd64.exe
+set PYTHON_URL=https://www.python.org/ftp/python/%PYTHON_VERSION%/%PYTHON_FILENAME%
+set PYTHON_MD5=2acba3117582c5177cdd28b91bbe9ac9
+set PYTHON_DEP=%DEPS_DIR%\python-%PYTHON_VERSION%
+
+
+::-------------------------------------------------------------------------
 :: Binaries
 ::-------------------------------------------------------------------------
-set BUNDLED_PYTHON_DIR=%BUILD_ROOT%\Python27
+set BUNDLED_PYTHON_DIR=%BUILD_ROOT%\Python
 set BUNDLED_PYTHON=%BUNDLED_PYTHON_DIR%\python.exe
 
 call :SetMSBuildPath || goto :Abort
-
-
-::-------------------------------------------------------------------------
-:: Dependencies
-::-------------------------------------------------------------------------
-set PYTHON_VERSION=2.7.17
-set PYTHON_URL=https://www.python.org/ftp/python/%PYTHON_VERSION%/python-%PYTHON_VERSION%.msi
-set PYTHON_MD5=4cc27e99ad41cd3e0f2a50d9b6a34f79
-set PYTHON_DEP=%DEPS_DIR%\python-%PYTHON_VERSION%
 
 
 ::-------------------------------------------------------------------------
@@ -58,7 +59,7 @@ if not exist "%BUILD_STAGE%" mkdir "%BUILD_STAGE%"
 
 call :InstallPython || goto :Abort
 call :CreateBuildDirectory || goto :Abort
-call :InstallPackagers || goto :Abort
+call :InstallPackages || goto :Abort
 call :InstallRBTools || goto :Abort
 call :RemoveUnwantedFiles || goto :Abort
 call :BuildInstaller || goto :Abort
@@ -77,7 +78,7 @@ setlocal
 echo.
 echo == Installing Python ==
 
-set _PYTHON_INSTALLER=%TEMP%\python-%PYTHON_VERSION%.msi
+set _PYTHON_INSTALLER=%TEMP%\%PYTHON_FILENAME%
 
 if not exist "%PYTHON_DEP%" (
     if not exist "%_PYTHON_INSTALLER%" (
@@ -90,7 +91,15 @@ if not exist "%PYTHON_DEP%" (
     )
 
     echo Running the installer...
-    msiexec /quiet /a "%_PYTHON_INSTALLER%" TARGETDIR="%PYTHON_DEP%"
+    "%_PYTHON_INSTALLER%" /quiet ^
+        AssociateFiles=0 Include_doc=0 Include_debug=0 Include_launcher=0 ^
+        Include_tcltk=0 Include_test=0 InstallAllUsers=0 ^
+        InstallLauncherAllUsers=0 Shortcuts=0 TargetDir="%PYTHON_DEP%-temp"
+    xcopy /EYI "%PYTHON_DEP%-temp" "%PYTHON_DEP%"
+
+    :: Remove the old install from the temp directory, and clean up the
+    :: registry files so future installs aren't impacted.
+    "%_PYTHON_INSTALLER%" /quiet /uninstall
 )
 
 goto :EOF
@@ -116,7 +125,7 @@ goto :EOF
 ::-------------------------------------------------------------------------
 :: Install package tools
 ::-------------------------------------------------------------------------
-:InstallPackagers
+:InstallPackages
 setlocal
 
 echo.
@@ -126,6 +135,12 @@ echo --------------------------- [Install log] ---------------------------
 
 pushd %TREE_ROOT%
 "%BUNDLED_PYTHON%" -m ensurepip --upgrade
+
+if ERRORLEVEL 1 (
+    popd
+    exit /B 1
+)
+
 "%BUNDLED_PYTHON%" -m pip install -U pip setuptools
 
 if ERRORLEVEL 1 (
@@ -177,7 +192,7 @@ echo == Removing unwanted files ==
 
 call :DeleteIfExists "%BUNDLED_PYTHON_DIR%\Doc"
 call :DeleteIfExists "%BUNDLED_PYTHON_DIR%\tcl"
-call :DeleteIfExists "%BUNDLED_PYTHON_DIR%\python-%PYTHON_VERSION%.msi"
+call :DeleteIfExists "%BUNDLED_PYTHON_DIR%\%PYTHON_FILENAME%"
 
 goto :EOF
 
@@ -198,6 +213,8 @@ set _wix_path=%CD%\wix
 
 %MSBUILD% ^
     /p:Version="%_rbtools_version%" ^
+    /p:Platform=x64 ^
+    /p:ExeSuffix=-amd64 ^
     /p:Root="%BUILD_ROOT%" ^
     /p:OutputPath="%BUILD_STAGE%\\" ^
     /p:SourcePath="%_wix_path%" ^
@@ -208,7 +225,8 @@ set _wix_path=%CD%\wix
 if ERRORLEVEL 1 exit /B 1
 
 mkdir "%BUILD_DEST%" 2>&1
-copy "%BUILD_STAGE%\RBTools-*.exe" "%BUILD_DEST%" >NUL
+dir "%BUILD_STAGE%" /S
+copy "%BUILD_STAGE%\RBTools-%_rbtools_version%*.exe" "%BUILD_DEST%" >NUL
 
 echo Installer published to %BUILD_DEST%
 
@@ -322,11 +340,11 @@ PowerShell -Command ^
  "$file = [System.IO.File]::ReadAllBytes('%_filename%');"^
  "$hash = [System.BitConverter]::ToString($md5.ComputeHash($file));"^
  "$hash = $hash.toLower().Replace('-', '');"^
- "Write-Host '%_filename% has hash $hash.';"^
+ "Write-Host '%_filename% has a valid hash.';"^
  "if ($hash -eq '%_expected_hash%') {"^
  "    exit 0;"^
  "} else {"^
- "    Write-Host 'Invalid checksum for %_filename%.';"^
+ "    Write-Host 'Invalid hash for %_filename%.';"^
  "    exit 1;"^
  "}" || exit /B 1
 

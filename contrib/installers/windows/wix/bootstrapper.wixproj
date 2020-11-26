@@ -3,37 +3,45 @@
 <Project ToolsVersion="4.0"
          DefaultTargets="Build"
          xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+ <!-- Common properties for building the bootstrap installer. -->
  <PropertyGroup>
   <Configuration Condition=" '$(Configuration)' == '' ">Release</Configuration>
-  <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
+  <Platform Condition=" '$(Platform)' == '' ">x64</Platform>
   <ProductVersion>3.9</ProductVersion>
   <ProjectGuid>0FB6BD50-77A5-416C-BE2E-BCFF8F265F9D</ProjectGuid>
   <SchemaVersion>2.0</SchemaVersion>
+
   <OutputName>RBTools</OutputName>
   <OutputType>Bundle</OutputType>
+  <Cultures>en-us</Cultures>
+
+  <DefineConstants>root=$(root);Version=$(Version);ExeSuffix=$(ExeSuffix)</DefineConstants>
   <WixTargetsPath Condition=" '$(WixTargetsPath)' == '' AND '$(MSBuildExtensionsPath32)' != '' ">$(MSBuildExtensionsPath32)\Microsoft\WiX\v3.x\Wix.targets</WixTargetsPath>
   <WixTargetsPath Condition=" '$(WixTargetsPath)' == '' ">$(MSBuildExtensionsPath)\Microsoft\WiX\v3.x\Wix.targets</WixTargetsPath>
   <SignOutput Condition="'$(CertificateThumbprint)' != ''">true</SignOutput>
   <TimestampUrl Condition="'$(TimestampUrl)' == ''">http://timestamp.verisign.com/scripts/timstamp.dll</TimestampUrl>
+
+  <OutputPath>bin\$(Platform)\$(Configuration)\</OutputPath>
+  <IntermediateOutputPath>obj\$(Platform)\$(Configuration)\</IntermediateOutputPath>
  </PropertyGroup>
- <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
-  <OutputPath>bin\</OutputPath>
-  <IntermediateOutputPath>obj\$(Configuration)\</IntermediateOutputPath>
-  <SuppressAllWarnings>False</SuppressAllWarnings>
-  <Pedantic>True</Pedantic>
-  <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
-  <DefineConstants>Version=$(Version)</DefineConstants>
-  <SuppressPdbOutput>True</SuppressPdbOutput>
- </PropertyGroup>
+
+ <!-- Compile the installer -->
  <ItemGroup>
   <Compile Include="bundle.wxs" />
  </ItemGroup>
+
+ <ItemGroup>
+  <EmbeddedResource Include="Product_en-us.wxl"/>
+ </ItemGroup>
+
  <ItemGroup>
   <WixExtension Include="WixBalExtension">
    <HintPath>$(WixExtDir)\WixBalExtension.dll</HintPath>
    <Name>WixBalExtension</Name>
   </WixExtension>
  </ItemGroup>
+
+ <!-- Define the actual RBTools installer we want to hand off to -->
  <ItemGroup>
   <ProjectReference Include="$(SourcePath)\rbtools.wixproj">
    <Name>rbtools</Name>
@@ -44,19 +52,25 @@
    <RefTargetDir>INSTALLFOLDER</RefTargetDir>
   </ProjectReference>
  </ItemGroup>
+
  <Import Project="$(WixTargetsPath)" />
+
+ <!-- Sign the bundled installer. -->
  <Target Name="SignBundleEngine">
   <SignFile CertificateThumbprint="$(CertificateThumbprint)"
             TimestampUrl="$(TimestampUrl)"
             SigningTarget="@(SignBundleEngine)"/>
  </Target>
+
  <Target Name="SignBundle">
   <SignFile CertificateThumbprint="$(CertificateThumbprint)"
             TimestampUrl="$(TimestampUrl)"
             SigningTarget="@(SignBundle)"/>
  </Target>
+
+ <!-- Copy the built installer to the output directory. -->
  <Target Name="AfterBuild">
   <Copy SourceFiles="$(TargetPath)"
-        DestinationFiles="$(OutputPath)RBTools-$(Version).exe" />
+        DestinationFiles="$(OutputPath)RBTools-$(Version)$(ExeSuffix).exe" />
  </Target>
 </Project>

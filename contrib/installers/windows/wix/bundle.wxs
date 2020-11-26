@@ -2,15 +2,17 @@
 
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
      xmlns:bal="http://schemas.microsoft.com/wix/BalExtension">
- <Bundle Name="RBTools"
+ <?include defines.wxi ?>
+
+ <Bundle Name="!(loc.ProductName)"
          Version="$(var.Version)"
-         Manufacturer="Beanbag, Inc."
+         Manufacturer="!(loc.Manufacturer)"
          UpgradeCode="0FB6BD50-77A5-416C-BE2E-BCFF8F265F9D"
          DisableModify="yes"
          IconSourceFile="files\favicon.ico"
-         Copyright="Copyright (c) 2014"
+         Copyright="!(loc.Copyright)"
          AboutUrl="https://www.reviewboard.org/"
-         HelpUrl="https://www.reviewboard.org/mailing-lists/">
+         HelpUrl="https://www.reviewboard.org/support/">
 
   <BootstrapperApplicationRef Id="WixStandardBootstrapperApplication.HyperlinkLargeLicense">
    <bal:WixStandardBootstrapperApplication LicenseUrl="" ShowVersion="yes"
@@ -19,7 +21,7 @@
 
   <Variable Name="InstallFolder"
             Type="string"
-            Value="[ProgramFilesFolder][WixBundleName]"/>
+            Value="[$(var.PlatformProgramFilesFolder)][WixBundleName]"/>
   <Chain>
    <MsiPackage SourceFile="$(var.rbtools.TargetPath)"
                SuppressSignatureVerification="yes">
