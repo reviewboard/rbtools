@@ -156,6 +156,10 @@ Git
   additional fallbacks have been added to try to detect the correct branch name
   in unusual situations.
 
+* Fixed reporting errors when failing to apply Git diffs on Python 3.
+
+  Patch by Daniel Fox.
+
 
 Mercurial
 ---------
