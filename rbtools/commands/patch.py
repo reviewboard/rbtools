@@ -80,13 +80,15 @@ class Patch(Command):
                default=None,
                help='Comma-separated list of commit IDs to apply.\n'
                     'This only applies to review requests created with commit '
-                    'history.'),
+                    'history.',
+               added_in='2.0'),
         Option('--squash',
                dest='squash',
                action='store_true',
                default=False,
                help='Squash all patches into one commit. This is only used if '
-                    'also using -c/--commit or -C/--commit-no-edit.'),
+                    'also using -c/--commit or -C/--commit-no-edit.',
+               added_in='2.0'),
         Command.server_options,
         Command.repository_options,
     ]

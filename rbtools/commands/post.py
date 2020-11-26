@@ -225,7 +225,8 @@ class Post(Command):
                        default=False,
                        help='Force the review request to be created without '
                             'history, even if the server supports it. '
-                            'Uploaded diffs will be squashed together.'),
+                            'Uploaded diffs will be squashed together.',
+                       added_in='2.0'),
                 Option('-H', '--with-history',
                        dest='with_history',
                        action='store_true',
@@ -234,7 +235,8 @@ class Post(Command):
                             'history if the server supports it.\n\n'
                             'This option overrides the SQUASH_HISTORY '
                             '.reviewboardrc option and the -S command line '
-                            'option.'),
+                            'option.',
+                       added_in='2.0'),
             ]
         ),
         Command.server_options,
