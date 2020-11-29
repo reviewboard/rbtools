@@ -1,27 +1,43 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
- <Product Id="*"
-          Name="RBTools"
-          Language="1033"
-          Version="$(var.Version)"
-          Manufacturer="Beanbag, Inc."
-          UpgradeCode="D8FE284C-2791-47F6-B8EC-AC05CD06E401">
-  <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine"/>
+ <?include defines.wxi ?>
 
-  <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed."/>
+ <Product Id="*"
+          Name="!(loc.ProductName)"
+          Language="!(loc.Language)"
+          Version="$(var.Version)"
+          Manufacturer="!(loc.Manufacturer)"
+          UpgradeCode="$(var.UpgradeCode)">
+  <Package InstallerVersion="200"
+           Compressed="yes"
+           InstallScope="perMachine"
+           Languages="1033"/>
+
+  <MajorUpgrade DowngradeErrorMessage="!(loc.NewerVersionAlreadyInstalled)"/>
   <MediaTemplate EmbedCab="yes"/>
 
-  <Feature Id="ProductFeature" Title="RBTools" Level="1">
+   <!-- Make sure the architecture is compatible. -->
+  <?if $(var.Platform) = x64 ?>
+   <Condition Message="!(loc.x86VersionRequired)">
+    <![CDATA[VersionNT64]]>
+   </Condition>
+  <?endif ?>
+
+  <Feature Id="ProductFeature"
+           Title="!(loc.ProductName)"
+           Description="!(loc.RBToolsDescription)"
+           Level="1">
    <ComponentGroupRef Id="rbgroup"/>
    <ComponentRef Id="rbt_cmd"/>
    <ComponentRef Id="rbt_sh"/>
   </Feature>
  </Product>
 
+ <!-- Specify where we're placing RBTools -->
  <Fragment>
   <Directory Id="TARGETDIR" Name="SourceDir">
-   <Directory Id="ProgramFilesFolder">
+   <Directory Id="$(var.PlatformProgramFilesFolder)">
     <Directory Id="INSTALLFOLDER" Name="RBTools">
      <Directory Id="bin" Name="bin"/>
     </Directory>

@@ -135,7 +135,7 @@ class CommandOptionsDirective(Directive):
     instances.
     """
     CMD_REF_RE = re.compile(r'`rbt ([a-z-]+)`')
-    OPT_REF_RE = re.compile(r'(--[a-z-]+)')
+    OPT_REF_RE = re.compile(r'(--[a-z-]+(="[^"]+")?)')
     BACKTICK_RE = re.compile(r'(?<![:`])`([^`:]+)`')
 
     def run(self):
@@ -230,13 +230,17 @@ class CommandOptionsDirective(Directive):
 
         if 'config_key' in option.attrs:
             if default_text:
-                default_text += (' The default can be changed by setting '
-                                 '``%s`` in :file:`.reviewboardrc`.'
-                                 % option.attrs['config_key'])
+                default_text += (
+                    ' The default can be changed by setting :rbtconfig:`%s` '
+                    'in :ref:`rbtools-reviewboardrc`.'
+                    % option.attrs['config_key']
+                )
             else:
-                default_text = ('The default can be set in ``%s`` in '
-                                ':file:`.reviewboardrc`.'
-                                % option.attrs['config_key'])
+                default_text = (
+                    'The default can be set in :rbtconfig:`%s` in '
+                    ':ref:`rbtools-reviewboardrc`.'
+                    % option.attrs['config_key']
+                )
 
         if default_text:
             content.append(default_text)
@@ -339,3 +343,7 @@ def setup(app):
     app.add_crossref_type(directivename=str('rbtcommand'),
                           rolename=str('rbtcommand'),
                           indextemplate=str('pair: %s; RBTools command'))
+    app.add_crossref_type(
+        directivename=str('rbtconfig'),
+        rolename=str('rbtconfig'),
+        indextemplate=str('pair: %s; .reviewboardrc setting'))

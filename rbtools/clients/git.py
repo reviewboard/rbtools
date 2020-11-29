@@ -1106,14 +1106,14 @@ class GitClient(SCMClient):
 
         if rc == 0:
             return PatchResult(applied=True, patch_output=data)
-        elif 'with conflicts' in data:
+        elif b'with conflicts' in data:
             return PatchResult(
                 applied=True,
                 has_conflicts=True,
                 conflicting_files=[
-                    line.split(' ', 1)[1]
+                    line.split(b' ', 1)[1]
                     for line in data.splitlines()
-                    if line.startswith('U')
+                    if line.startswith(b'U')
                 ],
                 patch_output=data)
         else:

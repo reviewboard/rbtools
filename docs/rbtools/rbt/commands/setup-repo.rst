@@ -32,7 +32,7 @@ repositories <rb:repositories>`.
 Setting up your server
 ======================
 
-If :ref:`rbtools-reviewboard-url` is not defined in your
+If :rbtconfig:`REVIEWBOARD_URL` is not defined in your
 :ref:`rbtools-reviewboardrc`, you will be prompted to enter the URL of a valid
 Review Board server you want to connect to. Alternatively, you may use
 :option:`--server` to skip this prompt.

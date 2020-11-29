@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<WixLocalization xmlns="http://schemas.microsoft.com/wix/2006/localization"
+                 Culture="en-us" Codepage="1252">
+ <String Id="Language">1033</String>
+ <String Id="ProductName">RBTools</String>
+ <String Id="Manufacturer">Beanbag, Inc.</String>
+ <String Id="Copyright">Copyright (c) 2014</String>
+
+ <String Id="RBToolsDescription">A newer version of [ProductName] is already installed.</String>
+
+ <String Id="NewerVersionAlreadyInstalled">Command line utilities and Python API for working with Review Board.</String>
+
+ <String Id="x64VersionRequired">You need to install the 64-bit version of this product on 64-bit Windows.</String>
+ <String Id="x86VersionRequired">You need to install the 32-bit version of this product on 32-bit Windows.</String>
+</WixLocalization>

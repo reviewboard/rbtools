@@ -3,45 +3,63 @@
 <Project ToolsVersion="4.0"
          DefaultTargets="Build"
          xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+ <!-- Common properties for building the installer. -->
  <PropertyGroup>
   <Configuration Condition=" '$(Configuration)' == '' ">Release</Configuration>
-  <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
+  <Platform Condition=" '$(Platform)' == '' ">x64</Platform>
   <ProductVersion>3.9</ProductVersion>
   <ProjectGuid>45BB4178-86BF-44FC-BE19-A54763BCA4CC</ProjectGuid>
   <SchemaVersion>2.0</SchemaVersion>
+
   <OutputName>RBTools</OutputName>
   <OutputType>Package</OutputType>
-  <WixTargetsPath Condition=" '$(WixTargetsPath)' == '' AND '$(MSBuildExtensionsPath32)' != '' ">$(MSBuildExtensionsPath32)\Microsoft\WiX\v3.x\Wix.targets</WixTargetsPath>
-  <WixTargetsPath Condition=" '$(WixTargetsPath)' == '' ">$(MSBuildExtensionsPath)\Microsoft\WiX\v3.x\Wix.targets</WixTargetsPath>
-  <SignOutput Condition="'$(CertificateThumbprint)' != '' ">true</SignOutput>
-  <TimestampUrl Condition="'$(TimestampUrl)' == ''">http://timestamp.verisign.com/scripts/timstamp.dll</TimestampUrl>
- </PropertyGroup>
- <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
-  <OutputPath>bin\</OutputPath>
-  <IntermediateOutputPath>obj\$(Configuration)\</IntermediateOutputPath>
-  <WixVariables>
-  </WixVariables>
+  <Cultures>en-us</Cultures>
+
   <DefineConstants>root=$(root);Version=$(Version)</DefineConstants>
   <SuppressAllWarnings>False</SuppressAllWarnings>
   <Pedantic>True</Pedantic>
   <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
   <SuppressPdbOutput>True</SuppressPdbOutput>
+  <WixTargetsPath Condition=" '$(WixTargetsPath)' == '' AND '$(MSBuildExtensionsPath32)' != '' ">$(MSBuildExtensionsPath32)\Microsoft\WiX\v3.x\Wix.targets</WixTargetsPath>
+  <WixTargetsPath Condition=" '$(WixTargetsPath)' == '' ">$(MSBuildExtensionsPath)\Microsoft\WiX\v3.x\Wix.targets</WixTargetsPath>
+  <SignOutput Condition="'$(CertificateThumbprint)' != '' ">true</SignOutput>
+  <TimestampUrl Condition="'$(TimestampUrl)' == ''">http://timestamp.verisign.com/scripts/timstamp.dll</TimestampUrl>
+
+  <OutputPath>bin\$(Platform)\$(Configuration)\</OutputPath>
+  <IntermediateOutputPath>obj\$(Platform)\$(Configuration)\</IntermediateOutputPath>
  </PropertyGroup>
+
+ <!--
+  Harvest the files from the root of the installer directory, turning it
+  into a rbtools.wxs file.
+ -->
+ <PropertyGroup>
+  <PreBuildEvent>"$(WIX)\bin\heat.exe" dir "$(root)" -gg -ag -dr INSTALLFOLDER -cg rbgroup -srd -sreg -scom -var var.root -out rbtools.wxs</PreBuildEvent>
+ </PropertyGroup>
+
+ <!-- Compile the generated rbtools.wxs and our provided product.wxs. -->
  <ItemGroup>
   <Compile Include="$(OutputPath)\rbtools.wxs">
    <Link>rbtools.wxs</Link>
   </Compile>
   <Compile Include="product.wxs" />
  </ItemGroup>
+
+ <ItemGroup>
+  <EmbeddedResource Include="Product_en-us.wxl"/>
+ </ItemGroup>
+
  <Import Project="$(WixTargetsPath)" />
- <PropertyGroup>
-  <PreBuildEvent>"$(WIX)\bin\heat.exe" dir "$(root)" -gg -ag -dr INSTALLFOLDER -cg rbgroup -srd -sreg -scom -var var.root -out rbtools.wxs</PreBuildEvent>
- </PropertyGroup>
+
+ <!-- Sign the bundled cabinet files -->
  <Target Name="SignCabs">
   <SignFile CertificateThumbprint="$(CertificateThumbprint)"
             TimestampUrl="$(TimestampUrl)"
             SigningTarget="%(SignCabs.FullPath)"/>
  </Target>
+
+ <!-- Sign the installer -->
  <Target Name="SignMsi">
   <Exec Command='"$(WindowsSDK80Path)\bin\x64\signtool.exe" sign /sha1 $(CertificateThumbprint) /t $(TimestampUrl) "%(SignMsi.FullPath)"' />
  </Target>

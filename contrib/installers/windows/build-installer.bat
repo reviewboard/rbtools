@@ -22,26 +22,38 @@ popd
 set BUILD_DEST=%TREE_ROOT%\dist
 set BUILD_BASE=%TREE_ROOT%\build\windows-pkg
 set BUILD_ROOT=%BUILD_BASE%\build
+set BUILD_ROOT_X86=%BUILD_BASE%\build\x86
+set BUILD_ROOT_X64=%BUILD_BASE%\build\x64
 set BUILD_STAGE=%BUILD_BASE%\stage
 set DEPS_DIR=%BUILD_BASE%\deps
 
 
 ::-------------------------------------------------------------------------
-:: Binaries
-::-------------------------------------------------------------------------
-set BUNDLED_PYTHON_DIR=%BUILD_ROOT%\Python27
-set BUNDLED_PYTHON=%BUNDLED_PYTHON_DIR%\python.exe
-
-call :SetMSBuildPath || goto :Abort
-
-
-::-------------------------------------------------------------------------
 :: Dependencies
 ::-------------------------------------------------------------------------
-set PYTHON_VERSION=2.7.17
-set PYTHON_URL=https://www.python.org/ftp/python/%PYTHON_VERSION%/python-%PYTHON_VERSION%.msi
-set PYTHON_MD5=4cc27e99ad41cd3e0f2a50d9b6a34f79
-set PYTHON_DEP=%DEPS_DIR%\python-%PYTHON_VERSION%
+set PYTHON_VERSION=3.8.6
+
+set PYTHON_X86_FILENAME=python-%PYTHON_VERSION%.exe
+set PYTHON_X86_URL=https://www.python.org/ftp/python/%PYTHON_VERSION%/%PYTHON_X86_FILENAME%
+set PYTHON_X86_MD5=02cd63bd5b31e642fc3d5f07b3a4862a
+set PYTHON_X86_DEP=%DEPS_DIR%\python-%PYTHON_VERSION%-x86
+
+set PYTHON_X64_FILENAME=python-%PYTHON_VERSION%-amd64.exe
+set PYTHON_X64_URL=https://www.python.org/ftp/python/%PYTHON_VERSION%/%PYTHON_X64_FILENAME%
+set PYTHON_X64_MD5=2acba3117582c5177cdd28b91bbe9ac9
+set PYTHON_X64_DEP=%DEPS_DIR%\python-%PYTHON_VERSION%-x64
+
+
+::-------------------------------------------------------------------------
+:: Binaries
+::-------------------------------------------------------------------------
+set BUNDLED_PYTHON_X86_DIR=%BUILD_ROOT_X86%\Python
+set BUNDLED_PYTHON_X86=%BUNDLED_PYTHON_X86_DIR%\python.exe
+
+set BUNDLED_PYTHON_X64_DIR=%BUILD_ROOT_X64%\Python
+set BUNDLED_PYTHON_X64=%BUNDLED_PYTHON_X64_DIR%\python.exe
+
+call :SetMSBuildPath || goto :Abort
 
 
 ::-------------------------------------------------------------------------
@@ -56,9 +68,18 @@ set CERT_THUMBPRINT=deee311acc700a6f797018a6cf4075131b6f7198
 if not exist "%DEPS_DIR%" mkdir "%DEPS_DIR%"
 if not exist "%BUILD_STAGE%" mkdir "%BUILD_STAGE%"
 
-call :InstallPython || goto :Abort
+call :InstallPython ^
+    x86 %PYTHON_X86_DEP% %PYTHON_X86_FILENAME% ^
+    %PYTHON_X86_URL% %PYTHON_X86_MD5% ^
+    || goto :Abort
+
+call :InstallPython ^
+    x64 %PYTHON_X64_DEP% %PYTHON_X64_FILENAME% ^
+    %PYTHON_X64_URL% %PYTHON_X64_MD5% ^
+    || goto :Abort
+
 call :CreateBuildDirectory || goto :Abort
-call :InstallPackagers || goto :Abort
+call :InstallPackages || goto :Abort
 call :InstallRBTools || goto :Abort
 call :RemoveUnwantedFiles || goto :Abort
 call :BuildInstaller || goto :Abort
@@ -71,26 +92,39 @@ goto :EOF
 ::-------------------------------------------------------------------------
 :: Installs Python
 ::-------------------------------------------------------------------------
-:InstallPython
+:InstallPython arch dep_path python_filename url md5
 setlocal
 
+set _arch=%~1
+set _dep_path=%~2
+set _python_filename=%~3
+set _url=%~4
+set _md5=%~5
+
 echo.
-echo == Installing Python ==
+echo == Installing Python [%_arch%] ==
 
-set _PYTHON_INSTALLER=%TEMP%\python-%PYTHON_VERSION%.msi
+set _PYTHON_INSTALLER=%TEMP%\%_python_filename%
 
-if not exist "%PYTHON_DEP%" (
+if not exist "%_dep_path%" (
     if not exist "%_PYTHON_INSTALLER%" (
-        echo Preparing to download Python v%PYTHON_VERSION%...
-        call :DownloadAndVerify %PYTHON_URL% ^
-                                "%_PYTHON_INSTALLER%" ^
-                                %PYTHON_MD5% || exit /B 1
+        echo Preparing to download Python v%PYTHON_VERSION% [%_arch%]...
+        call :DownloadAndVerify %_url% "%_PYTHON_INSTALLER%" %_md5% ^
+            || exit /B 1
 
         echo Downloaded to %_PYTHON_INSTALLER%
     )
 
-    echo Running the installer...
-    msiexec /quiet /a "%_PYTHON_INSTALLER%" TARGETDIR="%PYTHON_DEP%"
+    echo Running the installer [%_arch%]...
+    "%_PYTHON_INSTALLER%" /quiet ^
+        AssociateFiles=0 Include_doc=0 Include_debug=0 Include_launcher=0 ^
+        Include_tcltk=0 Include_test=0 InstallAllUsers=0 ^
+        InstallLauncherAllUsers=0 Shortcuts=0 TargetDir="%_dep_path%-temp"
+    xcopy /EYI "%_dep_path%-temp" "%_dep_path%"
+
+    :: Remove the old install from the temp directory, and clean up the
+    :: registry files so future installs aren't impacted.
+    "%_PYTHON_INSTALLER%" /quiet /uninstall
 )
 
 goto :EOF
@@ -108,7 +142,8 @@ echo.
 echo == Creating build directory ==
 
 call :DeleteIfExists "%BUILD_ROOT%"
-xcopy /EYI "%PYTHON_DEP%" "%BUNDLED_PYTHON_DIR%" >NUL
+xcopy /EYI "%PYTHON_X86_DEP%" "%BUNDLED_PYTHON_X86_DIR%" >NUL
+xcopy /EYI "%PYTHON_X64_DEP%" "%BUNDLED_PYTHON_X64_DIR%" >NUL
 
 goto :EOF
 
@@ -116,7 +151,7 @@ goto :EOF
 ::-------------------------------------------------------------------------
 :: Install package tools
 ::-------------------------------------------------------------------------
-:InstallPackagers
+:InstallPackages
 setlocal
 
 echo.
@@ -125,8 +160,31 @@ echo.
 echo --------------------------- [Install log] ---------------------------
 
 pushd %TREE_ROOT%
-"%BUNDLED_PYTHON%" -m ensurepip --upgrade
-"%BUNDLED_PYTHON%" -m pip install -U pip setuptools
+
+:: Install packages for 32-bit packages.
+"%BUNDLED_PYTHON_X86%" -m ensurepip --upgrade
+
+if ERRORLEVEL 1 (
+    popd
+    exit /B 1
+)
+
+"%BUNDLED_PYTHON_X86%" -m pip install -U pip setuptools
+
+if ERRORLEVEL 1 (
+    popd
+    exit /B 1
+)
+
+:: Install packages for 64-bit packages.
+"%BUNDLED_PYTHON_X64%" -m ensurepip --upgrade
+
+if ERRORLEVEL 1 (
+    popd
+    exit /B 1
+)
+
+"%BUNDLED_PYTHON_X64%" -m pip install -U pip setuptools
 
 if ERRORLEVEL 1 (
     popd
@@ -152,7 +210,17 @@ echo.
 echo --------------------------- [Install log] ---------------------------
 
 pushd %TREE_ROOT%
-"%BUNDLED_PYTHON%" setup.py release install >NUL
+
+:: Build for 32-bit Python.
+"%BUNDLED_PYTHON_X86%" setup.py release install >NUL
+
+if ERRORLEVEL 1 (
+    popd
+    exit /B 1
+)
+
+:: Build for 64-bit Python.
+"%BUNDLED_PYTHON_X64%" setup.py release install >NUL
 
 if ERRORLEVEL 1 (
     popd
@@ -175,9 +243,17 @@ setlocal
 echo.
 echo == Removing unwanted files ==
 
-call :DeleteIfExists "%BUNDLED_PYTHON_DIR%\Doc"
-call :DeleteIfExists "%BUNDLED_PYTHON_DIR%\tcl"
-call :DeleteIfExists "%BUNDLED_PYTHON_DIR%\python-%PYTHON_VERSION%.msi"
+call :DeleteIfExists "%BUNDLED_PYTHON_X86_DIR%\Doc"
+call :DeleteIfExists "%BUNDLED_PYTHON_X86_DIR%\tcl"
+call :DeleteIfExists "%BUNDLED_PYTHON_X86_DIR%\Tools"
+call :DeleteIfExists "%BUNDLED_PYTHON_X86_DIR%\%PYTHON_X86_FILENAME%"
+
+call :DeleteIfExists "%BUNDLED_PYTHON_X64_DIR%\Doc"
+call :DeleteIfExists "%BUNDLED_PYTHON_X64_DIR%\tcl"
+call :DeleteIfExists "%BUNDLED_PYTHON_X86_DIR%\Tools"
+call :DeleteIfExists "%BUNDLED_PYTHON_X64_DIR%\%PYTHON_X64_FILENAME%"
+
+echo == Files removed ==
 
 goto :EOF
 
@@ -188,29 +264,50 @@ goto :EOF
 :BuildInstaller
 setlocal
 
-echo.
-echo == Building the RBTools installer ==
-
 call :GetRBToolsVersion
 set _rbtools_version=%_return1%
 
 set _wix_path=%CD%\wix
+set _sln_file=%_wix_path%\rbtools.sln
+set _timestamp_url=http://timestamp.comodoca.com/authenticode
+
+echo.
+echo == Building the RBTools installer [x86] ==
 
 %MSBUILD% ^
     /p:Version="%_rbtools_version%" ^
-    /p:Root="%BUILD_ROOT%" ^
+    /p:Platform=x86 ^
+    /p:ExeSuffix=-32bit ^
+    /p:Root="%BUILD_ROOT_X86%" ^
     /p:OutputPath="%BUILD_STAGE%\\" ^
     /p:SourcePath="%_wix_path%" ^
     /p:CertificateThumbprint=%CERT_THUMBPRINT% ^
-    /p:TimestampUrl=http://timestamp.comodoca.com/authenticode ^
-    "%_wix_path%\rbtools.sln"
+    /p:TimestampUrl=%_timestamp_url% ^
+    "%_sln_file%"
+
+if ERRORLEVEL 1 exit /B 1
+
+echo.
+echo == Building the RBTools installer [x64] ==
+
+%MSBUILD% ^
+    /p:Version="%_rbtools_version%" ^
+    /p:Platform=x64 ^
+    /p:ExeSuffix=-64bit ^
+    /p:Root="%BUILD_ROOT_X64%" ^
+    /p:OutputPath="%BUILD_STAGE%\\" ^
+    /p:SourcePath="%_wix_path%" ^
+    /p:CertificateThumbprint=%CERT_THUMBPRINT% ^
+    /p:TimestampUrl=%_timestamp_url% ^
+    "%_sln_file%"
 
 if ERRORLEVEL 1 exit /B 1
 
 mkdir "%BUILD_DEST%" 2>&1
-copy "%BUILD_STAGE%\RBTools-*.exe" "%BUILD_DEST%" >NUL
+dir "%BUILD_STAGE%" /S
+copy "%BUILD_STAGE%\RBTools-%_rbtools_version%*.exe" "%BUILD_DEST%" >NUL
 
-echo Installer published to %BUILD_DEST%
+echo Installers published to %BUILD_DEST%
 
 goto :EOF
 
@@ -225,7 +322,7 @@ setlocal
 
 set _version_file=%BUILD_STAGE%\VERSION
 
-"%BUNDLED_PYTHON%" scripts/get-version.py > "%_version_file%"
+"%BUNDLED_PYTHON_X64%" scripts/get-version.py > "%_version_file%"
 set /P _version= < "%_version_file%"
 del "%_version_file%"
 
@@ -322,11 +419,11 @@ PowerShell -Command ^
  "$file = [System.IO.File]::ReadAllBytes('%_filename%');"^
  "$hash = [System.BitConverter]::ToString($md5.ComputeHash($file));"^
  "$hash = $hash.toLower().Replace('-', '');"^
- "Write-Host '%_filename% has hash $hash.';"^
  "if ($hash -eq '%_expected_hash%') {"^
+ "    Write-Host '%_filename% has a valid hash.';"^
  "    exit 0;"^
  "} else {"^
- "    Write-Host 'Invalid checksum for %_filename%.';"^
+ "    Write-Host 'Invalid hash for %_filename%.';"^
  "    exit 1;"^
  "}" || exit /B 1
 

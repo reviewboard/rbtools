@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<Include>
+ <?if $(var.Platform) = x64 ?>
+  <?define ProductName="RBTools (64-bit)" ?>
+  <?define Win64 = "yes" ?>
+  <?define PlatformProgramFilesFolder = "ProgramFiles64Folder" ?>
+ <?else ?>
+  <?define ProductName="RBTools (32-bit)" ?>
+  <?define Win64 = "no" ?>
+  <?define PlatformProgramFilesFolder = "ProgramFilesFolder" ?>
+ <?endif ?>
+
+ <!-- The upgrade code for all updates to RBTools. This cannot be changed. -->
+ <?define UpgradeCode="D8FE284C-2791-47F6-B8EC-AC05CD06E401" ?>
+</Include>

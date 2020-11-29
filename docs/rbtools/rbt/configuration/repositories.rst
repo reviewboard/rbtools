@@ -45,9 +45,378 @@ for your :file:`.reviewboardrc`. You can find more in the documentation for
 many of the commands. For example, see
 :ref:`rbt post's options <rbt-post-options>`.
 
+The main configuration settings you'll want to set are:
+
+* :rbtconfig:`BRANCH`
+* :rbtconfig:`REPOSITORY`
+* :rbtconfig:`REPOSITORY_TYPE`
+* :rbtconfig:`REVIEWBOARD_URL`
+* :rbtconfig:`TRACKING_BRANCH` (if using Git)
+
+
+.. rbtconfig:: BASEDIR
+
+BASEDIR
+~~~~~~~
+
+**Type:** String
+
+**Default:** Auto-detected
+
+This is used only for Subversion repositories, and specifies a path within
+the repository that should be prepended to all files in a diff.
+
+Example::
+
+    BASEDIR = "trunk/myproject/"
+
+.. note::
+
+   This is normally not needed, as this information is auto-detected. It
+   should only be set if there's a specialized requirement.
+
+This can also be provided by passing :option:`--basedir` to most commands.
+
+
+.. rbtconfig:: BRANCH
+
+BRANCH
+~~~~~~
+
+**Type:** String
+
+**Default:** Unset
+
+A review request's Branch field is a helpful way of seeing where a change is
+expected to be merged into. You can specify the default for all review
+requests on a branch by setting the ``BRANCH`` field.
+
+Note that the intent is to show the destination branch, and not the feature
+branch that the code is being developed on.
+
+This also does not affect code generation. It's used solely to display to the
+reviewers where the code will land.
+
+Example::
+
+    BRANCH = "release-2.0.x"
+
+This can also be provided by passing :option:`--branch` to most commands.
+
+
+.. rbtconfig:: CA_CERTS
+
+CA_CERTS
+--------
+
+**Type:** String
+
+**Default:** Unset
+
+A path to a custom SSL CA certifications file.
+
+Example::
+
+    CA_CERTS = "/mnt/corp-shared/ssl/ca-certs.pem"
+
+This can also be provided by passing :option:`--ca-certs` to any command.
+
+
+.. rbtconfig:: CLIENT_CERT
+
+CLIENT_CERT
+-----------
+
+**Type:** String
+
+**Default:** Unset
+
+A path to a SSL certification file.
+
+Example::
+
+    CLIENT_CERT = "/mnt/corp-shared/ssl/repo.pem"
+
+This can also be provided by passing :option:`--client-cert` to any command.
+
+
+.. rbtconfig:: CLIENT_KEY
+
+CLIENT_KEY
+----------
+
+**Type:** String
+
+**Default:** Unset
+
+A path to a SSL client authentication key.
+
+Example::
+
+    CLIENT_KEY = "/mnt/corp-shared/ssl/repo.key"
+
+This can also be provided by passing :option:`--client-key` to any command.
+
+
+.. rbtconfig:: DEPENDS_ON
+
+DEPENDS_ON
+----------
+
+**Commands:** :rbtcommand:`rbt post`
+
+**Type:** List of String
+
+**Default:** Unset
+
+A comma-separated list of review request IDs that any posted chagne will
+automatically depend on.
+
+This is rarely needed, but can be useful if all the work being done on a
+branch depends on some main review request.
+
+Example::
+
+    DEPENDS_ON = '42,43'
+
+This can also be provided by using :option:`rbt post --depends-on`.
+
+
+.. rbtconfig:: ENABLE_PROXY
+
+ENABLE_PROXY
+~~~~~~~~~~~~
+
+**Type:** Boolean
+
+**Default:** ``True``
+
+By default, any configured HTTP/HTTPS proxy will be used for requests. If
+your server is within your own network, you may want to turn this off.
+
+Example::
+
+    ENABLE_PROXY = False
+
+This can also be disabled by passing :option:`--disable-proxy` to any command.
+
+
+.. rbtconfig:: EXCLUDE_PATTERNS
+
+EXCLUDE_PATTERNS
+~~~~~~~~~~~~~~~~
+
+**Type:** List of String
+
+**Default:** Unset
+
+Excludes one or more files or file patterns from being posted for review.
+This uses standard UNIX glob patterns, like most shell commands.
+
+Example::
+
+    EXCLUDE_PATTERNS = ['_build', '*.min.js', '.*.swp']
+
+Patterns that begin with a path separator (``/`` on Mac OS and Linux, ``\\``
+on Windows) will be treated as being relative to the root of the repository.
+All other patterns are treated as being relative to the current working
+directory.
+
+When working with Mercurial, the patterns are provided directly to
+:command:`hg` and are not limited to globs. For more information on advanced
+pattern syntax in Mercurial, run :command:`hg help patterns`.
+
+When working with CVS, all diffs are generated relative to the current working
+directory so patterns beginning with a path separator are treated as relative
+to the current working directory.
+
+When working with Perforce, an exclude pattern beginning with ``//`` will be
+matched against depot paths. All other patterns will be matched against local
+paths.
+
+This can also be provided by passing :option:`--exclude` to most commands.
+
+
+.. rbtconfig:: INCLUDE_PATTERNS
+
+INCLUDE_PATTERNS
+~~~~~~~~~~~~~~~~
+
+**Type:** List of String
+
+**Default:** Unset
+
+Includes one or more files or file patterns when posting a review. Only these
+files will be posted by default. This uses standard UNIX glob patterns, like
+most shell commands.
+
+Example::
+
+    INCLUDE_PATTERNS = ['src/*.c', 'doc/*.txt']
+
+This can also be provided by passing :option:`--include` to most commands.
+
+
+.. rbtconfig:: LAND_DELETE_BRANCH
+
+LAND_DELETE_BRANCH
+------------------
+
+**Commands:** :rbtcommand:`rbt land`
+
+**Type:** Boolean
+
+**Default:** ``True``
+
+If enabled, and :rbtcommand:`rbt land` is landing a local branch, then that
+branch will be deleted once landed. This is the default behavior, as it
+indicates that work on that branch is complete.
+
+Example::
+
+    LAND_DELETE_BRANCH = False
+
+This can also be enabled by using :option:`rbt land --delete-branch`, or
+disabled by using :option:`rbt land --no-delete-branch`.
+
+
+.. rbtconfig:: LAND_DEST_BRANCH
+
+LAND_DEST_BRANCH
+----------------
+
+**Commands:** :rbtcommand:`rbt land`
+
+**Type:** String
+
+**Default:** Current branch
+
+The branch where :rbtcommand:`rbt land` should land changes.
+
+This is often set in common upstream branches where feature branches are
+derived from.
+
+Example::
+
+    LAND_DEST_BRANCH = "release-4.x"
+
+This can also be provided by using :option:`rbt land --dest`.
+
+
+.. rbtconfig:: LAND_SQUASH
+
+LAND_SQUASH
+-----------
+
+**Commands:** :rbtcommand:`rbt land`
+
+**Type:** Boolean
+
+**Default:** ``False``
+
+If enabled, :rbtcommand:`rbt land` will squash all commits on a review request
+into a single commit before landing it, which can lead to cleaner, more linear
+commit histories.
+
+Example::
+
+    LAND_SQUASH = True
+
+This can also be enabled by using :option:`rbt land --squash`, or disabled
+if using :option:`rbt land --no-squash`.
+
+
+.. rbtconfig:: LAND_PUSH
+
+LAND_PUSH
+---------
+
+**Commands:** :rbtcommand:`rbt land`
+
+**Type:** Boolean
+
+**Default:** ``False``
+
+If enabled, :rbtcommand:`rbt land` will push the branch upstream once
+successfully landing a change.
+
+Example::
+
+    LAND_PUSH = True
+
+This can also be enabled by using :option:`rbt land --push`, or disabled
+if using :option:`rbt land --no-push`.
+
+
+.. rbtconfig:: MARKDOWN
+
+MARKDOWN
+--------
+
+**Commands:** :rbtcommand:`rbt post`
+
+**Type:** Boolean
+
+**Default:** ``False``
+
+If enabled, any commit message used to auto-populate a review request's
+description will be interpreted as valid Markdown.
+
+This can be a useful setting if standardizing on Markdown-formatted commit
+descriptions, as it will also allow for nicely-formatted review requests by
+default.
+
+Example::
+
+    MARKDOWN = True
+
+This can also be enabled by using :option:`rbt post --markdown`.
+
+
+.. rbtconfig:: P4_PORT
+
+P4_PORT
+~~~~~~~
+
+**Type:** String
+
+**Default:** Unset
+
+The IP address or hostname of the Perforce server, overriding
+the :envvar:`P4PORT` environment variable.
+
+Example::
+
+    P4_PORT = "perforce.example.com:1666"
+
+This can also be provided by passing :option:`--p4-port` to most commands.
+
+
+.. rbtconfig:: PARENT_BRANCH
+
+PARENT_BRANCH
+~~~~~~~~~~~~~
+
+**Type:** String
+
+**Default:** Unset
+
+A specific parent branch that the change should be generated from.
+
+.. note::
+
+   This is rarely needed. Normally, you'll just want to pass a revision range
+   to :rbtcommand:`rbt land` or other commands.
+
+
+.. rbtconfig:: REPOSITORY
 
 REPOSITORY
 ~~~~~~~~~~
+
+**Type:** String
+
+**Default:** Unset
 
 By default, RBTools will try to determine the repository path and pass that to
 Review Board. This won't always work in all setups, particularly when
@@ -55,27 +424,149 @@ different people are checking out the repository with different URLs.
 
 You can use the ``REPOSITORY`` setting to specify the name of the
 repository to use. This is the same as on Review Board's New Review Request
-page. For example::
+page.
 
-    REPOSITORY = 'RBTools'
+Example::
+
+    REPOSITORY = "RBTools"
+
+This can also be provided by passing :option:`--repository` to any command.
+
+
+.. rbtconfig:: REPOSITORY_TYPE
+
+REPOSITORY_TYPE
+~~~~~~~~~~~~~~~
+
+**Type:** String
+
+**Default:** Unset
+
+The type of the repository. If set, RBTools won't have to scan to find the
+type of repository, which is a slow process.
+
+Valid repository types include:
+
+* ``bazaar``
+* ``clearcase``
+* ``cvs``
+* ``git``
+* ``git``
+* ``mercurial``
+* ``perforce``
+* ``plastic``
+* ``svn``
+* ``tfs``
+
+Example::
+
+    REPOSITORY_TYPE = "git"
+
+This can also be provided by passing :option:`--repository-type` to any
+command.
+
+
+.. _rbtools-reviewboardrc-repository-url:
+.. rbtconfig:: REPOSITORY_URL
+
+REPOSITORY_URL
+~~~~~~~~~~~~~~
+
+**Type:** String
+
+**Default:** Unset
+
+The URL pointing to the upstream repository.
+
+When generating diffs, this can be used for creating a diff outside of a
+working copy (currently only supported by Subversion with specific revisions
+or :option:`--diff-filename`, and by ClearCase with relative paths outside the
+view).
+
+For Git, this specifies the origin URL of the current repository, overriding
+the origin URL supplied by the client.
+
+Example::
+
+    REPOSITORY_URL = "https://git.example.com/myrepo.git"
+
+This can also be provided by passing :option:`--repository-url` to most
+commands.
 
 
 .. _rbtools-reviewboard-url:
+.. rbtconfig:: REVIEWBOARD_URL
 
 REVIEWBOARD_URL
 ~~~~~~~~~~~~~~~
 
+**Type:** String
+
+**Default:** Unset
+
 To specify the Review Board server to use, you can use the
 ``REVIEWBOARD_URL`` setting. This takes the URL to the Review Board server
-as a value. For example::
+as a value.
+
+Example::
 
     REVIEWBOARD_URL = "https://reviewboard.example.com"
 
+This can also be provided by passing :option:`--server` to any command.
 
-.. _rbtools-reviewboardrc-tracking-branch:
+
+.. rbtconfig:: SQUASH_HISTORY
+
+SQUASH_HISTORY
+~~~~~~~~~~~~~~
+
+.. versionadded:: 2.0
+
+**Commands:** :rbtcommand:`rbt post`
+
+**Type:** Boolean
+
+**Default:** ``False``
+
+If enabled, :rbtcommand:`rbt post` will squash all commits comprising a review
+request into a single diff when uploading to Review Board. The default is to
+retain each commit so the reviewer has the option of reviewing each
+individually.
+
+Example::
+
+    SQUASH_HISTORY = True
+
+This can also be provided by using :option:`rbt post --squash`.
+
+
+.. rbtconfig:: TF_CMD
+
+TF_CMD
+~~~~~~
+
+**Type:** String
+
+**Default:** Auto-detected
+
+The full path to the :command:`tf` command, overriding any detected path. This
+can be useful if there's a central copy of this command on a shared drive.
+
+Example::
+
+    TF_CMD = "/opt/tfs/bin/tf"
+
+This can also be provided by passing :option:`--tf-cmd` to most commands.
+
+
+.. rbtconfig:: TRACKING_BRANCH
 
 TRACKING_BRANCH
 ~~~~~~~~~~~~~~~
+
+**Type:** String
+
+**Default:** Unset
 
 When using Git or other DVCS repositories, RBTools makes an assumption about
 the upstream branch, which it needs to know in order to generate a diff.
@@ -86,37 +577,12 @@ force the usage of a specific branch. This is equivalent to providing the
 We recommend you set this for any :file:`.reviewboardrc` files on any
 long-running release or feature branches.
 
-For example::
+Example::
 
     TRACKING_BRANCH = "origin/release-2.0.x"
 
-
-.. _rbtools-reviewboardrc-branch:
-
-BRANCH
-~~~~~~
-
-A review request's Branch field is a helpful way of seeing where a change is
-expected to be merged into. You can specify the default for all review
-requests on a branch by setting the ``BRANCH`` field. For example::
-
-    BRANCH = "release-2.0.x"
-
-Note that the intent is to show the destination branch, and not the feature
-branch that the code is being developed on.
-
-This also does not affect code generation. It's used solely to display to the
-reviewers where the code will land.
-
-
-ENABLE_PROXY
-~~~~~~~~~~~~
-
-By default, any configured HTTP/HTTPS proxy will be used for requests. If
-your server is within your own network, you may want to turn this off. You can
-do so by setting ``ENABLE_PROXY`` to ``False``::
-
-    ENABLE_PROXY = False
+This can also be provided by passing :option:`--tracking-branch` to most
+commands.
 
 
 Git Properties

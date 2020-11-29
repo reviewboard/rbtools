@@ -1,1 +1,1 @@
-@"%~dp0..\Python27\python.exe" "%~dp0..\Python27\Scripts\rbt-script.py" %*
+@"%~dp0..\Python\python.exe" "%~dp0..\Python\Scripts\rbt-script.py" %*

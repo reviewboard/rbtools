@@ -5,7 +5,7 @@
 RBTools 2.0 Release Notes
 =========================
 
-**Release date:** TBD
+**Release date:** November 29, 2020
 
 
 New Features and Bug Fixes
@@ -23,18 +23,6 @@ the resulting diff would have all of the commits squashed into a single
 change. Review Board is now capable of showing all the commits separately.
 
 
-Python API
-----------
-
-* Added support for new field expansion information in API payloads.
-
-  Review Board 4.0 introduces metadata for expanded fields, which makes it more
-  flexible when making API requests. The Python API now supports this and
-  accessing an expanded field from a resource will return the resource object
-  for the field instead of just a simple field wrapper. Attribute accesses work
-  the same as before, but the resource object also allows invoking methods.
-
-
 Custom CA and Certificates
 --------------------------
 
@@ -44,6 +32,17 @@ self-signed certificates. This is done by specifying the :option:`--ca-certs`,
 :option:`--client-key`, and :option:`--client-cert` arguments.
 
 Patch by Alessandro.
+
+
+Windows Installer uses Python 3
+-------------------------------
+
+We've updated the RBTools for Windows installer to ship the latest Python 3.8
+release. This gives you a modern, well-tested version of Python, useful for
+any custom scripts using the RBTools Python API.
+
+Please note that if you have existing scripts written with Python 2.7 in mind,
+you may need to port them to support Python 3.8.
 
 
 rbt diff
@@ -156,6 +155,10 @@ Git
   additional fallbacks have been added to try to detect the correct branch name
   in unusual situations.
 
+* Fixed reporting errors when failing to apply Git diffs on Python 3.
+
+  Patch by Daniel Fox.
+
 
 Mercurial
 ---------
@@ -194,6 +197,18 @@ Perforce
 
 * Fixed repository information detection for Perforce repositories which use
   different SSL configurations.
+
+
+Python API
+----------
+
+* Added support for new field expansion information in API payloads.
+
+  Review Board 4.0 introduces metadata for expanded fields, which makes it more
+  flexible when making API requests. The Python API now supports this and
+  accessing an expanded field from a resource will return the resource object
+  for the field instead of just a simple field wrapper. Attribute accesses work
+  the same as before, but the resource object also allows invoking methods.
 
 
 Contributors

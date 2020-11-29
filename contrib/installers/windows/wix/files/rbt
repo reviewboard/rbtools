@@ -1,5 +1,5 @@
 #!/bin/sh
 
-python_dir="`dirname "$0"`/../Python27"
+python_dir="`dirname "$0"`/../Python"
 
 "${python_dir}/python.exe" "${python_dir}/Scripts/rbt-script.py" $*

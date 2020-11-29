@@ -27,12 +27,12 @@ class Status(Command):
                dest='format',
                default=None,
                help='Set the output format. The format is in the form of '
-                    '%%(field_name)s, where field_name is one of: id, status,'
-                    'summary, or description.\n'
-                    'A character escape can be included via \\xXX where XX is '
-                    'the hex code of a character.\n'
+                    '`%%(field_name)s`, where `field_name` is one of: `id`, '
+                    '`status`, `summary`, or `description`.\n'
+                    'A character escape can be included via `\\xXX` where '
+                    '`XX` the hex code of a character.\n'
                     'For example: --format="%%(id)s\\x09%%(summary)s"\n'
-                    'This option will print out the id and summary tab-'
+                    'This option will print out the ID and summary tab-'
                     'separated.'),
         Option('-z',
                dest='format_nul',
