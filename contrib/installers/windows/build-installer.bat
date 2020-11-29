@@ -277,7 +277,7 @@ echo == Building the RBTools installer [x86] ==
 %MSBUILD% ^
     /p:Version="%_rbtools_version%" ^
     /p:Platform=x86 ^
-    /p:ExeSuffix=32bit ^
+    /p:ExeSuffix=-32bit ^
     /p:Root="%BUILD_ROOT_X86%" ^
     /p:OutputPath="%BUILD_STAGE%\\" ^
     /p:SourcePath="%_wix_path%" ^
@@ -293,7 +293,7 @@ echo == Building the RBTools installer [x64] ==
 %MSBUILD% ^
     /p:Version="%_rbtools_version%" ^
     /p:Platform=x64 ^
-    /p:ExeSuffix=64bit ^
+    /p:ExeSuffix=-64bit ^
     /p:Root="%BUILD_ROOT_X64%" ^
     /p:OutputPath="%BUILD_STAGE%\\" ^
     /p:SourcePath="%_wix_path%" ^
