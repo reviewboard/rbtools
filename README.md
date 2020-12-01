@@ -112,37 +112,11 @@ on over to our
 If you're writing patches for RBTools, you'll need to know how to run our
 test suite.
 
-First, make sure you have the necessary dependencies.
-
-To run all the tests, you will need to install hgsubversion:
+First, make sure you have the necessary dependencies:
 
 ```
-$ easy_install hgsubversion
-```
-
-This may need apr-config, also known as apr-1-config, to run.  This is
-part of the apache distribution.  On ubuntu, you can get it via:
-
-```
-$ sudo apt-get install libapr1-dev  # also try apache2-dev or httpd-dev
-```
-
-hgsubversion also requires that you set up an :file:`.hgrc` in your home
-directory with the following contents:
-
-```
-[extensions]
-hgsvn = /path/to/hgsubversion
-```
-
-This will be something like
-`/usr/local/lib/python2.7/dist-packages/hgsubversion`. If you already have an
-`[extensions]` section in your `.hgrc`, just add the hgsvn line to it.
-
-You will also need nose:
-
-```
-$ easy_install nose
+$ ./setup.py develop
+$ pip install -r dev-requirements.txt
 ```
 
 
@@ -151,17 +125,17 @@ $ easy_install nose
 Running the test suite is easy. Simply run:
 
 ```
-$ nosetests -v
+$ ./tests/runtests.py
 ```
 
-from the top of the `rbtools` directory. You can also run a particular
-set of tests. For instance:
+from the top of the source tree. You can also run a particular set of tests.
+For instance:
 
 ```
-$ nosetests -v rbtools.api.tests
+$ ./tests/runtests.py rbtools.api.tests
 ```
 
-See `'nosetests --help'` for more options.
+See `./tests/runtests.py --help` for more options.
 
 
 Related Projects
@@ -172,8 +146,8 @@ Related Projects
 * [Djblets](https://github.com/djblets/djblets/) -
   Our pack of Django utilities for datagrids, API, extensions, and more. Used
   by Review Board.
-* [ReviewBot](https://github.com/reviewboard/ReviewBot/) -
+* [Review Bot](https://www.reviewboard.org/downloads/reviewbot/) -
   Pluggable, automated code review for Review Board.
-* [rb-gateway](https://github.com/reviewboard/rb-gateway/) -
+* [RB Gateway](https://www.reviewboard.org/downloads/rbgateway/) -
   Manages Git repositories, providing a full API enabling all of Review Board's
   feaures.

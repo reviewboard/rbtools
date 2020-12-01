@@ -53,10 +53,10 @@ elif sys.hexversion < 0x02070000:
         'Please install RBTools 0.7.x or upgrade Python to at least '
         '2.7.x.\n' % get_package_version())
     sys.exit(1)
-elif 0x03000000 <= sys.hexversion < 0x03050000:
+elif 0x03000000 <= sys.hexversion < 0x03060000:
     sys.stderr.write(
         'RBTools %s is incompatible with your version of Python.\n'
-        'Please use either Python 2.7 or 3.5+.\n'
+        'Please use either Python 2.7 or 3.6+.\n'
         % get_package_version())
     sys.exit(1)
 
@@ -133,7 +133,10 @@ setup(
     url='https://www.reviewboard.org/downloads/rbtools/',
     download_url=('https://downloads.reviewboard.org/releases/%s/%s.%s/'
                   % (PACKAGE_NAME, VERSION[0], VERSION[1])),
-    python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*',
+    python_requires=(
+        '>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*'
+        '!=3.5.*'
+    ),
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Environment :: Console',
@@ -146,8 +149,10 @@ setup(
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
         'Topic :: Software Development',
         'Topic :: Software Development :: Quality Assurance',
     ],
