@@ -1239,7 +1239,8 @@ class MercurialClient(SCMClient):
 
         cmd.append(patch_file)
 
-        rc, data = self._execute(cmd, with_errors=True, return_error_code=True)
+        rc, data = self._execute(cmd, with_errors=True, return_error_code=True,
+                                 results_unicode=False)
 
         return PatchResult(applied=(rc == 0), patch_output=data)
 
