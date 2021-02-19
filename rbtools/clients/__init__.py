@@ -173,7 +173,7 @@ class SCMClient(object):
             unicode:
             The Review Board server URL, if available.
         """
-        return self._get_server_from_config(self.config, repository_info)
+        return None
 
     def parse_revision_spec(self, revisions=[]):
         """Parse the given revision spec.
@@ -298,44 +298,6 @@ class SCMClient(object):
             The history entries.
         """
         raise NotImplementedError
-
-    def _get_server_from_config(self, config, repository_info):
-        """Return the Review Board server URL in the config.
-
-        Args:
-            config (dict):
-                The loaded user config.
-
-            repository_info (rbtools.clients.RepositoryInfo):
-                The repository info structure.
-
-        Returns:
-            unicode:
-            The server URL, if available.
-        """
-        if 'REVIEWBOARD_URL' in config:
-            return config['REVIEWBOARD_URL']
-        elif 'TREES' in config:
-            trees = config['TREES']
-            if not isinstance(trees, dict):
-                raise ValueError('"TREES" in config file is not a dict!')
-
-            # If repository_info is a list, check if any one entry is in trees.
-            path = None
-
-            if isinstance(repository_info.path, list):
-                for path in repository_info.path:
-                    if path in trees:
-                        break
-                else:
-                    path = None
-            elif repository_info.path in trees:
-                path = repository_info.path
-
-            if path and 'REVIEWBOARD_URL' in trees[path]:
-                return trees[path]['REVIEWBOARD_URL']
-
-        return None
 
     def _get_p_number(self, base_path, base_dir):
         """Return the appropriate value for the -p argument to patch.

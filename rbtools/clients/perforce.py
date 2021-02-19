@@ -707,27 +707,6 @@ class PerforceClient(SCMClient):
         return None
 
     def scan_for_server(self, repository_info):
-        """Find the Review Board server matching this repository.
-
-        Args:
-            repository_info (rbtools.clients.RepositoryInfo):
-                The repository information structure.
-
-        Returns:
-            unicode:
-            The Review Board server URL, if available.
-        """
-        # Scan first for dot files, since it's faster and will cover the
-        # user's $HOME/.reviewboardrc
-        server_url = \
-            super(PerforceClient, self).scan_for_server(repository_info)
-
-        if server_url:
-            return server_url
-
-        return self.scan_for_server_counter(repository_info)
-
-    def scan_for_server_counter(self, repository_info):
         """Find if a Review Board server has been defined in the p4 counters.
 
         This checks the Perforce counters to see if the Review Board server's

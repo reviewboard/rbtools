@@ -120,9 +120,8 @@ class PerforceClientTests(SCMClientTests):
         def run_p4(self, *args, **kwargs):
             assert False
 
-    def test_scan_for_server_counter_with_reviewboard_url(self):
-        """Testing PerforceClient.scan_for_server_counter with
-        reviewboard.url"""
+    def test_scan_for_server_with_reviewboard_url(self):
+        """Testing PerforceClient.scan_for_server with reviewboard.url"""
         RB_URL = 'http://reviewboard.example.com/'
 
         class TestWrapper(P4Wrapper):
@@ -133,7 +132,7 @@ class PerforceClientTests(SCMClientTests):
                 }
 
         client = PerforceClient(TestWrapper)
-        url = client.scan_for_server_counter(None)
+        url = client.scan_for_server(None)
 
         self.assertEqual(url, RB_URL)
 
@@ -311,9 +310,10 @@ class PerforceClientTests(SCMClientTests):
 
         self.assertEqual(info, None)
 
-    def test_scan_for_server_counter_with_reviewboard_url_encoded(self):
-        """Testing PerforceClient.scan_for_server_counter with encoded
-        reviewboard.url.http:||"""
+    def test_scan_for_server_with_reviewboard_url_encoded(self):
+        """Testing PerforceClient.scan_for_server with encoded
+        reviewboard.url.http:||
+        """
         URL_KEY = 'reviewboard.url.http:||reviewboard.example.com/'
         RB_URL = 'http://reviewboard.example.com/'
 
@@ -325,7 +325,7 @@ class PerforceClientTests(SCMClientTests):
                 }
 
         client = PerforceClient(TestWrapper)
-        url = client.scan_for_server_counter(None)
+        url = client.scan_for_server(None)
 
         self.assertEqual(url, RB_URL)
 

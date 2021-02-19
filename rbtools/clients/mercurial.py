@@ -1136,23 +1136,16 @@ class MercurialClient(SCMClient):
             unicode:
             The Review Board server URL, if available.
         """
-        # Scan first for dot files, since it's faster and will cover the
-        # user's $HOME/.reviewboardrc
-        server_url = \
-            super(MercurialClient, self).scan_for_server(repository_info)
+        server_url = self.hgrc.get('reviewboard.url', '').strip()
 
-        if not server_url and self.hgrc.get('reviewboard.url'):
-            server_url = self.hgrc.get('reviewboard.url').strip()
-
-        if not server_url and self._type == 'svn':
+        if server_url:
+            return server_url
+        elif self._type == 'svn':
             # Try using the reviewboard:url property on the SVN repo, if it
             # exists.
-            prop = SVNClient().scan_for_server_property(repository_info)
+            return SVNClient().scan_for_server_property(repository_info)
 
-            if prop:
-                return prop
-
-        return server_url
+        return None
 
     def _execute(self, cmd, *args, **kwargs):
         """Execute an hg command.

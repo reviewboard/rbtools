@@ -852,6 +852,35 @@ class Command(object):
             server_url = self.options.server
         elif tool and repository_info is not None:
             server_url = tool.scan_for_server(repository_info)
+
+            # Once upon a time, users could create a TREES dict in their config
+            # file that specified the REVIEWBOARD_URL for multiple repository
+            # paths. This was never documented, and has long outlived its
+            # usefulness. We're continuing to support it for now but emit a
+            # deprecation warning.
+            if server_url is None and 'TREES' in self.config:
+                trees = self.config['TREES']
+                path = None
+
+                # Some repositories will return a list of paths.
+                if isinstance(repository_info.path, list):
+                    for path in repository_info.path:
+                        if path in trees:
+                            break
+                    else:
+                        path = None
+                elif repository_info.path in trees:
+                    path = repository_info.path
+
+                if path and 'REVIEWBOARD_URL' in trees[path]:
+                    logging.warning(
+                        'The TREES configuration for specifying the '
+                        'REVIEWBOARD_URL is no longer supported and will be '
+                        'removed in RBTools 4.0. If you have multiple Review '
+                        'Board servers for different repositories, create '
+                        'individual .reviewboardrc files in each repository '
+                        'to define REVIEWBOARD_URL.')
+                    server_url = trees[path]['REVIEWBOARD_URL']
         else:
             server_url = None
 

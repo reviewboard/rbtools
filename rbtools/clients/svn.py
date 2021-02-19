@@ -288,26 +288,6 @@ class SVNClient(SCMClient):
         raise ValueError
 
     def scan_for_server(self, repository_info):
-        """Find the Review Board server matching this repository.
-
-        Args:
-            repository_info (rbtools.clients.RepositoryInfo):
-                The repository information structure.
-
-        Returns:
-            unicode:
-            The Review Board server URL, if available.
-        """
-        # Scan first for dot files, since it's faster and will cover the
-        # user's $HOME/.reviewboardrc
-        server_url = super(SVNClient, self).scan_for_server(repository_info)
-
-        if server_url:
-            return server_url
-
-        return self.scan_for_server_property(repository_info)
-
-    def scan_for_server_property(self, repository_info):
         """Scan for the reviewboard:url property in the repository.
 
         This method looks for the reviewboard:url property, which is an

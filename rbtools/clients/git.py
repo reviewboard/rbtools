@@ -460,33 +460,21 @@ class GitClient(SCMClient):
             unicode:
             The Review Board server URL, if available.
         """
-        # Scan first for dot files, since it's faster and will cover the
-        # user's $HOME/.reviewboardrc
-        server_url = super(GitClient, self).scan_for_server(repository_info)
+        if self._type == self.TYPE_GIT:
+            # TODO: Maybe support a server per remote later? Is that useful?
+            server_url = self._execute(
+                [self.git, 'config', '--get', 'reviewboard.url'],
+                ignore_errors=True).strip()
 
-        if server_url:
-            return server_url
-
-        # TODO: Maybe support a server per remote later? Is that useful?
-        url = self._execute([self.git, 'config', '--get', 'reviewboard.url'],
-                            ignore_errors=True).strip()
-        if url:
-            return url
-
-        if self._type == self.TYPE_GIT_SVN:
+            return server_url or None
+        elif self._type == self.TYPE_GIT_SVN:
             # Try using the reviewboard:url property on the SVN repo, if it
             # exists.
-            prop = SVNClient().scan_for_server_property(repository_info)
-
-            if prop:
-                return prop
+            return SVNClient().scan_for_server_property(repository_info)
         elif self._type == self.TYPE_GIT_P4:
-            prop = PerforceClient().scan_for_server(repository_info)
-
-            if prop:
-                return prop
-
-        return None
+            return PerforceClient().scan_for_server(repository_info)
+        else:
+            return None
 
     def get_raw_commit_message(self, revisions):
         """Extract the commit message based on the provided revision range.
