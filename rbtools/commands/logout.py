@@ -14,22 +14,22 @@ class Logout(Command):
 
     name = 'logout'
     author = 'The Review Board Project'
+
+    needs_api = True
+
     option_list = [
         Command.server_options,
     ]
 
     def main(self):
         """Run the command."""
-        server_url = self.get_server_url(None, None)
-        api_client, api_root = self.get_api(server_url)
-
-        session = api_root.get_session(expand='user')
+        session = self.api_root.get_session(expand='user')
 
         if session.authenticated:
-            api_client.logout()
+            self.api_client.logout()
 
             logging.info('You are now logged out of Review Board at %s',
-                         api_client.domain)
+                         self.api_client.domain)
         else:
             logging.info('You are already logged out of Review Board at %s',
-                         api_client.domain)
+                         self.api_client.domain)

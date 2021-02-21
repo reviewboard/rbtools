@@ -163,7 +163,8 @@ class SetupRepo(Command):
         if not api_root and not api_client:
             api_client, api_root = self.get_api(server)
 
-        self.setup_tool(tool, api_root=api_root)
+        self.capabilities = self.get_capabilities(self.api_root)
+        tool.capabilities = self.capabilities
 
         # Check if repository info on reviewboard server match local ones.
         repository_info = repository_info.find_server_repository_info(api_root)

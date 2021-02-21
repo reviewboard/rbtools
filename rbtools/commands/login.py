@@ -20,21 +20,22 @@ class Login(Command):
 
     name = 'login'
     author = 'The Review Board Project'
+
+    needs_api = True
+
     option_list = [
         Command.server_options,
     ]
 
     def main(self):
         """Run the command."""
-        server_url = self.get_server_url(None, None)
-        api_client, api_root = self.get_api(server_url)
-
-        session = api_root.get_session(expand='user')
+        session = self.api_root.get_session(expand='user')
         was_authenticated = session.authenticated
 
         if not was_authenticated:
             try:
-                session = get_authenticated_session(api_client, api_root,
+                session = get_authenticated_session(api_client=self.api_client,
+                                                    api_root=self.api_root,
                                                     auth_required=True,
                                                     session=session)
             except AuthorizationError:
@@ -46,4 +47,4 @@ class Login(Command):
                 logging.info('Successfully logged in to Review Board.')
             else:
                 logging.info('You are already logged in to Review Board at %s',
-                             api_client.domain)
+                             self.api_client.domain)

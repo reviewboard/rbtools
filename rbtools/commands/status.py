@@ -17,10 +17,12 @@ from rbtools.utils.users import get_username
 class Status(Command):
     """Display review requests for the current repository."""
 
-
     name = 'status'
     author = 'The Review Board Project'
     description = 'Output a list of your pending review requests.'
+
+    needs_api = True
+
     args = '[review-request [revision]]'
     option_list = [
         Option('--format',
@@ -153,16 +155,22 @@ class Status(Command):
 
         return requests_stats
 
-    def main(self):
-        repository_info, tool = self.initialize_scm_tool(
-            client_name=self.options.repository_type)
-        server_url = self.get_server_url(repository_info, tool)
-        api_client, api_root = self.get_api(server_url)
-        self.setup_tool(tool, api_root=api_root)
-        username = get_username(api_client, api_root, auth_required=True)
+    def initialize(self):
+        """Initialize the command.
 
-        # Check if repository info on reviewboard server match local ones.
-        repository_info = repository_info.find_server_repository_info(api_root)
+        This override of the base command initialize method exists so we can
+        conditionally set whether the SCM Client is necessary. Without any
+        options, this command will only print the status of review requests on
+        the current repository, which requires the client. If --all is passed,
+        this command only needs the API.
+        """
+        self.needs_scm_client = not self.options.all_repositories
+
+        super(Status, self).initialize()
+
+    def main(self):
+        username = get_username(self.api_client, self.api_root,
+                                auth_required=True)
 
         query_args = {
             'from_user': username,
@@ -171,9 +179,13 @@ class Status(Command):
         }
 
         if not self.options.all_repositories:
+            # Check if repository info on reviewboard server match local ones.
+            self.repository_info = \
+                self.repository_info.find_server_repository_info(self.api_root)
+
             repo_id = get_repository_id(
-                repository_info,
-                api_root,
+                repository_info=self.repository_info,
+                api_root=self.api_root,
                 repository_name=self.options.repository_name)
 
             if repo_id:
@@ -184,7 +196,7 @@ class Status(Command):
                                 'the Review Board server. Displaying review '
                                 'requests from all repositories.')
 
-        review_requests = api_root.get_review_requests(**query_args)
+        review_requests = self.api_root.get_review_requests(**query_args)
         review_request_info = self.get_data(review_requests)
 
         if self.options.format:

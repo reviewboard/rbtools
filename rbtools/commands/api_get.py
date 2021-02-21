@@ -15,6 +15,9 @@ class APIGet(Command):
     name = 'api-get'
     author = 'The Review Board Project'
     description = 'Retrieve raw API resource payloads.'
+
+    needs_api = True
+
     args = '<path> [--<query-arg>=<value> ...]'
     option_list = [
         Option('--pretty',
@@ -44,19 +47,11 @@ class APIGet(Command):
             else:
                 raise ParseError('Unexpected query argument %s' % arg)
 
-        if self.options.server:
-            server_url = self.options.server
-        else:
-            repository_info, tool = self.initialize_scm_tool()
-            server_url = self.get_server_url(repository_info, tool)
-
-        api_client, api_root = self.get_api(server_url)
-
         try:
             if path.startswith('http://') or path.startswith('https://'):
-                resource = api_client.get_url(path, **query_args)
+                resource = self.api_client.get_url(path, **query_args)
             else:
-                resource = api_client.get_path(path, **query_args)
+                resource = self.api_client.get_path(path, **query_args)
         except APIError as e:
             if e.rsp:
                 print(self._dumps(e.rsp))

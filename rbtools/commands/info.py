@@ -15,6 +15,9 @@ class Info(Command):
     name = 'info'
     author = 'The Review Board Project'
     description = 'Display information about a review request.'
+
+    needs_api = True
+
     args = '<review-request> [revision]'
     option_list = [
         Command.server_options,
@@ -22,14 +25,8 @@ class Info(Command):
     ]
 
     def main(self, review_request_id, diff_revision=None):
-        repository_info, self.tool = self.initialize_scm_tool(
-            client_name=self.options.repository_type)
-        server_url = self.get_server_url(repository_info, self.tool)
-        api_client, api_root = self.get_api(server_url)
-        self.setup_tool(self.tool, api_root=api_root)
-
         try:
-            review_request = api_root.get_review_request(
+            review_request = self.api_root.get_review_request(
                 review_request_id=review_request_id,
                 expand='submitter')
         except APIError:

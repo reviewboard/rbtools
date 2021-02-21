@@ -11,6 +11,9 @@ class Publish(Command):
 
     name = 'publish'
     author = 'The Review Board Project'
+
+    needs_api = True
+
     args = '<review-request-id>'
     option_list = [
         Command.server_options,
@@ -39,13 +42,8 @@ class Publish(Command):
 
     def main(self, review_request_id):
         """Run the command."""
-        repository_info, tool = self.initialize_scm_tool(
-            client_name=self.options.repository_type)
-        server_url = self.get_server_url(repository_info, tool)
-        api_client, api_root = self.get_api(server_url)
-
         try:
-            review_request = api_root.get_review_request(
+            review_request = self.api_root.get_review_request(
                 review_request_id=review_request_id,
                 only_fields='public',
                 only_links='draft')
@@ -53,14 +51,12 @@ class Publish(Command):
             raise CommandError('Error getting review request %s: %s'
                                % (review_request_id, e))
 
-        self.setup_tool(tool, api_root)
-
         update_fields = {
             'public': True,
         }
 
         if (self.options.trivial_publish and
-            tool.capabilities.has_capability('review_requests',
+            self.capabilities.has_capability('review_requests',
                                              'trivial_publish')):
             update_fields['trivial'] = True
 
@@ -70,7 +66,7 @@ class Publish(Command):
                     self.options.change_description
 
                 if (self.options.markdown and
-                    tool.capabilities.has_capability('text', 'markdown')):
+                    self.capabilities.has_capability('text', 'markdown')):
                     update_fields['changedescription_text_type'] = 'markdown'
                 else:
                     update_fields['changedescription_text_type'] = 'plain'

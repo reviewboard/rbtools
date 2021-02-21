@@ -154,25 +154,92 @@ class Command(object):
     This class will handle retrieving the configuration, and parsing
     command line options.
 
-    ``description`` is a string containing a short description of the
-    command which is suitable for display in usage text.
-
     ``usage`` is a list of usage strings each showing a use case. These
     should not include the main rbt command or the command name; they
     will be added automatically.
 
-    ``args`` is a string containing the usage text for what arguments the
-    command takes.
+    Attributes:
+        api_client (rbtools.api.client.RBClient):
+            The API client. This will be ``None`` if :py:attr:`needs_api` is
+            ``False``.
 
-    ``option_list`` is a list of command line options for the command.
-    Each list entry should be an Option or OptionGroup instance.
+        api_root (rbtools.api.resource.RootResource):
+            The API root resource. This will be ``None`` if
+            :py:attr:`needs_api` is ``False``.
+
+        capabilities (rbtools.api.capabilities.Capabilities):
+            The API capabilities object. This will be ``None`` if
+            :py:attr:`needs_api` is ``False``.
+
+        repository_info (rbtools.clients.RepositoryInfo):
+            The repository info object. This will be ``None`` if
+            :py:attr:`needs_scm_client` is ``False``.
+
+        server_url (unicode):
+            The URL to the Review Board server.
+
+        tool (rbtools.clients.SCMClient):
+            The SCM client. This will be ``None`` if
+            :py:attr:`needs_scm_client` is ``False``.
     """
 
+    #: The name of the command.
+    #:
+    #: Type:
+    #:     unicode
     name = ''
+
+    #: The author of the command.
+    #:
+    #: Type:
+    #:     unicode
     author = ''
+
+    #: A short description of the command, suitable for display in usage text.
+    #:
+    #: Type:
+    #:     unicode
     description = ''
+
+    #: Whether the command needs the API client.
+    #:
+    #: If this is set, the initialization of the command will set
+    #: :py:attr:`api_client` and :py:attr:`api_root`.
+    #:
+    #: Version Added:
+    #:     3.0
+    #:
+    #: Type:
+    #:     bool
+    needs_api = False
+
+    #: Whether the command needs the SCM client.
+    #:
+    #: If this is set, the initialization of the command will set
+    #: :py:attr:`repository_info` and :py:attr:`tool`.
+    #:
+    #: Version Added:
+    #:     3.0
+    #:
+    #: Type:
+    #:     bool
+    needs_scm_client = False
+
+    #: Usage text for what arguments the command takes.
+    #:
+    #: Arguments for the command are anything passed in other than defined
+    #: options (for example, revisions passed to :command:`rbt post`).
+    #:
+    #: Type:
+    #:     unicode
     args = ''
+
+    #: Command-line options for this command.
+    #:
+    #: Type:
+    #:     list of Option or OptionGroup
     option_list = []
+
     _global_options = [
         Option('-d', '--debug',
                action='store_true',
@@ -585,6 +652,12 @@ class Command(object):
         """
         self.log = logging.getLogger('rb.%s' % self.name)
         self.transport_cls = transport_cls or self.default_transport_cls
+        self.api_client = None
+        self.api_root = None
+        self.capabilities = None
+        self.repository_info = None
+        self.server_url = None
+        self.tool = None
 
     def create_parser(self, config, argv=[]):
         """Create and return the argument parser for this command."""
@@ -652,70 +725,29 @@ class Command(object):
 
         return logging.Formatter(fmt.format(color=color, reset=reset))
 
-    def init_logging(self):
-        """Initializes logging for the command.
+    def initialize(self):
+        """Initialize the command.
 
-        This will set up different log handlers based on the formatting we want
-        for the given levels.
-
-        The INFO log handler will just show the text, like a print statement.
-
-        WARNING and higher will show the level name as a prefix, in the form of
-        "LEVEL: message".
-
-        If debugging is enabled, a debug log handler will be set up showing
-        debug messages in the form of ">>> message", making it easier to
-        distinguish between debugging and other messages.
+        This will set up various prerequisites for commands. Individual command
+        subclasses can control what gets done by setting the various
+        ``needs_*`` attributes (as documented in this class).
         """
-        if sys.stdout.isatty():
-            # We only use colorized logging when writing to TTYs, so we don't
-            # bother initializing it then.
-            colorama.init()
+        self._init_logging()
 
-        root = logging.getLogger()
+        if self.needs_api:
+            self.server_url = self._init_server_url()
+            self.api_client, self.api_root = self.get_api(self.server_url)
+            self.capabilities = self.get_capabilities(self.api_root)
 
-        if self.options.debug:
-            handler = logging.StreamHandler()
-            handler.setFormatter(self._create_formatter(
-                'DEBUG', '{color}>>>{reset} %(message)s'))
-            handler.setLevel(logging.DEBUG)
-            handler.addFilter(LogLevelFilter(logging.DEBUG))
-            root.addHandler(handler)
+        if self.needs_scm_client:
+            # _init_server_url might have already done this, in the case that
+            # it needed to use the SCM client to detect the server name. Only
+            # repeat if necessary.
+            if self.repository_info is None and self.tool is None:
+                self.repository_info, self.tool = self.initialize_scm_tool(
+                    client_name=self.options.repository_type)
 
-            root.setLevel(logging.DEBUG)
-        else:
-            root.setLevel(logging.INFO)
-
-        # Handler for info messages. We'll treat these like prints.
-        handler = logging.StreamHandler()
-        handler.setFormatter(self._create_formatter(
-            'INFO', '{color}%(message)s{reset}'))
-
-        handler.setLevel(logging.INFO)
-        handler.addFilter(LogLevelFilter(logging.INFO))
-        root.addHandler(handler)
-
-        # Handlers for warnings, errors, and criticals. They'll show the
-        # level prefix and the message.
-        levels = (
-            ('WARNING', logging.WARNING),
-            ('ERROR', logging.ERROR),
-            ('CRITICAL', logging.CRITICAL),
-        )
-
-        for level_name, level in levels:
-            handler = logging.StreamHandler()
-            handler.setFormatter(self._create_formatter(
-                level_name, '{color}%(levelname)s:{reset} %(message)s'))
-            handler.addFilter(LogLevelFilter(level))
-            handler.setLevel(level)
-            root.addHandler(handler)
-
-        logging.debug('RBTools %s', get_version_string())
-        logging.debug('Python %s', sys.version)
-        logging.debug('Running on %s', platform.platform())
-        logging.debug('Home = %s', get_home_path())
-        logging.debug('Current directory = %s', os.getcwd())
+            self.tool.capabilities = self.capabilities
 
     def create_arg_parser(self, argv):
         """Create and return the argument parser.
@@ -763,7 +795,7 @@ class Command(object):
             parser.error('Invalid number of arguments provided')
             sys.exit(1)
 
-        self.init_logging()
+        self.initialize()
         log_command_line('Command line: %s', argv)
 
         try:
@@ -832,6 +864,10 @@ class Command(object):
         If api_root is not provided we'll assume we want to
         initialize the tool using only local information
         """
+        logging.warning('The Command.setup_tool method is deprecated. '
+                        'Commands which need to use both the API and SCM '
+                        'client should instead set the needs_api and '
+                        'needs_scm_client attributes.')
         tool.capabilities = self.get_capabilities(api_root)
 
     def get_server_url(self, repository_info, tool):
@@ -848,47 +884,14 @@ class Command(object):
             unicode:
             The server URL.
         """
-        if self.options.server:
-            server_url = self.options.server
-        elif tool and repository_info is not None:
-            server_url = tool.scan_for_server(repository_info)
+        logging.warning('The Command.get_server_url method is deprecated. '
+                        'Commands which need the API client should instead '
+                        'set the needs_api attribute.')
 
-            # Once upon a time, users could create a TREES dict in their config
-            # file that specified the REVIEWBOARD_URL for multiple repository
-            # paths. This was never documented, and has long outlived its
-            # usefulness. We're continuing to support it for now but emit a
-            # deprecation warning.
-            if server_url is None and 'TREES' in self.config:
-                trees = self.config['TREES']
-                path = None
+        if self.server_url is None:
+            self.server_url = self._init_server_url()
 
-                # Some repositories will return a list of paths.
-                if isinstance(repository_info.path, list):
-                    for path in repository_info.path:
-                        if path in trees:
-                            break
-                    else:
-                        path = None
-                elif repository_info.path in trees:
-                    path = repository_info.path
-
-                if path and 'REVIEWBOARD_URL' in trees[path]:
-                    logging.warning(
-                        'The TREES configuration for specifying the '
-                        'REVIEWBOARD_URL is no longer supported and will be '
-                        'removed in RBTools 4.0. If you have multiple Review '
-                        'Board servers for different repositories, create '
-                        'individual .reviewboardrc files in each repository '
-                        'to define REVIEWBOARD_URL.')
-                    server_url = trees[path]['REVIEWBOARD_URL']
-        else:
-            server_url = None
-
-        if not server_url:
-            raise CommandError('Unable to find a Review Board server for this '
-                               'source code tree.')
-
-        return server_url
+        return self.server_url
 
     def credentials_prompt(self, realm, uri, username=None, password=None,
                            *args, **kwargs):
@@ -1051,6 +1054,136 @@ class Command(object):
         functionality.
         """
         raise NotImplementedError()
+
+    def _init_logging(self):
+        """Initializes logging for the command.
+
+        This will set up different log handlers based on the formatting we want
+        for the given levels.
+
+        The INFO log handler will just show the text, like a print statement.
+
+        WARNING and higher will show the level name as a prefix, in the form of
+        "LEVEL: message".
+
+        If debugging is enabled, a debug log handler will be set up showing
+        debug messages in the form of ">>> message", making it easier to
+        distinguish between debugging and other messages.
+        """
+        if sys.stdout.isatty():
+            # We only use colorized logging when writing to TTYs, so we don't
+            # bother initializing it then.
+            colorama.init()
+
+        root = logging.getLogger()
+
+        if self.options.debug:
+            handler = logging.StreamHandler()
+            handler.setFormatter(self._create_formatter(
+                'DEBUG', '{color}>>>{reset} %(message)s'))
+            handler.setLevel(logging.DEBUG)
+            handler.addFilter(LogLevelFilter(logging.DEBUG))
+            root.addHandler(handler)
+
+            root.setLevel(logging.DEBUG)
+        else:
+            root.setLevel(logging.INFO)
+
+        # Handler for info messages. We'll treat these like prints.
+        handler = logging.StreamHandler()
+        handler.setFormatter(self._create_formatter(
+            'INFO', '{color}%(message)s{reset}'))
+
+        handler.setLevel(logging.INFO)
+        handler.addFilter(LogLevelFilter(logging.INFO))
+        root.addHandler(handler)
+
+        # Handlers for warnings, errors, and criticals. They'll show the
+        # level prefix and the message.
+        levels = (
+            ('WARNING', logging.WARNING),
+            ('ERROR', logging.ERROR),
+            ('CRITICAL', logging.CRITICAL),
+        )
+
+        for level_name, level in levels:
+            handler = logging.StreamHandler()
+            handler.setFormatter(self._create_formatter(
+                level_name, '{color}%(levelname)s:{reset} %(message)s'))
+            handler.addFilter(LogLevelFilter(level))
+            handler.setLevel(level)
+            root.addHandler(handler)
+
+        logging.debug('RBTools %s', get_version_string())
+        logging.debug('Python %s', sys.version)
+        logging.debug('Running on %s', platform.platform())
+        logging.debug('Home = %s', get_home_path())
+        logging.debug('Current directory = %s', os.getcwd())
+
+    def _init_server_url(self):
+        """Initialize the server URL.
+
+        This will discover the URL to the Review Board server (if possible),
+        and store it in :py:attr:`server_url`.
+
+        Returns:
+            unicode:
+            The Review Board server URL.
+
+        Raises:
+            CommandError:
+                The Review Board server could not be detected.
+        """
+        # First use anything directly provided on the command line or in the
+        # config file. This may be None or empty.
+        server_url = self.options.server
+
+        # Now try to use the SCM to discover the server name. Several SCMs have
+        # ways for the administrator to configure the Review Board server in
+        # the SCM metadata.
+        if not server_url:
+            self.repository_info, self.tool = self.initialize_scm_tool(
+                client_name=self.options.repository_type)
+
+            if self.repository_info is not None and self.tool is not None:
+                server_url = self.tool.scan_for_server(self.repository_info)
+
+        # Finally, fall back on the TREES config. Once upon a time, we
+        # suggested that users create a TREES dict in their config
+        # file that specified the REVIEWBOARD_URL for multiple repository
+        # paths. This was never properly documented, and has long outlived its
+        # usefulness. We're continuing to support it for now but emit a
+        # deprecation warning.
+        if not server_url:
+            if 'TREES' in self.config:
+                trees = self.config['TREES']
+                path = None
+
+                # Some repositories will return a list of paths.
+                if isinstance(self.repository_info.path, list):
+                    for path in self.repository_info.path:
+                        if path in trees:
+                            break
+                    else:
+                        path = None
+                elif self.repository_info.path in trees:
+                    path = self.repository_info.path
+
+                if path and 'REVIEWBOARD_URL' in trees[path]:
+                    logging.warning(
+                        'The TREES configuration for specifying the '
+                        'REVIEWBOARD_URL is no longer supported and will be '
+                        'removed in RBTools 4.0. If you have multiple Review '
+                        'Board servers for different repositories, create '
+                        'individual .reviewboardrc files in each repository '
+                        'to define REVIEWBOARD_URL.')
+                    server_url = trees[path]['REVIEWBOARD_URL']
+
+        if not server_url:
+            raise CommandError('Unable to find a Review Board server for this '
+                               'source code tree.')
+
+        return server_url
 
 
 def find_entry_point_for_command(command_name):

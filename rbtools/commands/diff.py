@@ -13,6 +13,16 @@ class Diff(Command):
 
     name = 'diff'
     author = 'The Review Board Project'
+
+    # The diff command uses the API because some of the clients may change
+    # their diff behavior based on server capabilities (for example, very old
+    # servers may not have support for moved files with some SCM types). We
+    # might want to consider adding a mode for running this command in a purely
+    # offline way, or we might just want to define a supported baseline version
+    # of Review Board and get rid of some of the capability conditionals.
+    needs_api = True
+    needs_scm_client = True
+
     args = '[revisions]'
     option_list = [
         Command.server_options,
@@ -44,11 +54,7 @@ class Diff(Command):
                 'Subversion changelist, pass the changelist name as an '
                 'additional argument after the command.')
 
-        repository_info, tool = self.initialize_scm_tool(
-            client_name=self.options.repository_type)
-        server_url = self.get_server_url(repository_info, tool)
-        api_client, api_root = self.get_api(server_url)
-        self.setup_tool(tool, api_root=api_root)
+        tool = self.tool
 
         try:
             revisions = tool.parse_revision_spec(args)

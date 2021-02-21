@@ -11,6 +11,9 @@ class Attach(Command):
 
     name = 'attach'
     author = 'The Review Board Project'
+
+    needs_api = True
+
     args = '<review-request-id> <file>'
     option_list = [
         Option('--filename',
@@ -26,13 +29,8 @@ class Attach(Command):
     ]
 
     def main(self, review_request_id, path_to_file):
-        self.repository_info, self.tool = self.initialize_scm_tool(
-            client_name=self.options.repository_type)
-        server_url = self.get_server_url(self.repository_info, self.tool)
-        api_client, api_root = self.get_api(server_url)
-
         try:
-            review_request = api_root.get_review_request(
+            review_request = self.api_root.get_review_request(
                 review_request_id=review_request_id)
         except APIError as e:
             raise CommandError('Error getting review request %s: %s'

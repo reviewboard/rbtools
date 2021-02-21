@@ -28,6 +28,9 @@ class StatusUpdate(Command):
 
     name = 'status-update'
     author = 'The Review Board Project'
+
+    needs_api = True
+
     description = ('Interact with review request status updates on Review '
                    'Board.')
     args = '<action>'
@@ -176,13 +179,8 @@ class StatusUpdate(Command):
             else:
                 self._print_status_update(response)
 
-    def add_review(self, api_root):
+    def add_review(self):
         """Handle adding a review to a review request from a json file.
-
-        Args:
-            api_root (rbtools.api.transport.Transport):
-                Representation of the root level of the Review Board API for
-                doing further requests to the Review Board API.
 
         Raises:
             rbtools.commands.CommandError:
@@ -236,7 +234,7 @@ class StatusUpdate(Command):
         with open(self.options.review) as f:
             file_contents = json.loads(f.read())
 
-        review_draft = api_root.get_reviews(
+        review_draft = self.api_root.get_reviews(
             review_request_id=self.options.rid)
 
         if ('reviews' not in file_contents and
@@ -279,13 +277,8 @@ class StatusUpdate(Command):
 
         return new_review_draft
 
-    def get_status_update(self, api_root):
+    def get_status_update(self):
         """Handle getting status update information from Review Board.
-
-        Args:
-            api_root (rbtools.api.transport.Transport):
-                Representation of the root level of the Review Board API for
-                doing further requests to the Review Board API.
 
         Raises:
             rbtools.commands.CommandError:
@@ -297,13 +290,13 @@ class StatusUpdate(Command):
         try:
             if self.options.sid:
                 self.print(
-                    api_root.get_status_update(
+                    self.api_root.get_status_update(
                         review_request_id=self.options.rid,
                         status_update_id=self.options.sid)
                     .rsp.get('status_update'))
             else:
                 self.print(
-                    api_root.get_status_updates(
+                    self.api_root.get_status_updates(
                         review_request_id=self.options.rid)
                     .rsp.get('status_updates'))
         except APIError as e:
@@ -314,13 +307,8 @@ class StatusUpdate(Command):
                 raise CommandError('Could not retrieve the requested '
                                    'resource: %s' % e)
 
-    def set_status_update(self, api_root):
+    def set_status_update(self):
         """Handle setting status update information on Review Board.
-
-        Args:
-            api_root (rbtools.api.transport.Transport):
-                Representation of the root level of the Review Board API for
-                doing further requests to the Review Board API.
 
         Raises:
             rbtools.commands.CommandError:
@@ -334,7 +322,7 @@ class StatusUpdate(Command):
         review_draft_id = None
 
         if self.options.review:
-            new_review_draft = self.add_review(api_root)
+            new_review_draft = self.add_review(self.api_root)
             review_draft_id = new_review_draft.id
 
         # Validate state option.
@@ -363,7 +351,7 @@ class StatusUpdate(Command):
 
         try:
             if self.options.sid:
-                status_update = api_root.get_status_update(
+                status_update = self.api_root.get_status_update(
                     review_request_id=self.options.rid,
                     status_update_id=self.options.sid)
 
@@ -374,7 +362,7 @@ class StatusUpdate(Command):
                                        'required input for creating a new '
                                        'status update')
 
-                status_update = api_root.get_status_updates(
+                status_update = self.api_root.get_status_updates(
                     review_request_id=self.options.rid)
 
                 status_update = status_update.create(**query_args)
@@ -392,13 +380,8 @@ class StatusUpdate(Command):
                 raise CommandError('Could not set the requested '
                                    'resource: %s' % e)
 
-    def delete_status_update(self, api_root):
+    def delete_status_update(self):
         """Handle deleting status updates on Review Board.
-
-        Args:
-            api_root (rbtools.api.transport.Transport):
-                Representation of the root level of the Review Board API for
-                doing further requests to the Review Board API.
 
         Raises:
             rbtools.commands.CommandError:
@@ -409,7 +392,7 @@ class StatusUpdate(Command):
                 raise CommandError('Status update ID is required for '
                                    'deleting a status update.')
 
-            status_update = api_root.get_status_update(
+            status_update = self.api_root.get_status_update(
                 review_request_id=self.options.rid,
                 status_update_id=self.options.sid)
 
@@ -430,14 +413,6 @@ class StatusUpdate(Command):
             rbtools.command.CommandError:
                 Error with the execution of the command.
         """
-        if self.options.server:
-            server_url = self.options.server
-        else:
-            repository_info, tool = self.initialize_scm_tool()
-            server_url = self.get_server_url(repository_info, tool)
-
-        api_client, api_root = self.get_api(server_url)
-
         if action == 'get':
             self.get_status_update(api_root)
         elif action == 'set':

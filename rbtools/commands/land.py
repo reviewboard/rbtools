@@ -33,6 +33,10 @@ class Land(Command):
 
     name = 'land'
     author = 'The Review Board Project'
+
+    needs_api = True
+    needs_scm_client = True
+
     args = '[<branch-name>]'
     option_list = [
         Option('--dest',
@@ -251,6 +255,37 @@ class Land(Command):
         print('Review request %s has landed on "%s".' %
               (review_request.id, self.options.destination_branch))
 
+    def initialize(self):
+        """Initialize the command.
+
+        This overrides Command.initialize in order to handle full review
+        request URLs on the command line. In this case, we want to parse that
+        URL in order to pull the server name and review request ID out of it.
+
+        Raises:
+            rbtools.commands.CommandError:
+                A review request URL passed in as the review request ID could
+                not be parsed correctly or included a bad diff revision.
+        """
+        review_request_id = self.options.rid
+
+        if review_request_id and review_request_id.startswith('http'):
+            server_url, review_request_id, diff_revision = \
+                parse_review_request_url(review_request_id)
+
+            if diff_revision and '-' in diff_revision:
+                raise CommandError('Interdiff patches are not supported: %s.'
+                                   % diff_revision)
+
+            if review_request_id is None:
+                raise CommandError('The URL %s does not appear to be a '
+                                   'review request.')
+
+            self.options.server = server_url
+            self.options.rid = review_request_id
+
+        super(Land, self).initialize()
+
     def main(self, branch_name=None, *args):
         """Run the command."""
         self.cmd_args = list(args)
@@ -258,14 +293,9 @@ class Land(Command):
         if branch_name:
             self.cmd_args.insert(0, branch_name)
 
-        repository_info, self.tool = self.initialize_scm_tool(
-            client_name=self.options.repository_type)
-        server_url = self.get_server_url(repository_info, self.tool)
-        api_client, api_root = self.get_api(server_url)
-        self.setup_tool(self.tool, api_root=api_root)
-
         # Check if repository info on reviewboard server match local ones.
-        repository_info = repository_info.find_server_repository_info(api_root)
+        self.repository_info = \
+            self.repository_info.find_server_repository_info(self.api_root)
 
         if not self.tool.can_merge:
             raise CommandError('This command does not support %s repositories.'
@@ -288,18 +318,13 @@ class Land(Command):
         if self.options.rid:
             is_local = branch_name is not None
             review_request_id = self.options.rid
-
-            if review_request_id.startswith('http'):
-                (server_url,
-                 review_request_id,
-                 diff_revision) = parse_review_request_url(review_request_id)
         else:
             try:
                 review_request = guess_existing_review_request(
-                    repository_info=repository_info,
+                    repository_info=self.repository_info,
                     repository_name=self.options.repository_name,
-                    api_root=api_root,
-                    api_client=api_client,
+                    api_root=self.api_root,
+                    api_client=self.api_client,
                     tool=self.tool,
                     revisions=get_revisions(self.tool, self.cmd_args),
                     guess_summary=False,
@@ -316,7 +341,7 @@ class Land(Command):
             is_local = True
 
         try:
-            review_request = api_root.get_review_request(
+            review_request = self.api_root.get_review_request(
                 review_request_id=review_request_id)
         except APIError as e:
             raise CommandError('Error getting review request %s: %s'

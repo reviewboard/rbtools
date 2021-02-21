@@ -31,8 +31,11 @@ class Stamp(Command):
     name = 'stamp'
     author = 'The Review Board Project'
     description = 'Adds the review request URL to the commit message.'
-    args = '[revisions]'
 
+    needs_api = True
+    needs_scm_client = True
+
+    args = '[revisions]'
     option_list = [
         OptionGroup(
             name='Stamp Options',
@@ -65,8 +68,7 @@ class Stamp(Command):
 
         return confirm(question)
 
-    def determine_review_request(self, api_client, api_root, repository_info,
-                                 repository_name, revisions):
+    def determine_review_request(self, repository_name, revisions):
         """Determine the correct review request for a commit.
 
         A tuple (review request ID, review request absolute URL) is returned.
@@ -74,10 +76,13 @@ class Stamp(Command):
         (None, None) is returned.
         """
         # First, try to match the changeset to a review request directly.
-        if repository_info.supports_changesets:
+        if self.repository_info.supports_changesets:
             review_request = find_review_request_by_change_id(
-                api_client, api_root, repository_info, repository_name,
-                revisions)
+                api_client=self.api_client,
+                api_root=self.api_root,
+                repository_info=self.repository_info,
+                repository_name=repository_name,
+                revisions=revisions)
 
             if review_request and review_request.id:
                 return review_request.id, review_request.absolute_url
@@ -89,8 +94,13 @@ class Stamp(Command):
 
         try:
             review_request = guess_existing_review_request(
-                repository_info, repository_name, api_root, api_client,
-                self.tool, revisions, guess_summary=False,
+                repository_info=self.repository_info,
+                repository_name=repository_name,
+                api_root=self.api_root,
+                api_client=self.api_client,
+                tool=self.tool,
+                revisions=revisions,
+                guess_summary=False,
                 guess_description=False,
                 is_fuzzy_match_func=self._ask_review_request_match,
                 no_commit_error=self.no_commit_error)
@@ -107,12 +117,6 @@ class Stamp(Command):
     def main(self, *args):
         """Add the review request URL to a commit message."""
         self.cmd_args = list(args)
-
-        repository_info, self.tool = self.initialize_scm_tool(
-            client_name=self.options.repository_type)
-        server_url = self.get_server_url(repository_info, self.tool)
-        api_client, api_root = self.get_api(server_url)
-        self.setup_tool(self.tool, api_root=api_root)
 
         if not self.tool.can_amend_commit:
             raise NotImplementedError('rbt stamp is not supported with %s.'
@@ -131,7 +135,7 @@ class Stamp(Command):
             review_request_id = self.options.rid
 
             try:
-                review_request = api_root.get_review_request(
+                review_request = self.api_root.get_review_request(
                     review_request_id=review_request_id)
             except APIError as e:
                 raise CommandError('Error getting review request %s: %s'
@@ -141,7 +145,6 @@ class Stamp(Command):
         else:
             review_request_id, review_request_url = \
                 self. determine_review_request(
-                    api_client, api_root, repository_info,
                     self.options.repository_name, revisions)
 
         if not review_request_url:

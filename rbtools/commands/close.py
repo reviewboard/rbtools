@@ -17,6 +17,9 @@ class Close(Command):
 
     name = 'close'
     author = 'The Review Board Project'
+
+    needs_api = True
+
     args = '<review-request-id>'
     option_list = [
         Option('--close-type',
@@ -45,18 +48,9 @@ class Close(Command):
         """Run the command."""
         close_type = self.options.close_type
         self.check_valid_type(close_type)
-        if self.options.server:
-            # Bypass getting the scm_tool to discover the server since it was
-            # specified with --server or in .reviewboardrc
-            repository_info, tool = None, None
-        else:
-            repository_info, tool = self.initialize_scm_tool(
-                client_name=self.options.repository_type)
-        server_url = self.get_server_url(repository_info, tool)
-        api_client, api_root = self.get_api(server_url)
 
         try:
-            review_request = api_root.get_review_request(
+            review_request = self.api_root.get_review_request(
                 review_request_id=review_request_id)
         except APIError as e:
             raise CommandError('Error getting review request %s: %s'

@@ -32,6 +32,10 @@ class Patch(Command):
 
     name = 'patch'
     author = 'The Review Board Project'
+
+    needs_api = True
+    needs_scm_client = True
+
     args = '<review-request-id>'
     option_list = [
         Option('-c', '--commit',
@@ -154,7 +158,7 @@ class Patch(Command):
 
         # Sanity-check the arguments, making sure that the options provided
         # are compatible with each other and with the Review Board server.
-        server_supports_history = self._tool.capabilities.has_capability(
+        server_supports_history = self.capabilities.has_capability(
             'review_requests', 'supports_history')
 
         if server_supports_history:
@@ -175,7 +179,7 @@ class Patch(Command):
         # revision through the API.
         if diff_revision is None:
             try:
-                diffs = self._api_root.get_diffs(
+                diffs = self.api_root.get_diffs(
                     review_request_id=self._review_request_id,
                     only_fields='',
                     only_links='')
@@ -191,11 +195,11 @@ class Patch(Command):
         try:
             # Fetch the main diff and (unless we're squashing) any commits within.
             if squashed:
-                diff = self._api_root.get_diff(
+                diff = self.api_root.get_diff(
                     review_request_id=self._review_request_id,
                     diff_revision=diff_revision)
             else:
-                diff = self._api_root.get_diff(
+                diff = self.api_root.get_diff(
                     review_request_id=self._review_request_id,
                     diff_revision=diff_revision,
                     expand='commits')
@@ -334,9 +338,9 @@ class Patch(Command):
                     'total': total_patches,
                 })
 
-        result = self._tool.apply_patch(
+        result = self.tool.apply_patch(
             patch_file=diff_file_path,
-            base_path=self._repository_info.base_path,
+            base_path=self.repository_info.base_path,
             base_dir=base_dir,
             p=self.options.px,
             revert=revert)
@@ -390,6 +394,40 @@ class Patch(Command):
 
         return True
 
+    def initialize(self):
+        """Initialize the command.
+
+        This overrides Command.initialize in order to handle full review
+        request URLs on the command line. In this case, we want to parse that
+        URL in order to pull the server name and diff revision out of it.
+
+        Raises:
+            rbtools.commands.CommandError:
+                A review request URL passed in as the review request ID could
+                not be parsed correctly or included a bad diff revision.
+        """
+        review_request_id = self.options.args[0]
+
+        if review_request_id.startswith('http'):
+            server_url, review_request_id, diff_revision = \
+                parse_review_request_url(review_request_id)
+
+            if diff_revision and '-' in diff_revision:
+                raise CommandError('Interdiff patches are not supported: %s.'
+                                   % diff_revision)
+
+            if review_request_id is None:
+                raise CommandError('The URL %s does not appear to be a '
+                                   'review request.')
+
+            self.options.server = server_url
+            self.options.diff_revision = diff_revision
+            self.options.args[0] = review_request_id
+
+        self.needs_scm_client = not self.options.patch_stdout
+
+        super(Patch, self).initialize()
+
     def main(self, review_request_id):
         """Run the command.
 
@@ -401,44 +439,24 @@ class Patch(Command):
             rbtools.command.CommandError:
                 Patching the tree has failed.
         """
+        self._review_request_id = review_request_id
         patch_stdout = self.options.patch_stdout
         revert = self.options.revert_patch
+        tool = self.tool
 
         if patch_stdout and revert:
             raise CommandError(_('--print and --revert cannot both be used.'))
-
-        repository_info, tool = self.initialize_scm_tool(
-            client_name=self.options.repository_type,
-            require_repository_info=not patch_stdout)
-
-        server_url = self.get_server_url(repository_info, tool)
-        diff_revision = None
-
-        if review_request_id.startswith('http'):
-            (server_url,
-             review_request_id,
-             diff_revision) = parse_review_request_url(review_request_id)
-
-            if diff_revision and '-' in diff_revision:
-                raise CommandError('Interdiff patches not supported: %s.'
-                                   % diff_revision)
-
-        if diff_revision is None:
-            diff_revision = self.options.diff_revision
 
         if revert and not tool.supports_patch_revert:
             raise CommandError(
                 _('The %s backend does not support reverting patches.')
                 % tool.name)
 
-        api_client, api_root = self.get_api(server_url)
-        self.setup_tool(tool, api_root=api_root)
-
         if not patch_stdout:
             # Check if the repository info on the Review Board server matches
             # the local checkout.
-            repository_info = repository_info.find_server_repository_info(
-                api_root)
+            self.repository_info = \
+                self.repository_info.find_server_repository_info(self.api_root)
 
             # Check if the working directory is clean.
             try:
@@ -451,12 +469,6 @@ class Patch(Command):
                         logger.warning(message)
             except NotImplementedError:
                 pass
-
-        # Store the instances we've set up so that other commands have access.
-        self._api_root = api_root
-        self._repository_info = repository_info
-        self._tool = tool
-        self._review_request_id = review_request_id
 
         if self.options.commit_ids:
             # Do our best to normalize what gets passed in, so that we don't
@@ -473,7 +485,7 @@ class Patch(Command):
         # Fetch the patches from the review request, based on the requested
         # options.
         patches = self.get_patches(
-            diff_revision=diff_revision,
+            diff_revision=self.options.diff_revision,
             commit_ids=commit_ids,
             squashed=self.options.squash,
             reverted=revert)
@@ -531,7 +543,7 @@ class Patch(Command):
             # Fetch the review request to use as a description. We only
             # want to fetch this once.
             try:
-                review_request = self._api_root.get_review_request(
+                review_request = self.api_root.get_review_request(
                     review_request_id=self._review_request_id,
                     force_text_type='plain')
             except APIError as e:
@@ -636,7 +648,7 @@ class Patch(Command):
                     message = '[Revert] %s' % message
 
                 try:
-                    self._tool.create_commit(
+                    self.tool.create_commit(
                         message=message,
                         author=author,
                         run_editor=not commit_no_edit)
@@ -644,4 +656,4 @@ class Patch(Command):
                     raise CommandError(six.text_type(e))
                 except NotImplementedError:
                     raise CommandError('--commit is not supported with %s'
-                                       % self._tool.name)
+                                       % self.tool.name)
