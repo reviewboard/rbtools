@@ -33,9 +33,9 @@ class _get_elements_from_label_thread(threading.Thread):
         self.dir_name = dir_name
         self.elements = elements
 
-        # Remove any trailing vobstag not supported by cleartool find.
+        # Remove any trailing VOB tag not supported by cleartool find.
         try:
-            label, vobstag = label.rsplit('@', 1)
+            label, vobtag = label.rsplit('@', 1)
         except Exception:
             pass
         self.label = label
@@ -139,9 +139,9 @@ class ClearCaseClient(SCMClient):
                 break
 
         # Find current VOB's tag
-        vobstag = execute(['cleartool', 'describe', '-short', 'vob:.'],
-                          ignore_errors=True).strip()
-        if 'Error: ' in vobstag:
+        vobtag = execute(['cleartool', 'describe', '-short', 'vob:.'],
+                         ignore_errors=True).strip()
+        if 'Error: ' in vobtag:
             raise SCMError('Failed to generate diff run rbt inside vob.')
 
         root_path = execute(['cleartool', 'pwv', '-root'],
@@ -156,11 +156,11 @@ class ClearCaseClient(SCMClient):
         # path separator, e.g. `/vobs/new_proj` for our new_proj VOB mounted
         # at `/vobs`.
         cwd = os.getcwd()
-        base_path = cwd[:len(root_path) + len(vobstag)]
+        base_path = cwd[:len(root_path) + len(vobtag)]
 
         return ClearCaseRepositoryInfo(path=base_path,
                                        base_path=base_path,
-                                       vobstag=vobstag)
+                                       vobtag=vobtag)
 
     def _determine_branch_path(self, version_path):
         """Determine the branch path of a version path.
@@ -209,28 +209,29 @@ class ClearCaseClient(SCMClient):
 
         return checkedout_elements
 
-    def _is_a_label(self, label, vobstag=None):
+    def _is_a_label(self, label, vobtag=None):
         """Return whether a given label is a valid ClearCase lbtype.
 
         Args:
             label (unicode):
                 The label to check.
 
-            vobstag (unicode, optional):
-                An optional vobstag to limit the label to.
+            vobtag (unicode, optional):
+                An optional VOB tag to limit the label to.
 
         Raises:
             Exception:
-                The vobstag did not match.
+                The VOB tag did not match.
 
         Returns:
             bool:
             Whether the label was valid.
         """
-        label_vobstag = None
-        # Try to find any vobstag.
+        label_vobtag = None
+
+        # Try to find any vobtag.
         try:
-            label, label_vobstag = label.rsplit('@', 1)
+            label, label_vobtag = label.rsplit('@', 1)
         except Exception:
             pass
 
@@ -238,11 +239,11 @@ class ClearCaseClient(SCMClient):
         if not label.startswith(self.REVISION_LABEL_PREFIX):
             label = '%s%s' % (self.REVISION_LABEL_PREFIX, label)
 
-        # If vobstag defined, check if it matches with the one extracted from
+        # If vobtag defined, check if it matches with the one extracted from
         # label, otherwise raise an exception.
-        if vobstag and label_vobstag and label_vobstag != vobstag:
-            raise Exception('label vobstag %s does not match expected vobstag '
-                            '%s' % (label_vobstag, vobstag))
+        if vobtag and label_vobtag and label_vobtag != vobtag:
+            raise Exception('label vobtag %s does not match expected vobtag '
+                            '%s' % (label_vobtag, vobtag))
 
         # Finally check if label exists in database, otherwise quit. Ignore
         # return code 1, it means label does not exist.
@@ -487,7 +488,7 @@ class ClearCaseClient(SCMClient):
 
         A UCM activity changeset can contain changes from different vobs,
         however reviewboard supports only changes from a single repo at the
-        same time, so changes made outside of the current vobstag will be
+        same time, so changes made outside of the current VOB tag will be
         ignored.
 
         Args:
@@ -507,8 +508,8 @@ class ClearCaseClient(SCMClient):
             path, current = change.split('@@')
 
             # If a file isn't in the correct vob, then ignore it.
-            if path.find('%s/' % (repository_info.vobstag,)) == -1:
-                logging.debug('Vobstag does not match, ignoring changes on %s',
+            if path.find('%s/' % (repository_info.vobtag,)) == -1:
+                logging.debug('VOB tag does not match, ignoring changes on %s',
                               path)
                 continue
 
@@ -855,7 +856,7 @@ class ClearCaseClient(SCMClient):
             # Now we get 2 labels for comparison, check if they are both valid.
             repository_info = self.get_repository_info()
             for label in labels:
-                if not self._is_a_label(label, repository_info.vobstag):
+                if not self._is_a_label(label, repository_info.vobtag):
                     raise Exception(
                         'ClearCase label %s is not a valid label' % label)
 
@@ -1172,7 +1173,7 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
     the URLs differ.
     """
 
-    def __init__(self, path, base_path, vobstag):
+    def __init__(self, path, base_path, vobtag):
         """Initialize the repsitory info.
 
         Args:
@@ -1183,12 +1184,12 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
                 The relative path between the repository root and the working
                 directory.
 
-            vobstag (unicode):
-                The vobstag for the repository.
+            vobtag (unicode):
+                The VOB tag for the repository.
         """
         RepositoryInfo.__init__(self, path, base_path,
                                 supports_parent_diffs=False)
-        self.vobstag = vobstag
+        self.vobtag = vobtag
 
     def find_server_repository_info(self, server):
         """Find a matching repository on the server.
@@ -1209,22 +1210,22 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
             The server-side information for this repository.
         """
         # Find VOB's family uuid based on VOB's tag
-        uuid = self._get_vobs_uuid(self.vobstag)
-        logging.debug('Repository vobstag %s uuid is %r', self.vobstag, uuid)
+        uuid = self._get_vobs_uuid(self.vobtag)
+        logging.debug('Repository VOB tag %s uuid is %r', self.vobtag, uuid)
 
         # To reduce HTTP requests (_get_repository_info calls), we build an
         # ordered list of ClearCase repositories starting with the ones that
-        # have a similar vobstag.
+        # have a similar vobtag.
         repository_scan_order = deque()
 
         # Because the VOB tag is platform-specific, we split and search
         # for the remote name in any sub-part so this HTTP request
         # optimization can work for users on both Windows and Unix-like
         # platforms.
-        vob_tag_parts = self.vobstag.split(cpath.sep)
+        vob_tag_parts = self.vobtag.split(cpath.sep)
 
         # Reduce list of repositories to only ClearCase ones and sort them by
-        # repo name matching vobstag (or some part of the vobstag) first.
+        # repo name matching vobtag (or some part of the vobtag) first.
         for repository in server.get_repositories(tool='ClearCase').all_items:
             # Ignore non-ClearCase repositories.
             if repository['tool'] != 'ClearCase':
@@ -1234,7 +1235,7 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
 
             # Repositories with a similar VOB tag get put at the beginning and
             # the others at the end.
-            if repo_name == self.vobstag or repo_name in vob_tag_parts:
+            if repo_name == self.vobtag or repo_name in vob_tag_parts:
                 repository_scan_order.appendleft(repository)
             else:
                 repository_scan_order.append(repository)
@@ -1251,7 +1252,7 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
                 if not (e.error_code == 101 and e.http_status == 403):
                     # We can safely ignore this repository unless the VOB tag
                     # matches.
-                    if repo_name == self.vobstag:
+                    if repo_name == self.vobtag:
                         raise SCMError('You do not have permission to access '
                                        'this repository.')
 
@@ -1267,20 +1268,20 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
             logging.debug('Matching repository uuid:%s with path:%s',
                           uuid, path)
             return ClearCaseRepositoryInfo(path=path, base_path=path,
-                                           vobstag=self.vobstag)
+                                           vobtag=self.vobtag)
 
         # We didn't found uuid but if version is >= 1.5.3
         # we can try to use VOB's name hoping it is better
         # than current VOB's path.
         if parse_version(server.rb_version) >= parse_version('1.5.3'):
-            self.path = cpath.split(self.vobstag)[1]
+            self.path = cpath.split(self.vobtag)[1]
 
         # We didn't find a matching repository on the server.
         # We'll just return self and hope for the best.
         return self
 
-    def _get_vobs_uuid(self, vobstag):
-        property_lines = execute(['cleartool', 'lsvob', '-long', vobstag],
+    def _get_vobs_uuid(self, vobtag):
+        property_lines = execute(['cleartool', 'lsvob', '-long', vobtag],
                                  split_lines=True)
         for line in property_lines:
             if line.startswith('Vob family uuid:'):
