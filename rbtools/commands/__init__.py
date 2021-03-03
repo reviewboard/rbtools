@@ -845,11 +845,16 @@ class Command(object):
             A 2-tuple, containing the repository info structure and the tool
             instance.
         """
+        if not require_repository_info:
+            logging.warning('The require_repository_info parameter to '
+                            'Command.initialize_scm_tool is deprecated. '
+                            'Commands which need to use only the API should '
+                            'set the needs_api attribute.')
+
         repository_info, tool = scan_usable_client(
             self.config,
             self.options,
-            client_name=client_name,
-            require_repository_info=require_repository_info)
+            client_name=client_name)
 
         try:
             tool.check_options()

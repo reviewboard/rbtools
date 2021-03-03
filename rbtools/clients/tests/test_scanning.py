@@ -14,6 +14,16 @@ from rbtools.utils.process import execute
 class ScanningTests(SCMClientTests):
     """Unit tests for client scanning."""
 
+    def setUp(self):
+        """Set up the scanning tests."""
+        super(ScanningTests, self).setUp()
+
+        # Clear out the SVN info cache.
+        from rbtools.clients import SCMCLIENTS
+
+        if SCMCLIENTS and 'svn' in SCMCLIENTS:
+            SCMCLIENTS['svn']._svn_info_cache = {}
+
     def test_scanning_nested_repos_1(self):
         """Testing scan_for_usable_client with nested repositories (git inside
         svn)

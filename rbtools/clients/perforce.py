@@ -420,19 +420,57 @@ class PerforceClient(SCMClient):
         """
         super(PerforceClient, self).__init__(**kwargs)
         self.p4 = p4_class(self.options)
+        self._p4_info = None
 
-    def get_repository_info(self):
-        """Return repository information for the current Perforce working tree.
+    def get_local_path(self):
+        """Return the local path to the working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
-            The repository info structure.
+            unicode:
+            The filesystem path of the repository on the client system.
         """
         if not self.p4.is_supported():
             logging.debug('Unable to execute "p4 help": skipping Perforce')
             return None
 
-        p4_info = self.p4.info()
+        if self._p4_info is None:
+            self._p4_info = self.p4.info()
+
+        # Get the client root and see if we're currently within that root.
+        # Since `p4 info` can return a result when we're nowhere near the
+        # checkout directory, we need to do this in order to ensure we're not
+        # going to be trying to build diffs in the wrong place.
+        client_root = self._p4_info.get('Client root')
+
+        # A 'null' client root is a valid configuration on Windows client,
+        # so don't enforce the repository directory check.
+        if (client_root and (client_root.lower() != 'null' or
+                             not sys.platform.startswith('win'))):
+            norm_cwd = os.path.normcase(os.path.realpath(os.getcwd()) +
+                                        os.path.sep)
+            local_path = os.path.normcase(os.path.realpath(client_root) +
+                                          os.path.sep)
+
+            # Only accept the repository if the current directory is inside
+            # the root of the Perforce client.
+            if norm_cwd.startswith(local_path):
+                return local_path
+
+        return None
+
+    def get_repository_info(self):
+        """Return repository information for the current working tree.
+
+        Returns:
+            rbtools.clients.RepositoryInfo:
+            The repository info structure.
+        """
+        local_path = self.get_local_path()
+
+        if not local_path:
+            return None
+
+        p4_info = self._p4_info
 
         # Check the server address. If we don't get something we expect here,
         # we'll want to bail early.
@@ -449,30 +487,6 @@ class PerforceClient(SCMClient):
             return None
 
         self.p4d_version = int(m.group(1)), int(m.group(2))
-
-        # Get the client root and see if we're currently within that root.
-        # Since `p4 info` can return a result when we're nowhere near the
-        # checkout directory, we need to do this in order to ensure we're not
-        # going to be trying to build diffs in the wrong place.
-        client_root = p4_info.get('Client root')
-
-        if client_root is None:
-            return None
-
-        # A 'null' client root is a valid configuration on Windows client,
-        # so don't enforce the repository directory check.
-        if client_root.lower() != 'null' or not sys.platform.startswith('win'):
-            norm_cwd = os.path.normcase(os.path.realpath(os.getcwd()) +
-                                        os.path.sep)
-            local_path = os.path.normcase(os.path.realpath(client_root) +
-                                          os.path.sep)
-
-            # Don't accept the repository if the current directory is outside
-            # the root of the Perforce client.
-            if not norm_cwd.startswith(local_path):
-                return None
-        else:
-            local_path = None
 
         # For the repository path, we first prefer p4 brokers, then the
         # upstream p4 server. If neither of those are found, just return None.

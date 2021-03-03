@@ -93,23 +93,50 @@ class ClearCaseClient(SCMClient):
     REVISION_LABEL_BASE = '--rbtools-label-base'
     REVISION_LABEL_PREFIX = 'lbtype:'
 
-    def get_repository_info(self):
-        """Return information on the ClearCase repository.
-
-        This will first check if the cleartool command is installed and in the
-        path, and that the current working directory is inside of the view.
+    def get_local_path(self):
+        """Return the local path to the working tree.
 
         Returns:
-            ClearCaseRepositoryInfo:
-            The repository info structure.
+            unicode:
+            The filesystem path of the repository on the client system.
         """
         if not check_install(['cleartool', 'help']):
             logging.debug('Unable to execute "cleartool help": skipping '
                           'ClearCase')
             return None
 
+        # Bail out early if we're not in a view.
         viewname = execute(['cleartool', 'pwv', '-short']).strip()
+
         if viewname.startswith('** NONE'):
+            return None
+
+        # Find the current VOB's tag.
+        vobtag = execute(['cleartool', 'describe', '-short', 'vob:.'],
+                         ignore_errors=True).strip()
+
+        if 'Error: ' in vobtag:
+            raise SCMError('Failed to generate diff run rbt inside vob.')
+
+        # Get the root path of the view.
+        root_path = execute(['cleartool', 'pwv', '-root'],
+                            ignore_errors=True).strip()
+
+        if 'Error: ' in root_path:
+            raise SCMError('Failed to generate diff run rbt inside view.')
+
+        return os.path.join(root_path, vobtag)
+
+    def get_repository_info(self):
+        """Return repository information for the current working tree.
+
+        Returns:
+            ClearCaseRepositoryInfo:
+            The repository info structure.
+        """
+        local_path = self.get_local_path()
+
+        if not local_path:
             return None
 
         # Now that we know it's ClearCase, make sure we have GNU diff
@@ -138,28 +165,13 @@ class ClearCaseClient(SCMClient):
 
                 break
 
-        # Find current VOB's tag
+        # TODO: We're now doing this twice (once in get_local_path, once here).
+        # This should be cached.
         vobtag = execute(['cleartool', 'describe', '-short', 'vob:.'],
                          ignore_errors=True).strip()
-        if 'Error: ' in vobtag:
-            raise SCMError('Failed to generate diff run rbt inside vob.')
 
-        root_path = execute(['cleartool', 'pwv', '-root'],
-                            ignore_errors=True).strip()
-        if 'Error: ' in root_path:
-            raise SCMError('Failed to generate diff run rbt inside view.')
-
-        # From current working directory cut path to VOB. On Windows
-        # and under cygwin, the VOB tag contains the VOB's path including
-        # name, e.g. `\new_proj` for a VOB `new_proj` mounted at the root
-        # of a drive. On Unix, the VOB tag is similar, but with a different
-        # path separator, e.g. `/vobs/new_proj` for our new_proj VOB mounted
-        # at `/vobs`.
-        cwd = os.getcwd()
-        base_path = cwd[:len(root_path) + len(vobtag)]
-
-        return ClearCaseRepositoryInfo(path=base_path,
-                                       base_path=base_path,
+        return ClearCaseRepositoryInfo(path=local_path,
+                                       base_path=local_path,
                                        vobtag=vobtag)
 
     def _determine_branch_path(self, version_path):
@@ -1213,7 +1225,8 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
         uuid = self._get_vobs_uuid(self.vobtag)
         logging.debug('Repository VOB tag %s uuid is %r', self.vobtag, uuid)
 
-        # To reduce HTTP requests (_get_repository_info calls), we build an
+        # To reduce calls to fetch the repository info resource (which can be
+        # expensive to compute on the server and isn't cacheable), we build an
         # ordered list of ClearCase repositories starting with the ones that
         # have a similar vobtag.
         repository_scan_order = deque()
@@ -1286,15 +1299,3 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
         for line in property_lines:
             if line.startswith('Vob family uuid:'):
                 return line.split(' ')[-1].rstrip()
-
-    def _get_repository_info(self, server, repository):
-        try:
-            return server.get_repository_info(repository['id'])
-        except APIError as e:
-            # If the server couldn't fetch the repository info, it will return
-            # code 210. Ignore those.
-            # Other more serious errors should still be raised, though.
-            if e.error_code == 210:
-                return None
-
-            raise e

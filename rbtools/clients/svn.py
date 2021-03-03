@@ -73,8 +73,44 @@ class SVNClient(SCMClient):
         self._svn_info_cache = {}
         self._svn_repository_info_cache = None
 
+    def is_remote_only(self):
+        """Return whether this repository is operating in remote-only mode.
+
+        For SVN, if a user provides the repository URL on the command line or
+        config file, RBTools can proceed without a checkout.
+
+        Returns:
+            bool:
+            Whether this repository is operating in remote-only mode.
+        """
+        repository_url = getattr(self.options, 'repository_url', None)
+
+        if repository_url:
+            info = self.svn_info(path=repository_url, ignore_errors=True)
+            return bool(info and 'Repository Root' in info)
+
+        return None
+
+    def get_local_path(self):
+        """Return the local path to the working tree.
+
+        Returns:
+            unicode:
+            The filesystem path of the repository on the client system.
+        """
+        if not check_install(['svn', 'help']):
+            logging.debug('Unable to execute "svn help": skipping SVN')
+            return None
+
+        info = self.svn_info(path=None, ignore_errors=True)
+
+        if info and 'Working Copy Root Path' in info:
+            return info['Working Copy Root Path']
+
+        return None
+
     def get_repository_info(self):
-        """Return repository information for the current SVN working tree.
+        """Return repository information for the current working tree.
 
         Returns:
             rbtools.clients.RepositoryInfo:
@@ -87,40 +123,21 @@ class SVNClient(SCMClient):
             logging.debug('Unable to execute "svn help": skipping SVN')
             return None
 
-        # Get the SVN repository path (either via a working copy or
-        # a supplied URI)
-        svn_info_params = ['info']
+        repository_url = getattr(self.options, 'repository_url', None)
+        info = self.svn_info(path=repository_url,
+                             ignore_errors=True)
 
-        if getattr(self.options, 'repository_url', None):
-            svn_info_params.append(self.options.repository_url)
-
-        data = self._run_svn(svn_info_params, ignore_errors=True,
-                             log_output_on_error=False)
-
-        m = re.search('^Repository Root: (.+)$', data, re.M)
-        if not m:
+        if not info:
             return None
 
-        path = m.group(1)
-
-        m = re.search('^Working Copy Root Path: (.+)$', data, re.M)
-
-        if m:
-            local_path = m.group(1)
-        else:
-            local_path = None
-
-        m = re.search('^URL: (.+)$', data, re.M)
-        if not m:
+        try:
+            path = info['Repository Root']
+            base_path = info['URL'][len(path):] or '/'
+            uuid = info['Repository UUID']
+        except KeyError:
             return None
 
-        base_path = m.group(1)[len(path):] or '/'
-
-        m = re.search('^Repository UUID: (.+)$', data, re.M)
-        if not m:
-            return None
-
-        uuid = m.group(1)
+        local_path = info.get('Working Copy Root Path')
 
         # Now that we know it's SVN, make sure we have GNU diff installed,
         # and error out if we don't.
@@ -861,11 +878,16 @@ class SVNClient(SCMClient):
         # includes an '@' character will be path@rev, and skips everything that
         # comes after the '@'. This makes it hard to do operations on files
         # which include '@' in the name (such as image@2x.png).
-        if '@' in path and not path[-1] == '@':
+        if path is not None and '@' in path and not path[-1] == '@':
             path += '@'
 
         if path not in self._svn_info_cache:
-            result = self._run_svn(['info', path],
+            if path is not None:
+                cmdline = ['info', path]
+            else:
+                cmdline = ['info']
+
+            result = self._run_svn(cmdline,
                                    split_lines=True,
                                    ignore_errors=ignore_errors,
                                    none_on_ignored_error=True)
@@ -1365,18 +1387,6 @@ class SVNRepositoryInfo(RepositoryInfo):
         # self and hope for the best. In reality, we'll likely fail, but we
         # did all we could really do.
         return self
-
-    def _get_repository_info(self, server, repository):
-        try:
-            return server.get_repository_info(repository['id'])
-        except APIError as e:
-            # If the server couldn't fetch the repository info, it will return
-            # code 210. Ignore those.
-            # Other more serious errors should still be raised, though.
-            if e.error_code == 210:
-                return None
-
-            raise e
 
     def _get_relative_path(self, path, root):
         pathdirs = self._split_on_slash(path)

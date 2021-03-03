@@ -39,30 +39,40 @@ class TFExeWrapper(object):
         self.config = config
         self.options = options
 
-    def get_repository_info(self):
-        """Determine and return the repository info.
+    def get_local_path(self):
+        """Return the local path to the working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
-            The repository info object. If the current working directory does
-            not correspond to a TFS checkout, this returns ``None``.
+            unicode:
+            The filesystem path of the repository on the client system.
         """
         workfold = self._run_tf(['vc', 'workfold', os.getcwd()])
 
         m = re.search('^Collection: (.*)$', workfold, re.MULTILINE)
 
-        if not m:
-            logging.debug('Could not find the collection from "tf vc '
-                          'workfold"')
-            return None
+        if m:
+            return unquote(m.group(1))
 
-        # Now that we know it's TFS, make sure we have GNU diff installed, and
-        # error out if we don't.
-        check_gnu_diff()
+        logging.debug('Could not find the collection from "tf vc workfold"')
+        return None
 
-        path = unquote(m.group(1))
+    def get_repository_info(self):
+        """Return repository information for the current working tree.
 
-        return RepositoryInfo(path=path, local_path=path)
+        Returns:
+            rbtools.clients.RepositoryInfo:
+            The repository info structure.
+        """
+        path = self.get_local_path()
+
+        if path:
+            # Now that we know it's TFS, make sure we have GNU diff installed, and
+            # error out if we don't.
+            check_gnu_diff()
+
+            return RepositoryInfo(path=path, local_path=path)
+
+        return None
 
     def parse_revision_spec(self, revisions):
         """Parse the given revision spec.
@@ -406,13 +416,12 @@ class TEEWrapper(object):
                 self.tf = location
                 break
 
-    def get_repository_info(self):
-        """Determine and return the repository info.
+    def get_local_path(self):
+        """Return the local path to the working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
-            The repository info object. If the current working directory does
-            not correspond to a TFS checkout, this returns ``None``.
+            unicode:
+            The filesystem path of the repository on the client system.
         """
         if self.tf is None:
             logging.debug('Unable to execute "tf help": skipping TFS')
@@ -421,17 +430,30 @@ class TEEWrapper(object):
         workfold = self._run_tf(['workfold', os.getcwd()])
 
         m = re.search('^Collection: (.*)$', workfold, re.MULTILINE)
-        if not m:
-            logging.debug('Could not find the collection from "tf workfold"')
-            return None
 
-        # Now that we know it's TFS, make sure we have GNU diff installed,
-        # and error out if we don't.
-        check_gnu_diff()
+        if m:
+            return unquote(m.group(1))
 
-        path = unquote(m.group(1))
+        logging.debug('Could not find the collection from "tf workfold"')
+        return None
 
-        return RepositoryInfo(path=path, local_path=path)
+    def get_repository_info(self):
+        """Return repository information for the current working tree.
+
+        Returns:
+            rbtools.clients.RepositoryInfo:
+            The repository info structure.
+        """
+        path = self.get_local_path()
+
+        if path:
+            # Now that we know it's TFS, make sure we have GNU diff installed,
+            # and error out if we don't.
+            check_gnu_diff()
+
+            return RepositoryInfo(path=path, local_path=path)
+
+        return None
 
     def parse_revision_spec(self, revisions):
         """Parse the given revision spec.
@@ -779,21 +801,34 @@ class TFHelperWrapper(object):
         self.config = config
         self.options = options
 
-    def get_repository_info(self):
-        """Determine and return the repository info.
+    def get_local_path(self):
+        """Return the local path to the working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
-            The repository info object. If the current working directory does
-            not correspond to a TFS checkout, this returns ``None``.
+            unicode:
+            The filesystem path of the repository on the client system.
         """
         rc, path, errors = self._run_helper(['get-collection'],
                                             ignore_errors=True)
 
         if rc == 0:
-            return RepositoryInfo(path.strip())
-        else:
-            return None
+            return path.strip()
+
+        return None
+
+    def get_repository_info(self):
+        """Return repository information for the current working tree.
+
+        Returns:
+            rbtools.clients.RepositoryInfo:
+            The repository info structure.
+        """
+        path = self.get_local_path()
+
+        if path:
+            return RepositoryInfo(path=path, local_path=path)
+
+        return None
 
     def parse_revision_spec(self, revisions):
         """Parse the given revision spec.
@@ -998,13 +1033,21 @@ class TFSClient(SCMClient):
         else:
             self.tf_wrapper = TEEWrapper(config, options)
 
+    def get_local_path(self):
+        """Return the local path to the working tree.
+
+        Returns:
+            unicode:
+            The filesystem path of the repository on the client system.
+        """
+        return self.tf_wrapper.get_local_path()
+
     def get_repository_info(self):
-        """Determine and return the repository info.
+        """Return repository information for the current working tree.
 
         Returns:
             rbtools.clients.RepositoryInfo:
-            The repository info object. If the current working directory does
-            not correspond to a TFS checkout, this returns ``None``.
+            The repository info structure.
         """
         return self.tf_wrapper.get_repository_info()
 

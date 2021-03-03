@@ -36,12 +36,12 @@ class PlasticClient(SCMClient):
         """
         super(PlasticClient, self).__init__(**kwargs)
 
-    def get_repository_info(self):
-        """Return repository information for the current working tree.
+    def get_local_path(self):
+        """Return the local path to the working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
-            The repository info structure.
+            unicode:
+            The filesystem path of the repository on the client system.
         """
         if not check_install(['cm', 'version']):
             logging.debug('Unable to execute "cm version": skipping Plastic')
@@ -66,12 +66,24 @@ class PlasticClient(SCMClient):
         if not m:
             return None
 
-        path = m.group(1)
+        return m.group(1)
 
-        return RepositoryInfo(path=path,
-                              local_path=path,
-                              supports_changesets=True,
-                              supports_parent_diffs=False)
+    def get_repository_info(self):
+        """Return repository information for the current working tree.
+
+        Returns:
+            rbtools.clients.RepositoryInfo:
+            The repository info structure.
+        """
+        local_path = self.get_local_path()
+
+        if local_path:
+            return RepositoryInfo(path=local_path,
+                                  local_path=local_path,
+                                  supports_changesets=True,
+                                  supports_parent_diffs=False)
+
+        return None
 
     def parse_revision_spec(self, revisions=[]):
         """Parse the given revision spec.

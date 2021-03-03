@@ -30,12 +30,12 @@ class CVSClient(SCMClient):
 
     REVISION_WORKING_COPY = '--rbtools-working-copy'
 
-    def get_repository_info(self):
-        """Return repository information for the current working tree.
+    def get_local_path(self):
+        """Return the local path to the working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
-            The repository info structure.
+            unicode:
+            The filesystem path of the repository on the client system.
         """
         if not check_install(['cvs']):
             logging.debug('Unable to execute "cvs": skipping CVS')
@@ -63,6 +63,21 @@ class CVSClient(SCMClient):
             except socket.error as msg:
                 logging.error('failed to get fqdn for %s, msg=%s',
                               host, msg)
+
+        return repository_path
+
+    def get_repository_info(self):
+        """Return repository information for the current working tree.
+
+        Returns:
+            rbtools.clients.RepositoryInfo:
+            The repository info structure.
+        """
+        if not check_install(['cvs']):
+            logging.debug('Unable to execute "cvs": skipping CVS')
+            return None
+
+        repository_path = self.get_local_path()
 
         return RepositoryInfo(path=repository_path,
                               local_path=repository_path)

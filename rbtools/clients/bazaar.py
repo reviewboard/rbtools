@@ -42,12 +42,12 @@ class BazaarClient(SCMClient):
     # This is the same regex used in bzrlib/option.py:_parse_revision_spec.
     REVISION_SEPARATOR_REGEX = re.compile(r'\.\.(?![\\/])')
 
-    def get_repository_info(self):
-        """Return repository information for the current working tree.
+    def get_local_path(self):
+        """Return the local path to the working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
-            The repository info structure.
+            unicode:
+            The filesystem path of the repository on the client system.
         """
         if not check_install(['bzr', 'help']):
             logging.debug('Unable to execute "bzr help": skipping Bazaar')
@@ -56,23 +56,35 @@ class BazaarClient(SCMClient):
         bzr_info = execute(['bzr', 'info'], ignore_errors=True)
 
         if 'ERROR: Not a branch:' in bzr_info:
-            # This is not a branch:
-            repository_info = None
-        else:
-            # This is a branch, let's get its attributes:
-            branch_match = re.search(self.BRANCH_REGEX, bzr_info, re.MULTILINE)
+            return None
 
-            path = branch_match.group('branch_path')
-            if path == '.':
-                path = os.getcwd()
+        # This is a branch, let's get its attributes:
+        branch_match = re.search(self.BRANCH_REGEX, bzr_info, re.MULTILINE)
 
-            repository_info = RepositoryInfo(
-                path=path,
-                base_path='/',  # Diffs are always relative to the root.
-                local_path=path,
-                supports_parent_diffs=True)
+        path = branch_match.group('branch_path')
 
-        return repository_info
+        if path == '.':
+            path = os.getcwd()
+
+        return path
+
+    def get_repository_info(self):
+        """Return repository information for the current working tree.
+
+        Returns:
+            rbtools.clients.RepositoryInfo:
+            The repository info structure.
+        """
+        path = self.get_local_path()
+
+        if not path:
+            return None
+
+        return RepositoryInfo(
+            path=path,
+            base_path='/',  # Diffs are always relative to the root.
+            local_path=path,
+            supports_parent_diffs=True)
 
     def parse_revision_spec(self, revisions=[]):
         """Parse the given revision spec.

@@ -254,8 +254,21 @@ class MercurialClient(SCMClient):
 
         return history
 
+    def get_local_path(self):
+        """Return the local path to the working tree.
+
+        Returns:
+            unicode:
+            The filesystem path of the repository on the client system.
+        """
+        if not check_install([self._exe, '--help']):
+            logging.debug('Unable to execute "hg --help": skipping Mercurial')
+            return None
+
+        return self.hg_root
+
     def get_repository_info(self):
-        """Return the repository info object.
+        """Return repository information for the current working tree.
 
         Returns:
             rbtools.clients.RepositoryInfo:

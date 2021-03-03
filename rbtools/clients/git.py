@@ -236,12 +236,12 @@ class GitClient(SCMClient):
 
         return result
 
-    def get_repository_info(self):
-        """Get repository information for the current Git working tree.
+    def get_local_path(self):
+        """Return the local path to the working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
-            The repository info structure.
+            unicode:
+            The filesystem path of the repository on the client system.
         """
         # Temporarily reset the toplevel. This is necessary for making things
         # work correctly in unit tests where we may be moving the cwd around a
@@ -260,9 +260,9 @@ class GitClient(SCMClient):
                               '--help": skipping Git')
                 return None
 
-        git_dir = self._get_git_dir()
+        self._git_dir = self._get_git_dir()
 
-        if git_dir is None:
+        if self._git_dir is None:
             return None
 
         # Sometimes core.bare is not set, and generates an error, so ignore
@@ -280,10 +280,24 @@ class GitClient(SCMClient):
             # Top level might not work on old git version se we use git dir
             # to find it.
             if (git_top.startswith(('fatal:', 'cygdrive')) or
-                not os.path.isdir(git_dir)):
-                git_top = git_dir
+                not os.path.isdir(self._git_dir)):
+                git_top = self._git_dir
 
             self._git_toplevel = os.path.abspath(git_top)
+
+        return self._git_toplevel
+
+    def get_repository_info(self):
+        """Return repository information for the current working tree.
+
+        Returns:
+            rbtools.clients.RepositoryInfo:
+            The repository info structure.
+        """
+        local_path = self.get_local_path()
+
+        if not local_path:
+            return None
 
         self._head_ref = self._execute(
             [self.git, 'symbolic-ref', '-q', 'HEAD'],
@@ -294,7 +308,7 @@ class GitClient(SCMClient):
         # directory. Otherwise, it may attempt to create one and scan
         # revisions, which can be slow. Also skip SVN detection if the git
         # repository was specified on command line.
-        git_svn_dir = os.path.join(git_dir, 'svn')
+        git_svn_dir = os.path.join(self._git_dir, 'svn')
 
         if (not getattr(self.options, 'repository_url', None) and
             os.path.isdir(git_svn_dir) and
@@ -350,7 +364,8 @@ class GitClient(SCMClient):
                                    'upgraded to version 1.5.4 or later.')
 
         # Okay, maybe Perforce (git-p4).
-        git_p4_ref = os.path.join(git_dir, 'refs', 'remotes', 'p4', 'master')
+        git_p4_ref = os.path.join(self._git_dir, 'refs', 'remotes', 'p4',
+                                  'master')
         if os.path.exists(git_p4_ref):
             data = self._execute([self.git, 'config', '--get', 'git-p4.port'],
                                  ignore_errors=True)
@@ -385,7 +400,7 @@ class GitClient(SCMClient):
             # Central bare repositories don't have origin URLs.
             # We return git_dir instead and hope for the best.
             if not url:
-                url = os.path.abspath(git_dir)
+                url = os.path.abspath(self._git_dir)
 
         if url:
             return RepositoryInfo(path=url,
@@ -542,7 +557,7 @@ class GitClient(SCMClient):
                                           ignore_errors=True).strip()
 
             if (defaultBranch and
-                os.path.exists(os.path.join(self._get_git_dir(), 'refs',
+                os.path.exists(os.path.join(self._git_dir, 'refs',
                                             'remotes', 'origin',
                                             defaultBranch))):
                 return 'origin/%s' % defaultBranch
