@@ -160,7 +160,6 @@ class PerforceClientTests(SCMClientTests):
 
         self.assertIsNotNone(info)
         self.assertEqual(info.path, SERVER_PATH)
-        self.assertIsNone(info.name)
         self.assertEqual(client.p4d_version, (2012, 2))
 
     def test_repository_info_with_broker_address(self):
@@ -189,7 +188,6 @@ class PerforceClientTests(SCMClientTests):
 
         self.assertIsNotNone(info)
         self.assertEqual(info.path, BROKER_PATH)
-        self.assertIsNone(info.name)
         self.assertEqual(client.p4d_version, (2012, 2))
 
     def test_repository_info_with_server_address_and_encrypted(self):
@@ -221,7 +219,6 @@ class PerforceClientTests(SCMClientTests):
             'ssl:%s' % SERVER_PATH,
             SERVER_PATH,
         ])
-        self.assertIsNone(info.name)
         self.assertEqual(client.p4d_version, (2012, 2))
 
     def test_repository_info_with_broker_address_and_encrypted(self):
@@ -255,7 +252,6 @@ class PerforceClientTests(SCMClientTests):
             'ssl:%s' % BROKER_PATH,
             BROKER_PATH,
         ])
-        self.assertIsNone(info.name)
         self.assertEqual(client.p4d_version, (2012, 2))
 
     def test_repository_info_with_repository_name_counter(self):
@@ -286,8 +282,9 @@ class PerforceClientTests(SCMClientTests):
 
         self.assertNotEqual(info, None)
         self.assertEqual(info.path, SERVER_PATH)
-        self.assertEqual(info.name, 'myrepo')
         self.assertEqual(client.p4d_version, (2012, 2))
+
+        self.assertEqual(client.get_repository_name(), 'myrepo')
 
     def test_repository_info_outside_client_root(self):
         """Testing PerforceClient.get_repository_info outside client root"""

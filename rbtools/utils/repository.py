@@ -25,24 +25,33 @@ def get_repository_id(repository_info, api_root, repository_name=None):
         int:
         The ID of the repository, or ``None`` if not found.
     """
-    if repository_name is None:
-        repository_name = repository_info.name
+    query = {
+        'only_fields': 'id,name,mirror_path,path',
+        'only_links': ''
+    }
 
-    detected_paths = repository_info.path
+    if repository_name:
+        repositories = api_root.get_repositories(
+            name=repository_name, **query)
 
-    if not isinstance(detected_paths, list):
-        detected_paths = [detected_paths]
+        try:
+            return repositories[0].id
+        except IndexError:
+            return None
+    else:
+        detected_paths = repository_info.path
 
-    repositories = api_root.get_repositories(
-        only_fields='id,name,mirror_path,path',
-        only_links='')
+        if not isinstance(detected_paths, list):
+            detected_paths = [detected_paths]
 
-    for repo in repositories.all_items:
-        # NOTE: Versions of Review Board prior to 1.7.19 didn't include a
-        #       'mirror_path' parameter, so we have to conditionally fetch it.
-        if (repo.name == repository_name or
-            repo.path in detected_paths or
-            getattr(repo, 'mirror_path', None) in detected_paths):
-            return repo.id
+        repositories = api_root.get_repositories(**query)
+
+        for repo in repositories.all_items:
+            # NOTE: Versions of Review Board prior to 1.7.19 didn't include a
+            #       'mirror_path' parameter, so we have to conditionally fetch it.
+            if (repo.name == repository_name or
+                repo.path in detected_paths or
+                getattr(repo, 'mirror_path', None) in detected_paths):
+                return repo.id
 
     return None

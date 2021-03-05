@@ -160,6 +160,22 @@ class SCMClient(object):
         """
         return None
 
+    def get_repository_name(self):
+        """Return any repository name configured in the repository.
+
+        This is used as a fallback from the standard config options, for
+        repository types that support configuring the name in repository
+        metadata.
+
+        Version Added:
+            3.0
+
+        Returns:
+            unicode:
+            The configured repository name, or None.
+        """
+        return None
+
     def check_options(self):
         """Verify the command line options.
 
@@ -702,6 +718,12 @@ class RepositoryInfo(object):
                  supports_changesets=False, supports_parent_diffs=False):
         """Initialize the object.
 
+        Version Changed:
+            3.0:
+            The ``name`` argument was deprecated. Clients which allow
+            configuring the repository name in metadata should instead
+            implement :py:meth:`get_repository_name`.
+
         Args:
             path (unicode or list of unicode, optional):
                 The path of the repository, or a list of possible paths
@@ -731,10 +753,14 @@ class RepositoryInfo(object):
         self.path = path
         self.base_path = base_path
         self.local_path = local_path
-        self.name = name
         self.supports_changesets = supports_changesets
         self.supports_parent_diffs = supports_parent_diffs
         logging.debug('Repository info: %s', self)
+
+        if name is not None:
+            logging.warning('The name argument to RepositoryInfo has been '
+                            'deprecated. Implement get_repository_name '
+                            'instead.')
 
     def __str__(self):
         """Return a string representation of the repository info.

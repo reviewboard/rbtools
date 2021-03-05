@@ -747,6 +747,14 @@ class Command(object):
                 self.repository_info, self.tool = self.initialize_scm_tool(
                     client_name=self.options.repository_type)
 
+            # Some SCMs allow configuring the repository name in the SCM
+            # metadata. This is a legacy configuration, and is only used as a
+            # fallback for when the repository name is not specified through
+            # the config or command line.
+            if self.options.repository_name is None:
+                self.options.repository_name = \
+                    self.tool.get_repository_name()
+
             self.tool.capabilities = self.capabilities
 
     def create_arg_parser(self, argv):

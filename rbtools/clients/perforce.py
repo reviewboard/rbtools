@@ -560,18 +560,28 @@ class PerforceClient(SCMClient):
         if len(repository_paths) == 1:
             repository_paths = repository_paths[0]
 
-        # Check if there's a counter available containing a repository name.
-        counters = self.p4.counters()
-        name = counters.get('reviewboard.repository_name', None)
-
         # Now that we know it's Perforce, make sure we have GNU diff
         # installed, and error out if we don't.
         check_gnu_diff()
 
         return RepositoryInfo(path=repository_paths,
                               local_path=local_path,
-                              name=name,
                               supports_changesets=True)
+
+    def get_repository_name(self):
+        """Return any repository name configured in the repository.
+
+        This is used as a fallback from the standard config options, for
+        repository types that support configuring the name in repository
+        metadata.
+
+        Returns:
+            unicode:
+            The configured repository name, or None.
+        """
+        # Check if there's a counter available containing a repository name.
+        counters = self.p4.counters()
+        return counters.get('reviewboard.repository_name', None)
 
     def parse_revision_spec(self, revisions=[]):
         """Parse the given revision spec.
