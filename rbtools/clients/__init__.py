@@ -11,6 +11,7 @@ import pkg_resources
 import six
 
 from rbtools.clients.errors import SCMError
+from rbtools.deprecation import RemovedInRBTools40Warning
 from rbtools.utils.process import execute
 
 
@@ -758,9 +759,10 @@ class RepositoryInfo(object):
         logging.debug('Repository info: %s', self)
 
         if name is not None:
-            logging.warning('The name argument to RepositoryInfo has been '
-                            'deprecated. Implement get_repository_name '
-                            'instead.')
+            RemovedInRBTools40Warning.warn(
+                'The name argument to RepositoryInfo has been deprecated and '
+                'will be removed in RBTools 4.0. Implement '
+                'get_repository_name instead.')
 
     def __str__(self):
         """Return a string representation of the repository info.

@@ -19,6 +19,7 @@ from rbtools.api.errors import APIError, ServerInterfaceError
 from rbtools.api.transport.sync import SyncTransport
 from rbtools.clients import scan_usable_client
 from rbtools.clients.errors import OptionsCheckError
+from rbtools.deprecation import RemovedInRBTools40Warning
 from rbtools.utils.console import get_input, get_pass
 from rbtools.utils.filesystem import (cleanup_tempfiles, get_home_path,
                                       is_exe_in_path, load_config)
@@ -854,10 +855,11 @@ class Command(object):
             instance.
         """
         if not require_repository_info:
-            logging.warning('The require_repository_info parameter to '
-                            'Command.initialize_scm_tool is deprecated. '
-                            'Commands which need to use only the API should '
-                            'set the needs_api attribute.')
+            RemovedInRBTools40Warning.warn(
+                'The require_repository_info parameter to '
+                'Command.initialize_scm_tool is deprecated and will be '
+                'removed in RBTools 4.0. Commands which need to use only the '
+                'API should set the needs_api attribute.')
 
         repository_info, tool = scan_usable_client(
             self.config,
@@ -877,10 +879,11 @@ class Command(object):
         If api_root is not provided we'll assume we want to
         initialize the tool using only local information
         """
-        logging.warning('The Command.setup_tool method is deprecated. '
-                        'Commands which need to use both the API and SCM '
-                        'client should instead set the needs_api and '
-                        'needs_scm_client attributes.')
+        RemovedInRBTools40Warning.warn(
+            'The Command.setup_tool method is deprecated and will be removed '
+            'in RBTools 4.0. Commands which need to use both the API and SCM '
+            'client should instead set the needs_api and needs_scm_client '
+            'attributes.')
         tool.capabilities = self.get_capabilities(api_root)
 
     def get_server_url(self, repository_info, tool):
@@ -897,9 +900,10 @@ class Command(object):
             unicode:
             The server URL.
         """
-        logging.warning('The Command.get_server_url method is deprecated. '
-                        'Commands which need the API client should instead '
-                        'set the needs_api attribute.')
+        RemovedInRBTools40Warning.warn(
+            'The Command.get_server_url method is deprecated and will be '
+            'removed in RBTools 4.0. Commands which need the API client '
+            'should instead set the needs_api attribute.')
 
         if self.server_url is None:
             self.server_url = self._init_server_url()
@@ -1183,7 +1187,7 @@ class Command(object):
                     path = self.repository_info.path
 
                 if path and 'REVIEWBOARD_URL' in trees[path]:
-                    logging.warning(
+                    RemovedInRBTools40Warning.warn(
                         'The TREES configuration for specifying the '
                         'REVIEWBOARD_URL is no longer supported and will be '
                         'removed in RBTools 4.0. If you have multiple Review '
