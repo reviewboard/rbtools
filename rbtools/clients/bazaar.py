@@ -25,6 +25,7 @@ class BazaarClient(SCMClient):
 
     name = 'Bazaar'
     supports_diff_exclude_patterns = True
+    supports_parent_diffs = True
     can_branch = True
 
     INDEX_FILE_RE = re.compile(b"===.+'(.+?)'\n")
@@ -83,8 +84,7 @@ class BazaarClient(SCMClient):
         return RepositoryInfo(
             path=path,
             base_path='/',  # Diffs are always relative to the root.
-            local_path=path,
-            supports_parent_diffs=True)
+            local_path=path)
 
     def parse_revision_spec(self, revisions=[]):
         """Parse the given revision spec.

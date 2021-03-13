@@ -697,7 +697,7 @@ class Post(Command):
         try:
             if diff_history:
                 self._post_diff_history(review_request, diff_history)
-            elif (not self.repository_info.supports_changesets or
+            elif (not self.tool.supports_changesets or
                   not self.options.change_only):
                 diff_kwargs = {
                     'parent_diff': squashed_diff.parent_diff,
@@ -1315,7 +1315,7 @@ class Post(Command):
         if self.options.include_files or self.options.exclude_patterns:
             diff_info['commit_id'] = None
 
-        if (self.repository_info.supports_changesets and
+        if (self.tool.supports_changesets and
             not self.options.diff_filename and
             'changenum' in diff_info):
             changenum = diff_info['changenum']

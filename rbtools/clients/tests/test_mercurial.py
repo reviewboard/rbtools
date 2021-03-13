@@ -156,8 +156,6 @@ class MercurialClientTests(SpyAgency, MercurialTestBase):
             hgpath = os.path.dirname(hgpath)
 
         self.assertEqual(self.hg_dir, hgpath)
-        self.assertTrue(ri.supports_parent_diffs)
-        self.assertFalse(ri.supports_changesets)
 
     def test_scan_for_server(self):
         """Testing MercurialClient.scan_for_server"""

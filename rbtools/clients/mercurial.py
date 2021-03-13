@@ -54,6 +54,7 @@ class MercurialClient(SCMClient):
 
     supports_commit_history = True
     supports_diff_exclude_patterns = True
+    supports_parent_diffs = True
     can_bookmark = True
     can_branch = True
     can_merge = True
@@ -296,8 +297,7 @@ class MercurialClient(SCMClient):
 
             return RepositoryInfo(path=path,
                                   base_path=base_path,
-                                  local_path=self.hg_root,
-                                  supports_parent_diffs=True)
+                                  local_path=self.hg_root)
 
     def parse_revision_spec(self, revisions=[]):
         """Parse the given revision spec.
@@ -530,8 +530,7 @@ class MercurialClient(SCMClient):
 
         return RepositoryInfo(path=root,
                               base_path=base_path,
-                              local_path=self.hg_root,
-                              supports_parent_diffs=True)
+                              local_path=self.hg_root)
 
     def _load_hgrc(self):
         """Load the hgrc file."""

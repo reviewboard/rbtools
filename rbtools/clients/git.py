@@ -41,6 +41,7 @@ class GitClient(SCMClient):
     supports_commit_history = True
     supports_diff_exclude_patterns = True
     supports_no_renames = True
+    supports_parent_diffs = True
     supports_patch_revert = True
 
     can_amend_commit = True
@@ -340,8 +341,7 @@ class GitClient(SCMClient):
                         return SVNRepositoryInfo(path=path,
                                                  base_path=base_path,
                                                  local_path=local_path,
-                                                 uuid=uuid,
-                                                 supports_parent_diffs=True)
+                                                 uuid=uuid)
             else:
                 # Versions of git-svn before 1.5.4 don't (appear to) support
                 # 'git svn info'.  If we fail because of an older git install,
@@ -379,8 +379,7 @@ class GitClient(SCMClient):
                 self._type = self.TYPE_GIT_P4
                 return RepositoryInfo(path=port,
                                       base_path='',
-                                      local_path=self._git_toplevel,
-                                      supports_parent_diffs=True)
+                                      local_path=self._git_toplevel)
 
         # Nope, it's git then.
         # Check for a tracking branch and determine merge-base
@@ -405,8 +404,7 @@ class GitClient(SCMClient):
         if url:
             return RepositoryInfo(path=url,
                                   base_path='',
-                                  local_path=self._git_toplevel,
-                                  supports_parent_diffs=True)
+                                  local_path=self._git_toplevel)
         return None
 
     def _get_git_dir(self):

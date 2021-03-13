@@ -110,10 +110,8 @@ class BazaarClientTests(SCMClientTests):
         self.assertTrue(isinstance(ri, RepositoryInfo))
         self.assertEqual(os.path.realpath(ri.path),
                          os.path.realpath(self.original_branch))
-        self.assertTrue(ri.supports_parent_diffs)
 
         self.assertEqual(ri.base_path, '/')
-        self.assertFalse(ri.supports_changesets)
 
     def test_get_repository_info_child_branch(self):
         """Testing BazaarClient get_repository_info with child branch"""
@@ -123,10 +121,8 @@ class BazaarClientTests(SCMClientTests):
         self.assertTrue(isinstance(ri, RepositoryInfo))
         self.assertEqual(os.path.realpath(ri.path),
                          os.path.realpath(self.child_branch))
-        self.assertTrue(ri.supports_parent_diffs)
 
         self.assertEqual(ri.base_path, "/")
-        self.assertFalse(ri.supports_changesets)
 
     def test_get_repository_info_no_branch(self):
         """Testing BazaarClient get_repository_info, no branch"""

@@ -1199,8 +1199,7 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
             vobtag (unicode):
                 The VOB tag for the repository.
         """
-        RepositoryInfo.__init__(self, path, base_path,
-                                supports_parent_diffs=False)
+        super(ClearCaseRepositoryInfo, self).__init__(path, base_path)
         self.vobtag = vobtag
 
     def find_server_repository_info(self, server):

@@ -83,8 +83,6 @@ class GitClientTests(SpyAgency, SCMClientTests):
         self.assertTrue(isinstance(ri, RepositoryInfo))
         self.assertEqual(ri.base_path, '')
         self.assertEqual(ri.path.rstrip('/.git'), self.git_dir)
-        self.assertTrue(ri.supports_parent_diffs)
-        self.assertFalse(ri.supports_changesets)
 
     def test_scan_for_server_simple(self):
         """Testing GitClient scan_for_server, simple case"""

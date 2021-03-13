@@ -23,6 +23,7 @@ class PlasticClient(SCMClient):
     """
 
     name = 'Plastic'
+    supports_changesets = True
     supports_patch_revert = True
 
     REVISION_CHANGESET_PREFIX = 'cs:'
@@ -79,9 +80,7 @@ class PlasticClient(SCMClient):
 
         if local_path:
             return RepositoryInfo(path=local_path,
-                                  local_path=local_path,
-                                  supports_changesets=True,
-                                  supports_parent_diffs=False)
+                                  local_path=local_path)
 
         return None
 

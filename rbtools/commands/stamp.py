@@ -76,7 +76,7 @@ class Stamp(Command):
         (None, None) is returned.
         """
         # First, try to match the changeset to a review request directly.
-        if self.repository_info.supports_changesets:
+        if self.tool.supports_changesets:
             review_request = find_review_request_by_change_id(
                 api_client=self.api_client,
                 api_root=self.api_root,

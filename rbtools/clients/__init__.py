@@ -85,23 +85,100 @@ class SCMClient(object):
     These are used for fetching repository information and generating diffs.
     """
 
+    #: The name of the client.
+    #:
+    #: Type:
+    #:     unicode
     name = None
 
-    #: Whether or not the SCM client can generate a commit history.
+    #: Whether the SCM uses server-side changesets
+    #:
+    #: Version Added:
+    #:     3.0
+    #:
+    #: Type:
+    #:     bool
+    supports_changesets = False
+
+    #: Whether the SCM client can generate a commit history.
+    #:
+    #: Type:
+    #:     bool
     supports_commit_history = False
+
+    #: Whether the SCM client's diff method takes the ``extra_args`` parameter.
+    #:
+    #: Type:
+    #:     bool
     supports_diff_extra_args = False
+
+    #: Whether the SCM client supports excluding files from the diff.
+    #:
+    #: Type:
+    #:     bool
     supports_diff_exclude_patterns = False
+
+    #: Whether the SCM client can generate diffs without renamed files.
+    #:
+    #: Type:
+    #:     bool
     supports_no_renames = False
+
+    #: Whether the SCM client supports generating parent diffs.
+    #:
+    #: Version Added:
+    #:     3.0
+    #:
+    #: Type:
+    #:     bool
+    supports_parent_diffs = False
+
+    #: Whether the SCM client supports reverting patches.
+    #:
+    #: Type:
+    #:     bool
     supports_patch_revert = False
 
+    #: Whether commits can be amended.
+    #:
+    #: Type:
+    #:     bool
     can_amend_commit = False
+
+    #: Whether the SCM can create merges.
+    #:
+    #: Type:
+    #:     bool
     can_merge = False
+
+    #: Whether commits can be pushed upstream.
+    #:
+    #: Type:
+    #:     bool
     can_push_upstream = False
+
+    #: Whether branch names can be deleted.
+    #:
+    #: Type:
+    #:     bool
     can_delete_branch = False
+
+    #: Whether new branches can be created.
+    #:
+    #: Type:
+    #:     bool
     can_branch = False
+
+    #: Whether new bookmarks can be created.
+    #:
+    #: Type:
+    #:     bool
     can_bookmark = False
 
     #: Whether commits can be squashed during merge.
+    #:
+    #: Type:
+    #:     bool
     can_squash_merges = False
 
     def __init__(self, config=None, options=None):
@@ -725,6 +802,11 @@ class RepositoryInfo(object):
             configuring the repository name in metadata should instead
             implement :py:meth:`get_repository_name`.
 
+            The ``supports_changesets`` and ``supports_parent_diffs`` arguments
+            were deprecated. Clients which need these should instead set
+            :py:attr:`supports_changesets` and :py:attr:`supports_parent_diffs`
+            on themselves.
+
         Args:
             path (unicode or list of unicode, optional):
                 The path of the repository, or a list of possible paths
@@ -764,6 +846,26 @@ class RepositoryInfo(object):
                 'will be removed in RBTools 4.0. Implement '
                 'get_repository_name instead.')
 
+        if supports_changesets:
+            # We can't make this a soft deprecation so raise an error instead.
+            # Users with custom SCMClient implementations will need to update
+            # their code when moving to RBTools 3.0+.
+            raise Exception(
+                'The supports_changesets argument to RepositoryInfo has been '
+                'deprecated and will be removed in RBTools 4.0. Clients which '
+                'rely on this must instead set the supports_changesets '
+                'attribute on the class.')
+
+        if supports_parent_diffs:
+            # We can't make this a soft deprecation so raise an error instead.
+            # Users with custom SCMClient implementations will need to update
+            # their code when moving to RBTools 3.0+.
+            raise Exception(
+                'The supports_changesets argument to RepositoryInfo has been '
+                'deprecated and will be removed in RBTools 4.0. Clients which '
+                'rely on this must instead set the supports_parent_diffs '
+                'attribute on the class.')
+
     def __str__(self):
         """Return a string representation of the repository info.
 
@@ -771,8 +873,7 @@ class RepositoryInfo(object):
             unicode:
             A loggable representation.
         """
-        return 'Path: %s, Base path: %s, Supports changesets: %s' % \
-            (self.path, self.base_path, self.supports_changesets)
+        return 'Path: %s, Base path: %s' % (self.path, self.base_path)
 
     def set_base_path(self, base_path):
         """Set the base path of the repository info.
@@ -937,13 +1038,13 @@ def scan_usable_client(config, options, client_name=None):
 
     # Verify that options specific to an SCM Client have not been mis-used.
     if (getattr(options, 'change_only', False) and
-        not repository_info.supports_changesets):
+        not tool.supports_changesets):
         logging.error('The --change-only option is not valid for the '
                       'current SCM client.\n')
         sys.exit(1)
 
     if (getattr(options, 'parent_branch', None) and
-        not repository_info.supports_parent_diffs):
+        not tool.supports_parent_diffs):
         logging.error('The --parent option is not valid for the '
                       'current SCM client.')
         sys.exit(1)

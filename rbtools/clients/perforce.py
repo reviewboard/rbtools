@@ -391,6 +391,7 @@ class PerforceClient(SCMClient):
 
     name = 'Perforce'
     can_amend_commit = True
+    supports_changesets = True
     supports_diff_exclude_patterns = True
     supports_diff_extra_args = True
     supports_patch_revert = True
@@ -565,8 +566,7 @@ class PerforceClient(SCMClient):
         check_gnu_diff()
 
         return RepositoryInfo(path=repository_paths,
-                              local_path=local_path,
-                              supports_changesets=True)
+                              local_path=local_path)
 
     def get_repository_name(self):
         """Return any repository name configured in the repository.
