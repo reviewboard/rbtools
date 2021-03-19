@@ -390,6 +390,7 @@ class PerforceClient(SCMClient):
     """
 
     name = 'Perforce'
+    server_tool_names = 'Perforce'
     can_amend_commit = True
     supports_changesets = True
     supports_diff_exclude_patterns = True

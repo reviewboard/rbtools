@@ -990,6 +990,7 @@ class TFSClient(SCMClient):
     """A client for Team Foundation Server."""
 
     name = 'Team Foundation Server'
+    server_tool_names = 'Team Foundation Server'
     supports_diff_exclude_patterns = True
     supports_patch_revert = True
 

@@ -24,6 +24,7 @@ class BazaarClient(SCMClient):
     """
 
     name = 'Bazaar'
+    server_tool_names = 'Bazaar'
     supports_diff_exclude_patterns = True
     supports_parent_diffs = True
     can_branch = True

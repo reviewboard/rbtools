@@ -425,6 +425,7 @@ class Patch(Command):
             self.options.args[0] = review_request_id
 
         self.needs_scm_client = not self.options.patch_stdout
+        self.needs_repository = not self.options.patch_stdout
 
         super(Patch, self).initialize()
 
@@ -453,11 +454,6 @@ class Patch(Command):
                 % tool.name)
 
         if not patch_stdout:
-            # Check if the repository info on the Review Board server matches
-            # the local checkout.
-            self.repository_info = \
-                self.repository_info.find_server_repository_info(self.api_root)
-
             # Check if the working directory is clean.
             try:
                 if tool.has_pending_changes():

@@ -127,6 +127,7 @@ class Post(Command):
 
     needs_api = True
     needs_scm_client = True
+    needs_repository = True
 
     #: Reserved built-in fields that can be set using the ``--field`` argument.
     reserved_fields = ('description', 'testing-done', 'summary')
@@ -546,48 +547,7 @@ class Post(Command):
             raise CommandError('Invalid value "%s" for argument "%s"'
                                % (guess, arg_name))
 
-    def get_repository_path(self):
-        """Get the repository path from the server.
-
-        This will compare the paths returned by the SCM client
-        with those one the server, and return the first match.
-        """
-        repository_info = self.repository_info
-
-        if isinstance(repository_info.path, list):
-            repositories = self.api_root.get_repositories(
-                only_fields='path,mirror_path', only_links='')
-
-            for repo in repositories.all_items:
-                if repo['path'] in repository_info.path:
-                    repository_info.path = repo['path']
-                    break
-                elif repo['mirror_path'] in repository_info.path:
-                    repository_info.path = repo['mirror_path']
-                    break
-
-        if isinstance(repository_info.path, list):
-            error_str = [
-                'There was an error creating this review request.\n',
-                '\n',
-                'There was no matching repository path found on the server.\n',
-                'Unknown repository paths found:\n',
-            ]
-
-            for foundpath in repository_info.path:
-                error_str.append('\t%s\n' % foundpath)
-
-            error_str += [
-                'Ask the administrator to add one of these repositories\n',
-                'to the Review Board server.\n',
-            ]
-
-            raise CommandError(''.join(error_str))
-
-        return repository_info.path
-
     def post_request(self,
-                     repository,
                      review_request=None,
                      diff_history=None,
                      squashed_diff=None,
@@ -595,9 +555,6 @@ class Post(Command):
         """Create or update a review request, uploading a diff in the process.
 
         Args:
-            repository (unicode):
-                The name of the repository.
-
             review_request (rbtools.api.resources.ReviewRequestResource,
                             optional):
                 The review request to update.
@@ -643,7 +600,7 @@ class Post(Command):
         if not review_request:
             try:
                 request_data = {
-                    'repository': repository,
+                    'repository': self.repository.id,
                 }
 
                 if squashed_diff:
@@ -960,14 +917,7 @@ class Post(Command):
         self.repository_info = \
             self.repository_info.find_server_repository_info(self.api_root)
 
-        repository = (
-            self.options.repository_name or
-            self.options.repository_url or
-            self.repository_info.name or
-            self.get_repository_path()
-        )
-
-        if repository is None:
+        if self.repository is None:
             raise CommandError('Could not find the repository on the Review '
                                'Board server.')
 
@@ -1065,10 +1015,9 @@ class Post(Command):
 
         try:
             if squashed_diff:
-                self._validate_squashed_diff(repository, squashed_diff)
+                self._validate_squashed_diff(squashed_diff)
             else:
-                diff_history = self._validate_diff_history(repository,
-                                                           diff_history)
+                diff_history = self._validate_diff_history(diff_history)
         except APIError as e:
             msg_prefix = ''
 
@@ -1079,7 +1028,6 @@ class Post(Command):
                                % (msg_prefix, e))
 
         review_request_id, review_request_url = self.post_request(
-            repository,
             review_request=review_request,
             diff_history=diff_history,
             squashed_diff=squashed_diff,
@@ -1176,8 +1124,6 @@ class Post(Command):
         if self.options.update and self.revisions:
             try:
                 review_request = guess_existing_review_request(
-                    repository_info=self.repository_info,
-                    repository_name=self.options.repository_name,
                     api_root=self.api_root,
                     api_client=self.api_client,
                     tool=self.tool,
@@ -1186,7 +1132,8 @@ class Post(Command):
                     guess_description=False,
                     is_fuzzy_match_func=self._ask_review_request_match,
                     submit_as=self.options.submit_as,
-                    additional_fields=additional_fields)
+                    additional_fields=additional_fields,
+                    repository_id=self.repository.id)
             except ValueError as e:
                 raise CommandError(six.text_type(e))
 
@@ -1374,13 +1321,10 @@ class Post(Command):
             parent_diff=diff_history.parent_diff,
             validation_info=diff_history.validation_info[-1])
 
-    def _validate_squashed_diff(self, repository, squashed_diff):
+    def _validate_squashed_diff(self, squashed_diff):
         """Validate the diff to ensure that it can be parsed and files exist.
 
         Args:
-            repository (unicode):
-                The name of the repository.
-
             squashed_diff (SquashedDiff):
                 The squashed diff and metadata.
 
@@ -1419,22 +1363,19 @@ class Post(Command):
                     squashed_diff.base_commit_id
 
             validator.validate_diff(
-                repository,
+                self.repository.id,
                 squashed_diff.diff,
                 parent_diff=squashed_diff.parent_diff,
                 base_dir=squashed_diff.base_dir,
                 **validate_kwargs)
 
-    def _validate_diff_history(self, repository, diff_history):
+    def _validate_diff_history(self, diff_history):
         """Validate the diffs.
 
         This will ensure that the diffs can be parsed and that all files
         mentioned exist.
 
         Args:
-            repository (unicode):
-                The name of the repository.
-
             diff_history (DiffHistory):
                 The history to validate.
 
@@ -1453,7 +1394,7 @@ class Post(Command):
         for history_entry in self._show_progress(iterable=diff_history.entries,
                                                  desc='Validating commits...'):
             validation_rsp = validator.validate_commit(
-                repository=repository,
+                repository=self.repository.id,
                 diff=history_entry['diff'],
                 commit_id=history_entry['commit_id'],
                 parent_id=history_entry['parent_id'],

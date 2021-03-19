@@ -8,7 +8,7 @@ import sys
 from functools import wraps
 from hashlib import md5
 
-from kgb import SpyAgency
+import kgb
 from nose import SkipTest
 from six.moves.urllib.request import urlopen
 
@@ -21,6 +21,7 @@ from rbtools.clients.tests import FOO1, FOO2, FOO3, SCMClientTests
 from rbtools.utils.checks import is_valid_version
 from rbtools.utils.filesystem import is_exe_in_path
 from rbtools.utils.process import execute
+from rbtools.utils.repository import get_repository_resource
 
 
 def svn_version_set_hash(svn16_hash, svn17_hash, svn19_hash):
@@ -50,7 +51,12 @@ def svn_version_set_hash(svn16_hash, svn17_hash, svn19_hash):
     return decorator
 
 
-class SVNRepositoryInfoTests(SpyAgency, SCMClientTests):
+_MATCH_URL_BASE = 'http://localhost:8080/api/repositories/'
+_MATCH_URL_TOOL = '&tool=Subversion'
+_MATCH_URL_FIELDS = '&only-fields=id%2Cname%2Cmirror_path%2Cpath'
+
+
+class SVNRepositoryMatchTests(kgb.SpyAgency, SCMClientTests):
     """Unit tests for rbtools.clients.svn.SVNRepositoryInfo."""
 
     payloads = {
@@ -71,7 +77,10 @@ class SVNRepositoryInfoTests(SpyAgency, SCMClientTests):
                 'stat': 'ok',
             },
         },
-        'http://localhost:8080/api/repositories/?tool=Subversion': {
+        (_MATCH_URL_BASE +
+            '?only-links=info&path=https%3A%2F%2Fsvn1.example.com%2F' +
+            _MATCH_URL_TOOL +
+            _MATCH_URL_FIELDS): {
             'mimetype': 'application/vnd.reviewboard.org.repositories+json',
             'rsp': {
                 'repositories': [
@@ -83,7 +92,90 @@ class SVNRepositoryInfoTests(SpyAgency, SCMClientTests):
                         'path': 'https://svn1.example.com/',
                         'links': {
                             'info': {
-                                'href': ('https://localhost:8080/api/'
+                                'href': ('http://localhost:8080/api/'
+                                         'repositories/1/info/'),
+                                'method': 'GET',
+                            },
+                        },
+                    },
+                ],
+                'links': {
+                },
+                'total_results': 1,
+                'stat': 'ok',
+            },
+        },
+        (_MATCH_URL_BASE +
+            '?only-links=info&path=svn%2Bssh%3A%2F%2Fsvn2.example.com%2F' +
+            _MATCH_URL_TOOL +
+            _MATCH_URL_FIELDS): {
+            'mimetype': 'application/vnd.reviewboard.org.repositories+json',
+            'rsp': {
+                'repositories': [
+                    {
+                        'id': 2,
+                        'name': 'SVN Repo 2',
+                        'path': 'https://svn2.example.com/',
+                        'mirror_path': 'svn+ssh://svn2.example.com/',
+                        'links': {
+                            'info': {
+                                'href': ('http://localhost:8080/api/'
+                                         'repositories/1/info/'),
+                                'method': 'GET',
+                            },
+                        },
+                    },
+                ],
+                'links': {
+                },
+                'total_results': 1,
+                'stat': 'ok',
+            },
+        },
+        (_MATCH_URL_BASE +
+            '?only-links=info&path=svn%2Bssh%3A%2F%2Fblargle%2F' +
+            _MATCH_URL_TOOL +
+            _MATCH_URL_FIELDS): {
+            'mimetype': 'application/vnd.reviewboard.org.repositories+json',
+            'rsp': {
+                'repositories': [
+                ],
+                'links': {
+                },
+                'total_results': 0,
+                'stat': 'ok',
+            },
+        },
+        (_MATCH_URL_BASE +
+            '?only-links=&path=svn%2Bssh%3A%2F%2Fblargle%2F' +
+            _MATCH_URL_TOOL +
+            _MATCH_URL_FIELDS): {
+            'mimetype': 'application/vnd.reviewboard.org.repositories+json',
+            'rsp': {
+                'repositories': [
+                ],
+                'links': {
+                },
+                'total_results': 0,
+                'stat': 'ok',
+            },
+        },
+        (_MATCH_URL_BASE +
+            '?only-links=info' +
+            _MATCH_URL_TOOL +
+            _MATCH_URL_FIELDS): {
+            'mimetype': 'application/vnd.reviewboard.org.repositories+json',
+            'rsp': {
+                'repositories': [
+                    {
+                        # This one doesn't have a mirror_path, to emulate
+                        # Review Board 1.6.
+                        'id': 1,
+                        'name': 'SVN Repo 1',
+                        'path': 'https://svn1.example.com/',
+                        'links': {
+                            'info': {
+                                'href': ('http://localhost:8080/api/'
                                          'repositories/1/info/'),
                                 'method': 'GET',
                             },
@@ -96,7 +188,7 @@ class SVNRepositoryInfoTests(SpyAgency, SCMClientTests):
                         'mirror_path': 'svn+ssh://svn2.example.com/',
                         'links': {
                             'info': {
-                                'href': ('https://localhost:8080/api/'
+                                'href': ('http://localhost:8080/api/'
                                          'repositories/2/info/'),
                                 'method': 'GET',
                             },
@@ -105,8 +197,10 @@ class SVNRepositoryInfoTests(SpyAgency, SCMClientTests):
                 ],
                 'links': {
                     'next': {
-                        'href': ('http://localhost:8080/api/repositories/'
-                                 '?tool=Subversion&page=2'),
+                        'href': ('http://localhost:8080/api/repositories/?'
+                                 'only-links=info&tool=Subversion&'
+                                 'only-fields=id%2Cname%2Cmirror_path%2Cpath&'
+                                 'page=2'),
                         'method': 'GET',
                     },
                 },
@@ -114,7 +208,9 @@ class SVNRepositoryInfoTests(SpyAgency, SCMClientTests):
                 'stat': 'ok',
             },
         },
-        'http://localhost:8080/api/repositories/?tool=Subversion&page=2': {
+        (_MATCH_URL_BASE +
+            '?only-links=info&tool=Subversion&page=2' +
+            _MATCH_URL_FIELDS): {
             'mimetype': 'application/vnd.reviewboard.org.repositories+json',
             'rsp': {
                 'repositories': [
@@ -125,7 +221,7 @@ class SVNRepositoryInfoTests(SpyAgency, SCMClientTests):
                         'mirror_path': 'svn+ssh://svn3.example.com/',
                         'links': {
                             'info': {
-                                'href': ('https://localhost:8080/api/'
+                                'href': ('http://localhost:8080/api/'
                                          'repositories/3/info/'),
                                 'method': 'GET',
                             },
@@ -136,7 +232,7 @@ class SVNRepositoryInfoTests(SpyAgency, SCMClientTests):
                 'stat': 'ok',
             },
         },
-        'https://localhost:8080/api/repositories/1/info/': {
+        (_MATCH_URL_BASE + '1/info/'): {
             'mimetype': 'application/vnd.reviewboard.org.repository-info+json',
             'rsp': {
                 'info': {
@@ -147,7 +243,7 @@ class SVNRepositoryInfoTests(SpyAgency, SCMClientTests):
                 'stat': 'ok',
             },
         },
-        'https://localhost:8080/api/repositories/2/info/': {
+        (_MATCH_URL_BASE + '2/info/'): {
             'mimetype': 'application/vnd.reviewboard.org.repository-info+json',
             'rsp': {
                 'info': {
@@ -158,7 +254,7 @@ class SVNRepositoryInfoTests(SpyAgency, SCMClientTests):
                 'stat': 'ok',
             },
         },
-        'https://localhost:8080/api/repositories/3/info/': {
+        (_MATCH_URL_BASE + '3/info/'): {
             'mimetype': 'application/vnd.reviewboard.org.repository-info+json',
             'rsp': {
                 'info': {
@@ -172,8 +268,9 @@ class SVNRepositoryInfoTests(SpyAgency, SCMClientTests):
     }
 
     def setUp(self):
-        super(SVNRepositoryInfoTests, self).setUp()
+        super(SVNRepositoryMatchTests, self).setUp()
 
+        @self.spy_for(urlopen)
         def _urlopen(url, **kwargs):
             url = url.get_full_url()
 
@@ -197,40 +294,54 @@ class SVNRepositoryInfoTests(SpyAgency, SCMClientTests):
                 },
                 json.dumps(payload['rsp']))
 
-        self.spy_on(urlopen, call_fake=_urlopen)
-
         self.api_client = RBClient('http://localhost:8080/')
         self.root_resource = self.api_client.get_root()
 
-    def test_find_server_repository_info_with_path_match(self):
-        """Testing SVNRepositoryInfo.find_server_repository_info with
-        path matching
+    def test_find_matching_server_repository_with_path_match(self):
+        """Testing SVNClient.find_matching_server_repository with path
+        match
         """
-        info = SVNRepositoryInfo('https://svn1.example.com/', '/', '')
+        url = 'https://svn1.example.com/'
+        self.options.repository_url = url
+        client = SVNClient(options=self.options)
 
-        repo_info = info.find_server_repository_info(self.root_resource)
-        self.assertEqual(repo_info, info)
-        self.assertEqual(repo_info.repository_id, 1)
+        repository, info = get_repository_resource(
+            self.root_resource,
+            tool=client,
+            repository_paths=url)
+        self.assertEqual(repository.id, 1)
 
-    def test_find_server_repository_info_with_mirror_path_match(self):
-        """Testing SVNRepositoryInfo.find_server_repository_info with
-        mirror_path matching
+    def test_find_matching_server_repository_with_mirror_path_match(self):
+        """Testing SVNClient.find_matching_server_repository with mirror_path
+        match
         """
-        info = SVNRepositoryInfo('svn+ssh://svn2.example.com/', '/', '')
+        url = 'svn+ssh://svn2.example.com/'
+        self.options.repository_url = url
+        client = SVNClient(options=self.options)
 
-        repo_info = info.find_server_repository_info(self.root_resource)
-        self.assertEqual(repo_info, info)
-        self.assertEqual(repo_info.repository_id, 2)
+        repository, info = get_repository_resource(
+            self.root_resource,
+            tool=client,
+            repository_paths=url)
+        self.assertEqual(repository.id, 2)
 
-    def test_find_server_repository_info_with_uuid_match(self):
-        """Testing SVNRepositoryInfo.find_server_repository_info with
-        UUID matching
+    def test_find_matching_server_repository_with_uuid_match(self):
+        """Testing SVNClient.find_matching_server_repository with UUID
+        match
         """
-        info = SVNRepositoryInfo('svn+ssh://blargle/', '/', 'UUID-3')
+        url = 'svn+ssh://blargle/'
+        self.options.repository_url = url
+        client = SVNClient(options=self.options)
 
-        repo_info = info.find_server_repository_info(self.root_resource)
-        self.assertNotEqual(repo_info, info)
-        self.assertEqual(repo_info.repository_id, 3)
+        self.spy_on(client.svn_info, op=kgb.SpyOpReturn({
+            'Repository UUID': 'UUID-3',
+        }))
+
+        repository, info = get_repository_resource(
+            self.root_resource,
+            tool=client,
+            repository_paths=url)
+        self.assertEqual(repository.id, 3)
 
     def test_relative_paths(self):
         """Testing SVNRepositoryInfo._get_relative_path"""

@@ -23,6 +23,7 @@ class PlasticClient(SCMClient):
     """
 
     name = 'Plastic'
+    server_tool_names = 'Plastic SCM'
     supports_changesets = True
     supports_patch_revert = True
 

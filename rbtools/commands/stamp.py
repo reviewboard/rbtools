@@ -34,6 +34,7 @@ class Stamp(Command):
 
     needs_api = True
     needs_scm_client = True
+    needs_repository = True
 
     args = '[revisions]'
     option_list = [
@@ -68,21 +69,31 @@ class Stamp(Command):
 
         return confirm(question)
 
-    def determine_review_request(self, repository_name, revisions):
+    def determine_review_request(self, revisions):
         """Determine the correct review request for a commit.
 
-        A tuple (review request ID, review request absolute URL) is returned.
-        If no review request ID is found by any of the strategies,
-        (None, None) is returned.
+        Args:
+            revisions (dict):
+                The parsed revisions from the command line.
+
+        Returns:
+            tuple:
+            A 2-tuple of the matched review request ID, and the review request
+            URL. If no matching review request is found, both values will be
+            ``None``.
+
+        Raises:
+            rbtools.commands.CommandError:
+                An error occurred while attempting to find a matching review
+                request.
         """
         # First, try to match the changeset to a review request directly.
         if self.tool.supports_changesets:
             review_request = find_review_request_by_change_id(
                 api_client=self.api_client,
                 api_root=self.api_root,
-                repository_info=self.repository_info,
-                repository_name=repository_name,
-                revisions=revisions)
+                revisions=revisions,
+                repository_id=self.repository.id)
 
             if review_request and review_request.id:
                 return review_request.id, review_request.absolute_url
@@ -94,8 +105,6 @@ class Stamp(Command):
 
         try:
             review_request = guess_existing_review_request(
-                repository_info=self.repository_info,
-                repository_name=repository_name,
                 api_root=self.api_root,
                 api_client=self.api_client,
                 tool=self.tool,
@@ -103,7 +112,8 @@ class Stamp(Command):
                 guess_summary=False,
                 guess_description=False,
                 is_fuzzy_match_func=self._ask_review_request_match,
-                no_commit_error=self.no_commit_error)
+                no_commit_error=self.no_commit_error,
+                repository_id=self.repository.id)
         except ValueError as e:
             raise CommandError(six.text_type(e))
 
@@ -144,8 +154,7 @@ class Stamp(Command):
             review_request_url = review_request.absolute_url
         else:
             review_request_id, review_request_url = \
-                self. determine_review_request(
-                    self.options.repository_name, revisions)
+                self. determine_review_request(revisions)
 
         if not review_request_url:
             raise CommandError('Could not determine the existing review '

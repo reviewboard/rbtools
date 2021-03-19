@@ -36,6 +36,7 @@ class Land(Command):
 
     needs_api = True
     needs_scm_client = True
+    reeds_repository = True
 
     args = '[<branch-name>]'
     option_list = [
@@ -293,10 +294,6 @@ class Land(Command):
         if branch_name:
             self.cmd_args.insert(0, branch_name)
 
-        # Check if repository info on reviewboard server match local ones.
-        self.repository_info = \
-            self.repository_info.find_server_repository_info(self.api_root)
-
         if not self.tool.can_merge:
             raise CommandError('This command does not support %s repositories.'
                                % self.tool.name)
@@ -321,15 +318,14 @@ class Land(Command):
         else:
             try:
                 review_request = guess_existing_review_request(
-                    repository_info=self.repository_info,
-                    repository_name=self.options.repository_name,
                     api_root=self.api_root,
                     api_client=self.api_client,
                     tool=self.tool,
                     revisions=get_revisions(self.tool, self.cmd_args),
                     guess_summary=False,
                     guess_description=False,
-                    is_fuzzy_match_func=self._ask_review_request_match)
+                    is_fuzzy_match_func=self._ask_review_request_match,
+                    repository_id=self.repository.id)
             except ValueError as e:
                 raise CommandError(six.text_type(e))
 

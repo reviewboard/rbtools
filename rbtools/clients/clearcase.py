@@ -16,9 +16,11 @@ from pkg_resources import parse_version
 from rbtools.api.errors import APIError
 from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.clients.errors import InvalidRevisionSpecError, SCMError
+from rbtools.deprecation import RemovedInRBTools40Warning
 from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import execute
+from rbtools.utils.repository import get_repository_resource
 
 # This specific import is necessary to handle the paths when running on cygwin.
 if sys.platform.startswith(('cygwin', 'win')):
@@ -80,7 +82,7 @@ class ClearCaseClient(SCMClient):
     """
 
     name = 'ClearCase'
-    viewtype = None
+    server_tool_names = 'ClearCase'
     supports_patch_revert = True
 
     REVISION_ACTIVITY_BASE = '--rbtools-activity-base'
@@ -92,6 +94,17 @@ class ClearCaseClient(SCMClient):
     REVISION_FILES = '--rbtools-files'
     REVISION_LABEL_BASE = '--rbtools-label-base'
     REVISION_LABEL_PREFIX = 'lbtype:'
+
+    def __init__(self, **kwargs):
+        """Initialize the client.
+
+        Args:
+            **kwargs (dict):
+                Keyword arguments to pass through to the superclass.
+        """
+        super(ClearCaseClient, self).__init__(**kwargs)
+        self.viewtype = None
+        self.vobtag = None
 
     def get_local_path(self):
         """Return the local path to the working tree.
@@ -111,12 +124,6 @@ class ClearCaseClient(SCMClient):
         if viewname.startswith('** NONE'):
             return None
 
-        # Find the current VOB's tag.
-        vobtag = execute(['cleartool', 'describe', '-short', 'vob:.'],
-                         ignore_errors=True).strip()
-
-        if 'Error: ' in vobtag:
-            raise SCMError('Failed to generate diff run rbt inside vob.')
 
         # Get the root path of the view.
         root_path = execute(['cleartool', 'pwv', '-root'],
@@ -124,6 +131,8 @@ class ClearCaseClient(SCMClient):
 
         if 'Error: ' in root_path:
             raise SCMError('Failed to generate diff run rbt inside view.')
+
+        vobtag = self._get_vobtag()
 
         return os.path.join(root_path, vobtag)
 
@@ -165,14 +174,255 @@ class ClearCaseClient(SCMClient):
 
                 break
 
-        # TODO: We're now doing this twice (once in get_local_path, once here).
-        # This should be cached.
-        vobtag = execute(['cleartool', 'describe', '-short', 'vob:.'],
-                         ignore_errors=True).strip()
-
         return ClearCaseRepositoryInfo(path=local_path,
                                        base_path=local_path,
-                                       vobtag=vobtag)
+                                       vobtag=self._get_vobtag(),
+                                       tool=self)
+
+    def find_matching_server_repository(self, repositories):
+        """Find a match for the repository on the server.
+
+        Args:
+            repositories (rbtools.api.resource.ListResource):
+                The fetched repositories.
+
+        Returns:
+            tuple:
+            A 2-tuple of :py:class:`~rbtools.api.resource.ItemResource`. The
+            first item is the matching repository, and the second is the
+            repository info resource.
+        """
+        vobtag = self._get_vobtag()
+        uuid = self._get_vob_uuid(vobtag)
+
+        # To reduce calls to fetch the repository info resource (which can be
+        # expensive to compute on the server and isn't cacheable), we build an
+        # ordered list of ClearCase repositories starting with the ones that
+        # have a similar vobtag.
+        repository_scan_order = deque()
+
+        # Because the VOB tag is platform-specific, we split and search for the
+        # remote name in any sub-part so the request optimiziation can work for
+        # users on both Windows and Unix-like platforms.
+        vobtag_parts = vobtag.split(cpath.sep)
+
+        for repository in repositories.all_items:
+            repo_name = repository['name']
+
+            # Repositories with a name similar to the VOB tag get put at the
+            # beginning, and others at the end.
+            if repo_name == vobtag or repo_name in vobtag_parts:
+                repository_scan_order.appendleft(repository)
+            else:
+                repository_scan_order.append(repository)
+
+        # Now scan through and look for a repository with a matching UUID.
+        for repository in repository_scan_order:
+            try:
+                info = repository.get_info()
+            except APIError:
+                continue
+
+            if info and info['uuid'] == uuid:
+                return repository, info
+
+        return None, None
+
+    def parse_revision_spec(self, revisions):
+        """Parse the given revision spec.
+
+        Args:
+            revisions (list of unicode, optional):
+                A list of revisions as specified by the user. Items in the list
+                do not necessarily represent a single revision, since the user
+                can use SCM-native syntaxes such as ``r1..r2`` or ``r1:r2``.
+                SCMTool-specific overrides of this method are expected to deal
+                with such syntaxes.
+
+        Raises:
+            rbtools.clients.errors.InvalidRevisionSpecError:
+                The given revisions could not be parsed.
+
+            rbtools.clients.errors.TooManyRevisionsError:
+                The specified revisions list contained too many revisions.
+
+        Returns:
+            dict:
+            A dictionary with the following keys:
+
+            ``base`` (:py:class:`unicode`):
+                A revision to use as the base of the resulting diff.
+
+            ``tip`` (:py:class:`unicode`):
+                A revision to use as the tip of the resulting diff.
+
+            These will be used to generate the diffs to upload to Review Board
+            (or print).
+
+            There are many different ways to generate diffs for clearcase,
+            because there are so many different workflows. This method serves
+            more as a way to validate the passed-in arguments than actually
+            parsing them in the way that other clients do.
+        """
+        n_revs = len(revisions)
+
+        if n_revs == 0:
+            return {
+                'base': self.REVISION_CHECKEDOUT_BASE,
+                'tip': self.REVISION_CHECKEDOUT_CHANGESET,
+            }
+        elif n_revs == 1:
+            if revisions[0].startswith(self.REVISION_ACTIVITY_PREFIX):
+                return {
+                    'base': self.REVISION_ACTIVITY_BASE,
+                    'tip': revisions[0][len(self.REVISION_ACTIVITY_PREFIX):],
+                }
+            if revisions[0].startswith(self.REVISION_BRANCH_PREFIX):
+                return {
+                    'base': self.REVISION_BRANCH_BASE,
+                    'tip': revisions[0][len(self.REVISION_BRANCH_PREFIX):],
+                }
+            if revisions[0].startswith(self.REVISION_LABEL_PREFIX):
+                return {
+                    'base': self.REVISION_LABEL_BASE,
+                    'tip': [revisions[0][len(self.REVISION_BRANCH_PREFIX):]],
+                }
+            # TODO:
+            # stream:streamname[@pvob] => review changes in this UCM stream
+            #                             (UCM "branch")
+            # baseline:baseline[@pvob] => review changes between this baseline
+            #                             and the working directory
+        elif n_revs == 2:
+            if self.viewtype != 'dynamic':
+                raise SCMError('To generate a diff using multiple revisions, '
+                               'you must use a dynamic view.')
+
+            if (revisions[0].startswith(self.REVISION_LABEL_PREFIX) and
+                revisions[1].startswith(self.REVISION_LABEL_PREFIX)):
+                return {
+                    'base': self.REVISION_LABEL_BASE,
+                    'tip': [x[len(self.REVISION_BRANCH_PREFIX):]
+                            for x in revisions],
+                }
+            # TODO:
+            # baseline:baseline1[@pvob] baseline:baseline2[@pvob]
+            #                             => review changes between these two
+            #                                baselines
+            pass
+
+        pairs = []
+        for r in revisions:
+            p = r.split(':')
+            if len(p) != 2:
+                raise InvalidRevisionSpecError(
+                    '"%s" is not a valid file@revision pair' % r)
+            pairs.append(p)
+
+        return {
+            'base': self.REVISION_FILES,
+            'tip': pairs,
+        }
+
+    def diff(self, revisions, include_files=[], exclude_patterns=[],
+             extra_args=[], **kwargs):
+        """Perform a diff using the given revisions.
+
+        Args:
+            revisions (dict):
+                A dictionary of revisions, as returned by
+                :py:meth:`parse_revision_spec`.
+
+            include_files (list of unicode, optional):
+                A list of files to whitelist during the diff generation.
+
+            exclude_patterns (list of unicode, optional):
+                A list of shell-style glob patterns to blacklist during diff
+                generation.
+
+            extra_args (list, unused):
+                Additional arguments to be passed to the diff generation.
+                Unused for ClearCase.
+
+            **kwargs (dict, optional):
+                Unused keyword arguments.
+
+        Returns:
+            dict:
+            A dictionary containing the following keys:
+
+            ``diff`` (:py:class:`bytes`):
+                The contents of the diff to upload.
+        """
+        if include_files:
+            raise Exception(
+                'The ClearCase backend does not currently support the '
+                '-I/--include parameter. To diff for specific files, pass in '
+                'file@revision1:file@revision2 pairs as arguments')
+
+        if revisions['tip'] == self.REVISION_CHECKEDOUT_CHANGESET:
+            changeset = self._get_checkedout_changeset()
+            return self._do_diff(changeset)
+        elif revisions['base'] == self.REVISION_ACTIVITY_BASE:
+            changeset = self._get_activity_changeset(revisions['tip'])
+            return self._do_diff(changeset)
+        elif revisions['base'] == self.REVISION_BRANCH_BASE:
+            changeset = self._get_branch_changeset(revisions['tip'])
+            return self._do_diff(changeset)
+        elif revisions['base'] == self.REVISION_LABEL_BASE:
+            changeset = self._get_label_changeset(revisions['tip'])
+            return self._do_diff(changeset)
+        elif revisions['base'] == self.REVISION_FILES:
+            include_files = revisions['tip']
+            return self._do_diff(include_files)
+        else:
+            assert False
+
+    def _get_vobtag(self):
+        """Return the current repository's VOB tag.
+
+        Returns:
+            unicode:
+            The VOB tag for the current working directory.
+
+        Raises:
+            rbtools.clients.errors.SCMError:
+                The VOB tag was unable to be determined.
+        """
+        if not self.vobtag:
+            self.vobtag = execute(['cleartool', 'describe', '-short', 'vob:.'],
+                                  ignore_errors=True).strip()
+
+            if 'Error: ' in self.vobtag:
+                raise SCMError('Unable to determine the current VOB. Make '
+                               'sure to run RBTools from within your '
+                               'ClearCase view.')
+
+        return self.vobtag
+
+    def _get_vob_uuid(self, vobtag):
+        """Return the current VOB's UUID.
+
+        Args:
+            vobtag (unicode):
+                The VOB tag to query.
+
+        Returns:
+            unicode:
+            The VOB UUID.
+
+        Raises:
+            rbtools.clients.errors.SCMError:
+                The current VOB tag was unable to be determined.
+        """
+        property_lines = execute(
+            ['cleartool', 'lsvob', '-long', vobtag],
+            split_lines=True)
+
+        for line in property_lines:
+            if line.startswith('Vob family uuid:'):
+                return line.split(' ')[-1].rstrip()
+
+        return None
 
     def _determine_branch_path(self, version_path):
         """Determine the branch path of a version path.
@@ -387,101 +637,6 @@ class ClearCaseClient(SCMClient):
             The combined revision.
         """
         return cpath.join(branch_path, version_number)
-
-    def parse_revision_spec(self, revisions):
-        """Parse the given revision spec.
-
-        Args:
-            revisions (list of unicode, optional):
-                A list of revisions as specified by the user. Items in the list
-                do not necessarily represent a single revision, since the user
-                can use SCM-native syntaxes such as ``r1..r2`` or ``r1:r2``.
-                SCMTool-specific overrides of this method are expected to deal
-                with such syntaxes.
-
-        Raises:
-            rbtools.clients.errors.InvalidRevisionSpecError:
-                The given revisions could not be parsed.
-
-            rbtools.clients.errors.TooManyRevisionsError:
-                The specified revisions list contained too many revisions.
-
-        Returns:
-            dict:
-            A dictionary with the following keys:
-
-            ``base`` (:py:class:`unicode`):
-                A revision to use as the base of the resulting diff.
-
-            ``tip`` (:py:class:`unicode`):
-                A revision to use as the tip of the resulting diff.
-
-            These will be used to generate the diffs to upload to Review Board
-            (or print).
-
-            There are many different ways to generate diffs for clearcase,
-            because there are so many different workflows. This method serves
-            more as a way to validate the passed-in arguments than actually
-            parsing them in the way that other clients do.
-        """
-        n_revs = len(revisions)
-
-        if n_revs == 0:
-            return {
-                'base': self.REVISION_CHECKEDOUT_BASE,
-                'tip': self.REVISION_CHECKEDOUT_CHANGESET,
-            }
-        elif n_revs == 1:
-            if revisions[0].startswith(self.REVISION_ACTIVITY_PREFIX):
-                return {
-                    'base': self.REVISION_ACTIVITY_BASE,
-                    'tip': revisions[0][len(self.REVISION_ACTIVITY_PREFIX):],
-                }
-            if revisions[0].startswith(self.REVISION_BRANCH_PREFIX):
-                return {
-                    'base': self.REVISION_BRANCH_BASE,
-                    'tip': revisions[0][len(self.REVISION_BRANCH_PREFIX):],
-                }
-            if revisions[0].startswith(self.REVISION_LABEL_PREFIX):
-                return {
-                    'base': self.REVISION_LABEL_BASE,
-                    'tip': [revisions[0][len(self.REVISION_BRANCH_PREFIX):]],
-                }
-            # TODO:
-            # stream:streamname[@pvob] => review changes in this UCM stream
-            #                             (UCM "branch")
-            # baseline:baseline[@pvob] => review changes between this baseline
-            #                             and the working directory
-        elif n_revs == 2:
-            if self.viewtype != 'dynamic':
-                raise SCMError('To generate a diff using multiple revisions, '
-                               'you must use a dynamic view.')
-
-            if (revisions[0].startswith(self.REVISION_LABEL_PREFIX) and
-                revisions[1].startswith(self.REVISION_LABEL_PREFIX)):
-                return {
-                    'base': self.REVISION_LABEL_BASE,
-                    'tip': [x[len(self.REVISION_BRANCH_PREFIX):]
-                            for x in revisions],
-                }
-            # TODO:
-            # baseline:baseline1[@pvob] baseline:baseline2[@pvob]
-            #                             => review changes between these two
-            #                                baselines
-            pass
-
-        pairs = []
-        for r in revisions:
-            p = r.split(':')
-            if len(p) != 2:
-                raise InvalidRevisionSpecError(
-                    '"%s" is not a valid file@revision pair' % r)
-            pairs.append(p)
-
-        return {
-            'base': self.REVISION_FILES,
-            'tip': pairs,
-        }
 
     def _sanitize_activity_changeset(self, changeset):
         """Return changeset containing non-binary, branched file versions.
@@ -947,60 +1102,6 @@ class ClearCaseClient(SCMClient):
 
         return changeset
 
-    def diff(self, revisions, include_files=[], exclude_patterns=[],
-             extra_args=[], **kwargs):
-        """Perform a diff using the given revisions.
-
-        Args:
-            revisions (dict):
-                A dictionary of revisions, as returned by
-                :py:meth:`parse_revision_spec`.
-
-            include_files (list of unicode, optional):
-                A list of files to whitelist during the diff generation.
-
-            exclude_patterns (list of unicode, optional):
-                A list of shell-style glob patterns to blacklist during diff
-                generation.
-
-            extra_args (list, unused):
-                Additional arguments to be passed to the diff generation.
-                Unused for ClearCase.
-
-            **kwargs (dict, optional):
-                Unused keyword arguments.
-
-        Returns:
-            dict:
-            A dictionary containing the following keys:
-
-            ``diff`` (:py:class:`bytes`):
-                The contents of the diff to upload.
-        """
-        if include_files:
-            raise Exception(
-                'The ClearCase backend does not currently support the '
-                '-I/--include parameter. To diff for specific files, pass in '
-                'file@revision1:file@revision2 pairs as arguments')
-
-        if revisions['tip'] == self.REVISION_CHECKEDOUT_CHANGESET:
-            changeset = self._get_checkedout_changeset()
-            return self._do_diff(changeset)
-        elif revisions['base'] == self.REVISION_ACTIVITY_BASE:
-            changeset = self._get_activity_changeset(revisions['tip'])
-            return self._do_diff(changeset)
-        elif revisions['base'] == self.REVISION_BRANCH_BASE:
-            changeset = self._get_branch_changeset(revisions['tip'])
-            return self._do_diff(changeset)
-        elif revisions['base'] == self.REVISION_LABEL_BASE:
-            changeset = self._get_label_changeset(revisions['tip'])
-            return self._do_diff(changeset)
-        elif revisions['base'] == self.REVISION_FILES:
-            include_files = revisions['tip']
-            return self._do_diff(include_files)
-        else:
-            assert False
-
     def _diff_files(self, old_file, new_file):
         """Return a unified diff for file.
 
@@ -1185,7 +1286,7 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
     the URLs differ.
     """
 
-    def __init__(self, path, base_path, vobtag):
+    def __init__(self, path, base_path, vobtag, tool=None):
         """Initialize the repsitory info.
 
         Args:
@@ -1198,11 +1299,29 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
 
             vobtag (unicode):
                 The VOB tag for the repository.
+
+            tool (rbtools.clients.SCMClient):
+                The SCM client.
         """
         super(ClearCaseRepositoryInfo, self).__init__(path, base_path)
         self.vobtag = vobtag
+        self.tool = tool
 
-    def find_server_repository_info(self, server):
+    def update_from_remote(self, repository, info):
+        """Update the info from a remote repository.
+
+        Args:
+            repository (rbtools.api.resource.ItemResource):
+                The repository resource.
+
+            info (rbtools.api.resource.ItemResource):
+                The repository info resource.
+        """
+        path = info['repopath']
+        self.path = path
+        self.base_path = path
+
+    def find_server_repository_info(self, api_root):
         """Find a matching repository on the server.
 
         The point of this function is to find a repository on the server that
@@ -1212,89 +1331,31 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
         repositories use the same path, you'll get back self, otherwise you'll
         get a different ClearCaseRepositoryInfo object (with a different path).
 
+        Deprecated:
+            3.0:
+            Commands which need to use the remote repository, or need data from
+            the remote repository such as the base path, should set
+            :py:attr:`needs_repository`.
+
         Args:
-            server (rbtools.api.resource.RootResource):
+            api_root (rbtools.api.resource.RootResource):
                 The root resource for the Review Board server.
 
         Returns:
             ClearCaseRepositoryInfo:
             The server-side information for this repository.
         """
-        # Find VOB's family uuid based on VOB's tag
-        uuid = self._get_vobs_uuid(self.vobtag)
-        logging.debug('Repository VOB tag %s uuid is %r', self.vobtag, uuid)
+        RemovedInRBTools40Warning.warn(
+            'The find_server_repository_info method is deprecated, and will '
+            'be removed in RBTools 4.0. If you need to access the remote '
+            'repository, set the needs_repository attribute on your Command '
+            'subclass.')
 
-        # To reduce calls to fetch the repository info resource (which can be
-        # expensive to compute on the server and isn't cacheable), we build an
-        # ordered list of ClearCase repositories starting with the ones that
-        # have a similar vobtag.
-        repository_scan_order = deque()
+        repository, info = get_repository_resource(
+            api_root,
+            tool=self.tool)
 
-        # Because the VOB tag is platform-specific, we split and search
-        # for the remote name in any sub-part so this HTTP request
-        # optimization can work for users on both Windows and Unix-like
-        # platforms.
-        vob_tag_parts = self.vobtag.split(cpath.sep)
+        if repository:
+            self.update_from_remote(repository, info)
 
-        # Reduce list of repositories to only ClearCase ones and sort them by
-        # repo name matching vobtag (or some part of the vobtag) first.
-        for repository in server.get_repositories(tool='ClearCase').all_items:
-            # Ignore non-ClearCase repositories.
-            if repository['tool'] != 'ClearCase':
-                continue
-
-            repo_name = repository['name']
-
-            # Repositories with a similar VOB tag get put at the beginning and
-            # the others at the end.
-            if repo_name == self.vobtag or repo_name in vob_tag_parts:
-                repository_scan_order.appendleft(repository)
-            else:
-                repository_scan_order.append(repository)
-
-        # Now try to find a matching uuid
-        for repository in repository_scan_order:
-            repo_name = repository['name']
-            try:
-                info = repository.get_info()
-            except APIError as e:
-                # If the current repository is not publicly accessible and the
-                # current user has no explicit access to it, the server will
-                # return error_code 101 and http_status 403.
-                if not (e.error_code == 101 and e.http_status == 403):
-                    # We can safely ignore this repository unless the VOB tag
-                    # matches.
-                    if repo_name == self.vobtag:
-                        raise SCMError('You do not have permission to access '
-                                       'this repository.')
-
-                    continue
-                else:
-                    # Bubble up any other errors
-                    raise e
-
-            if not info or uuid != info['uuid']:
-                continue
-
-            path = info['repopath']
-            logging.debug('Matching repository uuid:%s with path:%s',
-                          uuid, path)
-            return ClearCaseRepositoryInfo(path=path, base_path=path,
-                                           vobtag=self.vobtag)
-
-        # We didn't found uuid but if version is >= 1.5.3
-        # we can try to use VOB's name hoping it is better
-        # than current VOB's path.
-        if parse_version(server.rb_version) >= parse_version('1.5.3'):
-            self.path = cpath.split(self.vobtag)[1]
-
-        # We didn't find a matching repository on the server.
-        # We'll just return self and hope for the best.
         return self
-
-    def _get_vobs_uuid(self, vobtag):
-        property_lines = execute(['cleartool', 'lsvob', '-long', vobtag],
-                                 split_lines=True)
-        for line in property_lines:
-            if line.startswith('Vob family uuid:'):
-                return line.split(' ')[-1].rstrip()

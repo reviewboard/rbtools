@@ -29,10 +29,10 @@ class SetupRepoTest(SpyAgency, TestWithPayloads, RBTestBase):
         self.spy_on(setup._display_rb_repositories)
 
         output = setup.prompt_rb_repository(
-            tool_name='Git',
-            repository_info=RepositoryInfo(path='testpath'),
-            api_root=mock_api_root,
-        )
+            local_tool_name='Git',
+            server_tool_names='Git',
+            repository_paths='testpath',
+            api_root=mock_api_root)
 
         self.assertTrue(setup._display_rb_repositories.called)
         self.assertIsInstance(output, ItemResource)
@@ -49,10 +49,10 @@ class SetupRepoTest(SpyAgency, TestWithPayloads, RBTestBase):
         self.spy_on(setup._display_rb_repositories)
 
         output = setup.prompt_rb_repository(
-            tool_name='Git',
-            repository_info=RepositoryInfo(path='testpath'),
-            api_root=mock_api_root
-        )
+            local_tool_name='Git',
+            server_tool_names='Git',
+            repository_paths='testpath',
+            api_root=mock_api_root)
 
         self.assertFalse(setup._display_rb_repositories.called)
         self.assertIsNone(output)

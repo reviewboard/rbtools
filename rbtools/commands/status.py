@@ -10,7 +10,6 @@ except ImportError:
     from shutil import get_terminal_size
 
 from rbtools.commands import Command, Option
-from rbtools.utils.repository import get_repository_id
 from rbtools.utils.users import get_username
 
 
@@ -164,7 +163,7 @@ class Status(Command):
         the current repository, which requires the client. If --all is passed,
         this command only needs the API.
         """
-        self.needs_scm_client = not self.options.all_repositories
+        self.needs_repository = not self.options.all_repositories
 
         super(Status, self).initialize()
 
@@ -179,17 +178,8 @@ class Status(Command):
         }
 
         if not self.options.all_repositories:
-            # Check if repository info on reviewboard server match local ones.
-            self.repository_info = \
-                self.repository_info.find_server_repository_info(self.api_root)
-
-            repo_id = get_repository_id(
-                repository_info=self.repository_info,
-                api_root=self.api_root,
-                repository_name=self.options.repository_name)
-
-            if repo_id:
-                query_args['repository'] = repo_id
+            if self.repository:
+                query_args['repository'] = self.repository.id
             else:
                 logging.warning('The repository detected in the current '
                                 'directory was not found on\n'

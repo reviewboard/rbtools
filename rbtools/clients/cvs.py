@@ -23,6 +23,7 @@ class CVSClient(SCMClient):
     """
 
     name = 'CVS'
+    server_tool_names = 'CVS'
     supports_diff_exclude_patterns = True
     supports_patch_revert = True
 

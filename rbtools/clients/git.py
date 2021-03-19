@@ -37,6 +37,7 @@ class GitClient(SCMClient):
     """
 
     name = 'Git'
+    server_tool_names = 'Git,Perforce,Subversion'
 
     supports_commit_history = True
     supports_diff_exclude_patterns = True

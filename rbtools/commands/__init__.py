@@ -24,6 +24,7 @@ from rbtools.utils.console import get_input, get_pass
 from rbtools.utils.filesystem import (cleanup_tempfiles, get_home_path,
                                       is_exe_in_path, load_config)
 from rbtools.utils.process import log_command_line
+from rbtools.utils.repository import get_repository_resource
 
 
 RB_MAIN = 'rbt'
@@ -172,6 +173,9 @@ class Command(object):
             The API capabilities object. This will be ``None`` if
             :py:attr:`needs_api` is ``False``.
 
+        repository (rbtools.api.resource.ItemResource):
+            The API resource corresponding to the repository.
+
         repository_info (rbtools.clients.RepositoryInfo):
             The repository info object. This will be ``None`` if
             :py:attr:`needs_scm_client` is ``False``.
@@ -225,6 +229,18 @@ class Command(object):
     #: Type:
     #:     bool
     needs_scm_client = False
+
+    #: Whether the command needs the remote repository object.
+    #:
+    #: If this is set, the initialization of the command will set
+    #: :py:attr:`repository`.
+    #:
+    #: Version Added:
+    #:     3.0
+    #:
+    #: Type:
+    #:     bool
+    needs_repository = False
 
     #: Usage text for what arguments the command takes.
     #:
@@ -656,6 +672,7 @@ class Command(object):
         self.api_client = None
         self.api_root = None
         self.capabilities = None
+        self.repository = None
         self.repository_info = None
         self.server_url = None
         self.tool = None
@@ -735,6 +752,12 @@ class Command(object):
         """
         self._init_logging()
 
+        if self.needs_repository:
+            # If we need the repository, we implicitly need the API and SCM
+            # client as well.
+            self.needs_api = True
+            self.needs_scm_client = True
+
         if self.needs_api:
             self.server_url = self._init_server_url()
             self.api_client, self.api_root = self.get_api(self.server_url)
@@ -757,6 +780,16 @@ class Command(object):
                     self.tool.get_repository_name()
 
             self.tool.capabilities = self.capabilities
+
+        if self.needs_repository:
+            self.repository, info = get_repository_resource(
+                api_root=self.api_root,
+                tool=self.tool,
+                repository_name=self.options.repository_name,
+                repository_paths=self.repository_info.path)
+
+            if self.repository:
+                self.repository_info.update_from_remote(self.repository, info)
 
     def create_arg_parser(self, argv):
         """Create and return the argument parser.

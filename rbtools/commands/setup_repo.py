@@ -10,6 +10,7 @@ from six.moves import input
 from rbtools.commands import Command, CommandError
 from rbtools.utils.console import confirm, confirm_select
 from rbtools.utils.filesystem import CONFIG_FILE
+from rbtools.utils.repository import get_repository_resource
 
 
 class SetupRepo(Command):
@@ -40,40 +41,58 @@ class SetupRepo(Command):
         Command.tfs_options,
     ]
 
-    def prompt_rb_repository(self, tool_name, repository_info, api_root):
+    def prompt_rb_repository(self, local_tool_name, server_tool_names,
+                             repository_paths, api_root):
         """Interactively prompt to select a matching repository.
 
         The user is prompted to choose a matching repository found on the
         Review Board server.
+
+        Args:
+            local_tool_name (unicode):
+                The local name of the detected tool.
+
+            server_tool_names (unicode):
+                A comma-separated list of potentially matching SCMTool names in
+                the Review Board server.
+
+            repository_paths (list or unicode, optional):
+                A list of potential paths to match for the repository.
+
+            api_root (rbtools.api.resource.RootResource):
+                The root resource for the Review Board server.
+
+        Returns:
+            rbtools.api.resource.ItemResource:
+            The selected repository resource.
         """
         # Go through each matching repo and prompt for a selection. If a
         # selection is made, immediately return the selected repo.
         repo_paths = {}
-        for repository_page in api_root.get_repositories().all_pages:
-            for repository in repository_page:
-                if repository.tool != tool_name:
-                    continue
 
-                repo_paths[repository['path']] = repository
+        repositories = api_root.get_repositories(tool=server_tool_names)
 
-                if 'mirror_path' in repository:
-                    repo_paths[repository['mirror_path']] = repository
+        for repository in repositories.all_items:
+            repo_paths[repository['path']] = repository
 
-        closest_paths = difflib.get_close_matches(repository_info.path,
+            if 'mirror_path' in repository:
+                repo_paths[repository['mirror_path']] = repository
+
+        closest_paths = difflib.get_close_matches(repository_paths,
                                                   six.iterkeys(repo_paths),
                                                   n=4, cutoff=0.4)
 
         if closest_paths:
             print()
             print(
-                '%(num)s %(repo_type)s repositories found:'
+                '%(num)s matching %(repo_type)s repositories found:'
                 % {
                     'num': len(closest_paths),
-                    'repo_type': tool_name,
+                    'repo_type': local_tool_name,
                 })
             self._display_rb_repositories(closest_paths, repo_paths)
             repo_chosen = confirm_select('Select a %s repository to use' %
-                                         tool_name, len(closest_paths))
+                                         local_tool_name, len(closest_paths))
 
             if repo_chosen:
                 repo_chosen = int(repo_chosen) - 1
@@ -118,56 +137,56 @@ class SetupRepo(Command):
         api_client = None
         api_root = None
 
-        if not server:
-            print()
-            print(textwrap.fill(
-                'This command is intended to help users create a %s file in '
-                'the current directory to connect a repository and Review '
-                'Board server.')
-                % CONFIG_FILE)
-            print()
-            print(textwrap.fill(
-                'Repositories must currently exist on your server (either '
-                'hosted internally or via RBCommons) to successfully '
-                'generate this file.'))
-            print(textwrap.fill(
-                'Repositories can be added using the Admin Dashboard in '
-                'Review Board or under your team administration settings in '
-                'RBCommons.'))
-            print()
-            print(textwrap.fill(
-                'Press CTRL + C anytime during this command to cancel '
-                'generating your config file.'))
-            print()
+        print()
+        print(textwrap.fill(
+            'This command is intended to help users create a %s file in '
+            'the current directory to connect a repository and Review '
+            'Board server.')
+            % CONFIG_FILE)
+        print()
+        print(textwrap.fill(
+            'Repositories must currently exist on your server (either '
+            'hosted internally or via RBCommons) to successfully '
+            'generate this file.'))
+        print(textwrap.fill(
+            'Repositories can be added using the Admin Dashboard in '
+            'Review Board or under your team administration settings in '
+            'RBCommons.'))
+        print()
+        print(textwrap.fill(
+            'Press CTRL + C anytime during this command to cancel '
+            'generating your config file.'))
+        print()
 
-            while True:
-                server = input('Enter the Review Board server URL: ')
+        while True:
+            if server:
+                try:
+                    # Validate the inputted server.
+                    api_client, api_root = self.get_api(server)
+                    break
+                except CommandError as e:
+                    print()
+                    print('%s' % e)
+                    print('Please try again.')
+                    print()
 
-                if server:
-                    try:
-                        # Validate the inputted server.
-                        api_client, api_root = self.get_api(server)
-                        break
-                    except CommandError as e:
-                        print()
-                        print('%s' % e)
-                        print('Please try again.')
-                        print()
+            server = input('Enter the Review Board server URL: ')
 
         repository_info, tool = self.initialize_scm_tool()
 
-        # If we run the `--server` option or if we run `rbt setup-repo` with
-        # a server URL already defined in our config file, neither `api_root`
-        # nor `api_client` will be defined. We must re-validate our server
-        # again.
-        if not api_root and not api_client:
-            api_client, api_root = self.get_api(server)
-
-        self.capabilities = self.get_capabilities(self.api_root)
+        self.capabilities = self.get_capabilities(api_root)
         tool.capabilities = self.capabilities
 
-        # Check if repository info on reviewboard server match local ones.
-        repository_info = repository_info.find_server_repository_info(api_root)
+        # Go through standard detection mechanism first. If we find a match
+        # this way, we'll set the local repository_info path to be the same as
+        # the remote, which will improve matching.
+        repository, info = get_repository_resource(
+            api_root,
+            tool=tool,
+            repository_paths=repository_info.path)
+
+        if repository:
+            repository_info.update_from_remote(repository, info)
 
         # While a repository is not chosen, keep the repository selection
         # prompt displayed until the prompt is cancelled.
@@ -175,7 +194,10 @@ class SetupRepo(Command):
             print()
             print('Current server: %s' % server)
             selected_repo = self.prompt_rb_repository(
-                tool.name, repository_info, api_root)
+                local_tool_name=tool.name,
+                server_tool_names=tool.server_tool_names,
+                repository_paths=repository_info.path,
+                api_root=api_root)
 
             if not selected_repo:
                 print()

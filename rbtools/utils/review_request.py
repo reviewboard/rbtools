@@ -5,6 +5,7 @@ import re
 
 from rbtools.api.errors import APIError
 from rbtools.clients.errors import InvalidRevisionSpecError
+from rbtools.deprecation import RemovedInRBTools40Warning
 from rbtools.utils.match_score import Score
 from rbtools.utils.repository import get_repository_id
 from rbtools.utils.users import get_user
@@ -75,8 +76,12 @@ def get_revisions(tool, cmd_args):
     return revisions
 
 
-def find_review_request_by_change_id(api_client, api_root, repository_info,
-                                     repository_name, revisions):
+def find_review_request_by_change_id(api_client,
+                                     api_root,
+                                     repository_info=None,
+                                     repository_name=None,
+                                     revisions=None,
+                                     repository_id=None):
     """Ask ReviewBoard for the review request ID for the tip revision.
 
     Note that this function calls the ReviewBoard API with the only_fields
@@ -84,7 +89,35 @@ def find_review_request_by_change_id(api_client, api_root, repository_info,
     specified by the only_fields variable.
 
     If no review request is found, None will be returned instead.
+
+    Version Changed:
+        3.0:
+        The ``repository_info`` and ``repository_name`` arguments were
+        deprecated in favor of adding the new ``repository_id`` argument.
+
+    Args:
+        api_client (rbtools.api.client.RBClient):
+            The API client.
+
+        api_root (rbtools.api.resource.RootResource):
+            The root resource of the Review Board server.
+
+        repository_info (rbtools.clients.RepositoryInfo, deprecated):
+            The repository info object.
+
+        repository_name (unicode, deprecated):
+            The repository name.
+
+        revisions (dict):
+            The parsed revision information, including the ``tip`` key.
+
+        repository_id (int, optional):
+            The repository ID to use.
     """
+    assert api_client is not None
+    assert api_root is not None
+    assert revisions is not None
+
     only_fields = 'id,commit_id,changenum,status,url,absolute_url'
     change_id = revisions['tip']
     logging.debug('Attempting to find review request from tip revision ID: %s',
@@ -100,8 +133,16 @@ def find_review_request_by_change_id(api_client, api_root, repository_info,
         optional_args['changenum'] = int(change_id)
 
     user = get_user(api_client, api_root, auth_required=True)
-    repository_id = get_repository_id(
-        repository_info, api_root, repository_name)
+
+    if repository_info or repository_name:
+        RemovedInRBTools40Warning.warn(
+            'The repository_info and repository_name arguments to '
+            'find_review_request_by_change_id are deprecated and will be '
+            'removed in RBTools 4.0. Please change your command to use the '
+            'needs_repository attribute and pass in the repository ID '
+            'directly.')
+        repository_id = get_repository_id(
+            repository_info, api_root, repository_name)
 
     # Don't limit query to only pending requests because it's okay to stamp a
     # submitted review.
@@ -128,12 +169,19 @@ def find_review_request_by_change_id(api_client, api_root, repository_info,
     return None
 
 
-def guess_existing_review_request(repository_info, repository_name,
-                                  api_root, api_client, tool, revisions,
-                                  guess_summary, guess_description,
+def guess_existing_review_request(repository_info=None,
+                                  repository_name=None,
+                                  api_root=None,
+                                  api_client=None,
+                                  tool=None,
+                                  revisions=None,
+                                  guess_summary=None,
+                                  guess_description=None,
                                   is_fuzzy_match_func=None,
                                   no_commit_error=None,
-                                  submit_as=None, additional_fields=None):
+                                  submit_as=None,
+                                  additional_fields=None,
+                                  repository_id=None):
     """Try to guess the existing review request ID if it is available.
 
     The existing review request is guessed by comparing the existing
@@ -149,7 +197,60 @@ def guess_existing_review_request(repository_info, repository_name,
     Note that this function calls the ReviewBoard API with the only_fields
     paramater, thus the returned review request will contain only the fields
     specified by the only_fields variable.
+
+    Version Changed:
+        3.0:
+        The ``repository_info`` and ``repository_name`` arguments were
+        deprecated in favor of adding the new ``repository_id`` argument.
+
+    Args:
+        repository_info (rbtools.clients.RepositoryInfo, deprecated):
+            The repository info object.
+
+        repository_name (unicode, deprecated):
+            The repository name.
+
+        api_root (rbtools.api.resource.RootResource):
+            The root resource of the Review Board server.
+
+        api_client (rbtools.api.client.RBClient):
+            The API client.
+
+        tool (rbtools.clients.SCMClient):
+            The SCM client.
+
+        revisions (dict):
+            The parsed revisions object.
+
+        guess_summary (bool):
+            Whether to attempt to guess the summary for comparison.
+
+        guess_description (bool):
+            Whether to attempt to guess the description for comparison.
+
+        is_fuzzy_match_func (callable, optional):
+            A function which can check if a review request is a match for the
+            data being posted.
+
+        no_commit_error (callable, optional):
+            A function to be called when there's no local commit.
+
+        submit_as (unicode, optional):
+            A username on the server which is used for posting review requests.
+            If provided, review requests owned by this user will be matched.
+
+        additional_fields (list of unicode, optional):
+            A list of additional fields to include in the fetched review
+            request resource.
+
+        repository_id (int, optional):
+            The ID of the repository to match.
     """
+    assert api_root is not None
+    assert api_client is not None
+    assert tool is not None
+    assert revisions is not None
+
     only_fields = [
         'id', 'summary', 'description', 'draft', 'url', 'absolute_url',
         'bugs_closed', 'status', 'public'
@@ -164,8 +265,15 @@ def guess_existing_review_request(repository_info, repository_name,
         user = get_user(api_client, api_root, auth_required=True)
         username = user.username
 
-    repository_id = get_repository_id(
-        repository_info, api_root, repository_name)
+    if repository_info or repository_name:
+        RemovedInRBTools40Warning.warn(
+            'The repository_info and repository_name arguments to '
+            'find_review_request_by_change_id are deprecated and will be '
+            'removed in RBTools 4.0. Please change your command to use the '
+            'needs_repository attribute and pass in the repository ID '
+            'directly.')
+        repository_id = get_repository_id(
+            repository_info, api_root, repository_name)
 
     try:
         # Get only pending requests by the current user for this

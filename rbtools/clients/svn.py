@@ -19,6 +19,7 @@ from rbtools.clients.errors import (AuthenticationError,
                                     InvalidRevisionSpecError,
                                     MinimumVersionError, OptionsCheckError,
                                     SCMError, TooManyRevisionsError)
+from rbtools.deprecation import RemovedInRBTools40Warning
 from rbtools.utils.checks import (check_gnu_diff, check_install,
                                   is_valid_version)
 from rbtools.utils.console import get_pass
@@ -27,6 +28,7 @@ from rbtools.utils.diffs import (filename_match_any_patterns, filter_diff,
 from rbtools.utils.filesystem import (make_empty_files, make_tempfile,
                                       walk_parents)
 from rbtools.utils.process import execute
+from rbtools.utils.repository import get_repository_resource
 
 
 _fs_encoding = sys.getfilesystemencoding()
@@ -40,6 +42,7 @@ class SVNClient(SCMClient):
     """
 
     name = 'Subversion'
+    server_tool_names = 'Subversion'
     supports_diff_exclude_patterns = True
     supports_patch_revert = True
 
@@ -159,9 +162,43 @@ class SVNClient(SCMClient):
             path=path,
             base_path=base_path,
             local_path=local_path,
-            uuid=uuid)
+            uuid=uuid,
+            tool=self)
 
         return self._svn_repository_info_cache
+
+    def find_matching_server_repository(self, repositories):
+        """Find a match for the repository on the server.
+
+        Args:
+            repositories (rbtools.api.resource.ListResource):
+                The fetched repositories.
+
+        Returns:
+            tuple:
+            A 2-tuple of :py:class:`~rbtools.api.resource.ItemResource`. The
+            first item is the matching repository, and the second is the
+            repository info resource.
+        """
+        repository_url = getattr(self.options, 'repository_url', None)
+        info = self.svn_info(path=repository_url,
+                             ignore_errors=True)
+
+        if not info:
+            return None
+
+        uuid = info['Repository UUID']
+
+        for repository in repositories.all_items:
+            try:
+                server_info = repository.get_info()
+            except APIError:
+                continue
+
+            if server_info and uuid == server_info['uuid']:
+                return repository, server_info
+
+        return None, None
 
     def parse_revision_spec(self, revisions=[]):
         """Parse the given revision spec.
@@ -1282,7 +1319,7 @@ class SVNRepositoryInfo(RepositoryInfo):
     """
 
     def __init__(self, path=None, base_path=None, uuid=None, local_path=None,
-                 repository_id=None):
+                 repository_id=None, tool=None):
         """Initialize the repository information.
 
         Args:
@@ -1303,6 +1340,9 @@ class SVNRepositoryInfo(RepositoryInfo):
             repository_id (int, optional):
                 ID of the repository in the API. This is used primarily for
                 testing purposes, and is not guaranteed to be set.
+
+            tool (rbtools.clients.SCMClient):
+                The SCM client.
         """
         super(SVNRepositoryInfo, self).__init__(
             path=path,
@@ -1311,8 +1351,27 @@ class SVNRepositoryInfo(RepositoryInfo):
 
         self.uuid = uuid
         self.repository_id = repository_id
+        self.tool = tool
 
-    def find_server_repository_info(self, server):
+    def update_from_remote(self, repository, info):
+        """Update the info from a remote repository.
+
+        Args:
+            repository (rbtools.api.resource.ItemResource):
+                The repository resource.
+
+            info (rbtools.api.resource.ItemResource):
+                The repository info resource.
+        """
+        repos_base_path = info['url'][len(info['root_url']):]
+        relpath = self._get_relative_path(self.base_path, repos_base_path)
+
+        if relpath:
+            self.path = info['url']
+            self.base_path = relpath
+            self.repository_id = repository.id
+
+    def find_server_repository_info(self, api_root):
         """Return server-side information on the current Subversion repository.
 
         The point of this function is to find a repository on the server that
@@ -1322,66 +1381,34 @@ class SVNRepositoryInfo(RepositoryInfo):
         repositories use the same path, you'll get back self, otherwise you'll
         get a different SVNRepositoryInfo object (with a different path).
 
+        Deprecated:
+            3.0:
+            Commands which need to use the remote repository, or need data from
+            the remote repository such as the base path, should set
+            :py:attr:`needs_repository`.
+
         Args:
-            server (rbtools.api.resource.RootResource):
+            api_root (rbtools.api.resource.RootResource):
                 The root resource for the Review Board server.
 
         Returns:
             SVNRepositoryInfo:
             The server-side information for this repository.
         """
-        # Since all_items is a generator, and we need to process the list of
-        # repositories twice, we're going to keep a cached list of repositories
-        # that we'll add to as we iterate through the first time. That way,
-        # we can iterate through a second time, without performing another
-        # call to the server.
-        #
-        # Hopefully we'll match a repository in the first (less expensive) loop
-        # and won't need it.
-        #
-        # Note also that we're not fetching all pages up-front, as that could
-        # lead to a lot of unnecessary API requests if the repository in
-        # question is found before the last page of results in the first for
-        # loop.
-        repositories = server.get_repositories(tool='Subversion').all_items
-        cached_repos = []
+        RemovedInRBTools40Warning.warn(
+            'The find_server_repository_info method is deprecated, and will '
+            'be removed in RBTools 4.0. If you need to access the remote '
+            'repository, set the needs_repository attribute on your Command '
+            'subclass.')
 
-        # Do two paths. The first will be to try to find a matching entry
-        # by path/mirror path. If we don't find anything, then the second will
-        # be to find a matching UUID.
-        for repository in repositories:
-            if (self.path == repository['path'] or
-                ('mirror_path' in repository and
-                 self.path == repository['mirror_path'])):
-                self.repository_id = repository.id
-                return self
+        repository, info = get_repository_resource(
+            api_root,
+            tool=self.tool,
+            repository_paths=self.path)
 
-            cached_repos.append(repository)
+        if repository:
+            self.update_from_remote(repository, info)
 
-        # We didn't find our locally matched repository, so scan based on UUID.
-        for repository in cached_repos:
-            try:
-                info = repository.get_info()
-
-                if not info or self.uuid != info['uuid']:
-                    continue
-            except APIError:
-                continue
-
-            repos_base_path = info['url'][len(info['root_url']):]
-            relpath = self._get_relative_path(self.base_path, repos_base_path)
-
-            if relpath:
-                return SVNRepositoryInfo(
-                    path=info['url'],
-                    base_path=relpath,
-                    local_path=self.local_path,
-                    uuid=self.uuid,
-                    repository_id=repository.id)
-
-        # We didn't find a matching repository on the server. We'll just return
-        # self and hope for the best. In reality, we'll likely fail, but we
-        # did all we could really do.
         return self
 
     def _get_relative_path(self, path, root):

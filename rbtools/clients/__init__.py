@@ -91,6 +91,15 @@ class SCMClient(object):
     #:     unicode
     name = None
 
+    #: A comma-separated list of SCMClient names on the server
+    #:
+    #: Version Added:
+    #:    3.0
+    #:
+    #: Type:
+    #:     unicode
+    server_tool_names = None
+
     #: Whether the SCM uses server-side changesets
     #:
     #: Version Added:
@@ -232,11 +241,32 @@ class SCMClient(object):
 
         This is expected to be overridden by subclasses.
 
+        Version Added:
+            3.0
+
         Returns:
             rbtools.clients.RepositoryInfo:
             The repository info structure.
         """
         return None
+
+    def find_matching_server_repository(self, repositories):
+        """Find a match for the repository on the server.
+
+        Version Added:
+            3.0
+
+        Args:
+            repositories (rbtools.api.resource.ListResource):
+                The fetched repositories.
+
+        Returns:
+            tuple:
+            A 2-tuple of :py:class:`~rbtools.api.resource.ItemResource`. The
+            first item is the matching repository, and the second is the
+            repository info resource.
+        """
+        return None, None
 
     def get_repository_name(self):
         """Return any repository name configured in the repository.
@@ -890,11 +920,31 @@ class RepositoryInfo(object):
                       self.base_path, base_path)
         self.base_path = base_path
 
+    def update_from_remote(self, repository, info):
+        """Update the info from a remote repository.
+
+        Subclasses may override this to fetch additional data from the server.
+
+        Args:
+            repository (rbtools.api.resource.ItemResource):
+                The repository resource.
+
+            info (rbtools.api.resource.ItemResource):
+                The repository info resource.
+        """
+        self.path = repository.path
+
     def find_server_repository_info(self, server):
         """Try to find the repository from the list of repositories on the server.
 
         For Subversion, this could be a repository with a different URL. For
         all other clients, this is a noop.
+
+        Deprecated:
+            3.0:
+            Commands which need to use the remote repository, or need data from
+            the remote repository such as the base path, should set
+            :py:attr:`needs_repository`.
 
         Args:
             server (rbtools.api.resource.RootResource):
@@ -904,6 +954,11 @@ class RepositoryInfo(object):
             RepositoryInfo:
             The server-side information for this repository.
         """
+        RemovedInRBTools40Warning.warn(
+            'The find_server_repository_info method is deprecated, and will '
+            'be removed in RBTools 4.0. If you need to access the remote '
+            'repository, set the needs_repository attribute on your Command '
+            'subclass.')
         return self
 
 

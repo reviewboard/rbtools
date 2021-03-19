@@ -51,6 +51,7 @@ class MercurialClient(SCMClient):
     """
 
     name = 'Mercurial'
+    server_tool_names = 'Mercurial,Subversion'
 
     supports_commit_history = True
     supports_diff_exclude_patterns = True
