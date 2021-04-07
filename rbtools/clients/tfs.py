@@ -1099,7 +1099,7 @@ class TFSClient(SCMClient):
         return self.tf_wrapper.parse_revision_spec(revisions)
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
-             no_renames=False, extra_args=[]):
+             no_renames=False, extra_args=[], **kwargs):
         """Return the generated diff.
 
         Args:
@@ -1114,6 +1114,9 @@ class TFSClient(SCMClient):
 
             extra_args (list, optional):
                 Unused.
+
+            **kwargs (dict, unused):
+                Unused keyword arguments.
 
         Returns:
             dict:

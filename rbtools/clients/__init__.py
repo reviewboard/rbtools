@@ -394,7 +394,7 @@ class SCMClient(object):
         }
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
-             no_renames=False, extra_args=[]):
+             no_renames=False, extra_args=[], **kwargs):
         """Perform a diff using the given revisions.
 
         This is expected to be overridden by subclasses.
@@ -413,6 +413,9 @@ class SCMClient(object):
 
             extra_args (list, unused):
                 Additional arguments to be passed to the diff generation.
+
+            **kwargs (dict, unused):
+                Unused keyword arguments.
 
         Returns:
             dict:
