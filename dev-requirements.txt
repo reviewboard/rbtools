@@ -1,4 +1,4 @@
-kgb>=5.0
+kgb>=6.1
 mock
 nose
 

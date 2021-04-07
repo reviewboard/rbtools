@@ -207,23 +207,47 @@ which specifies the remote branch name. For example::
 
 .. _rbt-post-clearcase:
 
-ClearCase
----------
+ClearCase and VersionVault
+--------------------------
 
-.. versionchanged:: 0.6
-   ClearCase support used to use the :option:`--tracking-branch` and
-   :option:`--revision-range` options for specifying branches and manual
-   changesets, respectively. As of version 0.6, these are just passed in as
-   arguments.
+.. versionchanged:: 3.0
+   As of Version 3.0, RBTools supports both the legacy "ClearCase" repository
+   type, as well as the new "VersionVault" type which is a part of `Power
+   Pack`_. VersionVault can be used with both IBM ClearCase as well as HCL
+   VersionVault, and is the recommended implementation to use.
 
-:command:`rbt post` provides basic support for posting ClearCase reviews.
-If you want to post a review of all currently checked out files in your view
-simply run::
+:command:`rbt post` provides support for posting changes using IBM ClearCase or
+HCL VersionVault repositories. There are several different modes which can be
+used depending on how you've organized your repository. Changes must be posted
+from within a snapshot or dynamic view.
 
-     rbt post
+The most simple case is posting a diff of all currently checked out files in
+your view. This will work no matter what workflow you are using::
 
-If you collect changesets, for example, using ClearCase/ClearQuest integration,
-you can pass the changeset in as arguments. Each argument will be an
+    $ rbt post
+
+To post a change between a branch and its predecessor, use::
+
+    $ rbt post brtype:branchname
+
+To post a change between a label and its predecessor, use::
+
+    $ rbt post lbtype:labelname
+
+A diff between two labels can also be posted. This requires posting from within
+a dynamic view::
+
+    $ rbt post lbtype:label1 lbtype:label2
+
+If you're using UCM, you can also post activities, baselines, and streams::
+
+    $ rbt post activity:my-activity
+    $ rbt post baseline:project-dev
+    $ rbt post baseline:project-integration baseline:project-dev
+    $ rbt post stream:dev-stream
+
+Finally, you can also assemble a diff using file@revision pairs. This requires
+posting from within a dynamic view. Each argument will be a
 ``file@@revision1:file@@revision2`` pair::
 
     $ rbt post /vobs/proj/file.c@@/main/0:/vobs/proj/file.c@@/main/1
@@ -232,18 +256,24 @@ Multiple files can be posted by adding additional file/revision pairs::
 
     $ rbt post /vobs/proj/file.c@@/main/0:/vobs/proj/file.c@@/main/1 /vobs/proj/file.h@@/main/0:/vobs/proj/file.h@@/main/1
 
-Another way for post-commit review is send changes developed on branch by
-specifying the branch name with a ``brtype:`` prefix::
-
-    $ rbt post brtype:my_dev_branch
 
 .. note::
 
-   :command:`rbt post` tries to match Review Board's repository based on
-   the VOB's UUID. If this doesn't work, the VOB's name will be used.
-   If you need to override this behavior, you can use the ``REPOSITORY``
-   or ``REPOSITORY_URL`` settings in :file:`.reviewboardrc` or pass the
-   :option:`--repository` or :option:`--repository-url` command-line options.
+   Without any configuration, :command:`rbt post` tries to match Review Board's
+   repository based on the VOB's family UUID, and may fall back to trying to
+   match the name with the VOB tag. In both these cases, the match may be slow.
+   It's highly recommended to set ``REPOSITORY`` in :file:`.reviewboardrc` or
+   use the :option:`--repository` command-line option.
+
+.. note::
+
+   There are two ways that ClearCase repositories may be configured on the
+   Review Board server. If the repository is using the community-driven
+   ClearCase backed, review requests may only contain changes from a single
+   VOB. If the repository uses the newer VersionVault backend, changes may span
+   across multiple VOBs.
+
+.. _`Power Pack`: https://www.reviewboard.org/powerpack
 
 
 .. index:: post-commit review

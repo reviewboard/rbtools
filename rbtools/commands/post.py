@@ -1207,6 +1207,7 @@ class Post(Command):
 
         cumulative_diff_info = self.tool.diff(
             revisions=self.revisions,
+            repository_info=self.repository_info,
             extra_args=extra_args,
             **diff_kwargs)
 
@@ -1220,10 +1221,11 @@ class Post(Command):
             # by the requested files if provided.
             diff_info = self.tool.diff(
                 revisions=revisions,
-                extra_args=extra_args,
                 include_files=self.options.include_files or [],
                 exclude_patterns=self.options.exclude_patterns or [],
                 with_parent_diff=False,
+                repository_info=self.repository_info,
+                extra_args=extra_args,
                 **diff_kwargs)
 
             history_entry['diff'] = diff_info['diff']
@@ -1256,6 +1258,7 @@ class Post(Command):
             revisions=self.revisions,
             include_files=self.options.include_files or [],
             exclude_patterns=self.options.exclude_patterns or [],
+            repository_info=self.repository_info,
             extra_args=extra_args,
             **diff_kwargs)
 

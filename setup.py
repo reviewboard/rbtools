@@ -124,6 +124,7 @@ setup(
     install_requires=[
         'backports.shutil_get_terminal_size; python_version<"3.0"',
         'colorama',
+        'pydiffx',
         'six>=1.8.0',
         'texttable',
         'tqdm',

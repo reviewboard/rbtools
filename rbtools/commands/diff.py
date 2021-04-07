@@ -21,6 +21,7 @@ class Diff(Command):
     # offline way, or we might just want to define a supported baseline version
     # of Review Board and get rid of some of the capability conditionals.
     needs_api = True
+    needs_repository = True
     needs_scm_client = True
 
     args = '[revisions]'
@@ -91,6 +92,7 @@ class Diff(Command):
             revisions=revisions,
             include_files=self.options.include_files or [],
             exclude_patterns=self.options.exclude_patterns or [],
+            repository_info=self.repository_info,
             extra_args=extra_args,
             **diff_kwargs)
 

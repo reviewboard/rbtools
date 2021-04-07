@@ -394,7 +394,7 @@ class SCMClient(object):
         }
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
-             no_renames=False, extra_args=[], **kwargs):
+             no_renames=False, repository_info=None, extra_args=[]):
         """Perform a diff using the given revisions.
 
         This is expected to be overridden by subclasses.
@@ -410,6 +410,9 @@ class SCMClient(object):
             exclude_patterns (list of unicode, optional):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
+
+            repository_info (rbtools.clients.RepositoryInfo, optional):
+                The repository info structure.
 
             extra_args (list, unused):
                 Additional arguments to be passed to the diff generation.
