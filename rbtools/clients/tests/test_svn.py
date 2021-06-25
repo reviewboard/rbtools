@@ -52,8 +52,8 @@ def svn_version_set_hash(svn16_hash, svn17_hash, svn19_hash):
 
 
 _MATCH_URL_BASE = 'http://localhost:8080/api/repositories/'
-_MATCH_URL_TOOL = '&tool=Subversion'
-_MATCH_URL_FIELDS = '&only-fields=id%2Cname%2Cmirror_path%2Cpath'
+_MATCH_URL_TOOL = 'tool=Subversion'
+_MATCH_URL_FIELDS = 'only-fields=id%2Cname%2Cmirror_path%2Cpath'
 
 
 class SVNRepositoryMatchTests(kgb.SpyAgency, SCMClientTests):
@@ -77,10 +77,10 @@ class SVNRepositoryMatchTests(kgb.SpyAgency, SCMClientTests):
                 'stat': 'ok',
             },
         },
-        (_MATCH_URL_BASE +
-            '?only-links=info&path=https%3A%2F%2Fsvn1.example.com%2F' +
-            _MATCH_URL_TOOL +
-            _MATCH_URL_FIELDS): {
+        (_MATCH_URL_BASE + '?' +
+            _MATCH_URL_FIELDS +
+            '&only-links=info&path=https%3A%2F%2Fsvn1.example.com%2F&' +
+            _MATCH_URL_TOOL): {
             'mimetype': 'application/vnd.reviewboard.org.repositories+json',
             'rsp': {
                 'repositories': [
@@ -105,10 +105,10 @@ class SVNRepositoryMatchTests(kgb.SpyAgency, SCMClientTests):
                 'stat': 'ok',
             },
         },
-        (_MATCH_URL_BASE +
-            '?only-links=info&path=svn%2Bssh%3A%2F%2Fsvn2.example.com%2F' +
-            _MATCH_URL_TOOL +
-            _MATCH_URL_FIELDS): {
+        (_MATCH_URL_BASE + '?' +
+            _MATCH_URL_FIELDS +
+            '&only-links=info&path=svn%2Bssh%3A%2F%2Fsvn2.example.com%2F&' +
+            _MATCH_URL_TOOL): {
             'mimetype': 'application/vnd.reviewboard.org.repositories+json',
             'rsp': {
                 'repositories': [
@@ -132,10 +132,10 @@ class SVNRepositoryMatchTests(kgb.SpyAgency, SCMClientTests):
                 'stat': 'ok',
             },
         },
-        (_MATCH_URL_BASE +
-            '?only-links=info&path=svn%2Bssh%3A%2F%2Fblargle%2F' +
-            _MATCH_URL_TOOL +
-            _MATCH_URL_FIELDS): {
+        (_MATCH_URL_BASE + '?' +
+            _MATCH_URL_FIELDS +
+            '&only-links=info&path=svn%2Bssh%3A%2F%2Fblargle%2F&' +
+            _MATCH_URL_TOOL): {
             'mimetype': 'application/vnd.reviewboard.org.repositories+json',
             'rsp': {
                 'repositories': [
@@ -146,10 +146,10 @@ class SVNRepositoryMatchTests(kgb.SpyAgency, SCMClientTests):
                 'stat': 'ok',
             },
         },
-        (_MATCH_URL_BASE +
-            '?only-links=&path=svn%2Bssh%3A%2F%2Fblargle%2F' +
-            _MATCH_URL_TOOL +
-            _MATCH_URL_FIELDS): {
+        (_MATCH_URL_BASE + '?' +
+            _MATCH_URL_FIELDS +
+            '&only-links=&path=svn%2Bssh%3A%2F%2Fblargle%2F&' +
+            _MATCH_URL_TOOL): {
             'mimetype': 'application/vnd.reviewboard.org.repositories+json',
             'rsp': {
                 'repositories': [
@@ -160,10 +160,10 @@ class SVNRepositoryMatchTests(kgb.SpyAgency, SCMClientTests):
                 'stat': 'ok',
             },
         },
-        (_MATCH_URL_BASE +
-            '?only-links=info' +
-            _MATCH_URL_TOOL +
-            _MATCH_URL_FIELDS): {
+        (_MATCH_URL_BASE + '?' +
+            _MATCH_URL_FIELDS +
+            '&only-links=info&' +
+            _MATCH_URL_TOOL): {
             'mimetype': 'application/vnd.reviewboard.org.repositories+json',
             'rsp': {
                 'repositories': [
@@ -208,9 +208,10 @@ class SVNRepositoryMatchTests(kgb.SpyAgency, SCMClientTests):
                 'stat': 'ok',
             },
         },
-        (_MATCH_URL_BASE +
-            '?only-links=info&tool=Subversion&page=2' +
-            _MATCH_URL_FIELDS): {
+        (_MATCH_URL_BASE + '?' +
+            _MATCH_URL_FIELDS +
+            '&only-links=info&page=2&' +
+            _MATCH_URL_TOOL): {
             'mimetype': 'application/vnd.reviewboard.org.repositories+json',
             'rsp': {
                 'repositories': [
@@ -277,6 +278,8 @@ class SVNRepositoryMatchTests(kgb.SpyAgency, SCMClientTests):
             try:
                 payload = self.payloads[url]
             except KeyError:
+                print('Test requested unexpected URL "%s"' % url)
+
                 return MockResponse(404, {}, json.dumps({
                     'rsp': {
                         'stat': 'fail',

@@ -112,7 +112,16 @@ class HttpRequest(object):
         url_parts = list(urlparse(str(url)))
         query = dict(parse_qsl(url_parts[4]))
         query.update(query_args)
-        url_parts[4] = urlencode(query)
+
+        url_parts[4] = urlencode(
+            OrderedDict(
+                pair
+                for pair in sorted(six.iteritems(query),
+                                   key=lambda pair: pair[0])
+            ),
+            doseq=True
+        )
+
         self.url = urlunparse(url_parts)
 
     def encode_url_key(self, key):

@@ -54,8 +54,10 @@ _REPO3 = {
 }
 
 
-_MATCH_URL_BASE = 'http://localhost:8080/api/repositories/?only-links=info'
-_MATCH_URL_FIELDS = '&only-fields=id%2Cname%2Cmirror_path%2Cpath'
+_MATCH_URL_BASE = (
+    'http://localhost:8080/api/repositories/?'
+    'only-fields=id%2Cname%2Cmirror_path%2Cpath&only-links=info'
+)
 
 
 class RepositoryMatchTests(kgb.SpyAgency, RBTestBase):
@@ -80,8 +82,7 @@ class RepositoryMatchTests(kgb.SpyAgency, RBTestBase):
             },
         },
         (_MATCH_URL_BASE +
-            '&path=git%40example.com%3Atest.git' +
-            _MATCH_URL_FIELDS): {
+            '&path=git%40example.com%3Atest.git'): {
             'mimetype': 'application/vnd.reviewboard.org.repositories+json',
             'rsp': {
                 'repositories': [_REPO1],
@@ -91,8 +92,7 @@ class RepositoryMatchTests(kgb.SpyAgency, RBTestBase):
             },
         },
         (_MATCH_URL_BASE +
-            '&path=git%40example.com%3Atest2.git' +
-            _MATCH_URL_FIELDS): {
+            '&path=git%40example.com%3Atest2.git'): {
             'mimetype': 'application/vnd.reviewboard.org.repositories+json',
             'rsp': {
                 'repositories': [_REPO2],
@@ -102,8 +102,7 @@ class RepositoryMatchTests(kgb.SpyAgency, RBTestBase):
             },
         },
         (_MATCH_URL_BASE +
-            '&path=http%3A%2F%2Fexample.com%2Ftest3.git' +
-            _MATCH_URL_FIELDS): {
+            '&path=http%3A%2F%2Fexample.com%2Ftest3.git'): {
             'mimetype': 'application/vnd.reviewboard.org.repositories+json',
             'rsp': {
                 'repositories': [_REPO1, _REPO3],
@@ -113,8 +112,7 @@ class RepositoryMatchTests(kgb.SpyAgency, RBTestBase):
             },
         },
         (_MATCH_URL_BASE +
-            '&path=git%40example.com%3Atest4.git' +
-            _MATCH_URL_FIELDS): {
+            '&path=git%40example.com%3Atest4.git'): {
             'mimetype': 'application/vnd.reviewboard.org.repositories+json',
             'rsp': {
                 'repositories': [],
@@ -123,7 +121,7 @@ class RepositoryMatchTests(kgb.SpyAgency, RBTestBase):
                 'stat': 'ok',
             },
         },
-        (_MATCH_URL_BASE + _MATCH_URL_FIELDS): {
+        (_MATCH_URL_BASE): {
             'mimetype': 'application/vnd.reviewboard.org.repositories+json',
             'rsp': {
                 'repositories': [
@@ -147,6 +145,8 @@ class RepositoryMatchTests(kgb.SpyAgency, RBTestBase):
             try:
                 payload = self.payloads[url]
             except KeyError:
+                print('Test requested unexpected URL "%s"' % url)
+
                 return MockResponse(404, {}, json.dumps({
                     'rsp': {
                         'stat': 'fail',
