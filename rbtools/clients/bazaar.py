@@ -58,6 +58,10 @@ class BazaarClient(SCMClient):
         if 'ERROR: Not a branch:' in bzr_info:
             # This is not a branch:
             repository_info = None
+        elif '(format: git)' in bzr_info:
+            # This is a Git repository, which Breezy (Bazaar fork) will happily
+            # use, but we want to prioritize Git.
+            repository_info = None
         else:
             # This is a branch, let's get its attributes:
             branch_match = re.search(self.BRANCH_REGEX, bzr_info, re.MULTILINE)
