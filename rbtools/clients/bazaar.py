@@ -1,10 +1,12 @@
-"""A client for Bazaar."""
+"""A client for Bazaar and Breezy."""
 
 from __future__ import unicode_literals
 
 import logging
 import os
 import re
+
+import six
 
 from rbtools.clients import SCMClient, RepositoryInfo
 from rbtools.clients.errors import TooManyRevisionsError
@@ -17,10 +19,16 @@ USING_PARENT_PREFIX = 'Using parent branch '
 
 
 class BazaarClient(SCMClient):
-    """A client for Bazaar.
+    """A client for Bazaar and Breezy.
 
     This is a wrapper that fetches repository information and generates
     compatible diffs.
+
+    It supports the legacy Bazaar client, as well as the modern Breezy.
+
+    Version Changed:
+        2.0.1:
+        Added support for Breezy.
     """
 
     name = 'Bazaar'
@@ -42,6 +50,24 @@ class BazaarClient(SCMClient):
     # This is the same regex used in bzrlib/option.py:_parse_revision_spec.
     REVISION_SEPARATOR_REGEX = re.compile(r'\.\.(?![\\/])')
 
+    def __init__(self, **kwargs):
+        """Initialize the client.
+
+        Args:
+            **kwargs (dict):
+                Keyword arguments to pass through to the base class.
+        """
+        super(BazaarClient, self).__init__(**kwargs)
+
+        # The command used to execute bzr. This will be 'brz' if Breezy
+        # is used. This will be updated later.
+        self.bzr = 'bzr'
+
+        # Separately (since either bzr or brz might be used), we want to
+        # maintain a flag indicating if this is Breezy, since it changes
+        # some semantics.
+        self.is_breezy = False
+
     def get_repository_info(self):
         """Return repository information for the current working tree.
 
@@ -49,24 +75,38 @@ class BazaarClient(SCMClient):
             rbtools.clients.RepositoryInfo:
             The repository info structure.
         """
-        if not check_install(['bzr', 'help']):
-            logging.debug('Unable to execute "bzr help": skipping Bazaar')
+        if check_install(['brz', 'help']):
+            # This is Breezy.
+            self.bzr = 'brz'
+            self.is_breezy = True
+        elif check_install(['bzr', 'help']):
+            # This is either a legacy Bazaar (aliased to bzr) or the
+            # modern Breezy. Let's find out.
+            version = execute(['bzr', '--version'],
+                              ignore_errors=True)
+
+            self.is_breezy = version.startswith('Breezy')
+            self.bzr = 'bzr'
+        else:
+            logging.debug('Unable to execute "brz help" or "bzr help": '
+                          'skipping Bazaar')
             return None
 
-        bzr_info = execute(['bzr', 'info'], ignore_errors=True)
+        bzr_info = execute([self.bzr, 'info'], ignore_errors=True)
 
         if 'ERROR: Not a branch:' in bzr_info:
             # This is not a branch:
             repository_info = None
         elif '(format: git)' in bzr_info:
-            # This is a Git repository, which Breezy (Bazaar fork) will happily
-            # use, but we want to prioritize Git.
+            # This is a Git repository, which Breezy will happily use, but
+            # we want to prioritize Git.
             repository_info = None
         else:
             # This is a branch, let's get its attributes:
             branch_match = re.search(self.BRANCH_REGEX, bzr_info, re.MULTILINE)
 
             path = branch_match.group('branch_path')
+
             if path == '.':
                 path = os.getcwd()
 
@@ -175,7 +215,8 @@ class BazaarClient(SCMClient):
             A new revision spec that contains a revision number instead of a
             symbolic revision.
         """
-        command = ['bzr', 'revno']
+        command = [self.bzr, 'revno']
+
         if revision_spec:
             command += ['-r', revision_spec]
 
@@ -186,6 +227,8 @@ class BazaarClient(SCMClient):
         elif len(result) == 2 and result[0].startswith(USING_PARENT_PREFIX):
             branch = result[0][len(USING_PARENT_PREFIX):]
             return 'revno:%s:%s' % (result[1], branch)
+        else:
+            return None
 
     def diff(self, revisions, include_files=[], exclude_patterns=[],
              extra_args=[], **kwargs):
@@ -265,8 +308,23 @@ class BazaarClient(SCMClient):
             bytes:
             The generated diff contents.
         """
-        diff_cmd = ['bzr', 'diff', '-q', '-r',
-                    '%s..%s' % (base, tip)] + include_files
+        diff_cmd = [
+            self.bzr,
+            'diff',
+            '-q',
+        ]
+
+        if self.is_breezy:
+            # Turn off the "old/" and "new/" prefixes. This is mostly to
+            # ensure consistency with legacy Bazaar and for compatibility
+            # with versions of Review Board that expect legacy Bazaar diffs.
+            diff_cmd.append('--prefix=:')
+
+        diff_cmd += [
+            '-r',
+            '%s..%s' % (base, tip),
+        ] + include_files
+
         diff = execute(diff_cmd, ignore_errors=True, log_output_on_error=False,
                        split_lines=True, results_unicode=False)
 
@@ -301,8 +359,12 @@ class BazaarClient(SCMClient):
         # 2014-01-02  First Name  <email@address>
         #
         # ...
-        log_cmd = ['bzr', 'log', '-r',
-                   '%s..%s' % (revisions['base'], revisions['tip'])]
+        log_cmd = [
+            self.bzr,
+            'log',
+            '-r',
+            '%s..%s' % (revisions['base'], revisions['tip']),
+        ]
 
         # Find out how many commits there are, then log limiting to one fewer.
         # This is because diff treats the range as (r1, r2] while log treats
@@ -311,8 +373,10 @@ class BazaarClient(SCMClient):
                         ignore_errors=True, split_lines=True)
         n_revs = len(lines) - 1
 
-        lines = execute(log_cmd + ['--gnu-changelog', '-l', str(n_revs)],
-                        ignore_errors=True, split_lines=True)
+        lines = execute(
+            log_cmd + ['--gnu-changelog', '-l', six.text_type(n_revs)],
+            ignore_errors=True,
+            split_lines=True)
 
         message = []
 
@@ -333,4 +397,4 @@ class BazaarClient(SCMClient):
             unicode:
             A string with the name of the current branch.
         """
-        return execute(['bzr', 'nick'], ignore_errors=True).strip()
+        return execute([self.bzr, 'nick'], ignore_errors=True).strip()

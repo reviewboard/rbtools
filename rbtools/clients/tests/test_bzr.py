@@ -80,17 +80,35 @@ class BazaarClientTests(SCMClientTests):
 
     def _compare_diffs(self, filename, full_diff, expected_diff_digest,
                        change_type='modified'):
-        """Testing that the full_diff for ``filename`` matches the
-        ``expected_diff``."""
+        """Compare expected metadata to a generated diff.
+
+        Args:
+            filename (unicode):
+                The expected filename in the diff.
+
+            full_diff (bytes):
+                The generated diff content.
+
+            expected_diff_digest (bytes):
+                The expected MD5 digest of the diff, past the headers
+                (starting on the 3rd line).
+
+            change_type (unicode, optional):
+                The expected change type listed in the header.
+
+        Raises:
+            AssertionError:
+                One of the expectations failed.
+        """
+        filename = filename.encode('utf-8')
+        change_type = change_type.encode('utf-8')
+
         diff_lines = full_diff.splitlines()
 
-        self.assertEqual(('=== %s file \'%s\''
-                          % (change_type, filename)).encode('utf-8'),
-                         diff_lines[0])
-        self.assertTrue(diff_lines[1].startswith(
-            ('--- %s\t' % filename).encode('utf-8')))
-        self.assertTrue(diff_lines[2].startswith(
-            ('+++ %s\t' % filename).encode('utf-8')))
+        self.assertEqual(diff_lines[0],
+                         b"=== %s file '%s'" % (change_type, filename))
+        self.assertTrue(diff_lines[1].startswith(b'--- %s\t' % filename))
+        self.assertTrue(diff_lines[2].startswith(b'+++ %s\t' % filename))
 
         diff_body = b'\n'.join(diff_lines[3:])
         self.assertEqual(md5(diff_body).hexdigest(), expected_diff_digest)
