@@ -75,6 +75,12 @@ class Patch(Command):
                     'This feature does not work with Bazaar or Mercurial '
                     'repositories.',
                added_in='0.7.3'),
+        Option('--write',
+               dest='patch_outfile',
+               default=None,
+               help='Write the patch to a given file instead of applying '
+                    'it to the tree.',
+               added_in='2.0.1'),
         Option('--commit-ids',
                dest='commit_ids',
                default=None,
@@ -264,6 +270,8 @@ class Patch(Command):
                             'commit_id': commit['commit_id'],
                         })
 
+                assert isinstance(diff_content, bytes)
+
                 patches.append({
                     # DiffSets on review requests created with history
                     # support *always* have an empty base dir.
@@ -402,16 +410,28 @@ class Patch(Command):
                 Patching the tree has failed.
         """
         patch_stdout = self.options.patch_stdout
+        patch_outfile = self.options.patch_outfile
         revert = self.options.revert_patch
 
-        if patch_stdout and revert:
-            raise CommandError(_('--print and --revert cannot both be used.'))
+        if revert:
+            if patch_stdout:
+                raise CommandError(
+                    _('--print and --revert cannot both be used.'))
+
+            if patch_outfile and revert:
+                raise CommandError(
+                    _('--write and --revert cannot both be used.'))
+
+        if patch_stdout and patch_outfile:
+                raise CommandError(
+                    _('--print and --write cannot both be used.'))
 
         repository_info, tool = self.initialize_scm_tool(
             client_name=self.options.repository_type,
-            require_repository_info=not patch_stdout)
+            require_repository_info=(not patch_stdout and
+                                     not patch_outfile))
 
-        server_url = self.get_server_url(repository_info, tool)
+        server_url = None
         diff_revision = None
 
         if review_request_id.startswith('http'):
@@ -422,6 +442,9 @@ class Patch(Command):
             if diff_revision and '-' in diff_revision:
                 raise CommandError('Interdiff patches not supported: %s.'
                                    % diff_revision)
+
+        if server_url is None:
+            server_url = self.get_server_url(repository_info, tool)
 
         if diff_revision is None:
             diff_revision = self.options.diff_revision
@@ -434,7 +457,7 @@ class Patch(Command):
         api_client, api_root = self.get_api(server_url)
         self.setup_tool(tool, api_root=api_root)
 
-        if not patch_stdout:
+        if not patch_stdout and not patch_outfile:
             # Check if the repository info on the Review Board server matches
             # the local checkout.
             repository_info = repository_info.find_server_repository_info(
@@ -479,28 +502,36 @@ class Patch(Command):
             reverted=revert)
 
         if patch_stdout:
-            self._output_patches(patches)
+            if six.PY3:
+                stream = sys.stdout.buffer
+            else:
+                stream = sys.stdout
+
+            self._output_patches(patches, stream)
+        elif patch_outfile:
+            try:
+                with open(patch_outfile, 'wb') as fp:
+                    self._output_patches(patches, fp)
+            except IOError as e:
+                raise CommandError(_('Unable to write patch to %s: %s')
+                                   % (patch_outfile, e))
         else:
             self._apply_patches(patches)
 
-    def _output_patches(self, patches):
+    def _output_patches(self, patches, fp):
         """Output the contents of the patches to the console.
 
         Args:
             patches (list of dict):
                 The list of patches that would be applied.
+
+            fp (file or io.BufferedIOBase):
+                The file pointer or stream to write the patch content to.
+                This must accept byte strings.
         """
         for patch_data in patches:
-            diff_body = patch_data['diff']
-
-            if isinstance(diff_body, bytes):
-                if six.PY3:
-                    sys.stdout.buffer.write(diff_body)
-                    print()
-                else:
-                    print(diff_body.decode('utf-8'))
-            else:
-                print(diff_body)
+            fp.write(patch_data['diff'])
+            fp.write(b'\n')
 
     def _apply_patches(self, patches):
         """Apply a list of patches to the tree.
