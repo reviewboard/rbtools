@@ -31,16 +31,16 @@ set DEPS_DIR=%BUILD_BASE%\deps
 ::-------------------------------------------------------------------------
 :: Dependencies
 ::-------------------------------------------------------------------------
-set PYTHON_VERSION=3.8.6
+set PYTHON_VERSION=3.8.10
 
 set PYTHON_X86_FILENAME=python-%PYTHON_VERSION%.exe
 set PYTHON_X86_URL=https://www.python.org/ftp/python/%PYTHON_VERSION%/%PYTHON_X86_FILENAME%
-set PYTHON_X86_MD5=02cd63bd5b31e642fc3d5f07b3a4862a
+set PYTHON_X86_MD5=b355cfc84b681ace8908ae50908e8761
 set PYTHON_X86_DEP=%DEPS_DIR%\python-%PYTHON_VERSION%-x86
 
 set PYTHON_X64_FILENAME=python-%PYTHON_VERSION%-amd64.exe
 set PYTHON_X64_URL=https://www.python.org/ftp/python/%PYTHON_VERSION%/%PYTHON_X64_FILENAME%
-set PYTHON_X64_MD5=2acba3117582c5177cdd28b91bbe9ac9
+set PYTHON_X64_MD5=62cf1a12a5276b0259e8761d4cf4fe42
 set PYTHON_X64_DEP=%DEPS_DIR%\python-%PYTHON_VERSION%-x64
 
 
@@ -119,7 +119,9 @@ if not exist "%_dep_path%" (
     "%_PYTHON_INSTALLER%" /quiet ^
         AssociateFiles=0 Include_doc=0 Include_debug=0 Include_launcher=0 ^
         Include_tcltk=0 Include_test=0 InstallAllUsers=0 ^
-        InstallLauncherAllUsers=0 Shortcuts=0 TargetDir="%_dep_path%-temp"
+        InstallLauncherAllUsers=0 Shortcuts=0 SimpleInstall=1 ^
+		SimpleInsatllDescription="Python for RBTools for Windows" ^
+		TargetDir="%_dep_path%-temp"
     xcopy /EYI "%_dep_path%-temp" "%_dep_path%"
 
     :: Remove the old install from the temp directory, and clean up the

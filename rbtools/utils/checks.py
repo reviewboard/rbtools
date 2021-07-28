@@ -18,10 +18,15 @@ def check_install(command):
     instance, 'svn help' or 'git --version').
     """
     try:
-        subprocess.Popen(command,
-                         stdin=subprocess.PIPE,
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE)
+        p = subprocess.Popen(command,
+                             stdin=subprocess.PIPE,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+
+        # Wait for the process to end and pipes to close. This will avoid
+        # ResourceWarnings.
+        p.communicate()
+
         return True
     except (OSError, ValueError):
         # We catch ValueError exceptions here to work around bug in the

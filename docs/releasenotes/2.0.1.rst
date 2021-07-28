@@ -1,0 +1,82 @@
+.. default-intersphinx:: rbt2.0
+
+
+===========================
+RBTools 2.0.1 Release Notes
+===========================
+
+**Release date:** July 27, 2021
+
+
+New Features
+============
+
+* Added support for using Breezy_ (a Bazaar fork).
+
+  Breezy is now supported through our existing Bazaar support, and will
+  generate diffs compatible with Review Board.
+
+* The Windows installer has been upgraded from Python 3.8.6 to 3.8.10.
+
+  3.8.10 is the latest version with installers available that covers Windows
+  7 and up.
+
+  If you need a newer version, we recommend installing Python from the
+  Windows Store and following the standard :command:`pip`-based installation
+  instructions for RBTools.
+
+
+.. _Breezy: https://www.breezy-vcs.org/
+
+
+rbt patch
+---------
+
+.. program:: rbt patch
+
+* Added support for writing a patch to a file using the :option:`--write`
+  argument.
+
+  Based on a patch by André Klitzing.
+
+
+Bug Fixes
+=========
+
+General
+-------
+
+* Fixed some harmless (but noisy) warnings on Python 3 when running
+  with Python warnings enabled.
+
+  Patch by Tor Colvin.
+
+
+Bazaar/Breezy
+-------------
+
+* Fixed a compatibility issue between Git and Breezy.
+
+  If installed, Breezy could claim to manage Git repositories during
+  scanning (which would fail). This support has been disabled during
+  repository scanning, allowing our built-in Git support to work as
+  normal.
+
+
+Mercurial
+---------
+
+* Fixed a regression in using :ref:`rbt land <rbt-land>` and
+  :ref:`rbt patch <rbt-patch>` for Mercurial on Python 3. (:bug:`4894`)
+
+  Patch by Gary Kramlich.
+
+
+Contributors
+============
+
+* André Klitzing
+* Christian Hammond
+* David Trowbridge
+* Gary Kramlich
+* Tor Colvin

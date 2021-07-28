@@ -79,6 +79,12 @@ class Patch(Command):
                     'This feature does not work with Bazaar or Mercurial '
                     'repositories.',
                added_in='0.7.3'),
+        Option('--write',
+               dest='patch_outfile',
+               default=None,
+               help='Write the patch to a given file instead of applying '
+                    'it to the tree.',
+               added_in='2.0.1'),
         Option('--commit-ids',
                dest='commit_ids',
                default=None,
@@ -268,6 +274,8 @@ class Patch(Command):
                             'commit_id': commit['commit_id'],
                         })
 
+                assert isinstance(diff_content, bytes)
+
                 patches.append({
                     # DiffSets on review requests created with history
                     # support *always* have an empty base dir.
@@ -424,8 +432,9 @@ class Patch(Command):
             self.options.diff_revision = diff_revision
             self.options.args[0] = review_request_id
 
-        self.needs_scm_client = not self.options.patch_stdout
-        self.needs_repository = not self.options.patch_stdout
+        self.needs_scm_client = (not self.options.patch_stdout and
+                                 not self.options.patch_outfile)
+        self.needs_repository = self.needs_scm_client
 
         super(Patch, self).initialize()
 
@@ -442,18 +451,29 @@ class Patch(Command):
         """
         self._review_request_id = review_request_id
         patch_stdout = self.options.patch_stdout
+        patch_outfile = self.options.patch_outfile
         revert = self.options.revert_patch
         tool = self.tool
 
-        if patch_stdout and revert:
-            raise CommandError(_('--print and --revert cannot both be used.'))
+        if revert:
+            if patch_stdout:
+                raise CommandError(
+                    _('--print and --revert cannot both be used.'))
+
+            if patch_outfile and revert:
+                raise CommandError(
+                    _('--write and --revert cannot both be used.'))
+
+        if patch_stdout and patch_outfile:
+            raise CommandError(
+                _('--print and --write cannot both be used.'))
 
         if revert and not tool.supports_patch_revert:
             raise CommandError(
                 _('The %s backend does not support reverting patches.')
                 % tool.name)
 
-        if not patch_stdout:
+        if not patch_stdout and not patch_outfile:
             # Check if the working directory is clean.
             try:
                 if tool.has_pending_changes():
@@ -487,28 +507,36 @@ class Patch(Command):
             reverted=revert)
 
         if patch_stdout:
-            self._output_patches(patches)
+            if six.PY3:
+                stream = sys.stdout.buffer
+            else:
+                stream = sys.stdout
+
+            self._output_patches(patches, stream)
+        elif patch_outfile:
+            try:
+                with open(patch_outfile, 'wb') as fp:
+                    self._output_patches(patches, fp)
+            except IOError as e:
+                raise CommandError(_('Unable to write patch to %s: %s')
+                                   % (patch_outfile, e))
         else:
             self._apply_patches(patches)
 
-    def _output_patches(self, patches):
+    def _output_patches(self, patches, fp):
         """Output the contents of the patches to the console.
 
         Args:
             patches (list of dict):
                 The list of patches that would be applied.
+
+            fp (file or io.BufferedIOBase):
+                The file pointer or stream to write the patch content to.
+                This must accept byte strings.
         """
         for patch_data in patches:
-            diff_body = patch_data['diff']
-
-            if isinstance(diff_body, bytes):
-                if six.PY3:
-                    sys.stdout.buffer.write(diff_body)
-                    print()
-                else:
-                    print(diff_body.decode('utf-8'))
-            else:
-                print(diff_body)
+            fp.write(patch_data['diff'])
+            fp.write(b'\n')
 
     def _apply_patches(self, patches):
         """Apply a list of patches to the tree.
