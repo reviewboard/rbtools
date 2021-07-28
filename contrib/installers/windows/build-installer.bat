@@ -120,7 +120,7 @@ if not exist "%_dep_path%" (
         AssociateFiles=0 Include_doc=0 Include_debug=0 Include_launcher=0 ^
         Include_tcltk=0 Include_test=0 InstallAllUsers=0 ^
         InstallLauncherAllUsers=0 Shortcuts=0 SimpleInstall=1 ^
-		SimpleInsatllDescription="Python for RBTools for Windows" ^
+		SimpleInstallDescription="Python for RBTools for Windows" ^
 		TargetDir="%_dep_path%-temp"
     xcopy /EYI "%_dep_path%-temp" "%_dep_path%"
 
