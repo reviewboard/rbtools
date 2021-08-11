@@ -36,7 +36,7 @@ class Land(Command):
 
     needs_api = True
     needs_scm_client = True
-    reeds_repository = True
+    needs_repository = True
 
     args = '[<branch-name>]'
     option_list = [
