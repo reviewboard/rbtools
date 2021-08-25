@@ -1290,6 +1290,8 @@ class Post(Command):
         cumulative_diff_info = self.tool.diff(
             revisions=self.revisions,
             extra_args=extra_args,
+            include_files=self.options.include_files or [],
+            exclude_patterns=self.options.exclude_patterns or [],
             **diff_kwargs)
 
         for i, history_entry in enumerate(history_entries):
