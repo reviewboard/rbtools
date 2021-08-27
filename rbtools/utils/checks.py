@@ -25,9 +25,15 @@ def check_install(command):
 
         # Wait for the process to end and pipes to close. This will avoid
         # ResourceWarnings.
-        p.communicate()
+        stdout, stderr = p.communicate()
 
-        return True
+        # When pyenv is in use, and the needed executable is only available in
+        # a different Python version, pyenv intercepts the call and will print
+        # an error/return 127.
+        if b'command not found' in stderr:
+            return False
+        else:
+            return (p.returncode != 127)
     except (OSError, ValueError):
         # We catch ValueError exceptions here to work around bug in the
         # version of Python that ships with OS X 10.11. I don't know if the
