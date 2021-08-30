@@ -1,4 +1,4 @@
-from __future__ import print_function, unicode_literals
+from __future__ import unicode_literals
 
 import logging
 
@@ -82,4 +82,5 @@ class Publish(Command):
             raise CommandError('Error publishing review request (it may '
                                'already be published): %s' % e)
 
-        print('Review request #%s is published.' % review_request_id)
+        self.stdout.write('Review request #%s is published.'
+                          % review_request_id)

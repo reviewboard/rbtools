@@ -1,4 +1,4 @@
-from __future__ import print_function, unicode_literals
+from __future__ import unicode_literals
 
 import logging
 
@@ -229,11 +229,11 @@ class Land(Command):
             author = review_request.get_submitter()
 
             if squash:
-                print('Squashing branch "%s" into "%s".'
-                      % (source_branch, destination_branch))
+                self.stdout.write('Squashing branch "%s" into "%s".'
+                                  % (source_branch, destination_branch))
             else:
-                print('Merging branch "%s" into "%s".'
-                      % (source_branch, destination_branch))
+                self.stdout.write('Merging branch "%s" into "%s".'
+                                  % (source_branch, destination_branch))
 
             if not dry_run:
                 try:
@@ -247,14 +247,16 @@ class Land(Command):
                 except MergeError as e:
                     raise CommandError(six.text_type(e))
         else:
-            print('Applying patch from review request %s.' % review_request.id)
+            self.stdout.write('Applying patch from review request %s.'
+                              % review_request.id)
 
             if not dry_run:
                 self.patch(review_request.id,
                            squash=squash)
 
-        print('Review request %s has landed on "%s".' %
-              (review_request.id, self.options.destination_branch))
+        self.stdout.write('Review request %s has landed on "%s".'
+                          % (review_request.id,
+                             self.options.destination_branch))
 
     def initialize(self):
         """Initialize the command.
@@ -382,8 +384,9 @@ class Land(Command):
             dependencies = toposort(dependency_graph)[1:]
 
             if dependencies:
-                print('Recursively landing dependencies of review request %s.'
-                      % review_request_id)
+                self.stdout.write('Recursively landing dependencies of '
+                                  'review request %s.'
+                                  % review_request_id)
 
                 for dependency in dependencies:
                     land_error = self.can_land(dependency)
@@ -402,8 +405,8 @@ class Land(Command):
                   **land_kwargs)
 
         if self.options.push:
-            print('Pushing branch "%s" upstream'
-                  % self.options.destination_branch)
+            self.stdout.write('Pushing branch "%s" upstream'
+                              % self.options.destination_branch)
 
             if not self.options.dry_run:
                 try:

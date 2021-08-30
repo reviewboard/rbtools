@@ -1,6 +1,6 @@
 """The rbt info command."""
 
-from __future__ import print_function, unicode_literals
+from __future__ import unicode_literals
 
 from texttable import Texttable
 from backports.shutil_get_terminal_size import get_terminal_size
@@ -55,27 +55,27 @@ class Info(Command):
             raise CommandError('This review request does not have diffs '
                                'attached')
 
-        print(review_request.summary)
-        print()
-        print('Submitter: %s'
-              % (review_request.submitter.fullname or
-                 review_request.submitter.username))
-        print()
-        print(review_request.description)
+        self.stdout.write(review_request.summary)
+        self.stdout.new_line()
+        self.stdout.write('Submitter: %s'
+                          % (review_request.submitter.fullname or
+                             review_request.submitter.username))
+        self.stdout.new_line()
+        self.stdout.write(review_request.description)
 
-        print()
-        print('URL: %s' % review_request.absolute_url)
+        self.stdout.new_line()
+        self.stdout.write('URL: %s' % review_request.absolute_url)
 
         if diff:
-            print ('Diff: %sdiff/%s/'
-                   % (review_request.absolute_url, diff_revision))
-            print()
-            print('Revision: %s (of %d)'
-                  % (diff_revision, diffs.total_results))
+            self.stdout.write('Diff: %sdiff/%s/'
+                              % (review_request.absolute_url, diff_revision))
+            self.stdout.new_line()
+            self.stdout.write('Revision: %s (of %d)'
+                              % (diff_revision, diffs.total_results))
 
             if commits:
-                print()
-                print('Commits:')
+                self.stdout.new_line()
+                self.stdout.write('Commits:')
 
                 table = Texttable(get_terminal_size().columns)
                 table.header(('ID', 'Summary', 'Author'))
@@ -89,4 +89,4 @@ class Info(Command):
                     table.add_row((commit.commit_id, summary,
                                    commit.author_name))
 
-                print(table.draw())
+                self.stdout.write(table.draw())

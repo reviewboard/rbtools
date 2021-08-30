@@ -1,4 +1,4 @@
-from __future__ import print_function, unicode_literals
+from __future__ import unicode_literals
 
 import logging
 import os
@@ -709,27 +709,30 @@ class Post(Command):
         # upon posting.
         if self.options.stamp_when_posting:
             if diff_history:
-                print('Cannot stamp review request URL when posting with '
-                      'history.')
+                self.stdout.write('Cannot stamp review request URL '
+                                  'when posting with history.')
             elif not self.tool.can_amend_commit:
-                print('Cannot stamp review rquest URL onto the commit '
-                      'message; stamping is not supported with %s.'
-                      % self.tool.name)
+                self.stdout.write('Cannot stamp review request URL '
+                                  'onto the commit message; stamping is '
+                                  'not supported with %s.'
+                                  % self.tool.name)
 
             else:
                 try:
                     stamp_commit_with_review_url(self.revisions,
                                                  review_request.absolute_url,
                                                  self.tool)
-                    print('Stamped review URL onto the commit message.')
+                    self.stdout.write('Stamped review URL onto the '
+                                      'commit message.')
                 except AlreadyStampedError:
-                    print('Commit message has already been stamped')
+                    self.stdout.write('Commit message has already been '
+                                      'stamped')
                 except Exception as e:
                     logging.debug('Caught exception while stamping the '
                                   'commit message. Proceeding to post '
                                   'without stamping.', exc_info=True)
-                    print('Could not stamp review request URL onto the commit '
-                          'message.')
+                    self.stdout.write('Could not stamp review request URL '
+                                      'onto the commit message.')
 
         # Update the review request draft fields based on options set
         # by the user, or configuration.
@@ -1033,10 +1036,10 @@ class Post(Command):
             squashed_diff=squashed_diff,
             submit_as=self.options.submit_as)
 
-        print('Review request #%s posted.' % review_request_id)
-        print()
-        print(review_request_url)
-        print('%sdiff/' % review_request_url)
+        self.stdout.write('Review request #%s posted.' % review_request_id)
+        self.stdout.new_line()
+        self.stdout.write(review_request_url)
+        self.stdout.write('%sdiff/' % review_request_url)
 
         # Load the review up in the browser if requested to.
         if self.options.open_browser:

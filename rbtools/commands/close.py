@@ -1,4 +1,4 @@
-from __future__ import print_function, unicode_literals
+from __future__ import unicode_literals
 
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option
@@ -67,5 +67,5 @@ class Close(Command):
         else:
             review_request = review_request.update(status=close_type)
 
-        print('Review request #%s is set to %s.' %
-              (review_request_id, review_request.status))
+        self.stdout.write('Review request #%s is set to %s.'
+                          % (review_request_id, review_request.status))

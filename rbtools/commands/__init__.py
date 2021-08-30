@@ -1,4 +1,4 @@
-from __future__ import print_function, unicode_literals
+from __future__ import unicode_literals
 
 import argparse
 import inspect
@@ -61,6 +61,57 @@ class SmartHelpFormatter(argparse.HelpFormatter):
             lines.append('')
 
         return lines[:-1]
+
+
+class OutputWrapper(object):
+    """Wrapper for output of a command.
+
+    Wrapper around some output object that handles outputting messages.
+    Child classes specify the default object. The wrapper can handle
+    messages in either unicode or bytes.
+
+    Version Added:
+        3.0
+    """
+
+    def __init__(self, output_stream):
+        """Initialize with an output object to stream to.
+
+        Args:
+            output_stream (object):
+                The output stream to send command output to.
+        """
+        self.output_stream = output_stream
+
+    def write(self, msg, end='\n'):
+        """Write a message to the output stream.
+
+        Write a string to output stream object if defined, otherwise
+        do nothing. end specifies a string that should be appended to
+        the end of msg before being given to the output stream.
+
+        Args:
+            msg (unicode):
+                String to write to output stream.
+
+            end (unicode, optional):
+                String to append to end of msg. This defaults to ``\n```.
+        """
+        if self.output_stream:
+            if end:
+                if (isinstance(msg, bytes) and
+                    isinstance(end, six.string_types)):
+                    msg += end.encode('utf-8')
+                else:
+                    msg += end
+
+            self.output_stream.write(msg)
+
+    def new_line(self):
+        """Pass a new line character to output stream object.
+        """
+        if self.output_stream:
+            self.output_stream.write('\n')
 
 
 class Option(object):
@@ -182,6 +233,19 @@ class Command(object):
 
         server_url (unicode):
             The URL to the Review Board server.
+
+        stdout (OutputWrapper):
+            Standard unicode output wrapper that subclasses must write to.
+
+        stderr (OutputWrapper):
+            Standard unicode error output wrapper that subclasses must write
+            to.
+
+        stdout_byte (OutputWrapper):
+            Standard byte output wrapper that subclasses must write to.
+
+        stderr_byte (OutputWrapper):
+            Standard byte error output wrapper that subclasses must write to.
 
         tool (rbtools.clients.SCMClient):
             The SCM client. This will be ``None`` if
@@ -677,6 +741,16 @@ class Command(object):
         self.server_url = None
         self.tool = None
 
+        self.stdout = OutputWrapper(sys.stdout)
+        self.stderr = OutputWrapper(sys.stderr)
+
+        if six.PY2:
+            self.stderr_bytes = OutputWrapper(sys.stderr)
+            self.stdout_bytes = OutputWrapper(sys.stdout)
+        else:
+            self.stderr_bytes = OutputWrapper(sys.stderr.buffer)
+            self.stdout_bytes = OutputWrapper(sys.stdout.buffer)
+
     def create_parser(self, config, argv=[]):
         """Create and return the argument parser for this command."""
         parser = argparse.ArgumentParser(
@@ -973,9 +1047,10 @@ class Command(object):
 
                 raise CommandError('Unable to log in to Review Board.')
 
-            print()
-            print('Please log in to the Review Board server at %s.' %
-                  urlparse(uri)[1])
+            self.stdout.new_line()
+            self.stdout.write('Please log in to the Review Board server at '
+                              '%s.'
+                              % urlparse(uri)[1])
 
             if username is None:
                 username = get_input('Username: ')
@@ -997,22 +1072,23 @@ class Command(object):
                                'required, but cannot be used with '
                                '--diff-filename=-')
 
-        print()
-        print('Please enter your two-factor authentication token for Review '
-              'Board.')
+        self.stdout.new_line()
+        self.stdout.write('Please enter your two-factor authentication '
+                          'token for Review Board.')
 
         if token_method == 'sms':
-            print('You should be getting a text message with '
-                  'an authentication token.')
-            print('Enter the token below.')
+            self.stdout.write('You should be getting a text message with '
+                              'an authentication token.')
+            self.stdout.write('Enter the token below.')
         elif token_method == 'call':
-            print('You should be getting an automated phone call with '
-                  'an authentication token.')
-            print('Enter the token below.')
+            self.stdout.write('You should be getting an automated phone '
+                              'call with an authentication token.')
+            self.stdout.write('Enter the token below.')
         elif token_method == 'generator':
-            print('Enter the token shown on your token generator app below.')
+            self.stdout.write('Enter the token shown on your token '
+                              'generator app below.')
 
-        print()
+        self.stdout.new_line()
 
         return get_pass('Token: ', require=True)
 

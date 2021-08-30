@@ -1,4 +1,4 @@
-from __future__ import print_function, unicode_literals
+from __future__ import unicode_literals
 
 import logging
 import re
@@ -103,11 +103,11 @@ class Status(Command):
 
                 table.add_row(row)
 
-            print(table.draw())
+            self.stdout.write(table.draw())
         else:
-            print('No review requests found.')
+            self.stdout.write('No review requests found.')
 
-        print()
+        self.stdout.new_line()
 
     def get_data(self, requests):
         """Return current status and review summary for all reviews.
@@ -212,4 +212,4 @@ class Status(Command):
             end = '\n'
 
         for info in review_requests:
-            print(fmt % info, end=end)
+            self.stdout.write(fmt % info, end=end)

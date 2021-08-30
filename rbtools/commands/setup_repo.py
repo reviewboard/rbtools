@@ -1,4 +1,4 @@
-from __future__ import print_function, unicode_literals
+from __future__ import unicode_literals
 
 import difflib
 import os
@@ -83,8 +83,8 @@ class SetupRepo(Command):
                                                   n=4, cutoff=0.4)
 
         if closest_paths:
-            print()
-            print(
+            self.stdout.new_line()
+            self.stdout.write(
                 '%(num)s matching %(repo_type)s repositories found:'
                 % {
                     'num': len(closest_paths),
@@ -99,10 +99,11 @@ class SetupRepo(Command):
                 current_repo_index = closest_paths[repo_chosen]
                 current_repo = repo_paths[current_repo_index]
 
-                print()
-                print('Selecting "%s" (%s)...' % (current_repo['name'],
-                                                  current_repo['path']))
-                print()
+                self.stdout.new_line()
+                self.stdout.write('Selecting "%s" (%s)...'
+                                  % (current_repo['name'],
+                                     current_repo['path']))
+                self.stdout.new_line()
 
                 return current_repo
 
@@ -129,34 +130,34 @@ class SetupRepo(Command):
             raise CommandError('I/O error generating config file (%s): %s'
                                % (e.errno, e.strerror))
 
-        print('%s creation successful! Config written to %s' % (CONFIG_FILE,
-                                                                file_path))
+        self.stdout.write('%s creation successful! Config written to %s'
+                          % (CONFIG_FILE, file_path))
 
     def main(self, *args):
         server = self.options.server
         api_client = None
         api_root = None
 
-        print()
-        print(textwrap.fill(
+        self.stdout.new_line()
+        self.stdout.write(textwrap.fill(
             'This command is intended to help users create a %s file in '
             'the current directory to connect a repository and Review '
             'Board server.')
             % CONFIG_FILE)
-        print()
-        print(textwrap.fill(
+        self.stdout.new_line()
+        self.stdout.write(textwrap.fill(
             'Repositories must currently exist on your server (either '
             'hosted internally or via RBCommons) to successfully '
             'generate this file.'))
-        print(textwrap.fill(
+        self.stdout.write(textwrap.fill(
             'Repositories can be added using the Admin Dashboard in '
             'Review Board or under your team administration settings in '
             'RBCommons.'))
-        print()
-        print(textwrap.fill(
+        self.stdout.new_line()
+        self.stdout.write(textwrap.fill(
             'Press CTRL + C anytime during this command to cancel '
             'generating your config file.'))
-        print()
+        self.stdout.new_line()
 
         while True:
             if server:
@@ -165,10 +166,10 @@ class SetupRepo(Command):
                     api_client, api_root = self.get_api(server)
                     break
                 except CommandError as e:
-                    print()
-                    print('%s' % e)
-                    print('Please try again.')
-                    print()
+                    self.stdout.new_line()
+                    self.stdout.write('%s' % e)
+                    self.stdout.write('Please try again.')
+                    self.stdout.new_line()
 
             server = input('Enter the Review Board server URL: ')
 
@@ -191,8 +192,8 @@ class SetupRepo(Command):
         # While a repository is not chosen, keep the repository selection
         # prompt displayed until the prompt is cancelled.
         while True:
-            print()
-            print('Current server: %s' % server)
+            self.stdout.new_line()
+            self.stdout.write('Current server: %s' % server)
             selected_repo = self.prompt_rb_repository(
                 local_tool_name=tool.name,
                 server_tool_names=tool.server_tool_names,
@@ -200,19 +201,22 @@ class SetupRepo(Command):
                 api_root=api_root)
 
             if not selected_repo:
-                print()
-                print('No %s repository found for the Review Board server %s'
-                      % (tool.name, server))
-                print()
-                print('Cancelling %s creation...' % CONFIG_FILE)
-                print()
-                print(textwrap.fill(
-                    'Please make sure your repositories currently exist on '
-                    'your server. Repositories can be configured using the '
-                    'Review Board Admin Dashboard or under your team '
-                    'administration settings in RBCommons. For more '
-                    'information, see `rbt help setup-repo` or the official '
-                    'docs at https://www.reviewboard.org/docs/.'))
+                self.stdout.new_line()
+                self.stdout.write('No %s repository found for the Review '
+                                  'Board server %s'
+                                  % (tool.name, server))
+                self.stdout.new_line()
+                self.stdout.write('Cancelling %s creation...' % CONFIG_FILE)
+                self.stdout.new_line()
+                self.stdout.write(textwrap.fill(
+                    'Please make sure your repositories '
+                    'currently exist on your server. '
+                    'Repositories can be configured using the '
+                    'Review Board Admin Dashboard or under your '
+                    'team administration settings in RBCommons. '
+                    'For more information, see `rbt help '
+                    'setup-repo` or the official docs at '
+                    'https://www.reviewboard.org/docs/.'))
                 return
 
             config = [
@@ -258,7 +262,7 @@ class SetupRepo(Command):
         """
         for i, repo_url in enumerate(closest_paths):
             repo = repo_paths[repo_url]
-            print(
+            self.stdout.write(
                 '%(num)d) "%(repo_name)s" (%(repo_url)s)'
                 % {
                     'num': i + 1,

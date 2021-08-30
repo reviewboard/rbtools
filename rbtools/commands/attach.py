@@ -1,4 +1,4 @@
-from __future__ import print_function, unicode_literals
+from __future__ import unicode_literals
 
 import os
 
@@ -52,5 +52,5 @@ class Attach(Command):
         except APIError as e:
             raise CommandError('Error uploading file: %s' % e)
 
-        print('Uploaded %s to review request %s.' %
-              (path_to_file, review_request_id))
+        self.stdout.write('Uploaded %s to review request %s.'
+                          % (path_to_file, review_request_id))

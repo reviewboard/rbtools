@@ -130,10 +130,12 @@ class StatusUpdate(Command):
         else:
             description = ''
 
-        print(' %d\t%s: <%s> %s%s' %
-              (status_update.get('id'), status_update.get('service_id'),
-               status_update.get('state'), status_update.get('summary'),
-               description))
+        self.stdout.write(' %d\t%s: <%s> %s%s'
+                          % (status_update.get('id'),
+                             status_update.get('service_id'),
+                             status_update.get('state'),
+                             status_update.get('summary'),
+                             description))
 
     def _dict_status_update(self, status_update):
         """Create a dict for status update.
@@ -171,7 +173,7 @@ class StatusUpdate(Command):
             else:
                 output = self._dict_status_update(response)
 
-            print(json.dumps(output, indent=2, sort_keys=True))
+            self.stdout.write(json.dumps(output, indent=2, sort_keys=True))
         else:
             if isinstance(response, list):
                 for status_update in response:
@@ -301,7 +303,7 @@ class StatusUpdate(Command):
                     .rsp.get('status_updates'))
         except APIError as e:
             if e.rsp:
-                print(json.dumps(e.rsp, indent=2))
+                self.stdout.write(json.dumps(e.rsp, indent=2))
                 raise CommandExit(1)
             else:
                 raise CommandError('Could not retrieve the requested '
@@ -374,7 +376,7 @@ class StatusUpdate(Command):
             self.print(status_update.rsp.get('status_update'))
         except APIError as e:
             if e.rsp:
-                print(json.dumps(e.rsp, indent=2))
+                self.stdout.write(json.dumps(e.rsp, indent=2))
                 raise CommandExit(1)
             else:
                 raise CommandError('Could not set the requested '

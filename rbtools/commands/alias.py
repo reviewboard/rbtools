@@ -1,4 +1,4 @@
-from __future__ import print_function, unicode_literals
+from __future__ import unicode_literals
 
 from collections import defaultdict
 from subprocess import list2cmdline
@@ -64,19 +64,20 @@ class Alias(Command):
 
         for config_path in config_paths:
             if aliases[config_path]:
-                print('[%s]' % config_path)
+                self.stdout.write('[%s]' % config_path)
 
                 for alias_name, entry in six.iteritems(aliases[config_path]):
-                    print('    %s = %s' % (alias_name, entry['command']))
+                    self.stdout.write('    %s = %s'
+                                      % (alias_name, entry['command']))
 
                     if entry['invalid']:
-                        print('      !! This alias is overridden by an rbt '
-                              'command !!')
+                        self.stdout.write('      !! This alias is overridden '
+                                          'by an rbt command !!')
                     elif entry['overridden']:
-                        print('      !! This alias is overridden by another '
-                              'alias in "%s" !!'
-                              % predefined_aliases[alias_name])
-                print()
+                        self.stdout.write('      !! This alias is overridden '
+                                          'by another alias in "%s" !!'
+                                          % predefined_aliases[alias_name])
+                self.stdout.new_line()
 
     def main(self, *args):
         """Run the command."""
@@ -96,4 +97,4 @@ class Alias(Command):
 
             command = expand_alias(alias, args)[0]
 
-            print(list2cmdline(command))
+            self.stdout.write(list2cmdline(command))

@@ -1,4 +1,4 @@
-from __future__ import print_function, unicode_literals
+from __future__ import unicode_literals
 
 import logging
 
@@ -162,5 +162,5 @@ class Stamp(Command):
 
         stamp_commit_with_review_url(revisions, review_request_url, self.tool)
 
-        print('Successfully stamped change with the URL:')
-        print(review_request_url)
+        self.stdout.write('Successfully stamped change with the URL:')
+        self.stdout.write(review_request_url)

@@ -5,8 +5,11 @@ from __future__ import unicode_literals
 import os.path
 import sys
 
+import kgb
+import six
+
 from rbtools import get_version_string
-from rbtools.commands import main as rbt_main
+from rbtools.commands import main as rbt_main, OutputWrapper
 from rbtools.utils.process import execute
 from rbtools.utils.testbase import RBTestBase
 
@@ -118,3 +121,62 @@ class MainCommandTests(RBTestBase):
             The resulting output from the command.
         """
         return execute([sys.executable, _rbt_path] + list(args))
+
+
+class OutputWrapperTests(kgb.SpyAgency, RBTestBase):
+    """Unit tests for command OutputWrapper."""
+
+    def test_output_wrapper_initiates(self):
+        """Testing OutputWrapper instantiates given stream object
+        """
+        stdout = OutputWrapper(sys.stdout)
+
+        self.assertIs(stdout.output_stream, sys.stdout)
+
+    def test_output_wrapper_write(self):
+        """Testing OutputWrapper.write passes correct message to stream object
+        """
+        stdout = OutputWrapper(sys.stdout)
+        self.spy_on(sys.stdout.write)
+
+        stdout.write('test')
+        self.assertSpyCalledWith(sys.stdout.write, 'test\n')
+
+        stdout.write(msg='test', end='end')
+        self.assertSpyCalledWith(sys.stdout.write, 'testend')
+
+        stdout.write(msg='test', end=None)
+        self.assertSpyCalledWith(sys.stdout.write, 'test')
+
+    def test_output_wrapper_bytes_write(self):
+        """Testing OutputWrapper.write when writing byte strings"""
+        if six.PY2:
+            stdout_bytes = OutputWrapper(sys.stdout)
+            self.spy_on(sys.stdout.write)
+        else:
+            stdout_bytes = OutputWrapper(sys.stdout.buffer)
+            self.spy_on(sys.stdout.buffer.write)
+
+        stdout_bytes.write(msg=b'test', end=None)
+
+        if six.PY2:
+            self.assertSpyCalledWith(sys.stdout.write, b'test')
+        else:
+            self.assertSpyCalledWith(sys.stdout.buffer.write, b'test')
+
+        stdout_bytes.write(msg=b'test')
+
+        if six.PY2:
+            self.assertSpyCalledWith(sys.stdout.write, b'test\n')
+        else:
+            self.assertSpyCalledWith(sys.stdout.buffer.write, b'test\n')
+
+    def test_output_wrapper_newline(self):
+        """Testing OutputWrapper.new_line passes a newline character to
+        stream object
+        """
+        stdout = OutputWrapper(sys.stdout)
+
+        self.spy_on(sys.stdout.write)
+        stdout.new_line()
+        self.assertSpyCalledWith(sys.stdout.write, '\n')

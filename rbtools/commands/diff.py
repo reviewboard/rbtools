@@ -1,4 +1,4 @@
-from __future__ import print_function, unicode_literals
+from __future__ import unicode_literals
 
 import sys
 
@@ -98,8 +98,8 @@ class Diff(Command):
 
         if diff:
             if six.PY2:
-                print(diff)
+                self.stdout.write(diff)
             else:
                 # Write the non-decoded binary diff to standard out
-                sys.stdout.buffer.write(diff)
-                print()
+                self.stdout_bytes.write(diff)
+                self.stdout.new_line()

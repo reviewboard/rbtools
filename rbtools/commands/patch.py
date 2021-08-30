@@ -1,6 +1,6 @@
 """The rbt patch command."""
 
-from __future__ import print_function, unicode_literals
+from __future__ import unicode_literals
 
 import logging
 import os
@@ -354,17 +354,17 @@ class Patch(Command):
             revert=revert)
 
         if result.patch_output:
-            print()
+            self.stdout.new_line()
 
             patch_output = result.patch_output.strip()
 
             if six.PY2:
-                print(patch_output)
+                self.stdout.write(patch_output)
             else:
-                sys.stdout.buffer.write(patch_output)
-                print()
+                self.stdout_bytes.write(patch_output)
+                self.stdout.new_line()
 
-            print()
+            self.stdout.new_line()
 
         if not result.applied:
             if revert:
@@ -379,24 +379,24 @@ class Patch(Command):
         if result.has_conflicts:
             if result.conflicting_files:
                 if revert:
-                    print('The patch was partially reverted, but there were '
-                          'conflicts in:')
+                    self.stdout.write('The patch was partially reverted, but '
+                                      'there were conflicts in:')
                 else:
-                    print('The patch was partially applied, but there were '
-                          'conflicts in:')
+                    self.stdout.write('The patch was partially applied, but '
+                                      'there were conflicts in:')
 
-                print()
+                self.stdout.new_line()
 
                 for filename in result.conflicting_files:
-                    print('    %s' % filename)
+                    self.stdout.write('    %s' % filename)
 
-                print()
+                self.stdout.new_line()
             elif revert:
-                print('The patch was partially reverted, but there were '
-                      'conflicts.')
+                self.stdout.write('The patch was partially reverted, '
+                                  'but there were conflicts.')
             else:
-                print('The patch was partially applied, but there were '
-                      'conflicts.')
+                self.stdout.write('The patch was partially applied, but '
+                                  'there were conflicts.')
 
             return False
 
@@ -507,12 +507,7 @@ class Patch(Command):
             reverted=revert)
 
         if patch_stdout:
-            if six.PY3:
-                stream = sys.stdout.buffer
-            else:
-                stream = sys.stdout
-
-            self._output_patches(patches, stream)
+            self._output_patches(patches, self.stdout_bytes)
         elif patch_outfile:
             try:
                 with open(patch_outfile, 'wb') as fp:

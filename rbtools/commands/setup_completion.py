@@ -1,4 +1,4 @@
-from __future__ import print_function, unicode_literals
+from __future__ import unicode_literals
 
 import logging
 import os
@@ -74,8 +74,9 @@ class SetupCompletion(Command):
             logging.error('I/O Error (%s): %s', e.errno, e.strerror)
             sys.exit()
 
-        print('Successfully installed %s auto-completions.' % shell)
-        print('Restart the terminal for completions to work.')
+        self.stdout.write('Successfully installed %s auto-completions.'
+                          % shell)
+        self.stdout.write('Restart the terminal for completions to work.')
 
     def main(self, shell=None):
         """Run the command.

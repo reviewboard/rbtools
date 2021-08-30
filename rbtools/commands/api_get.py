@@ -1,4 +1,4 @@
-from __future__ import print_function, unicode_literals
+from __future__ import unicode_literals
 
 import json
 import re
@@ -54,10 +54,10 @@ class APIGet(Command):
                 resource = self.api_client.get_path(path, **query_args)
         except APIError as e:
             if e.rsp:
-                print(self._dumps(e.rsp))
+                self.stdout.write(self._dumps(e.rsp))
                 raise CommandExit(1)
             else:
                 raise CommandError('Could not retrieve the requested '
                                    'resource: %s' % e)
 
-        print(self._dumps(resource.rsp))
+        self.stdout.write(self._dumps(resource.rsp))
