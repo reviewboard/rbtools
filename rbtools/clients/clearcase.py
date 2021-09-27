@@ -2062,6 +2062,11 @@ class ClearCaseClient(SCMClient):
             rbtools.clients.errors.SCMError:
                 Could not determine the host info.
         """
+        if not check_install(['cleartool', 'help']):
+            logging.debug('Unable to execute "cleartool help": skipping '
+                          'ClearCase')
+            return None
+
         property_lines = execute(['cleartool', 'hostinfo', '-l'],
                                  split_lines=True)
 
