@@ -3,6 +3,7 @@
 from __future__ import unicode_literals
 
 import os
+import unittest
 
 import kgb
 import six
@@ -11,6 +12,7 @@ from rbtools.clients.clearcase import ClearCaseClient, ClearCaseRepositoryInfo
 from rbtools.clients.errors import SCMError
 from rbtools.clients.tests import SCMClientTests
 from rbtools.utils.checks import check_gnu_diff
+from rbtools.utils.filesystem import is_exe_in_path
 from rbtools.utils.process import execute
 
 
@@ -112,6 +114,8 @@ _WEBVIEW_VIEW_INFO = [
 class ClearCaseClientTests(kgb.SpyAgency, SCMClientTests):
     """Unit tests for ClearCaseClient."""
 
+    @unittest.skipIf(not is_exe_in_path('cleartool'),
+                     'cleartool not found in path')
     def setUp(self):
         super(ClearCaseClientTests, self).setUp()
 
