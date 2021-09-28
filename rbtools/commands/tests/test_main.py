@@ -2,11 +2,14 @@
 
 from __future__ import unicode_literals
 
+import io
 import os.path
 import sys
 
+import kgb
+
 from rbtools import get_version_string
-from rbtools.commands import main as rbt_main, OutputWrapper
+from rbtools.commands import JSONOutput, main as rbt_main, OutputWrapper
 from rbtools.utils.process import execute
 from rbtools.utils.testbase import RBTestBase
 
@@ -118,3 +121,58 @@ class MainCommandTests(RBTestBase):
             The resulting output from the command.
         """
         return execute([sys.executable, _rbt_path] + list(args))
+
+
+class JSONOutputTests(kgb.SpyAgency, RBTestBase):
+    """Tests for JSON output wrapper for --json command.
+    """
+
+    def setUp(self):
+        """Set up the test suite."""
+        super(JSONOutputTests, self).setUp()
+
+        self.json = JSONOutput(sys.stdout)
+
+    def test_json_wrapper_initializes(self):
+        """Testing JSONOutput instantiates given stream object.
+        """
+        self.assertIs(self.json._output_stream, sys.stdout)
+
+    def test_json_wrapper_initiates(self):
+        """Testing JSONOutput instantiates empty dictionary.
+        """
+        self.assertEqual(len(self.json._output), 0)
+
+    def test_json_wrapper_add(self):
+        """Testing JSONOutput.add adds a key value pair to output.
+        """
+        self.json.add('key', 'value')
+
+        self.assertEqual(self.json._output['key'], 'value')
+
+    def test_json_wrapper_append(self):
+        """Testing JSONOutput.append appends to list associated with a key.
+        """
+        self.json.add('test', [])
+        self.json.append('test', 'test')
+
+        self.assertEqual(self.json._output['test'], ['test'])
+
+        try:
+            self.json.append('nonexistent', 'test')
+        except KeyError:
+            pass
+
+        self.assertNotIn('nonexistent', self.json._output)
+
+    def test_json_wrapper_add_error(self):
+        """Testing JSONOutput.add_error will append to the errors key if it
+        already exists and create a new errors key if it does not.
+        """
+        self.json.add_error('test_error')
+
+        self.assertEqual(self.json._output['errors'], ['test_error'])
+
+        self.json.add_error('test_error2')
+        self.assertEqual(self.json._output['errors'],
+                         ['test_error', 'test_error2'])

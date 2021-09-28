@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 import argparse
 import inspect
 import io
+import json
 import logging
 import platform
 import os
@@ -43,6 +44,81 @@ class CommandError(Exception):
 
 class ParseError(CommandError):
     pass
+
+
+class JSONOutput(object):
+    """Output wrapper for JSON output.
+
+    JSON outputter class that stores Command outputs in python dictionary
+    and outputs as JSON object to output stream object. Commands should add any
+    structured output to this object. JSON output is then enabled with the
+    --json argument.
+
+    Version Added:
+        4.0
+    """
+    def __init__(self, output_stream):
+        """Initialize JSONOutput class.
+
+        Args:
+            output_stream (Object):
+                Object to output JSON object to.
+        """
+        self._output = {}
+        self._output_stream = output_stream
+
+    def add(self, key, value):
+        """Add a new key value pair.
+
+        Args:
+            key (unicode):
+                The key associated with the value to be added to dictionary.
+
+            value (object):
+                The value to attach to the key in the dictionary.
+        """
+        self._output[key] = value
+
+    def append(self, key, value):
+        """Add new value to an existing list associated with key.
+
+        Args:
+            key (unicode):
+                The key associated with the list to append to.
+
+            value (object):
+                The value to append to the list associated with key.
+
+        Raises:
+            KeyError:
+                The key was not found in the state.
+
+            AttributeError:
+                The existing value was not a list.
+        """
+        self._output[key].append(value)
+
+    def add_error(self, error):
+        """Add new error to 'errors' key.
+
+        Append new error to errors key if it exists. If errors key
+        does not exist, create new list associated with errors and append
+        new error.
+
+        Args:
+            error (unicode):
+                Error that will be added to list associated with key 'error'
+        """
+        if 'errors' in self._output:
+            self._output['errors'].append(error)
+        else:
+            self._output['errors'] = [error]
+
+    def print_to_stream(self):
+        """Output JSON string representation to output stream.
+        """
+        self._output_stream.write(json.dumps(self._output, indent=4))
+        self._output_stream.write('\n')
 
 
 class SmartHelpFormatter(argparse.HelpFormatter):
@@ -331,6 +407,12 @@ class Command(object):
                help='Displays debug output.',
                extended_help='This information can be valuable when debugging '
                              'problems running the command.'),
+        Option('--json',
+               action='store_true',
+               dest='json_output',
+               config_key='JSON_OUTPUT',
+               default=False,
+               help='Output results as JSON data instead of text')
     ]
 
     server_options = OptionGroup(
@@ -732,6 +814,7 @@ class Command(object):
                 this uses the transport defined in
                 :py:attr:`default_transport_cls`.
         """
+
         self.log = logging.getLogger('rb.%s' % self.name)
         self.transport_cls = transport_cls or self.default_transport_cls
         self.api_client = None
@@ -753,6 +836,8 @@ class Command(object):
             # stderr are actually io.StringIO)
             self.stderr_bytes = OutputWrapper(sys.stderr)
             self.stdout_bytes = OutputWrapper(sys.stdout)
+
+        self.json = JSONOutput(sys.stdout)
 
     def create_parser(self, config, argv=[]):
         """Create and return the argument parser for this command."""
@@ -868,6 +953,12 @@ class Command(object):
             if self.repository:
                 self.repository_info.update_from_remote(self.repository, info)
 
+        if self.options.json_output:
+            self.stdout.output_stream = None
+            self.stderr.output_stream = None
+            self.stderr_bytes.output_stream = None
+            self.stdout_bytes.output_stream = None
+
     def create_arg_parser(self, argv):
         """Create and return the argument parser.
 
@@ -926,6 +1017,7 @@ class Command(object):
                 raise
 
             logging.error(e)
+            self.json.add_error(str(e))
             exit_code = 1
         except CommandExit as e:
             exit_code = e.exit_code
@@ -941,6 +1033,15 @@ class Command(object):
             exit_code = 1
 
         cleanup_tempfiles()
+
+        if self.options.json_output:
+            if 'errors' in self.json._output:
+                self.json.add('status', 'failed')
+            else:
+                self.json.add('status', 'success')
+
+            self.json.print_to_stream()
+
         sys.exit(exit_code)
 
     def initialize_scm_tool(self, client_name=None,
