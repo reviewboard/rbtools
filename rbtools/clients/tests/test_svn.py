@@ -17,7 +17,7 @@ from rbtools.api.tests.base import MockResponse
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError)
 from rbtools.clients.svn import SVNRepositoryInfo, SVNClient
-from rbtools.clients.tests import FOO1, FOO2, FOO3, SCMClientTests
+from rbtools.clients.tests import FOO1, FOO2, FOO3, SCMClientTestCase
 from rbtools.utils.checks import is_valid_version
 from rbtools.utils.filesystem import is_exe_in_path
 from rbtools.utils.process import execute
@@ -56,7 +56,7 @@ _MATCH_URL_TOOL = 'tool=Subversion'
 _MATCH_URL_FIELDS = 'only-fields=id%2Cname%2Cmirror_path%2Cpath'
 
 
-class SVNRepositoryMatchTests(kgb.SpyAgency, SCMClientTests):
+class SVNRepositoryMatchTests(kgb.SpyAgency, SCMClientTestCase):
     """Unit tests for rbtools.clients.svn.SVNRepositoryInfo."""
 
     payloads = {
@@ -365,23 +365,48 @@ class SVNRepositoryMatchTests(kgb.SpyAgency, SCMClientTests):
             '/')
 
 
-class SVNClientTests(SCMClientTests):
-    def setUp(self):
-        super(SVNClientTests, self).setUp()
+class SVNClientTests(SCMClientTestCase):
+    """Unit tests for SVNClient."""
 
+    @classmethod
+    def setup_checkout(cls, checkout_dir):
+        """Populate a Subversion checkout.
+
+        This will create a checkout of the sample Subversion repository stored
+        in the :file:`testdata` directory.
+
+        Args:
+            checkout_dir (unicode):
+                The top-level directory in which the checkout will be placed.
+
+        Returns:
+            The main checkout directory, or ``None`` if :command:`svn` isn't
+            in the path.
+        """
+        if not is_exe_in_path('svn'):
+            return None
+
+        cls.svn_dir = os.path.join(cls.testdata_dir, 'svn-repo')
+        cls.svn_repo_url = 'file://%s' % cls.svn_dir
+        cls.clone_dir = os.path.join(checkout_dir, 'svn-repo')
+
+        os.mkdir(checkout_dir, 0o700)
+        os.chdir(checkout_dir)
+        cls._run_svn(['co', cls.svn_repo_url, cls.clone_dir])
+
+        return cls.clone_dir
+
+    def setUp(self):
         if not is_exe_in_path('svn'):
             raise SkipTest('svn not found in path')
 
-        self.svn_dir = os.path.join(self.testdata_dir, 'svn-repo')
-        self.clone_dir = self.chdir_tmp()
-        self.svn_repo_url = 'file://' + self.svn_dir
-        self._run_svn(['co', self.svn_repo_url, 'svn-repo'])
-        os.chdir(os.path.join(self.clone_dir, 'svn-repo'))
+        super(SVNClientTests, self).setUp()
 
-        self.client = SVNClient(options=self.options)
         self.options.svn_show_copies_as_adds = None
+        self.client = SVNClient(options=self.options)
 
-    def _run_svn(self, command):
+    @classmethod
+    def _run_svn(cls, command):
         return execute(['svn'] + command, env=None, split_lines=False,
                        ignore_errors=False, extra_ignore_errors=())
 

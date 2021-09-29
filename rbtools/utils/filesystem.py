@@ -124,14 +124,24 @@ def make_tempfile(content=None, prefix='rbtools.', suffix=None, filename=None):
     return tmpfile
 
 
-def make_tempdir(parent=None):
+def make_tempdir(parent=None, track=True):
     """Create a temporary directory and return the path.
 
-    The path is stored in an array for later cleanup.
+    By default, the path will be stored in a list for cleanup when calling
+    :py:func:`cleanup_tempfiles`.
+
+    Version Changed:
+        3.0:
+        Added ``track``.
 
     Args:
         parent (unicode, optional):
             An optional parent directory to create the path in.
+
+        track (bool, optional):
+            Whether to track the directory for later cleanup.
+
+            .. versionadded:: 3.0
 
     Returns:
         unicode:
@@ -139,7 +149,9 @@ def make_tempdir(parent=None):
     """
     tmpdir = tempfile.mkdtemp(prefix='rbtools.',
                               dir=parent)
-    tempdirs.append(tmpdir)
+
+    if track:
+        tempdirs.append(tmpdir)
 
     return tmpdir
 

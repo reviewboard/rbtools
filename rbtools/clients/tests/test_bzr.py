@@ -10,13 +10,54 @@ from nose import SkipTest
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.bazaar import BazaarClient
 from rbtools.clients.errors import TooManyRevisionsError
-from rbtools.clients.tests import FOO, FOO1, FOO2, FOO3, SCMClientTests
+from rbtools.clients.tests import FOO, FOO1, FOO2, FOO3, SCMClientTestCase
 from rbtools.utils.filesystem import is_exe_in_path, make_tempdir
 from rbtools.utils.process import execute
 
 
-class BazaarClientTests(SCMClientTests):
+class BazaarClientTests(SCMClientTestCase):
     """Unit tests for BazaarClient."""
+
+    @classmethod
+    def setup_checkout(cls, checkout_dir):
+        """Populate two Bazaar clones.
+
+        This will create a clone of the sample Bazaar repository stored in
+        the :file:`testdata` directory, and a child clone of that first
+        clone.
+
+        Args:
+            checkout_dir (unicode):
+                The top-level directory in which clones will be placed.
+
+        Returns:
+            The main clone directory, or ``None`` if :command:`bzr` isn't
+            in the path.
+        """
+        if not is_exe_in_path('bzr'):
+            return None
+
+        original_branch = os.path.join(checkout_dir, 'orig')
+        child_branch = os.path.join(checkout_dir, 'child')
+
+        os.mkdir(checkout_dir, 0o700)
+        os.mkdir(original_branch, 0o700)
+        os.mkdir(child_branch, 0o700)
+
+        cls._run_bzr(['init', '.'], cwd=original_branch)
+        cls._bzr_add_file_commit(filename='foo.txt',
+                                 data=FOO,
+                                 msg='initial commit',
+                                 cwd=original_branch)
+
+        cls._run_bzr(
+            ['branch', '--use-existing-dir', original_branch, child_branch],
+            cwd=original_branch)
+
+        cls.original_branch = original_branch
+        cls.child_branch = child_branch
+
+        return original_branch
 
     def setUp(self):
         if not is_exe_in_path('bzr'):
@@ -24,26 +65,17 @@ class BazaarClientTests(SCMClientTests):
 
         super(BazaarClientTests, self).setUp()
 
-        self.set_user_home(
-            os.path.join(self.testdata_dir, 'homedir'))
-
-        self.original_branch = make_tempdir()
-        self._run_bzr(['init', '.'], cwd=self.original_branch)
-        self._bzr_add_file_commit('foo.txt', FOO, 'initial commit',
-                                  cwd=self.original_branch)
-
-        self.child_branch = make_tempdir()
-        self._run_bzr(['branch', '--use-existing-dir', self.original_branch,
-                       self.child_branch],
-                      cwd=self.original_branch)
-        self.client = BazaarClient(options=self.options)
+        self.set_user_home(os.path.join(self.testdata_dir, 'homedir'))
 
         self.options.parent_branch = None
+        self.client = BazaarClient(options=self.options)
 
-    def _run_bzr(self, command, *args, **kwargs):
+    @classmethod
+    def _run_bzr(cls, command, *args, **kwargs):
         return execute(['bzr'] + command, *args, **kwargs)
 
-    def _bzr_add_file_commit(self, filename, data, msg, cwd=None, *args,
+    @classmethod
+    def _bzr_add_file_commit(cls, filename, data, msg, cwd=None, *args,
                              **kwargs):
         """Add a file to a Bazaar repository.
 
@@ -74,9 +106,9 @@ class BazaarClientTests(SCMClientTests):
         with open(filename, 'wb') as f:
             f.write(data)
 
-        self._run_bzr(['add', filename], cwd=cwd, *args, **kwargs)
-        self._run_bzr(['commit', '-m', msg, '--author', 'Test User'],
-                      cwd=cwd, *args, **kwargs)
+        cls._run_bzr(['add', filename], cwd=cwd, *args, **kwargs)
+        cls._run_bzr(['commit', '-m', msg, '--author', 'Test User'],
+                     cwd=cwd, *args, **kwargs)
 
     def _compare_diffs(self, filename, full_diff, expected_diff_digest,
                        change_type='modified'):

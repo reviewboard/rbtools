@@ -19,16 +19,17 @@ from rbtools.clients import RepositoryInfo
 from rbtools.clients.errors import CreateCommitError, MergeError
 from rbtools.clients.mercurial import MercurialClient, MercurialRefType
 from rbtools.clients.tests import (FOO, FOO1, FOO2, FOO3, FOO4, FOO5, FOO6,
-                                   SCMClientTests)
+                                   SCMClientTestCase)
 from rbtools.utils.encoding import force_unicode
-from rbtools.utils.filesystem import is_exe_in_path, load_config, make_tempdir
+from rbtools.utils.filesystem import is_exe_in_path, load_config
 from rbtools.utils.process import execute
 
 
-class MercurialTestBase(SCMClientTests):
+class MercurialTestBase(SCMClientTestCase):
     """Base class for all Mercurial unit tests."""
 
-    def run_hg(self, command, **kwargs):
+    @classmethod
+    def run_hg(cls, command, **kwargs):
         """Run a Mercurial command.
 
         Args:
@@ -120,17 +121,37 @@ class MercurialClientTests(SpyAgency, MercurialTestBase):
             'email': 'email',
         })
 
-    def setUp(self):
-        super(MercurialClientTests, self).setUp()
+    @classmethod
+    def setup_checkout(cls, checkout_dir):
+        """Populate a Mercurial clone.
 
+        This will create a clone of the sample Mercurial repository stored in
+        the :file:`testdata` directory.
+
+        Args:
+            checkout_dir (unicode):
+                The top-level directory in which the clone will be placed.
+
+        Returns:
+            The main clone directory, or ``None`` if :command:`hg` isn't
+            in the path.
+        """
+        if not is_exe_in_path('hg'):
+            return None
+
+        cls.hg_dir = os.path.join(cls.testdata_dir, 'hg-repo')
+        cls.run_hg(['clone', '--stream', cls.hg_dir, checkout_dir])
+
+        return checkout_dir
+
+    def setUp(self):
         if not is_exe_in_path('hg'):
             raise SkipTest('hg not found in path')
 
-        self.hg_dir = os.path.join(self.testdata_dir, 'hg-repo')
-        self.clone_dir = self.chdir_tmp()
-        self.clone_hgrc_path = os.path.join(self.clone_dir, '.hg', 'hgrc')
+        super(MercurialClientTests, self).setUp()
 
-        self.run_hg(['clone', '--stream', self.hg_dir, self.clone_dir])
+        self.clone_dir = self.checkout_dir
+        self.clone_hgrc_path = os.path.join(self.clone_dir, '.hg', 'hgrc')
 
         self.client = MercurialClient(options=self.options)
 

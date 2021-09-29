@@ -15,13 +15,13 @@ from rbtools.clients.errors import (CreateCommitError,
                                     PushError,
                                     TooManyRevisionsError)
 from rbtools.clients.git import GitClient
-from rbtools.clients.tests import FOO1, FOO2, FOO3, FOO4, SCMClientTests
+from rbtools.clients.tests import FOO1, FOO2, FOO3, FOO4, SCMClientTestCase
 from rbtools.utils.console import edit_text
 from rbtools.utils.filesystem import is_exe_in_path, load_config
 from rbtools.utils.process import execute
 
 
-class GitClientTests(SpyAgency, SCMClientTests):
+class GitClientTests(SpyAgency, SCMClientTestCase):
     """Unit tests for GitClient."""
 
     TESTSERVER = 'http://127.0.0.1:8080'
@@ -33,10 +33,62 @@ class GitClientTests(SpyAgency, SCMClientTests):
             'email': 'email'
         })
 
-    def _run_git(self, command):
-        return execute(['git'] + command, env=None, cwd=self.clone_dir,
-                       split_lines=False, ignore_errors=False,
+    @classmethod
+    def setup_checkout(cls, checkout_dir):
+        """Populate a Git checkout.
+
+        This will create a checkout of the sample Git repository stored
+        in the :file:`testdata` directory, along with a child clone and a
+        grandchild clone.
+
+        Args:
+            checkout_dir (unicode):
+                The top-level directory in which the clones will be placed.
+
+        Returns:
+            The main checkout directory, or ``None`` if :command:`git` isn't
+            in the path.
+        """
+        if not is_exe_in_path('git'):
+            return None
+
+        cls.git_dir = os.path.join(cls.testdata_dir, 'git-repo')
+        cls.clone_dir = checkout_dir
+
+        orig_clone_dir = os.path.join(checkout_dir, 'orig')
+        child_clone_dir = os.path.join(checkout_dir, 'child')
+        grandchild_clone_dir = os.path.join(checkout_dir, 'grandchild')
+
+        os.mkdir(checkout_dir, 0o700)
+        cls._run_git(['clone', cls.git_dir, orig_clone_dir])
+        cls._run_git(['clone', orig_clone_dir, child_clone_dir])
+        cls._run_git(['clone', child_clone_dir, grandchild_clone_dir])
+
+        cls.orig_clone_dir = orig_clone_dir
+        cls.child_clone_dir = child_clone_dir
+        cls.grandchild_clone_dir = grandchild_clone_dir
+
+        return orig_clone_dir
+
+    @classmethod
+    def _run_git(cls, command):
+        return execute(['git'] + command,
+                       env=None,
+                       split_lines=False,
+                       ignore_errors=False,
                        extra_ignore_errors=())
+
+    def setUp(self):
+        if not is_exe_in_path('git'):
+            raise SkipTest('git not found in path')
+
+        super(GitClientTests, self).setUp()
+
+        self.set_user_home(os.path.join(self.testdata_dir, 'homedir'))
+
+        self.options.parent_branch = None
+        self.options.tracking = None
+        self.client = GitClient(options=self.options)
 
     def _git_add_file_commit(self, filename, data, msg):
         """Add a file to a git repository.
@@ -59,23 +111,6 @@ class GitClientTests(SpyAgency, SCMClientTests):
 
     def _git_get_head(self):
         return self._run_git(['rev-parse', 'HEAD']).strip()
-
-    def setUp(self):
-        if not is_exe_in_path('git'):
-            raise SkipTest('git not found in path')
-
-        super(GitClientTests, self).setUp()
-
-        self.set_user_home(
-            os.path.join(self.testdata_dir, 'homedir'))
-        self.git_dir = os.path.join(self.testdata_dir, 'git-repo')
-
-        self.clone_dir = self.chdir_tmp()
-        self._run_git(['clone', self.git_dir, self.clone_dir])
-        self.client = GitClient(options=self.options)
-
-        self.options.parent_branch = None
-        self.options.tracking = None
 
     def test_get_repository_info_simple(self):
         """Testing GitClient get_repository_info, simple case"""
@@ -825,16 +860,15 @@ class GitClientTests(SpyAgency, SCMClientTests):
     def test_diff_finding_parent_case_seven(self):
         """Testing GitClient.parse_revision_spec with a target branch posted
         off a remote branch that is aligned to the same commit as another
-        remote branch"""
+        remote branch
+        """
         # In this case, the parent_base must be common commit that the two
         # remote branches are aligned to.
         self.client.get_repository_info()
 
         # Since pushing data upstream to the test repo corrupts its state,
-        # we clone the clone and use one clone as the remote for the other.
-        self.git_dir = os.getcwd()
-        self.clone_dir = self.chdir_tmp()
-        self._run_git(['clone', self.git_dir, self.clone_dir])
+        # we need to use the child clone.
+        os.chdir(self.child_clone_dir)
 
         self.client.get_repository_info()
 
@@ -887,17 +921,16 @@ class GitClientTests(SpyAgency, SCMClientTests):
 
     def test_diff_finding_parent_case_eight(self):
         """Testing GitClient.parse_revision_spec with a target branch not
-        up-to-date with a remote branch"""
+        up-to-date with a remote branch
+        """
         # In this case, there is no good way of detecting the remote branch we
         # are not up-to-date with, so the parent_base must be the common commit
         # that the target branch and remote branch share.
         self.client.get_repository_info()
 
         # Since pushing data upstream to the test repo corrupts its state,
-        # we clone the clone and use one clone as the remote for the other.
-        self.git_dir = os.getcwd()
-        self.clone_dir = self.chdir_tmp()
-        self._run_git(['clone', self.git_dir, self.clone_dir])
+        # we need to use the child clone.
+        os.chdir(self.child_clone_dir)
 
         self.client.get_repository_info()
 
@@ -950,21 +983,21 @@ class GitClientTests(SpyAgency, SCMClientTests):
 
     def test_diff_finding_parent_case_nine(self):
         """Testing GitClient.parse_revision_spec with a target branch that has
-        branches from different remotes in its path"""
-
+        branches from different remotes in its path
+        """
         # In this case, the other remotes should be ignored and the parent_base
         # should be some origin/*.
         self.client.get_repository_info()
         self._run_git(['checkout', 'not-master'])
 
-        orig_clone = os.getcwd()
-        self.clone_dir = self.chdir_tmp()
-        self._run_git(['clone', self.git_dir, self.clone_dir])
+        # Since pushing data upstream to the test repo corrupts its state,
+        # we need to use the child clone.
+        os.chdir(self.grandchild_clone_dir)
 
         self.client.get_repository_info()
 
         # Adding the original clone as a second remote to our repository.
-        self._run_git(['remote', 'add', 'not-origin', orig_clone])
+        self._run_git(['remote', 'add', 'not-origin', self.orig_clone_dir])
         self._run_git(['fetch', 'not-origin'])
         parent_base_commit_id = self._git_get_head()
 
@@ -1072,11 +1105,8 @@ class GitClientTests(SpyAgency, SCMClientTests):
         self.client.get_repository_info()
 
         # Since pushing data upstream to the test repo corrupts its state,
-        # we clone the clone and use one clone as the remote for the other.
-        # We need to push data upstrem for the merge to work.
-        self.git_dir = os.getcwd()
-        self.clone_dir = self.chdir_tmp()
-        self._run_git(['clone', self.git_dir, self.clone_dir])
+        # we need to use the child clone.
+        os.chdir(self.child_clone_dir)
 
         self.client.get_repository_info()
 
@@ -1101,11 +1131,8 @@ class GitClientTests(SpyAgency, SCMClientTests):
         self.client.get_repository_info()
 
         # Since pushing data upstream to the test repo corrupts its state,
-        # we clone the clone and use one clone as the remote for the other.
-        # We need to push data upstrem for the merge to work.
-        self.git_dir = os.getcwd()
-        self.clone_dir = self.chdir_tmp()
-        self._run_git(['clone', self.git_dir, self.clone_dir])
+        # we need to use the child clone.
+        os.chdir(self.child_clone_dir)
 
         self.client.get_repository_info()
 
@@ -1254,10 +1281,9 @@ class GitClientTests(SpyAgency, SCMClientTests):
         """Testing GitClient._get_parent_branch with a non-master default
         branch
         """
-        # Make a clone of the clone so we can update the "upstream"
-        self.git_dir = os.getcwd()
-        self.clone_dir = self.chdir_tmp()
-        self._run_git(['clone', self.git_dir, self.clone_dir])
+        # Since pushing data upstream to the test repo corrupts its state,
+        # we need to use the child clone.
+        os.chdir(self.child_clone_dir)
 
         self._run_git(['branch', '-m', 'master', 'main'])
         self._run_git(['push', '-u', 'origin', 'main'])
