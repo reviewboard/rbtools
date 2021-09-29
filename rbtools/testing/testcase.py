@@ -1,17 +1,26 @@
+"""Base test cases for RBTools unit tests."""
+
 from __future__ import unicode_literals
 
 import os
 import re
+import shutil
 import sys
+import tempfile
 import unittest
+from contextlib import contextmanager
+
+import six
+from rbtools.utils.filesystem import cleanup_tempfiles, make_tempdir
 
 
 class TestCase(unittest.TestCase):
     """The base class for RBTools test cases.
 
-    Unlike the standard unittest.TestCase, this allows the test case
-    description (generally the first line of the docstring) to wrap multiple
-    lines.
+    This provides helpful utility functions, environment management, and
+    better docstrings to help craft unit tests for RBTools functionality.
+    All RBTools unit tests should use this this class or a subclass of it
+    as the base class.
     """
 
     ws_re = re.compile(r'\s+')
@@ -22,10 +31,46 @@ class TestCase(unittest.TestCase):
                                      'scripts', 'editor.py'))
     )
 
+    #: Whether individual unit tests need a new temporary HOME directory.
+    #:
+    #: If set, a directory will be created at test startup, and will be
+    #: set as the home directory.
+    #:
+    #: Version Added:
+    #:     3.0
+    needs_temp_home = False
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestCase, cls).setUpClass()
+
+        cls._cls_old_cwd = os.getcwd()
+
+    @classmethod
+    def tearDownClass(cls):
+        os.chdir(cls._cls_old_cwd)
+
+        super(TestCase, cls).tearDownClass()
+
     def setUp(self):
         super(TestCase, self).setUp()
 
+        self._old_cwd = os.getcwd()
+        self.old_home = self.get_user_home()
+
+        if self.needs_temp_home:
+            self.set_user_home(make_tempdir())
+
         os.environ[str('RBTOOLS_EDITOR')] = str(self.default_text_editor)
+
+    def tearDown(self):
+        super(TestCase, self).tearDown()
+
+        os.chdir(self._old_cwd)
+        cleanup_tempfiles()
+
+        if self.old_home:
+            self.set_user_home(self.old_home)
 
     def shortDescription(self):
         """Returns the description of the current test.
@@ -33,6 +78,10 @@ class TestCase(unittest.TestCase):
         This changes the default behavior to replace all newlines with spaces,
         allowing a test description to span lines. It should still be kept
         short, though.
+
+        Returns:
+            unicode:
+            The descriptive text for the current unit test.
         """
         doc = self._testMethodDoc
 
@@ -41,6 +90,49 @@ class TestCase(unittest.TestCase):
             doc = self.ws_re.sub(' ', doc).strip()
 
         return doc
+
+    def get_user_home(self):
+        """Return the user's current home directory.
+
+        Version Added:
+            3.0
+
+        Returns:
+            unicode:
+            The current home directory.
+        """
+        return os.environ['HOME']
+
+    def set_user_home(self, path):
+        """Set the user's current home directory.
+
+        This will be unset when the unit test has finished.
+
+        Version Added:
+            3.0
+
+        Args:
+            path (unicode):
+                The new home directory.
+        """
+        os.environ['HOME'] = path
+
+    def chdir_tmp(self):
+        """Create a temporary directory and set it as the working directory.
+
+        The directory will be deleted after the test has finished.
+
+        Version Added:
+            3.0
+
+        Returns:
+            unicode:
+            The path to the temp directory.
+        """
+        dirname = make_tempdir()
+        os.chdir(dirname)
+
+        return dirname
 
     def assertRaisesMessage(self, expected_exception, expected_message):
         """Assert that a call raises an exception with the given message.
@@ -59,3 +151,48 @@ class TestCase(unittest.TestCase):
         """
         return self.assertRaisesRegexp(expected_exception,
                                        re.escape(expected_message))
+
+    @contextmanager
+    def reviewboardrc(self, config, use_temp_dir=False):
+        """Populate a temporary .reviewboardrc file.
+
+        This will create a :file:`.reviewboardrc` file, either in the current
+        directory or in a new temporary directory (if ``use_temp_dir`` is set).
+        The file will contain the provided configuration.
+
+        Version Added:
+            3.0
+
+        Args:
+            config (dict):
+                A dictionary of key-value pairs to write into the
+                :file:`.reviewboardrc` file.
+
+                A best effort attempt will be made to write each configuration
+                to the file.
+
+            use_temp_dir (bool, optional):
+                Whether a temporary directory should be created and set as
+                the current directory. If set, the file will be written there,
+                and the directory will be removed after the context manager
+                finishes.
+
+        Context:
+            The code being run will have a :file:`.reviewboardrc` in the
+            current directory.
+        """
+        if use_temp_dir:
+            temp_dir = tempfile.mkdtemp()
+            cwd = os.getcwd()
+            os.chdir(temp_dir)
+
+        with open('.reviewboardrc', 'w') as fp:
+            for key, value in six.iteritems(config):
+                fp.write('%s = %r\n' % (key, value))
+
+        try:
+            yield
+        finally:
+            if use_temp_dir:
+                os.chdir(cwd)
+                shutil.rmtree(temp_dir)

@@ -11,10 +11,13 @@ from rbtools.utils.testbase import RBTestBase
 class ChecksTests(RBTestBase):
     """Unit tests for rbtools.utils.checks."""
 
-    def test_check_install(self):
-        """Testing check_install"""
+    def test_check_install_with_found(self):
+        """Testing check_install with executable found"""
         self.assertTrue(checks.check_install([sys.executable, ' --version']))
-        self.assertFalse(checks.check_install([self.gen_uuid()]))
+
+    def test_check_install_with_not_found(self):
+        """Testing check_install with executable not found"""
+        self.assertFalse(checks.check_install(['xxx-invalid-bin-xxx']))
 
     def test_is_valid_version(self):
         """Testing is_valid_version"""
