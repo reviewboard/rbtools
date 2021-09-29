@@ -709,13 +709,16 @@ class Post(Command):
         # upon posting.
         if self.options.stamp_when_posting:
             if diff_history:
-                self.stdout.write('Cannot stamp review request URL '
-                                  'when posting with history.')
+                err = ('Cannot stamp review request URL when posting with '
+                       'history.')
+                self.stdout.write(err)
+                self.json.add_error(err)
             elif not self.tool.can_amend_commit:
-                self.stdout.write('Cannot stamp review request URL '
-                                  'onto the commit message; stamping is '
-                                  'not supported with %s.'
-                                  % self.tool.name)
+                err = ('Cannot stamp review request URL onto the commit '
+                       'message; stamping is not supported with %s.'
+                       % self.tool.name)
+                self.stdout.write(err)
+                self.json.add_error(err)
 
             else:
                 try:
@@ -725,14 +728,18 @@ class Post(Command):
                     self.stdout.write('Stamped review URL onto the '
                                       'commit message.')
                 except AlreadyStampedError:
-                    self.stdout.write('Commit message has already been '
-                                      'stamped')
+                    err = ('Commit message has already been stamped with '
+                           'the review request URL.')
+                    self.stdout.write(err)
+                    self.json.add_error(err)
                 except Exception as e:
                     logging.debug('Caught exception while stamping the '
                                   'commit message. Proceeding to post '
                                   'without stamping.', exc_info=True)
-                    self.stdout.write('Could not stamp review request URL '
-                                      'onto the commit message.')
+                    err = ('Could not stamp review request URL onto the '
+                           'commit message.')
+                    self.stdout.write(err)
+                    self.json.add_error(err)
 
         # Update the review request draft fields based on options set
         # by the user, or configuration.
@@ -929,7 +936,7 @@ class Post(Command):
 
         # If we are passing --diff-filename, we attempt to read the diff before
         # we normally would. This allows us to exit early if the file does not
-        # exist or cannot be read and save several network requetss.
+        # exist or cannot be read and save several network requests.
         if self.options.diff_filename:
             if self.options.diff_filename == '-':
                 if hasattr(sys.stdin, 'buffer'):
@@ -1040,6 +1047,10 @@ class Post(Command):
         self.stdout.new_line()
         self.stdout.write(review_request_url)
         self.stdout.write('%sdiff/' % review_request_url)
+
+        self.json.add('review_request', review_request_id)
+        self.json.add('review_request_url', review_request_url)
+        self.json.add('diff_url', '%sdiff/' % review_request_url)
 
         # Load the review up in the browser if requested to.
         if self.options.open_browser:
