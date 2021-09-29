@@ -13,6 +13,10 @@ from contextlib import contextmanager
 import six
 from rbtools.utils.filesystem import cleanup_tempfiles, make_tempdir
 
+import kgb
+
+from rbtools.utils.filesystem import make_tempfile
+
 
 class TestCase(unittest.TestCase):
     """The base class for RBTools test cases.
@@ -30,6 +34,8 @@ class TestCase(unittest.TestCase):
         os.path.abspath(os.path.join(os.path.dirname(__file__),
                                      'scripts', 'editor.py'))
     )
+
+    maxDiff = 10000
 
     #: Whether individual unit tests need a new temporary HOME directory.
     #:
@@ -133,6 +139,65 @@ class TestCase(unittest.TestCase):
         os.chdir(dirname)
 
         return dirname
+
+    def precreate_tempfiles(self, count):
+        """Pre-create a specific number of temporary files.
+
+        This will call :py:func:`~rbtools.utils.filesystem.make_tempfile`
+        the specified number of times, returning the list of generated temp
+        file paths, and will then spy that function to return those temp
+        files.
+
+        Once each pre-created temp file is used up, any further calls to
+        :py:func:`~rbtools.utils.filesystem.make_tempfile` will result in
+        an error, failing the test.
+
+        This is useful in unit tests that need to script a series of
+        expected calls using :py:mod:`kgb` (such as through
+        :py:class:`kgb.ops.SpyOpMatchInOrder`) that need to know the names
+        of temporary filenames up-front.
+
+        Unit test suites that use this must mix in :py:class:`kgb.SpyAgency`.
+
+        Args:
+            count (int):
+                The number of temporary filenames to pre-create.
+
+        Raises:
+            AssertionError:
+                The test suite class did not mix in :py:class:`kgb.SpyAgency`.
+        """
+        assert hasattr(self, 'spy_on'), (
+            '%r must mix in kgb.SpyAgency in order to call this method.'
+            % self.__class__)
+
+        tmpfiles = [
+            make_tempfile()
+            for i in range(count)
+        ]
+
+        self.spy_on(make_tempfile, op=kgb.SpyOpReturnInOrder(tmpfiles))
+
+        return tmpfiles
+
+    def assertDiffEqual(self, diff, expected_diff):
+        """Assert that two diffs are equal.
+
+        Args:
+            diff (bytes):
+                The generated diff.
+
+            expected_diff (bytes):
+                The expected diff.
+
+        Raises:
+            AssertionError:
+                The diffs aren't equal or of the right type.
+        """
+        self.assertIsInstance(diff, bytes)
+        self.assertIsInstance(expected_diff, bytes)
+
+        self.assertEqual(diff.splitlines(), expected_diff.splitlines())
 
     def assertRaisesMessage(self, expected_exception, expected_message):
         """Assert that a call raises an exception with the given message.
