@@ -34,13 +34,13 @@ class Status(Command):
                     '`XX` the hex code of a character.\n'
                     'For example: --format="%%(id)s\\x09%%(summary)s"\n'
                     'This option will print out the ID and summary tab-'
-                    'separated.'),
+                    'separated. This is incompatible with --json.'),
         Option('-z',
                dest='format_nul',
                default=False,
                action='store_true',
                help='Null-terminate each entry. Otherwise, the entries will '
-                    'be newline-terminated.'),
+                    'be newline-terminated. This is incompatible with --json.'),
         Option('--all',
                dest='all_repositories',
                action='store_true',
@@ -67,6 +67,8 @@ class Status(Command):
             review_requests (list of dict):
                 A list that contains statistics about each review request.
         """
+        self.json.add('summaries', [])
+
         if len(review_requests):
             has_branches = False
             has_bookmarks = False
@@ -95,13 +97,23 @@ class Status(Command):
                     'r/%s - %s' % (info['id'], info['summary']),
                 ]
 
+                summary = {
+                    'status': info['status'],
+                    'review_request': info['id'],
+                    'summary': info['summary'],
+                    'description': info['description'],
+                }
+
                 if has_branches:
                     row.append(info.get('branch') or '')
+                    summary['branch'] = row[-1]
 
                 if has_bookmarks:
                     row.append(info.get('bookmark') or '')
+                    summary['bookmark'] = row[-1]
 
                 table.add_row(row)
+                self.json.append('summaries', summary)
 
             self.stdout.write(table.draw())
         else:
