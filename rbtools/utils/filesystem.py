@@ -14,26 +14,47 @@ tempfiles = []
 tempdirs = []
 builtin = {}
 
+_exe_in_path_cache = {}
+
 
 def is_exe_in_path(name):
-    """Checks whether an executable is in the user's search path.
+    """Return whether an executable is in the user's search path.
 
     This expects a name without any system-specific executable extension.
     It will append the proper extension as necessary. For example,
     use "myapp" and not "myapp.exe".
 
-    This will return True if the app is in the path, or False otherwise.
+    The result will be cached. Future lookups for the same executable will
+    return the same value.
 
-    Taken from djblets.util.filesystem to avoid an extra dependency
+    Version Changed:
+        3.0:
+        The result is now cached.
+
+    Args:
+        name (unicode):
+            The name of the executable.
+
+    Returns:
+        bool:
+        ``True`` if the executable is in the path. ``False`` if it is not.
     """
     if sys.platform == 'win32' and not name.endswith('.exe'):
         name += '.exe'
 
-    for dir in os.environ['PATH'].split(os.pathsep):
-        if os.path.exists(os.path.join(dir, name)):
-            return True
+    try:
+        found = _exe_in_path_cache[name]
+    except KeyError:
+        found = False
 
-    return False
+        for dir in os.environ['PATH'].split(os.pathsep):
+            if os.path.exists(os.path.join(dir, name)):
+                found = True
+                break
+
+        _exe_in_path_cache[name] = found
+
+    return found
 
 
 def cleanup_tempfiles():
