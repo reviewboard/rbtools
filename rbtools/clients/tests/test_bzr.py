@@ -3,8 +3,10 @@
 from __future__ import unicode_literals
 
 import os
+import unittest
 from hashlib import md5
 
+import six
 from nose import SkipTest
 
 from rbtools.clients import RepositoryInfo
@@ -44,15 +46,19 @@ class BazaarClientTests(SCMClientTestCase):
         os.mkdir(original_branch, 0o700)
         os.mkdir(child_branch, 0o700)
 
-        cls._run_bzr(['init', '.'], cwd=original_branch)
-        cls._bzr_add_file_commit(filename='foo.txt',
-                                 data=FOO,
-                                 msg='initial commit',
-                                 cwd=original_branch)
+        try:
+            cls._run_bzr(['init', '.'], cwd=original_branch)
+            cls._bzr_add_file_commit(filename='foo.txt',
+                                     data=FOO,
+                                     msg='initial commit',
+                                     cwd=original_branch)
 
-        cls._run_bzr(
-            ['branch', '--use-existing-dir', original_branch, child_branch],
-            cwd=original_branch)
+            cls._run_bzr(
+                ['branch', '--use-existing-dir', original_branch, child_branch],
+                cwd=original_branch)
+        except Exception as e:
+            raise unittest.SkipTest('Unable to set up bzr checkout: %s' %
+                                    six.text_type(e))
 
         cls.original_branch = original_branch
         cls.child_branch = child_branch

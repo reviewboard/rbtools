@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 
 import argparse
 import inspect
+import io
 import logging
 import platform
 import os
@@ -744,12 +745,14 @@ class Command(object):
         self.stdout = OutputWrapper(sys.stdout)
         self.stderr = OutputWrapper(sys.stderr)
 
-        if six.PY2:
-            self.stderr_bytes = OutputWrapper(sys.stderr)
-            self.stdout_bytes = OutputWrapper(sys.stdout)
-        else:
+        if isinstance(sys.stdout, io.BufferedIOBase):
             self.stderr_bytes = OutputWrapper(sys.stderr.buffer)
             self.stdout_bytes = OutputWrapper(sys.stdout.buffer)
+        else:
+            # Python 2.x, or while we're running unit tests (where stdout and
+            # stderr are actually io.StringIO)
+            self.stderr_bytes = OutputWrapper(sys.stderr)
+            self.stdout_bytes = OutputWrapper(sys.stdout)
 
     def create_parser(self, config, argv=[]):
         """Create and return the argument parser for this command."""
