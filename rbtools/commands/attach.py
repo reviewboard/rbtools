@@ -54,3 +54,5 @@ class Attach(Command):
 
         self.stdout.write('Uploaded %s to review request %s.'
                           % (path_to_file, review_request_id))
+        self.json.add('attached_file', path_to_file)
+        self.json.add('review_request', review_request_id)
