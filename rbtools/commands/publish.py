@@ -84,3 +84,4 @@ class Publish(Command):
 
         self.stdout.write('Review request #%s is published.'
                           % review_request_id)
+        self.json.add('review_request', review_request_id)
