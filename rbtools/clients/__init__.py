@@ -1120,38 +1120,3 @@ def scan_usable_client(config, options, client_name=None):
         sys.exit(1)
 
     return repository_info, tool
-
-
-def print_clients(config, options, output_stream):
-    """Print the supported detected SCM clients.
-
-    Each SCM client, including those provided by third party packages,
-    will be printed. Additionally, SCM clients which are detected in
-    the current directory will be highlighted.
-
-    Args:
-        config (dict):
-            The loaded user config.
-
-        options (argparse.Namespace):
-            The parsed command line options.
-    """
-    output_stream.write(
-        'The following repository types are supported by this installation')
-    output_stream.write(
-        'of RBTools. Each "<type>" may be used as a value for the')
-    output_stream.write(
-        '"--repository-type=<type>" command line argument. Repository types')
-    output_stream.write(
-        'which are detected in the current directory are marked with a "*"')
-
-    if SCMCLIENTS is None:
-        load_scmclients(config, options)
-
-    for name, tool in six.iteritems(SCMCLIENTS):
-        repository_info = tool.get_repository_info()
-
-        if repository_info:
-            output_stream.write(' * "%s": %s' % (name, tool.name))
-        else:
-            output_stream.write('   "%s": %s' % (name, tool.name))
