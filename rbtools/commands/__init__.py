@@ -242,10 +242,10 @@ class Command(object):
             Standard unicode error output wrapper that subclasses must write
             to.
 
-        stdout_byte (OutputWrapper):
+        stdout_bytes (OutputWrapper):
             Standard byte output wrapper that subclasses must write to.
 
-        stderr_byte (OutputWrapper):
+        stderr_bytes (OutputWrapper):
             Standard byte error output wrapper that subclasses must write to.
 
         tool (rbtools.clients.SCMClient):
@@ -745,7 +745,7 @@ class Command(object):
         self.stdout = OutputWrapper(sys.stdout)
         self.stderr = OutputWrapper(sys.stderr)
 
-        if isinstance(sys.stdout, io.BufferedIOBase):
+        if isinstance(sys.stdout, io.TextIOWrapper):
             self.stderr_bytes = OutputWrapper(sys.stderr.buffer)
             self.stdout_bytes = OutputWrapper(sys.stdout.buffer)
         else:
