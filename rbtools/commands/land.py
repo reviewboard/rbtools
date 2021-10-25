@@ -224,16 +224,25 @@ class Land(Command):
                 Whether to simulate landing without actually changing the
                 repository.
         """
+        json_data = {
+            'review_request': review_request.id,
+            'destination_branch': destination_branch,
+        }
+
         if source_branch:
             review_commit_message = extract_commit_message(review_request)
             author = review_request.get_submitter()
 
+            json_data['source_branch'] = source_branch
+
             if squash:
                 self.stdout.write('Squashing branch "%s" into "%s".'
                                   % (source_branch, destination_branch))
+                json_data['type'] = 'squash'
             else:
                 self.stdout.write('Merging branch "%s" into "%s".'
                                   % (source_branch, destination_branch))
+                json_data['type'] = 'merge'
 
             if not dry_run:
                 try:
@@ -257,6 +266,7 @@ class Land(Command):
         self.stdout.write('Review request %s has landed on "%s".'
                           % (review_request.id,
                              self.options.destination_branch))
+        self.json.append('landed_review_requests', json_data)
 
     def initialize(self):
         """Initialize the command.
@@ -372,6 +382,8 @@ class Land(Command):
             'edit': self.options.edit,
             'squash': self.options.squash,
         }
+
+        self.json.add('landed_review_requests', [])
 
         if self.options.recursive:
             # The dependency graph shows us which review requests depend on
