@@ -381,22 +381,35 @@ class Patch(Command):
                 if revert:
                     self.stdout.write('The patch was partially reverted, but '
                                       'there were conflicts in:')
+                    self.json.add_error('The patch was partially reverted, '
+                                        'but there were conflicts.')
                 else:
                     self.stdout.write('The patch was partially applied, but '
                                       'there were conflicts in:')
+                    self.json.add_error('The patch was partially applied, '
+                                        'but there were conflicts.')
 
                 self.stdout.new_line()
+
+                self.json.add('conflicting_files', [])
 
                 for filename in result.conflicting_files:
                     self.stdout.write('    %s' % filename)
+                    self.json.append('conflicting_files',
+                                     filename.decode('utf-8'))
 
                 self.stdout.new_line()
             elif revert:
-                self.stdout.write('The patch was partially reverted, '
-                                  'but there were conflicts.')
+                err = ('The patch was partially reverted, but there were '
+                       'conflicts.')
+                self.stdout.write(err)
+                self.json.add_error(err)
             else:
-                self.stdout.write('The patch was partially applied, but '
-                                  'there were conflicts.')
+                err = ('The patch was partially applied, but there were '
+                       'conflicts.')
+                self.stdout.write(err)
+                self.json.add_error('The patch was partially applied, but '
+                                    'there were conflicts.')
 
             return False
 
@@ -468,6 +481,10 @@ class Patch(Command):
             raise CommandError(
                 _('--print and --write cannot both be used.'))
 
+        if patch_stdout and self.options.json_output:
+            raise CommandError(
+                _('--print and --json cannot both be used.'))
+
         if revert and not tool.supports_patch_revert:
             raise CommandError(
                 _('The %s backend does not support reverting patches.')
@@ -483,6 +500,7 @@ class Patch(Command):
                         raise CommandError(message)
                     else:
                         logger.warning(message)
+                        self.json.add_error(message)
             except NotImplementedError:
                 pass
 
@@ -605,6 +623,9 @@ class Patch(Command):
                 'review_request_id': self._review_request_id,
                 'diff_revision': diff_revision,
             })
+        self.json.add('review_request', self._review_request_id)
+        self.json.add('diff_revision', diff_revision)
+        self.json.add('n_patches', total_patches)
 
         # Start applying all the patches.
         for patch_data in patches:
