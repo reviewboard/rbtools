@@ -69,3 +69,5 @@ class Close(Command):
 
         self.stdout.write('Review request #%s is set to %s.'
                           % (review_request_id, review_request.status))
+        self.json.add('review_request', review_request_id)
+        self.json.add('status', review_request.status)
