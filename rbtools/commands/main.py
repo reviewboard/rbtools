@@ -1,6 +1,7 @@
 from __future__ import print_function, unicode_literals
 
 import argparse
+import glob
 import os
 import pkg_resources
 import signal
@@ -50,6 +51,32 @@ def help(args, parser):
             help_text = build_help_text(ep.load())
             print(help_text)
             sys.exit(0)
+        else:
+            try:
+                returncode = subprocess.call(
+                    ['%s-%s' % (RB_MAIN, args[0]), '--help'],
+                    stdin=sys.stdin,
+                    stdout=sys.stdout,
+                    stderr=sys.stderr,
+                    env=os.environ.copy())
+                sys.exit(returncode)
+            except OSError:
+                # OSError is only raised in this scenario when subprocess.call
+                # cannot find an executable with the name rbt-<command_name>.
+                # If this command doesn't exist, we will check if an alias
+                # exists with the name before printing an error message.
+                pass
+
+            aliases = load_config().get('ALIASES', {})
+
+            if args[0] in aliases:
+                if aliases[args[0]].startswith('!'):
+                    print('"%s" is an alias for the shell command "%s"' %
+                          (args[0], aliases[args[0]][1:]))
+                else:
+                    print('"%s" is an alias for the command "%s %s"' %
+                          (args[0], RB_MAIN, aliases[args[0]]))
+                sys.exit(0)
 
         print('No help found for %s' % args[0])
         sys.exit(0)
@@ -60,17 +87,26 @@ def help(args, parser):
     # try to override commands by using the same name, and then cast
     # back to a list for easy sorting.
     entrypoints = pkg_resources.iter_entry_points('rbtools_commands')
-    commands = list(set([entrypoint.name for entrypoint in entrypoints]))
+    commands = {entrypoint.name for entrypoint in entrypoints}
+
+    for path_dir in os.environ.get('PATH').split(':'):
+        path_prefix = '%s/%s-' % (path_dir, RB_MAIN)
+
+        for cmd in glob.glob(path_prefix + '*'):
+            commands.add(cmd.replace(path_prefix, ''))
+
+    aliases = load_config().get('ALIASES', {})
+    commands |= set(aliases.keys())
     common_commands = ['post', 'patch', 'close', 'diff']
+    other_commands = commands - set(common_commands)
 
     print('\nThe most commonly used commands are:')
     for command in common_commands:
         print('  %s' % command)
 
     print('\nOther commands:')
-    for command in sorted(commands):
-        if command not in common_commands:
-            print('  %s' % command)
+    for command in sorted(other_commands):
+        print('  %s' % command)
 
     print('See "%s help <command>" for more information on a specific '
           'command.' % RB_MAIN)
@@ -126,12 +162,13 @@ def main():
         # A command class could not be found, so try and execute
         # the "rb-<command>" on the system.
         try:
-            sys.exit(
-                subprocess.call(['%s-%s' % (RB_MAIN, command_name)] + args,
-                                stdin=sys.stdin,
-                                stdout=sys.stdout,
-                                stderr=sys.stderr,
-                                env=os.environ.copy()))
+            returncode = subprocess.call(
+                ['%s-%s' % (RB_MAIN, command_name)] + args,
+                stdin=sys.stdin,
+                stdout=sys.stdout,
+                stderr=sys.stderr,
+                env=os.environ.copy())
+            sys.exit(returncode)
         except OSError:
             # OSError is only raised in this scenario when subprocess.call
             # cannot find an executable with the name rbt-<command_name>. If

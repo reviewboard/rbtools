@@ -1220,6 +1220,8 @@ class Post(Command):
             revisions=self.revisions,
             repository_info=self.repository_info,
             extra_args=extra_args,
+            include_files=self.options.include_files or [],
+            exclude_patterns=self.options.exclude_patterns or [],
             **diff_kwargs)
 
         for i, history_entry in enumerate(history_entries):
