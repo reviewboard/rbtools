@@ -633,7 +633,8 @@ class ReviewBoardServer(object):
                  api_token=None, agent=None, session=None, disable_proxy=False,
                  auth_callback=None, otp_token_callback=None,
                  verify_ssl=True, save_cookies=True, ext_auth_cookies=None,
-                 ca_certs=None, client_key=None, client_cert=None):
+                 ca_certs=None, client_key=None, client_cert=None,
+                 proxy_authorization=None):
         if not url.endswith('/'):
             url += '/'
 
@@ -743,9 +744,13 @@ class ReviewBoardServer(object):
             self.agent = ('RBTools/' + get_package_version()).encode('utf-8')
 
         opener = build_opener(*handlers)
-        opener.addheaders = [
-            (str('User-agent'), str(self.agent)),
-        ]
+        headers = [(str('User-agent'), str(self.agent))]
+
+        if proxy_authorization:
+            headers.append((str('Proxy-Authorization'),
+                            str(proxy_authorization)))
+
+        opener.addheaders = headers
         install_opener(opener)
 
         self._cache = None

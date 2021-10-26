@@ -523,6 +523,13 @@ class Command(object):
                    config_key='CLIENT_CERT',
                    default=None,
                    help='Certificate for TLS client authentication.'),
+            Option('--proxy-authorization',
+                   dest='proxy_authorization',
+                   metavar='PROXY_AUTHORIZATION',
+                   config_key='PROXY_AUTHORIZATION',
+                   default=None,
+                   help='Value of the Proxy-Authorization header to send with '
+                        'HTTP requests.'),
         ]
     )
 
@@ -1219,6 +1226,7 @@ class Command(object):
             ca_certs=self.options.ca_certs,
             client_key=self.options.client_key,
             client_cert=self.options.client_cert,
+            proxy_authorization=self.options.proxy_authorization,
             transport_cls=self.transport_cls)
 
     def get_api(self, server_url):

@@ -28,7 +28,7 @@ class SyncTransport(Transport):
                  cache_location=None, in_memory_cache=False,
                  save_cookies=True, ext_auth_cookies=None,
                  ca_certs=None, client_key=None, client_cert=None,
-                 *args, **kwargs):
+                 proxy_authorization=None, *args, **kwargs):
         super(SyncTransport, self).__init__(url, *args, **kwargs)
         self.allow_caching = allow_caching
         self.cache_location = cache_location
@@ -48,7 +48,8 @@ class SyncTransport(Transport):
             ext_auth_cookies=ext_auth_cookies,
             ca_certs=ca_certs,
             client_key=client_key,
-            client_cert=client_cert)
+            client_cert=client_cert,
+            proxy_authorization=proxy_authorization)
 
     def get_root(self):
         return self._execute_request(HttpRequest(self.server.url))
