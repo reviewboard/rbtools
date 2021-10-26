@@ -731,7 +731,7 @@ class ReviewBoardServer(object):
         if agent:
             self.agent = agent
         else:
-            self.agent = ('RBTools/' + get_package_version()).encode('utf-8')
+            self.agent = 'RBTools/' + get_package_version()
 
         opener = build_opener(*handlers)
         opener.addheaders = [
