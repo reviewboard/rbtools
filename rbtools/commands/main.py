@@ -9,7 +9,10 @@ import subprocess
 import sys
 
 from rbtools import get_version_string
-from rbtools.commands import find_entry_point_for_command, Option, RB_MAIN
+from rbtools.commands import (BaseMultiCommand,
+                              Option,
+                              RB_MAIN,
+                              find_entry_point_for_command)
 from rbtools.utils.aliases import run_alias
 from rbtools.utils.filesystem import load_config
 
@@ -33,10 +36,35 @@ GLOBAL_OPTIONS = [
 ]
 
 
-def build_help_text(command_class):
-    """Generate help text from a command class."""
+def build_help_text(command_class, argv):
+    """Generate help text from a command class.
+
+    Args:
+        command_class (type):
+            The command class to instantiate.
+
+        argv (list):
+            The arguments to parse.
+
+    Returns:
+        unicode:
+        The printable help text.
+    """
     command = command_class()
-    parser = command.create_parser({})
+
+    if isinstance(command, BaseMultiCommand):
+        # Do a test parse to determine if we need to print subcommand help.
+        parser = command.create_parser({}, argv)
+
+        # TODO: Ideally we'd just initialize the parser with
+        # exit_on_error=False, but that's only available in Python 3.9+.
+        # Instead, temporarily patch away the exit method.
+        _exit = parser.exit
+        parser.exit = lambda *args, **kwargs: None
+        parser.parse_args(argv[1:])
+        parser.exit = _exit
+    else:
+        parser = command.create_parser({})
 
     return parser.format_help()
 
@@ -48,7 +76,7 @@ def help(args, parser):
         ep = find_entry_point_for_command(args[0])
 
         if ep:
-            help_text = build_help_text(ep.load())
+            help_text = build_help_text(ep.load(), args)
             print(help_text)
             sys.exit(0)
         else:

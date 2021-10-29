@@ -256,8 +256,26 @@ class OptionGroup(object):
         self.option_list = option_list
 
     def add_to(self, parser, config={}, argv=[]):
-        """Adds the group and all its contained options to the parser."""
-        group = parser.add_argument_group(self.name, self.description)
+        """Add the group and all its contained options to the parser.
+
+        Args:
+            parser (argparse.ArgumentParser):
+                The command-line parser.
+
+            config (dict):
+                The loaded RBTools configuration.
+
+            argv (list, deprecated):
+                Unused legacy argument.
+        """
+        # First look for an existing group with the same name. This allows
+        # a BaseSubCommand to merge option groups with its parent
+        # BaseMultiCommand.
+        for group in parser._action_groups:
+            if group.title == self.name:
+                break
+        else:
+            group = parser.add_argument_group(self.name, self.description)
 
         for option in self.option_list:
             option.add_to(group, config, argv)
@@ -851,7 +869,6 @@ class Command(object):
         parser = argparse.ArgumentParser(
             prog=RB_MAIN,
             usage=self.usage(),
-            add_help=False,
             formatter_class=SmartHelpFormatter)
 
         for option in self.option_list:
@@ -919,8 +936,6 @@ class Command(object):
         subclasses can control what gets done by setting the various
         ``needs_*`` attributes (as documented in this class).
         """
-        self._init_logging()
-
         if self.needs_repository:
             # If we need the repository, we implicitly need the API and SCM
             # client as well.
@@ -1012,6 +1027,7 @@ class Command(object):
             parser.error('Invalid number of arguments provided')
             sys.exit(1)
 
+        self._init_logging()
         self.initialize()
         log_command_line('Command line: %s', argv)
 
@@ -1423,6 +1439,144 @@ class Command(object):
 
         return server_url
 
+
+class BaseSubCommand(Command):
+    """Abstract base class for a subcommand."""
+
+    #: The subcommand's help text.
+    #:
+    #: Type:
+    #:     unicode
+    help_text = ''
+
+    def __init__(self, options, config, *args, **kwargs):
+        """Initialize the subcommand.
+
+        Args:
+            options (argparse.Namespace):
+                The parsed options.
+
+            config (dict):
+                The loaded RBTools configuration.
+
+            *args (list):
+                Positional arguments to pass to the Command class.
+
+            **kwargs (dict):
+                Keyword arguments to pass to the Command class.
+        """
+        super(BaseSubCommand, self).__init__(*args, **kwargs)
+        self.options = options
+        self.config = config
+
+
+class BaseMultiCommand(Command):
+    """Abstract base class for commands which offer subcommands.
+
+    Some commands (such as :command:`rbt review`) want to offer many
+    subcommands.
+    """
+
+    #: The available subcommands.
+    #:
+    #: This is a list of BaseSubCommand sub classes.
+    #:
+    #: Type:
+    #:     list
+    subcommands = {}
+
+    def usage(self, command_cls=None):
+        """Return a usage string for the command.
+
+        Args:
+            command_cls (type, optional):
+                The subcommand class to generate usage information for.
+
+        Returns:
+            unicode:
+            The usage string.
+        """
+        if command_cls is None:
+            subcommand = ' <subcommand>'
+            description = self.description
+        else:
+            subcommand = ''
+            description = command_cls.description
+
+        usage = '%%(prog)s %s [options] %s' % (subcommand, self.args)
+
+        if description:
+            return '%s\n\n%s' % (usage, description)
+        else:
+            return usage
+
+    def create_parser(self, config, argv=[]):
+        """Create and return the argument parser for this command.
+
+        Args:
+            config (dict):
+                The loaded RBTools config.
+
+            argv (list, optional):
+                The argument list.
+
+        Returns:
+            argparse.ArgumentParser:
+            The argument parser.
+        """
+        prog = '%s %s' % (RB_MAIN, self.name)
+
+        # TODO: Once we're Python 3.9+, we can change this to use
+        # exit_on_error=False, and remove the monkey patching in
+        # build_help_text in rbtools/commands/main.py.
+        parser = argparse.ArgumentParser(
+            prog=prog,
+            usage=self.usage(),
+            formatter_class=SmartHelpFormatter)
+
+        subparsers = parser.add_subparsers(
+            description=(
+                'To get additional help for these commands, run: '
+                '%s <subcommand> --help' % prog))
+
+        for command_cls in self.subcommands:
+            subparser = subparsers.add_parser(
+                command_cls.name,
+                usage=self.usage(command_cls),
+                formatter_class=SmartHelpFormatter,
+                prog='%s %s' % (parser.prog, command_cls.name),
+                description=command_cls.description,
+                help=command_cls.help_text)
+
+            for option in self.option_list:
+                option.add_to(subparser, config, argv)
+
+            for option in command_cls.option_list:
+                option.add_to(subparser, config, argv)
+
+            for option in self._global_options:
+                option.add_to(subparser, config, argv)
+
+            subparser.set_defaults(command_cls=command_cls)
+
+        return parser
+
+    def initialize(self):
+        """Initialize the command."""
+        super(BaseMultiCommand, self).initialize()
+
+        command = self.options.command_cls(options=self.options,
+                                           config=self.config,
+                                           transport_cls=self.transport_cls)
+        command.stdout = self.stdout
+        command.stderr = self.stderr
+        command.json = self.json
+        command.initialize()
+        self.subcommand = command
+
+    def main(self):
+        """Run the command."""
+        self.subcommand.main()
 
 def find_entry_point_for_command(command_name):
     """Return an entry point for the given rbtools command.
