@@ -64,12 +64,8 @@ class Publish(Command):
             if review_request.public:
                 update_fields['changedescription'] = \
                     self.options.change_description
-
-                if (self.options.markdown and
-                    self.capabilities.has_capability('text', 'markdown')):
-                    update_fields['changedescription_text_type'] = 'markdown'
-                else:
-                    update_fields['changedescription_text_type'] = 'plain'
+                update_fields['changedescription_text_type'] = \
+                    self._get_text_type(self.options.markdown)
             else:
                 logging.error(
                     'The change description field can only be set when '

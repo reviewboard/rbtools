@@ -793,26 +793,20 @@ class Post(Command):
             if self.options.testing_done:
                 update_fields['testing_done'] = self.options.testing_done
 
-            if ((self.options.description or self.options.testing_done) and
-                self.options.markdown and
-                self.capabilities.has_capability('text', 'markdown')):
+            text_type = self._get_text_type(self.options.markdown)
+
+            if self.options.description or self.options.testing_done:
                 # The user specified that their Description/Testing Done are
                 # valid Markdown, so tell the server so it won't escape the
                 # text.
-                update_fields['text_type'] = 'markdown'
+                update_fields['text_type'] = text_type
 
             if self.options.change_description is not None:
                 if review_request.public:
                     update_fields['changedescription'] = \
                         self.options.change_description
-
-                    if (self.options.markdown and
-                        self.capabilities.has_capability('text', 'markdown')):
-                        update_fields['changedescription_text_type'] = \
-                            'markdown'
-                    else:
-                        update_fields['changedescription_text_type'] = \
-                            'plain'
+                    update_fields['changedescription_text_type'] = \
+                        text_type
                 else:
                     logging.error(
                         'The change description field can only be set when '

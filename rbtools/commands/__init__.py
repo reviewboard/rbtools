@@ -1439,6 +1439,23 @@ class Command(object):
 
         return server_url
 
+    def _get_text_type(self, markdown):
+        """Return the appropriate text type for a field.
+
+        Args:
+            markdown (bool):
+                Whether the field should be interpreted as Markdown-formatted
+                text.
+
+        Returns:
+            unicode:
+            The text type value to set for the field.
+        """
+        if markdown and self.capabilities.has_capability('text', 'markdown'):
+            return 'markdown'
+        else:
+            return 'plain'
+
 
 class BaseSubCommand(Command):
     """Abstract base class for a subcommand."""

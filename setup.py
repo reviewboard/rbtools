@@ -76,6 +76,7 @@ rb_commands = [
     'patch = rbtools.commands.patch:Patch',
     'post = rbtools.commands.post:Post',
     'publish = rbtools.commands.publish:Publish',
+    'review = rbtools.commands.review:Review',
     'setup-completion = rbtools.commands.setup_completion:SetupCompletion',
     'setup-repo = rbtools.commands.setup_repo:SetupRepo',
     'stamp = rbtools.commands.stamp:Stamp',

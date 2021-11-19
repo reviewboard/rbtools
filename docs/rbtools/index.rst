@@ -60,6 +60,7 @@ There's a whole suite of additional commands that might also be useful:
 * :ref:`rbt-login` - Create a Review Board login session for RBTools
 * :ref:`rbt-logout` - Log RBTools out of Review Board
 * :ref:`rbt-publish` - Publish a review request
+* :ref:`rbt-review` - Create and publish reviews
 * :ref:`rbt-setup-completion` - Set up shell integration/auto-completion
 * :ref:`rbt-stamp` - Stamp a local commit with a review request URL
 * :ref:`rbt-status-update` - Register or update a "status update" on a review
