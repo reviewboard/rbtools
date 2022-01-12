@@ -128,6 +128,7 @@ setup(
         'six>=1.8.0',
         'texttable',
         'tqdm',
+        'setuptools',
     ],
     packages=find_packages(exclude=['tests']),
     include_package_data=True,
