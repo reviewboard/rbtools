@@ -54,11 +54,6 @@ class StatusUpdate(Command):
                        type=int,
                        help='Specifies which status update from the review '
                             'request.'),
-                Option('-j', '--json',
-                       action='store_true',
-                       dest='json',
-                       default=False,
-                       help='Format command output in JSON.'),
                 Option('--review',
                        dest='review',
                        metavar='FILE_PATH',
@@ -166,20 +161,17 @@ class StatusUpdate(Command):
                 Response from API with list of status-updates or a single
                 status-update.
         """
-        if self.options.json:
-            if isinstance(response, list):
-                output = [self._dict_status_update(status_update)
-                          for status_update in response]
-            else:
-                output = self._dict_status_update(response)
+        self.json.add('status_updates', [])
 
-            self.stdout.write(json.dumps(output, indent=2, sort_keys=True))
+        if isinstance(response, list):
+            for status_update in response:
+                self._print_status_update(status_update)
+                self.json.append('status_updates',
+                                 self._dict_status_update(status_update))
         else:
-            if isinstance(response, list):
-                for status_update in response:
-                    self._print_status_update(status_update)
-            else:
-                self._print_status_update(response)
+            self._print_status_update(response)
+            self.json.append('status_updates',
+                             self._dict_status_update(response))
 
     def add_review(self):
         """Handle adding a review to a review request from a json file.
