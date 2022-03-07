@@ -2,22 +2,20 @@
 
 from __future__ import unicode_literals
 
-import io
-import os.path
 import sys
 
 import kgb
 
 from rbtools import get_version_string
-from rbtools.commands import JSONOutput, main as rbt_main, OutputWrapper
+from rbtools.commands import JSONOutput, main as rbt_main
+from rbtools.testing import TestCase
 from rbtools.utils.process import execute
-from rbtools.utils.testbase import RBTestBase
 
 
 _rbt_path = rbt_main.__file__
 
 
-class MainCommandTests(RBTestBase):
+class MainCommandTests(TestCase):
     """Tests for RBT help command and rbt command help options."""
 
     def test_help_command(self):
@@ -123,7 +121,7 @@ class MainCommandTests(RBTestBase):
         return execute([sys.executable, _rbt_path] + list(args))
 
 
-class JSONOutputTests(kgb.SpyAgency, RBTestBase):
+class JSONOutputTests(kgb.SpyAgency, TestCase):
     """Tests for JSON output wrapper for --json command.
     """
 

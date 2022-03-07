@@ -2,11 +2,11 @@
 
 from __future__ import unicode_literals
 
+from rbtools.testing import TestCase
 from rbtools.utils.aliases import replace_arguments
-from rbtools.utils.testbase import RBTestBase
 
 
-class AliasTests(RBTestBase):
+class AliasTests(TestCase):
     """Tests for rbtools.utils.aliases."""
 
     def test_replace_arguments_basic(self):

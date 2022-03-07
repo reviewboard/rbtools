@@ -4,10 +4,10 @@ from __future__ import unicode_literals
 
 from rbtools.commands import CommandError
 from rbtools.commands.post import Post
-from rbtools.utils.testbase import RBTestBase
+from rbtools.testing import TestCase
 
 
-class PostCommandTests(RBTestBase):
+class PostCommandTests(TestCase):
     """Tests for rbt post command."""
 
     def test_post_one_extra_fields(self):

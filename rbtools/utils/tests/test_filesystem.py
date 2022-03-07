@@ -5,13 +5,13 @@ from __future__ import unicode_literals
 import os
 import shutil
 
+from rbtools.testing import TestCase
 from rbtools.utils import filesystem
 from rbtools.utils.filesystem import (cleanup_tempfiles, make_empty_files,
                                       make_tempdir, make_tempfile)
-from rbtools.utils.testbase import RBTestBase
 
 
-class FilesystemTests(RBTestBase):
+class FilesystemTests(TestCase):
     """Unit tests for rbtools.utils.filesystem."""
 
     def test_make_tempfile(self):

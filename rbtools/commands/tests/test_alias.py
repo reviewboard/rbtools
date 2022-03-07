@@ -3,11 +3,11 @@
 from __future__ import unicode_literals
 
 from rbtools.commands.alias import Alias
+from rbtools.testing import TestCase
 from rbtools.utils.process import execute
-from rbtools.utils.testbase import RBTestBase
 
 
-class AliasCommandTests(RBTestBase):
+class AliasCommandTests(TestCase):
     """Tests for rbt alias commmand."""
 
     def test_alias_list_defined(self):

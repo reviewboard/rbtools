@@ -11,12 +11,12 @@ from rbtools.api.capabilities import Capabilities
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError)
 from rbtools.clients.perforce import PerforceClient, P4Wrapper
-from rbtools.clients.tests import SCMClientTests
+from rbtools.clients.tests import SCMClientTestCase
+from rbtools.testing import TestCase
 from rbtools.utils.filesystem import make_tempfile
-from rbtools.utils.testbase import RBTestBase
 
 
-class P4WrapperTests(RBTestBase):
+class P4WrapperTests(TestCase):
     """Unit tests for P4Wrapper."""
 
     def is_supported(self):
@@ -63,7 +63,7 @@ class P4WrapperTests(RBTestBase):
         self.assertEqual(info['Server uptime'], '111:43:38')
 
 
-class PerforceClientTests(SCMClientTests):
+class PerforceClientTests(SCMClientTestCase):
     """Unit tests for PerforceClient."""
 
     class P4DiffTestWrapper(P4Wrapper):

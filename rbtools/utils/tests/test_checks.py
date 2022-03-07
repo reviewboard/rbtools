@@ -4,11 +4,11 @@ from __future__ import unicode_literals
 
 import sys
 
+from rbtools.testing import TestCase
 from rbtools.utils import checks
-from rbtools.utils.testbase import RBTestBase
 
 
-class ChecksTests(RBTestBase):
+class ChecksTests(TestCase):
     """Unit tests for rbtools.utils.checks."""
 
     def test_check_install_with_found(self):

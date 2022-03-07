@@ -25,7 +25,7 @@ from rbtools.utils.filesystem import is_exe_in_path, load_config
 from rbtools.utils.process import execute
 
 
-class MercurialTestBase(SCMClientTestCase):
+class MercurialTestCase(SCMClientTestCase):
     """Base class for all Mercurial unit tests."""
 
     @classmethod
@@ -94,7 +94,7 @@ class MercurialTestBase(SCMClientTestCase):
             self.run_hg(['tag', tag])
 
 
-class MercurialClientTests(SpyAgency, MercurialTestBase):
+class MercurialClientTests(SpyAgency, MercurialTestCase):
     """Unit tests for MercurialClient."""
 
     TESTSERVER = 'http://127.0.0.1:8080'
@@ -1397,7 +1397,7 @@ class MercurialClientTests(SpyAgency, MercurialTestBase):
         return force_unicode(self.run_hg(['identify']).split()[0])
 
 
-class MercurialSubversionClientTests(MercurialTestBase):
+class MercurialSubversionClientTests(MercurialTestCase):
     """Unit tests for hgsubversion."""
 
     TESTSERVER = 'http://127.0.0.1:8080'

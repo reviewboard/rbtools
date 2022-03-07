@@ -8,14 +8,13 @@ from kgb import SpyAgency
 
 from rbtools.api.resource import ItemResource
 from rbtools.api.tests.base import TestWithPayloads
-from rbtools.clients import RepositoryInfo
 from rbtools.commands.setup_repo import SetupRepo
+from rbtools.testing import TestCase
 from rbtools.testing.transport import TestTransport
 from rbtools.utils.console import confirm_select, get_input
-from rbtools.utils.testbase import RBTestBase
 
 
-class SetupRepoTest(SpyAgency, TestWithPayloads, RBTestBase):
+class SetupRepoTest(SpyAgency, TestWithPayloads, TestCase):
     """Tests for rbt setup-repo command."""
 
     def test_prompt_rb_repository_repos_found(self):

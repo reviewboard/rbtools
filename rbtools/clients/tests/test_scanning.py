@@ -7,11 +7,11 @@ import os
 from rbtools.clients import scan_usable_client
 from rbtools.clients.git import GitClient
 from rbtools.clients.svn import SVNClient
-from rbtools.clients.tests import SCMClientTests
+from rbtools.clients.tests import SCMClientTestCase
 from rbtools.utils.process import execute
 
 
-class ScanningTests(SCMClientTests):
+class ScanningTests(SCMClientTestCase):
     """Unit tests for client scanning."""
 
     def setUp(self):

@@ -10,7 +10,7 @@ import six
 
 from rbtools.clients.clearcase import ClearCaseClient, ClearCaseRepositoryInfo
 from rbtools.clients.errors import SCMError
-from rbtools.clients.tests import SCMClientTests
+from rbtools.clients.tests import SCMClientTestCase
 from rbtools.utils.checks import check_gnu_diff
 from rbtools.utils.filesystem import is_exe_in_path
 from rbtools.utils.process import execute
@@ -111,7 +111,7 @@ _WEBVIEW_VIEW_INFO = [
 ]
 
 
-class ClearCaseClientTests(kgb.SpyAgency, SCMClientTests):
+class ClearCaseClientTests(kgb.SpyAgency, SCMClientTestCase):
     """Unit tests for ClearCaseClient."""
 
     @unittest.skipIf(not is_exe_in_path('cleartool'),

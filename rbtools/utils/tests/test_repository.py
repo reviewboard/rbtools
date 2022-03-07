@@ -9,8 +9,8 @@ from six.moves.urllib.request import urlopen
 
 from rbtools.api.client import RBClient
 from rbtools.api.tests.base import MockResponse
+from rbtools.testing import TestCase
 from rbtools.utils.repository import get_repository_resource
-from rbtools.utils.testbase import RBTestBase
 
 
 _REPO1 = {
@@ -60,7 +60,7 @@ _MATCH_URL_BASE = (
 )
 
 
-class RepositoryMatchTests(kgb.SpyAgency, RBTestBase):
+class RepositoryMatchTests(kgb.SpyAgency, TestCase):
     """Unit tests for remote repository matching."""
 
     payloads = {

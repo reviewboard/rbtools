@@ -1074,11 +1074,11 @@ def scan_usable_client(config, options, client_name=None):
                     deepest_local_path = local_path
 
             if found_multiple:
-                logging.warn('Multiple matching repositories were found. '
-                             'Using %s repository at %s.',
-                             tool.name, deepest_local_path)
-                logging.warn('Define REPOSITORY_TYPE in .reviewboardrc if '
-                             'you wish to use a different repository.')
+                logging.warning('Multiple matching repositories were found. '
+                                'Using %s repository at %s.',
+                                tool.name, deepest_local_path)
+                logging.warning('Define REPOSITORY_TYPE in .reviewboardrc if '
+                                'you wish to use a different repository.')
 
             tool = deepest_repo_tool
 

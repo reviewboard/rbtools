@@ -7,13 +7,13 @@ import subprocess
 
 from kgb import SpyAgency
 
+from rbtools.testing import TestCase
 from rbtools.utils.console import edit_file, edit_text
 from rbtools.utils.errors import EditorError
 from rbtools.utils.filesystem import make_tempfile
-from rbtools.utils.testbase import RBTestBase
 
 
-class ConsoleTests(SpyAgency, RBTestBase):
+class ConsoleTests(SpyAgency, TestCase):
     """Unit tests for rbtools.utils.console."""
 
     def test_edit_file(self):
