@@ -1,6 +1,7 @@
 kgb>=6.1
 mock
-nose
+pytest
+pytest-env
 
 # Ordering here matters.
 mercurial>=4.4.2; python_version == '2.7'

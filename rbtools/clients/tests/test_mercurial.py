@@ -7,12 +7,12 @@ import re
 import shutil
 import tempfile
 import time
+import unittest
 from hashlib import md5
 from random import randint
 from textwrap import dedent
 
 from kgb import SpyAgency
-from nose import SkipTest
 from six.moves import range
 
 from rbtools.clients import RepositoryInfo
@@ -146,7 +146,7 @@ class MercurialClientTests(SpyAgency, MercurialTestBase):
 
     def setUp(self):
         if not is_exe_in_path('hg'):
-            raise SkipTest('hg not found in path')
+            raise unittest.SkipTest('hg not found in path')
 
         super(MercurialClientTests, self).setUp()
 
@@ -1500,7 +1500,7 @@ class MercurialSubversionClientTests(MercurialTestBase):
         super(MercurialSubversionClientTests, self).setUp()
 
         if self._skip_reason:
-            raise SkipTest(self._skip_reason)
+            raise unittest.SkipTest(self._skip_reason)
 
         home_dir = self.get_user_home()
         hgrc_path = os.path.join(home_dir, '.hgrc')

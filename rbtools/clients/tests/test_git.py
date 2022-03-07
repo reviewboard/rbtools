@@ -3,11 +3,11 @@
 from __future__ import unicode_literals
 
 import os
+import unittest
 from hashlib import md5
 
 import six
 from kgb import SpyAgency
-from nose import SkipTest
 
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.errors import (CreateCommitError,
@@ -16,8 +16,7 @@ from rbtools.clients.errors import (CreateCommitError,
                                     TooManyRevisionsError)
 from rbtools.clients.git import GitClient
 from rbtools.clients.tests import FOO1, FOO2, FOO3, FOO4, SCMClientTestCase
-from rbtools.utils.console import edit_text
-from rbtools.utils.filesystem import is_exe_in_path, load_config
+from rbtools.utils.filesystem import is_exe_in_path
 from rbtools.utils.process import execute
 
 
@@ -80,7 +79,7 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
 
     def setUp(self):
         if not is_exe_in_path('git'):
-            raise SkipTest('git not found in path')
+            raise unittest.SkipTest('git not found in path')
 
         super(GitClientTests, self).setUp()
 
@@ -1054,9 +1053,9 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         """Testing GitClient.push_upstream with an invalid remote branch"""
         # It must raise a PushError exception because the 'git pull' from an
         # invalid upstream branch will fail.
-        with self.assertRaisesRegexp(PushError,
-                                     'Could not determine remote for branch '
-                                     '"non-existent-branch".'):
+        with self.assertRaisesRegex(PushError,
+                                    'Could not determine remote for branch '
+                                    '"non-existent-branch".'):
             self.client.push_upstream('non-existent-branch')
 
     def test_push_upstream_no_push_exception(self):
@@ -1064,9 +1063,9 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         # Set the push url to be an invalid one.
         self._run_git(['remote', 'set-url', '--push', 'origin', 'bad-url'])
 
-        with self.assertRaisesRegexp(PushError,
-                                     'Could not push branch "master" to '
-                                     'upstream\.'):
+        with self.assertRaisesRegex(PushError,
+                                    r'Could not push branch "master" to '
+                                    r'upstream\.'):
             self.client.push_upstream('master')
 
     def test_merge_invalid_destination(self):

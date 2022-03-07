@@ -5,11 +5,11 @@ from __future__ import unicode_literals
 import json
 import os
 import sys
+import unittest
 from functools import wraps
 from hashlib import md5
 
 import kgb
-from nose import SkipTest
 from six.moves.urllib.request import urlopen
 
 from rbtools.api.client import RBClient
@@ -398,7 +398,7 @@ class SVNClientTests(SCMClientTestCase):
 
     def setUp(self):
         if not is_exe_in_path('svn'):
-            raise SkipTest('svn not found in path')
+            raise unittest.SkipTest('svn not found in path')
 
         super(SVNClientTests, self).setUp()
 
@@ -732,8 +732,8 @@ class SVNClientTests(SCMClientTestCase):
         # Ensure valid SVN client version.
         if not is_valid_version(self.client.subversion_client_version,
                                 self.client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
-            raise SkipTest('Subversion client is too old to test '
-                           '--show-copies-as-adds.')
+            raise unittest.SkipTest('Subversion client is too old to test '
+                                    '--show-copies-as-adds.')
 
         self.options.svn_show_copies_as_adds = state
 
@@ -782,8 +782,8 @@ class SVNClientTests(SCMClientTestCase):
         # Ensure valid SVN client version.
         if not is_valid_version(self.client.subversion_client_version,
                                 self.client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
-            raise SkipTest('Subversion client is too old to test '
-                           'history_scheduled_with_commit().')
+            raise unittest.SkipTest('Subversion client is too old to test '
+                                    'history_scheduled_with_commit().')
 
         self._svn_add_dir('dir1')
         self._svn_add_dir('dir2')
@@ -823,8 +823,8 @@ class SVNClientTests(SCMClientTestCase):
         # Ensure valid SVN client version.
         if not is_valid_version(self.client.subversion_client_version,
                                 self.client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
-            raise SkipTest('Subversion client is too old to test '
-                           'history_scheduled_with_commit().')
+            raise unittest.SkipTest('Subversion client is too old to test '
+                                    'history_scheduled_with_commit().')
 
         # While within a working copy which contains a scheduled commit with
         # addition-with-history, ensure history_scheduled_with_commit() is not
@@ -854,8 +854,8 @@ class SVNClientTests(SCMClientTestCase):
         # Ensure valid SVN client version.
         if not is_valid_version(self.client.subversion_client_version,
                                 self.client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
-            raise SkipTest('Subversion client is too old to test '
-                           'history_scheduled_with_commit().')
+            raise unittest.SkipTest('Subversion client is too old to test '
+                                    'history_scheduled_with_commit().')
 
         # Lone file with history is also excluded.  In this case there should
         # be no SystemExit raised and an (empty) diff should be produced. Test

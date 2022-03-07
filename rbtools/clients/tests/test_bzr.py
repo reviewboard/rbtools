@@ -7,7 +7,6 @@ import unittest
 from hashlib import md5
 
 import six
-from nose import SkipTest
 
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.bazaar import BazaarClient
@@ -67,7 +66,7 @@ class BazaarClientTests(SCMClientTestCase):
 
     def setUp(self):
         if not is_exe_in_path('bzr'):
-            raise SkipTest('bzr not found in path')
+            raise unittest.SkipTest('bzr not found in path')
 
         super(BazaarClientTests, self).setUp()
 

@@ -214,8 +214,8 @@ class TestCase(unittest.TestCase):
                 The assertion failure, if the exception and message isn't
                 raised.
         """
-        return self.assertRaisesRegexp(expected_exception,
-                                       re.escape(expected_message))
+        return self.assertRaisesRegex(expected_exception,
+                                      re.escape(expected_message))
 
     @contextmanager
     def reviewboardrc(self, config, use_temp_dir=False):
