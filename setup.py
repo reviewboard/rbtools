@@ -29,7 +29,7 @@ import sys
 
 from setuptools import setup, find_packages
 
-from rbtools import get_package_version, is_release, VERSION
+from rbtools import get_package_version, VERSION
 
 
 # Make sure this is a version of Python we are compatible with. This should
@@ -129,6 +129,10 @@ setup(
         'six>=1.8.0',
         'texttable',
         'tqdm',
+
+        # This is required upstream by tqdm, but we have to pin the version to
+        # work with Python 2.7.
+        'importlib_resources~=3.3.1',
     ],
     packages=find_packages(exclude=['tests']),
     include_package_data=True,

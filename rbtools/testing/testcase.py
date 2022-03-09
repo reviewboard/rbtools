@@ -214,8 +214,11 @@ class TestCase(unittest.TestCase):
                 The assertion failure, if the exception and message isn't
                 raised.
         """
-        return self.assertRaisesRegex(expected_exception,
-                                      re.escape(expected_message))
+        # This explicitly uses the old name, as opposed to assertRaisesRegex,
+        # because we still need Python 2.7 support. Once we move to Python 3,
+        # we can fix this.
+        return self.assertRaisesRegexp(expected_exception,
+                                       re.escape(expected_message))
 
     @contextmanager
     def reviewboardrc(self, config, use_temp_dir=False):

@@ -1053,9 +1053,9 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         """Testing GitClient.push_upstream with an invalid remote branch"""
         # It must raise a PushError exception because the 'git pull' from an
         # invalid upstream branch will fail.
-        with self.assertRaisesRegex(PushError,
-                                    'Could not determine remote for branch '
-                                    '"non-existent-branch".'):
+        with self.assertRaisesMessage(PushError,
+                                     'Could not determine remote for branch '
+                                     '"non-existent-branch".'):
             self.client.push_upstream('non-existent-branch')
 
     def test_push_upstream_no_push_exception(self):
@@ -1063,9 +1063,9 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         # Set the push url to be an invalid one.
         self._run_git(['remote', 'set-url', '--push', 'origin', 'bad-url'])
 
-        with self.assertRaisesRegex(PushError,
-                                    r'Could not push branch "master" to '
-                                    r'upstream\.'):
+        with self.assertRaisesMessage(PushError,
+                                      'Could not push branch "master" to '
+                                      'upstream.'):
             self.client.push_upstream('master')
 
     def test_merge_invalid_destination(self):
