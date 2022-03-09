@@ -68,7 +68,7 @@ class SetupCompletion(Command):
                             self.SHELLS[shell][system]['filename'])
 
         try:
-            with open(dest, 'w') as f:
+            with open(dest, 'wb') as f:
                 f.write(script)
         except IOError as e:
             logging.error('I/O Error (%s): %s', e.errno, e.strerror)
@@ -87,7 +87,7 @@ class SetupCompletion(Command):
                 auto-completions will be installed for.
         """
         if not shell:
-            shell = os.environ.get(b'SHELL')
+            shell = os.environ.get('SHELL')
 
             if shell:
                 shell = os.path.basename(shell)

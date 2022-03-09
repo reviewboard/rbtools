@@ -1054,8 +1054,8 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         # It must raise a PushError exception because the 'git pull' from an
         # invalid upstream branch will fail.
         with self.assertRaisesMessage(PushError,
-                                     'Could not determine remote for branch '
-                                     '"non-existent-branch".'):
+                                      'Could not determine remote for branch '
+                                      '"non-existent-branch".'):
             self.client.push_upstream('non-existent-branch')
 
     def test_push_upstream_no_push_exception(self):

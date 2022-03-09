@@ -1595,6 +1595,7 @@ class BaseMultiCommand(Command):
         """Run the command."""
         self.subcommand.main()
 
+
 def find_entry_point_for_command(command_name):
     """Return an entry point for the given rbtools command.
 

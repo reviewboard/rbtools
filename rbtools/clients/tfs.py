@@ -66,8 +66,8 @@ class TFExeWrapper(object):
         path = self.get_local_path()
 
         if path:
-            # Now that we know it's TFS, make sure we have GNU diff installed, and
-            # error out if we don't.
+            # Now that we know it's TFS, make sure we have GNU diff installed,
+            # and error out if we don't.
             check_gnu_diff()
 
             return RepositoryInfo(path=path, local_path=path)
@@ -174,7 +174,7 @@ class TFExeWrapper(object):
                              '/format:detailed', '/version:%s' % revision,
                              path or os.getcwd()])
 
-        m = re.search('^Changeset: (\d+)$', data, re.MULTILINE)
+        m = re.search(r'^Changeset: (\d+)$', data, re.MULTILINE)
 
         if not m:
             logging.debug('Failed to parse output from "tf vc history":\n%s',
@@ -674,7 +674,7 @@ class TEEWrapper(object):
                     pending_change.attrib['source-item'].encode('utf-8')
                 old_version = (
                     '%d' % self._convert_symbolic_revision(
-                        'W', old_filename.decode('utf-8')))
+                        'W', old_filename.decode('utf-8'))).encode('utf-8')
 
             if 'add' in action:
                 old_filename = b'/dev/null'

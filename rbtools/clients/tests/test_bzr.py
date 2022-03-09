@@ -52,9 +52,9 @@ class BazaarClientTests(SCMClientTestCase):
                                      msg='initial commit',
                                      cwd=original_branch)
 
-            cls._run_bzr(
-                ['branch', '--use-existing-dir', original_branch, child_branch],
-                cwd=original_branch)
+            cls._run_bzr(['branch', '--use-existing-dir', original_branch,
+                          child_branch],
+                         cwd=original_branch)
         except Exception as e:
             raise unittest.SkipTest('Unable to set up bzr checkout: %s' %
                                     six.text_type(e))

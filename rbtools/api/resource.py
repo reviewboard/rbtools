@@ -687,7 +687,7 @@ class RootResource(ItemResource):
     dictionary to the values parameter.
     """
     _excluded_attrs = ['uri_templates']
-    _TEMPLATE_PARAM_RE = re.compile('\{(?P<key>[A-Za-z_0-9]*)\}')
+    _TEMPLATE_PARAM_RE = re.compile(r'\{(?P<key>[A-Za-z_0-9]*)\}')
 
     def __init__(self, transport, payload, url, **kwargs):
         super(RootResource, self).__init__(transport, payload, url, token=None)

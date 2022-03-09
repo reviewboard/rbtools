@@ -5,7 +5,6 @@ from __future__ import unicode_literals
 import logging
 import os
 import re
-import sys
 from gettext import gettext as _, ngettext
 
 import six

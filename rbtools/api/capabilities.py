@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 class Capabilities(object):
     """Stores and retrieves Review Board server capabilities."""
+
     def __init__(self, capabilities):
         self.capabilities = capabilities
 

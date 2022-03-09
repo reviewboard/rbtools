@@ -91,7 +91,7 @@ class GitClient(SCMClient):
                                   none_on_ignored_error=True)
 
             if version_str:
-                m = re.search('(\d+)\.(\d+)\.(\d+)', version_str)
+                m = re.search(r'(\d+)\.(\d+)\.(\d+)', version_str)
 
                 if m:
                     git_version = (int(m.group(1)),
@@ -350,7 +350,7 @@ class GitClient(SCMClient):
                 # the user a hint about what to do next.
                 version = self._execute([self.git, 'svn', '--version'],
                                         ignore_errors=True)
-                version_parts = re.search('version (\d+)\.(\d+)\.(\d+)',
+                version_parts = re.search(r'version (\d+)\.(\d+)\.(\d+)',
                                           version)
                 svn_remote = self._execute(
                     [self.git, 'config', '--get', 'svn-remote.svn.url'],

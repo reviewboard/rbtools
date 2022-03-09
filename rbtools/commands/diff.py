@@ -1,7 +1,5 @@
 from __future__ import unicode_literals
 
-import sys
-
 from rbtools.clients.errors import InvalidRevisionSpecError
 from rbtools.commands import Command, CommandError
 

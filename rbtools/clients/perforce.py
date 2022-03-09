@@ -12,7 +12,6 @@ import string
 import subprocess
 import sys
 from fnmatch import fnmatch
-from locale import getpreferredencoding
 
 import six
 
@@ -399,7 +398,7 @@ class PerforceClient(SCMClient):
 
     DATE_RE = re.compile(br'(\w+)\s+(\w+)\s+(\d+)\s+(\d\d:\d\d:\d\d)\s+'
                          br'(\d\d\d\d)')
-    ENCODED_COUNTER_URL_RE = re.compile('reviewboard.url\.(\S+)')
+    ENCODED_COUNTER_URL_RE = re.compile(r'reviewboard.url\.(\S+)')
 
     REVISION_CURRENT_SYNC = '--rbtools-current-sync'
     REVISION_PENDING_CLN_PREFIX = '--rbtools-pending-cln:'

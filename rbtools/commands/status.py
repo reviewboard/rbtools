@@ -40,7 +40,8 @@ class Status(Command):
                default=False,
                action='store_true',
                help='Null-terminate each entry. Otherwise, the entries will '
-                    'be newline-terminated. This is incompatible with --json.'),
+                    'be newline-terminated. This is incompatible with '
+                    '--json.'),
         Option('--all',
                dest='all_repositories',
                action='store_true',

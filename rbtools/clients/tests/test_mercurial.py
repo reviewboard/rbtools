@@ -1529,7 +1529,7 @@ class MercurialSubversionClientTests(MercurialTestCase):
         self.client = MercurialClient(options=self.options)
 
     @classmethod
-    def svn_add_file_commit(self, filename, data, msg, add_file=True):
+    def svn_add_file_commit(cls, filename, data, msg, add_file=True):
         with open(filename, 'wb') as fp:
             fp.write(data)
 

@@ -82,7 +82,6 @@ class MercurialClient(SCMClient):
     # the actual character.
     _RECORD_SEP_ESC = r'\x1e'
 
-
     def __init__(self, executable='hg', **kwargs):
         """Initialize the client.
 
@@ -334,16 +333,17 @@ class MercurialClient(SCMClient):
             ``commit_id`` (:py:class:`unicode`, optional):
                 The ID of the single commit being posted, if not using a range.
 
-            These will be used to generate the diffs to upload to Review Board (or
-            print). The diff for review will include the changes in (base, tip],
-            and the parent diff (if necessary) will include (parent, base].
+            These will be used to generate the diffs to upload to Review Board
+            (or print). The diff for review will include the changes in (base,
+            tip], and the parent diff (if necessary) will include (parent,
+            base].
 
-            If zero revisions are passed in, this will return the outgoing changes
-            from the parent of the working directory.
+            If zero revisions are passed in, this will return the outgoing
+            changes from the parent of the working directory.
 
-            If a single revision is passed in, this will return the parent of that
-            revision for "base" and the passed-in revision for "tip". This will
-            result in generating a diff for the changeset specified.
+            If a single revision is passed in, this will return the parent of
+            that revision for "base" and the passed-in revision for "tip". This
+            will result in generating a diff for the changeset specified.
 
             If two revisions are passed in, they will be used for the "base"
             and "tip" revisions, respectively.
@@ -1123,7 +1123,7 @@ class MercurialClient(SCMClient):
             parents = execute(
                 [self._exe, 'log', '-r', str(rev), '--template', '{parents}'],
                 env=self._hg_env)
-            parents = re.split(':[^\s]+\s*', parents)
+            parents = re.split(r':[^\s]+\s*', parents)
             parents = [int(p) for p in parents if p != '']
 
             parents = [p for p in parents if p not in outgoing_changesets]

@@ -12,7 +12,6 @@ import threading
 from collections import defaultdict, deque
 
 import six
-from pkg_resources import parse_version
 from pydiffx.dom import DiffX
 
 from rbtools.api.errors import APIError
@@ -302,7 +301,6 @@ class ClearCaseClient(SCMClient):
     REVISION_STREAM_PREFIX = 'stream:'
 
     CHECKEDOUT_RE = re.compile(r'CHECKEDOUT(\.\d+)?$')
-
 
     def __init__(self, **kwargs):
         """Initialize the client.
@@ -1401,7 +1399,6 @@ class ClearCaseClient(SCMClient):
             A list of the changed files.
         """
         changeset = []
-        tmp_labels = []
 
         # Initialize comparison_path to current working directory.
         # TODO: support another argument to manage a different comparison path.
