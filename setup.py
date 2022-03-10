@@ -122,10 +122,30 @@ setup(
     },
     install_requires=[
         'backports.shutil_get_terminal_size; python_version<"3.0"',
-        'colorama',
+
+        # Pin to the last version which supports Python 2.7.
+        'colorama>=0.3,<0.4; python_version<"3.0"',
+        'colorama; python_version>"3.0"',
+
         'six>=1.8.0',
-        'texttable',
-        'tqdm',
+
+        # As of 1.6, texttable still supports Python 2.7. Pin in case that
+        # changes in the future.
+        'texttable>=1.6,<1.7; python_version<"3.0"',
+        'texttable; python_version>"3.0"',
+
+        # As of 4.x, tqdm is still compatible with Python 2.7, but there's
+        # no telling how long that'll be the case. Pin in case that changes in
+        # the future.
+        'tqdm>=4,<5; python_version<"3.0"',
+        'tqdm; python_version>"3.0"',
+
+        # These are required upstream by tqdm, but we have to pin the version
+        # to work with Python 2.7. This can be removed entirely once we are
+        # Python 3+ only.
+        'importlib_resources>=3.3.1,<3.4; python_version<"3.0"',
+        'more-itertools==5.0.0; python_version<"3.0"',
+        'zipp==1.0.0; python_version<"3.0"',
     ],
     packages=find_packages(exclude=['tests']),
     include_package_data=True,
