@@ -107,6 +107,9 @@ class BazaarClient(SCMClient):
         # This is a branch, let's get its attributes:
         branch_match = re.search(self.BRANCH_REGEX, bzr_info, re.MULTILINE)
 
+        if not branch_match:
+            return None
+
         path = branch_match.group('branch_path')
 
         if path == '.':
