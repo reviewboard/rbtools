@@ -1,0 +1,130 @@
+.. default-intersphinx:: rbt3.0 rb-latest
+
+
+=========================
+RBTools 3.0 Release Notes
+=========================
+
+**Release date:** TBD
+
+
+New Features
+============
+
+
+HCL VersionVault and IBM ClearCase
+----------------------------------
+
+Review Board `Power Pack`_ 4.0 includes new support for `HCL VersionVault`_ and
+`IBM ClearCase`_, built in cooperation with HCL. This replaces the old
+community-driven ClearCase implementation in Review Board, offering better
+compatibility, official support, and modern functionality. It includes many
+long-requested features such as the ability to include multiple VOBs in a
+single repository.
+
+Support for this new backend has been added, and support for the old
+community-driven backend has been significantly rewritten to improve
+performance and reliability.
+
+.. _Power Pack: https://www.reviewboard.org/powerpack/
+.. _HCL VersionVault: https://www.hcltechsw.com/versionvault/home
+.. _IBM ClearCase: https://www.ibm.com/products/rational-clearcase
+
+
+rbt review
+----------
+
+.. program:: rbt review
+
+The new :command:`rbt review` command makes it possible to perform reviews from
+the command line.
+
+This command offers several sub-commands, including the ability to create
+comments of different types, and create, edit, and publish reviews.
+
+Based on work by Anahita Mohapatra.
+
+
+JSON Output
+-----------
+
+All commands now include a :option:`--json` option for printing output in a
+machine-readable format. At a minimum this output will include the success or
+error status of the command, and most commands include additional keys for the
+data.
+
+Patch by Ryan Kang.
+
+
+Other Improvements
+------------------
+
+.. program:: rbt post
+
+* The performance of the repository detection mechanism which most commands use
+  at start-up has been significantly improved. We still recommend setting
+  ``REPOSITORY`` and ``REPOSITORY_TYPE`` in :file:`.reviewboardrc` (or using
+  :option:`--repository` and :option:`--repository-type`) in order to avoid the
+  need for auto-detection entirely.
+
+* Added support for setting the ``Proxy-Authorization`` header.
+
+  Some proxy servers and authentication gateways require setting this header. A
+  new config key and command-line flag have been added to support this.
+
+  Patch by Lukasz Kawczynski.
+
+* Show custom commands and aliases with :option:`--help`
+
+  The help output has been extended to discover custom commands (added via
+  Python entry points), as well as any aliases defined in
+  :file:`.reviewboardrc` files.
+
+  Patch by Matthew Blythe.
+
+* Improved command initialization.
+
+  If you're building custom RBTools commands, your command subclass can now use
+  the ``needs_api``, ``needs_scm_client``, and ``needs_repository`` attributes
+  to automatically initialize any required functionality. This reduces the
+  amount of boilerplate code required, and keeps all that implementation in a
+  centralized place. Existing commands can be updated to use these but the
+  older initialization methods will still work.
+
+
+Bug Fixes and Other Changes
+===========================
+
+* Fixed a bug with exclude patterns and multi-commit diffs (:bug:`4941`).
+
+  When posting multiple commits on Git, the individual commits would respect
+  any exclude patterns, but the cumulative diff which is also posted to the
+  server would not. This has been fixed.
+
+  Patch by Andrej Radović.
+
+* Fixed the type of the ``User-Agent`` header.
+
+  Under Python 3, the ``User-Agent`` header could be formatted incorrectly.
+
+  Patch by Lukasz Kawczynski.
+
+* The old ``TREES`` config key has been deprecated.
+
+  Early in RBTools' history, a config key was added to map filesystem locations
+  to Review Board server names. This was never properly documented, and has
+  been scheduled for removal in RBTools 4.0.
+
+
+Contributors
+============
+
+* Anahita Mohapatra
+* Andrej Radović
+* Christian Hammond
+* David Trowbridge
+* Laurent Marechal
+* Lukasz Kawczynski
+* Matthew Blythe
+* Ruonan Jia
+* Ryan Kang
