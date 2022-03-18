@@ -153,4 +153,166 @@ guaranteed, except that they will land after review request ``1`` and before
 review request ``4``.
 
 
+.. _rbt-land-json:
+
+JSON Output
+===========
+
+.. versionadded:: 3.0
+
+When running with :option:`--json`, the results of landing a change will be
+outputted as JSON. This can be used by programs that wrap RBTools in order to
+automate landing review requests.
+
+
+Successful Payloads
+-------------------
+
+When landing is successful, the results are in the form of:
+
+.. code-block:: javascript
+
+   {
+       "status": "success",
+
+       "is_approved": true,
+
+       /*
+        * A list of all review requests landed in this session.
+        *
+        * There may be more than one entry if using --recursive.
+        */
+       "landed_review_requests": [
+           {
+               // The branch the change was landed in.
+               "destination_branch": "<string>",
+
+               // The ID of the review request.
+               "review_request_id": <int>,
+
+               // The URL of the review request.
+               "review_request_url": "<string>",
+
+               // The local branch being landed, if specified.
+               "source_branch": "<string>",
+
+               /*
+                * The type of land operation. This will be one of:
+                *
+                * "squash" if using --squash and a local branch.
+                *
+                * "merge" if using --no-squash and a local branch.
+                *
+                * "patch" if landing a change on a review request.
+                */
+               "type": "<string>"
+           },
+           ...
+       ]
+   }
+
+For example:
+
+.. code-block:: console
+   :caption: Landing a local branch:
+
+   $ rbt land --json my-branch
+   {
+       "is_approved": true,
+       "landed_review_requests": [
+           {
+               "destination_branch": "dest-branch",
+               "review_request_id": 123,
+               "review_request_url": "https://example.com/r/123/",
+               "source_branch": "my-branch",
+               "type": "merge"
+           },
+       ],
+       "status": "success"
+   }
+
+.. code-block:: console
+   :caption: Landing a change on a review request:
+
+   $ rbt land --json -r 123
+   {
+       "is_approved": true,
+       "landed_review_requests": [
+           {
+               "destination_branch": "dest-branch",
+               "review_request_id": 123,
+               "review_request_url": "https://example.com/r/123/",
+               "source_branch": null,
+               "type": "merge"
+           },
+       ],
+       "status": "success"
+   }
+
+
+Error Payloads
+--------------
+
+When there's an error landing a change (such as the change not yet being
+approved), the results will be in the form of:
+
+.. code-block:: javascript
+
+   {
+       "status": "success",
+
+       // If the change is not approved, this will be present.
+       "approval_failure": {
+           // The approval failure message.
+           "message": "<string>",
+
+           // The ID of the review request that wasn't approved.
+           "review_request_id": <int>
+
+           // The URL of the review request that wasn't approved.
+           "review_request_url": "<string>"
+       },
+
+       // If the change is not approved, this will be present and `false`.
+       "is_approved": false,
+
+       // A list of errors from the operation.
+       "errors": [
+           "<string>",
+           ...
+       ]
+   }
+
+For example:
+
+.. code-block:: console
+   :caption: Attempting to land a change that isn't approved:
+
+   $ rbt close --json my-branch
+   {
+       "approval_failure": {
+           "message": "This review is not marked Ship It!",
+           "review_request_id": 123,
+           "review_request_url": "https://example.com/r/123/",
+       },
+       "errors": [
+           "Cannot land review request 123: This review is not marked Ship It!",
+       ],
+       "is_approved": false,
+       "status": "failed"
+   }
+
+.. code-block:: console
+   :caption: The change was approved but could not be applied.
+
+   $ rbt close --json -r 123
+   {
+       "errors": [
+           "Failed to execute \"rbt patch\": ..."
+       ],
+       "is_approved": true,
+       "status": "failed"
+   }
+
+
 .. rbt-command-options::
