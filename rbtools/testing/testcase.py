@@ -10,12 +10,12 @@ import tempfile
 import unittest
 from contextlib import contextmanager
 
-import six
-from rbtools.utils.filesystem import cleanup_tempfiles, make_tempdir
-
 import kgb
+import six
 
-from rbtools.utils.filesystem import make_tempfile
+from rbtools.utils.filesystem import (cleanup_tempfiles,
+                                      make_tempdir,
+                                      make_tempfile)
 
 
 class TestCase(unittest.TestCase):
@@ -159,6 +159,9 @@ class TestCase(unittest.TestCase):
 
         Unit test suites that use this must mix in :py:class:`kgb.SpyAgency`.
 
+        Version Added:
+            3.0
+
         Args:
             count (int):
                 The number of temporary filenames to pre-create.
@@ -179,6 +182,48 @@ class TestCase(unittest.TestCase):
         self.spy_on(make_tempfile, op=kgb.SpyOpReturnInOrder(tmpfiles))
 
         return tmpfiles
+
+    def precreate_tempdirs(self, count):
+        """Pre-create a specific number of temporary directories.
+
+        This will call :py:func:`~rbtools.utils.filesystem.make_tempdir`
+        the specified number of times, returning the list of generated temp
+        paths, and will then spy that function to return those temp paths.
+
+        Once each pre-created temp path is used up, any further calls to
+        :py:func:`~rbtools.utils.filesystem.make_tempdir` will result in
+        an error, failing the test.
+
+        This is useful in unit tests that need to script a series of
+        expected calls using :py:mod:`kgb` (such as through
+        :py:class:`kgb.ops.SpyOpMatchInOrder`) that need to know the names
+        of temporary filenames up-front.
+
+        Unit test suites that use this must mix in :py:class:`kgb.SpyAgency`.
+
+        Version Added:
+            3.0
+
+        Args:
+            count (int):
+                The number of temporary directories to pre-create.
+
+        Raises:
+            AssertionError:
+                The test suite class did not mix in :py:class:`kgb.SpyAgency`.
+        """
+        assert hasattr(self, 'spy_on'), (
+            '%r must mix in kgb.SpyAgency in order to call this method.'
+            % self.__class__)
+
+        tmpdirs = [
+            make_tempdir()
+            for i in range(count)
+        ]
+
+        self.spy_on(make_tempdir, op=kgb.SpyOpReturnInOrder(tmpdirs))
+
+        return tmpdirs
 
     def assertDiffEqual(self, diff, expected_diff):
         """Assert that two diffs are equal.

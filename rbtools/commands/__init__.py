@@ -55,7 +55,7 @@ class JSONOutput(object):
     --json argument.
 
     Version Added:
-        4.0
+        3.0
     """
     def __init__(self, output_stream):
         """Initialize JSONOutput class.
@@ -101,23 +101,30 @@ class JSONOutput(object):
     def add_error(self, error):
         """Add new error to 'errors' key.
 
-        Append new error to errors key if it exists. If errors key
-        does not exist, create new list associated with errors and append
-        new error.
+        Append a new error to the ``errors`` key, creating one if needed.
 
         Args:
             error (unicode):
-                Error that will be added to list associated with key 'error'
+                The error that will be added to ``errors``.
         """
-        if 'errors' in self._output:
-            self._output['errors'].append(error)
-        else:
-            self._output['errors'] = [error]
+        self._output.setdefault('errors', []).append(error)
+
+    def add_warning(self, warning):
+        """Add new warning to 'warnings' key.
+
+        Append a new warning to the ``warnings`` key, creating one if needed.
+
+        Args:
+            warning (unicode):
+                The warning that will be added to ``warnings``.
+        """
+        self._output.setdefault('warnings', []).append(warning)
 
     def print_to_stream(self):
-        """Output JSON string representation to output stream.
-        """
-        self._output_stream.write(json.dumps(self._output, indent=4))
+        """Output JSON string representation to output stream."""
+        self._output_stream.write(json.dumps(self._output,
+                                             indent=4,
+                                             sort_keys=True))
         self._output_stream.write('\n')
 
 
@@ -430,7 +437,8 @@ class Command(object):
                dest='json_output',
                config_key='JSON_OUTPUT',
                default=False,
-               help='Output results as JSON data instead of text')
+               added_in='3.0',
+               help='Output results as JSON data instead of text.')
     ]
 
     server_options = OptionGroup(
@@ -1052,6 +1060,8 @@ class Command(object):
             if self.options.debug:
                 raise
 
+            self.json.add_error('Internal error: %s: %s'
+                                % (type(e).__name__, e))
             logging.critical(e)
             exit_code = 1
 

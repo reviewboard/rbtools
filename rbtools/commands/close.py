@@ -60,14 +60,19 @@ class Close(Command):
             raise CommandError('Review request #%s is already %s.' % (
                 review_request_id, close_type))
 
-        if self.options.description:
+        description = self.options.description
+
+        if description:
             review_request = review_request.update(
                 status=close_type,
-                description=self.options.description)
+                description=description)
         else:
             review_request = review_request.update(status=close_type)
 
         self.stdout.write('Review request #%s is set to %s.'
                           % (review_request_id, review_request.status))
-        self.json.add('review_request', review_request_id)
-        self.json.add('status', review_request.status)
+
+        self.json.add('close_type', review_request.status)
+        self.json.add('description', description)
+        self.json.add('review_request_id', review_request_id)
+        self.json.add('review_request_url', review_request.absolute_url)

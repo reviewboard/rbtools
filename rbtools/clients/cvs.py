@@ -80,6 +80,9 @@ class CVSClient(SCMClient):
 
         repository_path = self.get_local_path()
 
+        if not repository_path:
+            return None
+
         return RepositoryInfo(path=repository_path,
                               local_path=repository_path)
 

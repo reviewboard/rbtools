@@ -45,7 +45,7 @@ class Publish(Command):
         try:
             review_request = self.api_root.get_review_request(
                 review_request_id=review_request_id,
-                only_fields='public',
+                only_fields='absolute_url,id,public',
                 only_links='draft')
         except APIError as e:
             raise CommandError('Error getting review request %s: %s'
@@ -80,4 +80,5 @@ class Publish(Command):
 
         self.stdout.write('Review request #%s is published.'
                           % review_request_id)
-        self.json.add('review_request', review_request_id)
+        self.json.add('review_request_id', review_request.id)
+        self.json.add('review_request_url', review_request.absolute_url)

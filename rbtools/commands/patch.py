@@ -499,7 +499,7 @@ class Patch(Command):
                         raise CommandError(message)
                     else:
                         logger.warning(message)
-                        self.json.add_error(message)
+                        self.json.add_warning(message)
             except NotImplementedError:
                 pass
 
@@ -568,29 +568,29 @@ class Patch(Command):
         total_patches = len(patches)
 
         # Check if we're planning to commit and have any patch without
-        # metadata, in which case we'll need to fetch the review request so we
-        # can generate a commit message.
-        needs_review_request = will_commit and (
+        # metadata, in which case we'll need to fetch metadata from the
+        # review request so we can generate a commit message.
+        needs_review_request_metadata = will_commit and (
             squash or total_patches == 1 or
             any(patch_data['commit_meta'] is None for patch_data in patches)
         )
 
-        if needs_review_request:
-            # Fetch the review request to use as a description. We only
-            # want to fetch this once.
-            try:
-                review_request = self.api_root.get_review_request(
-                    review_request_id=self._review_request_id,
-                    force_text_type='plain')
-            except APIError as e:
-                raise CommandError(
-                    _('Error getting review request %(review_request_id)d: '
-                      '%(error)s')
-                    % {
-                        'review_request_id': self._review_request_id,
-                        'error': e,
-                    })
+        # Fetch the review request to use as a description and for URLs in
+        # JSON metadata. We only want to fetch this once.
+        try:
+            review_request = self.api_root.get_review_request(
+                review_request_id=self._review_request_id,
+                force_text_type='plain')
+        except APIError as e:
+            raise CommandError(
+                _('Error getting review request %(review_request_id)d: '
+                  '%(error)s')
+                % {
+                    'review_request_id': self._review_request_id,
+                    'error': e,
+                })
 
+        if needs_review_request_metadata:
             default_author = review_request.get_submitter()
             default_commit_message = extract_commit_message(review_request)
         else:
@@ -622,9 +622,10 @@ class Patch(Command):
                 'review_request_id': self._review_request_id,
                 'diff_revision': diff_revision,
             })
-        self.json.add('review_request', self._review_request_id)
+        self.json.add('review_request_id', review_request.id)
+        self.json.add('review_request_url', review_request.absolute_url)
         self.json.add('diff_revision', diff_revision)
-        self.json.add('n_patches', total_patches)
+        self.json.add('total_patches', total_patches)
 
         # Start applying all the patches.
         for patch_data in patches:
@@ -645,6 +646,8 @@ class Patch(Command):
                     error = _('Could not apply patch %(num)d of %(total)d')
                 else:
                     error = _('Could not revert patch %(num)d of %(total)d')
+
+                self.json.add('failed_patch_num', patch_num)
 
                 raise CommandError(error % {
                     'num': patch_num,
