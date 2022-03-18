@@ -131,26 +131,19 @@ class JSONOutputTests(kgb.SpyAgency, TestCase):
 
         self.json = JSONOutput(sys.stdout)
 
-    def test_json_wrapper_initializes(self):
-        """Testing JSONOutput instantiates given stream object.
-        """
+    def test_init(self):
+        """Testing JSONOutput instantiates given stream object"""
         self.assertIs(self.json._output_stream, sys.stdout)
-
-    def test_json_wrapper_initiates(self):
-        """Testing JSONOutput instantiates empty dictionary.
-        """
         self.assertEqual(len(self.json._output), 0)
 
-    def test_json_wrapper_add(self):
-        """Testing JSONOutput.add adds a key value pair to output.
-        """
+    def test_add(self):
+        """Testing JSONOutput.add adds a key value pair to output"""
         self.json.add('key', 'value')
 
         self.assertEqual(self.json._output['key'], 'value')
 
-    def test_json_wrapper_append(self):
-        """Testing JSONOutput.append appends to list associated with a key.
-        """
+    def test_append(self):
+        """Testing JSONOutput.append appends to list associated with a key"""
         self.json.add('test', [])
         self.json.append('test', 'test')
 
@@ -163,14 +156,28 @@ class JSONOutputTests(kgb.SpyAgency, TestCase):
 
         self.assertNotIn('nonexistent', self.json._output)
 
-    def test_json_wrapper_add_error(self):
-        """Testing JSONOutput.add_error will append to the errors key if it
-        already exists and create a new errors key if it does not.
-        """
+    def test_add_error_without_key(self):
+        """Testing JSONOutput.add_error without existing key"""
         self.json.add_error('test_error')
 
         self.assertEqual(self.json._output['errors'], ['test_error'])
 
+    def test_add_error_with_key(self):
+        """Testing JSONOutput.add_error with existing key"""
+        self.json.add_error('test_error')
         self.json.add_error('test_error2')
         self.assertEqual(self.json._output['errors'],
                          ['test_error', 'test_error2'])
+
+    def test_add_warning_without_key(self):
+        """Testing JSONOutput.add_warning without existing key"""
+        self.json.add_warning('test_warning')
+
+        self.assertEqual(self.json._output['warnings'], ['test_warning'])
+
+    def test_add_warning_with_key(self):
+        """Testing JSONOutput.add_warning with existing key"""
+        self.json.add_warning('test_warning')
+        self.json.add_warning('test_warning2')
+        self.assertEqual(self.json._output['warnings'],
+                         ['test_warning', 'test_warning2'])
