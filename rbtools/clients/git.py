@@ -484,7 +484,7 @@ class GitClient(SCMClient):
         elif self._type == self.TYPE_GIT_SVN:
             # Try using the reviewboard:url property on the SVN repo, if it
             # exists.
-            return SVNClient().scan_for_server_property(repository_info)
+            return SVNClient().scan_for_server(repository_info)
         elif self._type == self.TYPE_GIT_P4:
             return PerforceClient().scan_for_server(repository_info)
         else:

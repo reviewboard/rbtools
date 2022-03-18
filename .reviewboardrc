@@ -1,6 +1,6 @@
-REVIEWBOARD_URL = "https://reviews.reviewboard.org"
-REPOSITORY = "RBTools"
-REPOSITORY_TYPE = "git"
-BRANCH = "master"
-TRACKING_BRANCH = "origin/master"
-LAND_DEST_BRANCH = "master"
+REVIEWBOARD_URL = 'https://reviews.reviewboard.org'
+REPOSITORY = 'RBTools'
+REPOSITORY_TYPE = 'git'
+BRANCH = 'master'
+TRACKING_BRANCH = 'origin/%s' % BRANCH
+LAND_DEST_BRANCH = BRANCH

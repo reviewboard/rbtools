@@ -1,6 +1,5 @@
 from __future__ import unicode_literals
 
-import argparse
 import re
 import sys
 
@@ -10,7 +9,7 @@ from docutils.statemachine import ViewList
 from six.moves import range
 
 from rbtools import commands
-from rbtools.commands import OptionGroup, Option
+from rbtools.commands import BaseMultiCommand, OptionGroup, Option
 
 
 class CommandClassNotFound(Exception):
@@ -104,12 +103,7 @@ class CommandUsageDirective(Directive):
         cmd = cmd_class()
         parser = cmd.create_parser({})
 
-        formatter = argparse.HelpFormatter(prog='rbt')
-        formatter.add_usage(parser.usage, parser._actions,
-                            parser._mutually_exclusive_groups,
-                            prefix='')
-
-        usage = '$ %s' % formatter.format_help().splitlines()[0]
+        usage = '$ %s' % parser.format_help().splitlines()[0][7:]
 
         section = nodes.section(ids=[
             '%s-usage' % env.temp_data['rbt-command:doc-prefix'],
@@ -119,6 +113,18 @@ class CommandUsageDirective(Directive):
 
         # Insert this as a main section under the document section.
         add_at_section_level(self, 1, [section])
+
+        if isinstance(cmd, BaseMultiCommand):
+            section += nodes.Text('This command provides several subcommands:')
+
+            subcommands_list = nodes.bullet_list()
+
+            for subcommand in cmd.subcommands:
+                item = nodes.list_item()
+                item += nodes.literal(text=subcommand.name)
+                subcommands_list += item
+
+            section += subcommands_list
 
         return []
 
