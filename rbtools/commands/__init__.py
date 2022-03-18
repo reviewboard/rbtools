@@ -55,7 +55,7 @@ class JSONOutput(object):
     --json argument.
 
     Version Added:
-        4.0
+        3.0
     """
     def __init__(self, output_stream):
         """Initialize JSONOutput class.
@@ -430,7 +430,8 @@ class Command(object):
                dest='json_output',
                config_key='JSON_OUTPUT',
                default=False,
-               help='Output results as JSON data instead of text')
+               added_in='3.0',
+               help='Output results as JSON data instead of text.')
     ]
 
     server_options = OptionGroup(
@@ -1052,6 +1053,8 @@ class Command(object):
             if self.options.debug:
                 raise
 
+            self.json.add_error('Internal error: %s: %s'
+                                % (type(e).__name__, e))
             logging.critical(e)
             exit_code = 1
 
