@@ -225,8 +225,10 @@ class Land(Command):
                 repository.
         """
         json_data = {
-            'review_request': review_request.id,
+            'review_request_id': review_request.id,
+            'review_request_url': review_request.absolute_url,
             'destination_branch': destination_branch,
+            'source_branch': None,
         }
 
         if source_branch:
@@ -258,6 +260,8 @@ class Land(Command):
         else:
             self.stdout.write('Applying patch from review request %s.'
                               % review_request.id)
+
+            json_data['type'] = 'patch'
 
             if not dry_run:
                 self.patch(review_request.id,
@@ -372,6 +376,13 @@ class Land(Command):
         land_error = self.can_land(review_request)
 
         if land_error is not None:
+            self.json.add('is_approved', False)
+            self.json.add('approval_failure', {
+                'review_request_id': review_request.id,
+                'review_request_url': review_request.absolute_url,
+                'message': land_error,
+            })
+
             raise CommandError('Cannot land review request %s: %s'
                                % (review_request_id, land_error))
 
@@ -404,6 +415,13 @@ class Land(Command):
                     land_error = self.can_land(dependency)
 
                     if land_error is not None:
+                        self.json.add('is_approved', False)
+                        self.json.add('approval_failure', {
+                            'review_request_id': review_request.id,
+                            'review_request_url': review_request.absolute_url,
+                            'message': land_error,
+                        })
+
                         raise CommandError(
                             'Aborting recursive land of review request %s.\n'
                             'Review request %s cannot be landed: %s'
@@ -411,6 +429,8 @@ class Land(Command):
 
                 for dependency in reversed(dependencies):
                     self.land(review_request=dependency, **land_kwargs)
+
+        self.json.add('is_approved', True)
 
         self.land(review_request=review_request,
                   source_branch=branch_name,
