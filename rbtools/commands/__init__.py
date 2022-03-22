@@ -1562,6 +1562,21 @@ class BaseMultiCommand(Command):
         """
         prog = '%s %s' % (RB_MAIN, self.name)
 
+        # Set up a parent parser containing the options that will be shared.
+        #
+        # Ideally the globals would also be available to the main command,
+        # but it ends up leading to arguments on the main command overruling
+        # those on the subcommand, which is a problem for --json. For now,
+        # we are only sharing on the subcommands.
+        common_parser = argparse.ArgumentParser(add_help=False)
+
+        for option in self.common_subcommand_option_list:
+            option.add_to(common_parser, config, argv)
+
+        for option in self._global_options:
+            option.add_to(common_parser, config, argv)
+
+        # Set up the parser for the main command.
         parser = argparse.ArgumentParser(
             prog=prog,
             usage=self.usage(),
@@ -1570,9 +1585,7 @@ class BaseMultiCommand(Command):
         for option in self.option_list:
             option.add_to(parser, config, argv)
 
-        for option in self._global_options:
-            option.add_to(parser, config, argv)
-
+        # Set up the parsers for each subcommand.
         subparsers = parser.add_subparsers(
             description=(
                 'To get additional help for these commands, run: '
@@ -1585,15 +1598,10 @@ class BaseMultiCommand(Command):
                 formatter_class=SmartHelpFormatter,
                 prog='%s %s' % (parser.prog, command_cls.name),
                 description=command_cls.description,
-                help=command_cls.help_text)
-
-            for option in self.common_subcommand_option_list:
-                option.add_to(subparser, config, argv)
+                help=command_cls.help_text,
+                parents=[common_parser])
 
             for option in command_cls.option_list:
-                option.add_to(subparser, config, argv)
-
-            for option in self._global_options:
                 option.add_to(subparser, config, argv)
 
             subparser.set_defaults(command_cls=command_cls)
