@@ -28,11 +28,13 @@ OS X
 
 Zsh gets installed in a directory that requires root permission to write to.
 You can either run the command as root or follow the instructions for manual
-installation below. To install, run::
+installation below. To install, run:
 
-	$ sudo rbt setup-completion zsh
+.. code-block:: console
 
-Note: Bash on OS X does not require the use of ``sudo``.
+   $ sudo rbt setup-completion zsh
+
+Note: Bash on OS X does not require the use of :command:`sudo`.
 
 
 Linux
@@ -40,9 +42,11 @@ Linux
 
 Both Bash and Zsh are installed in directories that require root permission to
 write to. You can either run the command as root or follow the instructions for
-manual installation below. To install, run::
+manual installation below. To install, run:
 
-	$ sudo rbt setup-completion <shell>
+.. code-block:: console
+
+   $ sudo rbt setup-completion <shell>
 
 
 Manual Installation

@@ -152,7 +152,12 @@ class CommandUsageDirective(Directive):
                                              for_subcommand=for_subcommand),
         ])
         section += nodes.title(text='Usage')
-        section += nodes.literal_block(usage, usage, classes=['cmdline'])
+        section += parse_text(
+            self,
+            '.. code-block:: console\n'
+            '\n'
+            '   %s\n'
+            % usage)
 
         if for_subcommand:
             # Insert this as a main section under the document section.

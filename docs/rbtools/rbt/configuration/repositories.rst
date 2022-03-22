@@ -33,7 +33,9 @@ This is the recommended way of configuring your repository to talk to
 Review Board.
 
 You can generate this file automatically, starting with RBTools 0.5.3,
-by typing::
+by typing:
+
+.. code-block:: console
 
     $ rbt setup-repo
 
@@ -592,7 +594,9 @@ Repository information can be set in a ``reviewboard.url`` property on
 the Git tree. Users may need to do this themselves on their own Git
 tree, so in some cases, it may be ideal to use dotfiles instead.
 
-To set the property on a Git tree, type::
+To set the property on a Git tree, type:
+
+.. code-block:: console
 
     $ git config reviewboard.url http://reviewboard.example.com
 
@@ -605,7 +609,9 @@ Repository information can be set on Perforce servers by using
 of Perforce.
 
 Perforce version 2008.1 and up support strings in counters, so you can simply
-do::
+do:
+
+.. code-block:: console
 
     $ p4 counter reviewboard.url http://reviewboard.example.com
 
@@ -613,7 +619,9 @@ Older versions of Perforce support only numeric counters, so you must encode
 the server as part of the counter name. As ``/`` characters aren't supported
 in counter names, they must be replaced by ``|`` characters. ``|`` is a
 special character in shells, so you'll need need to escape these using ``\|``.
-For example::
+For example:
+
+.. code-block:: console
 
     $ p4 counter reviewboard.url.http:\|\|reviewboard.example.com 1
 
@@ -627,6 +635,8 @@ are common as base checkout paths. This usually means something like
 :file:`/trunk` or :file:`/trunk/myproject`. If the directory is in the
 user's checkout, it will be faster to find the property.
 
-To set the property on a directory, type::
+To set the property on a directory, type:
+
+.. code-block:: console
 
     $ svn propset reviewboard:url http://reviewboard.example.com .

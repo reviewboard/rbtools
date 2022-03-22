@@ -8,6 +8,9 @@ stamp
 the active branch and, if found, alters the commit message to contain a
 ``Reviewed at <url>`` line.
 
+
+.. rbt-command-usage::
+
 The ``revisions`` argument behaves like it does in rbt post, where it is
 required for some SCMs (e.g. Perforce) and unnecessary/ignored for others
 (e.g. Git). For repositories that use it, the specified revision/changelist
@@ -28,8 +31,9 @@ perform actions such as closing the review request.
 A commit message can also be stamped from :command:`rbt post` by adding the
 `-s` flag:
 
+.. code-block:: console
+
     $ rbt post -s
 
 
-.. rbt-command-usage::
 .. rbt-command-options::
