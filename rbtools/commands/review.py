@@ -365,9 +365,8 @@ class Edit(ReviewSubCommand):
             update_fields['body_bottom'] = options.review_footer
             update_fields['body_bottom_text_type'] = text_type
 
-        if options.ship_it or options.no_ship_it:
-            update_fields['ship_it'] = (options.ship_it and not
-                                        options.no_ship_it)
+        if options.ship_it is not None:
+            update_fields['ship_it'] = options.ship_it
 
         if update_fields:
             try:
