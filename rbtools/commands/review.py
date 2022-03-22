@@ -357,11 +357,11 @@ class Edit(ReviewSubCommand):
 
         update_fields = {}
 
-        if options.review_header:
+        if options.review_header is not None:
             update_fields['body_top'] = options.review_header
             update_fields['body_top_text_type'] = text_type
 
-        if options.review_footer:
+        if options.review_footer is not None:
             update_fields['body_bottom'] = options.review_footer
             update_fields['body_bottom_text_type'] = text_type
 
