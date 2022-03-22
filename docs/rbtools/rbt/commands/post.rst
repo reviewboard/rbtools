@@ -447,4 +447,77 @@ You can set the default for :option:`--submit-as` by setting ``SUBMIT_AS``
 in :file:`.reviewboardrc`.
 
 
+JSON Output
+===========
+
+.. versionadded:: 3.0
+
+When running with :option:`--json`, the results of posting the review request
+will be outputted as JSON. This can be used by programs that wrap RBTools in
+order to automate posting changes for review.
+
+
+Successful Payloads
+-------------------
+
+When posting is successful, the results are in the form of:
+
+.. code-block:: javascript
+
+   {
+       "status": "success",
+
+       // The path to the new diff.
+       "diff_url": "<string>",
+
+       // The ID of the review request.
+       "review_request_id": <int>,
+
+       // The URL of the review request.
+       "review_request_url": "<string>"
+   }
+
+For example:
+
+.. code-block:: console
+
+   $ rbt post --json my-branch
+   {
+       "diff_url": "https://example.com/r/123/diff/",
+       "review_request_id": 123,
+       "review_request_url": "https://example.com/r/123/"
+   }
+
+
+Error Payloads
+--------------
+
+When there's an error posting a change for review, the results will be in the
+form of:
+
+.. code-block:: javascript
+
+   {
+       "status": "failed",
+
+       // A list of errors from the operation.
+       "errors": [
+           "<string>",
+           ...
+       ]
+   }
+
+For example:
+
+.. code-block:: console
+
+   $ rbt post --json my-branch
+   {
+       "errors": [
+           "Could not find the repository on the Review Board server."
+       ],
+       "status": "failed"
+   }
+
+
 .. rbt-command-options::
