@@ -1560,6 +1560,8 @@ class BaseMultiCommand(Command):
             argparse.ArgumentParser:
             The argument parser.
         """
+        subcommand_parsers = {}
+
         prog = '%s %s' % (RB_MAIN, self.name)
 
         # Set up a parent parser containing the options that will be shared.
@@ -1592,11 +1594,13 @@ class BaseMultiCommand(Command):
                 '%s <subcommand> --help' % prog))
 
         for command_cls in self.subcommands:
+            subcommand_name = command_cls.name
+
             subparser = subparsers.add_parser(
-                command_cls.name,
+                subcommand_name,
                 usage=self.usage(command_cls),
                 formatter_class=SmartHelpFormatter,
-                prog='%s %s' % (parser.prog, command_cls.name),
+                prog='%s %s' % (parser.prog, subcommand_name),
                 description=command_cls.description,
                 help=command_cls.help_text,
                 parents=[common_parser])
@@ -1605,6 +1609,9 @@ class BaseMultiCommand(Command):
                 option.add_to(subparser, config, argv)
 
             subparser.set_defaults(command_cls=command_cls)
+            subcommand_parsers[subcommand_name] = subparser
+
+        self.subcommand_parsers = subcommand_parsers
 
         return parser
 
