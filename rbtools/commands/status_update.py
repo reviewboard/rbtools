@@ -119,8 +119,7 @@ class GetStatusUpdateSubCommand(BaseStatusUpdateSubCommand):
                        dest='sid',
                        metavar='ID',
                        type=int,
-                       help='Specifies which status update from the review '
-                            'request.'),
+                       help='A specific status update to display.'),
             ]
         ),
     ]
@@ -449,6 +448,9 @@ class DeleteStatusUpdateSubCommand(BaseStatusUpdateSubCommand):
         except APIError as e:
             raise CommandError('Could not delete the requested resource: '
                                '%s' % e)
+
+        self.stdout.write('Status update %s has been deleted.'
+                          % status_update_id)
 
 
 class StatusUpdate(BaseMultiCommand):
