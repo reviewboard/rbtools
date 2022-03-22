@@ -97,4 +97,7 @@ class Alias(Command):
 
             command = expand_alias(alias, args)[0]
 
-            self.stdout.write(list2cmdline(command))
+            if isinstance(command, list):
+                command = list2cmdline(command)
+
+            self.stdout.write(command)
