@@ -1,4 +1,4 @@
-.. default-intersphinx:: rbt3.0 rb-latest
+.. default-intersphinx:: rbt3.x rb-latest
 
 
 =========================
