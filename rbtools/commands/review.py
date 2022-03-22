@@ -420,7 +420,7 @@ class Review(BaseMultiCommand):
         Discard,
     ]
 
-    option_list = [
+    common_subcommand_option_list = [
         OptionGroup(
             name='Review Options',
             option_list=[

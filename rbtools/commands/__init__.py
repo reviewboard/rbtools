@@ -1502,6 +1502,9 @@ class BaseMultiCommand(Command):
 
     Some commands (such as :command:`rbt review`) want to offer many
     subcommands.
+
+    Version Added:
+        3.0
     """
 
     #: The available subcommands.
@@ -1511,6 +1514,12 @@ class BaseMultiCommand(Command):
     #: Type:
     #:     list
     subcommands = {}
+
+    #: Options common to all subcommands.
+    #:
+    #: Type:
+    #:     list
+    common_subcommand_option_list = []
 
     def usage(self, command_cls=None):
         """Return a usage string for the command.
@@ -1558,6 +1567,12 @@ class BaseMultiCommand(Command):
             usage=self.usage(),
             formatter_class=SmartHelpFormatter)
 
+        for option in self.option_list:
+            option.add_to(parser, config, argv)
+
+        for option in self._global_options:
+            option.add_to(parser, config, argv)
+
         subparsers = parser.add_subparsers(
             description=(
                 'To get additional help for these commands, run: '
@@ -1572,7 +1587,7 @@ class BaseMultiCommand(Command):
                 description=command_cls.description,
                 help=command_cls.help_text)
 
-            for option in self.option_list:
+            for option in self.common_subcommand_option_list:
                 option.add_to(subparser, config, argv)
 
             for option in command_cls.option_list:
