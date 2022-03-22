@@ -36,8 +36,18 @@ GLOBAL_OPTIONS = [
 ]
 
 
-def build_help_text(command_class, argv):
-    """Generate help text from a command class.
+def print_help_text(command_class, argv):
+    """Print help text from a command class.
+
+    This will work with any of the following invocations:
+
+    * :command:`rbt help <command>`
+    * :command:`rbt help <command> <subcommand>`
+    * :command:`rbt --help <command>`
+    * :command:`rbt --help <command> <subcommand>`
+    * :command:`rbt <command> --help`
+    * :command:`rbt <command> --help <subcommand>`
+    * :command:`rbt <command> <subcommand> --help`
 
     Args:
         command_class (type):
@@ -45,28 +55,38 @@ def build_help_text(command_class, argv):
 
         argv (list):
             The arguments to parse.
-
-    Returns:
-        unicode:
-        The printable help text.
     """
-    command = command_class()
+    help_args = []
 
-    if isinstance(command, BaseMultiCommand):
-        # Do a test parse to determine if we need to print subcommand help.
-        parser = command.create_parser({}, argv)
+    if issubclass(command_class, BaseMultiCommand):
+        # We need to be able to handle --help for both the main command or
+        # the subcommand. By default, we're showing help for the main command,
+        # but if the first positional argument is a subcommand, we'll switch
+        # to showing help for that instead.
+        pos_args = [
+            _arg
+            for _arg in argv[1:]
+            if not _arg.startswith('-')
+        ]
 
-        # TODO: Ideally we'd just initialize the parser with
-        # exit_on_error=False, but that's only available in Python 3.9+.
-        # Instead, temporarily patch away the exit method.
-        _exit = parser.exit
-        parser.exit = lambda *args, **kwargs: None
-        parser.parse_args(argv[1:])
-        parser.exit = _exit
-    else:
-        parser = command.create_parser({})
+        if pos_args:
+            # Check if we got a subcommand.
+            subcommand_arg = pos_args[0]
 
-    return parser.format_help()
+            for subcommand_cls in command_class.subcommands:
+                if subcommand_cls.name == subcommand_arg:
+                    # We found the subcommand the user wants help on. Put
+                    # together command line arguments for getting help on
+                    # this subcommand, for parsing below.
+                    help_args = [argv[0], subcommand_cls.name, '--help']
+                    break
+
+    parser = command_class().create_parser({}, help_args)
+
+    if help_args:
+        parser.parse_args(help_args[1:])
+
+    print(parser.format_help())
 
 
 def help(args, parser):
@@ -76,8 +96,7 @@ def help(args, parser):
         ep = find_entry_point_for_command(args[0])
 
         if ep:
-            help_text = build_help_text(ep.load(), args)
-            print(help_text)
+            print_help_text(ep.load(), args)
             sys.exit(0)
         else:
             try:

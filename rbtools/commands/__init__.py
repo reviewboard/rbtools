@@ -1530,7 +1530,7 @@ class BaseMultiCommand(Command):
             subcommand = ''
             description = command_cls.description
 
-        usage = '%%(prog)s %s [options] %s' % (subcommand, self.args)
+        usage = '%%(prog)s%s [options] %s' % (subcommand, self.args)
 
         if description:
             return '%s\n\n%s' % (usage, description)
@@ -1553,9 +1553,6 @@ class BaseMultiCommand(Command):
         """
         prog = '%s %s' % (RB_MAIN, self.name)
 
-        # TODO: Once we're Python 3.9+, we can change this to use
-        # exit_on_error=False, and remove the monkey patching in
-        # build_help_text in rbtools/commands/main.py.
         parser = argparse.ArgumentParser(
             prog=prog,
             usage=self.usage(),

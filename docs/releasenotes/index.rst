@@ -4,6 +4,15 @@
 RBTools Release Notes
 =====================
 
+3.0 Releases
+============
+
+.. toctree::
+   :maxdepth: 1
+
+   3.0
+
+
 2.0 Releases
 ============
 
