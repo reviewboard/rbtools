@@ -1042,7 +1042,7 @@ class Post(Command):
         self.stdout.write(review_request_url)
         self.stdout.write('%sdiff/' % review_request_url)
 
-        self.json.add('review_request', review_request_id)
+        self.json.add('review_request_id', review_request_id)
         self.json.add('review_request_url', review_request_url)
         self.json.add('diff_url', '%sdiff/' % review_request_url)
 

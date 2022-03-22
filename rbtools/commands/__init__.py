@@ -1502,6 +1502,9 @@ class BaseMultiCommand(Command):
 
     Some commands (such as :command:`rbt review`) want to offer many
     subcommands.
+
+    Version Added:
+        3.0
     """
 
     #: The available subcommands.
@@ -1511,6 +1514,12 @@ class BaseMultiCommand(Command):
     #: Type:
     #:     list
     subcommands = {}
+
+    #: Options common to all subcommands.
+    #:
+    #: Type:
+    #:     list
+    common_subcommand_option_list = []
 
     def usage(self, command_cls=None):
         """Return a usage string for the command.
@@ -1551,37 +1560,58 @@ class BaseMultiCommand(Command):
             argparse.ArgumentParser:
             The argument parser.
         """
+        subcommand_parsers = {}
+
         prog = '%s %s' % (RB_MAIN, self.name)
 
+        # Set up a parent parser containing the options that will be shared.
+        #
+        # Ideally the globals would also be available to the main command,
+        # but it ends up leading to arguments on the main command overruling
+        # those on the subcommand, which is a problem for --json. For now,
+        # we are only sharing on the subcommands.
+        common_parser = argparse.ArgumentParser(add_help=False)
+
+        for option in self.common_subcommand_option_list:
+            option.add_to(common_parser, config, argv)
+
+        for option in self._global_options:
+            option.add_to(common_parser, config, argv)
+
+        # Set up the parser for the main command.
         parser = argparse.ArgumentParser(
             prog=prog,
             usage=self.usage(),
             formatter_class=SmartHelpFormatter)
 
+        for option in self.option_list:
+            option.add_to(parser, config, argv)
+
+        # Set up the parsers for each subcommand.
         subparsers = parser.add_subparsers(
             description=(
                 'To get additional help for these commands, run: '
                 '%s <subcommand> --help' % prog))
 
         for command_cls in self.subcommands:
+            subcommand_name = command_cls.name
+
             subparser = subparsers.add_parser(
-                command_cls.name,
+                subcommand_name,
                 usage=self.usage(command_cls),
                 formatter_class=SmartHelpFormatter,
-                prog='%s %s' % (parser.prog, command_cls.name),
+                prog='%s %s' % (parser.prog, subcommand_name),
                 description=command_cls.description,
-                help=command_cls.help_text)
-
-            for option in self.option_list:
-                option.add_to(subparser, config, argv)
+                help=command_cls.help_text,
+                parents=[common_parser])
 
             for option in command_cls.option_list:
                 option.add_to(subparser, config, argv)
 
-            for option in self._global_options:
-                option.add_to(subparser, config, argv)
-
             subparser.set_defaults(command_cls=command_cls)
+            subcommand_parsers[subcommand_name] = subparser
+
+        self.subcommand_parsers = subcommand_parsers
 
         return parser
 

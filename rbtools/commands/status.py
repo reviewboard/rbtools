@@ -53,9 +53,11 @@ class Status(Command):
         Command.perforce_options,
         Command.tfs_options,
     ]
+
     # The number of spaces between the request's status and the request's id
     # and summary.
     TAB_SIZE = 3
+
     # The number of spaces after the end of the request's summary.
     PADDING = 5
 
@@ -68,7 +70,7 @@ class Status(Command):
             review_requests (list of dict):
                 A list that contains statistics about each review request.
         """
-        self.json.add('summaries', [])
+        self.json.add('review_requests', [])
 
         if len(review_requests):
             has_branches = False
@@ -99,10 +101,16 @@ class Status(Command):
                 ]
 
                 summary = {
-                    'status': info['status'],
-                    'review_request': info['id'],
-                    'summary': info['summary'],
+                    'approval_failure': info['approval_failure'],
+                    'approved': info['approved'],
                     'description': info['description'],
+                    'has_draft': info['has_draft'],
+                    'open_issue_count': info['open_issue_count'],
+                    'review_request_id': info['id'],
+                    'review_request_url': info['url'],
+                    'shipit_count': info['shipit_count'],
+                    'status': info['status'],
+                    'summary': info['summary'],
                 }
 
                 if has_branches:
@@ -114,7 +122,7 @@ class Status(Command):
                     summary['bookmark'] = row[-1]
 
                 table.add_row(row)
-                self.json.append('summaries', summary)
+                self.json.append('review_requests', summary)
 
             self.stdout.write(table.draw())
         else:
@@ -122,50 +130,57 @@ class Status(Command):
 
         self.stdout.new_line()
 
-    def get_data(self, requests):
-        """Return current status and review summary for all reviews.
+    def get_data(self, review_requests):
+        """Return current status and review summary for all review requests.
 
         Args:
-            requests (ListResource):
-                A ListResource that contains data on all open/draft requests.
+            review_requests (ListResource):
+                A ListResource that contains data on all open/draft
+                review requests.
 
         Returns:
-            list: A list whose elements are dicts of each request's statistics.
+            list:
+            A list whose elements are dicts of each review request's
+            statistics.
         """
-        requests_stats = []
+        review_requests_stats = []
 
-        for request in requests.all_items:
-            if request.draft:
+        for review_request in review_requests.all_items:
+            if review_request.draft:
                 status = 'Draft'
-            elif request.issue_open_count:
-                status = 'Open Issues (%s)' % request.issue_open_count
-            elif request.ship_it_count:
-                status = 'Ship It! (%s)' % request.ship_it_count
+            elif review_request.issue_open_count:
+                status = 'Open Issues (%s)' % review_request.issue_open_count
+            elif review_request.ship_it_count:
+                status = 'Ship It! (%s)' % review_request.ship_it_count
             else:
                 status = 'Pending'
 
-            if request.draft:
-                summary = request.draft[0]['summary']
+            if review_request.draft:
+                summary = review_request.draft[0]['summary']
             else:
-                summary = request.summary
+                summary = review_request.summary
 
             info = {
-                'id':  request.id,
+                'approval_failure': review_request.approval_failure,
+                'approved': review_request.approved,
+                'description': review_request.description,
+                'id':  review_request.id,
                 'status': status,
                 'summary': summary,
-                'description': request.description,
+                'url': review_request.absolute_url,
+                'shipit_count': review_request.ship_it_count,
+                'open_issue_count': review_request.issue_open_count,
+                'has_draft': review_request.draft is not None
             }
 
-            if 'local_branch' in request.extra_data:
-                info['branch'] = \
-                    request.extra_data['local_branch']
-            elif 'local_bookmark' in request.extra_data:
-                info['bookmark'] = \
-                    request.extra_data['local_bookmark']
+            if 'local_branch' in review_request.extra_data:
+                info['branch'] = review_request.extra_data['local_branch']
+            elif 'local_bookmark' in review_request.extra_data:
+                info['bookmark'] = review_request.extra_data['local_bookmark']
 
-            requests_stats.append(info)
+            review_requests_stats.append(info)
 
-        return requests_stats
+        return review_requests_stats
 
     def initialize(self):
         """Initialize the command.

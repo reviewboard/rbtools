@@ -47,7 +47,9 @@ Board stores changeset numbers of a posted change and can use these to
 associate particular changes with review requests.
 
 To post a review request for a specific change, or to update an existing
-review request for that change, type::
+review request for that change, type:
+
+.. code-block:: console
 
     $ rbt post CHANGENUM
 
@@ -115,19 +117,25 @@ CVS and Subversion
 
 CVS and Subversion don't have a concept of changesets, so instead the
 working copy's uncommitted changes are posted for review. To post a
-review request with all uncommitted files in a tree, simply run::
+review request with all uncommitted files in a tree, simply run:
+
+.. code-block:: console
 
     $ rbt post
 
 This will create a new review request and post the diff of the uncommitted
 changes. If you  want to update an existing review request with new changes
 instead, use the :option:`-r` parameter. For example, to update
-review request #42, type::
+review request #42, type:
+
+.. code-block:: console
 
     $ rbt post -r 42
 
 If you need to post specific files, leaving other uncommitted files out of
-the review request, you can include them on the command line, like so::
+the review request, you can include them on the command line, like so:
+
+.. code-block:: console
 
     $ rbt post -I src/foo.c -I data/bar.png
 
@@ -142,18 +150,24 @@ Distributed Version Control Systems
 When using a distributed version control system, such as Git or Mercurial,
 :command:`rbt post` will by default post the diff between the current
 branch and the ``master`` branch. To post a new review request with the
-diff between the current branches commit, and the master branch, simply run::
+diff between the current branches commit, and the master branch, simply run:
+
+.. code-block:: console
 
    $ rbt post
 
 If you'd like to update an existing review request with new changes instead,
 use the :option:`-u` parameter. This will attempt to locate the matching
-review request for your change's commit message. ::
+review request for your change's commit message.
+
+.. code-block:: console
 
    $ rbt post -u
 
 If you want to update a specific review request by ID, you can use the
-:option:`-r` parameter::
+:option:`-r` parameter:
+
+.. code-block:: console
 
     $ rbt post -r 42
 
@@ -181,7 +195,9 @@ you would need to tell :command:`rbt post` to also generate a parent diff
 between ``master`` and ``topicA``.
 
 This is done by using the :option:`--parent` parameter with the branch name.
-For example, in this case you would simply do::
+For example, in this case you would simply do:
+
+.. code-block:: console
 
     $ rbt post --parent=topicA
 
@@ -200,7 +216,9 @@ you are working on a feature branch or have a remote named something other than
 ``origin``.
 
 In this case, you will want to use the :option:`--tracking-branch` option,
-which specifies the remote branch name. For example::
+which specifies the remote branch name. For example:
+
+.. code-block:: console
 
     $ rbt post --tracking-branch=upstream/master
 
@@ -222,24 +240,34 @@ used depending on how you've organized your repository. Changes must be posted
 from within a snapshot or dynamic view.
 
 The most simple case is posting a diff of all currently checked out files in
-your view. This will work no matter what workflow you are using::
+your view. This will work no matter what workflow you are using:
+
+.. code-block:: console
 
     $ rbt post
 
-To post a change between a branch and its predecessor, use::
+To post a change between a branch and its predecessor, use:
+
+.. code-block:: console
 
     $ rbt post brtype:branchname
 
-To post a change between a label and its predecessor, use::
+To post a change between a label and its predecessor, use:
+
+.. code-block:: console
 
     $ rbt post lbtype:labelname
 
 A diff between two labels can also be posted. This requires posting from within
-a dynamic view::
+a dynamic view:
+
+.. code-block:: console
 
     $ rbt post lbtype:label1 lbtype:label2
 
-If you're using UCM, you can also post activities, baselines, and streams::
+If you're using UCM, you can also post activities, baselines, and streams:
+
+.. code-block:: console
 
     $ rbt post activity:my-activity
     $ rbt post baseline:project-dev
@@ -248,13 +276,18 @@ If you're using UCM, you can also post activities, baselines, and streams::
 
 Finally, you can also assemble a diff using file@revision pairs. This requires
 posting from within a dynamic view. Each argument will be a
-``file@@revision1:file@@revision2`` pair::
+``file@@revision1:file@@revision2`` pair:
+
+.. code-block:: console
 
     $ rbt post /vobs/proj/file.c@@/main/0:/vobs/proj/file.c@@/main/1
 
-Multiple files can be posted by adding additional file/revision pairs::
+Multiple files can be posted by adding additional file/revision pairs:
 
-    $ rbt post /vobs/proj/file.c@@/main/0:/vobs/proj/file.c@@/main/1 /vobs/proj/file.h@@/main/0:/vobs/proj/file.h@@/main/1
+.. code-block:: console
+
+    $ rbt post /vobs/proj/file.c@@/main/0:/vobs/proj/file.c@@/main/1 \
+               /vobs/proj/file.h@@/main/0:/vobs/proj/file.h@@/main/1
 
 
 .. note::
@@ -292,13 +325,17 @@ generate a diff based on a range of committed revisions. This allows a single
 review request to show a diff representing the entire history of a branch, if
 desired.
 
-Usage is easy. Simply type::
+Usage is easy. Simply type:
+
+.. code-block:: console
 
     $ rbt post STARTREV STOPREV
 
 Where ``STARTREV`` is the beginning revision in the range, and
 ``STOPREV`` is the ending revision, inclusive. If you only need to post
-a single revision, you can type::
+a single revision, you can type:
+
+.. code-block:: console
 
     $ rbt post REVISION
 
@@ -318,11 +355,15 @@ repository type, but if you need to post a pre-existing diff, you can
 use the :option:`--diff-filename` parameter to specify the path to
 the diff file.
 
-For example::
+For example:
+
+.. code-block:: console
 
     $ rbt post --diff-filename=mycode.diff
 
-You can also use the special value of ``-`` to pipe a diff into STDIN::
+You can also use the special value of ``-`` to pipe a diff into STDIN:
+
+.. code-block:: console
 
     $ cat mycode.diff | rbt post --diff-filename=-
 
@@ -375,19 +416,25 @@ The guessing options can each take a value to control when guessing is done:
   and not when updating.
 
 You can specify a value when using either short-form or long-form arguments.
-For example::
+For example:
+
+.. code-block:: console
 
     $ rbt post --guess-fields=no
 
 By default, if no guessing options are specified, ``--guess-fields=auto`` will
 be implied. This allows you to run the following and have it automatically
-fill in the summary and description::
+fill in the summary and description:
+
+.. code-block:: console
 
     $ rbt post
 
 If specifying a guessing argument without a value, ``yes`` will be implied
 instead, forcing the fields to be updated, regardless of the default. For
-example::
+example:
+
+.. code-block:: console
 
     $ rbt post -g
 
@@ -434,9 +481,13 @@ is protected. You'll then want to grant the
 :ref:`can-edit-review-request-permission` to the user. This will give this
 user to the ability to modify a review request as another user.
 
-You can then invoke :command:`rbt post` by doing the following::
+You can then invoke :command:`rbt post` by doing the following:
 
-    $ rbt post --username=SPECIAL_USER --password=PASSWORD --submit-as=ANOTHER_USER
+.. code-block:: console
+
+    $ rbt post --username=SPECIAL_USER \
+               --password=PASSWORD \
+               --submit-as=ANOTHER_USER
 
 Of course, you can pass any other values as you see fit.
 
@@ -445,6 +496,79 @@ This will log in as ``SPECIAL_USER`` and perform operations as
 
 You can set the default for :option:`--submit-as` by setting ``SUBMIT_AS``
 in :file:`.reviewboardrc`.
+
+
+JSON Output
+===========
+
+.. versionadded:: 3.0
+
+When running with :option:`--json`, the results of posting the review request
+will be outputted as JSON. This can be used by programs that wrap RBTools in
+order to automate posting changes for review.
+
+
+Successful Payloads
+-------------------
+
+When posting is successful, the results are in the form of:
+
+.. code-block:: javascript
+
+   {
+       "status": "success",
+
+       // The path to the new diff.
+       "diff_url": "<string>",
+
+       // The ID of the review request.
+       "review_request_id": <int>,
+
+       // The URL of the review request.
+       "review_request_url": "<string>"
+   }
+
+For example:
+
+.. code-block:: console
+
+   $ rbt post --json my-branch
+   {
+       "diff_url": "https://example.com/r/123/diff/",
+       "review_request_id": 123,
+       "review_request_url": "https://example.com/r/123/"
+   }
+
+
+Error Payloads
+--------------
+
+When there's an error posting a change for review, the results will be in the
+form of:
+
+.. code-block:: javascript
+
+   {
+       "status": "failed",
+
+       // A list of errors from the operation.
+       "errors": [
+           "<string>",
+           ...
+       ]
+   }
+
+For example:
+
+.. code-block:: console
+
+   $ rbt post --json my-branch
+   {
+       "errors": [
+           "Could not find the repository on the Review Board server."
+       ],
+       "status": "failed"
+   }
 
 
 .. rbt-command-options::

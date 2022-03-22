@@ -107,7 +107,7 @@ There's a few useful tips to keep in mind when posting commits for review:
 
 For example:
 
-.. code-block:: text
+.. code-block:: console
 
    $ rbt post some-parent..HEAD
    Review request #123 posted.
@@ -209,7 +209,9 @@ Putting It All Together
 Let's walk through an example using 3 commits across two branches.
 
 First, we'll create ``my-branch-1`` off of ``master`` with the first 2
-commits::
+commits:
+
+.. code-block:: console
 
     $ git checkout -b my-branch-1 master
     $ vim foo.py
@@ -217,7 +219,9 @@ commits::
     $ vim bar.py
     $ git commit -a
 
-Now let's create ``my-branch-2`` off of that, with only a single commit::
+Now let's create ``my-branch-2`` off of that, with only a single commit:
+
+.. code-block:: console
 
     $ git checkout -b my-branch-2
     $ vim foo.py
@@ -236,7 +240,9 @@ Your tree now looks like this::
     .
 
 We'll post ``my-branch-1`` for review. Since we want everything since
-``origin/master``, this will be very easy. We just post like so::
+``origin/master``, this will be very easy. We just post like so:
+
+.. code-block:: console
 
     $ git checkout my-branch-1
     $ rbt post
@@ -256,7 +262,9 @@ description.
 
 Let's create a second review request, covering the changes on ``my-branch-2``.
 We'll take the opportunity to mark these as dependent on our new review
-request #1001::
+request #1001:
+
+.. code-block:: console
 
     $ git checkout my-branch-2
     $ rbt post --depends-on 1001 my-branch-1..HEAD
@@ -278,7 +286,9 @@ request #1001::
    left it out entirely. Just helps reviewers know what to review first.
 
 Let's make some changes to the commit on `my-branch-1`, based on review
-feedback, and post a new diff to the review request::
+feedback, and post a new diff to the review request:
+
+.. code-block:: console
 
     $ git checkout my-branch-1
     $ vim README
@@ -296,12 +306,16 @@ changes.
 
    You can update (:option:`-u <rbt post -u>`), describe the changes
    (:option:`-m <rbt post -m>`), and publish (:option:`-p <rbt post -p>`),
-   all in the same step::
+   all in the same step:
+
+   .. code-block:: console
 
        rbt post -u -p -m "Fixed a broken link." HEAD
 
 And now for ``my-branch-2``. Let's rebase onto ``my-branch-1``, edit a file,
-and post::
+and post:
+
+.. code-block:: console
 
      $ git checkout my-branch-2
      $ git rebase my-branch-1
@@ -313,7 +327,9 @@ and post::
      https://reviewboard.example.com/r/1002/
      https://reviewboard.example.com/r/1002/diff/
 
-Hey, we got a Ship It! for both review requests. Great, let's land these::
+Hey, we got a Ship It! for both review requests. Great, let's land these:
+
+.. code-block:: console
 
     $ git checkout master
     $ rbt land --dest=master my-branch-1

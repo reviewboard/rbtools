@@ -357,17 +357,16 @@ class Edit(ReviewSubCommand):
 
         update_fields = {}
 
-        if options.review_header:
+        if options.review_header is not None:
             update_fields['body_top'] = options.review_header
             update_fields['body_top_text_type'] = text_type
 
-        if options.review_footer:
+        if options.review_footer is not None:
             update_fields['body_bottom'] = options.review_footer
             update_fields['body_bottom_text_type'] = text_type
 
-        if options.ship_it or options.no_ship_it:
-            update_fields['ship_it'] = (options.ship_it and not
-                                        options.no_ship_it)
+        if options.ship_it is not None:
+            update_fields['ship_it'] = options.ship_it
 
         if update_fields:
             try:
@@ -420,7 +419,7 @@ class Review(BaseMultiCommand):
         Discard,
     ]
 
-    option_list = [
+    common_subcommand_option_list = [
         OptionGroup(
             name='Review Options',
             option_list=[

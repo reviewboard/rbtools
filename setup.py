@@ -125,6 +125,7 @@ setup(
     install_requires=[
         'backports.shutil_get_terminal_size; python_version<"3.0"',
         'pydiffx',
+        'setuptools',
         'six>=1.8.0',
 
         # Pin to the last version which supports Python 2.7.

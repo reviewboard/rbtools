@@ -539,12 +539,16 @@ For example, consider the following aliases:
     }
 
 
-The following commands are equivalent::
+The following commands are equivalent:
+
+.. code-block:: console
 
     $ rbt post-this
     $ rbt post HEAD
 
-As are the following::
+As are the following:
+
+.. code-block:: console
 
     $ rbt push 3351
     $ git push && rbt close 3351

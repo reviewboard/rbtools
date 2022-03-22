@@ -1,4 +1,4 @@
-.. default-intersphinx:: rbt3.0 rb-latest
+.. default-intersphinx:: rbt3.x rb-latest
 
 
 =========================
@@ -108,6 +108,12 @@ Bug Fixes and Other Changes
   Under Python 3, the ``User-Agent`` header could be formatted incorrectly.
 
   Patch by Lukasz Kawczynski.
+
+* Fixed displaying some aliases using :option:`rbt alias --dry-run`.
+
+  If an :ref:`alias <rbtools-aliases>` was defined as a system command alias
+  (using the ``!`` prefix), :option:`rbt alias --dry-run` would fail to print
+  out the alias correctly.
 
 * The old ``TREES`` config key has been deprecated.
 

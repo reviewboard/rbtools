@@ -29,11 +29,15 @@ The "rbt" Command
 
 All the RBTools commands are invoked through the :command:`rbt` tool. This
 runs on Windows, Linux, and MacOS X, and contains a number of useful
-sub-commands through the following usage::
+sub-commands through the following usage:
+
+.. code-block:: console
 
    $ rbt <command> [options] [<args>]
 
-You can get help on :command:`rbt` or a sub-command in the following ways::
+You can get help on :command:`rbt` or a sub-command in the following ways:
+
+.. code-block:: console
 
    $ rbt help
    $ rbt help <command>

@@ -50,7 +50,9 @@ When using Visual Studio 2010 through 2015, the Team Explorer Everywhere tools,
 or the TFS extensions for Eclipse, we provide a custom adaptor which supports
 posting pending, committed, or shelved changes.
 
-To install the rb-tfs adaptor, run::
+To install the rb-tfs adaptor, run:
+
+.. code-block:: console
 
      $ rbt install tfs
 
