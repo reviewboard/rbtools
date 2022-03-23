@@ -5,7 +5,7 @@
 RBTools 3.0 Release Notes
 =========================
 
-**Release date:** TBD
+**Release date:** March 22, 2022
 
 
 New Features
