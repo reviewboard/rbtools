@@ -63,7 +63,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'RBTools Documentation'
+project = 'RBTools'
 copyright = '2009-%s, Beanbag, Inc.' % datetime.now().year
 
 # The version info for the project you're documenting, acts as
@@ -71,7 +71,7 @@ copyright = '2009-%s, Beanbag, Inc.' % datetime.now().year
 # places throughout the built documents.
 #
 # The short X.Y version.
-version = '.'.join(str(i) for i in rbtools.VERSION[:-1][:2])
+version = '.'.join(str(i) for i in rbtools.VERSION[:2])
 
 # The full version, including alpha/beta/rc tags.
 release = rbtools.get_version_string()
