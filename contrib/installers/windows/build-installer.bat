@@ -31,16 +31,19 @@ set DEPS_DIR=%BUILD_BASE%\deps
 ::-------------------------------------------------------------------------
 :: Dependencies
 ::-------------------------------------------------------------------------
-set PYTHON_VERSION=3.8.10
+set PYTHON_VERSION=3.8.13
+
+set PYTHON_URL_BASE=https://s3.amazonaws.com/downloads.beanbaginc.com/python
+:: set PYTHON_URL_BASE=https://www.python.org/ftp/python
 
 set PYTHON_X86_FILENAME=python-%PYTHON_VERSION%.exe
-set PYTHON_X86_URL=https://www.python.org/ftp/python/%PYTHON_VERSION%/%PYTHON_X86_FILENAME%
-set PYTHON_X86_MD5=b355cfc84b681ace8908ae50908e8761
+set PYTHON_X86_URL=%PYTHON_URL_BASE%/%PYTHON_VERSION%/%PYTHON_X86_FILENAME%
+set PYTHON_X86_MD5=5e8edbf3fe95034850768b4e6680bc9f
 set PYTHON_X86_DEP=%DEPS_DIR%\python-%PYTHON_VERSION%-x86
 
 set PYTHON_X64_FILENAME=python-%PYTHON_VERSION%-amd64.exe
-set PYTHON_X64_URL=https://www.python.org/ftp/python/%PYTHON_VERSION%/%PYTHON_X64_FILENAME%
-set PYTHON_X64_MD5=62cf1a12a5276b0259e8761d4cf4fe42
+set PYTHON_X64_URL=%PYTHON_URL_BASE%/%PYTHON_VERSION%/%PYTHON_X64_FILENAME%
+set PYTHON_X64_MD5=8cd844e55135bd5f9e1d8d2d70a2b6ae
 set PYTHON_X64_DEP=%DEPS_DIR%\python-%PYTHON_VERSION%-x64
 
 
@@ -107,10 +110,12 @@ echo == Installing Python [%_arch%] ==
 set _PYTHON_INSTALLER=%TEMP%\%_python_filename%
 
 if not exist "%_dep_path%" (
+    echo Checking for %_PYTHON_INSTALLER%...
     if not exist "%_PYTHON_INSTALLER%" (
         echo Preparing to download Python v%PYTHON_VERSION% [%_arch%]...
-        call :DownloadAndVerify %_url% "%_PYTHON_INSTALLER%" %_md5% ^
-            || exit /B 1
+
+        call :DownloadAndVerify %_url% "%_PYTHON_INSTALLER%" %_md5%
+        if %errorlevel% neq 0 exit /b 1
 
         echo Downloaded to %_PYTHON_INSTALLER%
     )
@@ -120,13 +125,17 @@ if not exist "%_dep_path%" (
         AssociateFiles=0 Include_doc=0 Include_debug=0 Include_launcher=0 ^
         Include_tcltk=0 Include_test=0 InstallAllUsers=0 ^
         InstallLauncherAllUsers=0 Shortcuts=0 SimpleInstall=1 ^
-		SimpleInstallDescription="Python for RBTools for Windows" ^
-		TargetDir="%_dep_path%-temp"
+        SimpleInstallDescription="Python for RBTools for Windows" ^
+        TargetDir="%_dep_path%-temp"
+    if %errorlevel% neq 0 exit /b 1
+
     xcopy /EYI "%_dep_path%-temp" "%_dep_path%"
+    if %errorlevel% neq 0 exit /b 1
 
     :: Remove the old install from the temp directory, and clean up the
     :: registry files so future installs aren't impacted.
     "%_PYTHON_INSTALLER%" /quiet /uninstall
+    if %errorlevel% neq 0 exit /b 1
 )
 
 goto :EOF
@@ -416,7 +425,7 @@ set _expected_hash=%~2
 
 echo Verifying that %_filename% has MD5 hash %_expected_hash%...
 
-PowerShell -Command ^
+PowerShell -NoProfile -Command ^
  "$md5 = New-Object Security.Cryptography.MD5CryptoServiceProvider;"^
  "$file = [System.IO.File]::ReadAllBytes('%_filename%');"^
  "$hash = [System.BitConverter]::ToString($md5.ComputeHash($file));"^
@@ -427,7 +436,7 @@ PowerShell -Command ^
  "} else {"^
  "    Write-Host 'Invalid hash for %_filename%.';"^
  "    exit 1;"^
- "}" || exit /B 1
+ "}" < nul || exit /B 1
 
 echo Hash verified.
 
