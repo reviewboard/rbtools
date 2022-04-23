@@ -1162,6 +1162,9 @@ class Command(object):
         username and password. This is used as a callback in the
         API when the user requires authorization.
         """
+        # TODO: Consolidate the logic in this function with
+        #       get_authenticated_session() in rbtools/utils/users.py.
+
         if username is None or password is None:
             if getattr(self.options, 'diff_filename', None) == '-':
                 raise CommandError('HTTP authentication is required, but '
@@ -1175,14 +1178,29 @@ class Command(object):
             # flushed automatically in this case, so the program just appears
             # to hang.
             if not sys.stdin.isatty():
-                logging.error('Authentication is required but input is not a '
-                              'tty.')
-                if sys.platform == 'win32':
-                    logging.info('Check that you are not running this script '
-                                 'from a Cygwin terminal emulator (or use '
-                                 'Cygwin Python to run it).')
+                message_parts = [
+                    'Authentication is required but RBTools cannot prompt for '
+                    'it.'
+                ]
 
-                raise CommandError('Unable to log in to Review Board.')
+                if sys.platform == 'win32':
+                    message_parts.append(
+                        'This can occur if you are piping input into the '
+                        'command, or if you are running in a Cygwin terminal '
+                        'emulator and not using Cygwin Python.'
+                    )
+                else:
+                    message_parts.append(
+                        'This can occur if you are piping input into the '
+                        'command.'
+                    )
+
+                message_parts.append(
+                    'You may need to explicitly provide API credentials when '
+                    'invoking the command, or try logging in separately.'
+                )
+
+                raise CommandError(' '.join(message_parts))
 
             self.stdout.new_line()
             self.stdout.write('Please log in to the Review Board server at '
