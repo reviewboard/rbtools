@@ -339,9 +339,33 @@ class Command(object):
         stdout (OutputWrapper):
             Standard unicode output wrapper that subclasses must write to.
 
+        stdout_is_atty (bool):
+            Whether :py:attr:`stdout` is connected to a TTY or similar device.
+
+            Version Added:
+                3.1
+
         stderr (OutputWrapper):
             Standard unicode error output wrapper that subclasses must write
             to.
+
+        stderr_is_atty (bool):
+            Whether :py:attr:`stderr` is connected to a TTY or similar device.
+
+            Version Added:
+                3.1
+
+        stdin (io.TextIOWrapper):
+            Standard input.
+
+            Version Added:
+                3.1
+
+        stdin_is_atty (bool):
+            Whether :py:attr:`stdin` is connected to a TTY or similar device.
+
+            Version Added:
+                3.1
 
         stdout_bytes (OutputWrapper):
             Standard byte output wrapper that subclasses must write to.
@@ -838,7 +862,11 @@ class Command(object):
 
     default_transport_cls = SyncTransport
 
-    def __init__(self, transport_cls=SyncTransport):
+    def __init__(self,
+                 transport_cls=SyncTransport,
+                 stdout=sys.stdout,
+                 stderr=sys.stderr,
+                 stdin=sys.stdin):
         """Initialize the base functionality for the command.
 
         Args:
@@ -846,8 +874,28 @@ class Command(object):
                 The transport class used for all API communication. By default,
                 this uses the transport defined in
                 :py:attr:`default_transport_cls`.
-        """
 
+            stdout (io.TextIOWrapper, optional):
+                The standard output stream. This can be used to capture output
+                programmatically.
+
+                Version Added:
+                    3.1
+
+            stderr (io.TextIOWrapper, optional):
+                The standard error stream. This can be used to capture errors
+                programmatically.
+
+                Version Added:
+                    3.1
+
+            stdin (io.TextIOWrapper, optional):
+                The standard input stream. This can be used to provide input
+                programmatically.
+
+                Version Added:
+                    3.1
+        """
         self.log = logging.getLogger('rb.%s' % self.name)
         self.transport_cls = transport_cls or self.default_transport_cls
         self.api_client = None
@@ -858,19 +906,24 @@ class Command(object):
         self.server_url = None
         self.tool = None
 
-        self.stdout = OutputWrapper(sys.stdout)
-        self.stderr = OutputWrapper(sys.stderr)
+        self.stdout = OutputWrapper(stdout)
+        self.stderr = OutputWrapper(stderr)
+        self.stdin = stdin
 
-        if isinstance(sys.stdout, io.TextIOWrapper):
-            self.stderr_bytes = OutputWrapper(sys.stderr.buffer)
-            self.stdout_bytes = OutputWrapper(sys.stdout.buffer)
+        self.stdout_is_atty = hasattr(stdout, 'isatty') and stdout.isatty()
+        self.stderr_is_atty = hasattr(stderr, 'isatty') and stderr.isatty()
+        self.stdin_is_atty = hasattr(stdin, 'isatty') and stdin.isatty()
+
+        if isinstance(stdout, io.TextIOWrapper):
+            self.stderr_bytes = OutputWrapper(stderr.buffer)
+            self.stdout_bytes = OutputWrapper(stdout.buffer)
         else:
             # Python 2.x, or while we're running unit tests (where stdout and
             # stderr are actually io.StringIO)
-            self.stderr_bytes = OutputWrapper(sys.stderr)
-            self.stdout_bytes = OutputWrapper(sys.stdout)
+            self.stderr_bytes = OutputWrapper(stderr)
+            self.stdout_bytes = OutputWrapper(stdout)
 
-        self.json = JSONOutput(sys.stdout)
+        self.json = JSONOutput(stdout)
 
     def create_parser(self, config, argv=[]):
         """Create and return the argument parser for this command."""
@@ -926,7 +979,7 @@ class Command(object):
         color = ''
         reset = ''
 
-        if sys.stdout.isatty():
+        if self.stdout_is_atty:
             color_name = self.config['COLOR'].get(level.upper())
 
             if color_name:
@@ -1177,7 +1230,7 @@ class Command(object):
             # puzzling to the users, especially because stderr is also _not_
             # flushed automatically in this case, so the program just appears
             # to hang.
-            if not sys.stdin.isatty():
+            if not self.stdin_is_atty:
                 message_parts = [
                     'Authentication is required but RBTools cannot prompt for '
                     'it.'
@@ -1352,15 +1405,20 @@ class Command(object):
         debug messages in the form of ">>> message", making it easier to
         distinguish between debugging and other messages.
         """
-        if sys.stdout.isatty():
+        if self.stderr_is_atty:
             # We only use colorized logging when writing to TTYs, so we don't
             # bother initializing it then.
             colorama.init()
 
+        # We use the stderr interface to be compliant with the default
+        # behavior of StreamHandler (which will use sys.stderr if not
+        # specified).
+        log_stream = self.stderr.output_stream
+
         root = logging.getLogger()
 
         if self.options.debug:
-            handler = logging.StreamHandler()
+            handler = logging.StreamHandler(log_stream)
             handler.setFormatter(self._create_formatter(
                 'DEBUG', '{color}>>>{reset} %(message)s'))
             handler.setLevel(logging.DEBUG)
@@ -1372,7 +1430,7 @@ class Command(object):
             root.setLevel(logging.INFO)
 
         # Handler for info messages. We'll treat these like prints.
-        handler = logging.StreamHandler()
+        handler = logging.StreamHandler(log_stream)
         handler.setFormatter(self._create_formatter(
             'INFO', '{color}%(message)s{reset}'))
 
@@ -1389,7 +1447,7 @@ class Command(object):
         )
 
         for level_name, level in levels:
-            handler = logging.StreamHandler()
+            handler = logging.StreamHandler(log_stream)
             handler.setFormatter(self._create_formatter(
                 level_name, '{color}%(levelname)s:{reset} %(message)s'))
             handler.addFilter(LogLevelFilter(level))
