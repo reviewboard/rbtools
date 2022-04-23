@@ -1199,40 +1199,26 @@ class Post(Command):
             rbtools.commands.CommandError:
                 The diff history is empty.
         """
-        history_entries = self.tool.get_commit_history(self.revisions)
+        tool = self.tool
+
+        history_entries = tool.get_commit_history(self.revisions)
 
         if history_entries is None:
             raise CommandError("There don't seem to be any diffs.")
 
-        diff_kwargs = {}
+        diff_kwargs = self._build_get_diff_kwargs(extra_args)
+        cumulative_diff_info = tool.diff(revisions=self.revisions,
+                                         **diff_kwargs)
 
-        if self.options.git_find_renames_threshold is not None:
-            diff_kwargs['git_find_renames_threshold'] = \
-                self.options.git_find_renames_threshold
-
-        cumulative_diff_info = self.tool.diff(
-            revisions=self.revisions,
-            repository_info=self.repository_info,
-            extra_args=extra_args,
-            include_files=self.options.include_files or [],
-            exclude_patterns=self.options.exclude_patterns or [],
-            **diff_kwargs)
-
-        for i, history_entry in enumerate(history_entries):
-            revisions = {
-                'base': history_entry['parent_id'],
-                'tip': history_entry['commit_id'],
-            }
-
+        for history_entry in history_entries:
             # Generate a diff against the revisions or arguments, filtering
             # by the requested files if provided.
-            diff_info = self.tool.diff(
-                revisions=revisions,
-                include_files=self.options.include_files or [],
-                exclude_patterns=self.options.exclude_patterns or [],
+            diff_info = tool.diff(
+                revisions={
+                    'base': history_entry['parent_id'],
+                    'tip': history_entry['commit_id'],
+                },
                 with_parent_diff=False,
-                repository_info=self.repository_info,
-                extra_args=extra_args,
                 **diff_kwargs)
 
             history_entry['diff'] = diff_info['diff']
@@ -1255,32 +1241,25 @@ class Post(Command):
             SquashedDiff:
             The squashed diff and associated metadata.
         """
-        diff_kwargs = {}
+        tool = self.tool
+        options = self.options
 
-        if self.options.git_find_renames_threshold is not None:
-            diff_kwargs['git_find_renames_threshold'] = \
-                self.options.git_find_renames_threshold
-
-        diff_info = self.tool.diff(
-            revisions=self.revisions,
-            include_files=self.options.include_files or [],
-            exclude_patterns=self.options.exclude_patterns or [],
-            repository_info=self.repository_info,
-            extra_args=extra_args,
-            **diff_kwargs)
+        diff_kwargs = self._build_get_diff_kwargs(extra_args)
+        diff_info = tool.diff(revisions=self.revisions,
+                              **diff_kwargs)
 
         # If only certain files within a commit are being submitted for review,
         # do not include the commit id. This prevents conflicts if multiple
         # files from the same commit are posted for review separately.
-        if self.options.include_files or self.options.exclude_patterns:
+        if options.include_files or options.exclude_patterns:
             diff_info['commit_id'] = None
 
-        if (self.tool.supports_changesets and
-            not self.options.diff_filename and
+        if (tool.supports_changesets and
+            not options.diff_filename and
             'changenum' in diff_info):
             changenum = diff_info['changenum']
         else:
-            changenum = self.tool.get_changenum(self.revisions)
+            changenum = tool.get_changenum(self.revisions)
 
         return SquashedDiff(
             diff=diff_info['diff'],
@@ -1288,7 +1267,39 @@ class Post(Command):
             base_commit_id=diff_info.get('base_commit_id'),
             commit_id=diff_info.get('commit_id'),
             changenum=changenum,
-            base_dir=self.options.basedir or self.repository_info.base_path)
+            base_dir=options.basedir or self.repository_info.base_path)
+
+    def _build_get_diff_kwargs(self, extra_args):
+        """Build keyword arguments for a diff call.
+
+        This is a convenience function used by :py:meth:`_get_diff_history`
+        and :py:meth:`_get_squashed_diff`.
+
+        Version Added:
+            3.1
+
+        Args:
+            extra_args (list):
+                Extra arguments to pass to the underlying tool.
+
+        Returns:
+            dict:
+            The keyword arguments to pass to the call.
+        """
+        options = self.options
+
+        diff_kwargs = {
+            'exclude_patterns': options.exclude_patterns or [],
+            'extra_args': extra_args,
+            'include_files': options.include_files or [],
+            'repository_info': self.repository_info,
+        }
+
+        if options.git_find_renames_threshold is not None:
+            diff_kwargs['git_find_renames_threshold'] = \
+                options.git_find_renames_threshold
+
+        return diff_kwargs
 
     def _post_diff_history(self, review_request, diff_history):
         """Post the diff history to the review request.
