@@ -283,6 +283,7 @@ class CommandTestsMixin(kgb.SpyAgency):
         if server_url and self.command_cls.needs_api:
             argv += ['--server', server_url]
 
-        argv += args
+        if args:
+            argv += args
 
         return argv

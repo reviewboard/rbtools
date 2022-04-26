@@ -3,15 +3,16 @@
 from __future__ import unicode_literals
 
 from rbtools.commands.alias import Alias
-from rbtools.testing import TestCase
-from rbtools.utils.process import execute
+from rbtools.testing import CommandTestsMixin, TestCase
 
 
-class AliasCommandTests(TestCase):
+class AliasCommandTests(CommandTestsMixin, TestCase):
     """Tests for rbt alias commmand."""
 
+    command_cls = Alias
+
     def test_alias_list_defined(self):
-        """Testing alias --list with defined aliases"""
+        """Testing rbt alias --list with defined aliases"""
         config = {
             'ALIASES': {
                 'alias1': 'command1',
@@ -19,25 +20,31 @@ class AliasCommandTests(TestCase):
             }
         }
 
-        with self.reviewboardrc(config, use_temp_dir=True):
-            alias = self._create_alias_command(args=['--list'])
-            output = execute(['rbt', 'alias', '--list'])
-            self.assertIn('alias1 = command1', output)
-            self.assertIn('alias2 = command2', output)
-            self.assertTrue(alias.options.list_aliases)
+        with self.reviewboardrc(config):
+            result = self.run_command(args=['--list'])
+
+        self.assertTrue(result['command'].options.list_aliases)
+        self.assertEqual(result['exit_code'], 0)
+
+        output = result['stdout']
+        self.assertIn(b'alias1 = command1', output)
+        self.assertIn(b'alias2 = command2', output)
 
     def test_alias_list_undefined(self):
-        """Testing alias --list with no defined aliases"""
+        """Testing rbt alias --list with no defined aliases"""
         config = {
             'ALIASES': {},
         }
 
-        with self.reviewboardrc(config, use_temp_dir=True):
-            output = execute(['rbt', 'alias', '--list'])
-            self.assertEqual(output, '')
+        with self.reviewboardrc(config):
+            result = self.run_command(args=['--list'])
+
+        self.assertTrue(result['command'].options.list_aliases)
+        self.assertEqual(result['exit_code'], 0)
+        self.assertEqual(result['stdout'], b'')
 
     def test_alias_list_debug(self):
-        """Testing alias --list with debug option"""
+        """Testing rbt alias --list with debug option"""
         config = {
             'ALIASES': {
                 'alias1': 'command1',
@@ -45,13 +52,16 @@ class AliasCommandTests(TestCase):
             }
         }
 
-        with self.reviewboardrc(config, use_temp_dir=True):
-            alias = self._create_alias_command(args=['--list', '-d'])
-            self.assertTrue(alias.options.list_aliases)
-            self.assertTrue(alias.options.debug)
+        with self.reviewboardrc(config):
+            result = self.run_command(args=['--list', '-d'])
+
+        command = result['command']
+        self.assertTrue(command.options.list_aliases)
+        self.assertTrue(command.options.debug)
+        self.assertEqual(result['exit_code'], 0)
 
     def test_alias_dry_run_defined(self):
-        """Testing alias --dry-run with a defined alias"""
+        """Testing rbt alias --dry-run with a defined alias"""
         config = {
             'ALIASES': {
                 'alias1': 'command1',
@@ -59,38 +69,44 @@ class AliasCommandTests(TestCase):
             }
         }
 
-        with self.reviewboardrc(config, use_temp_dir=True):
-            output = execute(['rbt', 'alias', '--dry-run', 'alias1'])
-            alias = self._create_alias_command(args=['--dry-run', 'alias1'])
-            self.assertIn('command1', output)
-            self.assertTrue(alias.options.dry_run_alias)
+        with self.reviewboardrc(config):
+            result = self.run_command(args=['--dry-run', 'alias1'])
+
+        self.assertTrue(result['command'].options.dry_run_alias)
+        self.assertEqual(result['exit_code'], 0)
+        self.assertEqual(result['stdout'], b'rbt command1\n')
 
     def test_alias_dry_run_undefined(self):
-        """Testing alias --dry-run with an undefined alias"""
+        """Testing rbt alias --dry-run with an undefined alias"""
         config = {
             'ALIASES': {
                 'alias1': 'command1',
             }
         }
 
-        with self.reviewboardrc(config, use_temp_dir=True):
-            alias = self._create_alias_command(args=['--dry-run', 'alias2'])
-            self.assertEqual(alias.options.dry_run_alias, 'alias2')
-            self.assertRaises(Exception, execute, ['rbt', 'alias', '--dry-run',
-                                                   'alias2'])
+        with self.reviewboardrc(config):
+            result = self.run_command(args=['--dry-run', 'alias2'])
+            self.assertEqual(result['command'].options.dry_run_alias,
+                             'alias2')
+            self.assertEqual(result['exit_code'], 1)
+            self.assertEqual(result['stderr'],
+                             b'ERROR: No such alias "alias2"\n')
 
     def test_alias_dry_run_no_arg(self):
-        """Testing alias --dry-run with no alias argument provided"""
+        """Testing rbt alias --dry-run with no alias argument provided"""
         config = {
             'ALIASES': {},
         }
 
-        with self.reviewboardrc(config, use_temp_dir=True):
-            self.assertRaises(Exception, execute, ['rbt', 'alias',
-                                                   '--dry-run'])
+        with self.reviewboardrc(config):
+            result = self.run_command(args=['--dry-run'])
+
+            # The argument parser will output to the real sys.stderr, so we
+            # can't capture the output. Instead, check the error code.
+            self.assertEqual(result['exit_code'], 2)
 
     def test_alias_dry_run_debug(self):
-        """Testing alias --dry-run with debug option"""
+        """Testing rbt alias --dry-run with debug option"""
         config = {
             'ALIASES': {
                 'alias1': 'command1',
@@ -98,37 +114,10 @@ class AliasCommandTests(TestCase):
             }
         }
 
-        with self.reviewboardrc(config, use_temp_dir=True):
-            alias = self._create_alias_command(args=['--dry-run', 'alias2',
-                                                     '-d'])
-            self.assertTrue(alias.options.dry_run_alias)
-            self.assertTrue(alias.options.debug)
+        with self.reviewboardrc(config):
+            result = self.run_command(args=['--dry-run', 'alias2', '-d'])
 
-    def _create_alias_command(self, fields=None, args=None):
-        """Create an argument parser for alias with given extra fields.
-
-        Args:
-            fields (list of unicode):
-                A list of key=value formatted unicode strings for the field
-                arugment.
-
-            args (list of unicode):
-                A list of command line arguments to be passed to the parser.
-
-        Returns:
-            rbtools.commands.alias.Alias:
-            An instance of the Alias command.
-        """
-        alias = Alias()
-        argv = ['rbt', 'alias']
-
-        if args is not None:
-            argv += args
-
-        parser = alias.create_arg_parser(argv)
-        alias.options = parser.parse_args(argv[2:])
-
-        if fields is not None:
-            alias.options.fields = fields
-
-        return alias
+            command = result['command']
+            self.assertTrue(command.options.dry_run_alias)
+            self.assertTrue(command.options.debug)
+            self.assertEqual(result['exit_code'], 0)
