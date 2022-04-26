@@ -65,7 +65,14 @@ class TestCase(unittest.TestCase):
         self.old_home = self.get_user_home()
 
         if self.needs_temp_home:
-            self.set_user_home(make_tempdir())
+            home_dir = make_tempdir()
+            self.set_user_home(home_dir)
+
+            # Since the tests need a safer HOME setup, it stands to reason
+            # that we should also not operate within the tree, as it could
+            # result in RBTools's .reviewboardrc being picked up. We'll
+            # instead default to running within the new home directory.
+            os.chdir(home_dir)
 
         os.environ[str('RBTOOLS_EDITOR')] = str(self.default_text_editor)
 
