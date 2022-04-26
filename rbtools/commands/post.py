@@ -594,35 +594,12 @@ class Post(Command):
                 'Exactly one of "diff_history" or "squashed_diff" must be '
                 'provided to "Post.post_request()".')
 
-        supports_posting_commit_ids = \
-            self.capabilities.has_capability('review_requests', 'commit_ids')
-
         if not review_request:
+            request_data = self._build_new_review_request_data(
+                squashed_diff=squashed_diff,
+                submit_as=submit_as)
+
             try:
-                request_data = {
-                    'repository': self.repository.id,
-                }
-
-                if squashed_diff:
-                    if squashed_diff.changenum:
-                        request_data['changenum'] = squashed_diff.changenum
-                    elif (squashed_diff.commit_id and
-                          supports_posting_commit_ids):
-                        request_data['commit_id'] = squashed_diff.commit_id
-                else:
-                    request_data['create_with_history'] = True
-
-
-                if submit_as:
-                    request_data['submit_as'] = submit_as
-
-                if self.tool.can_bookmark:
-                    bookmark = self.tool.get_current_bookmark()
-                    request_data['extra_data__local_bookmark'] = bookmark
-                elif self.tool.can_branch:
-                    branch = self.tool.get_current_branch()
-                    request_data['extra_data__local_branch'] = branch
-
                 review_requests = self.api_root.get_review_requests(
                     only_fields='',
                     only_links='create')
@@ -719,7 +696,6 @@ class Post(Command):
                        % self.tool.name)
                 self.stdout.write(err)
                 self.json.add_error(err)
-
             else:
                 try:
                     stamp_commit_with_review_url(self.revisions,
@@ -743,78 +719,10 @@ class Post(Command):
 
         # Update the review request draft fields based on options set
         # by the user, or configuration.
-        update_fields = {}
-
-        if self.options.publish:
-            update_fields['public'] = True
-
-            if (self.options.trivial_publish and
-                self.capabilities.has_capability('review_requests',
-                                                 'trivial_publish')):
-                update_fields['trivial'] = True
-
-        if not self.options.diff_only:
-            # If the user has requested to guess the summary or description,
-            # get the commit message and override the summary and description
-            # options, which we'll fill in below. The guessing takes place
-            # after stamping so that the guessed description matches the commit
-            # when rbt exits.
-            if not self.options.diff_filename:
-                self.check_guess_fields()
-
-            update_fields.update(self.options.extra_fields)
-
-            if self.options.target_groups:
-                update_fields['target_groups'] = self.options.target_groups
-
-            if self.options.target_people:
-                update_fields['target_people'] = self.options.target_people
-
-            if self.options.depends_on:
-                update_fields['depends_on'] = self.options.depends_on
-
-            if self.options.summary:
-                update_fields['summary'] = self.options.summary
-
-            if self.options.branch:
-                update_fields['branch'] = self.options.branch
-
-            if self.options.bugs_closed:
-                # Append to the existing list of bugs.
-                self.options.bugs_closed = self.options.bugs_closed.strip(', ')
-                bug_set = (set(re.split('[, ]+', self.options.bugs_closed)) |
-                           set(review_request.bugs_closed))
-                self.options.bugs_closed = ','.join(bug_set)
-                update_fields['bugs_closed'] = self.options.bugs_closed
-
-            if self.options.description:
-                update_fields['description'] = self.options.description
-
-            if self.options.testing_done:
-                update_fields['testing_done'] = self.options.testing_done
-
-            text_type = self._get_text_type(self.options.markdown)
-
-            if self.options.description or self.options.testing_done:
-                # The user specified that their Description/Testing Done are
-                # valid Markdown, so tell the server so it won't escape the
-                # text.
-                update_fields['text_type'] = text_type
-
-            if self.options.change_description is not None:
-                if review_request.public:
-                    update_fields['changedescription'] = \
-                        self.options.change_description
-                    update_fields['changedescription_text_type'] = \
-                        text_type
-                else:
-                    logging.error(
-                        'The change description field can only be set when '
-                        'publishing an update. Use --description instead.')
-
-            if (squashed_diff and supports_posting_commit_ids and
-                squashed_diff.commit_id != draft.commit_id):
-                update_fields['commit_id'] = squashed_diff.commit_id or ''
+        update_fields = self._build_review_request_draft_data(
+            review_request=review_request,
+            squashed_diff=squashed_diff,
+            draft=draft)
 
         if update_fields:
             try:
@@ -1183,6 +1091,171 @@ class Post(Command):
                 % review_request.id)
 
         return review_request
+
+    def _build_new_review_request_data(self, squashed_diff, submit_as):
+        """Return API field data to set when creating a new review request.
+
+        This will set the following:
+
+        * ``repository``
+        * ``changenum`` or ``commit_id`` (if posting a squashed diff)
+        * ``create_with_history`` (if posting with history)
+        * ``submit_as`` (if submitting as another user)
+        * ``extra_data__local_bookmark`` (if storing bookmark metadata)
+        * ``extra_data__local_branch`` (if storing branch metadata)
+
+        Only ``repository`` is guaranteed to be set. The rest are conditional.
+
+        Args:
+            squashed_diff (SquashedDiff):
+                The squashed diff instance (if not posting with history).
+
+            submit_as (unicode):
+                The optional username that the post is being submitted as.
+
+        Returns:
+            dict:
+            The field data to set when creating the review request.
+        """
+        supports_posting_commit_ids = \
+            self.capabilities.has_capability('review_requests', 'commit_ids')
+
+        request_data = {
+            'repository': self.repository.id,
+        }
+
+        if squashed_diff:
+            if squashed_diff.changenum:
+                request_data['changenum'] = squashed_diff.changenum
+            elif (squashed_diff.commit_id and
+                  supports_posting_commit_ids):
+                request_data['commit_id'] = squashed_diff.commit_id
+        else:
+            request_data['create_with_history'] = True
+
+        if submit_as:
+            request_data['submit_as'] = submit_as
+
+        if self.tool.can_bookmark:
+            bookmark = self.tool.get_current_bookmark()
+            request_data['extra_data__local_bookmark'] = bookmark
+        elif self.tool.can_branch:
+            branch = self.tool.get_current_branch()
+            request_data['extra_data__local_branch'] = branch
+
+        return request_data
+
+    def _build_review_request_draft_data(self, review_request, draft,
+                                         squashed_diff):
+        """Return API field data to set when updating a draft.
+
+        This will set the following:
+
+        * ``public`` (if publishing the changes)
+        * ``trivial`` (if publishing trivially on a server that supports it)
+        * ``branch`` (if setting new branch information)
+        * ``depends_on`` (if setting new dependencies)
+        * ``description`` (if setting a new description)
+        * ``summary`` (if setting a new summary)
+        * ``testing_done`` (if setting new testing information)
+        * ``bugs_closed`` (if setting a new list of bugs that are closed)
+        * ``target_groups`` (if setting new group reviewers)
+        * ``target_people`` (if setting new user reviewers)
+        * ``text_type`` (if setting ``description`` or ``testing_done``)
+        * ``changedescription`` (if setting a new change description)
+        * ``changedescription_text_type`` (if setting a new change description)
+        * ``commit_id`` (if setting a new commit ID from a squashed diff on
+          a server that supports it)
+
+        All fields are conditional. This may return an empty dictionary.
+
+        Args:
+            review_request (rbtools.api.resources.ReviewRequest):
+                The review request that owns the draft.
+
+            draft (rbtools.api.resources.Resource):
+                The draft resource being updated.
+
+            squashed_diff (SquashedDiff):
+                The squashed diff instance (if not posting with history).
+
+        Returns:
+            dict:
+            The field data to set when updating the draft.
+        """
+        options = self.options
+
+        # Update the review request draft fields based on options set
+        # by the user, or configuration.
+        update_fields = {}
+
+        if options.publish:
+            update_fields['public'] = True
+
+            if (options.trivial_publish and
+                self.capabilities.has_capability('review_requests',
+                                                 'trivial_publish')):
+                update_fields['trivial'] = True
+
+        if not options.diff_only:
+            # If the user has requested to guess the summary or description,
+            # get the commit message and override the summary and description
+            # options, which we'll fill in below. The guessing takes place
+            # after stamping so that the guessed description matches the commit
+            # when rbt exits.
+            if not options.diff_filename:
+                self.check_guess_fields()
+
+            update_fields.update(options.extra_fields)
+            update_fields.update({
+                _field: _value
+                for _field, _value in (
+                    ('branch', options.branch),
+                    ('depends_on', options.depends_on),
+                    ('description', options.description),
+                    ('summary', options.summary),
+                    ('target_groups', options.target_groups),
+                    ('target_people', options.target_people),
+                    ('testing_done', options.testing_done),
+                )
+                if _value
+            })
+
+            if options.bugs_closed:
+                # Append to the existing list of bugs.
+                options.bugs_closed = ','.join(sorted(
+                    (set(re.split('[, ]+', options.bugs_closed.strip(', '))) |
+                     set(review_request.bugs_closed))))
+                update_fields['bugs_closed'] = options.bugs_closed
+
+            text_type = self._get_text_type(options.markdown)
+
+            if options.description or options.testing_done:
+                # The user specified that their Description/Testing Done are
+                # valid Markdown, so tell the server so it won't escape the
+                # text.
+                update_fields['text_type'] = text_type
+
+            if options.change_description is not None:
+                if review_request.public:
+                    update_fields.update({
+                        'changedescription': options.change_description,
+                        'changedescription_text_type': text_type,
+                    })
+                else:
+                    logging.error(
+                        'The change description field can only be set when '
+                        'publishing an update. Use --description instead.')
+
+            supports_posting_commit_ids = \
+                self.capabilities.has_capability('review_requests',
+                                                 'commit_ids')
+
+            if (squashed_diff and supports_posting_commit_ids and
+                squashed_diff.commit_id != draft.commit_id):
+                update_fields['commit_id'] = squashed_diff.commit_id or ''
+
+        return update_fields
 
     def _get_diff_history(self, extra_args):
         """Compute and return the diff history of the selected revisions.
