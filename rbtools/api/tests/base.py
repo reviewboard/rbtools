@@ -67,6 +67,19 @@ class TestWithPayloads(TestCase):
                 'method': 'GET',
                 'title': 'Link Field',
             },
+            'extra_data': {
+                'key1': 'value1',
+                'key2': [1, 2, 3],
+                'key3': {
+                    'subkey': True,
+                },
+                'links': {
+                    'test': {
+                        'href': 'https://example.com/',
+                        'method': 'POST',
+                    },
+                },
+            },
         },
         'links': {
             'self': {

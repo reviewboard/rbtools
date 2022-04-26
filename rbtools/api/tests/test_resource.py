@@ -11,9 +11,11 @@ from rbtools.api.resource import (CountResource,
                                   ListResource,
                                   RESOURCE_MAP,
                                   ResourceDictField,
+                                  ResourceExtraDataField,
                                   ResourceLinkField,
                                   ResourceListField,
-                                  RootResource)
+                                  RootResource,
+                                  _EXTRA_DATA_DOCS_URL)
 from rbtools.api.tests.base import TestWithPayloads
 
 
@@ -225,23 +227,167 @@ class ItemResourceTests(TestWithPayloads):
         self.assertIsInstance(items['other-list'], ResourceListField)
         self.assertIsInstance(items['other-list'][0], ResourceDictField)
 
-    def test_extra_data_rewriting_create(self):
-        """Testing rewriting of extra_data__ parameters to create"""
-        r = create_resource(self.transport, self.list_payload, '')
-        request = r.create(extra_data__foo='bar')
-        self.assertTrue(b'extra_data.foo' in request._fields)
-        self.assertEqual(request._fields[b'extra_data.foo'], b'bar')
+    def test_update_with_extra_data(self):
+        """Testing ItemResource.update with extra_data__<field>="""
+        r = create_resource(transport=self.transport,
+                            payload=self.item_payload,
+                            url='')
+        request = r.update(extra_data__key1='value1',
+                           extra_data__key2=True,
+                           extra_data__key3=123)
 
-    def test_extra_data_rewriting_update(self):
-        """Testing rewriting of exta_data__ parameters to update"""
-        r = create_resource(self.transport, self.item_payload, '')
-        request = r.update(extra_data__foo='bar')
-        self.assertTrue(b'extra_data.foo' in request._fields)
-        self.assertEqual(request._fields[b'extra_data.foo'], b'bar')
+        self.assertEqual(
+            request._fields,
+            {
+                b'extra_data.key1': b'value1',
+                b'extra_data.key2': b'True',
+                b'extra_data.key3': b'123',
+            })
+
+    def test_update_with_extra_data_json(self):
+        """Testing ItemResource.update with extra_data_json="""
+        r = create_resource(transport=self.transport,
+                            payload=self.item_payload,
+                            url='')
+        request = r.update(extra_data_json={
+            'foo': {
+                'bar': {
+                    'num': 123,
+                    'string': 'hi!',
+                    'bool': True,
+                },
+            },
+            'test': [1, 2, 3],
+        })
+
+        self.assertEqual(
+            request._fields,
+            {
+                b'extra_data:json': (
+                    b'{'
+                    b'"foo":{'
+                    b'"bar":{'
+                    b'"bool":true,'
+                    b'"num":123,'
+                    b'"string":"hi!"'
+                    b'}'
+                    b'},'
+                    b'"test":[1,2,3]'
+                    b'}'
+                )
+            })
+
+    def test_update_with_extra_data_json_patch(self):
+        """Testing ItemResource.update with extra_data_json_patch="""
+        r = create_resource(transport=self.transport,
+                            payload=self.item_payload,
+                            url='')
+        request = r.update(extra_data_json_patch=[
+            {
+                'op': 'add',
+                'path': '/a',
+                'value': {
+                    'array': [1, 2, 3],
+                },
+            }
+        ])
+
+        self.assertEqual(
+            request._fields,
+            {
+                b'extra_data:json-patch': (
+                    b'[{'
+                    b'"op":"add",'
+                    b'"path":"/a",'
+                    b'"value":{'
+                    b'"array":[1,2,3]'
+                    b'}'
+                    b'}]'
+                )
+            })
 
 
 class ListResourceTests(TestWithPayloads):
     """Unit tests for rbtools.api.resource.ListResource."""
+
+    def test_create_with_extra_data(self):
+        """Testing ListResource.create with extra_data__<field>="""
+        r = create_resource(transport=self.transport,
+                            payload=self.list_payload,
+                            url='')
+        request = r.create(extra_data__key1='value1',
+                           extra_data__key2=True,
+                           extra_data__key3=123)
+
+        self.assertEqual(
+            request._fields,
+            {
+                b'extra_data.key1': b'value1',
+                b'extra_data.key2': b'True',
+                b'extra_data.key3': b'123',
+            })
+
+    def test_create_with_extra_data_json(self):
+        """Testing ItemResource.create with extra_data_json="""
+        r = create_resource(transport=self.transport,
+                            payload=self.list_payload,
+                            url='')
+        request = r.create(extra_data_json={
+            'foo': {
+                'bar': {
+                    'num': 123,
+                    'string': 'hi!',
+                    'bool': True,
+                },
+            },
+            'test': [1, 2, 3],
+        })
+
+        self.assertEqual(
+            request._fields,
+            {
+                b'extra_data:json': (
+                    b'{'
+                    b'"foo":{'
+                    b'"bar":{'
+                    b'"bool":true,'
+                    b'"num":123,'
+                    b'"string":"hi!"'
+                    b'}'
+                    b'},'
+                    b'"test":[1,2,3]'
+                    b'}'
+                )
+            })
+
+    def test_create_with_extra_data_json_patch(self):
+        """Testing ItemResource.create with extra_data_json_patch="""
+        r = create_resource(transport=self.transport,
+                            payload=self.list_payload,
+                            url='')
+        request = r.create(extra_data_json_patch=[
+            {
+                'op': 'add',
+                'path': '/a',
+                'value': {
+                    'array': [1, 2, 3],
+                },
+            }
+        ])
+
+        self.assertEqual(
+            request._fields,
+            {
+                b'extra_data:json-patch': (
+                    b'[{'
+                    b'"op":"add",'
+                    b'"path":"/a",'
+                    b'"value":{'
+                    b'"array":[1,2,3]'
+                    b'}'
+                    b'}]'
+                )
+            })
 
     def test_list_resource_list(self):
         """Testing list resource lists"""
@@ -475,6 +621,54 @@ class ResourceFieldDictTests(TestWithPayloads):
 
         with self.assertRaisesMessage(AttributeError, message):
             r.nested_field.clear()
+
+
+class ResourceExtraDataFieldTests(TestWithPayloads):
+    """Unit tests for ResourceExtraDataField."""
+
+    def test_wrapped_fields(self):
+        """Testing ResourceExtraDataField field wrapping"""
+        r = create_resource(transport=self.transport,
+                            payload=self.item_payload,
+                            url='')
+
+        self.assertIs(type(r.extra_data), ResourceExtraDataField)
+        self.assertIs(type(r.extra_data['key3']), ResourceExtraDataField)
+        self.assertIs(type(r.extra_data['links']), ResourceExtraDataField)
+        self.assertIs(type(r.extra_data['links']['test']),
+                      ResourceExtraDataField)
+
+    def test_copy(self):
+        """Testing ResourceExtraDataField.copy"""
+        r = create_resource(transport=self.transport,
+                            payload=self.item_payload,
+                            url='')
+
+        extra_data = r.extra_data.copy()
+        self.assertIs(type(extra_data), dict)
+        self.assertIs(type(extra_data['key3']), dict)
+        self.assertIs(type(extra_data['links']), dict)
+        self.assertIs(type(extra_data['links']['test']), dict)
+
+    def test_setitem(self):
+        """Testing ResourceExtraDataField.__setitem__"""
+        r = create_resource(transport=self.transport,
+                            payload=self.item_payload,
+                            url='')
+
+        message = (
+            'extra_data attributes cannot be modified directly on this '
+            'dictionary. To make a mutable copy of this and all its contents, '
+            'call .copy(). To set or change extra_data state, issue a '
+            '.update(extra_data_json={...}) for a JSON Merge Patch requst or '
+            '.update(extra_data_json_patch=[...]) for a JSON Patch request '
+            'on the parent resource. See %s for the format for these '
+            'operations.'
+            % _EXTRA_DATA_DOCS_URL
+        )
+
+        with self.assertRaisesMessage(AttributeError, message):
+            r.extra_data['new'] = 'value'
 
 
 class ResourceFactoryTests(TestWithPayloads):
