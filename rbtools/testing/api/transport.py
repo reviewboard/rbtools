@@ -34,6 +34,7 @@ class URLMapTransport(Transport):
     * ``/api/``
     * ``/api/info/``
     * ``/api/repositories/``
+    * ``/api/review-requests/``
 
     Unit tests can define any additional resources they need through the
     following functions:
@@ -204,6 +205,12 @@ class URLMapTransport(Transport):
             list_key='repositories',
             mimetype=payload_factory.make_mimetype('repositories'),
             item_mimetype=payload_factory.make_mimetype('repository'))
+
+        self.add_list_url(
+            url='/api/review-requests/',
+            list_key='review_requests',
+            mimetype=payload_factory.make_mimetype('review-requests'),
+            item_mimetype=payload_factory.make_mimetype('review-request'))
 
         # Pull out the capabilities for clients to easily set in tests.
         self.capabilities = root_payload['capabilities']
@@ -462,6 +469,53 @@ class URLMapTransport(Transport):
             'repositories_info_url_info': repo_info_url_info,
             'repositories_url_info': repos_url_info,
         }
+
+    def add_review_request_url(self, **kwargs):
+        """Add URLs for a review request.
+
+        This will add a URL for a review request item resource and register it
+        in the corresponding list resource.
+
+        Args:
+            **kwargs (dict):
+                Keyword arguments for the review request payload. See
+                :py:meth:`rbtools.testing.api.payloads.PayloadFactory.
+                make_review_request_object_data` for details.
+
+        Returns:
+            dict:
+            The results of the add operation, for further tracking or
+            processing. See the return type for :py:meth:`add_url` for
+            details.
+        """
+        obj_data = self.payload_factory.make_review_request_object_data(
+            **kwargs)
+
+        return self.add_item_url(
+            in_list_urls=['/api/review-requests/'],
+            **obj_data)
+
+    def add_review_request_draft_url(self, **kwargs):
+        """Add URLs for a review request draft.
+
+        This will add a URL for a review request draft resource.
+
+        Args:
+            **kwargs (dict):
+                Keyword arguments for the review request draft payload. See
+                :py:meth:`rbtools.testing.api.payloads.PayloadFactory.
+                make_review_request_draft_object_data` for details.
+
+        Returns:
+            dict:
+            The results of the add operation, for further tracking or
+            processing. See the return type for :py:meth:`add_url` for
+            details.
+        """
+        obj_data = self.payload_factory.make_review_request_draft_object_data(
+            **kwargs)
+
+        return self.add_item_url(**obj_data)
 
     def get_root(self):
         """Perform a simulated HTTP GET on the root API.

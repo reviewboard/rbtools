@@ -63,6 +63,8 @@ class ResourcePayloadFactory(object):
        * :py:meth:`make_api_info_object_data`
        * :py:meth:`make_repository_object_data`
        * :py:meth:`make_repository_info_object_data`
+       * :py:meth:`make_review_request_draft_object_data`
+       * :py:meth:`make_review_request_object_data`
        * :py:meth:`make_root_object_data`
 
     Whenever unit tests need to generate a type of payload not provided in
@@ -319,8 +321,13 @@ class ResourcePayloadFactory(object):
                 },
                 'stat': 'ok',
                 'uri_templates': {
+                    'draft': ('%sreview-requests/{review_request_id}/draft/'
+                              % url),
                     'info': '%sinfo/' % url,
                     'repositories': '%srepositories/' % url,
+                    'repository': '%srepositories/{repository_id}/' % url,
+                    'review_request': ('%sreview-requests/{review_request_id}/'
+                                       % url),
                     'review_requests': '%sreview-requests/' % url,
                 },
             },
@@ -443,6 +450,422 @@ class ResourcePayloadFactory(object):
             'url': url,
             'mimetype': self.make_mimetype('repository-info'),
             'payload': info_payload,
+        }
+
+    def make_review_request_object_data(
+            self,
+            review_request_id,
+            approval_failure=None,
+            approved=False,
+            blocks_ids=[],
+            branch='test-branch',
+            bugs_closed=[],
+            changenum=None,
+            close_description='',
+            close_description_text_type='plain',
+            commit_id=None,
+            created_with_history=True,
+            depends_on_ids=[],
+            description='Test Description',
+            description_text_type='plain',
+            extra_data={},
+            issue_dropped_count=0,
+            issue_open_count=0,
+            issue_resolved_count=0,
+            issue_verifying_count=0,
+            last_updated='2022-04-21T15:44:00Z',
+            public=True,
+            repository_id=None,
+            ship_it_count=0,
+            status='pending',
+            submitter_username='test-user',
+            summary='Test Summary',
+            target_group_names=[],
+            target_people_usernames=[],
+            testing_done='Test Testing Done',
+            testing_done_text_type='plain',
+            text_type=None,
+            time_added='2022-04-21T12:30:00Z',
+            latest_diff_id=1):
+        """Return new review request resource data.
+
+        Args:
+            review_request_id (int):
+                The ID of the review request.
+
+            approval_failure (unicode, optional):
+                The value of the ``approval_failure`` field.
+
+            approved (bool, optional):
+                The value of the ``approved`` field.
+
+            blocks_ids (list of int, optional):
+                A list of review request IDs that this blocks, for use in
+                the ``blocks`` field.
+
+            branch (unicode, optional):
+                The value of the ``branch`` field.
+
+            bugs_closed (list of unicode, optional):
+                The value of the ``bugs_closed`` field.
+
+            changenum (int, optional):
+                The value of the ``changenum`` field.
+
+            close_description (unicode, optional):
+                The value of the ``close_description`` field.
+
+            close_description _text_type (unicode, optional):
+                The value of the ``close_description_text_type`` field.
+
+            commit_id (unicode, optional):
+                The value of the ``commit_id`` field.
+
+            created_with_history (bool, optional):
+                The value of the ``created_with_history`` field.
+
+            depends_on_ids (list of int, optional):
+                A list of review request IDs that this depends on, for use
+                in the ``depends_on`` field.
+
+            description (unicode, optional):
+                The value of the ``description`` field.
+
+            description_text_type (unicode, optional):
+                The value of the ``description_text_type`` field.
+
+            extra_data (dict, optional):
+                The value of the ``extra_data`` field.
+
+            issue_dropped_count (int, optional):
+                The value of the ``issue_dropped_count`` field.
+
+            issue_open_count (int, optional):
+                The value of the ``issue_open_count`` field.
+
+            issue_resolved_count (int, optional):
+                The value of the ``issue_resolved_count`` field.
+
+            issue_verifying_count (int, optional):
+                The value of the ``issue_verifying_count`` field.
+
+            last_updated (unicode, optional):
+                The value of the ``last_updated`` field.
+
+            public (bool, optional):
+                The value of the ``public`` field.
+
+            repository_id (int, optional):
+                The ID of the repository, for the ``repository`` link.
+
+            ship_it_count (int, optional):
+                The value of the ``ship_it_count`` field.
+
+            status (unicode, optional):
+                The value of the ``status`` field.
+
+            submitter_username (unicode, optional):
+                The username of the submitter, for the ``submitter`` link.
+
+            summary (unicode, optional):
+                The value of the ``summary`` field.
+
+            target_group_names (unicode, optional):
+                A list of group names, for use in the ``target_groups`` field.
+
+            target_people_usernames (unicode, optional):
+                A list of usernames, for use in the ``target_people`` field.
+
+            testing_done (unicode, optional):
+                The value of the ``testing_done`` field.
+
+            testing_done_text_type (unicode, optional):
+                The value of the ``testing_don_text_type `` field.
+
+            text_type (unicode, optional):
+                The value of the ``text_type `` field.
+
+            time_added (unicode, optional):
+                The value of the ``time_added `` field.
+
+            latest_diff_id (int, optional):
+                The ID of the last diff on the review request, for use in
+                the ``latest_diff`` link.
+
+        Returns:
+            dict:
+            The resource payload and metadata. See the class documentation
+            for details.
+        """
+        url = self._make_api_url('review-requests/%s/' % review_request_id)
+
+        links = self._make_item_links(
+            url=url,
+            child_resource_names=[
+                'changes',
+                'diff_context',
+                'diffs',
+                'draft',
+                'file_attachments',
+                'last_update',
+                'reviews',
+                'screenshots',
+                'status_updates',
+            ])
+        links['submitter'] = {
+            'href': self._make_api_url('users/%s/' % submitter_username),
+            'method': 'GET',
+            'title': submitter_username,
+        }
+
+        if repository_id is not None:
+            links.update({
+                'latest_diff': {
+                    'href': '%sdiffs/%s/' % (url, latest_diff_id),
+                    'method': 'GET',
+                },
+                'repository': {
+                    'href': self._make_api_url('repositories/%s/'
+                                               % repository_id),
+                    'method': 'GET',
+                    'title': 'Test Repository',
+                },
+            })
+
+        return {
+            'item_key': 'review_request',
+            'mimetype': self.make_mimetype('review-request'),
+            'payload': {
+                'absolute_url': '%sr/%s/' % (self.server_url,
+                                             review_request_id),
+                'approval_failure': approval_failure,
+                'approved': approved,
+                'blocks': [
+                    {
+                        'href': self._make_api_url('review-requests/%s/'
+                                                   % _id),
+                        'method': 'GET',
+                        'title': 'Review request %s' % _id,
+                    }
+                    for _id in blocks_ids
+                ],
+                'branch': branch,
+                'bugs_closed': bugs_closed,
+                'changenum': changenum,
+                'close_description': close_description,
+                'close_description_text_type': close_description_text_type,
+                'commit_id': commit_id,
+                'created_with_history': created_with_history,
+                'depends_on': [
+                    {
+                        'href': self._make_api_url('review-requests/%s/'
+                                                   % _id),
+                        'method': 'GET',
+                        'title': 'Review request %s' % _id,
+                    }
+                    for _id in depends_on_ids
+                ],
+                'description': description,
+                'description_text_type': description_text_type,
+                'extra_data': extra_data,
+                'id': review_request_id,
+                'issue_dropped_count': issue_dropped_count,
+                'issue_open_count': issue_open_count,
+                'issue_resolved_count': issue_resolved_count,
+                'issue_verifying_count': issue_verifying_count,
+                'last_updated': last_updated,
+                'links': links,
+                'public': public,
+                'ship_it_count': ship_it_count,
+                'status': status,
+                'summary': summary,
+                'target_groups': [
+                    {
+                        'href': self._make_api_url('groups/%s/' % _name),
+                        'method': 'GET',
+                        'title': _name,
+                    }
+                    for _name in target_group_names
+                ],
+                'target_people': [
+                    {
+                        'href': self._make_api_url('users/%s/' % _username),
+                        'method': 'GET',
+                        'title': _username,
+                    }
+                    for _username in target_people_usernames
+                ],
+                'testing_done': testing_done,
+                'testing_done_text_type': testing_done_text_type,
+                'text_type': text_type,
+                'time_added': time_added,
+                'url': '/r/%s/' % review_request_id,
+            },
+            'url': url,
+        }
+
+    def make_review_request_draft_object_data(
+            self,
+            draft_id,
+            review_request_id,
+            branch='test-branch',
+            bugs_closed=[],
+            close_description='',
+            close_description_text_type='plain',
+            commit_id=None,
+            depends_on_ids=[],
+            description='Test Description',
+            description_text_type='plain',
+            extra_data={},
+            last_updated='2022-04-21T15:44:00Z',
+            public=True,
+            submitter_username='test-user',
+            summary='Test Summary',
+            target_group_names=[],
+            target_people_usernames=[],
+            testing_done='Test Testing Done',
+            testing_done_text_type='plain',
+            text_type=None):
+        """Return new review request draft resource data.
+
+        Args:
+            draft_id (int):
+                The ID of the review request draft.
+
+            review_request_id (int):
+                The ID of the review request.
+
+            branch (unicode, optional):
+                The value of the ``branch`` field.
+
+            bugs_closed (list of unicode, optional):
+                The value of the ``bugs_closed`` field.
+
+            close_description (unicode, optional):
+                The value of the ``close_description`` field.
+
+            close_description _text_type (unicode, optional):
+                The value of the ``close_description_text_type`` field.
+
+            commit_id (unicode, optional):
+                The value of the ``commit_id`` field.
+
+            depends_on_ids (list of int, optional):
+                A list of review request IDs that this depends on, for use
+                in the ``depends_on`` field.
+
+            description (unicode, optional):
+                The value of the ``description`` field.
+
+            description_text_type (unicode, optional):
+                The value of the ``description_text_type`` field.
+
+            extra_data (dict, optional):
+                The value of the ``extra_data`` field.
+
+            last_updated (unicode, optional):
+                The value of the ``last_updated`` field.
+
+            public (bool, optional):
+                The value of the ``public`` field.
+
+            submitter_username (unicode, optional):
+                The username of the submitter, for the ``submitter`` link.
+
+            summary (unicode, optional):
+                The value of the ``summary`` field.
+
+            target_group_names (unicode, optional):
+                A list of group names, for use in the ``target_groups`` field.
+
+            target_people_usernames (unicode, optional):
+                A list of usernames, for use in the ``target_people`` field.
+
+            testing_done (unicode, optional):
+                The value of the ``testing_done`` field.
+
+            testing_done_text_type (unicode, optional):
+                The value of the ``testing_don_text_type `` field.
+
+            text_type (unicode, optional):
+                The value of the ``text_type `` field.
+
+        Returns:
+            dict:
+            The resource payload and metadata. See the class documentation
+            for details.
+        """
+        url = self._make_api_url('review-requests/%s/draft/'
+                                 % review_request_id)
+
+        links = self._make_item_links(
+            url=url,
+            child_resource_names=[
+                'draft_diffs',
+                'draft_file_attachments',
+                'draft_screenshots',
+            ])
+        links.update({
+            'review_request': {
+                'href': self._make_api_url('review-requests/%s/'
+                                           % review_request_id),
+                'method': 'GET',
+                'title': 'Review request #%s' % review_request_id,
+            },
+            'submitter': {
+                'href': self._make_api_url('users/%s/' % submitter_username),
+                'method': 'GET',
+                'title': submitter_username,
+            },
+        })
+
+        return {
+            'item_key': 'draft',
+            'mimetype': self.make_mimetype('review-request-draft'),
+            'payload': {
+                'branch': branch,
+                'bugs_closed': bugs_closed,
+                'close_description': close_description,
+                'close_description_text_type': close_description_text_type,
+                'commit_id': commit_id,
+                'depends_on': [
+                    {
+                        'href': self._make_api_url('review-requests/%s/'
+                                                   % _id),
+                        'method': 'GET',
+                        'title': 'Review Request %s' % _id,
+                    }
+                    for _id in depends_on_ids
+                ],
+                'description': description,
+                'description_text_type': description_text_type,
+                'extra_data': extra_data,
+                'id': draft_id,
+                'last_updated': last_updated,
+                'links': links,
+                'public': public,
+                'summary': summary,
+                'target_groups': [
+                    {
+                        'href': self._make_api_url('groups/%s/' % _name),
+                        'method': 'GET',
+                        'title': _name,
+                    }
+                    for _name in target_group_names
+                ],
+                'target_people': [
+                    {
+                        'href': self._make_api_url('users/%s/' % _username),
+                        'method': 'GET',
+                        'title': _username,
+                    }
+                    for _username in target_people_usernames
+                ],
+                'testing_done': testing_done,
+                'testing_done_text_type': testing_done_text_type,
+                'text_type': text_type,
+            },
+            'url': url,
         }
 
     def _make_item_links(self, url, methods=['GET', 'PUT', 'DELETE'],
