@@ -299,29 +299,6 @@ class ListResourceTests(TestWithPayloads):
             self.assertTrue(hasattr(r, method_name))
             self.assertTrue(callable(getattr(r, method_name)))
 
-    def test_resource_dict_field(self):
-        """Testing access of a dictionary field"""
-        r = create_resource(self.transport, self.item_payload, '')
-
-        field = r.nested_field
-
-        self.assertTrue(isinstance(field, ResourceDictField))
-        self.assertEqual(
-            field.nested1,
-            self.item_payload['resource_token']['nested_field']['nested1'])
-
-    def test_resource_dict_field_iteration(self):
-        """Testing iterating sub-fields of a dictionary field"""
-        r = create_resource(self.transport, self.item_payload, '')
-
-        field = r.nested_field
-        iterated_fields = set(f for f in field.iterfields())
-        nested_fields = set(
-            f for f in self.item_payload['resource_token']['nested_field'])
-
-        self.assertEqual(set(),
-                         nested_fields.symmetric_difference(iterated_fields))
-
     def test_link_field(self):
         """Testing access of a link field"""
         r = create_resource(self.transport, self.item_payload, '')
@@ -334,6 +311,170 @@ class ListResourceTests(TestWithPayloads):
         self.assertEqual(
             request.url,
             self.item_payload['resource_token']['link_field']['href'])
+
+
+class ResourceFieldDictTests(TestWithPayloads):
+    """Unit tests for ResourceDictField."""
+
+    def test_getattr(self):
+        """Testing ResourceDictField.__getattr__"""
+        r = create_resource(transport=self.transport,
+                            payload=self.item_payload,
+                            url='')
+        field = r.nested_field
+
+        self.assertIsInstance(field, ResourceDictField)
+        self.assertEqual(
+            field.nested1,
+            self.item_payload['resource_token']['nested_field']['nested1'])
+
+    def test_getattr_with_invalid_key(self):
+        """Testing ResourceDictField.__getattr__ with invalid key"""
+        r = create_resource(transport=self.transport,
+                            payload=self.item_payload,
+                            url='')
+        field = r.nested_field
+
+        self.assertIsInstance(field, ResourceDictField)
+
+        message = (
+            'This dictionary resource for ItemResource does not have an '
+            'attribute "nestedX".'
+        )
+
+        with self.assertRaisesMessage(AttributeError, message):
+            field.nestedX
+
+    def test_getitem(self):
+        """Testing ResourceDictField.__getitem__"""
+        r = create_resource(transport=self.transport,
+                            payload=self.item_payload,
+                            url='')
+        field = r['nested_field']
+
+        self.assertIsInstance(field, ResourceDictField)
+        self.assertEqual(
+            field['nested1'],
+            self.item_payload['resource_token']['nested_field']['nested1'])
+
+    def test_getitem_with_invalid_key(self):
+        """Testing ResourceDictField.__getitem__ with invalid key"""
+        r = create_resource(transport=self.transport,
+                            payload=self.item_payload,
+                            url='')
+        field = r.nested_field
+
+        self.assertIsInstance(field, ResourceDictField)
+
+        message = (
+            'This dictionary resource for ItemResource does not have a '
+            'key "nestedX".'
+        )
+
+        with self.assertRaisesMessage(KeyError, message):
+            field['nestedX']
+
+    def test_iterfields(self):
+        """Testing ResourceDictField.iterfields"""
+        r = create_resource(transport=self.transport,
+                            payload=self.item_payload,
+                            url='')
+
+        self.assertEqual(
+            set(r.nested_field.iterfields()),
+            set(self.item_payload['resource_token']['nested_field']))
+
+    def test_setitem(self):
+        """Testing ResourceDictField.__setitem__"""
+        r = create_resource(transport=self.transport,
+                            payload=self.item_payload,
+                            url='')
+
+        message = (
+            'Attributes cannot be modified directly on this dictionary. To '
+            'change values, issue a .update(attr=value, ...) call on the '
+            'parent resource.'
+        )
+
+        with self.assertRaisesMessage(AttributeError, message):
+            r.nested_field['new'] = {}
+
+    def test_setdefault(self):
+        """Testing ResourceDictField.setdefault"""
+        r = create_resource(transport=self.transport,
+                            payload=self.item_payload,
+                            url='')
+
+        message = (
+            'Attributes cannot be modified directly on this dictionary. To '
+            'change values, issue a .update(attr=value, ...) call on the '
+            'parent resource.'
+        )
+
+        with self.assertRaisesMessage(AttributeError, message):
+            r.nested_field.setdefault('new', {})
+
+    def test_update(self):
+        """Testing ResourceDictField.update"""
+        r = create_resource(transport=self.transport,
+                            payload=self.item_payload,
+                            url='')
+
+        message = (
+            'Attributes cannot be modified directly on this dictionary. To '
+            'change values, issue a .update(attr=value, ...) call on the '
+            'parent resource.'
+        )
+
+        with self.assertRaisesMessage(AttributeError, message):
+            r.nested_field.update({
+                'new': {},
+            })
+
+    def test_pop(self):
+        """Testing ResourceDictField.pop"""
+        r = create_resource(transport=self.transport,
+                            payload=self.item_payload,
+                            url='')
+
+        message = (
+            'Attributes cannot be modified directly on this dictionary. To '
+            'change values, issue a .update(attr=value, ...) call on the '
+            'parent resource.'
+        )
+
+        with self.assertRaisesMessage(AttributeError, message):
+            r.nested_field.pop('nested1')
+
+    def test_popitem(self):
+        """Testing ResourceDictField.popitem"""
+        r = create_resource(transport=self.transport,
+                            payload=self.item_payload,
+                            url='')
+
+        message = (
+            'Attributes cannot be modified directly on this dictionary. To '
+            'change values, issue a .update(attr=value, ...) call on the '
+            'parent resource.'
+        )
+
+        with self.assertRaisesMessage(AttributeError, message):
+            r.nested_field.popitem()
+
+    def test_clear(self):
+        """Testing ResourceDictField.clear"""
+        r = create_resource(transport=self.transport,
+                            payload=self.item_payload,
+                            url='')
+
+        message = (
+            'Attributes cannot be modified directly on this dictionary. To '
+            'change values, issue a .update(attr=value, ...) call on the '
+            'parent resource.'
+        )
+
+        with self.assertRaisesMessage(AttributeError, message):
+            r.nested_field.clear()
 
 
 class ResourceFactoryTests(TestWithPayloads):

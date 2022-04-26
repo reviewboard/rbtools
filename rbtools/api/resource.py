@@ -4,6 +4,11 @@ import logging
 import re
 from collections import defaultdict, deque
 
+try:
+    from collections.abc import MutableMapping
+except ImportError:
+    from collections import MutableMapping
+
 import six
 from pkg_resources import parse_version
 from six.moves import range
@@ -331,47 +336,196 @@ class Resource(object):
         return self._payload
 
 
-class ResourceDictField(object):
+class ResourceDictField(MutableMapping):
     """Wrapper for dictionaries returned from a resource.
 
-    Any dictionary returned from a resource will be wrapped using this
-    class. Attribute access will correspond to accessing the
-    dictionary key with the name of the attribute.
+    Items fetched from this dictionary may be wrapped as a resource or
+    resource field container.
+
+    Changes cannot be made to resource dictionaries. Instead, changes must be
+    made using :py:meth:`Resource.update` calls.
+
+    Version Changed:
+        3.1:
+        This class now operates like a standard dictionary, but blocks any
+        changes (which were misleading and could not be used to save state
+        in any prior version).
     """
+
     def __init__(self, resource, fields):
+        """Initialize the field.
+
+        Args:
+            resource (Resource):
+                The parent resource that owns this field.
+
+            fields (dict):
+                The dictionary contents from the payload.
+        """
+        super(ResourceDictField, self).__init__()
+
         self._resource = resource
         self._fields = fields
 
     def __getattr__(self, name):
-        if name in self._fields:
+        """Return the value of a key from the field as an attribute reference.
+
+        The resulting value will be wrapped as a resource or resource field
+        if appropriate.
+
+        Args:
+            name (unicode):
+                The name of the key.
+
+        Returns:
+            object:
+            The value of the field.
+
+        Raises:
+            AttributeError:
+                The provided key name was not found in the dictionary.
+        """
+        try:
             return self._resource._wrap_field(self._fields[name])
-        else:
+        except KeyError:
             raise AttributeError('This dictionary resource for %s does not '
                                  'have an attribute "%s".'
                                  % (self._resource.__class__.__name__, name))
 
-    def __getitem__(self, key):
+    def __getitem__(self, name):
+        """Return the value of a key from the field as an item lookup.
+
+        The resulting value will be wrapped as a resource or resource field
+        if appropriate.
+
+        Args:
+            name (unicode):
+                The name of the key.
+
+        Returns:
+            object:
+            The value of the field.
+
+        Raises:
+            KeyError:
+                The provided key name was not found in the dictionary.
+        """
         try:
-            return self.__getattr__(key)
-        except AttributeError:
-            raise KeyError
+            return self._resource._wrap_field(self._fields[name])
+        except KeyError:
+            raise KeyError('This dictionary resource for %s does not have '
+                           'a key "%s".'
+                           % (self._resource.__class__.__name__, name))
 
-    def __contains__(self, key):
-        return key in self._fields
+    def __delitem__(self, name):
+        """Delete an item from the dictionary.
 
-    def iterfields(self):
-        for field in self._fields:
-            yield field
+        This will raise an exception stating that changes are not allowed
+        and offering an alternative.
 
-    def iteritems(self):
-        for key, value in six.iteritems(self._fields):
-            yield key, self._resource._wrap_field(value)
+        Args:
+            name (unicode, unused):
+                The name of the key to delete.
+
+        Raises:
+            AttributeError:
+                An error stating that changes are not allowed.
+        """
+        self._raise_immutable()
+
+    def __setitem__(self, name, value):
+        """Set an item in the dictionary.
+
+        This will raise an exception stating that changes are not allowed
+        and offering an alternative.
+
+        Args:
+            name (unicode, unused):
+                The name of the key to set.
+
+        Raises:
+            AttributeError:
+                An error stating that changes are not allowed.
+        """
+        self._raise_immutable()
+
+    def __len__(self):
+        """Return the number of items in the dictionary.
+
+        Returns:
+            int:
+            The number of items.
+        """
+        return len(self._fields)
+
+    def __iter__(self):
+        """Iterate through the dictionary.
+
+        Yields:
+            object:
+            Each item in the dictionary.
+        """
+        return six.iterkeys(self._fields)
 
     def __repr__(self):
+        """Return a string representation of the dictionary field.
+
+        Returns:
+            unicode:
+            The string representation.
+        """
         return '%s(resource=%r, fields=%r)' % (
             self.__class__.__name__,
             self._resource,
             self._fields)
+
+    def fields(self):
+        """Iterate through all fields in the dictionary.
+
+        This will yield each field name in the dictionary. This is the same
+        as calling :py:meth:`keys` or simply ``for field in dict_field``.
+
+        Yields:
+            unicode:
+            Each field in this dictionary.
+        """
+        for field in self:
+            yield field
+
+    # Backwards-compatibility functions.
+    iterfields = fields
+
+    if six.PY3:
+        def iteritems(self):
+            """Iterate through all items in this dictionary.
+
+            This is a legacy interface that provides compatibility with code
+            written in Python 3 and RBTools <= 3.0.
+
+            Yields:
+                tuple:
+                A 2-tuple of:
+
+                1. The key
+                2. The value
+            """
+            for item in self.items():
+                yield item
+
+    def _raise_immutable(self):
+        """Raise an exception stating that the dictionary is immutable.
+
+        Version Added:
+            3.1
+
+        Raises:
+            AttributeError:
+                An error stating that changes are not allowed.
+        """
+        raise AttributeError(
+            'Attributes cannot be modified directly on this dictionary. To '
+            'change values, issue a .update(attr=value, ...) call on the '
+            'parent resource.')
 
 
 class ResourceLinkField(ResourceDictField):
