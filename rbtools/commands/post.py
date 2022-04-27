@@ -24,6 +24,10 @@ from rbtools.utils.review_request import (get_draft_or_current_value,
 
 #: A squashed diff that may be the product of one or more revisions.
 #:
+#: Version Changed:
+#:     3.1:
+#:     Added ``review_request_extra_data``.
+#:
 #: Attributes:
 #:     diff (bytes):
 #:         The contents of the diff.
@@ -45,6 +49,12 @@ from rbtools.utils.review_request import (get_draft_or_current_value,
 #:     changenum (unicode):
 #:         For SCMs such as Perforce, this is the change number that the diff
 #:         corresponds to. This is ``None`` for other SCMs.
+#:
+#:     review_request_extra_data (dict):
+#:         State to store in a review request's ``extra_data`` field.
+#:
+#:         Version Added:
+#:             3.1
 SquashedDiff = namedtuple(
     'SquashedDiff', (
         'diff',
@@ -53,10 +63,15 @@ SquashedDiff = namedtuple(
         'base_dir',
         'commit_id',
         'changenum',
+        'review_request_extra_data',
     ))
 
 
 #: A series of diffs that each correspond to a single revision.
+#:
+#: Version Changed:
+#:     3.1:
+#:     Added ``review_request_extra_data``.
 #:
 #: Attributes:
 #:     entries (list of dict):
@@ -108,6 +123,12 @@ SquashedDiff = namedtuple(
 #:
 #:     cumulative_diff (bytes):
 #:         The cumulative diff of the entire history.
+#:
+#:     review_request_extra_data (dict):
+#:         State to store in a review request's ``extra_data`` field.
+#:
+#:         Version Added:
+#:             3.1
 DiffHistory = namedtuple(
     'History', (
         'entries',
@@ -115,6 +136,7 @@ DiffHistory = namedtuple(
         'base_commit_id',
         'validation_info',
         'cumulative_diff',
+        'review_request_extra_data',
     ))
 
 
@@ -594,9 +616,12 @@ class Post(Command):
                 'Exactly one of "diff_history" or "squashed_diff" must be '
                 'provided to "Post.post_request()".')
 
-        if not review_request:
+        review_request_is_new = review_request is None
+
+        if review_request_is_new:
             request_data = self._build_new_review_request_data(
                 squashed_diff=squashed_diff,
+                diff_history=diff_history,
                 submit_as=submit_as)
 
             try:
@@ -721,7 +746,9 @@ class Post(Command):
         # by the user, or configuration.
         update_fields = self._build_review_request_draft_data(
             review_request=review_request,
+            review_request_is_new=review_request_is_new,
             squashed_diff=squashed_diff,
+            diff_history=diff_history,
             draft=draft)
 
         if update_fields:
@@ -1092,7 +1119,8 @@ class Post(Command):
 
         return review_request
 
-    def _build_new_review_request_data(self, squashed_diff, submit_as):
+    def _build_new_review_request_data(self, squashed_diff, diff_history,
+                                       submit_as):
         """Return API field data to set when creating a new review request.
 
         This will set the following:
@@ -1109,6 +1137,9 @@ class Post(Command):
         Args:
             squashed_diff (SquashedDiff):
                 The squashed diff instance (if not posting with history).
+
+            diff_history (DiffHistory):
+                The diff history instance (if posting with history).
 
             submit_as (unicode):
                 The optional username that the post is being submitted as.
@@ -1136,17 +1167,17 @@ class Post(Command):
         if submit_as:
             request_data['submit_as'] = submit_as
 
-        if self.tool.can_bookmark:
-            bookmark = self.tool.get_current_bookmark()
-            request_data['extra_data__local_bookmark'] = bookmark
-        elif self.tool.can_branch:
-            branch = self.tool.get_current_branch()
-            request_data['extra_data__local_branch'] = branch
+        # Queue up a patch to set the new extra_data in the review
+        # request.
+        self._set_review_request_extra_data(
+            request_data,
+            diff_obj=squashed_diff or diff_history)
 
         return request_data
 
     def _build_review_request_draft_data(self, review_request, draft,
-                                         squashed_diff):
+                                         squashed_diff, diff_history,
+                                         review_request_is_new):
         """Return API field data to set when updating a draft.
 
         This will set the following:
@@ -1178,6 +1209,9 @@ class Post(Command):
 
             squashed_diff (SquashedDiff):
                 The squashed diff instance (if not posting with history).
+
+            diff_history (DiffHistory):
+                The diff history instance (if posting with history).
 
         Returns:
             dict:
@@ -1255,7 +1289,69 @@ class Post(Command):
                 squashed_diff.commit_id != draft.commit_id):
                 update_fields['commit_id'] = squashed_diff.commit_id or ''
 
+        # If we're updating an existing review request, queue up a patch
+        # to set the new extra_data in the review request.
+        if not review_request_is_new:
+            self._set_review_request_extra_data(
+                update_fields,
+                diff_obj=squashed_diff or diff_history)
+
         return update_fields
+
+    def _set_review_request_extra_data(self, request_data, diff_obj):
+        """Calculate and set new extra_data for a review request.
+
+        This will calculate state to store in ``extra_data`` on the review
+        request, taking into consideration some common SCM state and anything
+        set by the SCMClient during diff generation. This is applied to the
+        review request as a JSON patch on servers that support it.
+
+        On versions of Review Board prior to 3.0, we'll only set the current
+        bookmark or branch, if available for the repository.
+
+        Args:
+            request_data (dict):
+                The API request data that's being built.
+
+            diff_obj (SquashedDiff or DiffHistory):
+                The object representing the diff being posted for review.
+        """
+        tool = self.tool
+        extra_data_patch = {}
+
+        if tool.can_bookmark:
+            bookmark = tool.get_current_bookmark()
+            extra_data_patch['local_bookmark'] = bookmark
+        elif tool.can_branch:
+            branch = tool.get_current_branch()
+            extra_data_patch['local_branch'] = branch
+
+        if self.capabilities.has_capability('extra_data', 'json_patching'):
+            # JSON patching is enabled, so we can store more complex state.
+            #
+            # We'll set any keys provided by diff generation.
+            if diff_obj is not None and diff_obj.review_request_extra_data:
+                # Store any fields provided by the diff in extra_data. Note
+                # that it's up to the SCMClient implementation to determine the
+                # conditions under which a field should be set (e.g., posting a
+                # squashed vs. multi-commit review request).
+                extra_data_patch.update(diff_obj.review_request_extra_data)
+
+            if extra_data_patch:
+                request_data['extra_data_json'] = extra_data_patch
+        else:
+            # JSON patching has been around since Review Board 3. If the
+            # server doesn't support it, we just won't bother storing anything
+            # more than local_bookmark or local_branch (which we used to store
+            # on older releases, so we'll continue to do so).
+            #
+            # It's better than shoe-horning in complex types and then
+            # having to deal with that later.
+            if extra_data_patch:
+                request_data.update({
+                    'extra_data__%s' % _key: _value
+                    for _key, _value in six.iteritems(extra_data_patch)
+                })
 
     def _get_diff_history(self, extra_args):
         """Compute and return the diff history of the selected revisions.
@@ -1301,6 +1397,8 @@ class Post(Command):
             cumulative_diff=cumulative_diff_info['diff'],
             entries=history_entries,
             parent_diff=cumulative_diff_info.get('parent_diff'),
+            review_request_extra_data=cumulative_diff_info.get(
+                'review_request_extra_data'),
             validation_info=None)
 
     def _get_squashed_diff(self, extra_args):
@@ -1339,6 +1437,8 @@ class Post(Command):
             parent_diff=diff_info.get('parent_diff'),
             base_commit_id=diff_info.get('base_commit_id'),
             commit_id=diff_info.get('commit_id'),
+            review_request_extra_data=diff_info.get(
+                'review_request_extra_data'),
             changenum=changenum,
             base_dir=options.basedir or self.repository_info.base_path)
 

@@ -5,7 +5,7 @@ from __future__ import unicode_literals
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.git import GitClient
 from rbtools.commands import CommandError
-from rbtools.commands.post import Post, SquashedDiff
+from rbtools.commands.post import DiffHistory, Post, SquashedDiff
 from rbtools.testing import CommandTestsMixin, TestCase
 
 
@@ -211,6 +211,21 @@ class PostBuildNewReviewRequestDataTests(BasePostCommandTests):
             bookmark='my-bookmark',
             expected_request_data={
                 'create_with_history': True,
+                'extra_data_json': {
+                    'local_bookmark': 'my-bookmark',
+                },
+                'repository': 1,
+            })
+
+    def test_with_can_bookmark_and_no_json_patching_cap(self):
+        """Testing Post._build_new_review_request_data with
+        SCMClient.can_bookmark=True and no json_patching capability
+        """
+        self._run_test(
+            bookmark='my-bookmark',
+            cap_json_patching=False,
+            expected_request_data={
+                'create_with_history': True,
                 'extra_data__local_bookmark': 'my-bookmark',
                 'repository': 1,
             })
@@ -221,6 +236,21 @@ class PostBuildNewReviewRequestDataTests(BasePostCommandTests):
         """
         self._run_test(
             branch='my-branch',
+            expected_request_data={
+                'create_with_history': True,
+                'extra_data_json': {
+                    'local_branch': 'my-branch',
+                },
+                'repository': 1,
+            })
+
+    def test_with_can_branch_and_no_json_patching_cap(self):
+        """Testing Post._build_new_review_request_data with
+        SCMClient.can_branch=True and no json_patching capability
+        """
+        self._run_test(
+            branch='my-branch',
+            cap_json_patching=False,
             expected_request_data={
                 'create_with_history': True,
                 'extra_data__local_branch': 'my-branch',
@@ -237,7 +267,8 @@ class PostBuildNewReviewRequestDataTests(BasePostCommandTests):
                                        base_commit_id=None,
                                        base_dir=None,
                                        commit_id=None,
-                                       changenum=123),
+                                       changenum=123,
+                                       review_request_extra_data={}),
             expected_request_data={
                 'changenum': 123,
                 'repository': 1,
@@ -253,7 +284,8 @@ class PostBuildNewReviewRequestDataTests(BasePostCommandTests):
                                        base_commit_id=None,
                                        base_dir=None,
                                        commit_id='abc1234',
-                                       changenum=None),
+                                       changenum=None,
+                                       review_request_extra_data={}),
             expected_request_data={
                 'commit_id': 'abc1234',
                 'repository': 1,
@@ -270,8 +302,111 @@ class PostBuildNewReviewRequestDataTests(BasePostCommandTests):
                                        base_commit_id=None,
                                        base_dir=None,
                                        commit_id='abc1234',
-                                       changenum=None),
+                                       changenum=None,
+                                       review_request_extra_data={}),
             expected_request_data={
+                'repository': 1,
+            })
+
+    def test_with_squashed_diff_extra_data(self):
+        """Testing Post._build_new_review_request_data with squashed diff
+        containing review_request_extra_data
+        """
+        self._run_test(
+            squashed_diff=SquashedDiff(
+                diff=b'',
+                parent_diff=None,
+                base_commit_id=None,
+                base_dir=None,
+                commit_id=None,
+                changenum=None,
+                review_request_extra_data={
+                    'new_key1': 'new_value',
+                    'new_key2': {
+                        'new_subkey': [1, 2, 3],
+                    },
+                }),
+            expected_request_data={
+                'extra_data_json': {
+                    'new_key1': 'new_value',
+                    'new_key2': {
+                        'new_subkey': [1, 2, 3],
+                    },
+                },
+                'repository': 1,
+            })
+
+    def test_with_squashed_diff_extra_data_no_json_patching_cap(self):
+        """Testing Post._build_new_review_request_data with squashed diff
+        containing review_request_extra_data and no json_patching capability
+        """
+        self._run_test(
+            cap_json_patching=False,
+            squashed_diff=SquashedDiff(
+                diff=b'',
+                parent_diff=None,
+                base_commit_id=None,
+                base_dir=None,
+                commit_id=None,
+                changenum=None,
+                review_request_extra_data={
+                    'new_key1': 'new_value',
+                    'new_key2': {
+                        'new_subkey': [1, 2, 3],
+                    },
+                }),
+            expected_request_data={
+                'repository': 1,
+            })
+
+    def test_with_diff_history_extra_data(self):
+        """Testing Post._build_new_review_request_data with squashed diff
+        containing review_request_extra_data
+        """
+        self._run_test(
+            diff_history=DiffHistory(
+                entries=[],
+                parent_diff=None,
+                base_commit_id=None,
+                validation_info=None,
+                cumulative_diff=None,
+                review_request_extra_data={
+                    'new_key1': 'new_value',
+                    'new_key2': {
+                        'new_subkey': [1, 2, 3],
+                    },
+                }),
+            expected_request_data={
+                'create_with_history': True,
+                'extra_data_json': {
+                    'new_key1': 'new_value',
+                    'new_key2': {
+                        'new_subkey': [1, 2, 3],
+                    },
+                },
+                'repository': 1,
+            })
+
+    def test_with_diff_history_extra_data_no_json_patching_cap(self):
+        """Testing Post._build_new_review_request_data with squashed diff
+        containing review_request_extra_data and no json_patching capability
+        """
+        self._run_test(
+            cap_json_patching=False,
+            diff_history=DiffHistory(
+                entries=[],
+                parent_diff=None,
+                base_commit_id=None,
+                validation_info=None,
+                cumulative_diff=None,
+                review_request_extra_data={
+                    'new_key1': 'new_value',
+                    'new_key2': {
+                        'new_subkey': [1, 2, 3],
+                    },
+                }),
+            expected_request_data={
+                'create_with_history': True,
                 'repository': 1,
             })
 
@@ -286,8 +421,15 @@ class PostBuildNewReviewRequestDataTests(BasePostCommandTests):
                 'submit_as': 'some-user',
             })
 
-    def _run_test(self, expected_request_data, bookmark=None, branch=None,
-                  squashed_diff=None, submit_as=None, cap_commit_ids=True):
+    def _run_test(self,
+                  expected_request_data,
+                  bookmark=None,
+                  branch=None,
+                  squashed_diff=None,
+                  diff_history=None,
+                  submit_as=None,
+                  cap_commit_ids=True,
+                  cap_json_patching=True):
         """Run a test with the provided and expected data.
 
         Args:
@@ -300,14 +442,20 @@ class PostBuildNewReviewRequestDataTests(BasePostCommandTests):
             branch (unicode, optional):
                 An optional branch to simulate being returned by the tool.
 
-            squashed_diff (SquashedDiff, optional):
+            squashed_diff (rbtools.commands.post.SquashedDiff, optional):
                 An optional squashed diff to set.
+
+            diff_history (rbtools.commands.post.SquashedDiff, optional):
+                An optional diff history to set.
 
             submit_as (unicode, optional):
                 An optional username to simulate posting as.
 
             cap_commit_ids (bool, optional):
                 The value of the ``commit_ids`` capability to use.
+
+            cap_json_patching (bool, optional):
+                The value of the ``json_patching`` capability to use.
 
         Raises:
             AssertionError:
@@ -325,8 +473,11 @@ class PostBuildNewReviewRequestDataTests(BasePostCommandTests):
                 return branch
 
         def setup_transport(transport):
+            transport.capabilities['extra_data']['json_patching'] = \
+                cap_json_patching
             transport.capabilities['review_requests']['commit_ids'] = \
                 cap_commit_ids
+
             transport.add_repository_urls(path=repo_info.path,
                                           tool=tool.name)
 
@@ -341,6 +492,7 @@ class PostBuildNewReviewRequestDataTests(BasePostCommandTests):
 
         request_data = post._build_new_review_request_data(
             squashed_diff=squashed_diff,
+            diff_history=diff_history,
             submit_as=submit_as)
 
         self.assertEqual(request_data, expected_request_data)
@@ -488,6 +640,70 @@ class BuildReviewRequestDraftDataTests(BasePostCommandTests):
                 'changedescription_text_type': 'markdown',
             })
 
+    def test_with_can_bookmark(self):
+        """Testing Post._build_review_request_draft_data with
+        SCMClient.can_bookmark=True
+        """
+        self._run_test(
+            bookmark='my-bookmark',
+            expected_request_data={
+                'extra_data_json': {
+                    'local_bookmark': 'my-bookmark',
+                },
+            })
+
+    def test_with_can_bookmark_and_no_json_patching_cap(self):
+        """Testing Post._build_review_request_draft_data with
+        SCMClient.can_bookmark=True and no json_patching capability
+        """
+        self._run_test(
+            bookmark='my-bookmark',
+            cap_json_patching=False,
+            expected_request_data={
+                'extra_data__local_bookmark': 'my-bookmark',
+            })
+
+    def test_with_can_bookmark_and_review_request_is_new(self):
+        """Testing Post._build_review_request_draft_data with
+        SCMClient.can_bookmark=True and review request is newly-created
+        """
+        self._run_test(
+            bookmark='my-bookmark',
+            review_request_is_new=True,
+            expected_request_data={})
+
+    def test_with_can_branch(self):
+        """Testing Post._build_review_request_draft_data with
+        SCMClient.can_branch=True
+        """
+        self._run_test(
+            branch='my-branch',
+            expected_request_data={
+                'extra_data_json': {
+                    'local_branch': 'my-branch',
+                },
+            })
+
+    def test_with_can_branch_and_no_json_patching_cap(self):
+        """Testing Post._build_review_request_draft_data with
+        SCMClient.can_branch=True and no json_patching capability
+        """
+        self._run_test(
+            branch='my-branch',
+            cap_json_patching=False,
+            expected_request_data={
+                'extra_data__local_branch': 'my-branch',
+            })
+
+    def test_with_can_branch_and_review_request_is_new(self):
+        """Testing Post._build_review_request_draft_data with
+        SCMClient.can_branch=True and review request is newly-created
+        """
+        self._run_test(
+            branch='my-branch',
+            review_request_is_new=True,
+            expected_request_data={})
+
     def test_with_squashed_diff(self):
         """Testing Post._build_review_request_draft_data with squashed diff"""
         self._run_test(
@@ -496,7 +712,8 @@ class BuildReviewRequestDraftDataTests(BasePostCommandTests):
                                        base_commit_id=None,
                                        base_dir=None,
                                        commit_id=None,
-                                       changenum=None),
+                                       changenum=None,
+                                       review_request_extra_data={}),
             expected_request_data={})
 
     def test_with_squashed_diff_and_commit_id(self):
@@ -509,7 +726,8 @@ class BuildReviewRequestDraftDataTests(BasePostCommandTests):
                                        base_commit_id=None,
                                        base_dir=None,
                                        commit_id='abc123',
-                                       changenum=None),
+                                       changenum=None,
+                                       review_request_extra_data={}),
             expected_request_data={
                 'commit_id': 'abc123',
             })
@@ -526,7 +744,8 @@ class BuildReviewRequestDraftDataTests(BasePostCommandTests):
                                        base_commit_id=None,
                                        base_dir=None,
                                        commit_id='def456',
-                                       changenum=None),
+                                       changenum=None,
+                                       review_request_extra_data={}),
             expected_request_data={})
 
     def test_with_squashed_diff_and_commit_id_no_cap(self):
@@ -540,7 +759,145 @@ class BuildReviewRequestDraftDataTests(BasePostCommandTests):
                                        base_commit_id=None,
                                        base_dir=None,
                                        commit_id='abc123',
-                                       changenum=None),
+                                       changenum=None,
+                                       review_request_extra_data={}),
+            expected_request_data={})
+
+    def test_with_squashed_diff_extra_data(self):
+        """Testing Post._build_review_request_draft_data with squashed diff
+        containing review_request_extra_data
+        """
+        self._run_test(
+            squashed_diff=SquashedDiff(
+                diff=b'',
+                parent_diff=None,
+                base_commit_id=None,
+                base_dir=None,
+                commit_id=None,
+                changenum=None,
+                review_request_extra_data={
+                    'new_key1': 'new_value',
+                    'new_key2': {
+                        'new_subkey': [1, 2, 3],
+                    },
+                }),
+            expected_request_data={
+                'extra_data_json': {
+                    'new_key1': 'new_value',
+                    'new_key2': {
+                        'new_subkey': [1, 2, 3],
+                    },
+                },
+            })
+
+    def test_with_squashed_diff_extra_data_no_json_patching_cap(self):
+        """Testing Post._build_review_request_draft_data with squashed diff
+        containing review_request_extra_data and no json_patching capability
+        """
+        self._run_test(
+            cap_json_patching=False,
+            squashed_diff=SquashedDiff(
+                diff=b'',
+                parent_diff=None,
+                base_commit_id=None,
+                base_dir=None,
+                commit_id=None,
+                changenum=None,
+                review_request_extra_data={
+                    'new_key1': 'new_value',
+                    'new_key2': {
+                        'new_subkey': [1, 2, 3],
+                    },
+                }),
+            expected_request_data={})
+
+    def test_with_squashed_diff_extra_data_and_review_requst_is_new(self):
+        """Testing Post._build_review_request_draft_data with squashed diff
+        containing review_request_extra_data and review request is
+        newly-created
+        """
+        self._run_test(
+            review_request_is_new=True,
+            squashed_diff=SquashedDiff(
+                diff=b'',
+                parent_diff=None,
+                base_commit_id=None,
+                base_dir=None,
+                commit_id=None,
+                changenum=None,
+                review_request_extra_data={
+                    'new_key1': 'new_value',
+                    'new_key2': {
+                        'new_subkey': [1, 2, 3],
+                    },
+                }),
+            expected_request_data={})
+
+    def test_with_diff_history_extra_data(self):
+        """Testing Post._build_review_request_draft_data with squashed diff
+        containing review_request_extra_data
+        """
+        self._run_test(
+            diff_history=DiffHistory(
+                entries=[],
+                parent_diff=None,
+                base_commit_id=None,
+                validation_info=None,
+                cumulative_diff=None,
+                review_request_extra_data={
+                    'new_key1': 'new_value',
+                    'new_key2': {
+                        'new_subkey': [1, 2, 3],
+                    },
+                }),
+            expected_request_data={
+                'extra_data_json': {
+                    'new_key1': 'new_value',
+                    'new_key2': {
+                        'new_subkey': [1, 2, 3],
+                    },
+                },
+            })
+
+    def test_with_diff_history_extra_data_no_json_patching_cap(self):
+        """Testing Post._build_review_request_draft_data with squashed diff
+        containing review_request_extra_data and no json_patching capability
+        """
+        self._run_test(
+            cap_json_patching=False,
+            diff_history=DiffHistory(
+                entries=[],
+                parent_diff=None,
+                base_commit_id=None,
+                validation_info=None,
+                cumulative_diff=None,
+                review_request_extra_data={
+                    'new_key1': 'new_value',
+                    'new_key2': {
+                        'new_subkey': [1, 2, 3],
+                    },
+                }),
+            expected_request_data={})
+
+    def test_with_diff_history_extra_data_and_review_requst_is_new(self):
+        """Testing Post._build_review_request_draft_data with squashed diff
+        containing review_request_extra_data and review request is
+        newly-created
+        """
+        self._run_test(
+            review_request_is_new=True,
+            diff_history=DiffHistory(
+                entries=[],
+                parent_diff=None,
+                base_commit_id=None,
+                validation_info=None,
+                cumulative_diff=None,
+                review_request_extra_data={
+                    'new_key1': 'new_value',
+                    'new_key2': {
+                        'new_subkey': [1, 2, 3],
+                    },
+                }),
             expected_request_data={})
 
     def test_with_guess_no(self):
@@ -909,9 +1266,18 @@ class BuildReviewRequestDraftDataTests(BasePostCommandTests):
             },
             expected_request_data={})
 
-    def _run_test(self, expected_request_data, args=[], squashed_diff=None,
-                  draft_commit_id=None, commit_message=None,
-                  cap_trivial_publish=True, cap_commit_ids=True):
+    def _run_test(self,
+                  expected_request_data,
+                  args=[],
+                  squashed_diff=None,
+                  diff_history=None,
+                  draft_commit_id=None,
+                  review_request_is_new=False,
+                  bookmark=None, branch=None,
+                  commit_message=None,
+                  cap_trivial_publish=True,
+                  cap_commit_ids=True,
+                  cap_json_patching=True):
         """Run a test with the provided and expected data.
 
         Args:
@@ -921,11 +1287,24 @@ class BuildReviewRequestDraftDataTests(BasePostCommandTests):
             args (list of unicode):
                 Arguments to pass to the command.
 
-            squashed_diff (SquashedDiff, optional):
+            squashed_diff (rbtools.commands.post.SquashedDiff, optional):
                 An optional squashed diff to set.
+
+            diff_history (rbtools.commands.post.SquashedDiff, optional):
+                An optional diff history to set.
 
             draft_commit_id (unicode, optional):
                 An optional commit ID to set.
+
+            review_request_is_new (bool, optional):
+                Whether to simulate that the review request has just been
+                created.
+
+            bookmark (unicode, optional):
+                An optional bookmark to simulate being returned by the tool.
+
+            branch (unicode, optional):
+                An optional branch to simulate being returned by the tool.
 
             commit_message (dict, optional):
                 An optional commit message result dictionary.
@@ -936,17 +1315,30 @@ class BuildReviewRequestDraftDataTests(BasePostCommandTests):
             cap_commit_ids (bool, optional):
                 The value of the ``commit_ids`` capability to use.
 
+            cap_json_patching (bool, optional):
+                The value of the ``json_patching`` capability to use.
+
         Raises:
             AssertionError:
                 An expectation failed.
         """
         class MyTool(GitClient):
             name = 'my-tool'
+            can_bookmark = (bookmark is not None)
+            can_branch = (branch is not None)
+
+            def get_current_bookmark(self):
+                return bookmark
+
+            def get_current_branch(self):
+                return branch
 
             def get_commit_message(self, revisions):
                 return commit_message
 
         def setup_transport(transport):
+            transport.capabilities['extra_data']['json_patching'] = \
+                cap_json_patching
             transport.capabilities['review_requests'].update({
                 'commit_ids': cap_commit_ids,
                 'trivial_publish': cap_trivial_publish,
@@ -981,9 +1373,11 @@ class BuildReviewRequestDraftDataTests(BasePostCommandTests):
         api_root = post.api_root
 
         request_data = post._build_review_request_draft_data(
+            review_request_is_new=review_request_is_new,
             review_request=api_root.get_review_request(
                 review_request_id=review_request_id),
             draft=api_root.get_draft(review_request_id=review_request_id),
-            squashed_diff=squashed_diff)
+            squashed_diff=squashed_diff,
+            diff_history=diff_history)
 
         self.assertEqual(request_data, expected_request_data)

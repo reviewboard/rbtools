@@ -422,27 +422,45 @@ class SCMClient(object):
 
         Returns:
             dict:
-            A dictionary containing the following keys:
+            A dictionary containing:
 
-            ``diff`` (:py:class:`bytes`):
-                The contents of the diff to upload.
+            Keys:
+                diff (bytes):
+                    The contents of the diff to upload.
 
-            ``parent_diff`` (:py:class:`bytes`, optional):
-                The contents of the parent diff, if available.
+                parent_diff (bytes, optional):
+                    The contents of the parent diff, if available.
 
-            ``commit_id`` (:py:class:`unicode`, optional):
-                The commit ID to include when posting, if available.
+                commit_id (unicode, optional):
+                    The commit ID to include when posting, if available.
 
-            ``base_commit_id` (:py:class:`unicode`, optional):
-                The ID of the commit that the change is based on, if available.
-                This is necessary for some hosting services that don't provide
-                individual file access.
+                base_commit_id (unicode, optional):
+                    The ID of the commit that the change is based on, if
+                    available.  This is necessary for some hosting services
+                    that don't provide individual file access.
+
+                review_request_extra_data (dict, optional):
+                    A dictionary of ``extra_data`` keys to set on the review
+                    request (when posting to Review Board 3.0 or higher).
+
+                    If posting a brand-new review request, this will set the
+                    fields on the review request itself.
+
+                    If updating a review request, this will set them on the
+                    draft.
+
+                    This may contain structured data. It will be sent to the
+                    server as part of a JSON Merge Patch.
+
+                    Version Added:
+                        3.1
         """
         return {
             'diff': None,
             'parent_diff': None,
             'commit_id': None,
             'base_commit_id': None,
+            'review_request_extra_data': None,
         }
 
     def get_commit_history(self, revisions):
