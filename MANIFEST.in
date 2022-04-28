@@ -1,6 +1,7 @@
 recursive-include contrib *.py *.txt README*
 recursive-include rbtools/commands *
 include ez_setup.py
+include pytest.ini
 include AUTHORS
 include COPYING
 include INSTALL
