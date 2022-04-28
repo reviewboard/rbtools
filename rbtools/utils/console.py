@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 
-from distutils.util import strtobool
+import six
 from six.moves import input
 
 from rbtools.utils.encoding import force_unicode
@@ -17,8 +17,16 @@ from rbtools.utils.filesystem import make_tempfile
 logger = logging.getLogger(__name__)
 
 
-def get_input(prompt, require=False):
+def get_input(prompt, require=False, stderr=sys.stderr, stdin=sys.stdin):
     """Ask the user for input.
+
+    Version Changed:
+        3.1:
+        ``stdout`` and ``stderr` streams are now supported. This can now be
+        used with a non-TTY input stream.
+
+    If ``stdin`` is not a TTY, this will read lines of input until it
+    receives a valid answer.
 
     Args:
         prompt (unicode):
@@ -27,6 +35,18 @@ def get_input(prompt, require=False):
         require (bool, optional):
             Whether to require a result. If ``True``, this will keep prompting
             until a non-empty value is entered.
+
+        stderr (io.TextIOWrapper or file, optional):
+            The error stream to use for the prompt.
+
+            Version Added:
+                3.1
+
+        stdin (io.TextIOWrapper or file, optional):
+            The input stream to use.
+
+            Version Added:
+                3.1
 
     Returns:
         unicode:
@@ -38,10 +58,16 @@ def get_input(prompt, require=False):
         # this is often paired with getpass (entering a username/password
         # combination), we mimic the behavior there, writing the prompt to
         # stderr.
-        sys.stderr.write(prompt)
-        return input()
+        stderr.write(prompt)
 
-    prompt = str(prompt)
+        if hasattr(stdin, 'isatty') and stdin.isatty():
+            result = input()
+        else:
+            result = stdin.readline().rstrip()
+
+        return result
+
+    prompt = six.text_type(prompt)
 
     if require:
         value = None
@@ -54,8 +80,16 @@ def get_input(prompt, require=False):
     return value
 
 
-def get_pass(prompt, require=False):
+def get_pass(prompt, require=False, stderr=sys.stderr, stdin=sys.stdin):
     """Ask the user for a password.
+
+    Version Changed:
+        3.1:
+        ``stdout`` and ``stderr` streams are now supported. This can now be
+        used with a non-TTY input stream.
+
+    If ``stdin`` is not a TTY, this will read lines of input until it
+    receives a valid answer.
 
     Args:
         prompt (unicode):
@@ -65,44 +99,113 @@ def get_pass(prompt, require=False):
             Whether to require a result. If ``True``, this will keep prompting
             until a non-empty value is entered.
 
+        stderr (io.TextIOWrapper or file, optional):
+            The error stream to use for the prompt.
+
+            Version Added:
+                3.1
+
+        stdin (io.TextIOWrapper or file, optional):
+            The input stream to use.
+
+            Version Added:
+                3.1
+
     Returns:
         bytes:
         The entered password.
     """
-    prompt = str(prompt)
+    def _get_pass(prompt):
+        if hasattr(stdin, 'isatty') and stdin.isatty():
+            result = getpass.getpass(prompt)
+        else:
+            stderr.write(prompt)
+            result = stdin.readline()
+
+        return result.strip()
+
+    prompt = six.text_type(prompt)
 
     if require:
         password = None
 
         while not password:
-            password = getpass.getpass(prompt)
+            password = _get_pass(prompt)
     else:
-        password = getpass.getpass(prompt)
+        password = _get_pass(prompt)
 
     return password
 
 
-def confirm(question):
+def confirm(question, stderr=sys.stderr, stdin=sys.stdin):
     """Interactively prompt for a Yes/No answer.
 
-    Accepted values (case-insensitive) depend on distutils.util.strtobool():
-    'Yes' values: y, yes, t, true, on, 1
-    'No' values: n, no , f, false, off, 0
+    This requires a Yes or a No answer. These are case-insensitive.
+
+    Valid Yes answers include: ``y``, ``yes``, ``t``, ``true``, ``on``, ``1``.
+
+    Valid No answers include: ``n``, ``no``, ``f``, ``false``, ``off``, ``0``.
+
+    If ``stdin`` is not a TTY, this will read lines of input until it
+    receives a valid answer.
+
+    Version Changed:
+        3.1:
+        ``stdout`` and ``stderr` streams are now supported. This can now be
+        used with a non-TTY input stream.
+
+    Args:
+        question (unicode):
+            The question to ask.
+
+        stderr (io.TextIOWrapper or file, optional):
+            The error stream to use for the prompt.
+
+            Version Added:
+                3.1
+
+        stdin (io.TextIOWrapper or file, optional):
+            The input stream to use.
+
+            Version Added:
+                3.1
+
+    Returns:
+        bool:
+        The confirmed value.
     """
+    valid_yes = ('yes', 'y', 'true', 't', 'on', '1')
+    valid_no = ('no', 'n', 'false', 'f', 'off', '0')
+
+    full_question = '%s [Yes/No]: ' % question
+
     while True:
-        full_question = '%s [Yes/No]: ' % question
-        answer = get_input(full_question).lower()
-        try:
-            return strtobool(answer)
-        except ValueError:
-            print('%s is not a valid answer.' % answer)
+        answer = get_input(full_question,
+                           stderr=stderr,
+                           stdin=stdin).lower()
+
+        if answer in valid_yes:
+            return True
+        elif answer in valid_no:
+            return False
+        else:
+            stderr.write('"%s" is not a valid answer.\n' % answer)
 
 
-def confirm_select(question, options_length):
+def confirm_select(question, options_length, stderr=sys.stderr,
+                   stdin=sys.stdin):
     """Interactively prompt for a specific answer from a list of options.
 
     Accepted answers are integers starting from 1 until an integer n
     representing the nth of element within options.
+
+    If ``stdin`` is not a TTY, this will read lines of input until it
+    receives a valid answer.
+
+    Version Changed:
+        3.1:
+        ``stdout`` and ``stderr` streams are now supported. This can now be
+        used with a non-TTY input stream.
 
     Args:
         question (unicode):
@@ -112,13 +215,27 @@ def confirm_select(question, options_length):
             The number of available options that the user can choose a
             response from.
 
+        stderr (io.TextIOWrapper or file, optional):
+            The error stream to use for the prompt.
+
+            Version Added:
+                3.1
+
+        stdin (io.TextIOWrapper or file, optional):
+            The input stream to use.
+
+            Version Added:
+                3.1
+
     Returns:
         unicode:
         The user's chosen response. If the user decides to cancel the
         prompt, None is returned.
     """
     while True:
-        answer = get_input('%s [1-%i]: ' % (question, options_length))
+        answer = get_input('%s [1-%i]: ' % (question, options_length),
+                           stderr=stderr,
+                           stdin=stdin)
 
         try:
             int_answer = int(answer)
@@ -128,7 +245,7 @@ def confirm_select(question, options_length):
 
             raise ValueError
         except ValueError:
-            print('%s is not a valid answer.' % answer)
+            stderr.write('"%s" is not a valid answer.\n' % answer)
 
 
 def edit_file(filename):
