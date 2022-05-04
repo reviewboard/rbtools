@@ -92,6 +92,7 @@ scm_clients = [
     'mercurial = rbtools.clients.mercurial:MercurialClient',
     'perforce = rbtools.clients.perforce:PerforceClient',
     'plastic = rbtools.clients.plastic:PlasticClient',
+    'sos = rbtools.clients.sos:SOSClient',
     'svn = rbtools.clients.svn:SVNClient',
     'tfs = rbtools.clients.tfs:TFSClient',
 ]
@@ -124,7 +125,7 @@ setup(
     },
     install_requires=[
         'backports.shutil_get_terminal_size; python_version<"3.0"',
-        'pydiffx',
+        'pydiffx>=1.0.1,<=1.999',
         'setuptools',
         'six>=1.8.0',
 
