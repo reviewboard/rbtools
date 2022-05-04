@@ -82,6 +82,8 @@ class ResourcePayloadFactory(object):
        * :py:meth:`make_review_request_draft_object_data`
        * :py:meth:`make_review_request_object_data`
        * :py:meth:`make_root_object_data`
+       * :py:meth:`make_session_object_data`
+       * :py:meth:`make_user_object_data`
 
     Whenever unit tests need to generate a type of payload not provided in
     this factory, they should add a suitable function to the factory rather
@@ -915,6 +917,125 @@ class ResourcePayloadFactory(object):
                 'testing_done': testing_done,
                 'testing_done_text_type': testing_done_text_type,
                 'text_type': text_type,
+            },
+            'url': url,
+        }
+
+    def make_session_object_data(self, authenticated=True,
+                                 username='test-user'):
+        """Return new session resource data.
+
+        Args:
+            authenticated (bool, optional):
+                Whether this should be an authenticated session.
+
+            username (unicode, optional):
+                The current username, if authenticated.
+
+        Returns:
+            dict:
+            The resource payload and metadata. See the class documentation
+            for details.
+        """
+        url = self._make_api_url('session/')
+
+        links = self._make_item_links(url=url)
+
+        if authenticated:
+            assert username
+
+            links['user'] = {
+                'href': self._make_api_url('users/%s/' % username),
+                'method': 'GET',
+                'title': username,
+            }
+
+        return {
+            'item_key': 'session',
+            'mimetype': self.make_mimetype('session'),
+            'payload': {
+                'authenticated': authenticated,
+                'links': links,
+            },
+            'url': url,
+        }
+
+    def make_user_object_data(self,
+                              user_id=1,
+                              username='test-user',
+                              email='test-user@example.com',
+                              first_name='Test',
+                              last_name='User',
+                              is_active=True,
+                              avatar_html=None,
+                              avatar_urls={}):
+        """Return new user resource data.
+
+        Args:
+            user_id (int, optional):
+                The ID of the user.
+
+            username (unicode, optional):
+                The value of the ``username`` field.
+
+            email (unicode, optional):
+                The value of the ``email`` field.
+
+            first_name (unicode, optional):
+                The value of the ``first_name`` field.
+
+                This also affects the ``fullname`` field.
+
+            last_name (unicode, optional):
+                The value of the ``last_name`` field.
+
+                This also affects the ``fullname`` field.
+
+            is_active (bool, optional):
+                The value of the ``is_active`` field.
+
+            avatar_html (unicode, optional):
+                The value of the ``avatar_html`` field.
+
+            avatar_urls (dict, optional):
+                The value of the ``avatar_urls`` field.
+
+                If set, and if it contains a ``1x`` key, this will also
+                affect the ``avatar_url`` field.
+
+        Returns:
+            dict:
+            The resource payload and metadata. See the class documentation
+            for details.
+        """
+        url = self._make_api_url('users/%s/' % username)
+
+        links = self._make_item_links(
+            url=url,
+            child_resource_names=[
+                'api_tokens',
+                'archived_review_requests',
+                'muted_review_requests',
+                'user_file_attachments',
+                'watched',
+            ])
+
+        return {
+            'item_key': 'user',
+            'mimetype': self.make_mimetype('user'),
+            'payload': {
+                'avatar_html': avatar_html,
+                'avatar_url': avatar_urls.get('1x'),
+                'avatar_urls': avatar_urls,
+                'email': email,
+                'first_name': first_name,
+                'fullname': '%s %s' % (first_name, last_name),
+                'id': user_id,
+                'is_active': is_active,
+                'last_name': last_name,
+                'links': links,
+                'url': '/users/%s/' % username,
+                'username': username,
             },
             'url': url,
         }

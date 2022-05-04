@@ -213,6 +213,12 @@ class URLMapTransport(Transport):
             mimetype=payload_factory.make_mimetype('review-requests'),
             item_mimetype=payload_factory.make_mimetype('review-request'))
 
+        self.add_list_url(
+            url='/api/users/',
+            list_key='users',
+            mimetype=payload_factory.make_mimetype('users'),
+            item_mimetype=payload_factory.make_mimetype('users'))
+
         # Pull out the capabilities for clients to easily set in tests.
         self.capabilities = root_payload['capabilities']
 
@@ -545,6 +551,46 @@ class URLMapTransport(Transport):
             **kwargs)
 
         return self.add_item_url(**obj_data)
+
+    def add_session_url(self, **kwargs):
+        """Add URLs for a user session.
+
+        Args:
+            **kwargs (dict):
+                Keyword arguments for the session payload. See
+                :py:meth:`rbtools.testing.api.payloads.PayloadFactory.
+                make_session_object_data` for details.
+
+        Returns:
+            dict:
+            The results of the add operation, for further tracking or
+            processing. See the return type for :py:meth:`add_url` for
+            details.
+        """
+        obj_data = self.payload_factory.make_session_object_data(**kwargs)
+
+        return self.add_item_url(**obj_data)
+
+    def add_user_url(self, **kwargs):
+        """Add URLs for a user resource.
+
+        Args:
+            **kwargs (dict):
+                Keyword arguments for the user payload. See
+                :py:meth:`rbtools.testing.api.payloads.PayloadFactory.
+                make_user_object_data` for details.
+
+        Returns:
+            dict:
+            The results of the add operation, for further tracking or
+            processing. See the return type for :py:meth:`add_url` for
+            details.
+        """
+        obj_data = self.payload_factory.make_user_object_data(**kwargs)
+
+        return self.add_item_url(
+            in_list_urls=['/api/users/'],
+            **obj_data)
 
     def get_root(self):
         """Perform a simulated HTTP GET on the root API.
