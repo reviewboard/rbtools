@@ -9,6 +9,22 @@ from __future__ import unicode_literals
 from copy import deepcopy
 
 
+class LinkExpansionType(object):
+    """A type of link expansion.
+
+    This helps to indicate if a link should expand as an item or a list.
+
+    Version Added:
+        3.1
+    """
+
+    #: Always expand links as lists.
+    LIST = 1
+
+    #: Expand links as individual items (if contents are not a list).
+    ITEM = 2
+
+
 class ResourcePayloadFactory(object):
     """Factory for creating simulated API payloads for testing.
 
@@ -138,6 +154,41 @@ class ResourcePayloadFactory(object):
 
         self.server_url = server_url
         self.root_api_url = '%sapi/' % server_url
+
+    def expand_link(self, payload, link_key, expanded_payload,
+                    expand_key=None, expansion_type=None):
+        """Expand a link in the payload.
+
+        This will remove the link from ``links`` and add the provided expanded
+        payload to the object payload.
+
+        Args:
+            payload (dict):
+                The payload where the epanded resource will be provided, and
+                where ``links`` resides.
+
+            link_key (unicode):
+                The name of the link key.
+
+            expanded_payload (dict or list of dict):
+                The payload or list of payloads to put in the object payload
+                under the key.
+
+            expand_key (unicode, optional):
+                The key to use for the expanded payloads. If not provided,
+                this defaults to the value of ``link_key``.
+        """
+        assert 'links' in payload
+        assert link_key in payload['links']
+
+        if expansion_type == LinkExpansionType.LIST:
+            if expanded_payload is None:
+                expanded_payload = []
+            elif not isinstance(expanded_payload, list):
+                expanded_payload = [expanded_payload]
+
+        del payload['links'][link_key]
+        payload[expand_key or link_key] = expanded_payload
 
     def make_mimetype(self, name, payload_format='json'):
         """Return a mimetype for a resource.

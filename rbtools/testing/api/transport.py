@@ -10,13 +10,14 @@ import json
 import logging
 from collections import defaultdict
 
-from six.moves.urllib.parse import urljoin, urlparse
+from six.moves.urllib.parse import parse_qs, urljoin, urlparse
 
 from rbtools.api.errors import create_api_error
 from rbtools.api.factory import create_resource
 from rbtools.api.request import HttpRequest
 from rbtools.api.transport import Transport
-from rbtools.testing.api.payloads import ResourcePayloadFactory
+from rbtools.testing.api.payloads import (LinkExpansionType,
+                                          ResourcePayloadFactory)
 
 
 logger = logging.getLogger(__name__)
@@ -220,7 +221,8 @@ class URLMapTransport(Transport):
             self.login(username, password)
 
     def add_url(self, url, mimetype, method='GET', http_status=200,
-                headers={}, payload={}):
+                headers={}, payload={}, link_expansion_types={},
+                extra_node_state={}):
         """Add a URL mapping to a payload.
 
         Args:
@@ -235,15 +237,23 @@ class URLMapTransport(Transport):
             method (unicode, optional):
                 The HTTP method that the payload will map to.
 
-            http_status (int, optional):
+            http_status (int, optional, optional):
                 The HTTP status code of the response.
 
-            headers (dict, optional):
+            headers (dict, optional, optional):
                 Any custom headers to provide in the response.
 
-            payload (dict or bytes):
+            payload (dict or bytes, optional):
                 The payload data. This can be a dictionary of deserialized
                 API results, or it can be a byte string of content.
+
+            link_expansion_types (dict, optional):
+                A mapping of links to :py:class:`rbtools.testing.api.payloads.
+                LinkExpansionType` values to help determine how to expand
+                links.
+
+            extra_node_state (dict, optional):
+                Extra state to store along with the registered URL node.
 
         Responses:
             dict:
@@ -262,13 +272,14 @@ class URLMapTransport(Transport):
                     for modification.
         """
         url = self._normalize_api_url(url)
-        node = {
-            'http_status': http_status,
+        node = dict({
             'headers': dict({
                 'Content-Type': mimetype,
             }, **headers),
+            'http_status': http_status,
+            'link_expansion_types': link_expansion_types,
             'payload': payload,
-        }
+        }, **extra_node_state)
 
         self.urls.setdefault(url, {})[method] = node
 
@@ -279,7 +290,7 @@ class URLMapTransport(Transport):
         }
 
     def add_item_url(self, url, payload, item_key=None, in_list_urls=[],
-                     **kwargs):
+                     link_expansion_types={}, **kwargs):
         """Add a URL for an item or singleton resource.
 
         Args:
@@ -300,6 +311,11 @@ class URLMapTransport(Transport):
                 Any URLs for list resources that should contain this item
                 in list responses.
 
+            link_expansion_types (dict, optional):
+                A mapping of links to :py:class:`rbtools.testing.api.payloads.
+                LinkExpansionType` values to help determine how to expand
+                links.
+
             **kwargs (dict):
                 Additional keyword arguments for the registration. See
                 :py:meth:`add_url` for details.
@@ -314,12 +330,19 @@ class URLMapTransport(Transport):
             item_key=item_key,
             object_payload=payload)
 
-        url_info = self.add_url(url=url,
-                                payload=response_payload,
-                                **kwargs)
+        url_info = self.add_url(
+            url=url,
+            payload=response_payload,
+            link_expansion_types=link_expansion_types,
+            extra_node_state={
+                'item_key': item_key,
+            },
+            **kwargs)
 
         for list_url in in_list_urls:
             self.list_item_payloads[list_url].append(payload)
+            self.urls[list_url]['GET']['link_expansion_types'] = \
+                link_expansion_types
 
         return url_info
 
@@ -364,6 +387,9 @@ class URLMapTransport(Transport):
             headers=dict({
                 'Item-Content-Type': item_mimetype,
             }, **headers),
+            extra_node_state={
+                'list_key': list_key,
+            },
             **kwargs)
 
     def add_error_url(self, url, error_code, error_message, payload_extra=None,
@@ -493,6 +519,9 @@ class URLMapTransport(Transport):
 
         return self.add_item_url(
             in_list_urls=['/api/review-requests/'],
+            link_expansion_types={
+                'draft': LinkExpansionType.LIST,
+            },
             **obj_data)
 
     def add_review_request_draft_url(self, **kwargs):
@@ -564,7 +593,7 @@ class URLMapTransport(Transport):
             rbtools.api.resource.Resource or rbtools.api.errors.APIError:
             The resulting resource or error.
         """
-        assert url.endswith('/'), (
+        assert urlparse(url).path.endswith('/'), (
             'The URL "%s" must be built to end with a trailing "/"' % url
         )
 
@@ -680,11 +709,13 @@ class URLMapTransport(Transport):
         }
         self.api_calls.append(api_call)
 
+        parsed_url = urlparse(path)
+
         try:
             url_info = self.urls[path]
         except KeyError:
             try:
-                url_info = self.urls[urlparse(path).path]
+                url_info = self.urls[parsed_url.path]
             except KeyError:
                 raise AssertionError(
                     'URL "%s" was not defined in the transport!'
@@ -720,6 +751,25 @@ class URLMapTransport(Transport):
             if method == 'DELETE':
                 return None
 
+            expand = parse_qs(parsed_url.query).get('expand')
+
+            if expand and expand[0]:
+                # Expand any referenced links.
+                #
+                # We don't know exactly where these live, so walk the tree
+                # looking for them.
+                expand_keys = set(expand[0].split(','))
+
+                item_key = method_info.get('item_key')
+                list_key = method_info.get('list_key')
+                link_expansion_types = \
+                    method_info.get('link_expansion_types', {})
+
+                self._expand_links(payload=payload,
+                                   key=item_key or list_key,
+                                   expand_keys=expand_keys,
+                                   link_expansion_types=link_expansion_types)
+
             return create_resource(transport=self,
                                    payload=payload,
                                    url=urljoin(self.url, path),
@@ -745,6 +795,146 @@ class URLMapTransport(Transport):
                 message = payload
 
             raise create_api_error(http_status, error_code, rsp, message)
+
+    def _expand_links(self, payload, expand_keys, link_expansion_types,
+                      key=None):
+        """Expand links in a payload.
+
+        This will handle expanding links in a payload, an item within a
+        payload, or within a list of payloads.
+
+        Args:
+            payload (list or dict):
+                The payload or list of payloads in which to expand links.
+
+            expand_keys (list of unicode):
+                A list of keys to expand.
+
+            link_expansion_types (dict):
+                A dictionary mapping keys to forced link expansion types
+                (values in :py:class:`~rbtools.testing.api.payloads.
+                LinkExpansionType`).
+
+            key (unicode, optional):
+                The key within ``payload`` where expansion should start.
+        """
+        if key:
+            payload = payload[key]
+
+        if isinstance(payload, list):
+            for item_payload in payload:
+                self._expand_item_links(
+                    item_payload=item_payload,
+                    expand_keys=expand_keys,
+                    link_expansion_types=link_expansion_types)
+        elif isinstance(payload, dict):
+            self._expand_item_links(item_payload=payload,
+                                    expand_keys=expand_keys,
+                                    link_expansion_types=link_expansion_types)
+
+    def _expand_item_links(self, item_payload, expand_keys,
+                           link_expansion_types):
+        """Expand links within an item payload.
+
+        This will recurse into any expanded payloads as well.
+
+        Keys not found in links will be skipped. However, to expand a link,
+        the URL must be registered first.
+
+        Args:
+            item_payload (dict):
+                The item payload. This must contain a ``links`` key.
+
+            expand_keys (list of unicode):
+                A list of keys to expand.
+
+            link_expansion_types (dict):
+                A dictionary mapping keys to forced link expansion types
+                (values in :py:class:`~rbtools.testing.api.payloads.
+                LinkExpansionType`).
+
+        Raises:
+            AssertionError:
+                The URL for an expanded link was not registered.
+        """
+        links = item_payload['links']
+
+        for expand_key in expand_keys:
+            try:
+                link_info = links[expand_key]
+            except KeyError:
+                continue
+
+            url = self._normalize_api_url(link_info['href'])
+            method = link_info['method']
+
+            # See if a URL exists for this. If not, it'll expand to an
+            # empty payload.
+            try:
+                expand_url_info = self.urls[url][method]
+            except KeyError:
+                expand_url_info = {}
+
+            # If we do have information on this, find out what result key
+            # we should expect within the payload, and what type of result
+            # this is.
+            expanded_result_key = None
+            expansion_type = None
+
+            if expand_url_info:
+                try:
+                    expanded_result_key = expand_url_info['item_key']
+                    expansion_type = LinkExpansionType.ITEM
+                except KeyError:
+                    try:
+                        expanded_result_key = expand_url_info['list_key']
+                        expansion_type = LinkExpansionType.LIST
+                    except KeyError:
+                        expanded_result_key = None
+
+                # Require HTTP 200 for valid payloads. A 404 will result in
+                # an empty payload.
+                http_status = expand_url_info['http_status']
+
+                if http_status == 200:
+                    expanded_payload = expand_url_info['payload']
+
+                    if expanded_result_key:
+                        expanded_payload = \
+                            expanded_payload[expanded_result_key]
+                elif http_status == 404:
+                    expanded_payload = None
+                else:
+                    raise AssertionError(
+                        'Cannot expand link "%s": The expanded resource URL '
+                        '"%s" for method "%s" has http_status=%s, which '
+                        'cannot be expanded!'
+                        % (expand_key, url, method, http_status))
+            else:
+                # The URL was not registered. Treat this like a 404, and
+                # set an empty result.
+                expanded_payload = None
+
+            # See if the URL overrides the expansion type for this link.
+            try:
+                expansion_type = link_expansion_types[expand_key]
+            except KeyError:
+                # There's no custom expansion type registered. Use our
+                # default above.
+                pass
+
+            self.payload_factory.expand_link(
+                payload=item_payload,
+                link_key=expand_key,
+                expanded_payload=expanded_payload,
+                expansion_type=expansion_type)
+
+            # Recurse into the links for the expanded resource.
+            self._expand_links(
+                payload=expanded_payload,
+                expand_keys=expand_keys,
+                link_expansion_types=expand_url_info.get(
+                    'link_expansion_types', {}))
 
     def _normalize_api_url(self, url):
         """Return a normalized version of the given URL.
