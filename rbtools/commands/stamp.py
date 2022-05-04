@@ -8,6 +8,7 @@ from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option, OptionGroup
 from rbtools.utils.commands import stamp_commit_with_review_url
 from rbtools.utils.console import confirm
+from rbtools.utils.errors import MatchReviewRequestsError
 from rbtools.utils.review_request import (find_review_request_by_change_id,
                                           get_draft_or_current_value,
                                           get_revisions,
@@ -109,12 +110,11 @@ class Stamp(Command):
                 api_client=self.api_client,
                 tool=self.tool,
                 revisions=revisions,
-                guess_summary=False,
-                guess_description=False,
+                commit_id=revisions.get('commit_id'),
                 is_fuzzy_match_func=self._ask_review_request_match,
                 no_commit_error=self.no_commit_error,
                 repository_id=self.repository.id)
-        except ValueError as e:
+        except MatchReviewRequestsError as e:
             raise CommandError(six.text_type(e))
 
         if review_request:

@@ -10,6 +10,7 @@ from rbtools.commands import Command, CommandError, Option, RB_MAIN
 from rbtools.utils.commands import (build_rbtools_cmd_argv,
                                     extract_commit_message)
 from rbtools.utils.console import confirm
+from rbtools.utils.errors import MatchReviewRequestsError
 from rbtools.utils.graphs import toposort
 from rbtools.utils.process import execute
 from rbtools.utils.review_request import (get_draft_or_current_value,
@@ -333,16 +334,17 @@ class Land(Command):
             review_request_id = self.options.rid
         else:
             try:
+                revisions = get_revisions(self.tool, self.cmd_args)
+
                 review_request = guess_existing_review_request(
                     api_root=self.api_root,
                     api_client=self.api_client,
                     tool=self.tool,
-                    revisions=get_revisions(self.tool, self.cmd_args),
-                    guess_summary=False,
-                    guess_description=False,
+                    revisions=revisions,
+                    commit_id=revisions.get('commit_id'),
                     is_fuzzy_match_func=self._ask_review_request_match,
                     repository_id=self.repository.id)
-            except ValueError as e:
+            except MatchReviewRequestsError as e:
                 raise CommandError(six.text_type(e))
 
             if not review_request or not review_request.id:

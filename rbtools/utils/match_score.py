@@ -1,6 +1,15 @@
+"""Utilities for applying matching scores for summaries and descriptions.
+
+Deprecated:
+    3.1:
+    This will be removed in RBTools 4.0.
+"""
+
 from __future__ import unicode_literals
 
 from difflib import SequenceMatcher
+
+from rbtools.deprecation import RemovedInRBTools40Warning
 
 
 class Score(object):
@@ -8,10 +17,20 @@ class Score(object):
 
     This is currently used with 'rbt post -u' to match the new change with
     existing review requests. The 'get_match' method will return a new Score,
-    and then multiple scores can be ranked against each other."""
+    and then multiple scores can be ranked against each other.
+
+    Deprecated:
+        3.1:
+        This will be removed in RBTools 4.0.
+    """
+
     EXACT_MATCH_SCORE = 1.0
 
     def __init__(self, summary_score, description_score):
+        RemovedInRBTools40Warning.warn(
+            'rbtools.utils.match_score.Score is deprecated and will be '
+            'removed in RBTools 4.0.')
+
         self.summary_score = summary_score
         self.description_score = description_score
 

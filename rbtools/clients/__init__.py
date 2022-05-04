@@ -393,6 +393,44 @@ class SCMClient(object):
             'tip': None,
         }
 
+    def get_tree_matches_review_request(self, review_request, revisions,
+                                        **kwargs):
+        """Return whether a review request matches revisions or tree state.
+
+        This works along with review request matching in tools like
+        :command:`rbt post` to match state in a review request (such as in
+        ``extra_data``) with the state in the local tree (such as the local
+        branch or SCM-specific identifiers other than a commit ID).
+
+        Subclasses can override this to implement their own matching logic.
+        By default, no additional logic is implemented.
+
+        Version Added:
+            3.1
+
+        Args:
+            review_request (rbtools.api.resource.ReviewRequestResource):
+                The review request being matched.
+
+            revisions (dict):
+                A dictionary of revisions, as returned by
+                :py:meth:`parse_revision_spec`.
+
+            **kwargs (dict, unused):
+                Additional keyword arguments, for future expansion.
+
+        Returns:
+            bool:
+            ``True`` if the review request is considered an exact match.
+
+            ``False`` if the review request should be explicitly discarded
+            as a possible match.
+
+            ``None`` if a match could not be determined based on available
+            information.
+        """
+        return None
+
     def diff(self, revisions, include_files=[], exclude_patterns=[],
              no_renames=False, repository_info=None, extra_args=[]):
         """Perform a diff using the given revisions.

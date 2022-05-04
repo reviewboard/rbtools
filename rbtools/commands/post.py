@@ -17,6 +17,7 @@ from rbtools.utils.commands import (AlreadyStampedError,
                                     stamp_commit_with_review_url)
 from rbtools.utils.console import confirm
 from rbtools.utils.encoding import force_unicode
+from rbtools.utils.errors import MatchReviewRequestsError
 from rbtools.utils.review_request import (get_draft_or_current_value,
                                           get_revisions,
                                           guess_existing_review_request)
@@ -1071,13 +1072,12 @@ class Post(Command):
                     api_client=self.api_client,
                     tool=self.tool,
                     revisions=self.revisions,
-                    guess_summary=False,
-                    guess_description=False,
+                    commit_id=self.revisions.get('commit_id'),
                     is_fuzzy_match_func=self._ask_review_request_match,
                     submit_as=self.options.submit_as,
                     additional_fields=additional_fields,
                     repository_id=self.repository.id)
-            except ValueError as e:
+            except MatchReviewRequestsError as e:
                 raise CommandError(six.text_type(e))
 
             if not review_request or not review_request.id:
