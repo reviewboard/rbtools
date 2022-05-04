@@ -6,3 +6,4 @@ RBTools Workflows
    :maxdepth: 1
 
    git
+   sos

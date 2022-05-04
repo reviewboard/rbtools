@@ -453,10 +453,10 @@ Valid repository types include:
 * ``clearcase``
 * ``cvs``
 * ``git``
-* ``git``
 * ``mercurial``
 * ``perforce``
 * ``plastic``
+* ``sos``
 * ``svn``
 * ``tfs``
 

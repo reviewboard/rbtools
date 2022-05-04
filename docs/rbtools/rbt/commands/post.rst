@@ -309,6 +309,70 @@ Multiple files can be posted by adding additional file/revision pairs:
 .. _`Power Pack`: https://www.reviewboard.org/powerpack
 
 
+.. _rbt-post-sos:
+
+Cliosoft SOS
+------------
+
+.. versionadded:: 3.1
+
+:command:`rbt post` provides support for posting changes using
+`Cliosoft SOS`_ 7.20 or higher. It supports posting changelists (recommended)
+or selections.
+
+See :ref:`rbtools-workflow-sos` for a detailed guide.
+
+
+Posting Changelists
+~~~~~~~~~~~~~~~~~~~
+
+Changelists can be posted by passing a changelist name to :command:`rbt post`.
+For example:
+
+.. code-block::
+
+   $ rbt post my-changelist
+
+You can then update the review request that matches that changelist by using
+:option:`-u`:
+
+.. code-block::
+
+   $ rbt post -u my-changelist
+
+
+Posting Selections
+~~~~~~~~~~~~~~~~~~
+
+To post a default selection (which includes all modified files, or files
+added to/removed from checked-out directories):
+
+.. code-block::
+
+   $ rbt post
+
+To post an explicit SOS selection:
+
+.. code-block::
+
+   $ rbt post "select:<flags>"
+
+   # For example:
+   $ rbt post "select:-scm -sor -sunm"
+
+You can update the review request by using :option:`-r` and passing the ID
+of the review request you created. Make sure to pass in any selections along
+with this. Examples include:
+
+.. code-block::
+
+   $ rbt post -r 123
+   $ rbt post -r 123 "select:-scm -sor -sunm"
+
+
+.. _Cliosoft SOS: https://www.cliosoft.com/products/sos/
+
+
 .. index:: post-commit review
 .. _posting-committed-code:
 

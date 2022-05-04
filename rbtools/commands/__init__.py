@@ -661,7 +661,7 @@ class Command(object):
                         'multiple files.'
                         '\n'
                         'Supported by: Bazaar, CVS, Git, Mercurial, '
-                        'Perforce, and Subversion.',
+                        'Perforce, SOS, and Subversion.',
                    added_in='0.6'),
             Option('-X', '--exclude',
                    metavar='PATTERN',
@@ -674,7 +674,7 @@ class Command(object):
                         'for pattern matching.'
                         '\n'
                         'Supported by: Bazaar, CVS, Git, Mercurial, '
-                        'Perforce, and Subversion.',
+                        'Perforce, SOS, and Subversion.',
                    extended_help=(
                        'Patterns that begin with a path separator (/ on Mac '
                        'OS and Linux, \\ on Windows) will be treated as being '
