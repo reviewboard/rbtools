@@ -124,7 +124,7 @@ html_style = 'classic.css'
 
 # The name for this set of Sphinx documents. If None, it defaults to
 # "<project> v<release> documentation".
-#html_title = None
+html_title = 'RBTools %s Documentation' % version
 
 # A shorter title for the navigation bar. Default is the same as
 # html_title.
