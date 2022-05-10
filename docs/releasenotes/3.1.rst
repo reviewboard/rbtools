@@ -1,0 +1,169 @@
+.. default-intersphinx:: rbt3.x rb-latest
+
+
+=========================
+RBTools 3.1 Release Notes
+=========================
+
+**Release date:** May 10, 2022
+
+
+New Features
+============
+
+Code Review for Cliosoft SOS
+----------------------------
+
+RBTools 3.1 now supports posting and reviewing code on `Cliosoft SOS`_!
+
+SOS is an enterprise-grade source code management solution widely used for
+hardware and software design and development. It's built to allow teams across
+the globe to collaborate on large hardware-focused projects.
+
+RBTools can now post in-progress changes for review. This supports SOS
+selections and changelists (new in 7.20). Any pending changes can be posted as
+a review request and iterated on until approved and ready to check in.
+
+RBTools requires a licensed copy of SOS 7.20 or higher.
+
+Review Board 4.0.6, `Power Pack`_ 5.0, and SOS 7.20 is required on the server.
+Any user posting changes to Review Board must also be licensed in Power Pack.
+
+This is a collaboration between Cliosoft_ and Beanbag.
+
+See our guide on :ref:`setting up SOS repositories <repository-scm-sos>` and
+:ref:`posting to SOS repositories <rbtools-workflow-sos>` for more
+information.
+
+
+Improved Matching of Review Requests
+------------------------------------
+
+The logic for matching review requests when running :option:`rbt post -u`
+has been enhanced and expanded. It should now do a better job of finding a
+suitable match, based on the stored commit ID, summary, and description.
+
+Future versions of RBTools will take advantage of some of the newer features
+to help detect by branches and other relevant metadata as well.
+
+
+.. _Cliosoft: https://www.cliosoft.com/
+.. _Cliosoft SOS: https://www.cliosoft.com/products/sos/
+.. _Power Pack: https://www.reviewboard.org/powerpack/
+
+
+RBTools API
+===========
+
+* ``extra_data`` dictionaries on resources now behave like standard Python
+  dictionaries.
+
+  These can also be converted into a plain dictionary, if needed.
+
+  These are immutable, and will raise an error if you try to modify them
+  directly.
+
+* ``update()`` calls on resources can now modify ``extra_data`` fields using
+  JSON Patch or JSON Merge Patch.
+
+  A JSON Merge Patch can be set by passing ``extra_data_json={...}`` to these
+  requests.
+
+  A JSON Patch can be set by passing ``extra_data_json_patch=[...]``.
+
+  For example:
+
+  .. code-block:: python
+
+     review_requests.update(extra_data_json={
+         'key1': 'value',
+         'key2': {
+             'items': [1, 2, 3],
+         },
+     })
+
+  See :ref:`webapi2.0-extra-data-patching` for details on these forms of
+  JSON patching.
+
+  This replaces the now-legacy :samp:`extra_data__{fieldname}=value`
+  convention.
+
+* API errors now contain more useful information.
+
+  These are sometimes shown when a more specific error isn't available.
+  The following changes have been made to how errors are shown:
+
+  * API error codes and HTTP status codes are now shown alongside the name
+    of the error.
+
+  * The HTTP status code is no longer shown if we have an API error code.
+
+  * There's always a helpful default error message shown if there isn't
+    something more specific.
+
+* Added unit testing capabilities for consumers of the Python API.
+
+  The Python API can now be tested more easily using a series of new
+  testing classes:
+
+  * :py:class:`rbtools.testing.api.transport.URLMapTransport`:
+    An API transport that enable registration of URLs to payloads, with
+    lots of built-in registration helpers. This can be passed to a
+    :py:class:`rbtools.commands.Command` or
+    :py:class:`rbtools.api.client.RBClient` instance.
+
+  * :py:class:`rbtools.testing.api.payloads.ResourcePayloadFactory`:
+    A helper class for generating consistent API response payloads for
+    different kinds of API resources.
+
+  * :py:class:`rbtools.testing.commands.CommandTestsMixin`: A mixin for
+    unittest-based test suites to help construct and run commands in the
+    test environment.
+
+  Along with this, :py:class:`rbtools.testing.testcase.TestCase` can now
+  help create new the new transport or client.
+
+
+Bug Fixes
+=========
+
+ClearCase / VersionVault
+------------------------
+
+* Fixed a bug with checking VOBs on Windows.
+
+* :ref:`rbt list-repo-types <rbt-list-repo-types>` now lists
+  "VersionVault / ClearCase" in the repository list, instead of just
+  "ClearCase".
+
+
+Git
+---
+
+* Fixed detecting git-p4 repositories after running :command:`git gc`.
+
+  This could sometimes cause a file used to detect git-p4 repositories to
+  be deleted. We now employ alternative means for detection.
+
+  Patch by Ben Jackson.
+
+
+Mercurial
+---------
+
+* Fixed launching Mercurial when encountering configuration or extension
+  errors.
+
+
+Subversion
+----------
+
+* Fixed detecting other repository types when Subversion isn't installed.
+
+
+Contributors
+============
+
+* Ben Jackson
+* Christian Hammond
+* David Trowbridge
