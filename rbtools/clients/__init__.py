@@ -393,6 +393,44 @@ class SCMClient(object):
             'tip': None,
         }
 
+    def get_tree_matches_review_request(self, review_request, revisions,
+                                        **kwargs):
+        """Return whether a review request matches revisions or tree state.
+
+        This works along with review request matching in tools like
+        :command:`rbt post` to match state in a review request (such as in
+        ``extra_data``) with the state in the local tree (such as the local
+        branch or SCM-specific identifiers other than a commit ID).
+
+        Subclasses can override this to implement their own matching logic.
+        By default, no additional logic is implemented.
+
+        Version Added:
+            3.1
+
+        Args:
+            review_request (rbtools.api.resource.ReviewRequestResource):
+                The review request being matched.
+
+            revisions (dict):
+                A dictionary of revisions, as returned by
+                :py:meth:`parse_revision_spec`.
+
+            **kwargs (dict, unused):
+                Additional keyword arguments, for future expansion.
+
+        Returns:
+            bool:
+            ``True`` if the review request is considered an exact match.
+
+            ``False`` if the review request should be explicitly discarded
+            as a possible match.
+
+            ``None`` if a match could not be determined based on available
+            information.
+        """
+        return None
+
     def diff(self, revisions, include_files=[], exclude_patterns=[],
              no_renames=False, repository_info=None, extra_args=[]):
         """Perform a diff using the given revisions.
@@ -422,27 +460,45 @@ class SCMClient(object):
 
         Returns:
             dict:
-            A dictionary containing the following keys:
+            A dictionary containing:
 
-            ``diff`` (:py:class:`bytes`):
-                The contents of the diff to upload.
+            Keys:
+                diff (bytes):
+                    The contents of the diff to upload.
 
-            ``parent_diff`` (:py:class:`bytes`, optional):
-                The contents of the parent diff, if available.
+                parent_diff (bytes, optional):
+                    The contents of the parent diff, if available.
 
-            ``commit_id`` (:py:class:`unicode`, optional):
-                The commit ID to include when posting, if available.
+                commit_id (unicode, optional):
+                    The commit ID to include when posting, if available.
 
-            ``base_commit_id` (:py:class:`unicode`, optional):
-                The ID of the commit that the change is based on, if available.
-                This is necessary for some hosting services that don't provide
-                individual file access.
+                base_commit_id (unicode, optional):
+                    The ID of the commit that the change is based on, if
+                    available.  This is necessary for some hosting services
+                    that don't provide individual file access.
+
+                review_request_extra_data (dict, optional):
+                    A dictionary of ``extra_data`` keys to set on the review
+                    request (when posting to Review Board 3.0 or higher).
+
+                    If posting a brand-new review request, this will set the
+                    fields on the review request itself.
+
+                    If updating a review request, this will set them on the
+                    draft.
+
+                    This may contain structured data. It will be sent to the
+                    server as part of a JSON Merge Patch.
+
+                    Version Added:
+                        3.1
         """
         return {
             'diff': None,
             'parent_diff': None,
             'commit_id': None,
             'base_commit_id': None,
+            'review_request_extra_data': None,
         }
 
     def get_commit_history(self, revisions):

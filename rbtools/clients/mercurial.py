@@ -127,10 +127,15 @@ class MercurialClient(SCMClient):
         if not hasattr(self, '_hidden_changesets_supported'):
             # The choice of command is arbitrary. parents for the initial
             # revision should be fast.
-            result = execute([self._exe, 'parents', '--hidden', '-r', '0'],
-                             ignore_errors=True,
-                             with_errors=False,
-                             none_on_ignored_error=True)
+            #
+            # Note that this cannot use self._execute, as this property is
+            # accessed by that function, and we don't want to infinitely
+            # recurse.
+            result = execute(
+                [self._exe, 'parents', '--hidden', '-r', '0'],
+                ignore_errors=True,
+                with_errors=False,
+                none_on_ignored_error=True)
             self._hidden_changesets_supported = result is not None
 
         return self._hidden_changesets_supported
@@ -160,12 +165,14 @@ class MercurialClient(SCMClient):
             return
 
         if 'extensions.hgsubversion' in self.hgrc:
-            svn_info = execute([self._exe, 'svn', 'info'], ignore_errors=True)
+            svn_info = execute([self._exe, 'svn', 'info'],
+                               ignore_errors=True)
         else:
             svn_info = None
 
-        if (svn_info and not svn_info.startswith('abort:') and
-            not svn_info.startswith('hg: unknown command') and
+        if (svn_info and
+            not svn_info.startswith('abort:') and
+            'hg: unknown command' not in svn_info and
             not svn_info.lower().startswith('not a child of')):
             self._type = 'svn'
             self._svn_info = svn_info
@@ -210,7 +217,7 @@ class MercurialClient(SCMClient):
         }
         log_format = self._FIELD_SEP_ESC.join(six.itervalues(log_fields))
 
-        log_entries = execute(
+        log_entries = self._execute(
             [
                 self._exe,
                 'log',
@@ -536,7 +543,9 @@ class MercurialClient(SCMClient):
     def _load_hgrc(self):
         """Load the hgrc file."""
         for line in execute([self._exe, 'showconfig'],
-                            env=self._hg_env, split_lines=True):
+                            env=self._hg_env,
+                            with_errors=False,
+                            split_lines=True):
             line = line.split('=', 1)
 
             if len(line) == 2:
@@ -807,8 +816,10 @@ class MercurialClient(SCMClient):
         """
         cmd = [self._exe, 'locate', '-r', rev]
 
-        files = execute(cmd, env=self._hg_env, ignore_errors=True,
-                        none_on_ignored_error=True)
+        files = self._execute(cmd,
+                              env=self._hg_env,
+                              ignore_errors=True,
+                              none_on_ignored_error=True)
 
         if files:
             files = files.replace('\\', '/')  # workaround for issue 3894
@@ -828,9 +839,11 @@ class MercurialClient(SCMClient):
             unicode:
             The branch branch for the hgsubversion checkout.
         """
-        return (getattr(self.options, 'tracking', None) or
-                execute([self._exe, 'parent', '--svn', '--template',
-                        '{node}\n']).strip())
+        return (
+            getattr(self.options, 'tracking', None) or
+            self._execute([
+                self._exe, 'parent', '--svn', '--template', '{node}\n',
+            ]).strip())
 
     def _get_remote_branch(self):
         """Return the remote branch assoicated with this repository.
@@ -1020,7 +1033,7 @@ class MercurialClient(SCMClient):
             unicode:
             The name of the currently checked-out branch.
         """
-        return execute([self._exe, 'branch'], env=self._hg_env).strip()
+        return self._execute([self._exe, 'branch'], env=self._hg_env).strip()
 
     def _get_bottom_and_top_outgoing_revs_for_remote(self, rev=None):
         """Return the bottom and top outgoing revisions.
@@ -1069,17 +1082,20 @@ class MercurialClient(SCMClient):
             outgoing changeset. The list will be sorted in revision order.
         """
         outgoing_changesets = []
-        args = [self._exe, '-q', 'outgoing', '--template',
-                '{rev}\\t{node|short}\\t{branch}\\n',
-                remote]
+
+        args = [
+            self._exe, '-q', 'outgoing', '--template',
+            '{rev}\\t{node|short}\\t{branch}\\n', remote,
+        ]
+
         if rev:
-            args.extend(['-r', rev])
+            args += ['-r', rev]
 
         # We must handle the special case where there are no outgoing commits
         # as mercurial has a non-zero return value in this case.
-        raw_outgoing = execute(args,
-                               env=self._hg_env,
-                               extra_ignore_errors=(1,))
+        raw_outgoing = self._execute(args,
+                                     env=self._hg_env,
+                                     extra_ignore_errors=(1,))
 
         for line in raw_outgoing.splitlines():
             if not line:
@@ -1120,7 +1136,7 @@ class MercurialClient(SCMClient):
         bottom_rev = min(revs)
 
         for rev, node, branch in reversed(outgoing_changesets):
-            parents = execute(
+            parents = self._execute(
                 [self._exe, 'log', '-r', str(rev), '--template', '{parents}'],
                 env=self._hg_env)
             parents = re.split(r':[^\s]+\s*', parents)
@@ -1183,8 +1199,8 @@ class MercurialClient(SCMClient):
         # with testing and could mess up callers.
         cmd = list(cmd)
 
-        if not self.hidden_changesets_supported and '--hidden' in cmd:
-            cmd = [p for p in cmd if p != '--hidden']
+        if '--hidden' in cmd and not self.hidden_changesets_supported:
+            cmd.remove('--hidden')
 
         # Add our extension which normalizes settings. This is the easiest
         # way to normalize settings since it doesn't require us to chase
@@ -1194,7 +1210,7 @@ class MercurialClient(SCMClient):
             'extensions.rbtoolsnormalize=%s' % self._hgext_path
         ]
 
-        return execute(cmd, *args, **kwargs)
+        return execute(cmd, with_errors=False, *args, **kwargs)
 
     def has_pending_changes(self):
         """Check if there are changes waiting to be committed.
@@ -1204,8 +1220,8 @@ class MercurialClient(SCMClient):
             ``True`` if the working directory has been modified, otherwise
             returns ``False``.
         """
-        status = execute([self._exe, 'status', '--modified', '--added',
-                          '--removed', '--deleted'])
+        status = self._execute([self._exe, 'status', '--modified', '--added',
+                                '--removed', '--deleted'])
         return status != ''
 
     def apply_patch(self, patch_file, base_path=None, base_dir=None, p=None,
@@ -1284,8 +1300,9 @@ class MercurialClient(SCMClient):
         if added_files:
             added_files = self._strip_p_num_slashes(added_files, int(p_num))
             make_empty_files(added_files)
-            result = execute([self._exe, 'add'] + added_files,
-                             ignore_errors=True, none_on_ignored_error=True)
+            result = self._execute([self._exe, 'add'] + added_files,
+                                   ignore_errors=True,
+                                   none_on_ignored_error=True)
 
             if result is None:
                 logging.error('Unable to execute "hg add" on: %s',
@@ -1296,8 +1313,9 @@ class MercurialClient(SCMClient):
         if deleted_files:
             deleted_files = self._strip_p_num_slashes(deleted_files,
                                                       int(p_num))
-            result = execute([self._exe, 'remove'] + deleted_files,
-                             ignore_errors=True, none_on_ignored_error=True)
+            result = self._execute([self._exe, 'remove'] + deleted_files,
+                                   ignore_errors=True,
+                                   none_on_ignored_error=True)
 
             if result is None:
                 logging.error('Unable to execute "hg remove" on: %s',
@@ -1325,4 +1343,5 @@ class MercurialClient(SCMClient):
             unicode:
             A string with the name of the current bookmark.
         """
-        return execute([self._exe, 'id', '-B'], ignore_errors=True).strip()
+        return self._execute([self._exe, 'id', '-B'],
+                             ignore_errors=True).strip()

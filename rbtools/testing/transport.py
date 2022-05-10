@@ -1,4 +1,10 @@
-"""Transport subclass used for unit testing."""
+"""Transport subclass used for unit testing.
+
+Deprecated::
+    3.1:
+    Replaced with
+    :py:class:`rbtools.testing.api.transport.URLMapTransport.`
+"""
 
 from __future__ import unicode_literals
 
@@ -16,6 +22,11 @@ class TestTransport(Transport):
     implementation of its parent class, custom payloads can be passed in to
     force return a specific subclass of
     :py:class:`rbtools.api.resource.Resource`.
+
+    Deprecated::
+        3.1:
+        Replaced with
+        :py:class:`rbtools.testing.api.transport.URLMapTransport.`
     """
 
     def __init__(self, url, list_payload=TestWithPayloads.list_payload,

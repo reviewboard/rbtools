@@ -17,6 +17,8 @@ def get_authenticated_session(api_client, api_root, auth_required=False,
     'auth_required' parameter is True, in which case the user will be prompted
     to login.
     """
+    # TODO: Consolidate the logic in this function with
+    #       Command.credentials_prompt().
     if not session:
         session = api_root.get_session(expand='user')
 
@@ -32,14 +34,29 @@ def get_authenticated_session(api_client, api_root, auth_required=False,
         # flushed automatically in this case, so the program just appears
         # to hang.
         if not sys.stdin.isatty():
-            logging.error('Authentication is required but input is not a tty.')
+            message_parts = [
+                'Authentication is required but RBTools cannot prompt for '
+                'it.'
+            ]
 
             if sys.platform == 'win32':
-                logging.info('Check that you are not running this script '
-                             'from a Cygwin terminal emulator (or use '
-                             'Cygwin Python to run it).')
+                message_parts.append(
+                    'This can occur if you are piping input into the '
+                    'command, or if you are running in a Cygwin terminal '
+                    'emulator and not using Cygwin Python.'
+                )
+            else:
+                message_parts.append(
+                    'This can occur if you are piping input into the '
+                    'command.'
+                )
 
-            raise AuthorizationError(http_status=None, error_code=None)
+            message_parts.append(
+                'You may need to explicitly provide API credentials when '
+                'invoking the command, or try logging in separately.'
+            )
+
+            raise AuthorizationError(message=' '.join(message_parts))
 
         logging.info('Please log in to the Review Board server at %s',
                      api_client.domain)

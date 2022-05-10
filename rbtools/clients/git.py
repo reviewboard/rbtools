@@ -365,9 +365,12 @@ class GitClient(SCMClient):
                                    'upgraded to version 1.5.4 or later.')
 
         # Okay, maybe Perforce (git-p4).
-        git_p4_ref = os.path.join(self._git_dir, 'refs', 'remotes', 'p4',
-                                  'master')
-        if os.path.exists(git_p4_ref):
+        git_p4_ref = self._execute(
+            [self.git, 'show-ref', '--verify', 'refs/remotes/p4/master'],
+            none_on_ignored_error=True,
+            ignore_errors=True)
+
+        if git_p4_ref:
             data = self._execute([self.git, 'config', '--get', 'git-p4.port'],
                                  ignore_errors=True)
             m = re.search(r'(.+)', data)

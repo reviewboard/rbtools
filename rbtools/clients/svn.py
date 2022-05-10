@@ -76,6 +76,8 @@ class SVNClient(SCMClient):
         self._svn_info_cache = {}
         self._svn_repository_info_cache = None
 
+        self._svn_installed = check_install(['svn', 'help'])
+
     def is_remote_only(self):
         """Return whether this repository is operating in remote-only mode.
 
@@ -86,6 +88,10 @@ class SVNClient(SCMClient):
             bool:
             Whether this repository is operating in remote-only mode.
         """
+        if not self._svn_installed:
+            logging.debug('Unable to execute "svn help": skipping SVN')
+            return None
+
         repository_url = getattr(self.options, 'repository_url', None)
 
         if repository_url:
@@ -101,7 +107,7 @@ class SVNClient(SCMClient):
             unicode:
             The filesystem path of the repository on the client system.
         """
-        if not check_install(['svn', 'help']):
+        if not self._svn_installed:
             logging.debug('Unable to execute "svn help": skipping SVN')
             return None
 
@@ -122,7 +128,7 @@ class SVNClient(SCMClient):
         if self._svn_repository_info_cache:
             return self._svn_repository_info_cache
 
-        if not check_install(['svn', 'help']):
+        if not self._svn_installed:
             logging.debug('Unable to execute "svn help": skipping SVN')
             return None
 

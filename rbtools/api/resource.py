@@ -1,8 +1,15 @@
 from __future__ import unicode_literals
 
+import copy
+import json
 import logging
 import re
 from collections import defaultdict, deque
+
+try:
+    from collections.abc import MutableMapping
+except ImportError:
+    from collections import MutableMapping
 
 import six
 from pkg_resources import parse_version
@@ -24,6 +31,12 @@ _EXCLUDE_ATTRS = [LINKS_TOK, EXPANDED_TOKEN, 'stat']
 _EXTRA_DATA_PREFIX = 'extra_data__'
 
 
+_EXTRA_DATA_DOCS_URL = (
+    'https://www.reviewboard.org/docs/manual/4.0/webapi/2.0/extra-data/'
+    '#storing-merging-json-data'
+)
+
+
 def resource_mimetype(mimetype):
     """Set the mimetype for the decorated class in the resource map."""
     def wrapper(cls):
@@ -36,16 +49,53 @@ def resource_mimetype(mimetype):
 def _preprocess_fields(fields):
     """Pre-process request fields.
 
-    This function rewrites fields of the form ``extra_data__field_name`` to
-    fields of the form ``extra_data.field_name`` so that Review Board can
-    understand them.
+    Any ``extra_data_json`` (JSON Merge Patch) or ``extra_data_json_patch``
+    (JSON Patch) fields will be serialized to JSON and stored.
+
+    Any :samp:`extra_data__{key}` fields will be converted to
+    :samp:`extra_data.{key}` fields, which will be handled by the Review Board
+    API. These cannot store complex types.
+
+    Version Changed:
+        3.1:
+        Added support for ``extra_data_json`` and ``extra_data_json_patch``.
 
     Args:
         fields (dict):
             A mapping of field names to field values.
+
+    Yields:
+        tuple:
+        A 2-tuple of:
+
+        1. The normalized field name to send in the request.
+        2. The normalized value to send.
     """
-    for name, value in six.iteritems(fields):
+    field_names = set(six.iterkeys(fields))
+
+    # Serialize the JSON Merge Patch or JSON Patch payloads first.
+    for norm_field_name, field_name in (('extra_data:json',
+                                         'extra_data_json'),
+                                        ('extra_data:json-patch',
+                                         'extra_data_json_patch')):
+        if field_name in field_names:
+            field_names.remove(field_name)
+
+            yield (
+                norm_field_name,
+                json.dumps(fields[field_name],
+                           sort_keys=True,
+                           separators=(',', ':')),
+            )
+
+    for name in sorted(field_names):
+        value = fields[name]
+
         if name.startswith(_EXTRA_DATA_PREFIX):
+            # It's technically not a problem to send both an extra_data.<key>
+            # and a JSON Patch or Merge Patch in the same request, but in
+            # the future we may want to warn about it, just to help guide
+            # users toward a single implementation.
             name = 'extra_data.%s' % name[len(_EXTRA_DATA_PREFIX):]
 
         yield name, value
@@ -91,26 +141,49 @@ def _create_resource_for_field(parent_resource, field_payload,
 def _create(resource, data=None, query_args={}, *args, **kwargs):
     """Generate a POST request on a resource.
 
-    Unlike other methods, any additional query args must be passed in
-    using the 'query_args' parameter, since kwargs is used for the
-    fields which will be sent.
+    Any ``extra_data_json`` (JSON Merge Patch) or ``extra_data_json_patch``
+    (JSON Patch) fields will be serialized to JSON and stored.
 
-    Review Board expects ``extra_data`` fields to be sent as
-    ``extra_data.field_name``, which cannot be passed as a raw literal in
-    Python. Fields like this would have to be added to a dict and splatted.
-    However, this function also accepts keyword arguments of the form
-    ``extra_data__field_name``, which will be rewritten to fields of the form
-    ``extra_data.field_name``.
+    Any :samp:`extra_data__{key}` fields will be converted to
+    :samp:`extra_data.{key}` fields, which will be handled by the Review Board
+    API. These cannot store complex types.
+
+    Version Changed:
+        3.1:
+        Added support for ``extra_data_json`` and ``extra_data_json_patch``.
+
+    Args:
+        resource (Resource):
+            The resource instance owning this create method.
+
+        data (dict, optional):
+            Data to send in the POST request. This will be merged with
+            ``**kwargs``.
+
+        query_args (dict, optional):
+            Optional query arguments for the URL.
+
+        *args (tuple, unused):
+            Unused positional arguments.
+
+        **kwargs (dict):
+            Keyword arguments representing additional fields to set in the
+            request. This will be merged with ``data``.
+
+    Returns:
+        rbtools.api.request.HttpRequest:
+        The resulting HTTP POST request for this create operation.
     """
-    request = HttpRequest(resource._links['create']['href'], method='POST',
+    request = HttpRequest(resource._links['create']['href'],
+                          method='POST',
                           query_args=query_args)
 
-    if data is None:
-        data = {}
+    field_data = kwargs
 
-    kwargs.update(data)
+    if data:
+        field_data.update(data)
 
-    for name, value in _preprocess_fields(kwargs):
+    for name, value in _preprocess_fields(field_data):
         request.add_field(name, value)
 
     return request
@@ -133,26 +206,48 @@ def _get_self(resource, *args, **kwargs):
 def _update(resource, data=None, query_args={}, *args, **kwargs):
     """Generate a PUT request on a resource.
 
-    Unlike other methods, any additional query args must be passed in
-    using the 'query_args' parameter, since kwargs is used for the
-    fields which will be sent.
+    Any ``extra_data_json`` (JSON Merge Patch) or ``extra_data_json_patch``
+    (JSON Patch) fields will be serialized to JSON and stored.
 
-    Review Board expects ``extra_data`` fields to be sent as
-    ``extra_data.field_name``, which cannot be passed as a raw literal in
-    Python. Fields like this would have to be added to a dict and splatted.
-    However, this function also accepts keyword arguments of the form
-    ``extra_data__field_name``, which will be rewritten to fields of the form
-    ``extra_data.field_name``.
+    Any :samp:`extra_data__{key}` fields will be converted to
+    :samp:`extra_data.{key}` fields, which will be handled by the Review Board
+    API. These cannot store complex types.
+
+    Version Changed:
+        3.1:
+        Added support for ``extra_data_json`` and ``extra_data_json_patch``.
+
+    Args:
+        resource (Resource):
+            The resource instance owning this create method.
+
+        data (dict, optional):
+            Data to send in the POST request. This will be merged with
+            ``**kwargs``.
+
+        query_args (dict, optional):
+            Optional query arguments for the URL.
+
+        *args (tuple, unused):
+            Unused positional arguments.
+
+        **kwargs (dict):
+            Keyword arguments representing additional fields to set in the
+            request. This will be merged with ``data``.
+
+    Returns:
+        rbtools.api.request.HttpRequest:
+        The resulting HTTP PUT request for this create operation.
     """
     request = HttpRequest(resource._links['update']['href'], method='PUT',
                           query_args=query_args)
 
-    if data is None:
-        data = {}
+    field_data = kwargs
 
-    kwargs.update(data)
+    if data:
+        field_data.update(data)
 
-    for name, value in _preprocess_fields(kwargs):
+    for name, value in _preprocess_fields(field_data):
         request.add_field(name, value)
 
     return request
@@ -239,8 +334,9 @@ class Resource(object):
                         lambda resource=self, url=body['href'], **kwargs: (
                             self._get_url(url, **kwargs)))
 
-    def _wrap_field(self, field_payload, field_url=None, field_mimetype=None,
-                    list_item_mimetype=None, force_resource=False):
+    def _wrap_field(self, field_payload, field_name=None, field_url=None,
+                    field_mimetype=None, list_item_mimetype=None,
+                    force_resource=False):
         """Wrap the value of a field in a resource or field object.
 
         This determines a suitable wrapper for a field, turning it into
@@ -251,6 +347,12 @@ class Resource(object):
             field_payload (object):
                 The payload of the field. The type of value determines the
                 way in which this is wrapped.
+
+            field_name (unicode, optional):
+                The name of the field being wrapped, if known.
+
+                Version Added:
+                    3.1
 
             field_url (unicode, optional):
                 The URL representing the payload in the field, if one is
@@ -276,8 +378,9 @@ class Resource(object):
 
             1. A subclass of :py:class:`Resource`.
             2. A field wrapper (:py:class:`ResourceDictField`,
+               :py:class:`ResourceListField`,
                :py:class:`ResourceLinkField`, or
-               :py:class:`ResourceListField`).
+               :py:class:`ResourceExtraDataField`).
             3. The field payload itself, if no wrapper is needed.
         """
         if isinstance(field_payload, dict):
@@ -297,14 +400,24 @@ class Resource(object):
                                                   mimetype=field_mimetype,
                                                   url=field_url)
             else:
+                # If this is an extra_data field, we'll return a special
+                # ExtraDataField.
+                #
                 # If the payload consists solely of link-supported keys,
-                # then we'll return a special ResourceLinkField. Anything
-                # else is treated as a standard dictionary.
-                if ('href' in field_payload and
-                    not set(field_payload.keys()) - LINK_KEYS):
-                    return ResourceLinkField(self, field_payload)
+                # then we'll return a special ResourceLinkField.
+                #
+                # Anything else is treated as a standard dictionary, which
+                # will be wrapped.
+                if field_name == 'extra_data':
+                    return ResourceExtraDataField(resource=self,
+                                                  fields=field_payload)
+                elif ('href' in field_payload and
+                      not set(field_payload.keys()) - LINK_KEYS):
+                    return ResourceLinkField(resource=self,
+                                             fields=field_payload)
                 else:
-                    return ResourceDictField(self, field_payload)
+                    return ResourceDictField(resource=self,
+                                             fields=field_payload)
         elif isinstance(field_payload, list):
             return ResourceListField(self, field_payload,
                                      item_mimetype=list_item_mimetype)
@@ -331,47 +444,217 @@ class Resource(object):
         return self._payload
 
 
-class ResourceDictField(object):
+class ResourceDictField(MutableMapping):
     """Wrapper for dictionaries returned from a resource.
 
-    Any dictionary returned from a resource will be wrapped using this
-    class. Attribute access will correspond to accessing the
-    dictionary key with the name of the attribute.
+    Items fetched from this dictionary may be wrapped as a resource or
+    resource field container.
+
+    Changes cannot be made to resource dictionaries. Instead, changes must be
+    made using :py:meth:`Resource.update` calls.
+
+    Version Changed:
+        3.1:
+        This class now operates like a standard dictionary, but blocks any
+        changes (which were misleading and could not be used to save state
+        in any prior version).
     """
+
     def __init__(self, resource, fields):
+        """Initialize the field.
+
+        Args:
+            resource (Resource):
+                The parent resource that owns this field.
+
+            fields (dict):
+                The dictionary contents from the payload.
+        """
+        super(ResourceDictField, self).__init__()
+
         self._resource = resource
         self._fields = fields
 
     def __getattr__(self, name):
-        if name in self._fields:
-            return self._resource._wrap_field(self._fields[name])
-        else:
+        """Return the value of a key from the field as an attribute reference.
+
+        The resulting value will be wrapped as a resource or resource field
+        if appropriate.
+
+        Args:
+            name (unicode):
+                The name of the key.
+
+        Returns:
+            object:
+            The value of the field.
+
+        Raises:
+            AttributeError:
+                The provided key name was not found in the dictionary.
+        """
+        try:
+            return self._wrap_field(name)
+        except KeyError:
             raise AttributeError('This dictionary resource for %s does not '
                                  'have an attribute "%s".'
                                  % (self._resource.__class__.__name__, name))
 
-    def __getitem__(self, key):
+    def __getitem__(self, name):
+        """Return the value of a key from the field as an item lookup.
+
+        The resulting value will be wrapped as a resource or resource field
+        if appropriate.
+
+        Args:
+            name (unicode):
+                The name of the key.
+
+        Returns:
+            object:
+            The value of the field.
+
+        Raises:
+            KeyError:
+                The provided key name was not found in the dictionary.
+        """
         try:
-            return self.__getattr__(key)
-        except AttributeError:
-            raise KeyError
+            return self._wrap_field(name)
+        except KeyError:
+            raise KeyError('This dictionary resource for %s does not have '
+                           'a key "%s".'
+                           % (self._resource.__class__.__name__, name))
 
-    def __contains__(self, key):
-        return key in self._fields
+    def __delitem__(self, name):
+        """Delete an item from the dictionary.
 
-    def iterfields(self):
-        for field in self._fields:
-            yield field
+        This will raise an exception stating that changes are not allowed
+        and offering an alternative.
 
-    def iteritems(self):
-        for key, value in six.iteritems(self._fields):
-            yield key, self._resource._wrap_field(value)
+        Args:
+            name (unicode, unused):
+                The name of the key to delete.
+
+        Raises:
+            AttributeError:
+                An error stating that changes are not allowed.
+        """
+        self._raise_immutable()
+
+    def __setitem__(self, name, value):
+        """Set an item in the dictionary.
+
+        This will raise an exception stating that changes are not allowed
+        and offering an alternative.
+
+        Args:
+            name (unicode, unused):
+                The name of the key to set.
+
+        Raises:
+            AttributeError:
+                An error stating that changes are not allowed.
+        """
+        self._raise_immutable()
+
+    def __len__(self):
+        """Return the number of items in the dictionary.
+
+        Returns:
+            int:
+            The number of items.
+        """
+        return len(self._fields)
+
+    def __iter__(self):
+        """Iterate through the dictionary.
+
+        Yields:
+            object:
+            Each item in the dictionary.
+        """
+        return six.iterkeys(self._fields)
 
     def __repr__(self):
+        """Return a string representation of the dictionary field.
+
+        Returns:
+            unicode:
+            The string representation.
+        """
         return '%s(resource=%r, fields=%r)' % (
             self.__class__.__name__,
             self._resource,
             self._fields)
+
+    def fields(self):
+        """Iterate through all fields in the dictionary.
+
+        This will yield each field name in the dictionary. This is the same
+        as calling :py:meth:`keys` or simply ``for field in dict_field``.
+
+        Yields:
+            unicode:
+            Each field in this dictionary.
+        """
+        for field in self:
+            yield field
+
+    # Backwards-compatibility functions.
+    iterfields = fields
+
+    if six.PY3:
+        def iteritems(self):
+            """Iterate through all items in this dictionary.
+
+            This is a legacy interface that provides compatibility with code
+            written in Python 3 and RBTools <= 3.0.
+
+            Yields:
+                tuple:
+                A 2-tuple of:
+
+                1. The key
+                2. The value
+            """
+            for item in self.items():
+                yield item
+
+    def _wrap_field(self, field_name):
+        """Conditionally return a wrapped version of a field's value.
+
+        This will wrap content according to the resource's wrapping logic.
+
+        Args:
+            field_name (unicode):
+                The name of the field to wrap.
+
+        Returns:
+            object:
+            The wrapped object or field value.
+
+        Raises:
+            KeyError:
+                The field could not be found in this dictionary.
+        """
+        # This may raise an exception, which will be handled by the caller.
+        return self._resource._wrap_field(self._fields[field_name],
+                                          field_name=field_name)
+
+    def _raise_immutable(self):
+        """Raise an exception stating that the dictionary is immutable.
+
+        Version Added:
+            3.1
+
+        Raises:
+            AttributeError:
+                An error stating that changes are not allowed.
+        """
+        raise AttributeError(
+            'Attributes cannot be modified directly on this dictionary. To '
+            'change values, issue a .update(attr=value, ...) call on the '
+            'parent resource.')
 
 
 class ResourceLinkField(ResourceDictField):
@@ -393,6 +676,73 @@ class ResourceLinkField(ResourceDictField):
     @request_method_decorator
     def get(self, **query_args):
         return HttpRequest(self._fields['href'], query_args=query_args)
+
+
+class ResourceExtraDataField(ResourceDictField):
+    """Wrapper for extra_data fields on resources.
+
+    Version Added:
+        3.1
+    """
+
+    def copy(self):
+        """Return a copy of the dictionary's fields.
+
+        A copy of the original ``extra_data`` content will be returned,
+        without any field wrapping.
+
+        Returns:
+            dict:
+            The copy of the dictionary.
+        """
+        return copy.deepcopy(self._fields)
+
+    def _wrap_field(self, field_name):
+        """Conditionally return a wrapped version of a field's value.
+
+        This will wrap dictionaries in another
+        :py:class:`ResourceExtraDataField`, and otherwise leave everything
+        else unwrapped (preventing list-like or links-like payloads from
+        being wrapped in their respective field types).
+
+        Args:
+            field_name (unicode):
+                The name of the field to wrap.
+
+        Returns:
+            object:
+            The wrapped object or field value.
+
+        Raises:
+            KeyError:
+                The field could not be found in this dictionary.
+        """
+        # This may raise an exception, which will be handled by the caller.
+        value = self._fields[field_name]
+
+        if isinstance(value, dict):
+            return ResourceExtraDataField(resource=self._resource,
+                                          fields=value)
+
+        # Leave everything else unwrapped.
+        return value
+
+    def _raise_immutable(self):
+        """Raise an exception stating that the dictionary is immutable.
+
+        Raises:
+            AttributeError:
+                An error stating that changes are not allowed.
+        """
+        raise AttributeError(
+            'extra_data attributes cannot be modified directly on this '
+            'dictionary. To make a mutable copy of this and all its contents, '
+            'call .copy(). To set or change extra_data state, issue a '
+            '.update(extra_data_json={...}) for a JSON Merge Patch requst or '
+            '.update(extra_data_json_patch=[...]) for a JSON Patch request '
+            'on the parent resource. See %s for the format for these '
+            'operations.'
+            % _EXTRA_DATA_DOCS_URL)
 
 
 class ResourceListField(list):
@@ -487,16 +837,19 @@ class ItemResource(Resource):
 
         if isinstance(field_payload, dict):
             value = self._wrap_field(
+                field_name=name,
                 field_payload=field_payload,
                 field_mimetype=expand_info.get('item_mimetype'))
         elif isinstance(field_payload, list):
             value = self._wrap_field(
+                field_name=name,
                 field_payload=field_payload,
                 field_url=expand_info.get('list_url'),
                 field_mimetype=expand_info.get('list_mimetype'),
                 list_item_mimetype=expand_info.get('item_mimetype'))
         else:
-            value = self._wrap_field(field_payload)
+            value = self._wrap_field(field_payload,
+                                     field_name=name)
 
         return value
 

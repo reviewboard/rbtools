@@ -17,12 +17,17 @@ from rbtools.utils.commands import (AlreadyStampedError,
                                     stamp_commit_with_review_url)
 from rbtools.utils.console import confirm
 from rbtools.utils.encoding import force_unicode
+from rbtools.utils.errors import MatchReviewRequestsError
 from rbtools.utils.review_request import (get_draft_or_current_value,
                                           get_revisions,
                                           guess_existing_review_request)
 
 
 #: A squashed diff that may be the product of one or more revisions.
+#:
+#: Version Changed:
+#:     3.1:
+#:     Added ``review_request_extra_data``.
 #:
 #: Attributes:
 #:     diff (bytes):
@@ -45,6 +50,12 @@ from rbtools.utils.review_request import (get_draft_or_current_value,
 #:     changenum (unicode):
 #:         For SCMs such as Perforce, this is the change number that the diff
 #:         corresponds to. This is ``None`` for other SCMs.
+#:
+#:     review_request_extra_data (dict):
+#:         State to store in a review request's ``extra_data`` field.
+#:
+#:         Version Added:
+#:             3.1
 SquashedDiff = namedtuple(
     'SquashedDiff', (
         'diff',
@@ -53,10 +64,15 @@ SquashedDiff = namedtuple(
         'base_dir',
         'commit_id',
         'changenum',
+        'review_request_extra_data',
     ))
 
 
 #: A series of diffs that each correspond to a single revision.
+#:
+#: Version Changed:
+#:     3.1:
+#:     Added ``review_request_extra_data``.
 #:
 #: Attributes:
 #:     entries (list of dict):
@@ -108,6 +124,12 @@ SquashedDiff = namedtuple(
 #:
 #:     cumulative_diff (bytes):
 #:         The cumulative diff of the entire history.
+#:
+#:     review_request_extra_data (dict):
+#:         State to store in a review request's ``extra_data`` field.
+#:
+#:         Version Added:
+#:             3.1
 DiffHistory = namedtuple(
     'History', (
         'entries',
@@ -115,6 +137,7 @@ DiffHistory = namedtuple(
         'base_commit_id',
         'validation_info',
         'cumulative_diff',
+        'review_request_extra_data',
     ))
 
 
@@ -594,35 +617,15 @@ class Post(Command):
                 'Exactly one of "diff_history" or "squashed_diff" must be '
                 'provided to "Post.post_request()".')
 
-        supports_posting_commit_ids = \
-            self.capabilities.has_capability('review_requests', 'commit_ids')
+        review_request_is_new = review_request is None
 
-        if not review_request:
+        if review_request_is_new:
+            request_data = self._build_new_review_request_data(
+                squashed_diff=squashed_diff,
+                diff_history=diff_history,
+                submit_as=submit_as)
+
             try:
-                request_data = {
-                    'repository': self.repository.id,
-                }
-
-                if squashed_diff:
-                    if squashed_diff.changenum:
-                        request_data['changenum'] = squashed_diff.changenum
-                    elif (squashed_diff.commit_id and
-                          supports_posting_commit_ids):
-                        request_data['commit_id'] = squashed_diff.commit_id
-                else:
-                    request_data['create_with_history'] = True
-
-
-                if submit_as:
-                    request_data['submit_as'] = submit_as
-
-                if self.tool.can_bookmark:
-                    bookmark = self.tool.get_current_bookmark()
-                    request_data['extra_data__local_bookmark'] = bookmark
-                elif self.tool.can_branch:
-                    branch = self.tool.get_current_branch()
-                    request_data['extra_data__local_branch'] = branch
-
                 review_requests = self.api_root.get_review_requests(
                     only_fields='',
                     only_links='create')
@@ -719,7 +722,6 @@ class Post(Command):
                        % self.tool.name)
                 self.stdout.write(err)
                 self.json.add_error(err)
-
             else:
                 try:
                     stamp_commit_with_review_url(self.revisions,
@@ -743,78 +745,12 @@ class Post(Command):
 
         # Update the review request draft fields based on options set
         # by the user, or configuration.
-        update_fields = {}
-
-        if self.options.publish:
-            update_fields['public'] = True
-
-            if (self.options.trivial_publish and
-                self.capabilities.has_capability('review_requests',
-                                                 'trivial_publish')):
-                update_fields['trivial'] = True
-
-        if not self.options.diff_only:
-            # If the user has requested to guess the summary or description,
-            # get the commit message and override the summary and description
-            # options, which we'll fill in below. The guessing takes place
-            # after stamping so that the guessed description matches the commit
-            # when rbt exits.
-            if not self.options.diff_filename:
-                self.check_guess_fields()
-
-            update_fields.update(self.options.extra_fields)
-
-            if self.options.target_groups:
-                update_fields['target_groups'] = self.options.target_groups
-
-            if self.options.target_people:
-                update_fields['target_people'] = self.options.target_people
-
-            if self.options.depends_on:
-                update_fields['depends_on'] = self.options.depends_on
-
-            if self.options.summary:
-                update_fields['summary'] = self.options.summary
-
-            if self.options.branch:
-                update_fields['branch'] = self.options.branch
-
-            if self.options.bugs_closed:
-                # Append to the existing list of bugs.
-                self.options.bugs_closed = self.options.bugs_closed.strip(', ')
-                bug_set = (set(re.split('[, ]+', self.options.bugs_closed)) |
-                           set(review_request.bugs_closed))
-                self.options.bugs_closed = ','.join(bug_set)
-                update_fields['bugs_closed'] = self.options.bugs_closed
-
-            if self.options.description:
-                update_fields['description'] = self.options.description
-
-            if self.options.testing_done:
-                update_fields['testing_done'] = self.options.testing_done
-
-            text_type = self._get_text_type(self.options.markdown)
-
-            if self.options.description or self.options.testing_done:
-                # The user specified that their Description/Testing Done are
-                # valid Markdown, so tell the server so it won't escape the
-                # text.
-                update_fields['text_type'] = text_type
-
-            if self.options.change_description is not None:
-                if review_request.public:
-                    update_fields['changedescription'] = \
-                        self.options.change_description
-                    update_fields['changedescription_text_type'] = \
-                        text_type
-                else:
-                    logging.error(
-                        'The change description field can only be set when '
-                        'publishing an update. Use --description instead.')
-
-            if (squashed_diff and supports_posting_commit_ids and
-                squashed_diff.commit_id != draft.commit_id):
-                update_fields['commit_id'] = squashed_diff.commit_id or ''
+        update_fields = self._build_review_request_draft_data(
+            review_request=review_request,
+            review_request_is_new=review_request_is_new,
+            squashed_diff=squashed_diff,
+            diff_history=diff_history,
+            draft=draft)
 
         if update_fields:
             try:
@@ -1136,13 +1072,12 @@ class Post(Command):
                     api_client=self.api_client,
                     tool=self.tool,
                     revisions=self.revisions,
-                    guess_summary=False,
-                    guess_description=False,
+                    commit_id=self.revisions.get('commit_id'),
                     is_fuzzy_match_func=self._ask_review_request_match,
                     submit_as=self.options.submit_as,
                     additional_fields=additional_fields,
                     repository_id=self.repository.id)
-            except ValueError as e:
+            except MatchReviewRequestsError as e:
                 raise CommandError(six.text_type(e))
 
             if not review_request or not review_request.id:
@@ -1184,6 +1119,240 @@ class Post(Command):
 
         return review_request
 
+    def _build_new_review_request_data(self, squashed_diff, diff_history,
+                                       submit_as):
+        """Return API field data to set when creating a new review request.
+
+        This will set the following:
+
+        * ``repository``
+        * ``changenum`` or ``commit_id`` (if posting a squashed diff)
+        * ``create_with_history`` (if posting with history)
+        * ``submit_as`` (if submitting as another user)
+        * ``extra_data__local_bookmark`` (if storing bookmark metadata)
+        * ``extra_data__local_branch`` (if storing branch metadata)
+
+        Only ``repository`` is guaranteed to be set. The rest are conditional.
+
+        Args:
+            squashed_diff (SquashedDiff):
+                The squashed diff instance (if not posting with history).
+
+            diff_history (DiffHistory):
+                The diff history instance (if posting with history).
+
+            submit_as (unicode):
+                The optional username that the post is being submitted as.
+
+        Returns:
+            dict:
+            The field data to set when creating the review request.
+        """
+        supports_posting_commit_ids = \
+            self.capabilities.has_capability('review_requests', 'commit_ids')
+
+        request_data = {
+            'repository': self.repository.id,
+        }
+
+        if squashed_diff:
+            if squashed_diff.changenum:
+                request_data['changenum'] = squashed_diff.changenum
+            elif (squashed_diff.commit_id and
+                  supports_posting_commit_ids):
+                request_data['commit_id'] = squashed_diff.commit_id
+        else:
+            request_data['create_with_history'] = True
+
+        if submit_as:
+            request_data['submit_as'] = submit_as
+
+        # Queue up a patch to set the new extra_data in the review
+        # request.
+        self._set_review_request_extra_data(
+            request_data,
+            diff_obj=squashed_diff or diff_history)
+
+        return request_data
+
+    def _build_review_request_draft_data(self, review_request, draft,
+                                         squashed_diff, diff_history,
+                                         review_request_is_new):
+        """Return API field data to set when updating a draft.
+
+        This will set the following:
+
+        * ``public`` (if publishing the changes)
+        * ``trivial`` (if publishing trivially on a server that supports it)
+        * ``branch`` (if setting new branch information)
+        * ``depends_on`` (if setting new dependencies)
+        * ``description`` (if setting a new description)
+        * ``summary`` (if setting a new summary)
+        * ``testing_done`` (if setting new testing information)
+        * ``bugs_closed`` (if setting a new list of bugs that are closed)
+        * ``target_groups`` (if setting new group reviewers)
+        * ``target_people`` (if setting new user reviewers)
+        * ``text_type`` (if setting ``description`` or ``testing_done``)
+        * ``changedescription`` (if setting a new change description)
+        * ``changedescription_text_type`` (if setting a new change description)
+        * ``commit_id`` (if setting a new commit ID from a squashed diff on
+          a server that supports it)
+
+        All fields are conditional. This may return an empty dictionary.
+
+        Args:
+            review_request (rbtools.api.resources.ReviewRequest):
+                The review request that owns the draft.
+
+            draft (rbtools.api.resources.Resource):
+                The draft resource being updated.
+
+            squashed_diff (SquashedDiff):
+                The squashed diff instance (if not posting with history).
+
+            diff_history (DiffHistory):
+                The diff history instance (if posting with history).
+
+        Returns:
+            dict:
+            The field data to set when updating the draft.
+        """
+        options = self.options
+
+        # Update the review request draft fields based on options set
+        # by the user, or configuration.
+        update_fields = {}
+
+        if options.publish:
+            update_fields['public'] = True
+
+            if (options.trivial_publish and
+                self.capabilities.has_capability('review_requests',
+                                                 'trivial_publish')):
+                update_fields['trivial'] = True
+
+        if not options.diff_only:
+            # If the user has requested to guess the summary or description,
+            # get the commit message and override the summary and description
+            # options, which we'll fill in below. The guessing takes place
+            # after stamping so that the guessed description matches the commit
+            # when rbt exits.
+            if not options.diff_filename:
+                self.check_guess_fields()
+
+            update_fields.update(options.extra_fields)
+            update_fields.update({
+                _field: _value
+                for _field, _value in (
+                    ('branch', options.branch),
+                    ('depends_on', options.depends_on),
+                    ('description', options.description),
+                    ('summary', options.summary),
+                    ('target_groups', options.target_groups),
+                    ('target_people', options.target_people),
+                    ('testing_done', options.testing_done),
+                )
+                if _value
+            })
+
+            if options.bugs_closed:
+                # Append to the existing list of bugs.
+                options.bugs_closed = ','.join(sorted(
+                    (set(re.split('[, ]+', options.bugs_closed.strip(', '))) |
+                     set(review_request.bugs_closed))))
+                update_fields['bugs_closed'] = options.bugs_closed
+
+            text_type = self._get_text_type(options.markdown)
+
+            if options.description or options.testing_done:
+                # The user specified that their Description/Testing Done are
+                # valid Markdown, so tell the server so it won't escape the
+                # text.
+                update_fields['text_type'] = text_type
+
+            if options.change_description is not None:
+                if review_request.public:
+                    update_fields.update({
+                        'changedescription': options.change_description,
+                        'changedescription_text_type': text_type,
+                    })
+                else:
+                    logging.error(
+                        'The change description field can only be set when '
+                        'publishing an update. Use --description instead.')
+
+            supports_posting_commit_ids = \
+                self.capabilities.has_capability('review_requests',
+                                                 'commit_ids')
+
+            if (squashed_diff and supports_posting_commit_ids and
+                squashed_diff.commit_id != draft.commit_id):
+                update_fields['commit_id'] = squashed_diff.commit_id or ''
+
+        # If we're updating an existing review request, queue up a patch
+        # to set the new extra_data in the review request.
+        if not review_request_is_new:
+            self._set_review_request_extra_data(
+                update_fields,
+                diff_obj=squashed_diff or diff_history)
+
+        return update_fields
+
+    def _set_review_request_extra_data(self, request_data, diff_obj):
+        """Calculate and set new extra_data for a review request.
+
+        This will calculate state to store in ``extra_data`` on the review
+        request, taking into consideration some common SCM state and anything
+        set by the SCMClient during diff generation. This is applied to the
+        review request as a JSON patch on servers that support it.
+
+        On versions of Review Board prior to 3.0, we'll only set the current
+        bookmark or branch, if available for the repository.
+
+        Args:
+            request_data (dict):
+                The API request data that's being built.
+
+            diff_obj (SquashedDiff or DiffHistory):
+                The object representing the diff being posted for review.
+        """
+        tool = self.tool
+        extra_data_patch = {}
+
+        if tool.can_bookmark:
+            bookmark = tool.get_current_bookmark()
+            extra_data_patch['local_bookmark'] = bookmark
+        elif tool.can_branch:
+            branch = tool.get_current_branch()
+            extra_data_patch['local_branch'] = branch
+
+        if self.capabilities.has_capability('extra_data', 'json_patching'):
+            # JSON patching is enabled, so we can store more complex state.
+            #
+            # We'll set any keys provided by diff generation.
+            if diff_obj is not None and diff_obj.review_request_extra_data:
+                # Store any fields provided by the diff in extra_data. Note
+                # that it's up to the SCMClient implementation to determine the
+                # conditions under which a field should be set (e.g., posting a
+                # squashed vs. multi-commit review request).
+                extra_data_patch.update(diff_obj.review_request_extra_data)
+
+            if extra_data_patch:
+                request_data['extra_data_json'] = extra_data_patch
+        else:
+            # JSON patching has been around since Review Board 3. If the
+            # server doesn't support it, we just won't bother storing anything
+            # more than local_bookmark or local_branch (which we used to store
+            # on older releases, so we'll continue to do so).
+            #
+            # It's better than shoe-horning in complex types and then
+            # having to deal with that later.
+            if extra_data_patch:
+                request_data.update({
+                    'extra_data__%s' % _key: _value
+                    for _key, _value in six.iteritems(extra_data_patch)
+                })
+
     def _get_diff_history(self, extra_args):
         """Compute and return the diff history of the selected revisions.
 
@@ -1199,40 +1368,26 @@ class Post(Command):
             rbtools.commands.CommandError:
                 The diff history is empty.
         """
-        history_entries = self.tool.get_commit_history(self.revisions)
+        tool = self.tool
+
+        history_entries = tool.get_commit_history(self.revisions)
 
         if history_entries is None:
             raise CommandError("There don't seem to be any diffs.")
 
-        diff_kwargs = {}
+        diff_kwargs = self._build_get_diff_kwargs(extra_args)
+        cumulative_diff_info = tool.diff(revisions=self.revisions,
+                                         **diff_kwargs)
 
-        if self.options.git_find_renames_threshold is not None:
-            diff_kwargs['git_find_renames_threshold'] = \
-                self.options.git_find_renames_threshold
-
-        cumulative_diff_info = self.tool.diff(
-            revisions=self.revisions,
-            repository_info=self.repository_info,
-            extra_args=extra_args,
-            include_files=self.options.include_files or [],
-            exclude_patterns=self.options.exclude_patterns or [],
-            **diff_kwargs)
-
-        for i, history_entry in enumerate(history_entries):
-            revisions = {
-                'base': history_entry['parent_id'],
-                'tip': history_entry['commit_id'],
-            }
-
+        for history_entry in history_entries:
             # Generate a diff against the revisions or arguments, filtering
             # by the requested files if provided.
-            diff_info = self.tool.diff(
-                revisions=revisions,
-                include_files=self.options.include_files or [],
-                exclude_patterns=self.options.exclude_patterns or [],
+            diff_info = tool.diff(
+                revisions={
+                    'base': history_entry['parent_id'],
+                    'tip': history_entry['commit_id'],
+                },
                 with_parent_diff=False,
-                repository_info=self.repository_info,
-                extra_args=extra_args,
                 **diff_kwargs)
 
             history_entry['diff'] = diff_info['diff']
@@ -1242,6 +1397,8 @@ class Post(Command):
             cumulative_diff=cumulative_diff_info['diff'],
             entries=history_entries,
             parent_diff=cumulative_diff_info.get('parent_diff'),
+            review_request_extra_data=cumulative_diff_info.get(
+                'review_request_extra_data'),
             validation_info=None)
 
     def _get_squashed_diff(self, extra_args):
@@ -1255,40 +1412,67 @@ class Post(Command):
             SquashedDiff:
             The squashed diff and associated metadata.
         """
-        diff_kwargs = {}
+        tool = self.tool
+        options = self.options
 
-        if self.options.git_find_renames_threshold is not None:
-            diff_kwargs['git_find_renames_threshold'] = \
-                self.options.git_find_renames_threshold
-
-        diff_info = self.tool.diff(
-            revisions=self.revisions,
-            include_files=self.options.include_files or [],
-            exclude_patterns=self.options.exclude_patterns or [],
-            repository_info=self.repository_info,
-            extra_args=extra_args,
-            **diff_kwargs)
+        diff_kwargs = self._build_get_diff_kwargs(extra_args)
+        diff_info = tool.diff(revisions=self.revisions,
+                              **diff_kwargs)
 
         # If only certain files within a commit are being submitted for review,
         # do not include the commit id. This prevents conflicts if multiple
         # files from the same commit are posted for review separately.
-        if self.options.include_files or self.options.exclude_patterns:
+        if options.include_files or options.exclude_patterns:
             diff_info['commit_id'] = None
 
-        if (self.tool.supports_changesets and
-            not self.options.diff_filename and
+        if (tool.supports_changesets and
+            not options.diff_filename and
             'changenum' in diff_info):
             changenum = diff_info['changenum']
         else:
-            changenum = self.tool.get_changenum(self.revisions)
+            changenum = tool.get_changenum(self.revisions)
 
         return SquashedDiff(
             diff=diff_info['diff'],
             parent_diff=diff_info.get('parent_diff'),
             base_commit_id=diff_info.get('base_commit_id'),
             commit_id=diff_info.get('commit_id'),
+            review_request_extra_data=diff_info.get(
+                'review_request_extra_data'),
             changenum=changenum,
-            base_dir=self.options.basedir or self.repository_info.base_path)
+            base_dir=options.basedir or self.repository_info.base_path)
+
+    def _build_get_diff_kwargs(self, extra_args):
+        """Build keyword arguments for a diff call.
+
+        This is a convenience function used by :py:meth:`_get_diff_history`
+        and :py:meth:`_get_squashed_diff`.
+
+        Version Added:
+            3.1
+
+        Args:
+            extra_args (list):
+                Extra arguments to pass to the underlying tool.
+
+        Returns:
+            dict:
+            The keyword arguments to pass to the call.
+        """
+        options = self.options
+
+        diff_kwargs = {
+            'exclude_patterns': options.exclude_patterns or [],
+            'extra_args': extra_args,
+            'include_files': options.include_files or [],
+            'repository_info': self.repository_info,
+        }
+
+        if options.git_find_renames_threshold is not None:
+            diff_kwargs['git_find_renames_threshold'] = \
+                options.git_find_renames_threshold
+
+        return diff_kwargs
 
     def _post_diff_history(self, review_request, diff_history):
         """Post the diff history to the review request.

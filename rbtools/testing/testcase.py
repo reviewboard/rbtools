@@ -13,6 +13,8 @@ from contextlib import contextmanager
 import kgb
 import six
 
+from rbtools.api.client import RBClient
+from rbtools.testing.api.transport import URLMapTransport
 from rbtools.utils.filesystem import (cleanup_tempfiles,
                                       make_tempdir,
                                       make_tempfile)
@@ -36,6 +38,12 @@ class TestCase(unittest.TestCase):
     )
 
     maxDiff = 10000
+
+    #: A sample test URL for a Review Board server.
+    #:
+    #: Version Added:
+    #:     3.1
+    TEST_SERVER_URL = 'https://reviews.example.com/'
 
     #: Whether individual unit tests need a new temporary HOME directory.
     #:
@@ -65,7 +73,14 @@ class TestCase(unittest.TestCase):
         self.old_home = self.get_user_home()
 
         if self.needs_temp_home:
-            self.set_user_home(make_tempdir())
+            home_dir = make_tempdir()
+            self.set_user_home(home_dir)
+
+            # Since the tests need a safer HOME setup, it stands to reason
+            # that we should also not operate within the tree, as it could
+            # result in RBTools's .reviewboardrc being picked up. We'll
+            # instead default to running within the new home directory.
+            os.chdir(home_dir)
 
         os.environ[str('RBTOOLS_EDITOR')] = str(self.default_text_editor)
 
@@ -264,6 +279,47 @@ class TestCase(unittest.TestCase):
         # we can fix this.
         return self.assertRaisesRegexp(expected_exception,
                                        re.escape(expected_message))
+
+    def create_rbclient(self):
+        """Return a RBClient for testing.
+
+        This will set up a :py:class:`~rbtools.testing.api.transport.
+        URLMapTransport`. It's recommended that the caller access it via
+        :py:meth:`get_rbclient_transport`.
+
+        Version Added:
+            3.1
+
+        Args:
+            transport (rbtools.api.transport.Transport, optional):
+                An explicit transport instance to use
+
+        Returns:
+            rbtools.api.client.RBClient:
+            The client for testing purposes.
+        """
+        return RBClient(url=self.TEST_SERVER_URL,
+                        transport_cls=URLMapTransport)
+
+    def get_rbclient_transport(self, client):
+        """Return the transport associated with a RBClient.
+
+        This allows tests to avoid reaching into
+        :py:class:`~rbtools.api.client.RBClient` internals in order to get
+        the transport.
+
+        Version Added:
+            3.1
+
+        Args:
+            client (rbtools.api.client.RBClient):
+                The client instance.
+
+        Returns:
+            rbtools.api.transport.Transport:
+            The client's transport.
+        """
+        return client._transport
 
     @contextmanager
     def reviewboardrc(self, config, use_temp_dir=False):

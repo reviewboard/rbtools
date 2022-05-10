@@ -282,7 +282,7 @@ class ClearCaseClient(SCMClient):
     is installed on Windows.
     """
 
-    name = 'ClearCase'
+    name = 'VersionVault / ClearCase'
     server_tool_names = 'ClearCase,VersionVault / ClearCase'
     supports_patch_revert = True
 
@@ -985,7 +985,7 @@ class ClearCaseClient(SCMClient):
 
             # If a file isn't in the correct vob, then ignore it.
             for tag in repository_info.vob_tags:
-                if ('%s/' % tag) in path:
+                if ('%s%s' % (tag, os.sep)) in path:
                     break
             else:
                 logging.debug('VOB tag does not match, ignoring changes on %s',

@@ -51,6 +51,7 @@ class MercurialTestCase(SCMClientTestCase):
             },
             split_lines=False,
             results_unicode=False,
+            with_errors=False,
             **kwargs)
 
     def hg_add_file_commit(self, filename='test.txt', data=b'Test',
