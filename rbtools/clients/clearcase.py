@@ -1574,11 +1574,19 @@ class ClearCaseClient(SCMClient):
         """
         if entry.old_path:
             old_file_rel = os.path.relpath(entry.old_path, self.root_path)
+
+            if repository_info.is_legacy:
+                old_file_rel = os.path.join(repository_info.vobtag,
+                                            old_file_rel)
         else:
             old_file_rel = '/dev/null'
 
         if entry.new_path:
             new_file_rel = os.path.relpath(entry.new_path, self.root_path)
+
+            if repository_info.is_legacy:
+                new_file_rel = os.path.join(repository_info.vobtag,
+                                            new_file_rel)
         else:
             new_file_rel = '/dev/null'
 
@@ -1709,7 +1717,7 @@ class ClearCaseClient(SCMClient):
                 diff_type=diff_type,
                 diff=b''.join(dl))
 
-            return dl
+        return dl
 
     def _get_content_snapshot(self, filename):
         """Return the content of a file in a snapshot view.
@@ -2158,6 +2166,9 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
         for uuid, tags in six.iteritems(tags):
             self.vob_tags.update(tags)
             self.uuid_to_tags[uuid] = list(tags)
+
+        if self.is_legacy:
+            self.base_path = self.vobtag
 
     def find_server_repository_info(self, api_root):
         """Find a matching repository on the server.
