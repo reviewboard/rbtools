@@ -7,3 +7,4 @@ RBTools Workflows
 
    git
    sos
+   versionvault

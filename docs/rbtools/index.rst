@@ -137,6 +137,7 @@ RBTools Workflows
 
 * :ref:`rbtools-workflow-git`
 * :ref:`rbtools-workflow-sos`
+* :ref:`rbtools-workflow-versionvault`
 
 
 Indices, Glossary and Tables
