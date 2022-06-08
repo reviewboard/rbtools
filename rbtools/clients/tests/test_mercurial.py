@@ -12,9 +12,10 @@ from hashlib import md5
 from random import randint
 from textwrap import dedent
 
-from kgb import SpyAgency
+import kgb
 from six.moves import range
 
+import rbtools.helpers
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.errors import CreateCommitError, MergeError
 from rbtools.clients.mercurial import MercurialClient, MercurialRefType
@@ -23,6 +24,10 @@ from rbtools.clients.tests import (FOO, FOO1, FOO2, FOO3, FOO4, FOO5, FOO6,
 from rbtools.utils.encoding import force_unicode
 from rbtools.utils.filesystem import is_exe_in_path, load_config
 from rbtools.utils.process import execute
+
+
+hgext_path = os.path.abspath(os.path.join(rbtools.helpers.__file__, '..',
+                                          'hgext.py'))
 
 
 class MercurialTestCase(SCMClientTestCase):
@@ -95,7 +100,7 @@ class MercurialTestCase(SCMClientTestCase):
             self.run_hg(['tag', tag])
 
 
-class MercurialClientTests(SpyAgency, MercurialTestCase):
+class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
     """Unit tests for MercurialClient."""
 
     TESTSERVER = 'http://127.0.0.1:8080'
@@ -1387,6 +1392,79 @@ class MercurialClientTests(SpyAgency, MercurialTestCase):
                               destination='non-existent-branch',
                               message='commit message',
                               author=self.AUTHOR)
+
+    def test_apply_patch(self):
+        """Testing MercurialClient.apply_patch"""
+        client = self.client
+
+        self.spy_on(execute,
+                    op=kgb.SpyOpReturn((0, b'test')))
+
+        result = client.apply_patch(patch_file='test.diff')
+
+        self.assertSpyCalledWith(
+            execute,
+            [
+                'hg', 'patch', '--no-commit', 'test.diff',
+                '--config', 'extensions.rbtoolsnormalize=%s' % hgext_path,
+            ],
+            with_errors=True,
+            return_error_code=True,
+            results_unicode=False)
+
+        self.assertTrue(result.applied)
+        self.assertFalse(result.has_conflicts)
+        self.assertEqual(result.conflicting_files, [])
+        self.assertEqual(result.patch_output, b'test')
+
+    def test_apply_patch_with_p(self):
+        """Testing MercurialClient.apply_patch with p="""
+        client = self.client
+
+        self.spy_on(execute,
+                    op=kgb.SpyOpReturn((0, b'test')))
+
+        result = client.apply_patch(patch_file='test.diff',
+                                    p='1')
+
+        self.assertSpyCalledWith(
+            execute,
+            [
+                'hg', 'patch', '--no-commit', '-p', '1', 'test.diff',
+                '--config', 'extensions.rbtoolsnormalize=%s' % hgext_path,
+            ],
+            with_errors=True,
+            return_error_code=True,
+            results_unicode=False)
+
+        self.assertTrue(result.applied)
+        self.assertFalse(result.has_conflicts)
+        self.assertEqual(result.conflicting_files, [])
+        self.assertEqual(result.patch_output, b'test')
+
+    def test_apply_patch_with_error(self):
+        """Testing MercurialClient.apply_patch with error"""
+        client = self.client
+
+        self.spy_on(execute,
+                    op=kgb.SpyOpReturn((1, b'bad')))
+
+        result = client.apply_patch(patch_file='test.diff')
+
+        self.assertSpyCalledWith(
+            execute,
+            [
+                'hg', 'patch', '--no-commit', 'test.diff',
+                '--config', 'extensions.rbtoolsnormalize=%s' % hgext_path,
+            ],
+            with_errors=True,
+            return_error_code=True,
+            results_unicode=False)
+
+        self.assertFalse(result.applied)
+        self.assertFalse(result.has_conflicts)
+        self.assertEqual(result.conflicting_files, [])
+        self.assertEqual(result.patch_output, b'bad')
 
     def _hg_get_tip(self):
         """Return the revision at the tip of the branch.

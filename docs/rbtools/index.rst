@@ -97,6 +97,15 @@ instructions for your operating system.
    the our guide on :ref:`configuring TFS <rbtools-tfs>`.
 
 
+Authentication
+==============
+
+Most actions with RBTools require that you are authenticated to a Review Board
+server.
+
+* :ref:`Authenticating to Review Board <rbtools-authentication>`
+
+
 Configuration
 =============
 

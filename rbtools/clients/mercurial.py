@@ -1176,12 +1176,19 @@ class MercurialClient(SCMClient):
 
         return None
 
-    def _execute(self, cmd, *args, **kwargs):
+    def _execute(self, cmd, with_errors=False, *args, **kwargs):
         """Execute an hg command.
 
         Args:
             cmd (list of unicode):
                 A command line to execute.
+
+            with_errors (bool, optional):
+                Whether to combine the output and error streams of the command
+                together into a single return value.
+
+                Unlike in :py:`rbtools.utils.process.execute`, this defaults
+                to ``False``.
 
             *args (list):
                 Addditional arguments to pass to
@@ -1210,7 +1217,7 @@ class MercurialClient(SCMClient):
             'extensions.rbtoolsnormalize=%s' % self._hgext_path
         ]
 
-        return execute(cmd, with_errors=False, *args, **kwargs)
+        return execute(cmd, with_errors=with_errors, *args, **kwargs)
 
     def has_pending_changes(self):
         """Check if there are changes waiting to be committed.

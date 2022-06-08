@@ -1773,6 +1773,8 @@ class ClearCaseClient(SCMClient):
         })
         legacy_diff = []
 
+        logging.debug('Doing diff of changeset: %s', changeset)
+
         for entry in changeset:
             legacy_dl = []
 
@@ -1796,6 +1798,25 @@ class ClearCaseClient(SCMClient):
         return {
             'diff': diff,
         }
+
+    def _is_dir(self, path):
+        """Return whether a given path is a directory.
+
+        Args:
+            path (unicode):
+                The path of the element to check.
+
+        Returns:
+            bool:
+            ``True`` if the given element is a directory.
+        """
+        if self.viewtype == 'dynamic' and cpath.exists(path):
+            return cpath.isdir(path)
+        else:
+            object_kind = execute(
+                ['cleartool', 'describe', '-fmt', '%m', path])
+
+            return object_kind.startswith('directory')
 
     def _process_directory_changes(self, changeset):
         """Scan through the changeset and handle directory elements.
@@ -1821,15 +1842,7 @@ class ClearCaseClient(SCMClient):
         directories = []
 
         for old_file, new_file in changeset:
-            if self.viewtype == 'snapshot':
-                object_kind = execute(['cleartool', 'describe', '-fmt', '%m',
-                                       new_file])
-
-                is_dir = object_kind.startswith('directory')
-            else:
-                is_dir = cpath.isdir(new_file)
-
-            if is_dir:
+            if self._is_dir(new_file):
                 directories.append((old_file, new_file))
             else:
                 files.append(ChangesetEntry(self.root_path, old_path=old_file,
@@ -1844,10 +1857,11 @@ class ClearCaseClient(SCMClient):
                         file.op = 'create'
                         break
                 else:
-                    files.append(ChangesetEntry(self.root_path,
-                                                new_path=filename,
-                                                new_oid=oid,
-                                                op='create'))
+                    if not self._is_dir(filename):
+                        files.append(ChangesetEntry(self.root_path,
+                                                    new_path=filename,
+                                                    new_oid=oid,
+                                                    op='create'))
 
             for filename, oid in changes['deleted']:
                 for file in files:
@@ -1855,17 +1869,18 @@ class ClearCaseClient(SCMClient):
                         file.op = 'delete'
                         break
                 else:
-                    # The extended path we get here doesn't include the
-                    # revision of the element. While many operations can
-                    # succeed in this case, fetching the content of the file
-                    # from snapshot views does not. We therefore look at the
-                    # history of the file and get the last revision from it.
-                    filename = execute(['cleartool', 'lshistory', '-last',
-                                        '1', '-fmt', '%Xn', 'oid:%s' % oid])
-                    files.append(ChangesetEntry(self.root_path,
-                                                old_path=filename,
-                                                old_oid=oid,
-                                                op='delete'))
+                    if not self._is_dir(filename):
+                        # The extended path we get here doesn't include the
+                        # revision of the element. While many operations can
+                        # succeed in this case, fetching the content of the file
+                        # from snapshot views does not. We therefore look at the
+                        # history of the file and get the last revision from it.
+                        filename = execute(['cleartool', 'lshistory', '-last',
+                                            '1', '-fmt', '%Xn', 'oid:%s' % oid])
+                        files.append(ChangesetEntry(self.root_path,
+                                                    old_path=filename,
+                                                    old_oid=oid,
+                                                    op='delete'))
 
             for old_file, old_oid, new_file, new_oid in changes['renamed']:
                 # Just using the old filename that we get from the
@@ -1883,12 +1898,13 @@ class ClearCaseClient(SCMClient):
                         file.op = 'move'
                         break
                 else:
-                    files.append(ChangesetEntry(self.root_path,
-                                                old_path=old_path,
-                                                new_path=new_file,
-                                                old_oid=old_oid,
-                                                new_oid=new_oid,
-                                                op='move'))
+                    if not self._is_dir(new_file):
+                        files.append(ChangesetEntry(self.root_path,
+                                                    old_path=old_path,
+                                                    new_path=new_file,
+                                                    old_oid=old_oid,
+                                                    new_oid=new_oid,
+                                                    op='move'))
 
         return files
 
