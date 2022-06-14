@@ -1,0 +1,64 @@
+.. default-intersphinx:: rbt3.x rb-latest
+
+
+===========================
+RBTools 3.1.1 Release Notes
+===========================
+
+**Release date:** TBD
+
+
+Bug Fixes
+=========
+
+rbt patch
+---------
+
+* Fixed the display of filenames when encountering conflicts on Python 3.
+
+  Filenames were being shown with a ``b'`` prefix, indicating a Python
+  bytestring.
+
+
+rbt post
+--------
+
+* Fixed a regression with posting an existing diff using
+  :option:`--diff-filename <rbt post --diff-filename>`.
+
+  Due to an internal change, this was crashing before posting for review.
+
+* Fixed File Not Found errors to show the missing revision alongside the
+  filename.
+
+
+IBM ClearCase / HCL VersionVault
+--------------------------------
+
+* Fixed generating diffs when directories are added or deleted.
+
+* Fixed regressions when posting changes against repositories configured using
+  the legacy ClearCase support shipped in Review Board.
+
+  We recommend that all legacy ClearCase users migrate to the new support in
+  `Power Pack`_.
+
+
+.. _Power Pack: https://www.reviewboard.org/powerpack/
+
+
+Mercurial
+---------
+
+* Fixed a regression in applying patches using :ref:`rbt land <rbt-land>` or
+  :ref:`rbt patch <rbt-patch>` in Mercurial.
+
+  This regressed in RBTools 3.1.
+
+
+Contributors
+============
+
+* Christian Hammond
+* David Trowbridge
+* Michelle Aubin

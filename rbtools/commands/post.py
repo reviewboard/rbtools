@@ -890,6 +890,7 @@ class Post(Command):
                 base_commit_id=None,
                 commit_id=None,
                 changenum=None,
+                review_request_extra_data=None,
                 base_dir=(self.options.basedir or
                           self.repository_info.base_path))
         else:
@@ -962,7 +963,8 @@ class Post(Command):
             msg_prefix = ''
 
             if e.error_code == 207:
-                msg_prefix = '%s: ' % e.rsp['file']
+                msg_prefix = '%s (revision %s): ' % (e.rsp['file'],
+                                                     e.rsp['revision'])
 
             raise CommandError('Error validating diff\n\n%s%s'
                                % (msg_prefix, e))

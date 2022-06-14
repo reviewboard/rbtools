@@ -393,9 +393,9 @@ class Patch(Command):
                 self.json.add('conflicting_files', [])
 
                 for filename in result.conflicting_files:
+                    filename = filename.decode('utf-8')
                     self.stdout.write('    %s' % filename)
-                    self.json.append('conflicting_files',
-                                     filename.decode('utf-8'))
+                    self.json.append('conflicting_files', filename)
 
                 self.stdout.new_line()
             elif revert:
