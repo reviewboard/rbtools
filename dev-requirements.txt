@@ -3,6 +3,6 @@ mock
 nose
 
 # Ordering here matters.
-mercurial>=4.4.2; python_version == '2.7'
+mercurial>=4.4.2,<6.2; python_version == '2.7'
 mercurial==4.2.2,<4.2.999; python_version == '2.6'
 hgsubversion; python_version <= '2.7'
