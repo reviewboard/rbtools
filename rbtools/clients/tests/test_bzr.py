@@ -12,7 +12,8 @@ from rbtools.clients import RepositoryInfo
 from rbtools.clients.bazaar import BazaarClient
 from rbtools.clients.errors import TooManyRevisionsError
 from rbtools.clients.tests import FOO, FOO1, FOO2, FOO3, SCMClientTestCase
-from rbtools.utils.filesystem import is_exe_in_path, make_tempdir
+from rbtools.utils.checks import check_install
+from rbtools.utils.filesystem import make_tempdir
 from rbtools.utils.process import execute
 
 
@@ -35,9 +36,6 @@ class BazaarClientTests(SCMClientTestCase):
             The main clone directory, or ``None`` if :command:`bzr` isn't
             in the path.
         """
-        if not is_exe_in_path('bzr'):
-            return None
-
         original_branch = os.path.join(checkout_dir, 'orig')
         child_branch = os.path.join(checkout_dir, 'child')
 
@@ -45,27 +43,36 @@ class BazaarClientTests(SCMClientTestCase):
         os.mkdir(original_branch, 0o700)
         os.mkdir(child_branch, 0o700)
 
-        try:
-            cls._run_bzr(['init', '.'], cwd=original_branch)
-            cls._bzr_add_file_commit(filename='foo.txt',
-                                     data=FOO,
-                                     msg='initial commit',
-                                     cwd=original_branch)
-
-            cls._run_bzr(['branch', '--use-existing-dir', original_branch,
-                          child_branch],
-                         cwd=original_branch)
-        except Exception as e:
-            raise unittest.SkipTest('Unable to set up bzr checkout: %s' %
-                                    six.text_type(e))
-
         cls.original_branch = original_branch
         cls.child_branch = child_branch
+
+        if check_install(['bzr', 'help']):
+            cls._bzr = 'bzr'
+        elif check_install(['brz', 'help']):
+            cls._bzr = 'brz'
+        else:
+            cls._bzr = None
+
+        if cls._bzr:
+            try:
+                cls._run_bzr(['init', '.'], cwd=original_branch)
+                cls._bzr_add_file_commit(filename='foo.txt',
+                                         data=FOO,
+                                         msg='initial commit',
+                                         cwd=original_branch)
+
+                cls._run_bzr(['branch', '--use-existing-dir', original_branch,
+                              child_branch],
+                             cwd=original_branch)
+            except Exception as e:
+                # We couldn't set up the repository, so skip this. We'll skip
+                # when setting up the client.
+                pass
 
         return original_branch
 
     def setUp(self):
-        if not is_exe_in_path('bzr'):
+        if not self._bzr:
             raise unittest.SkipTest('bzr not found in path')
 
         super(BazaarClientTests, self).setUp()
@@ -77,7 +84,32 @@ class BazaarClientTests(SCMClientTestCase):
 
     @classmethod
     def _run_bzr(cls, command, *args, **kwargs):
-        return execute(['bzr'] + command, *args, **kwargs)
+        """Run Bazaar/Breezy with the provided arguments.
+
+        Args:
+            command (list of unicode):
+                The argument to pass to the command.
+
+            *args (tuple):
+                Additional positional arguments to pass to
+                :py:func:`~rtools.utils.process.execute`.
+
+            **kwargs (dict):
+                Additional Keyword arguments to pass to
+                :py:func:`~rtools.utils.process.execute`.
+
+        Returns:
+            object:
+            The result of the :py:func:`~rtools.utils.process.execute` call.
+        """
+        return execute(
+            [cls._bzr] + command,
+            env={
+                'BRZ_EMAIL': 'Test User <test@example.com>',
+                'BZR_EMAIL': 'Test User <test@example.com>',
+            },
+            *args,
+            **kwargs)
 
     @classmethod
     def _bzr_add_file_commit(cls, filename, data, msg, cwd=None, *args,
