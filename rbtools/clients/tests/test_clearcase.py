@@ -3,7 +3,6 @@
 from __future__ import unicode_literals
 
 import os
-import unittest
 
 import kgb
 import six
@@ -11,8 +10,7 @@ import six
 from rbtools.clients.clearcase import ClearCaseClient, ClearCaseRepositoryInfo
 from rbtools.clients.errors import SCMError
 from rbtools.clients.tests import SCMClientTestCase
-from rbtools.utils.checks import check_gnu_diff
-from rbtools.utils.filesystem import is_exe_in_path
+from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.process import execute
 
 
@@ -114,14 +112,26 @@ _WEBVIEW_VIEW_INFO = [
 class ClearCaseClientTests(kgb.SpyAgency, SCMClientTestCase):
     """Unit tests for ClearCaseClient."""
 
-    @unittest.skipIf(not is_exe_in_path('cleartool'),
-                     'cleartool not found in path')
+    scmclient_cls = ClearCaseClient
+
     def setUp(self):
         super(ClearCaseClientTests, self).setUp()
 
-        self.set_user_home(
-            os.path.join(self.testdata_dir, 'homedir'))
-        self.client = ClearCaseClient(options=self.options)
+        self.set_user_home(os.path.join(self.testdata_dir, 'homedir'))
+
+        self.spy_on(check_install, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': (['cleartool', 'help'],),
+                'op': kgb.SpyOpReturn(True),
+            },
+        ]))
+
+        self.spy_on(ClearCaseClient._get_host_info, op=kgb.SpyOpReturn({
+            'Product name': 'ClearCase',
+            'Product version': '7.0.1.0',
+            'Operating system': 'Linux',
+            'Registry region': 'devel',
+        }))
 
     def test_get_local_path_outside_view(self):
         """Testing ClearCaseClient.get_local_path outside of view"""
@@ -132,7 +142,9 @@ class ClearCaseClientTests(kgb.SpyAgency, SCMClientTestCase):
             },
         ]))
 
-        self.assertEqual(self.client.get_local_path(), None)
+        client = self.build_client()
+
+        self.assertIsNone(client.get_local_path())
 
     def test_get_local_path_inside_view(self):
         """Testing ClearCaseClient.get_local_path inside view"""
@@ -151,7 +163,9 @@ class ClearCaseClientTests(kgb.SpyAgency, SCMClientTestCase):
             },
         ]))
 
-        self.assertEqual(self.client.get_local_path(), '/test/view/vob')
+        client = self.build_client()
+
+        self.assertEqual(client.get_local_path(), '/test/view/vob')
 
     def test_get_repository_info_snapshot(self):
         """Testing ClearCaseClient.get_repository_info with snapshot view"""
@@ -176,17 +190,19 @@ class ClearCaseClientTests(kgb.SpyAgency, SCMClientTestCase):
             },
         ]))
 
-        repository_info = self.client.get_repository_info()
+        client = self.build_client()
+
+        repository_info = client.get_repository_info()
         self.assertEqual(repository_info.path, '/test/view/vob')
         self.assertEqual(repository_info.vobtag, 'vob')
         self.assertEqual(repository_info.vob_tags, {'vob'})
 
         # Initial state that gets populated later by update_from_remote
         self.assertEqual(repository_info.uuid_to_tags, {})
-        self.assertEqual(repository_info.is_legacy, True)
+        self.assertTrue(repository_info.is_legacy)
 
-        self.assertEqual(self.client.viewtype, 'snapshot')
-        self.assertEqual(self.client.is_ucm, False)
+        self.assertEqual(client.viewtype, 'snapshot')
+        self.assertFalse(client.is_ucm)
 
     def test_get_repository_info_dynamic(self):
         """Testing ClearCaseClient.get_repository_info with dynamic view and
@@ -213,17 +229,19 @@ class ClearCaseClientTests(kgb.SpyAgency, SCMClientTestCase):
             },
         ]))
 
-        repository_info = self.client.get_repository_info()
+        client = self.build_client()
+
+        repository_info = client.get_repository_info()
         self.assertEqual(repository_info.path, '/test/view/vob')
         self.assertEqual(repository_info.vobtag, 'vob')
         self.assertEqual(repository_info.vob_tags, {'vob'})
 
         # Initial state that gets populated later by update_from_remote
         self.assertEqual(repository_info.uuid_to_tags, {})
-        self.assertEqual(repository_info.is_legacy, True)
+        self.assertTrue(repository_info.is_legacy)
 
-        self.assertEqual(self.client.viewtype, 'dynamic')
-        self.assertEqual(self.client.is_ucm, False)
+        self.assertEqual(client.viewtype, 'dynamic')
+        self.assertFalse(client.is_ucm)
 
     def test_get_repository_info_dynamic_UCM(self):
         """Testing ClearCaseClient.get_repository_info with dynamic view and UCM
@@ -249,17 +267,19 @@ class ClearCaseClientTests(kgb.SpyAgency, SCMClientTestCase):
             },
         ]))
 
-        repository_info = self.client.get_repository_info()
+        client = self.build_client()
+
+        repository_info = client.get_repository_info()
         self.assertEqual(repository_info.path, '/test/view/vob')
         self.assertEqual(repository_info.vobtag, 'vob')
         self.assertEqual(repository_info.vob_tags, {'vob'})
 
         # Initial state that gets populated later by update_from_remote
         self.assertEqual(repository_info.uuid_to_tags, {})
-        self.assertEqual(repository_info.is_legacy, True)
+        self.assertTrue(repository_info.is_legacy)
 
-        self.assertEqual(self.client.viewtype, 'dynamic')
-        self.assertEqual(self.client.is_ucm, True)
+        self.assertEqual(client.viewtype, 'dynamic')
+        self.assertTrue(client.is_ucm)
 
     def test_get_repository_info_automatic(self):
         """Testing ClearCaseClient.get_repository_info with automatic view"""
@@ -284,8 +304,10 @@ class ClearCaseClientTests(kgb.SpyAgency, SCMClientTestCase):
             },
         ]))
 
+        client = self.build_client()
+
         try:
-            self.client.get_repository_info()
+            client.get_repository_info()
         except SCMError as e:
             self.assertEqual(six.text_type(e),
                              'Webviews and automatic views are not currently '
@@ -317,8 +339,10 @@ class ClearCaseClientTests(kgb.SpyAgency, SCMClientTestCase):
             },
         ]))
 
+        client = self.build_client()
+
         try:
-            self.client.get_repository_info()
+            client.get_repository_info()
         except SCMError as e:
             self.assertEqual(six.text_type(e),
                              'Webviews and automatic views are not currently '
@@ -363,7 +387,7 @@ class ClearCaseClientTests(kgb.SpyAgency, SCMClientTestCase):
             '9ac6856f.c9af11eb.9851.52:54:00:7f:63:a5': ['vob1'],
             'b520a815.c9af11eb.986f.52:54:00:7f:63:a5': ['vob2'],
         })
-        self.assertEqual(repository_info.is_legacy, False)
+        self.assertFalse(repository_info.is_legacy)
 
     def test_repository_info_update_from_remote_versionvault(self):
         """Testing ClearCaseRepositoryInfo.update_from_remote with
@@ -391,7 +415,7 @@ class ClearCaseClientTests(kgb.SpyAgency, SCMClientTestCase):
         self.assertEqual(repository_info.uuid_to_tags, {
             '9ac6856f.c9af11eb.9851.52:54:00:7f:63:a5': ['vob'],
         })
-        self.assertEqual(repository_info.is_legacy, True)
+        self.assertTrue(repository_info.is_legacy)
 
     def test_get_vobtag_success(self):
         """Testing ClearCaseClient._get_vobtag inside view"""
@@ -402,7 +426,9 @@ class ClearCaseClientTests(kgb.SpyAgency, SCMClientTestCase):
             },
         ]))
 
-        self.assertEqual(self.client._get_vobtag(), '/vob')
+        client = self.build_client()
+
+        self.assertEqual(client._get_vobtag(), '/vob')
 
     def test_get_vobtag_error(self):
         """Testing ClearCaseClient._get_vobtag outside view"""
@@ -416,8 +442,10 @@ class ClearCaseClientTests(kgb.SpyAgency, SCMClientTestCase):
             },
         ]))
 
+        client = self.build_client()
+
         with self.assertRaises(SCMError):
-            self.client._get_vobtag()
+            client._get_vobtag()
 
     def test_parse_revision_spec(self):
         """Testing ClearCaseClient.parse_revision_spec"""
@@ -477,11 +505,12 @@ class ClearCaseClientTests(kgb.SpyAgency, SCMClientTestCase):
 
         # Fake a dynamic view, which is required for revision specs with two
         # revisions.
-        self.client.viewtype = 'dynamic'
+        client = self.build_client()
+        client.viewtype = 'dynamic'
 
         for spec, base, tip in cases:
             self.assertEqual(
-                self.client.parse_revision_spec(spec),
+                client.parse_revision_spec(spec),
                 {'base': base, 'tip': tip})
 
     def test_checkedout_changeset(self):
@@ -508,13 +537,15 @@ class ClearCaseClientTests(kgb.SpyAgency, SCMClientTestCase):
             },
         ]))
 
+        client = self.build_client()
+
         repository_info = ClearCaseRepositoryInfo('/view/test/vob', 'vob')
         repository_info.update_from_remote({}, {
             'repopath': '/view/server-view',
             'uuid': '9ac6856f.c9af11eb.9851.52:54:00:7f:63:a5',
         })
 
-        changeset = self.client._get_checkedout_changeset(repository_info)
+        changeset = client._get_checkedout_changeset(repository_info)
 
         self.assertEqual(changeset, [
             ('test2.py@@/main/1', 'test2.py'),
@@ -562,14 +593,16 @@ class ClearCaseClientTests(kgb.SpyAgency, SCMClientTestCase):
             },
         ]))
 
+        client = self.build_client()
+
         repository_info = ClearCaseRepositoryInfo('/view/test/vob', 'vob')
         repository_info.update_from_remote({}, {
             'repopath': '/view/server-view',
             'uuid': '9ac6856f.c9af11eb.9851.52:54:00:7f:63:a5',
         })
 
-        changeset = self.client._get_activity_changeset('activity-name',
-                                                        repository_info)
+        changeset = client._get_activity_changeset('activity-name',
+                                                   repository_info)
 
         self.assertEqual(changeset, [
             ('/view/x/vobs/els/.@@/main/int/1',
@@ -626,8 +659,10 @@ class ClearCaseClientTests(kgb.SpyAgency, SCMClientTestCase):
             },
         ]))
 
+        client = self.build_client()
+
         self.assertEqual(
-            self.client._diff_directory('.@@/main/1', '.@@/main/CHECKEDOUT'),
+            client._diff_directory('.@@/main/1', '.@@/main/CHECKEDOUT'),
             {
                 'added': {('.@@/main/CHECKEDOUT/test4.py',
                            'test4.py-fake-oid')},
