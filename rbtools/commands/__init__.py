@@ -1072,15 +1072,21 @@ class Command(object):
         args = self.options.args
 
         # Check that the proper number of arguments have been provided.
-        argspec = inspect.getargspec(self.main)
-        minargs = len(argspec[0]) - 1
+        if hasattr(inspect, 'getfullargspec'):
+            # Python 3
+            argspec = inspect.getfullargspec(self.main)
+        else:
+            # Python 2
+            argspec = inspect.getargspec(self.main)
+
+        minargs = len(argspec.args) - 1
         maxargs = minargs
 
         # Arguments that have a default value are considered optional.
-        if argspec[3] is not None:
-            minargs -= len(argspec[3])
+        if argspec.defaults is not None:
+            minargs -= len(argspec.defaults)
 
-        if argspec[1] is not None:
+        if argspec.varargs is not None:
             maxargs = None
 
         if len(args) < minargs or (maxargs is not None and
