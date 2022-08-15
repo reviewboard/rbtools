@@ -12,17 +12,16 @@ from rbtools.clients.tests import SCMClientTestCase
 class CVSClientTests(kgb.SpyAgency, SCMClientTestCase):
     """Unit tests for CVSClient."""
 
-    def setUp(self):
-        super(CVSClientTests, self).setUp()
-
-        self.client = CVSClient(options=self.options)
+    scmclient_cls = CVSClient
 
     def test_get_repository_info_with_found(self):
         """Testing CVSClient.get_repository_info with repository found"""
-        self.spy_on(CVSClient.get_local_path,
+        client = self.build_client()
+
+        self.spy_on(client.get_local_path,
                     op=kgb.SpyOpReturn('/path/to/cvsdir'))
 
-        repository_info = self.client.get_repository_info()
+        repository_info = client.get_repository_info()
 
         self.assertIsInstance(repository_info, RepositoryInfo)
         self.assertIsNone(repository_info.base_path)
@@ -31,9 +30,11 @@ class CVSClientTests(kgb.SpyAgency, SCMClientTestCase):
 
     def test_get_repository_info_with_not_found(self):
         """Testing CVSClient.get_repository_info with repository not found"""
-        self.spy_on(CVSClient.get_local_path,
+        client = self.build_client()
+
+        self.spy_on(client.get_local_path,
                     op=kgb.SpyOpReturn(None))
 
-        repository_info = self.client.get_repository_info()
+        repository_info = client.get_repository_info()
 
         self.assertIsNone(repository_info)
