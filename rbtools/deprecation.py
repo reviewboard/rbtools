@@ -19,7 +19,11 @@ class BaseRemovedInRBToolsVersionWarning(DeprecationWarning):
     """
 
     @classmethod
-    def warn(cls, message, stacklevel=2):
+    def warn(
+        cls,
+        message: str,
+        stacklevel: int = 2,
+    ) -> None:
         """Emit the deprecation warning.
 
         This is a convenience function that emits a deprecation warning using
@@ -45,4 +49,22 @@ class RemovedInRBTools40Warning(BaseRemovedInRBToolsVersionWarning):
     """
 
 
-RemovedInNextRBToolsVersionWarning = RemovedInRBTools40Warning
+class RemovedInRBTools50Warning(BaseRemovedInRBToolsVersionWarning):
+    """Deprecations for features removed in RBTools 5.0.
+
+    Note that this class will itself be removed in RBTools 5.0. If you need to
+    check against RBTools deprecation warnings, please see
+    :py:class:`BaseRemovedInRBToolsVersionWarning`.
+    """
+
+
+class RemovedInRBTools60Warning(BaseRemovedInRBToolsVersionWarning):
+    """Deprecations for features removed in RBTools 6.0.
+
+    Note that this class will itself be removed in RBTools 6.0. If you need to
+    check against RBTools deprecation warnings, please see
+    :py:class:`BaseRemovedInRBToolsVersionWarning`.
+    """
+
+
+RemovedInNextRBToolsVersionWarning = RemovedInRBTools50Warning
