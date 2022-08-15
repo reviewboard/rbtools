@@ -24,33 +24,6 @@ from rbtools.utils.process import execute
 from rbtools.utils.repository import get_repository_resource
 
 
-def svn_version_set_hash(svn16_hash, svn17_hash, svn19_hash):
-    """Pass the appropriate hash to the wrapped function.
-
-    SVN 1.6, 1.7/1.8, and 1.9+ will generate slightly different output for
-    ``svn diff`` when generating the diff with a working copy. This works
-    around that by checking the installed SVN version and passing the
-    appropriate hash.
-    """
-
-    def decorator(f):
-        @wraps(f)
-        def wrapped(self):
-            self.client.get_repository_info()
-
-            version = self.client.subversion_client_version
-
-            if version < (1, 7):
-                return f(self, svn16_hash)
-            elif version < (1, 9):
-                return f(self, svn17_hash)
-            else:
-                return f(self, svn19_hash)
-
-        return wrapped
-    return decorator
-
-
 _MATCH_URL_BASE = 'http://localhost:8080/api/repositories/'
 _MATCH_URL_TOOL = 'tool=Subversion'
 _MATCH_URL_FIELDS = 'only-fields=id%2Cname%2Cmirror_path%2Cpath'
@@ -368,6 +341,8 @@ class SVNRepositoryMatchTests(kgb.SpyAgency, SCMClientTestCase):
 class SVNClientTests(SCMClientTestCase):
     """Unit tests for SVNClient."""
 
+    scmclient_cls = SVNClient
+
     @classmethod
     def setup_checkout(cls, checkout_dir):
         """Populate a Subversion checkout.
@@ -394,6 +369,25 @@ class SVNClientTests(SCMClientTestCase):
         os.chdir(checkout_dir)
         cls._run_svn(['co', cls.svn_repo_url, cls.clone_dir])
 
+        svn_version = cls._run_svn(['--version', '-q'])
+        cls.svn_version = tuple(
+            int(_v)
+            for _v in svn_version.split('.')
+        )
+
+        if cls.svn_version >= (1, 9):
+            # Subversion >= 1.9
+            cls.new_file_diff_orig_version = b'nonexistent'
+            cls.new_file_diff_modified_version = b'working copy'
+        elif cls.svn_version >= (1, 7):
+            # Subversion >= 1.7, < 1.9
+            cls.new_file_diff_orig_version = b'revision 0'
+            cls.new_file_diff_modified_version = b'working copy'
+        else:
+            # Subversion < 1.7
+            cls.new_file_diff_orig_version = b'revision 0'
+            cls.new_file_diff_modified_version = b'revision 0'
+
         return cls.clone_dir
 
     def setUp(self):
@@ -403,7 +397,6 @@ class SVNClientTests(SCMClientTestCase):
         super(SVNClientTests, self).setUp()
 
         self.options.svn_show_copies_as_adds = None
-        self.client = SVNClient(options=self.options)
 
     @classmethod
     def _run_svn(cls, command):
@@ -432,212 +425,244 @@ class SVNClientTests(SCMClientTestCase):
 
     def test_parse_revision_spec_no_args(self):
         """Testing SVNClient.parse_revision_spec with no specified revisions"""
-        revisions = self.client.parse_revision_spec()
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' not in revisions)
-        self.assertEqual(revisions['base'], 'BASE')
-        self.assertEqual(revisions['tip'], '--rbtools-working-copy')
+        client = self.build_client()
+
+        self.assertEqual(
+            client.parse_revision_spec(),
+            {
+                'base': 'BASE',
+                'tip': '--rbtools-working-copy',
+            })
 
     def test_parse_revision_spec_one_revision(self):
         """Testing SVNClient.parse_revision_spec with one specified numeric
-        revision"""
-        revisions = self.client.parse_revision_spec(['3'])
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' not in revisions)
-        self.assertEqual(revisions['base'], 2)
-        self.assertEqual(revisions['tip'], 3)
+        revision
+        """
+        client = self.build_client()
+
+        self.assertEqual(
+            client.parse_revision_spec(['3']),
+            {
+                'base': 2,
+                'tip': 3,
+            })
 
     def test_parse_revision_spec_one_revision_changelist(self):
         """Testing SVNClient.parse_revision_spec with one specified changelist
-        revision"""
+        revision
+        """
+        client = self.build_client()
+
         self._svn_add_file('foo.txt', FOO3, 'my-change')
 
-        revisions = self.client.parse_revision_spec(['my-change'])
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' not in revisions)
-        self.assertEqual(revisions['base'], 'BASE')
-        self.assertEqual(revisions['tip'],
-                         SVNClient.REVISION_CHANGELIST_PREFIX + 'my-change')
+        self.assertEqual(
+            client.parse_revision_spec(['my-change']),
+            {
+                'base': 'BASE',
+                'tip': '%smy-change' % SVNClient.REVISION_CHANGELIST_PREFIX,
+            })
 
     def test_parse_revision_spec_one_revision_nonexistant_changelist(self):
         """Testing SVNClient.parse_revision_spec with one specified invalid
-        changelist revision"""
+        changelist revision
+        """
+        client = self.build_client()
+
         self._svn_add_file('foo.txt', FOO3, 'my-change')
 
-        self.assertRaises(
-            InvalidRevisionSpecError,
-            lambda: self.client.parse_revision_spec(['not-my-change']))
+        with self.assertRaises(InvalidRevisionSpecError):
+            client.parse_revision_spec(['not-my-change'])
 
     def test_parse_revision_spec_one_arg_two_revisions(self):
         """Testing SVNClient.parse_revision_spec with R1:R2 syntax"""
-        revisions = self.client.parse_revision_spec(['1:3'])
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' not in revisions)
-        self.assertEqual(revisions['base'], 1)
-        self.assertEqual(revisions['tip'], 3)
+        client = self.build_client()
+
+        self.assertEqual(
+            client.parse_revision_spec(['1:3']),
+            {
+                'base': 1,
+                'tip': 3,
+            })
 
     def test_parse_revision_spec_two_arguments(self):
         """Testing SVNClient.parse_revision_spec with two revisions"""
-        revisions = self.client.parse_revision_spec(['1', '3'])
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' not in revisions)
-        self.assertEqual(revisions['base'], 1)
-        self.assertEqual(revisions['tip'], 3)
+        client = self.build_client()
+
+        self.assertEqual(
+            client.parse_revision_spec(['1', '3']),
+            {
+                'base': 1,
+                'tip': 3,
+            })
 
     def test_parse_revision_spec_one_revision_url(self):
         """Testing SVNClient.parse_revision_spec with one revision and a
-        repository URL"""
-        self.options.repository_url = \
-            'http://svn.apache.org/repos/asf/subversion/trunk'
+        repository URL
+        """
+        client = self.build_client(options={
+            'repository_url': ('http://svn.apache.org/repos/asf/'
+                               'subversion/trunk'),
+        })
 
-        revisions = self.client.parse_revision_spec(['1549823'])
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' not in revisions)
-        self.assertEqual(revisions['base'], 1549822)
-        self.assertEqual(revisions['tip'], 1549823)
+        self.assertEqual(
+            client.parse_revision_spec(['1549823']),
+            {
+                'base': 1549822,
+                'tip': 1549823,
+            })
 
     def test_parse_revision_spec_two_revisions_url(self):
         """Testing SVNClient.parse_revision_spec with R1:R2 syntax and a
-        repository URL"""
-        self.options.repository_url = \
-            'http://svn.apache.org/repos/asf/subversion/trunk'
+        repository URL
+        """
+        client = self.build_client(options={
+            'repository_url': ('http://svn.apache.org/repos/asf/'
+                               'subversion/trunk'),
+        })
 
-        revisions = self.client.parse_revision_spec(['1549823:1550211'])
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' not in revisions)
-        self.assertEqual(revisions['base'], 1549823)
-        self.assertEqual(revisions['tip'], 1550211)
+        self.assertEqual(
+            client.parse_revision_spec(['1549823:1550211']),
+            {
+                'base': 1549823,
+                'tip': 1550211,
+            })
 
     def test_parse_revision_spec_invalid_spec(self):
         """Testing SVNClient.parse_revision_spec with invalid specifications"""
-        self.assertRaises(InvalidRevisionSpecError,
-                          self.client.parse_revision_spec,
-                          ['aoeu'])
-        self.assertRaises(InvalidRevisionSpecError,
-                          self.client.parse_revision_spec,
-                          ['aoeu', '1234'])
-        self.assertRaises(TooManyRevisionsError,
-                          self.client.parse_revision_spec,
-                          ['1', '2', '3'])
+        client = self.build_client()
+
+        with self.assertRaises(InvalidRevisionSpecError):
+            client.parse_revision_spec(['aoeu'])
+
+        with self.assertRaises(InvalidRevisionSpecError):
+            client.parse_revision_spec(['aoeu', '1234'])
+
+        with self.assertRaises(TooManyRevisionsError):
+            client.parse_revision_spec(['1', '2', '3'])
 
     def test_parse_revision_spec_non_unicode_log(self):
         """Testing SVNClient.parse_revision_spec with a non-utf8 log entry"""
+        client = self.build_client()
+
         # Note: the svn log entry for commit r2 contains one non-utf8 character
-        revisions = self.client.parse_revision_spec(['2'])
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' not in revisions)
-        self.assertEqual(revisions['base'], 1)
-        self.assertEqual(revisions['tip'], 2)
+        self.assertEqual(
+            client.parse_revision_spec(['2']),
+            {
+                'base': 1,
+                'tip': 2,
+            })
 
     def test_get_commit_message_working_copy(self):
         """Testing SVNClient.get_commit_message with a working copy change"""
-        revisions = self.client.parse_revision_spec()
-        message = self.client.get_commit_message(revisions)
-        self.assertIsNone(message)
+        client = self.build_client()
+        revisions = client.parse_revision_spec()
+
+        self.assertIsNone(client.get_commit_message(revisions))
 
     def test_get_commit_message_committed_revision(self):
         """Testing SVNClient.get_commit_message with a single committed
         revision
         """
-        revisions = self.client.parse_revision_spec(['2'])
-        message = self.client.get_commit_message(revisions)
+        client = self.build_client()
+        revisions = client.parse_revision_spec(['2'])
 
-        self.assertTrue('summary' in message)
-        self.assertTrue('description' in message)
-
-        self.assertEqual(message['summary'],
-                         'Commit 2 -- a non-utf8 character: \xe9')
-        self.assertEqual(message['description'],
-                         'Commit 2 -- a non-utf8 character: \xe9\n')
+        self.assertEqual(
+            client.get_commit_message(revisions),
+            {
+                'description': 'Commit 2 -- a non-utf8 character: \xe9\n',
+                'summary': 'Commit 2 -- a non-utf8 character: \xe9',
+            })
 
     def test_get_commit_message_committed_revisions(self):
         """Testing SVNClient.get_commit_message with multiple committed
         revisions
         """
-        revisions = self.client.parse_revision_spec(['1:3'])
-        message = self.client.get_commit_message(revisions)
+        client = self.build_client()
+        revisions = client.parse_revision_spec(['1:3'])
 
-        self.assertTrue('summary' in message)
-        self.assertTrue('description' in message)
+        self.assertEqual(
+            client.get_commit_message(revisions),
+            {
+                'description': 'Commit 3',
+                'summary': 'Commit 2 -- a non-utf8 character: \xe9',
+            })
 
-        self.assertEqual(message['summary'],
-                         'Commit 2 -- a non-utf8 character: \xe9')
-        self.assertEqual(message['description'], 'Commit 3')
-
-    @svn_version_set_hash('6613644d417f7c90f83f3a2d16b1dad5',
-                          '7630ea80056a7340d93a556e9af60c63',
-                          '6a5339da19e60c7706e44aeebfa4da5f')
-    def test_diff_exclude(self, md5sum):
+    def test_diff_exclude(self):
         """Testing SVNClient diff with file exclude patterns"""
+        client = self.build_client()
+
         self._svn_add_file('bar.txt', FOO1)
         self._svn_add_file('exclude.txt', FOO2)
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions,
-                                  exclude_patterns=['exclude.txt'])
-        self.assertTrue(isinstance(result, dict))
-        self.assertTrue('diff' in result)
+        revisions = client.parse_revision_spec([])
 
-        self.assertEqual(md5(result['diff']).hexdigest(), md5sum)
+        self.assertEqual(
+            client.diff(revisions, exclude_patterns=['exclude.txt']),
+            {
+                'diff': (
+                    b'Index: /bar.txt\n'
+                    b'===================================================='
+                    b'===============\n'
+                    b'--- /bar.txt\t(%s)\n'
+                    b'+++ /bar.txt\t(%s)\n'
+                    b'@@ -0,0 +1,9 @@\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+Italiam, fato profugus, Laviniaque venit\n'
+                    b'+litora, multum ille et terris iactatus et alto\n'
+                    b'+vi superum saevae memorem Iunonis ob iram;\n'
+                    b'+multa quoque et bello passus, dum conderet urbem,\n'
+                    b'+inferretque deos Latio, genus unde Latinum,\n'
+                    b'+Albanique patres, atque altae moenia Romae.\n'
+                    b'+Musa, mihi causas memora, quo numine laeso,\n'
+                    b'+\n'
+                ) % (self.new_file_diff_orig_version,
+                     self.new_file_diff_modified_version),
+            })
 
     def test_diff_exclude_in_subdir(self):
         """Testing SVNClient diff with exclude patterns in a subdir"""
+        client = self.build_client()
+
         self._svn_add_file('foo.txt', FOO1)
         self._svn_add_dir('subdir')
         self._svn_add_file(os.path.join('subdir', 'exclude.txt'), FOO2)
 
         os.chdir('subdir')
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(
-            revisions,
-            exclude_patterns=['exclude.txt'])
+        revisions = client.parse_revision_spec([])
 
-        self.assertTrue(isinstance(result, dict))
-        self.assertTrue('diff' in result)
-
-        self.assertEqual(result['diff'], b'')
+        self.assertEqual(
+            client.diff(revisions, exclude_patterns=['exclude.txt']),
+            {
+                'diff': b'',
+            })
 
     def test_diff_exclude_root_pattern_in_subdir(self):
         """Testing SVNClient diff with repo exclude patterns in a subdir"""
+        client = self.build_client()
+
         self._svn_add_file('exclude.txt', FOO1)
         self._svn_add_dir('subdir')
 
         os.chdir('subdir')
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(
-            revisions,
-            exclude_patterns=[os.path.join(os.path.sep, 'exclude.txt'),
-                              '.'])
+        revisions = client.parse_revision_spec([])
+        exclude_patterns = [
+            os.path.join(os.path.sep, 'exclude.txt'),
+            '.',
+        ]
 
-        self.assertTrue(isinstance(result, dict))
-        self.assertTrue('diff' in result)
+        self.assertEqual(
+            client.diff(revisions, exclude_patterns=exclude_patterns),
+            {
+                'diff': b'',
+            })
 
-        self.assertEqual(result['diff'], b'')
-
-    @svn_version_set_hash('043befc507b8177a0f010dc2cecc4205',
-                          '1b68063237c584d38a9a3ddbdf1f72a2',
-                          '466f7c2092e085354f5b24b91d48dd80')
-    def test_same_diff_multiple_methods(self, md5_sum):
+    def test_same_diff_multiple_methods(self):
         """Testing SVNClient identical diff generated from root, subdirectory,
-        and via target"""
+        and via target
+        """
+        client = self.build_client()
 
         # Test diff generation for a single file, where 'svn diff' is invoked
         # from three different locations.  This should result in an identical
@@ -656,86 +681,223 @@ class SVNClientTests(SCMClientTestCase):
         self._svn_add_file('dir1/A.txt', FOO3)
 
         # Case 1: Generate diff from checkout root.
-        revisions = self.client.parse_revision_spec()
-        result = self.client.diff(revisions)
-        self.assertTrue(isinstance(result, dict))
-        self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(), md5_sum)
+        revisions = client.parse_revision_spec()
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'diff': (
+                    b'Index: /dir1/A.txt\n'
+                    b'============================================='
+                    b'======================\n'
+                    b'--- /dir1/A.txt\t(%s)\n'
+                    b'+++ /dir1/A.txt\t(%s)\n'
+                    b'@@ -0,0 +1,11 @@\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+Italiam, fato profugus, Laviniaque venit\n'
+                    b'+litora, multum ille et terris iactatus et alto\n'
+                    b'+vi superum saevae memorem Iunonis ob iram;\n'
+                    b'+dum conderet urbem,\n'
+                    b'+inferretque deos Latio, genus unde Latinum,\n'
+                    b'+Albanique patres, atque altae moenia Romae.\n'
+                    b'+Albanique patres, atque altae moenia Romae.\n'
+                    b'+Musa, mihi causas memora, quo numine laeso,\n'
+                    b'+\n'
+                ) % (self.new_file_diff_orig_version,
+                     self.new_file_diff_modified_version),
+            })
 
         # Case 2: Generate diff from dir1 subdirectory.
         os.chdir('dir1')
-        result = self.client.diff(revisions)
-        self.assertTrue(isinstance(result, dict))
-        self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(), md5_sum)
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'diff': (
+                    b'Index: /dir1/A.txt\n'
+                    b'============================================='
+                    b'======================\n'
+                    b'--- /dir1/A.txt\t(nonexistent)\n'
+                    b'+++ /dir1/A.txt\t(working copy)\n'
+                    b'@@ -0,0 +1,11 @@\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+Italiam, fato profugus, Laviniaque venit\n'
+                    b'+litora, multum ille et terris iactatus et alto\n'
+                    b'+vi superum saevae memorem Iunonis ob iram;\n'
+                    b'+dum conderet urbem,\n'
+                    b'+inferretque deos Latio, genus unde Latinum,\n'
+                    b'+Albanique patres, atque altae moenia Romae.\n'
+                    b'+Albanique patres, atque altae moenia Romae.\n'
+                    b'+Musa, mihi causas memora, quo numine laeso,\n'
+                    b'+\n'
+                ),
+            })
 
         # Case 3: Generate diff from dir2 subdirectory, but explicitly target
         # only ../dir1/A.txt.
         os.chdir('..')
         self._svn_add_dir('dir2')
         os.chdir('dir2')
-        result = self.client.diff(revisions, ['../dir1/A.txt'])
-        self.assertTrue(isinstance(result, dict))
-        self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(), md5_sum)
 
-    @svn_version_set_hash('902d662a110400f7470294b2d9e72d36',
-                          '13803373ded9af750384a4601d5173ce',
-                          'f11dfbe58925871c5f64b6ca647a8d3c')
-    def test_diff_non_unicode_characters(self, md5_sum):
+        self.assertEqual(
+            client.diff(revisions, include_files=['../dir1/A.txt']),
+            {
+                'diff': (
+                    b'Index: /dir1/A.txt\n'
+                    b'============================================='
+                    b'======================\n'
+                    b'--- /dir1/A.txt\t(nonexistent)\n'
+                    b'+++ /dir1/A.txt\t(working copy)\n'
+                    b'@@ -0,0 +1,11 @@\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+Italiam, fato profugus, Laviniaque venit\n'
+                    b'+litora, multum ille et terris iactatus et alto\n'
+                    b'+vi superum saevae memorem Iunonis ob iram;\n'
+                    b'+dum conderet urbem,\n'
+                    b'+inferretque deos Latio, genus unde Latinum,\n'
+                    b'+Albanique patres, atque altae moenia Romae.\n'
+                    b'+Albanique patres, atque altae moenia Romae.\n'
+                    b'+Musa, mihi causas memora, quo numine laeso,\n'
+                    b'+\n'
+                ),
+            })
+
+    def test_diff_non_unicode_characters(self):
         """Testing SVNClient diff with a non-utf8 file"""
+        client = self.build_client()
+
         self._svn_add_file('A.txt', '\xe2'.encode('iso-8859-1'))
         self._run_svn(['propset', 'svn:mime-type', 'text/plain', 'A.txt'])
 
-        revisions = self.client.parse_revision_spec()
-        result = self.client.diff(revisions)
-        self.assertTrue(isinstance(result, dict))
-        self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(), md5_sum)
+        revisions = client.parse_revision_spec()
 
-    @svn_version_set_hash('60c4d21f4d414da947f4e7273e6d1326',
-                          '60c4d21f4d414da947f4e7273e6d1326',
-                          '571e47c456698bad35bca06523473008')
-    def test_diff_non_unicode_filename_repository_url(self, md5sum):
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'diff': (
+                    b'Index: /A.txt\n'
+                    b'=================================================='
+                    b'=================\n'
+                    b'--- /A.txt\t(%s)\n'
+                    b'+++ /A.txt\t(%s)\n'
+                    b'@@ -0,0 +1 @@\n'
+                    b'+\xe2\n'
+                    b'\\ No newline at end of file\n'
+                    b'\n'
+                    b'Property changes on: A.txt\n'
+                    b'__________________________________________'
+                    b'_________________________\n'
+                    b'Added: svn:mime-type\n'
+                    b'## -0,0 +1 ##\n'
+                    b'+text/plain\n'
+                    b'\\ No newline at end of property\n'
+                ) % (self.new_file_diff_orig_version,
+                     self.new_file_diff_modified_version),
+            })
+
+    def test_diff_non_unicode_filename_repository_url(self):
         """Testing SVNClient diff with a non-utf8 filename via repository_url
-        option"""
-        self.options.repository_url = self.svn_repo_url
+        option
+        """
+        client = self.build_client(options={
+            'repository_url': self.svn_repo_url,
+        })
 
         # Note: commit r4 adds one file with a non-utf8 character in both its
         # filename and content.
-        revisions = self.client.parse_revision_spec(['4'])
-        result = self.client.diff(revisions)
-        self.assertTrue(isinstance(result, dict))
-        self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(), md5sum)
+        revisions = client.parse_revision_spec(['4'])
 
-    @svn_version_set_hash('ac1835240ec86ee14ddccf1f2236c442',
-                          'ac1835240ec86ee14ddccf1f2236c442',
-                          '610f5506e670dc55a2464a6ad9af015c')
-    def test_show_copies_as_adds_enabled(self, md5sum):
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'diff': (
+                    b'Index: /\xc3\xa2.txt\n'
+                    b'============================================='
+                    b'======================\n'
+                    b'--- /\xc3\xa2.txt\t(%s)\n'
+                    b'+++ /\xc3\xa2.txt\t(revision 4)\n'
+                    b'@@ -0,0 +1,2 @@\n'
+                    b'+This file has a non-utf8 filename.\n'
+                    b'+It also contains a non-utf8 character: \xc3\xa9.\n'
+                ) % self.new_file_diff_orig_version,
+            })
+
+    def test_show_copies_as_adds_enabled(self):
         """Testing SVNClient with --show-copies-as-adds functionality
-        enabled"""
-        self.check_show_copies_as_adds('y', md5sum)
+        enabled
+        """
+        self.check_show_copies_as_adds(
+            state='y',
+            expected_diff_result={
+                'diff': (
+                    b'Index: /dir1/foo.txt\n'
+                    b'==========================================='
+                    b'========================\n'
+                    b'--- /foo.txt\t(%s)\n'
+                    b'+++ /dir1/foo.txt\t(working copy)\n'
+                    b'@@ -0,0 +1,11 @@\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+Italiam, fato profugus, Laviniaque venit\n'
+                    b'+litora, multum ille et terris iactatus et alto\n'
+                    b'+vi superum saevae memorem Iunonis ob iram;\n'
+                    b'+dum conderet urbem,\n'
+                    b'+inferretque deos Latio, genus unde Latinum,\n'
+                    b'+Albanique patres, atque altae moenia Romae.\n'
+                    b'+Albanique patres, atque altae moenia Romae.\n'
+                    b'+Musa, mihi causas memora, quo numine laeso,\n'
+                    b'+\n'
+                ) % self.new_file_diff_orig_version,
+            })
 
-    @svn_version_set_hash('d41d8cd98f00b204e9800998ecf8427e',
-                          'd41d8cd98f00b204e9800998ecf8427e',
-                          'b656e2f9b70ade256c3fe855c13ee52c')
-    def test_show_copies_as_adds_disabled(self, md5sum):
+    def test_show_copies_as_adds_disabled(self):
         """Testing SVNClient with --show-copies-as-adds functionality
-        disabled"""
-        self.check_show_copies_as_adds('n', md5sum)
+        disabled
+        """
+        if self.svn_version >= (1, 9):
+            # Subversion >= 1.9
+            diff = (
+                b'Index: /dir1/foo.txt\n'
+                b'==========================================='
+                b'========================\n'
+            )
+        else:
+            # Subversion < 1.9
+            diff = b''
 
-    def check_show_copies_as_adds(self, state, md5sum):
-        """Helper function to evaluate --show-copies-as-adds"""
-        self.client.get_repository_info()
+        self.check_show_copies_as_adds(
+            state='n',
+            expected_diff_result={
+                'diff': diff,
+            })
+
+    def check_show_copies_as_adds(self, state, expected_diff_result):
+        """Helper function to evaluate --show-copies-as-adds.
+
+        Args:
+            state (unicode):
+                The state to set for ``--show-copies-as-adds``.
+
+            expected_diff_result (dict):
+                The expected result of the diff call.
+
+        Raises:
+            AssertionError:
+                One of the checks failed.
+        """
+        client = self.build_client(options={
+            'svn_show_copies_as_adds': state,
+        })
+        client.get_repository_info()
 
         # Ensure valid SVN client version.
-        if not is_valid_version(self.client.subversion_client_version,
-                                self.client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
+        if not is_valid_version(client.subversion_client_version,
+                                client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
             raise unittest.SkipTest('Subversion client is too old to test '
                                     '--show-copies-as-adds.')
-
-        self.options.svn_show_copies_as_adds = state
 
         self._svn_add_dir('dir1')
         self._svn_add_dir('dir2')
@@ -747,41 +909,31 @@ class SVNClientTests(SCMClientTestCase):
         #  3) from checkout root when all relevant files belong to a changelist
         #  4) via explicit include target
 
-        revisions = self.client.parse_revision_spec()
-        result = self.client.diff(revisions)
-        self.assertTrue(isinstance(result, dict))
-        self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(), md5sum)
+        revisions = client.parse_revision_spec()
+        self.assertEqual(client.diff(revisions), expected_diff_result)
 
         self._run_svn(['changelist', 'cl1', 'dir1/foo.txt'])
-        revisions = self.client.parse_revision_spec(['cl1'])
-        result = self.client.diff(revisions)
-        self.assertTrue(isinstance(result, dict))
-        self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(), md5sum)
+        revisions = client.parse_revision_spec(['cl1'])
+        self.assertEqual(client.diff(revisions), expected_diff_result)
 
-        revisions = self.client.parse_revision_spec()
-        result = self.client.diff(revisions)
-        self.assertTrue(isinstance(result, dict))
-        self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(), md5sum)
+        revisions = client.parse_revision_spec()
+        self.assertEqual(client.diff(revisions), expected_diff_result)
 
         self._run_svn(['changelist', '--remove', 'dir1/foo.txt'])
 
         os.chdir('dir2')
-        revisions = self.client.parse_revision_spec()
-        result = self.client.diff(revisions, ['../dir1'])
-        self.assertTrue(isinstance(result, dict))
-        self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(), md5sum)
+        revisions = client.parse_revision_spec()
+        self.assertEqual(client.diff(revisions, include_files=['../dir1']),
+                         expected_diff_result)
 
     def test_history_scheduled_with_commit_nominal(self):
         """Testing SVNClient.history_scheduled_with_commit nominal cases"""
-        self.client.get_repository_info()
+        client = self.build_client()
+        client.get_repository_info()
 
         # Ensure valid SVN client version.
-        if not is_valid_version(self.client.subversion_client_version,
-                                self.client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
+        if not is_valid_version(client.subversion_client_version,
+                                client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
             raise unittest.SkipTest('Subversion client is too old to test '
                                     'history_scheduled_with_commit().')
 
@@ -790,39 +942,55 @@ class SVNClientTests(SCMClientTestCase):
         self._run_svn(['copy', 'foo.txt', 'dir1'])
 
         # Squash stderr to prevent error message in test output.
+        old_stderr = sys.stderr
         sys.stderr = open(os.devnull, 'w')
 
-        # Ensure SystemExit is raised when attempting to generate diff via
-        # several methods:
-        #  1) from checkout root
-        #  2) via changelist
-        #  3) from checkout root when all relevant files belong to a changelist
-        #  4) via explicit include target
+        try:
+            # Ensure SystemExit is raised when attempting to generate diff via
+            # several methods:
+            #
+            #  1) from checkout root
+            #  2) via changelist
+            #  3) from checkout root when all relevant files belong to a
+            #     changelist
+            #  4) via explicit include target
 
-        revisions = self.client.parse_revision_spec()
-        self.assertRaises(SystemExit, self.client.diff, revisions)
+            revisions = client.parse_revision_spec()
 
-        self._run_svn(['changelist', 'cl1', 'dir1/foo.txt'])
-        revisions = self.client.parse_revision_spec(['cl1'])
-        self.assertRaises(SystemExit, self.client.diff, revisions)
+            with self.assertRaises(SystemExit):
+                client.diff(revisions)
 
-        revisions = self.client.parse_revision_spec()
-        self.assertRaises(SystemExit, self.client.diff, revisions)
+            self._run_svn(['changelist', 'cl1', 'dir1/foo.txt'])
+            revisions = client.parse_revision_spec(['cl1'])
 
-        self._run_svn(['changelist', '--remove', 'dir1/foo.txt'])
+            with self.assertRaises(SystemExit):
+                client.diff(revisions)
 
-        os.chdir('dir2')
-        revisions = self.client.parse_revision_spec()
-        self.assertRaises(SystemExit, self.client.diff, revisions, ['../dir1'])
+            revisions = client.parse_revision_spec()
+
+            with self.assertRaises(SystemExit):
+                client.diff(revisions)
+
+            self._run_svn(['changelist', '--remove', 'dir1/foo.txt'])
+
+            os.chdir('dir2')
+            revisions = client.parse_revision_spec()
+
+            with self.assertRaises(SystemExit):
+                client.diff(revisions, include_files=['../dir1'])
+        finally:
+            sys.stderr = old_stderr
 
     def test_history_scheduled_with_commit_special_case_non_local_mods(self):
         """Testing SVNClient.history_scheduled_with_commit is bypassed when
-        diff is not for local modifications in a working copy"""
-        self.client.get_repository_info()
+        diff is not for local modifications in a working copy
+        """
+        client = self.build_client()
+        client.get_repository_info()
 
         # Ensure valid SVN client version.
-        if not is_valid_version(self.client.subversion_client_version,
-                                self.client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
+        if not is_valid_version(client.subversion_client_version,
+                                client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
             raise unittest.SkipTest('Subversion client is too old to test '
                                     'history_scheduled_with_commit().')
 
@@ -832,28 +1000,77 @@ class SVNClientTests(SCMClientTestCase):
         # 1) locally or 2) via --reposistory-url option.
 
         self._run_svn(['copy', 'foo.txt', 'foo_copy.txt'])
-        revisions = self.client.parse_revision_spec(['1:2'])
-        result = self.client.diff(revisions)
-        self.assertTrue(isinstance(result, dict))
-        self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         'ed154720a7459c2649cab4d2fa34fa93')
+        revisions = client.parse_revision_spec(['1:2'])
 
-        self.options.repository_url = self.svn_repo_url
-        revisions = self.client.parse_revision_spec(['2'])
-        result = self.client.diff(revisions)
-        self.assertTrue(isinstance(result, dict))
-        self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         'ed154720a7459c2649cab4d2fa34fa93')
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'diff': (
+                    b'Index: /foo.txt\n'
+                    b'================================================'
+                    b'===================\n'
+                    b'--- /foo.txt\t(revision 1)\n'
+                    b'+++ /foo.txt\t(revision 2)\n'
+                    b'@@ -1,4 +1,6 @@\n'
+                    b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b' Italiam, fato profugus, Laviniaque venit\n'
+                    b' litora, multum ille et terris iactatus et alto\n'
+                    b' vi superum saevae memorem Iunonis ob iram;\n'
+                    b'@@ -6,7 +8,4 @@\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                ),
+            })
+
+        client = self.build_client(options={
+            'repository_url': self.svn_repo_url,
+        })
+        client.get_repository_info()
+
+        revisions = client.parse_revision_spec(['2'])
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'diff': (
+                    b'Index: /foo.txt\n'
+                    b'================================================'
+                    b'===================\n'
+                    b'--- /foo.txt\t(revision 1)\n'
+                    b'+++ /foo.txt\t(revision 2)\n'
+                    b'@@ -1,4 +1,6 @@\n'
+                    b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b' Italiam, fato profugus, Laviniaque venit\n'
+                    b' litora, multum ille et terris iactatus et alto\n'
+                    b' vi superum saevae memorem Iunonis ob iram;\n'
+                    b'@@ -6,7 +8,4 @@\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                ),
+            })
 
     def test_history_scheduled_with_commit_special_case_exclude(self):
         """Testing SVNClient.history_scheduled_with_commit with exclude file"""
-        self.client.get_repository_info()
+        client = self.build_client()
+        client.get_repository_info()
 
         # Ensure valid SVN client version.
-        if not is_valid_version(self.client.subversion_client_version,
-                                self.client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
+        if not is_valid_version(client.subversion_client_version,
+                                client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
             raise unittest.SkipTest('Subversion client is too old to test '
                                     'history_scheduled_with_commit().')
 
@@ -862,20 +1079,22 @@ class SVNClientTests(SCMClientTestCase):
         # from checkout root and via changelist.
 
         self._run_svn(['copy', 'foo.txt', 'foo_copy.txt'])
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions, [], ['foo_copy.txt'])
-        self.assertTrue(isinstance(result, dict))
-        self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         'd41d8cd98f00b204e9800998ecf8427e')
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions, exclude_patterns=['foo_copy.txt']),
+            {
+                'diff': b'',
+            })
 
         self._run_svn(['changelist', 'cl1', 'foo_copy.txt'])
-        revisions = self.client.parse_revision_spec(['cl1'])
-        result = self.client.diff(revisions, [], ['foo_copy.txt'])
-        self.assertTrue(isinstance(result, dict))
-        self.assertTrue('diff' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         'd41d8cd98f00b204e9800998ecf8427e')
+        revisions = client.parse_revision_spec(['cl1'])
+
+        self.assertEqual(
+            client.diff(revisions, exclude_patterns=['foo_copy.txt']),
+            {
+                'diff': b'',
+            })
 
     def test_rename_diff_mangling_bug_4546(self):
         """Test diff with removal of lines that look like headers"""
@@ -887,8 +1106,22 @@ class SVNClientTests(SCMClientTestCase):
                     '-- test line2\n'
                     '-- test line (test2)\n')
 
-        revisions = self.client.parse_revision_spec()
-        result = self.client.diff(revisions)
-        self.assertTrue(isinstance(result, dict))
-        self.assertTrue('diff' in result)
-        self.assertTrue(b'--- test line (test1)' in result['diff'])
+        client = self.build_client()
+        revisions = client.parse_revision_spec()
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'diff': (
+                    b'Index: /bug-4546.txt\n'
+                    b'==========================================='
+                    b'========================\n'
+                    b'--- /bug-4546.txt\t(revision 5)\n'
+                    b'+++ /bug-4546.txt\t(working copy)\n'
+                    b'@@ -1,4 +1,3 @@\n'
+                    b' -- test line1\n'
+                    b'--- test line (test1)\n'
+                    b' -- test line2\n'
+                    b' -- test line (test2)\n'
+                ),
+            })
