@@ -154,6 +154,7 @@ class SCMClientTestCase(TestCase):
         # Set some defaults.
         cmd_options = self.options
         cmd_options.parent_branch = None
+        cmd_options.tracking = None
 
         # Set anything from the caller.
         for key, value in six.iteritems(options):
