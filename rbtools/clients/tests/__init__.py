@@ -5,6 +5,8 @@ from __future__ import unicode_literals
 import os
 import shutil
 
+import six
+
 from rbtools.deprecation import RemovedInRBTools40Warning
 from rbtools.tests import OptionsStub
 from rbtools.testing import TestCase
@@ -26,6 +28,17 @@ class SCMClientTestCase(TestCase):
         * Renamed from ``SCMClientTests`` to ``SCMClientTestCase``.
         * Added support for centralized clone/checkout management and caching.
     """
+
+    #: The client class.
+    #:
+    #: This is required by :py:meth:`build_client`.
+    #:
+    #: Version Added:
+    #:     4.0
+    #:
+    #: Type:
+    #:     type
+    scmclient_cls = None
 
     #: The main checkout directory used by tests.
     #:
@@ -118,6 +131,35 @@ class SCMClientTestCase(TestCase):
             # Make sure any commands that are run default to working out of
             # the primary checkout directory.
             os.chdir(self.checkout_dir)
+
+    def build_client(self, options={}, client_kwargs={}):
+        """Build a client for testing.
+
+        Version Added:
+            4.0
+
+        Args:
+            options (dict, optional):
+                Parsed command line options to pass to the client class.
+
+            client_kwargs (dict, optional):
+                Keyword arguments to pass to the client class.
+
+        Returns:
+            rbtools.clients.SCMClient:
+            The client instance.
+        """
+        self.assertIsNotNone(self.scmclient_cls)
+
+        # Set some defaults.
+        cmd_options = self.options
+        cmd_options.parent_branch = None
+
+        # Set anything from the caller.
+        for key, value in six.iteritems(options):
+            setattr(cmd_options, key, value)
+
+        return self.scmclient_cls(options=cmd_options, **client_kwargs)
 
 
 class SCMClientTests(SCMClientTestCase):
