@@ -31,16 +31,14 @@ class BaseSOSTestCase(kgb.SpyAgency, SCMClientTestCase):
         3.1
     """
 
+    scmclient_cls = SOSClient
+
     TEST_WORKAREA_ID = '1234567890'
 
     def setUp(self):
         super(BaseSOSTestCase, self).setUp()
 
-        self.client = SOSClient()
         self.workarea_dir = make_tempdir()
-
-        self.client._cache['sos_version'] = (7, 20)
-        self.client._cache['waid'] = self.TEST_WORKAREA_ID
 
     @property
     def rule_query_wa_root(self):
@@ -378,6 +376,26 @@ class BaseSOSTestCase(kgb.SpyAgency, SCMClientTestCase):
             ]),
         }
 
+    def build_client(self, **kwargs):
+        """Build a client for testing.
+
+        Version Added:
+            4.0
+
+        Args:
+            **kwargs (dict, optional):
+                Additional keyword arguments to pass to the parent method.
+
+        Returns:
+            rbtools.clients.sos.SOClient:
+            The client instance.
+        """
+        client = super(BaseSOSTestCase, self).build_client(**kwargs)
+        client._cache['sos_version'] = (7, 20)
+        client._cache['waid'] = self.TEST_WORKAREA_ID
+
+        return client
+
     def write_workarea_file(self, out_filename, content):
         """Write a file to the workarea.
 
@@ -405,7 +423,8 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_get_local_path(self):
         """Testing SOSClient.get_local_path"""
-        del self.client._cache['sos_version']
+        client = self.build_client()
+        del client._cache['sos_version']
 
         self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
             {
@@ -418,12 +437,12 @@ class SOSClientTests(BaseSOSTestCase):
             self.rule_query_wa_root,
         ]))
 
-        client = self.client
         self.assertEqual(client.get_local_path(), self.workarea_dir)
 
     def test_get_local_path_without_soscmd(self):
         """Testing SOSClient.get_local_path without soscmd"""
-        del self.client._cache['sos_version']
+        client = self.build_client()
+        del client._cache['sos_version']
 
         self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
             {
@@ -437,7 +456,6 @@ class SOSClientTests(BaseSOSTestCase):
 
         self.spy_on(logger.debug)
 
-        client = self.client
         self.assertIsNone(client.get_local_path())
         self.assertSpyCalledWith(
             logger.debug,
@@ -445,7 +463,8 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_get_local_path_with_bad_soscmd_version(self):
         """Testing SOSClient.get_local_path with bad soscmd version string"""
-        del self.client._cache['sos_version']
+        client = self.build_client()
+        del client._cache['sos_version']
 
         self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
             {
@@ -459,7 +478,6 @@ class SOSClientTests(BaseSOSTestCase):
 
         self.spy_on(logger.debug)
 
-        client = self.client
         self.assertIsNone(client.get_local_path())
         self.assertSpyCalledWith(
             logger.debug,
@@ -468,7 +486,8 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_get_repository_info(self):
         """Testing SOSClient.get_repository_info"""
-        del self.client._cache['sos_version']
+        client = self.build_client()
+        del client._cache['sos_version']
 
         self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
             {
@@ -484,14 +503,16 @@ class SOSClientTests(BaseSOSTestCase):
         ]))
         self.spy_on(check_gnu_diff, call_original=False)
 
-        repo_info = self.client.get_repository_info()
+        repo_info = client.get_repository_info()
         self.assertEqual(repo_info.path, 'SOS:test-server:test-project')
         self.assertEqual(repo_info.local_path, self.workarea_dir)
 
     def test_parse_revision_spec_with_0_args(self):
         """Testing SOSClient.parse_revision_spec with 0 args"""
+        client = self.build_client()
+
         self.assertEqual(
-            self.client.parse_revision_spec(),
+            client.parse_revision_spec(),
             {
                 'sos_selection': ['-scm'],
                 'has_explicit_selection': False,
@@ -499,8 +520,10 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_parse_revision_spec_with_1_arg_select(self):
         """Testing SOSClient.parse_revision_spec with select:* argument"""
+        client = self.build_client()
+
         self.assertEqual(
-            self.client.parse_revision_spec(['select:-scm -sor -sunm']),
+            client.parse_revision_spec(['select:-scm -sor -sunm']),
             {
                 'sos_selection': ['-scm', '-sor', '-sunm'],
                 'has_explicit_selection': True,
@@ -510,8 +533,10 @@ class SOSClientTests(BaseSOSTestCase):
         """Testing SOSClient.parse_revision_spec with 1 argument (changelist)
         and changelists supported
         """
+        client = self.build_client()
+
         self.assertEqual(
-            self.client.parse_revision_spec(['my_changelist']),
+            client.parse_revision_spec(['my_changelist']),
             {
                 'sos_changelist': 'my_changelist',
             })
@@ -525,15 +550,18 @@ class SOSClientTests(BaseSOSTestCase):
             'of: "select:<selection>". For example: select:-scm'
         )
 
-        self.client._cache['supports_changelists'] = False
+        client = self.build_client()
+        client._cache['supports_changelists'] = False
 
         with self.assertRaisesMessage(InvalidRevisionSpecError, message):
-            self.client.parse_revision_spec(['123'])
+            client.parse_revision_spec(['123'])
 
     def test_parse_revision_spec_with_multiple_args(self):
         """Testing SOSClient.parse_revision_spec with multiple arguments"""
+        client = self.build_client()
+
         with self.assertRaises(TooManyRevisionsError):
-            self.client.parse_revision_spec(['123', '456'])
+            client.parse_revision_spec(['123', '456'])
 
     def test_get_tree_matches_review_request_with_match(self):
         """Testing SOSClient.get_tree_matches_review_request with match"""
@@ -550,10 +578,11 @@ class SOSClientTests(BaseSOSTestCase):
             },
             url='https://reviews.example.com/api/review-requests/123/')
 
-        self.client._cache['project'] = 'my_project'
-        self.client._cache['server'] = 'my_server'
+        client = self.build_client()
+        client._cache['project'] = 'my_project'
+        client._cache['server'] = 'my_server'
 
-        self.assertTrue(self.client.get_tree_matches_review_request(
+        self.assertTrue(client.get_tree_matches_review_request(
             review_request=review_request,
             revisions={
                 'sos_changelist': 'my_changelist',
@@ -574,10 +603,11 @@ class SOSClientTests(BaseSOSTestCase):
             },
             url='https://reviews.example.com/api/review-requests/123/')
 
-        self.client._cache['project'] = 'my_project'
-        self.client._cache['server'] = 'my_server'
+        client = self.build_client()
+        client._cache['project'] = 'my_project'
+        client._cache['server'] = 'my_server'
 
-        self.assertFalse(self.client.get_tree_matches_review_request(
+        self.assertFalse(client.get_tree_matches_review_request(
             review_request=review_request,
             revisions={
                 'sos_changelist': 'my_changelist',
@@ -595,10 +625,11 @@ class SOSClientTests(BaseSOSTestCase):
             },
             url='https://reviews.example.com/api/review-requests/123/')
 
-        self.client._cache['project'] = 'my_project'
-        self.client._cache['server'] = 'my_server'
+        client = self.build_client()
+        client._cache['project'] = 'my_project'
+        client._cache['server'] = 'my_server'
 
-        self.assertFalse(self.client.get_tree_matches_review_request(
+        self.assertFalse(client.get_tree_matches_review_request(
             review_request=review_request,
             revisions={
                 'sos_changelist': 'my_changelist',
@@ -683,7 +714,8 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        result = self.client.diff(revisions={
+        client = self.build_client()
+        result = client.diff(revisions={
             'sos_changelist': 'my_changelist',
         })
 
@@ -829,7 +861,8 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        result = self.client.diff(revisions={
+        client = self.build_client()
+        result = client.diff(revisions={
             'sos_changelist': 'my_changelist',
         })
 
@@ -972,7 +1005,8 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        result = self.client.diff(revisions={
+        client = self.build_client()
+        result = client.diff(revisions={
             'sos_changelist': 'my_changelist',
         })
 
@@ -1144,7 +1178,8 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        result = self.client.diff(revisions={
+        client = self.build_client()
+        result = client.diff(revisions={
             'sos_changelist': 'my_changelist',
         })
 
@@ -1296,7 +1331,8 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        result = self.client.diff(revisions={
+        client = self.build_client()
+        result = client.diff(revisions={
             'sos_changelist': 'my_changelist',
         })
 
@@ -1507,7 +1543,8 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        result = self.client.diff(revisions={
+        client = self.build_client()
+        result = client.diff(revisions={
             'sos_changelist': 'my_changelist',
         })
 
@@ -1765,7 +1802,8 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        result = self.client.diff(
+        client = self.build_client()
+        result = client.diff(
             revisions={
                 'sos_changelist': 'my_changelist',
             },
@@ -1983,7 +2021,8 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        result = self.client.diff(
+        client = self.build_client()
+        result = client.diff(
             revisions={
                 'sos_changelist': 'my_changelist',
             },
@@ -2163,7 +2202,8 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        result = self.client.diff(revisions={
+        client = self.build_client()
+        result = client.diff(revisions={
             'sos_selection': ['-scm'],
             'has_explicit_selection': False,
         })
@@ -2290,7 +2330,8 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        result = self.client.diff(revisions={
+        client = self.build_client()
+        result = client.diff(revisions={
             'sos_selection': ['-scm'],
             'has_explicit_selection': False,
         })
@@ -2431,7 +2472,8 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        result = self.client.diff(revisions={
+        client = self.build_client()
+        result = client.diff(revisions={
             'sos_selection': ['-scm'],
             'has_explicit_selection': False,
         })
@@ -2595,7 +2637,8 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        result = self.client.diff(revisions={
+        client = self.build_client()
+        result = client.diff(revisions={
             'sos_selection': ['-scm'],
             'has_explicit_selection': False,
         })
@@ -2753,7 +2796,8 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        result = self.client.diff(revisions={
+        client = self.build_client()
+        result = client.diff(revisions={
             'sos_selection': ['-scm'],
             'has_explicit_selection': False,
         })
@@ -2905,7 +2949,8 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        result = self.client.diff(revisions={
+        client = self.build_client()
+        result = client.diff(revisions={
             'sos_selection': ['-scm'],
             'has_explicit_selection': False,
         })
@@ -3082,7 +3127,8 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        result = self.client.diff(
+        client = self.build_client()
+        result = client.diff(
             revisions={
                 'sos_selection': ['-scm'],
                 'has_explicit_selection': False,
@@ -3287,7 +3333,8 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        result = self.client.diff(
+        client = self.build_client()
+        result = client.diff(
             revisions={
                 'sos_selection': ['-scm'],
                 'has_explicit_selection': False,
@@ -3405,38 +3452,50 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_normalize_sos_path_with_sos_path(self):
         """Testing SOSClient._normalize_sos_path with leading ./"""
+        client = self.build_client()
+
         self.assertEqual(
-            self.client._normalize_sos_path('./dir/file'),
+            client._normalize_sos_path('./dir/file'),
             'dir/file')
 
     def test_normalize_sos_path_with_non_sos_path(self):
         """Testing SOSClient._normalize_sos_path without leading ./"""
+        client = self.build_client()
+
         self.assertEqual(
-            self.client._normalize_sos_path('dir/file'),
+            client._normalize_sos_path('dir/file'),
             'dir/file')
 
     def test_normalize_sos_path_with_none(self):
         """Testing SOSClient._normalize_sos_path with None"""
-        self.assertIsNone(self.client._normalize_sos_path(None))
+        client = self.build_client()
+
+        self.assertIsNone(client._normalize_sos_path(None))
 
     def test_make_sos_path(self):
         """Testing SOSClient._make_sos_path"""
+        client = self.build_client()
+
         self.assertEqual(
-            self.client._make_sos_path(os.path.join('dir', '', 'file'),
-                                       self.workarea_dir),
+            client._make_sos_path(os.path.join('dir', '', 'file'),
+                                  self.workarea_dir),
             './dir/file')
 
     def test_make_sos_path_with_abs_path(self):
         """Testing SOSClient._make_sos_path with absolute path"""
+        client = self.build_client()
+
         self.assertEqual(
-            self.client._make_sos_path(
+            client._make_sos_path(
                 os.path.join(self.workarea_dir, 'dir', 'file'),
                 self.workarea_dir),
             './dir/file')
 
     def test_make_sos_path_with_dot_slash(self):
         """Testing SOSClient._make_sos_path with "./"-prefixed relative path"""
+        client = self.build_client()
+
         self.assertEqual(
-            self.client._make_sos_path(os.path.join('.', 'dir', 'file'),
-                                       self.workarea_dir),
+            client._make_sos_path(os.path.join('.', 'dir', 'file'),
+                                  self.workarea_dir),
             './dir/file')
