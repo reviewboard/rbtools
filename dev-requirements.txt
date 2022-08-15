@@ -1,9 +1,4 @@
-kgb>=6.1
-mock
+kgb~=7.1.1
+mercurial
 pytest
 pytest-env
-
-# Ordering here matters.
-mercurial>=4.4.2,<6.2; python_version == '2.7'
-mercurial>=5.2; python_version >= '3.6'
-hgsubversion; python_version <= '2.7'
