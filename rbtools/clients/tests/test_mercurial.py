@@ -16,13 +16,15 @@ import kgb
 from six.moves import range
 
 import rbtools.helpers
-from rbtools.clients import RepositoryInfo
+from rbtools.clients import PatchAuthor, RepositoryInfo
 from rbtools.clients.errors import CreateCommitError, MergeError
 from rbtools.clients.mercurial import MercurialClient, MercurialRefType
 from rbtools.clients.tests import (FOO, FOO1, FOO2, FOO3, FOO4, FOO5, FOO6,
                                    SCMClientTestCase)
 from rbtools.utils.encoding import force_unicode
-from rbtools.utils.filesystem import is_exe_in_path, load_config
+from rbtools.utils.filesystem import (is_exe_in_path,
+                                      load_config,
+                                      make_tempdir)
 from rbtools.utils.process import execute
 
 
@@ -61,7 +63,7 @@ class MercurialTestCase(SCMClientTestCase):
 
     def hg_add_file_commit(self, filename='test.txt', data=b'Test',
                            msg='Test commit', branch=None,
-                           bookmark=None, tag=None):
+                           bookmark=None, tag=None, date=None):
         """Add a file to the repository and commit it.
 
         This can also optionally construct a branch for the commit.
@@ -84,6 +86,12 @@ class MercurialTestCase(SCMClientTestCase):
 
             tag (unicode, optional):
                 The optional tag to create.
+
+            date (unicode, optional):
+                The optional date to set for the commit.
+
+                Version Added:
+                    4.0
         """
         if branch:
             self.run_hg(['branch', branch])
@@ -94,7 +102,14 @@ class MercurialTestCase(SCMClientTestCase):
         with open(filename, 'wb') as f:
             f.write(data)
 
-        self.run_hg(['commit', '-A', '-m', msg, filename])
+        commit_args = ['commit', '-A', '-m', msg]
+
+        if date:
+            commit_args += ['-d', date]
+
+        commit_args.append(filename)
+
+        self.run_hg(commit_args)
 
         if tag:
             self.run_hg(['tag', tag])
@@ -102,6 +117,8 @@ class MercurialTestCase(SCMClientTestCase):
 
 class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
     """Unit tests for MercurialClient."""
+
+    scmclient_cls = MercurialClient
 
     TESTSERVER = 'http://127.0.0.1:8080'
     CLONE_HGRC = dedent("""
@@ -119,13 +136,8 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
         git = true
     """).rstrip()
 
-    AUTHOR = type(
-        str('Author'),
-        (object,),
-        {
-            'fullname': 'name',
-            'email': 'email',
-        })
+    AUTHOR = PatchAuthor(full_name='name',
+                         email='email')
 
     @classmethod
     def setup_checkout(cls, checkout_dir):
@@ -159,8 +171,6 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
         self.clone_dir = self.checkout_dir
         self.clone_hgrc_path = os.path.join(self.clone_dir, '.hg', 'hgrc')
 
-        self.client = MercurialClient(options=self.options)
-
         with open(self.clone_hgrc_path, 'w') as fp:
             fp.write(self.CLONE_HGRC % {
                 'hg_dir': self.hg_dir,
@@ -168,11 +178,10 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
                 'test_server': self.TESTSERVER,
             })
 
-        self.options.parent_branch = None
-
     def test_get_repository_info(self):
         """Testing MercurialClient.get_repository_info"""
-        ri = self.client.get_repository_info()
+        client = self.build_client()
+        ri = client.get_repository_info()
 
         self.assertIsInstance(ri, RepositoryInfo)
         self.assertEqual(ri.base_path, '')
@@ -189,31 +198,36 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
         os.rename(self.clone_hgrc_path,
                   os.path.join(self.clone_dir, '._disabled_hgrc'))
 
-        self.client.hgrc = {}
-        self.client._load_hgrc()
-        ri = self.client.get_repository_info()
+        client = self.build_client()
+        client.hgrc = {}
+        client._load_hgrc()
 
-        self.assertIsNone(self.client.scan_for_server(ri))
+        ri = client.get_repository_info()
+
+        self.assertIsNone(client.scan_for_server(ri))
 
     def test_scan_for_server_when_present_in_hgrc(self):
         """Testing MercurialClient.scan_for_server when present in hgrc"""
-        ri = self.client.get_repository_info()
+        client = self.build_client()
+        ri = client.get_repository_info()
 
-        self.assertEqual(self.client.scan_for_server(ri),
+        self.assertEqual(client.scan_for_server(ri),
                          self.TESTSERVER)
 
     def test_scan_for_server_reviewboardrc(self):
         """Testing MercurialClient.scan_for_server when in .reviewboardrc"""
-        with self.reviewboardrc({'REVIEWBOARD_URL': self.TESTSERVER}):
-            self.client.config = load_config()
-            ri = self.client.get_repository_info()
+        client = self.build_client()
 
-            self.assertEqual(self.client.scan_for_server(ri),
+        with self.reviewboardrc({'REVIEWBOARD_URL': self.TESTSERVER}):
+            client.config = load_config()
+            ri = client.get_repository_info()
+
+            self.assertEqual(client.scan_for_server(ri),
                              self.TESTSERVER)
 
     def test_diff(self):
         """Testing MercurialClient.diff"""
-        client = self.client
+        client = self.build_client()
 
         base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
@@ -264,7 +278,7 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
 
     def test_diff_with_multiple_commits(self):
         """Testing MercurialClient.diff with multiple commits"""
-        client = self.client
+        client = self.build_client()
 
         base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
@@ -328,7 +342,7 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
 
     def test_diff_with_exclude_patterns(self):
         """Testing MercurialClient.diff with exclude_patterns"""
-        client = self.client
+        client = self.build_client()
 
         base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
@@ -383,7 +397,7 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
         """Testing MercurialClient.diff with exclude_patterns matching empty
         file
         """
-        client = self.client
+        client = self.build_client()
 
         base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
@@ -436,7 +450,7 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
 
     def test_diff_with_diverged_branch(self):
         """Testing MercurialClient.diff with diverged branch"""
-        client = self.client
+        client = self.build_client()
 
         base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
@@ -565,7 +579,7 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
 
     def test_diff_with_parent_diff(self):
         """Testing MercurialClient.diff with parent diffs"""
-        client = self.client
+        client = self.build_client()
 
         base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
@@ -667,7 +681,7 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
         """
         # This test is very similar to test_diff_with_parent_diff except we
         # throw a branch into the mix.
-        client = self.client
+        client = self.build_client()
 
         base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
@@ -769,7 +783,9 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
         """Testing MercurialClient.diff with parent diffs using --parent"""
         # This test is very similar to test_diff_with_parent_diff except we
         # use the --parent option to post without explicit revisions
-        client = self.client
+        client = self.build_client(options={
+            'parent_branch': '2',
+        })
 
         base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
@@ -785,8 +801,6 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
                                 data=FOO3,
                                 msg='commit 3')
         commit_id3 = self._hg_get_tip()
-
-        self.options.parent_branch = '2'
 
         revisions = client.parse_revision_spec([])
 
@@ -870,6 +884,8 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
 
     def test_parse_revision_spec_with_no_args(self):
         """Testing MercurialClient.parse_revision_spec with no arguments"""
+        client = self.build_client()
+
         base = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO1,
@@ -879,51 +895,55 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
                                 msg='commit 2')
 
         tip = self._hg_get_tip()
-        revisions = self.client.parse_revision_spec([])
 
-        self.assertIsInstance(revisions, dict)
-        self.assertIn('base', revisions)
-        self.assertIn('tip', revisions)
-        self.assertNotIn('parent_base', revisions)
-        self.assertEqual(revisions['base'], base)
-        self.assertEqual(revisions['tip'], tip)
+        self.assertEqual(
+            client.parse_revision_spec([]),
+            {
+                'base': base,
+                'commit_id': tip,
+                'tip': tip,
+            })
 
     def test_parse_revision_spec_with_one_arg_periods(self):
         """Testing MercurialClient.parse_revision_spec with r1..r2 syntax"""
+        client = self.build_client()
+
         base = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO1,
                                 msg='commit 1')
 
         tip = self._hg_get_tip()
-        revisions = self.client.parse_revision_spec(['0..1'])
 
-        self.assertIsInstance(revisions, dict)
-        self.assertIn('base', revisions)
-        self.assertIn('tip', revisions)
-        self.assertNotIn('parent_base', revisions)
-        self.assertEqual(revisions['base'], base)
-        self.assertEqual(revisions['tip'], tip)
+        self.assertEqual(
+            client.parse_revision_spec(['0..1']),
+            {
+                'base': base,
+                'tip': tip,
+            })
 
     def test_parse_revision_spec_with_one_arg_colons(self):
         """Testing MercurialClient.parse_revision_spec with r1::r2 syntax"""
+        client = self.build_client()
+
         base = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO1,
                                 msg='commit 1')
 
         tip = self._hg_get_tip()
-        revisions = self.client.parse_revision_spec(['0..1'])
 
-        self.assertIsInstance(revisions, dict)
-        self.assertIn('base', revisions)
-        self.assertIn('tip', revisions)
-        self.assertNotIn('parent_base', revisions)
-        self.assertEqual(revisions['base'], base)
-        self.assertEqual(revisions['tip'], tip)
+        self.assertEqual(
+            client.parse_revision_spec(['0..1']),
+            {
+                'base': base,
+                'tip': tip,
+            })
 
     def test_parse_revision_spec_with_one_arg(self):
         """Testing MercurialClient.parse_revision_spec with one revision"""
+        client = self.build_client()
+
         base = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO1,
@@ -933,17 +953,18 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
                                 data=FOO2,
                                 msg='commit 2')
 
-        revisions = self.client.parse_revision_spec(['1'])
-
-        self.assertIsInstance(revisions, dict)
-        self.assertIn('base', revisions)
-        self.assertIn('tip', revisions)
-        self.assertNotIn('parent_base', revisions)
-        self.assertEqual(revisions['base'], base)
-        self.assertEqual(revisions['tip'], tip)
+        self.assertEqual(
+            client.parse_revision_spec(['1']),
+            {
+                'base': base,
+                'commit_id': tip,
+                'tip': tip,
+            })
 
     def test_parse_revision_spec_with_two_args(self):
         """Testing MercurialClient.parse_revision_spec with two revisions"""
+        client = self.build_client()
+
         base = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO1,
@@ -953,17 +974,17 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
                                 msg='commit 2')
         tip = self._hg_get_tip()
 
-        revisions = self.client.parse_revision_spec(['0', '2'])
-
-        self.assertIsInstance(revisions, dict)
-        self.assertIn('base', revisions)
-        self.assertIn('tip', revisions)
-        self.assertNotIn('parent_base', revisions)
-        self.assertEqual(revisions['base'], base)
-        self.assertEqual(revisions['tip'], tip)
+        self.assertEqual(
+            client.parse_revision_spec(['0', '2']),
+            {
+                'base': base,
+                'tip': tip,
+            })
 
     def test_parse_revision_spec_with_parent_base(self):
         """Testing MercurialClient.parse_revision_spec with parent base"""
+        client = self.build_client()
+
         start_base = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO1,
@@ -986,7 +1007,7 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
                                 msg='commit 5')
 
         self.assertEqual(
-            self.client.parse_revision_spec(['1', '2']),
+            client.parse_revision_spec(['1', '2']),
             {
                 'base': commit1,
                 'tip': commit2,
@@ -994,7 +1015,7 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
             })
 
         self.assertEqual(
-            self.client.parse_revision_spec(['4']),
+            client.parse_revision_spec(['4']),
             {
                 'base': commit3,
                 'tip': commit4,
@@ -1003,7 +1024,7 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
             })
 
         self.assertEqual(
-            self.client.parse_revision_spec(['2', '4']),
+            client.parse_revision_spec(['2', '4']),
             {
                 'base': commit2,
                 'tip': commit4,
@@ -1012,42 +1033,52 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
 
     def test_get_hg_ref_type(self):
         """Testing MercurialClient.get_hg_ref_type"""
+        client = self.build_client()
+
         self.hg_add_file_commit(branch='test-branch',
                                 bookmark='test-bookmark',
                                 tag='test-tag')
         tip = self._hg_get_tip()
 
-        self.assertEqual(self.client.get_hg_ref_type('test-branch'),
+        self.assertEqual(client.get_hg_ref_type('test-branch'),
                          MercurialRefType.BRANCH)
-        self.assertEqual(self.client.get_hg_ref_type('test-bookmark'),
+        self.assertEqual(client.get_hg_ref_type('test-bookmark'),
                          MercurialRefType.BOOKMARK)
-        self.assertEqual(self.client.get_hg_ref_type('test-tag'),
+        self.assertEqual(client.get_hg_ref_type('test-tag'),
                          MercurialRefType.TAG)
-        self.assertEqual(self.client.get_hg_ref_type(tip),
+        self.assertEqual(client.get_hg_ref_type(tip),
                          MercurialRefType.REVISION)
-        self.assertEqual(self.client.get_hg_ref_type('something-invalid'),
+        self.assertEqual(client.get_hg_ref_type('something-invalid'),
                          MercurialRefType.UNKNOWN)
 
     def test_get_commit_message_with_one_commit_in_range(self):
         """Testing MercurialClient.get_commit_message with range containing
         only one commit
         """
-        self.options.guess_summary = True
-        self.options.guess_description = True
+        client = self.build_client(options={
+            'guess_description': True,
+            'guess_summary': True,
+        })
 
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO1,
                                 msg='commit 1')
 
-        revisions = self.client.parse_revision_spec([])
-        commit_message = self.client.get_commit_message(revisions)
+        revisions = client.parse_revision_spec([])
 
-        self.assertEqual(commit_message['summary'], 'commit 1')
+        self.assertEqual(
+            client.get_commit_message(revisions),
+            {
+                'description': 'commit 1',
+                'summary': 'commit 1',
+            })
 
     def test_get_commit_message_with_commit_range(self):
         """Testing MercurialClient.get_commit_message with commit range"""
-        self.options.guess_summary = True
-        self.options.guess_description = True
+        client = self.build_client(options={
+            'guess_description': True,
+            'guess_summary': True,
+        })
 
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO1,
@@ -1059,17 +1090,31 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
                                 data=FOO3,
                                 msg='commit 3\n\ndesc3')
 
-        revisions = self.client.parse_revision_spec([])
-        commit_message = self.client.get_commit_message(revisions)
+        revisions = client.parse_revision_spec([])
 
-        self.assertEqual(commit_message['summary'], 'commit 1')
-        self.assertEqual(commit_message['description'],
-                         'desc1\n\ncommit 2\n\ndesc2\n\ncommit 3\n\ndesc3')
+        self.assertEqual(
+            client.get_commit_message(revisions),
+            {
+                'description': (
+                    'desc1\n'
+                    '\n'
+                    'commit 2\n'
+                    '\n'
+                    'desc2\n'
+                    '\n'
+                    'commit 3\n'
+                    '\n'
+                    'desc3'
+                ),
+                'summary': 'commit 1',
+            })
 
     def test_get_commit_message_with_specific_commit(self):
         """Testing MercurialClient.get_commit_message with specific commit"""
-        self.options.guess_summary = True
-        self.options.guess_description = True
+        client = self.build_client(options={
+            'guess_description': True,
+            'guess_summary': True,
+        })
 
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO1,
@@ -1082,111 +1127,149 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
                                 data=FOO3,
                                 msg='commit 3\n\ndesc3')
 
-        revisions = self.client.parse_revision_spec([tip])
-        commit_message = self.client.get_commit_message(revisions)
+        revisions = client.parse_revision_spec([tip])
 
-        self.assertEqual(commit_message['summary'], 'commit 2')
-        self.assertEqual(commit_message['description'], 'desc2')
+        self.assertEqual(
+            client.get_commit_message(revisions),
+            {
+                'description': 'desc2',
+                'summary': 'commit 2',
+            })
 
     def test_commit_history(self):
         """Testing MercurialClient.get_commit_history"""
+        client = self.build_client()
+
+        base_commit_id = self._hg_get_tip(full=True)
+
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO1,
-                                msg='commit 1\n\ndesc1')
+                                msg='commit 1\n\ndesc1',
+                                date='2022-08-04T11:00:00-07:00')
+        commit_id1 = self._hg_get_tip(full=True)
+
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO2,
-                                msg='commit 2\n\ndesc2')
+                                msg='commit 2\n\ndesc2',
+                                date='2022-08-05T12:00:00-07:00')
+        commit_id2 = self._hg_get_tip(full=True)
+
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO3,
-                                msg='commit 3\n\ndesc3')
+                                msg='commit 3\n\ndesc3',
+                                date='2022-08-06T13:00:00-07:00')
+        commit_id3 = self._hg_get_tip(full=True)
 
-        revisions = self.client.parse_revision_spec([])
-        commit_history = self.client.get_commit_history(revisions)
+        revisions = client.parse_revision_spec([])
+        commit_history = client.get_commit_history(revisions)
 
-        self.assertEqual(len(commit_history), 3)
-        self.assertEqual(commit_history[0]['commit_message'],
-                         'commit 1\n\ndesc1')
-        self.assertEqual(commit_history[0]['author_name'],
-                         'test user <user at example.com>')
-
-        self.assertEqual(commit_history[1]['commit_message'],
-                         'commit 2\n\ndesc2')
-        self.assertEqual(commit_history[1]['author_name'],
-                         'test user <user at example.com>')
-
-        self.assertEqual(commit_history[2]['commit_message'],
-                         'commit 3\n\ndesc3')
-        self.assertEqual(commit_history[2]['author_name'],
-                         'test user <user at example.com>')
+        self.assertEqual(
+            commit_history,
+            [
+                {
+                    'author_date': '2022-08-04T11:00:00-07:00',
+                    'author_email': 'user at example.com',
+                    'author_name': 'test user <user at example.com>',
+                    'commit_id': commit_id1,
+                    'commit_message': 'commit 1\n\ndesc1',
+                    'parent_id': base_commit_id,
+                },
+                {
+                    'author_date': '2022-08-05T12:00:00-07:00',
+                    'author_email': 'user at example.com',
+                    'author_name': 'test user <user at example.com>',
+                    'commit_id': commit_id2,
+                    'commit_message': 'commit 2\n\ndesc2',
+                    'parent_id': commit_id1,
+                },
+                {
+                    'author_date': '2022-08-06T13:00:00-07:00',
+                    'author_email': 'user at example.com',
+                    'author_name': 'test user <user at example.com>',
+                    'commit_id': commit_id3,
+                    'commit_message': 'commit 3\n\ndesc3',
+                    'parent_id': commit_id2,
+                },
+            ])
 
     def test_create_commit_with_run_editor_true(self):
         """Testing MercurialClient.create_commit with run_editor set to True"""
-        self.spy_on(self.client._execute)
+        client = self.build_client()
+        self.spy_on(client._execute)
 
         with open('foo.txt', 'w') as fp:
             fp.write('change')
 
-        self.client.create_commit(message='Test commit message.',
-                                  author=self.AUTHOR,
-                                  run_editor=True,
-                                  files=['foo.txt'])
+        client.create_commit(message='Test commit message.',
+                             author=self.AUTHOR,
+                             run_editor=True,
+                             files=['foo.txt'])
 
-        self.assertTrue(self.client._execute.last_called_with(
+        self.assertSpyLastCalledWith(
+            client._execute,
             ['hg', 'commit', '-m', 'TEST COMMIT MESSAGE.', '-u',
-             'name <email>', 'foo.txt']))
+             'name <email>', 'foo.txt'])
 
     def test_create_commit_with_run_editor_false(self):
         """Testing MercurialClient.create_commit with run_editor set to False
         """
-        self.spy_on(self.client._execute)
+        client = self.build_client()
+        self.spy_on(client._execute)
 
         with open('foo.txt', 'w') as fp:
             fp.write('change')
 
-        self.client.create_commit(message='Test commit message.',
-                                  author=self.AUTHOR,
-                                  run_editor=False,
-                                  files=['foo.txt'])
+        client.create_commit(message='Test commit message.',
+                             author=self.AUTHOR,
+                             run_editor=False,
+                             files=['foo.txt'])
 
-        self.assertTrue(self.client._execute.last_called_with(
+        self.assertSpyLastCalledWith(
+            client._execute,
             ['hg', 'commit', '-m', 'Test commit message.', '-u',
-             'name <email>', 'foo.txt']))
+             'name <email>', 'foo.txt'])
 
     def test_create_commit_with_all_files_true(self):
         """Testing MercurialClient.create_commit with all_files set to True"""
-        self.spy_on(self.client._execute)
+        client = self.build_client()
+        self.spy_on(client._execute)
 
         with open('foo.txt', 'w') as fp:
             fp.write('change')
 
-        self.client.create_commit(message='message',
-                                  author=self.AUTHOR,
-                                  run_editor=False,
-                                  files=[],
-                                  all_files=True)
+        client.create_commit(message='message',
+                             author=self.AUTHOR,
+                             run_editor=False,
+                             files=[],
+                             all_files=True)
 
-        self.assertTrue(self.client._execute.last_called_with(
-            ['hg', 'commit', '-m', 'message', '-u', 'name <email>', '-A']))
+        self.assertSpyLastCalledWith(
+            client._execute,
+            ['hg', 'commit', '-m', 'message', '-u', 'name <email>', '-A'])
 
     def test_create_commit_with_all_files_false(self):
         """Testing MercurialClient.create_commit with all_files set to False"""
-        self.spy_on(self.client._execute)
+        client = self.build_client()
+        self.spy_on(client._execute)
 
         with open('foo.txt', 'w') as fp:
             fp.write('change')
 
-        self.client.create_commit(message='message',
-                                  author=self.AUTHOR,
-                                  run_editor=False,
-                                  files=['foo.txt'],
-                                  all_files=False)
+        client.create_commit(message='message',
+                             author=self.AUTHOR,
+                             run_editor=False,
+                             files=['foo.txt'],
+                             all_files=False)
 
-        self.assertTrue(self.client._execute.last_called_with(
+        self.assertSpyLastCalledWith(
+            client._execute,
             ['hg', 'commit', '-m', 'message', '-u', 'name <email>',
-             'foo.txt']))
+             'foo.txt'])
 
     def test_create_commit_with_empty_commit_message(self):
         """Testing MercurialClient.create_commit with empty commit message"""
+        client = self.build_client()
+
         with open('foo.txt', 'w') as fp:
             fp.write('change')
 
@@ -1196,206 +1279,224 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
         )
 
         with self.assertRaisesMessage(CreateCommitError, message):
-            self.client.create_commit(message='',
-                                      author=self.AUTHOR,
-                                      run_editor=True,
-                                      files=['foo.txt'])
+            client.create_commit(message='',
+                                 author=self.AUTHOR,
+                                 run_editor=True,
+                                 files=['foo.txt'])
 
     def test_create_commit_without_author(self):
         """Testing MercurialClient.create_commit without author information"""
-        self.spy_on(self.client._execute)
+        client = self.build_client()
+        self.spy_on(client._execute)
 
         with open('foo.txt', 'w') as fp:
             fp.write('change')
 
-        self.client.create_commit(message='Test commit message.',
-                                  author=None,
-                                  run_editor=True,
-                                  files=['foo.txt'])
+        client.create_commit(message='Test commit message.',
+                             author=None,
+                             run_editor=True,
+                             files=['foo.txt'])
 
-        self.assertTrue(self.client._execute.last_called_with(
-            ['hg', 'commit', '-m', 'TEST COMMIT MESSAGE.', 'foo.txt']))
+        self.assertSpyLastCalledWith(
+            client._execute,
+            ['hg', 'commit', '-m', 'TEST COMMIT MESSAGE.', 'foo.txt'])
 
     def test_merge_with_branch_and_close_branch_false(self):
         """Testing MercurialClient.merge with target branch and
         close_branch=False
         """
+        client = self.build_client()
+
         self.hg_add_file_commit(branch='test-branch')
 
-        self.spy_on(self.client._execute)
-        self.client.merge(target='test-branch',
-                          destination='default',
-                          message='My merge commit',
-                          author=self.AUTHOR,
-                          close_branch=False)
+        self.spy_on(client._execute)
+        client.merge(target='test-branch',
+                     destination='default',
+                     message='My merge commit',
+                     author=self.AUTHOR,
+                     close_branch=False)
 
-        calls = self.client._execute.calls
-        self.assertEqual(len(calls), 5)
-        self.assertTrue(calls[0].called_with(['hg', 'log', '-ql1', '-r',
-                                              'bookmark(test-branch)']))
-        self.assertTrue(calls[1].called_with(['hg', 'branches', '-q']))
-        self.assertTrue(calls[2].called_with(['hg', 'update', 'default']))
-        self.assertTrue(calls[3].called_with(['hg', 'merge', 'test-branch']))
-        self.assertTrue(calls[4].called_with(['hg', 'commit', '-m',
-                                              'My merge commit',
-                                              '-u', 'name <email>']))
+        calls = client._execute.calls
+        self.assertSpyCallCount(client._execute, 5)
+        self.assertSpyCalledWith(calls[0], ['hg', 'log', '-ql1', '-r',
+                                            'bookmark(test-branch)'])
+        self.assertSpyCalledWith(calls[1], ['hg', 'branches', '-q'])
+        self.assertSpyCalledWith(calls[2], ['hg', 'update', 'default'])
+        self.assertSpyCalledWith(calls[3], ['hg', 'merge', 'test-branch'])
+        self.assertSpyCalledWith(calls[4], ['hg', 'commit', '-m',
+                                            'My merge commit',
+                                            '-u', 'name <email>'])
 
     def test_merge_with_branch_and_close_branch_true(self):
         """Testing MercurialClient.merge with target branch and
         close_branch=True
         """
+        client = self.build_client()
+
         self.hg_add_file_commit(branch='test-branch')
 
-        self.spy_on(self.client._execute)
-        self.client.merge(target='test-branch',
-                          destination='default',
-                          message='My merge commit',
-                          author=self.AUTHOR,
-                          close_branch=True)
+        self.spy_on(client._execute)
+        client.merge(target='test-branch',
+                     destination='default',
+                     message='My merge commit',
+                     author=self.AUTHOR,
+                     close_branch=True)
 
-        calls = self.client._execute.calls
-        self.assertEqual(len(calls), 7)
-        self.assertTrue(calls[0].called_with(['hg', 'log', '-ql1', '-r',
-                                              'bookmark(test-branch)']))
-        self.assertTrue(calls[1].called_with(['hg', 'branches', '-q']))
-        self.assertTrue(calls[2].called_with(['hg', 'update', 'test-branch']))
-        self.assertTrue(calls[3].called_with(['hg', 'commit', '-m',
-                                              'My merge commit',
-                                              '--close-branch']))
-        self.assertTrue(calls[4].called_with(['hg', 'update', 'default']))
-        self.assertTrue(calls[5].called_with(['hg', 'merge', 'test-branch']))
-        self.assertTrue(calls[6].called_with(['hg', 'commit', '-m',
-                                              'My merge commit',
-                                              '-u', 'name <email>']))
+        calls = client._execute.calls
+        self.assertSpyCallCount(client._execute, 7)
+        self.assertSpyCalledWith(calls[0], ['hg', 'log', '-ql1', '-r',
+                                            'bookmark(test-branch)'])
+        self.assertSpyCalledWith(calls[1], ['hg', 'branches', '-q'])
+        self.assertSpyCalledWith(calls[2], ['hg', 'update', 'test-branch'])
+        self.assertSpyCalledWith(calls[3], ['hg', 'commit', '-m',
+                                            'My merge commit',
+                                            '--close-branch'])
+        self.assertSpyCalledWith(calls[4], ['hg', 'update', 'default'])
+        self.assertSpyCalledWith(calls[5], ['hg', 'merge', 'test-branch'])
+        self.assertSpyCalledWith(calls[6], ['hg', 'commit', '-m',
+                                            'My merge commit',
+                                            '-u', 'name <email>'])
 
     def test_merge_with_bookmark_and_close_branch_false(self):
         """Testing MercurialClient.merge with target bookmark and
         close_branch=False
         """
+        client = self.build_client()
+
         self.run_hg(['branch', 'feature-work'])
         self.hg_add_file_commit(bookmark='test-bookmark')
 
-        self.spy_on(self.client._execute)
-        self.client.merge(target='test-bookmark',
-                          destination='default',
-                          message='My merge commit',
-                          author=self.AUTHOR,
-                          close_branch=False)
+        self.spy_on(client._execute)
+        client.merge(target='test-bookmark',
+                     destination='default',
+                     message='My merge commit',
+                     author=self.AUTHOR,
+                     close_branch=False)
 
-        calls = self.client._execute.calls
-        self.assertEqual(len(calls), 4)
-        self.assertTrue(calls[0].called_with(['hg', 'log', '-ql1', '-r',
-                                              'bookmark(test-bookmark)']))
-        self.assertTrue(calls[1].called_with(['hg', 'update', 'default']))
-        self.assertTrue(calls[2].called_with(['hg', 'merge', 'test-bookmark']))
-        self.assertTrue(calls[3].called_with(['hg', 'commit', '-m',
-                                              'My merge commit',
-                                              '-u', 'name <email>']))
+        calls = client._execute.calls
+        self.assertSpyCallCount(client._execute, 4)
+        self.assertSpyCalledWith(calls[0], ['hg', 'log', '-ql1', '-r',
+                                            'bookmark(test-bookmark)'])
+        self.assertSpyCalledWith(calls[1], ['hg', 'update', 'default'])
+        self.assertSpyCalledWith(calls[2], ['hg', 'merge', 'test-bookmark'])
+        self.assertSpyCalledWith(calls[3], ['hg', 'commit', '-m',
+                                            'My merge commit',
+                                            '-u', 'name <email>'])
 
     def test_merge_with_bookmark_and_close_branch_true(self):
         """Testing MercurialClient.merge with target bookmark and
         close_branch=True
         """
+        client = self.build_client()
+
         self.run_hg(['branch', 'feature-work'])
         self.hg_add_file_commit(bookmark='test-bookmark')
 
-        self.spy_on(self.client._execute)
-        self.client.merge(target='test-bookmark',
-                          destination='default',
-                          message='My merge commit',
-                          author=self.AUTHOR,
-                          close_branch=True)
+        self.spy_on(client._execute)
+        client.merge(target='test-bookmark',
+                     destination='default',
+                     message='My merge commit',
+                     author=self.AUTHOR,
+                     close_branch=True)
 
-        calls = self.client._execute.calls
-        self.assertEqual(len(calls), 5)
-        self.assertTrue(calls[0].called_with(['hg', 'log', '-ql1', '-r',
-                                              'bookmark(test-bookmark)']))
-        self.assertTrue(calls[1].called_with(['hg', 'update', 'default']))
-        self.assertTrue(calls[2].called_with(['hg', 'merge', 'test-bookmark']))
-        self.assertTrue(calls[3].called_with(['hg', 'commit', '-m',
-                                              'My merge commit',
-                                              '-u', 'name <email>']))
-        self.assertTrue(calls[4].called_with(['hg', 'bookmark', '-d',
-                                              'test-bookmark']))
+        calls = client._execute.calls
+        self.assertSpyCallCount(client._execute, 5)
+        self.assertSpyCalledWith(calls[0], ['hg', 'log', '-ql1', '-r',
+                                            'bookmark(test-bookmark)'])
+        self.assertSpyCalledWith(calls[1], ['hg', 'update', 'default'])
+        self.assertSpyCalledWith(calls[2], ['hg', 'merge', 'test-bookmark'])
+        self.assertSpyCalledWith(calls[3], ['hg', 'commit', '-m',
+                                            'My merge commit',
+                                            '-u', 'name <email>'])
+        self.assertSpyCalledWith(calls[4], ['hg', 'bookmark', '-d',
+                                            'test-bookmark'])
 
     def test_merge_with_tag(self):
         """Testing MercurialClient.merge with target tag"""
+        client = self.build_client()
+
         self.run_hg(['branch', 'feature-work'])
         self.hg_add_file_commit(tag='test-tag')
 
-        self.spy_on(self.client._execute)
-        self.client.merge(target='test-tag',
-                          destination='default',
-                          message='My merge commit',
-                          author=self.AUTHOR,
-                          close_branch=True)
+        self.spy_on(client._execute)
+        client.merge(target='test-tag',
+                     destination='default',
+                     message='My merge commit',
+                     author=self.AUTHOR,
+                     close_branch=True)
 
-        calls = self.client._execute.calls
-        self.assertEqual(len(calls), 6)
-        self.assertTrue(calls[0].called_with(['hg', 'log', '-ql1', '-r',
-                                              'bookmark(test-tag)']))
-        self.assertTrue(calls[1].called_with(['hg', 'branches', '-q']))
-        self.assertTrue(calls[2].called_with(['hg', 'log', '-ql1', '-r',
-                                              'tag(test-tag)']))
-        self.assertTrue(calls[3].called_with(['hg', 'update', 'default']))
-        self.assertTrue(calls[4].called_with(['hg', 'merge', 'test-tag']))
-        self.assertTrue(calls[5].called_with(['hg', 'commit', '-m',
-                                              'My merge commit',
-                                              '-u', 'name <email>']))
+        calls = client._execute.calls
+        self.assertSpyCallCount(client._execute, 6)
+        self.assertSpyCalledWith(calls[0], ['hg', 'log', '-ql1', '-r',
+                                            'bookmark(test-tag)'])
+        self.assertSpyCalledWith(calls[1], ['hg', 'branches', '-q'])
+        self.assertSpyCalledWith(calls[2], ['hg', 'log', '-ql1', '-r',
+                                            'tag(test-tag)'])
+        self.assertSpyCalledWith(calls[3], ['hg', 'update', 'default'])
+        self.assertSpyCalledWith(calls[4], ['hg', 'merge', 'test-tag'])
+        self.assertSpyCalledWith(calls[5], ['hg', 'commit', '-m',
+                                            'My merge commit',
+                                            '-u', 'name <email>'])
 
     def test_merge_with_revision(self):
         """Testing MercurialClient.merge with target revision"""
+        client = self.build_client()
+
         self.run_hg(['branch', 'feature-work'])
         self.hg_add_file_commit()
         tip = self._hg_get_tip()
 
-        self.spy_on(self.client._execute)
-        self.client.merge(target=tip,
-                          destination='default',
-                          message='My merge commit',
-                          author=self.AUTHOR,
-                          close_branch=True)
+        self.spy_on(client._execute)
+        client.merge(target=tip,
+                     destination='default',
+                     message='My merge commit',
+                     author=self.AUTHOR,
+                     close_branch=True)
 
-        calls = self.client._execute.calls
-        self.assertEqual(len(calls), 7)
-        self.assertTrue(calls[0].called_with(['hg', 'log', '-ql1', '-r',
-                                              'bookmark(%s)' % tip]))
-        self.assertTrue(calls[1].called_with(['hg', 'branches', '-q']))
-        self.assertTrue(calls[2].called_with(['hg', 'log', '-ql1', '-r',
-                                              'tag(%s)' % tip]))
-        self.assertTrue(calls[3].called_with(['hg', 'identify', '-r', tip]))
-        self.assertTrue(calls[4].called_with(['hg', 'update', 'default']))
-        self.assertTrue(calls[5].called_with(['hg', 'merge', tip]))
-        self.assertTrue(calls[6].called_with(['hg', 'commit', '-m',
-                                              'My merge commit',
-                                              '-u', 'name <email>']))
+        calls = client._execute.calls
+        self.assertSpyCallCount(client._execute, 7)
+        self.assertSpyCalledWith(calls[0], ['hg', 'log', '-ql1', '-r',
+                                            'bookmark(%s)' % tip])
+        self.assertSpyCalledWith(calls[1], ['hg', 'branches', '-q'])
+        self.assertSpyCalledWith(calls[2], ['hg', 'log', '-ql1', '-r',
+                                            'tag(%s)' % tip])
+        self.assertSpyCalledWith(calls[3], ['hg', 'identify', '-r', tip])
+        self.assertSpyCalledWith(calls[4], ['hg', 'update', 'default'])
+        self.assertSpyCalledWith(calls[5], ['hg', 'merge', tip])
+        self.assertSpyCalledWith(calls[6], ['hg', 'commit', '-m',
+                                            'My merge commit',
+                                            '-u', 'name <email>'])
 
     def test_merge_with_invalid_target(self):
         """Testing MercurialClient.merge with an invalid target"""
+        client = self.build_client()
+
         expected_message = (
             'Could not find a valid branch, tag, bookmark, or revision called '
             '"invalid".'
         )
 
         with self.assertRaisesMessage(MergeError, expected_message):
-            self.client.merge(target='invalid',
-                              destination='default',
-                              message='commit message',
-                              author=self.AUTHOR)
+            client.merge(target='invalid',
+                         destination='default',
+                         message='commit message',
+                         author=self.AUTHOR)
 
     def test_merge_with_invalid_destination(self):
         """Testing MercurialClient.merge with an invalid destination branch"""
+        client = self.build_client()
+
         expected_message = 'Could not switch to branch "non-existent-branch".'
 
         with self.assertRaisesMessage(MergeError, expected_message):
-            self.client.merge(target='default',
-                              destination='non-existent-branch',
-                              message='commit message',
-                              author=self.AUTHOR)
+            client.merge(target='default',
+                         destination='non-existent-branch',
+                         message='commit message',
+                         author=self.AUTHOR)
 
     def test_apply_patch(self):
         """Testing MercurialClient.apply_patch"""
-        client = self.client
+        client = self.build_client()
 
         self.spy_on(execute,
                     op=kgb.SpyOpReturn((0, b'test')))
@@ -1419,7 +1520,7 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
 
     def test_apply_patch_with_p(self):
         """Testing MercurialClient.apply_patch with p="""
-        client = self.client
+        client = self.build_client()
 
         self.spy_on(execute,
                     op=kgb.SpyOpReturn((0, b'test')))
@@ -1444,7 +1545,7 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
 
     def test_apply_patch_with_error(self):
         """Testing MercurialClient.apply_patch with error"""
-        client = self.client
+        client = self.build_client()
 
         self.spy_on(execute,
                     op=kgb.SpyOpReturn((1, b'bad')))
@@ -1466,14 +1567,29 @@ class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
         self.assertEqual(result.conflicting_files, [])
         self.assertEqual(result.patch_output, b'bad')
 
-    def _hg_get_tip(self):
+    def _hg_get_tip(self, full=False):
         """Return the revision at the tip of the branch.
+
+        Args:
+            full (bool, optional):
+                Whether to return a full ID. By default, a shortened ID is
+                returned.
+
+                Version Added:
+                    4.0
 
         Returns:
             unicode:
             The tip revision.
         """
-        return force_unicode(self.run_hg(['identify']).split()[0])
+        cmdline = ['identify']
+
+        if full:
+            # This is currently the most cross-Mercurial way of getting a
+            # full ID.
+            cmdline.append('--debug')
+
+        return force_unicode(self.run_hg(cmdline).split()[0])
 
 
 class MercurialSubversionClientTests(MercurialTestCase):
@@ -1549,6 +1665,7 @@ class MercurialSubversionClientTests(MercurialTestCase):
                          str(randint(30000, 40000)))
 
         pid_file = os.path.join(temp_base_path, 'svnserve.pid')
+
         execute(['svnserve', '--single-thread', '--pid-file', pid_file, '-d',
                  '--listen-port', svnserve_port, '-r', temp_base_path])
 
@@ -1581,7 +1698,8 @@ class MercurialSubversionClientTests(MercurialTestCase):
         if self._skip_reason:
             raise unittest.SkipTest(self._skip_reason)
 
-        home_dir = self.get_user_home()
+        home_dir = make_tempdir()
+        self.set_user_home(home_dir)
         hgrc_path = os.path.join(home_dir, '.hgrc')
 
         # Make sure hgsubversion is enabled.
@@ -1604,8 +1722,6 @@ class MercurialSubversionClientTests(MercurialTestCase):
                 'Unable to clone Subversion repository: %s' % e)
 
         os.chdir(self.clone_dir)
-        self.options.parent_branch = None
-        self.client = MercurialClient(options=self.options)
 
     @classmethod
     def svn_add_file_commit(cls, filename, data, msg, add_file=True):
@@ -1619,9 +1735,10 @@ class MercurialSubversionClientTests(MercurialTestCase):
 
     def test_get_repository_info(self):
         """Testing MercurialClient.get_repository_info with SVN"""
-        ri = self.client.get_repository_info()
+        client = self.build_client()
+        ri = client.get_repository_info()
 
-        self.assertEqual(self.client._type, 'svn')
+        self.assertEqual(client._type, 'svn')
         self.assertEqual(ri.base_path, '/trunk')
         self.assertEqual(ri.path, self.svn_checkout_url)
 
@@ -1629,7 +1746,9 @@ class MercurialSubversionClientTests(MercurialTestCase):
         """Testing MercurialClient._calculate_hgsubversion_repository_info
         with SVN determines repository and base paths
         """
-        repo_info = self.client._calculate_hgsubversion_repository_info(
+        client = self.build_client()
+
+        repo_info = client._calculate_hgsubversion_repository_info(
             'URL: svn+ssh://testuser@svn.example.net/repo/trunk\n'
             'Repository Root: svn+ssh://testuser@svn.example.net/repo\n'
             'Repository UUID: bfddb570-5023-0410-9bc8-bc1659bf7c01\n'
@@ -1647,41 +1766,46 @@ class MercurialSubversionClientTests(MercurialTestCase):
         """Testing MercurialClient.scan_for_server with SVN and configured
         .reviewboardrc
         """
-        with self.reviewboardrc({'REVIEWBOARD_URL': 'https://example.com/'}):
-            self.client.config = load_config()
-            ri = self.client.get_repository_info()
+        client = self.build_client()
 
-            self.assertEqual(self.client.scan_for_server(ri),
+        with self.reviewboardrc({'REVIEWBOARD_URL': 'https://example.com/'}):
+            client.config = load_config()
+            ri = client.get_repository_info()
+
+            self.assertEqual(client.scan_for_server(ri),
                              'https://example.com/')
 
     def test_scan_for_server_with_property(self):
         """Testing MercurialClient.scan_for_server with SVN and reviewboard:url
         property
         """
-        ri = self.client.get_repository_info()
+        client = self.build_client()
+        ri = client.get_repository_info()
 
-        self.assertEqual(self.client.scan_for_server(ri), self.TESTSERVER)
+        self.assertEqual(client.scan_for_server(ri), self.TESTSERVER)
 
     def test_diff(self):
         """Testing MercurialClient.diff with SVN"""
-        self.client.get_repository_info()
+        client = self.build_client()
+        client.get_repository_info()
 
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO4,
                                 msg='edit 4')
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions)
+        revisions = client.parse_revision_spec([])
 
-        self.assertIsInstance(result, dict)
-        self.assertIn('diff', result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '2eb0a5f2149232c43a1745d90949fcd5')
-        self.assertIsNone(result['parent_diff'])
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'diff': '',
+                'parent_diff': None,
+            })
 
     def test_diff_with_multiple_commits(self):
         """Testing MercurialClient.diff with SVN and multiple commits"""
-        self.client.get_repository_info()
+        client = self.build_client()
+        client.get_repository_info()
 
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO4,
@@ -1693,18 +1817,19 @@ class MercurialSubversionClientTests(MercurialTestCase):
                                 data=FOO6,
                                 msg='edit 6')
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions)
+        revisions = client.parse_revision_spec([])
 
-        self.assertIsInstance(result, dict)
-        self.assertIn('diff', result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '3d007394de3831d61e477cbcfe60ece8')
-        self.assertIsNone(result['parent_diff'])
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'diff': '',
+                'parent_diff': None,
+            })
 
     def test_diff_with_revision(self):
         """Testing MercurialClient.diff with SVN and specific revision"""
-        self.client.get_repository_info()
+        client = self.build_client()
+        client.get_repository_info()
 
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO4,
@@ -1723,11 +1848,11 @@ class MercurialSubversionClientTests(MercurialTestCase):
                                 msg='edit 7',
                                 branch='b')
 
-        revisions = self.client.parse_revision_spec(['3'])
-        result = self.client.diff(revisions)
+        revisions = client.parse_revision_spec(['3'])
 
-        self.assertIsInstance(result, dict)
-        self.assertIn('diff', result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '2eb0a5f2149232c43a1745d90949fcd5')
-        self.assertIsNone(result['parent_diff'])
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'diff': '',
+                'parent_diff': None,
+            })
