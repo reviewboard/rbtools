@@ -22,6 +22,7 @@ _build
 bak
 build
 dist
+docs/rbtools/api/coderef/python
 pickle
 temp
 

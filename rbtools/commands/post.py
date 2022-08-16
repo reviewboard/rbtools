@@ -587,14 +587,14 @@ class Post(Command):
             diff_history (DiffHistory, optional):
                 The diff history to post for multi-commit review requests.
 
-                Exactly one of ``diff_history`` and ``squashed_diff` must be
+                Exactly one of ``diff_history`` and ``squashed_diff`` must be
                 specified.
 
             squashed_diff (SquashedDiff, optional):
                 The squashed diff information to upload when uploading a
                 traditional-style review request.
 
-                Exactly one of ``diff_history`` and ``squashed_diff` must be
+                Exactly one of ``diff_history`` and ``squashed_diff`` must be
                 specified.
 
             submit_as (unicode, optional):

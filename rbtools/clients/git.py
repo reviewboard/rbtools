@@ -688,7 +688,7 @@ class GitClient(BaseSCMClient):
             ``commit_id`` (:py:class:`unicode`, optional):
                 The commit ID to include when posting, if available.
 
-            ``base_commit_id` (:py:class:`unicode`, optional):
+            ``base_commit_id`` (:py:class:`unicode`, optional):
                 The ID of the commit that the change is based on, if available.
                 This is necessary for some hosting services that don't provide
                 individual file access.

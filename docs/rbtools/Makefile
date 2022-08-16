@@ -26,7 +26,7 @@ help:
 	@echo "  linkcheck to check all external links for integrity"
 
 clean:
-	-rm -rf $(BUILDDIR)/*
+	-rm -rf $(BUILDDIR)/* api/coderef/python/*.rst
 
 html:
 	mkdir -p $(BUILDDIR)/html $(BUILDDIR)/doctrees

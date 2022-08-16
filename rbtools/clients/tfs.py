@@ -205,7 +205,7 @@ class TFExeWrapper(object):
             ``diff`` (:py:class:`bytes`):
                 The contents of the diff to upload.
 
-            ``base_commit_id` (:py:class:`unicode`, optional):
+            ``base_commit_id`` (:py:class:`unicode`, optional):
                 The ID of the commit that the change is based on, if available.
                 This is necessary for some hosting services that don't provide
                 individual file access.
@@ -598,7 +598,7 @@ class TEEWrapper(object):
             ``diff`` (:py:class:`bytes`):
                 The contents of the diff to upload.
 
-            ``base_commit_id` (:py:class:`unicode`, optional):
+            ``base_commit_id`` (:py:class:`unicode`, optional):
                 The ID of the commit that the change is based on, if available.
                 This is necessary for some hosting services that don't provide
                 individual file access.
@@ -908,7 +908,7 @@ class TFHelperWrapper(object):
             ``diff`` (:py:class:`bytes`):
                 The contents of the diff to upload.
 
-            ``base_commit_id` (:py:class:`unicode`, optional):
+            ``base_commit_id`` (:py:class:`unicode`, optional):
                 The ID of the commit that the change is based on, if available.
                 This is necessary for some hosting services that don't provide
                 individual file access.
@@ -1126,7 +1126,7 @@ class TFSClient(BaseSCMClient):
             ``diff`` (:py:class:`bytes`):
                 The contents of the diff to upload.
 
-            ``base_commit_id` (:py:class:`unicode`, optional):
+            ``base_commit_id`` (:py:class:`unicode`, optional):
                 The ID of the commit that the change is based on, if available.
                 This is necessary for some hosting services that don't provide
                 individual file access.

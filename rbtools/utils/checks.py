@@ -70,8 +70,10 @@ def check_gnu_diff():
 
 def is_valid_version(actual, expected):
     """
-    Takes two tuples, both in the form:
+    Takes two tuples, both in the form::
+
         (major_version, minor_version, micro_version)
+
     Returns true if the actual version is greater than or equal to
     the expected version, and false otherwise.
     """
