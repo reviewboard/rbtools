@@ -1096,6 +1096,8 @@ def scan_usable_client(config, options, client_name=None):
     else:
         tool = None
 
+    candidate_tool_names = []
+
     # Now scan through the repositories to find any local working directories.
     # If there are multiple repositories which appear to be active in the CWD,
     # choose the deepest and emit a warning.
@@ -1103,6 +1105,8 @@ def scan_usable_client(config, options, client_name=None):
         candidate_repos = []
 
         for name, tool in six.iteritems(scmclients):
+            candidate_tool_names.append(tool.name)
+
             logging.debug('Checking for a %s repository...', tool.name)
             local_path = tool.get_local_path()
 
@@ -1133,23 +1137,43 @@ def scan_usable_client(config, options, client_name=None):
                 logging.warning('Multiple matching repositories were found. '
                                 'Using %s repository at %s.',
                                 tool.name, deepest_local_path)
+                logging.warning('')
                 logging.warning('Define REPOSITORY_TYPE in .reviewboardrc if '
                                 'you wish to use a different repository.')
 
             tool = deepest_repo_tool
+    else:
+        candidate_tool_names.append(tool.name)
 
     repository_info = tool and tool.get_repository_info()
 
     if repository_info is None:
         if client_name:
-            logging.error('The provided repository type was not detected '
-                          'in the current directory.')
-        elif getattr(options, 'repository_url', None):
-            logging.error('No supported repository could be accessed at '
-                          'the supplied url.')
+            logging.error('A %s repository was not detected in the current '
+                          'directory.',
+                          client_name)
         else:
-            logging.error('The current directory does not contain a checkout '
-                          'from a supported source code repository.')
+            repository_url = getattr(options, 'repository_url', None)
+
+            if repository_url:
+                logging.error('A supported repository was not found at %s',
+                              repository_url)
+            else:
+                logging.error('A supported repository was not found in the '
+                              'the current directory or any parent directory.')
+                logging.error('')
+                logging.error('The following types of repositories were '
+                              'tried: %s',
+                              ', '.join(sorted(candidate_tool_names)))
+
+            logging.error('')
+            logging.error('You may need to set up a .reviewboardrc file '
+                          'with REPOSITORY_NAME, REPOSITORY_TYPE, and '
+                          'REVIEWBOARD_URL, if one is not already set up. '
+                          'This can be done by running `rbt setup-repo` and '
+                          'following the instructions. This file should then '
+                          'be committed to the repository for everyone to '
+                          'use.')
 
         sys.exit(1)
 
