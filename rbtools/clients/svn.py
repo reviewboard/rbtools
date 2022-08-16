@@ -1114,7 +1114,9 @@ class SVNClient(SCMClient):
 
         cmd.append(six.text_type(patch_file))
 
-        rc, patch_output = self._run_svn(cmd, return_error_code=True)
+        rc, patch_output = self._run_svn(cmd,
+                                         results_unicode=False,
+                                         return_error_code=True)
 
         if self.supports_empty_files():
             try:

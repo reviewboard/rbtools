@@ -338,7 +338,7 @@ class SVNRepositoryMatchTests(kgb.SpyAgency, SCMClientTestCase):
             '/')
 
 
-class SVNClientTests(SCMClientTestCase):
+class SVNClientTests(kgb.SpyAgency, SCMClientTestCase):
     """Unit tests for SVNClient."""
 
     scmclient_cls = SVNClient
@@ -1125,3 +1125,83 @@ class SVNClientTests(SCMClientTestCase):
                     b' -- test line (test2)\n'
                 ),
             })
+
+    def test_apply_patch(self):
+        """Testing SVNClient.apply_patch"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(execute,
+                    op=kgb.SpyOpReturn((0, b'test')))
+
+        result = client.apply_patch(base_path=repository_info.base_path,
+                                    base_dir='',
+                                    patch_file='test.diff')
+
+        self.assertSpyCalledWith(
+            execute,
+            [
+                'svn', '--non-interactive', 'patch', '--strip=1', 'test.diff',
+            ],
+            with_errors=True,
+            return_error_code=True,
+            results_unicode=False)
+
+        self.assertTrue(result.applied)
+        self.assertFalse(result.has_conflicts)
+        self.assertEqual(result.conflicting_files, [])
+        self.assertEqual(result.patch_output, b'test')
+
+    def test_apply_patch_with_p(self):
+        """Testing SVNClient.apply_patch with p="""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(execute,
+                    op=kgb.SpyOpReturn((0, b'test')))
+
+        result = client.apply_patch(base_path=repository_info.base_path,
+                                    base_dir='',
+                                    patch_file='test.diff',
+                                    p=3)
+
+        self.assertSpyCalledWith(
+            execute,
+            [
+                'svn', '--non-interactive', 'patch', '--strip=3', 'test.diff',
+            ],
+            with_errors=True,
+            return_error_code=True,
+            results_unicode=False)
+
+        self.assertTrue(result.applied)
+        self.assertFalse(result.has_conflicts)
+        self.assertEqual(result.conflicting_files, [])
+        self.assertEqual(result.patch_output, b'test')
+
+    def test_apply_patch_with_error(self):
+        """Testing SVNClient.apply_patch with error"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(execute,
+                    op=kgb.SpyOpReturn((1, 'bád'.encode('utf-8'))))
+
+        result = client.apply_patch(base_path=repository_info.base_path,
+                                    base_dir='',
+                                    patch_file='test.diff',
+                                    p=3)
+
+        self.assertSpyCalledWith(
+            execute,
+            [
+                'svn', '--non-interactive', 'patch', '--strip=3', 'test.diff',
+            ],
+            with_errors=True,
+            return_error_code=True,
+            results_unicode=False)
+
+        self.assertFalse(result.applied)
+        self.assertFalse(result.has_conflicts)
+        self.assertEqual(result.conflicting_files, [])
+        self.assertEqual(result.patch_output, b'b\xc3\xa1d')
