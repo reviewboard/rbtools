@@ -11,7 +11,7 @@ import xml.etree.ElementTree as ET
 
 from six.moves.urllib.parse import unquote
 
-from rbtools.clients import RepositoryInfo, SCMClient
+from rbtools.clients import BaseSCMClient, RepositoryInfo
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMError,
                                     TooManyRevisionsError)
@@ -60,7 +60,7 @@ class TFExeWrapper(object):
         """Return repository information for the current working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            rbtools.clients.base.repository.RepositoryInfo:
             The repository info structure.
         """
         path = self.get_local_path()
@@ -441,7 +441,7 @@ class TEEWrapper(object):
         """Return repository information for the current working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            rbtools.clients.base.repository.RepositoryInfo:
             The repository info structure.
         """
         path = self.get_local_path()
@@ -820,7 +820,7 @@ class TFHelperWrapper(object):
         """Return repository information for the current working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            rbtools.clients.base.repository.RepositoryInfo:
             The repository info structure.
         """
         path = self.get_local_path()
@@ -986,7 +986,7 @@ class TFHelperWrapper(object):
                        **kwargs)
 
 
-class TFSClient(SCMClient):
+class TFSClient(BaseSCMClient):
     """A client for Team Foundation Server."""
 
     name = 'Team Foundation Server'
@@ -1047,7 +1047,7 @@ class TFSClient(SCMClient):
         """Return repository information for the current working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            rbtools.clients.base.repository.RepositoryInfo:
             The repository info structure.
         """
         return self.tf_wrapper.get_repository_info()

@@ -10,7 +10,7 @@ import uuid
 import six
 from six.moves.urllib.parse import urlsplit, urlunparse
 
-from rbtools.clients import PatchResult, SCMClient, RepositoryInfo
+from rbtools.clients import BaseSCMClient, PatchResult, RepositoryInfo
 from rbtools.clients.errors import (CreateCommitError,
                                     InvalidRevisionSpecError,
                                     MergeError,
@@ -43,7 +43,7 @@ class MercurialRefType(object):
     UNKNOWN = 'unknown'
 
 
-class MercurialClient(SCMClient):
+class MercurialClient(BaseSCMClient):
     """A client for Mercurial.
 
     This is a wrapper around the hg executable that fetches repository
@@ -279,7 +279,7 @@ class MercurialClient(SCMClient):
         """Return repository information for the current working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            rbtools.clients.base.repository.RepositoryInfo:
             The repository info structure.
         """
         if not check_install([self._exe, '--help']):
@@ -512,7 +512,7 @@ class MercurialClient(SCMClient):
                 The SVN info output.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            rbtools.clients.base.repository.RepositoryInfo:
             The repository info structure, if available.
         """
         def _info(r):
@@ -1158,7 +1158,7 @@ class MercurialClient(SCMClient):
         """Find the Review Board server matching this repository.
 
         Args:
-            repository_info (rbtools.clients.RepositoryInfo):
+            repository_info (rbtools.clients.base.repository.RepositoryInfo):
                 The repository information structure.
 
         Returns:
@@ -1258,7 +1258,7 @@ class MercurialClient(SCMClient):
                 Whether the patch should be reverted rather than applied.
 
         Returns:
-            rbtools.clients.PatchResult:
+            rbtools.clients.base.patch.PatchResult:
             The result of the patch operation.
         """
         cmd = [self._exe, 'patch', '--no-commit']

@@ -8,7 +8,7 @@ import re
 
 import six
 
-from rbtools.clients import SCMClient, RepositoryInfo
+from rbtools.clients import BaseSCMClient, RepositoryInfo
 from rbtools.clients.errors import TooManyRevisionsError
 from rbtools.utils.checks import check_install
 from rbtools.utils.diffs import filter_diff, normalize_patterns
@@ -18,7 +18,7 @@ from rbtools.utils.process import execute
 USING_PARENT_PREFIX = 'Using parent branch '
 
 
-class BazaarClient(SCMClient):
+class BazaarClient(BaseSCMClient):
     """A client for Bazaar and Breezy.
 
     This is a wrapper that fetches repository information and generates
@@ -121,7 +121,7 @@ class BazaarClient(SCMClient):
         """Return repository information for the current working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            rbtools.clients.base.repository.RepositoryInfo:
             The repository info structure.
         """
         path = self.get_local_path()

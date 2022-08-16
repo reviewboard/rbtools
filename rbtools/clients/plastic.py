@@ -6,7 +6,7 @@ import logging
 import os
 import re
 
-from rbtools.clients import SCMClient, RepositoryInfo
+from rbtools.clients import BaseSCMClient, RepositoryInfo
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError,
                                     SCMError)
@@ -15,7 +15,7 @@ from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import execute
 
 
-class PlasticClient(SCMClient):
+class PlasticClient(BaseSCMClient):
     """A client for Plastic SCM.
 
     This is a wrapper around the cm executable that fetches repository
@@ -74,7 +74,7 @@ class PlasticClient(SCMClient):
         """Return repository information for the current working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            rbtools.clients.base.repository.RepositoryInfo:
             The repository info structure.
         """
         local_path = self.get_local_path()

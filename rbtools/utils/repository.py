@@ -18,7 +18,7 @@ def get_repository_resource(api_root,
         api_root (rbtools.api.resource.RootResource):
             The root resource for the API.
 
-        tool (rbtools.clients.SCMClient, optional):
+        tool (rbtools.clients.base.BaseSCMClient, optional):
             The SCM client corresponding to the local working directory.
 
         repository_name (unicode, optional):
@@ -102,7 +102,7 @@ def get_repository_id(repository_info, api_root, repository_name=None):
     find the ID of one that matches the provided repository information.
 
     Args:
-        repository_info (rbtools.clients.RepositoryInfo):
+        repository_info (rbtools.clients.base.repository.RepositoryInfo):
             The scanned repository information.
 
         api_root (rbtools.api.resource.RootResource):

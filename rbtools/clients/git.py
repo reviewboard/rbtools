@@ -10,7 +10,7 @@ import sys
 import six
 from six.moves import zip
 
-from rbtools.clients import PatchResult, SCMClient, RepositoryInfo
+from rbtools.clients import BaseSCMClient, PatchResult, RepositoryInfo
 from rbtools.clients.errors import (AmendError,
                                     CreateCommitError,
                                     MergeError,
@@ -28,7 +28,7 @@ from rbtools.utils.errors import EditorError
 from rbtools.utils.process import execute
 
 
-class GitClient(SCMClient):
+class GitClient(BaseSCMClient):
     """A client for Git.
 
     This is a wrapper around the git executable that fetches repository
@@ -293,7 +293,7 @@ class GitClient(SCMClient):
         """Return repository information for the current working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            rbtools.clients.base.repository.RepositoryInfo:
             The repository info structure.
         """
         local_path = self.get_local_path()
@@ -470,7 +470,7 @@ class GitClient(SCMClient):
         """Find the Review Board server matching this repository.
 
         Args:
-            repository_info (rbtools.clients.RepositoryInfo):
+            repository_info (rbtools.clients.base.repository.RepositoryInfo):
                 The repository information structure.
 
         Returns:
@@ -1090,7 +1090,7 @@ class GitClient(SCMClient):
                 Whether the patch should be reverted rather than applied.
 
         Returns:
-            rbtools.clients.PatchResult:
+            rbtools.clients.base.patch.PatchResult:
             The result of the patch operation.
         """
         cmd = ['git', 'apply', '-3']

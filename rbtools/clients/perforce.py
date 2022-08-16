@@ -15,7 +15,7 @@ from fnmatch import fnmatch
 
 import six
 
-from rbtools.clients import SCMClient, RepositoryInfo
+from rbtools.clients import BaseSCMClient, RepositoryInfo
 from rbtools.clients.errors import (AmendError,
                                     EmptyChangeError,
                                     InvalidRevisionSpecError,
@@ -381,7 +381,7 @@ class P4Wrapper(object):
         return keyvals
 
 
-class PerforceClient(SCMClient):
+class PerforceClient(BaseSCMClient):
     """A client for Perforce.
 
     This is a wrapper around the :command:`p4` executable that fetches
@@ -463,7 +463,7 @@ class PerforceClient(SCMClient):
         """Return repository information for the current working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            rbtools.clients.base.repository.RepositoryInfo:
             The repository info structure.
         """
         local_path = self.get_local_path()
@@ -745,7 +745,7 @@ class PerforceClient(SCMClient):
 
 
         Args:
-            repository_info (rbtools.clients.RepositoryInfo):
+            repository_info (rbtools.clients.base.repository.RepositoryInfo):
                 The repository information structure.
 
         Returns:

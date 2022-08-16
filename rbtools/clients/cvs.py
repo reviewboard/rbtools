@@ -7,7 +7,7 @@ import os
 import re
 import socket
 
-from rbtools.clients import SCMClient, RepositoryInfo
+from rbtools.clients import BaseSCMClient, RepositoryInfo
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError)
 from rbtools.utils.checks import check_install
@@ -15,7 +15,7 @@ from rbtools.utils.diffs import filter_diff, normalize_patterns
 from rbtools.utils.process import execute
 
 
-class CVSClient(SCMClient):
+class CVSClient(BaseSCMClient):
     """A client for CVS.
 
     This is a wrapper around the cvs executable that fetches repository
@@ -71,7 +71,7 @@ class CVSClient(SCMClient):
         """Return repository information for the current working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            rbtools.clients.base.repository.RepositoryInfo:
             The repository info structure.
         """
         if not check_install(['cvs']):

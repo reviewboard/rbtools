@@ -146,7 +146,7 @@ class SCMClientTestCase(TestCase):
                 Keyword arguments to pass to the client class.
 
         Returns:
-            rbtools.clients.SCMClient:
+            rbtools.clients.base.BaseSCMClient:
             The client instance.
         """
         self.assertIsNotNone(self.scmclient_cls)

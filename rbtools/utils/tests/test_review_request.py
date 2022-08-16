@@ -5,7 +5,7 @@ from __future__ import unicode_literals
 import kgb
 
 from rbtools.api.errors import APIError
-from rbtools.clients import SCMClient
+from rbtools.clients import BaseSCMClient
 from rbtools.testing import TestCase
 from rbtools.utils.errors import MatchReviewRequestsError
 from rbtools.utils.review_request import (find_review_request_matches,
@@ -125,7 +125,7 @@ class FindReviewRequestMatchesTests(TestCase):
         """Testing find_review_request_matches with
         tool.get_tree_matches_review_request() returns boolean results
         """
-        class MySCMClient(SCMClient):
+        class MySCMClient(BaseSCMClient):
             def get_tree_matches_review_request(_self, review_request,
                                                 revisions):
                 return review_request.extra_data.get('key') == 'good'
@@ -157,7 +157,7 @@ class FindReviewRequestMatchesTests(TestCase):
         """Testing find_review_request_matches with
         tool.get_tree_matches_review_request() returns None
         """
-        class MySCMClient(SCMClient):
+        class MySCMClient(BaseSCMClient):
             def get_tree_matches_review_request(_self, review_request,
                                                 revisions):
                 return None
@@ -189,7 +189,7 @@ class FindReviewRequestMatchesTests(TestCase):
         tool.get_tree_matches_review_request() returns boolean results and
         draft
         """
-        class MySCMClient(SCMClient):
+        class MySCMClient(BaseSCMClient):
             def get_tree_matches_review_request(_self, review_request,
                                                 revisions):
                 print(review_request)
@@ -490,7 +490,7 @@ class FindReviewRequestMatchesTests(TestCase):
 
     def test_with_multiple_exact_matches(self):
         """Testing find_review_request_matches with multiple exact matches"""
-        class MySCMClient(SCMClient):
+        class MySCMClient(BaseSCMClient):
             def get_tree_matches_review_request(_self, review_request,
                                                 revisions):
                 if 'key' in review_request.extra_data:
@@ -731,10 +731,13 @@ class GuessExistingReviewRequestTests(kgb.SpyAgency, TestCase):
 
     def test_with_defaults(self):
         """Testing guess_existing_review_request without match criteria"""
+        class MySCMClient(BaseSCMClient):
+            pass
+
         self._add_review_requests(1)
 
         self.assertIsNone(guess_existing_review_request(
-            tool=SCMClient(),
+            tool=MySCMClient(),
             revisions={
                 'tip': 'abc123',
                 'base': 'def456',
@@ -744,7 +747,7 @@ class GuessExistingReviewRequestTests(kgb.SpyAgency, TestCase):
 
     def test_with_exact_match(self):
         """Testing guess_existing_review_request with exact match"""
-        class MySCMClient(SCMClient):
+        class MySCMClient(BaseSCMClient):
             def get_commit_message(_self, revisions):
                 return {
                     'summary': 'Test summary 2',
@@ -769,7 +772,7 @@ class GuessExistingReviewRequestTests(kgb.SpyAgency, TestCase):
         """Testing guess_existing_review_request with fuzzy match and no
         is_fuzzy_match_func
         """
-        class MySCMClient(SCMClient):
+        class MySCMClient(BaseSCMClient):
             def get_commit_message(_self, revisions):
                 return {
                     'summary': 'Test summary 2',
@@ -793,7 +796,7 @@ class GuessExistingReviewRequestTests(kgb.SpyAgency, TestCase):
         """Testing guess_existing_review_request with fuzzy match and
         is_fuzzy_match_func
         """
-        class MySCMClient(SCMClient):
+        class MySCMClient(BaseSCMClient):
             def get_commit_message(_self, revisions):
                 return {
                     'summary': 'Test summary 2',
@@ -830,7 +833,7 @@ class GuessExistingReviewRequestTests(kgb.SpyAgency, TestCase):
         """Testing guess_existing_review_request with fuzzy match and
         is_fuzzy_match_func returns False for all
         """
-        class MySCMClient(SCMClient):
+        class MySCMClient(BaseSCMClient):
             def get_commit_message(_self, revisions):
                 return {
                     'summary': 'Test summary 2',
@@ -865,6 +868,9 @@ class GuessExistingReviewRequestTests(kgb.SpyAgency, TestCase):
         """Testing guess_existing_review_request with APIError when fetching
         review requests
         """
+        class MySCMClient(BaseSCMClient):
+            pass
+
         self.spy_on(get_pending_review_requests,
                     op=kgb.SpyOpRaise(APIError()))
 
@@ -876,7 +882,7 @@ class GuessExistingReviewRequestTests(kgb.SpyAgency, TestCase):
         with self.assertRaisesMessage(MatchReviewRequestsError,
                                       message):
             self.assertIsNone(guess_existing_review_request(
-                tool=SCMClient(),
+                tool=MySCMClient(),
                 revisions={
                     'tip': 'abc123',
                     'base': 'def456',

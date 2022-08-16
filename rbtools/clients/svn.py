@@ -14,7 +14,7 @@ from six.moves import map
 from six.moves.urllib.parse import unquote
 
 from rbtools.api.errors import APIError
-from rbtools.clients import PatchResult, RepositoryInfo, SCMClient
+from rbtools.clients import BaseSCMClient, PatchResult, RepositoryInfo
 from rbtools.clients.errors import (AuthenticationError,
                                     InvalidRevisionSpecError,
                                     MinimumVersionError, OptionsCheckError,
@@ -34,7 +34,7 @@ from rbtools.utils.repository import get_repository_resource
 _fs_encoding = sys.getfilesystemencoding()
 
 
-class SVNClient(SCMClient):
+class SVNClient(BaseSCMClient):
     """A client for Subversion.
 
     This is a wrapper around the svn executable that fetches repository
@@ -122,7 +122,7 @@ class SVNClient(SCMClient):
         """Return repository information for the current working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            SVNRepositoryInfo:
             The repository info structure.
         """
         if self._svn_repository_info_cache:
@@ -355,7 +355,7 @@ class SVNClient(SCMClient):
         inside a subversion repository.
 
         Args:
-            repository_info (rbtools.clients.RepositoryInfo):
+            repository_info (SVNRepositoryInfo):
                 The repository information structure.
 
         Returns:
@@ -1076,7 +1076,7 @@ class SVNClient(SCMClient):
                 Whether the patch should be reverted rather than applied.
 
         Returns:
-            rbtools.clients.PatchResult:
+            rbtools.clients.base.patch.PatchResult:
             The result of the patch operation.
         """
         if not is_valid_version(self.subversion_client_version,
@@ -1349,7 +1349,7 @@ class SVNRepositoryInfo(RepositoryInfo):
                 ID of the repository in the API. This is used primarily for
                 testing purposes, and is not guaranteed to be set.
 
-            tool (rbtools.clients.SCMClient):
+            tool (rbtools.clients.base.scmclient.BaseSCMClient):
                 The SCM client.
         """
         super(SVNRepositoryInfo, self).__init__(

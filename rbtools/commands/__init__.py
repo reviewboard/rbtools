@@ -329,7 +329,7 @@ class Command(object):
         repository (rbtools.api.resource.ItemResource):
             The API resource corresponding to the repository.
 
-        repository_info (rbtools.clients.RepositoryInfo):
+        repository_info (rbtools.clients.base.repository.RepositoryInfo):
             The repository info object. This will be ``None`` if
             :py:attr:`needs_scm_client` is ``False``.
 
@@ -373,7 +373,7 @@ class Command(object):
         stderr_bytes (OutputWrapper):
             Standard byte error output wrapper that subclasses must write to.
 
-        tool (rbtools.clients.SCMClient):
+        tool (rbtools.clients.base.BaseSCMClient):
             The SCM client. This will be ``None`` if
             :py:attr:`needs_scm_client` is ``False``.
     """
@@ -1193,10 +1193,11 @@ class Command(object):
         """Return the Review Board server url.
 
         Args:
-            repository_info (rbtools.clients.RepositoryInfo, optional):
+            repository_info (rbtools.clients.base.repository.RepositoryInfo,
+                             optional):
                 Information about the current repository
 
-            tool (rbtools.clients.SCMClient, optional):
+            tool (rbtools.clients.base.BaseSCMClient, optional):
                 The repository client.
 
         Returns:

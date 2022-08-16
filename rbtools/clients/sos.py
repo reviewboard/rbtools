@@ -22,7 +22,7 @@ from pydiffx import DiffType, DiffX
 from pydiffx.utils.text import guess_line_endings
 from six.moves import range
 
-from rbtools.clients import SCMClient, RepositoryInfo
+from rbtools.clients import BaseSCMClient, RepositoryInfo
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMError,
                                     TooManyRevisionsError)
@@ -173,7 +173,7 @@ class SOSChangeList(object):
         self.modifications = modifications or set()
 
 
-class SOSClient(SCMClient):
+class SOSClient(BaseSCMClient):
     """A client for Cliosoft SOS.
 
     `Cliosoft SOS <https://www.cliosoft.com/products/sos/>`_ is an Enterprise
@@ -243,7 +243,7 @@ class SOSClient(SCMClient):
         """Return repository information for the current SOS workarea.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            rbtools.clients.base.repository.RepositoryInfo:
             The workarea repository information, or ``None`` if not in a
             SOS workarea.
         """

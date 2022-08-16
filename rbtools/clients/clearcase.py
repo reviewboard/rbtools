@@ -15,7 +15,7 @@ import six
 from pydiffx.dom import DiffX
 
 from rbtools.api.errors import APIError
-from rbtools.clients import SCMClient, RepositoryInfo
+from rbtools.clients import BaseSCMClient, RepositoryInfo
 from rbtools.clients.errors import InvalidRevisionSpecError, SCMError
 from rbtools.deprecation import RemovedInRBTools40Warning
 from rbtools.utils.checks import check_gnu_diff, check_install
@@ -274,7 +274,7 @@ class ChangesetEntry(object):
                 % (self.op, self.old_path, self.new_path))
 
 
-class ClearCaseClient(SCMClient):
+class ClearCaseClient(BaseSCMClient):
     """A client for ClearCase.
 
     This is a wrapper around the clearcase tool that fetches repository
@@ -962,7 +962,7 @@ class ClearCaseClient(SCMClient):
             changeset (unicode):
                 The changeset to fetch.
 
-            repository_info (rbtools.clients.RepositoryInfo):
+            repository_info (ClearCaseRepositoryInfo):
                 The repository info structure.
 
         Returns:
@@ -1196,7 +1196,7 @@ class ClearCaseClient(SCMClient):
         current file version.
 
         Args:
-            repository_info (rbtools.clients.RepositoryInfo):
+            repository_info (ClearCaseRepositoryInfo):
                 The repository info structure.
 
         Returns:
@@ -1243,7 +1243,7 @@ class ClearCaseClient(SCMClient):
             activity (unicode):
                 The activity name.
 
-            repository_info (rbtools.clients.RepositoryInfo):
+            repository_info (ClearCaseRepositoryInfo):
                 The repository info structure.
 
         Returns:
@@ -1340,7 +1340,7 @@ class ClearCaseClient(SCMClient):
             branch (unicode):
                 The branch name.
 
-            repository_info (rbtools.clients.RepositoryInfo):
+            repository_info (ClearCaseRepositoryInfo):
                 The repository info structure.
 
         Returns:
@@ -1391,7 +1391,7 @@ class ClearCaseClient(SCMClient):
             labels (list):
                 A list of labels to compare.
 
-            repository_info (rbtools.clients.RepositoryInfo):
+            repository_info (ClearCaseRepositoryInfo):
                 The repository info structure.
 
         Returns:
@@ -1514,7 +1514,7 @@ class ClearCaseClient(SCMClient):
                 The UCM stream name. This must include the PVOB tag as well, so
                 that ``cleartool describe`` can fetch the branch name.
 
-            repository_info (rbtools.clients.RepositoryInfo):
+            repository_info (ClearCaseRepositoryInfo):
                 The repository info structure.
 
         Returns:
@@ -2128,7 +2128,7 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
             vobtag (unicode):
                 The VOB tag for the repository.
 
-            tool (rbtools.clients.SCMClient):
+            tool (rbtools.clients.base.scmclient.BaseSCMClient):
                 The SCM client.
         """
         super(ClearCaseRepositoryInfo, self).__init__(path)
