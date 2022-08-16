@@ -41,6 +41,7 @@ class SVNClient(BaseSCMClient):
     information and generates compatible diffs.
     """
 
+    scmclient_id = 'svn'
     name = 'Subversion'
     server_tool_names = 'Subversion'
     supports_diff_exclude_patterns = True

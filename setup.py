@@ -69,19 +69,6 @@ rb_commands = [
     'status-update = rbtools.commands.status_update:StatusUpdate',
 ]
 
-scm_clients = [
-    'bazaar = rbtools.clients.bazaar:BazaarClient',
-    'clearcase = rbtools.clients.clearcase:ClearCaseClient',
-    'cvs = rbtools.clients.cvs:CVSClient',
-    'git = rbtools.clients.git:GitClient',
-    'mercurial = rbtools.clients.mercurial:MercurialClient',
-    'perforce = rbtools.clients.perforce:PerforceClient',
-    'plastic = rbtools.clients.plastic:PlasticClient',
-    'sos = rbtools.clients.sos:SOSClient',
-    'svn = rbtools.clients.svn:SVNClient',
-    'tfs = rbtools.clients.tfs:TFSClient',
-]
-
 
 PACKAGE_NAME = 'RBTools'
 
@@ -170,9 +157,9 @@ setup(
             'rbt = rbtools.commands.main:main',
         ],
         'rbtools_commands': rb_commands,
-        'rbtools_scm_clients': scm_clients,
     },
     install_requires=[
+        'importlib-metadata~=4.12; python_version < "3.10"',
         'colorama',
         'pydiffx~=1.0.1',
         'setuptools',

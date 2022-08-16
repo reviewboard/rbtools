@@ -222,7 +222,7 @@ class SetupRepo(Command):
             config = [
                 ('REVIEWBOARD_URL', server),
                 ('REPOSITORY', selected_repo['name']),
-                ('REPOSITORY_TYPE', tool.entrypoint_name),
+                ('REPOSITORY_TYPE', tool.scmclient_id),
             ]
 
             try:

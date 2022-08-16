@@ -22,6 +22,7 @@ class PlasticClient(BaseSCMClient):
     information and generates compatible diffs.
     """
 
+    scmclient_id = 'plastic'
     name = 'Plastic'
     server_tool_names = 'Plastic SCM'
     supports_changesets = True

@@ -13,6 +13,7 @@ import six
 
 from rbtools.clients.base.patch import PatchResult
 from rbtools.clients.errors import SCMError
+from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.process import execute
 
 
@@ -27,6 +28,16 @@ class BaseSCMClient(object):
           :py:mod:`rbtools.clients.base.scmclient` and renamed from
           ``SCMClient`` to ``BaseSCMClient``.
     """
+
+    #: The unique ID of the client.
+    #:
+    #: Version Added:
+    #:     4.0:
+    #:     This will be required in RBTools 5.0.
+    #:
+    #: Type:
+    #:     str
+    scmclient_id: str = ''
 
     #: The name of the client.
     #:
@@ -146,6 +157,26 @@ class BaseSCMClient(object):
         self.config = config or {}
         self.options = options
         self.capabilities = None
+
+    @property
+    def entrypoint_name(self) -> str:
+        """An alias for the SCMClient ID.
+
+        This is here for backwards-compatibility purposes.
+
+        Deprecated:
+            4.0:
+            Callers should use :py:attr:`scmclient_id`. This attribute will
+            be removed in RBTools 5.0.
+        """
+        cls_name = type(self).__name__
+
+        RemovedInRBTools50Warning.warn(
+            '%s.entrypoint_name is deprecated. Please use %s.scmclient_id '
+            'instead. This will be removed in RBTools 5.0.'
+            % (cls_name, cls_name))
+
+        return self.scmclient_id
 
     def is_remote_only(self):
         """Return whether this repository is operating in remote-only mode.

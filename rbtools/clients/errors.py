@@ -55,3 +55,30 @@ class EmptyChangeError(Exception):
         """Initialize the error."""
         super(EmptyChangeError, self).__init__(
             "Couldn't find any affected files for this change.")
+
+
+class SCMClientNotFoundError(Exception):
+    """An error indicating a specified SCMClient could not be found.
+
+    Version Added:
+        4.0
+
+    Attributes:
+        scmclient_id (str):
+            The ID of the SCMClient that could not be found.
+    """
+
+    def __init__(
+        self,
+        scmclient_id: str,
+    ) -> None:
+        """Initialize the error.
+
+        Args:
+            scmclient_id (str):
+                The ID of the SCMClient that could not be found.
+        """
+        self.scmclient_id = scmclient_id
+
+        super().__init__('No client support was found for "%s".'
+                         % scmclient_id)

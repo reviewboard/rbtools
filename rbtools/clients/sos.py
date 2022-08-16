@@ -191,6 +191,7 @@ class SOSClient(BaseSCMClient):
         3.1
     """
 
+    scmclient_id = 'sos'
     name = 'Cliosoft SOS'
     supports_diff_exclude_patterns = True
 

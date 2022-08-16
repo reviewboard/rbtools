@@ -22,6 +22,7 @@ class CVSClient(BaseSCMClient):
     information and generates compatible diffs.
     """
 
+    scmclient_id = 'cvs'
     name = 'CVS'
     server_tool_names = 'CVS'
     supports_diff_exclude_patterns = True

@@ -989,6 +989,7 @@ class TFHelperWrapper(object):
 class TFSClient(BaseSCMClient):
     """A client for Team Foundation Server."""
 
+    scmclient_id = 'tfs'
     name = 'Team Foundation Server'
     server_tool_names = 'Team Foundation Server'
     supports_diff_exclude_patterns = True

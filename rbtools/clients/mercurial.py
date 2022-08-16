@@ -50,6 +50,7 @@ class MercurialClient(BaseSCMClient):
     information and generates compatible diffs.
     """
 
+    scmclient_id = 'mercurial'
     name = 'Mercurial'
     server_tool_names = 'Mercurial,Subversion'
 

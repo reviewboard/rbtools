@@ -11,6 +11,7 @@ This particular module provides forwarding imports for:
 
    ~rbtools.clients.base.patch.PatchAuthor
    ~rbtools.clients.base.patch.PatchResult
+   ~rbtools.clients.base.registry.scmclient_registry
    ~rbtools.clients.base.repository.RepositoryInfo
    ~rbtools.clients.base.scmclient.BaseSCMClient
 
@@ -36,6 +37,7 @@ import pkg_resources
 import six
 
 from rbtools.clients.base.patch import PatchAuthor, PatchResult
+from rbtools.clients.base.registry import scmclient_registry
 from rbtools.clients.base.repository import RepositoryInfo
 from rbtools.clients.base.scmclient import BaseSCMClient
 from rbtools.deprecation import RemovedInRBTools50Warning
@@ -91,13 +93,14 @@ def load_scmclients(config, options):
 
     SCMCLIENTS = {}
 
-    for ep in pkg_resources.iter_entry_points(group='rbtools_scm_clients'):
+    for scmclient_cls in scmclient_registry:
         try:
-            client = ep.load()(config=config, options=options)
-            client.entrypoint_name = ep.name
-            SCMCLIENTS[ep.name] = client
+            scmclient = scmclient_cls(config=config,
+                                      options=options)
+            SCMCLIENTS[scmclient_cls.scmclient_id] = scmclient
         except Exception:
-            logging.exception('Could not load SCM Client "%s"', ep.name)
+            logging.exception('Could not load SCM Client "%s"',
+                              scmclient_cls.scmclient_id)
 
 
 def scan_usable_client(config, options, client_name=None):
@@ -264,6 +267,7 @@ __all__ = [
     'SCMClient',
     'load_scmclients',
     'scan_usable_client',
+    'scmclient_registry',
 ]
 
 
@@ -272,4 +276,5 @@ __autodoc_excludes__ = [
     'PatchAuthor',
     'PatchResult',
     'RepositoryInfo',
+    'scmclient_registry',
 ]

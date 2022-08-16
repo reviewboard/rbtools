@@ -282,6 +282,7 @@ class ClearCaseClient(BaseSCMClient):
     is installed on Windows.
     """
 
+    scmclient_id = 'clearcase'
     name = 'VersionVault / ClearCase'
     server_tool_names = 'ClearCase,VersionVault / ClearCase'
     supports_patch_revert = True

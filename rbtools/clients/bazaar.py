@@ -31,6 +31,7 @@ class BazaarClient(BaseSCMClient):
         Added support for Breezy.
     """
 
+    scmclient_id = 'bazaar'
     name = 'Bazaar'
     server_tool_names = 'Bazaar'
     supports_diff_exclude_patterns = True

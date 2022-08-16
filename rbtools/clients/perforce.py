@@ -388,6 +388,7 @@ class PerforceClient(BaseSCMClient):
     repository information and generates compatible diffs.
     """
 
+    scmclient_id = 'perforce'
     name = 'Perforce'
     server_tool_names = 'Perforce'
     can_amend_commit = True

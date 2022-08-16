@@ -36,6 +36,7 @@ class GitClient(BaseSCMClient):
     diff suitable for the remote repository, whether git, SVN or Perforce.
     """
 
+    scmclient_id = 'git'
     name = 'Git'
     server_tool_names = 'Git,Perforce,Subversion'
 
