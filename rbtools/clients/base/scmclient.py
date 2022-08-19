@@ -8,11 +8,14 @@ from __future__ import unicode_literals
 
 import logging
 import re
+from typing import Optional, cast
+
+from typing_extensions import final
 
 import six
 
 from rbtools.clients.base.patch import PatchResult
-from rbtools.clients.errors import SCMError
+from rbtools.clients.errors import SCMClientDependencyError, SCMError
 from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.process import execute
 
@@ -22,11 +25,38 @@ class BaseSCMClient(object):
 
     These are used for fetching repository information and generating diffs.
 
+    Callers must run :py:meth:`setup` or :py:meth:`has_dependencies` before
+    calling methods on this tool.
+
     Version Changed:
         4.0:
         * Moved from :py:mod:`rbtools.clients` into
           :py:mod:`rbtools.clients.base.scmclient` and renamed from
           ``SCMClient`` to ``BaseSCMClient``.
+
+        * A call to :py:meth:`setup` or :py:meth:`has_dependencies` will be
+          required starting in RBTools 5.0.
+
+    Attributes:
+        config (dict):
+            Any user configuration loaded via :file:`.reviewboardrc` files.
+            This may be empty.
+
+        is_setup (bool):
+            Whether the client is set up and ready for operations. Operations
+            may fail if this is ``False``.
+
+            Callers must call :py:meth:`setup` or :py:meth:`has_dependencies`
+            before performing operations using this client.
+
+            Version Added:
+                4.0
+
+        options (argparse.Namespace):
+            Any command line arguments passed to a tool running this client.
+            This may be empty, and makes assumptions about which command line
+            arguments are registered with a command. It's intended for use
+            within RBTools.
     """
 
     #: The unique ID of the client.
@@ -157,6 +187,9 @@ class BaseSCMClient(object):
         self.config = config or {}
         self.options = options
         self.capabilities = None
+        self.is_setup: bool = False
+
+        self._has_deps: Optional[bool] = None
 
     @property
     def entrypoint_name(self) -> str:
@@ -177,6 +210,122 @@ class BaseSCMClient(object):
             % (cls_name, cls_name))
 
         return self.scmclient_id
+
+    @final
+    def setup(self) -> None:
+        """Set up the client.
+
+        This will perform checks to ensure the client can be used. Callers
+        should make sure to either call this method or
+        :py:meth:`has_dependencies` before performing any other operations
+        on this client.
+
+        If checks succeed, :py:attr:`is_setup` will be ``True``, and operations
+        using this client can be performed.
+
+        If checks fail, an exception may be raised, and :py:attr:`is_setup`
+        will be ``False``.
+
+        Version Added:
+            4.0
+
+        Raises:
+            rbtools.clients.errors.SCMClientDependencyError:
+                One or more required dependencies are missing.
+        """
+        if self.is_setup:
+            # Silently return. We may want to make this a warning in a future
+            # version, or enforce call order, but it's currently harmless to
+            # allow multiple calls.
+            return
+
+        try:
+            self.check_dependencies()
+            self._has_deps = True
+        except SCMClientDependencyError:
+            self._has_deps = False
+            raise
+
+        self.is_setup = True
+
+    def has_dependencies(
+        self,
+        expect_checked: bool = False,
+    ) -> bool:
+        """Return whether all dependencies for the client are available.
+
+        Either this or :py:meth:`setup` must be called before any operations
+        are performed with this client.
+
+        Version Added:
+            4.0
+
+        Args:
+            expect_checked (bool, optional):
+                Whether the caller expects that dependency checking has
+                already been done.
+
+                If ``True``, and dependencies have not yet been checked via
+                :py:meth:`check_dependencies`, this will raise a deprecation
+                warning.
+
+                Starting in RBTools 4.0, this will raise an exception if
+                :py:meth:`check_dependencies` hasn't yet been called.
+
+        Returns:
+            bool:
+            ``True`` if dependencies are all available. ``False`` if one or
+            more are not.
+        """
+        if self._has_deps is None:
+            if expect_checked:
+                RemovedInRBTools50Warning.warn(
+                    'Either %(cls_name)s.setup() or '
+                    '%(cls_name)s.has_dependencies() must be called before '
+                    'other functions are used. This will be required '
+                    'starting in RBTools 5.0.'
+                    % {
+                        'cls_name': type(self).__name__,
+                    })
+
+            try:
+                self.setup()
+            except SCMClientDependencyError:
+                pass
+
+        return cast(bool, self._has_deps)
+
+    def check_dependencies(self) -> None:
+        """Check whether the base dependencies needed are available.
+
+        This is responsible for checking for any command line tools or Python
+        modules required to consider this client as an option when scanning
+        repositories or selecting a specific client.
+
+        This should not check for diff implementations or anything specific
+        about a local filesystem. It's merely a first-pass dependency check.
+
+        This function is normally called via :py:meth:`setup` (which will
+        re-raise any exceptions here) or :py:meth:`has_dependencies`. It
+        doesn't need to be called manually unless attempting to re-generate
+        the exception.
+
+        Subclasses can log any failed checks in the debug log, to help with
+        debugging missing tools. If checking against multiple possible names,
+        they may also record information needed to locate the matching
+        executable for future operations.
+
+        It's recommended to use :py:meth:`rbtools.utils.checks.check_install`
+        to help with executable dependency checks.
+
+        Version Added:
+            4.0
+
+        Raises:
+            rbtools.clients.errors.SCMClientDependencyError:
+                One or more required dependencies are missing.
+        """
+        pass
 
     def is_remote_only(self):
         """Return whether this repository is operating in remote-only mode.
