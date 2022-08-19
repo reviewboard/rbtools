@@ -6,7 +6,6 @@ import os
 import unittest
 
 import six
-from kgb import SpyAgency
 
 from rbtools.clients import PatchAuthor, RepositoryInfo
 from rbtools.clients.errors import (CreateCommitError,
@@ -19,7 +18,7 @@ from rbtools.utils.filesystem import is_exe_in_path
 from rbtools.utils.process import execute
 
 
-class GitClientTests(SpyAgency, SCMClientTestCase):
+class GitClientTests(SCMClientTestCase):
     """Unit tests for GitClient."""
 
     scmclient_cls = GitClient

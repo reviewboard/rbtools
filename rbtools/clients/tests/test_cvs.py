@@ -9,7 +9,7 @@ from rbtools.clients.cvs import CVSClient
 from rbtools.clients.tests import SCMClientTestCase
 
 
-class CVSClientTests(kgb.SpyAgency, SCMClientTestCase):
+class CVSClientTests(SCMClientTestCase):
     """Unit tests for CVSClient."""
 
     scmclient_cls = CVSClient

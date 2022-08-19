@@ -115,7 +115,7 @@ class MercurialTestCase(SCMClientTestCase):
             self.run_hg(['tag', tag])
 
 
-class MercurialClientTests(kgb.SpyAgency, MercurialTestCase):
+class MercurialClientTests(MercurialTestCase):
     """Unit tests for MercurialClient."""
 
     scmclient_cls = MercurialClient

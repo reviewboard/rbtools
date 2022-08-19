@@ -29,7 +29,7 @@ _MATCH_URL_TOOL = 'tool=Subversion'
 _MATCH_URL_FIELDS = 'only-fields=id%2Cname%2Cmirror_path%2Cpath'
 
 
-class SVNRepositoryMatchTests(kgb.SpyAgency, SCMClientTestCase):
+class SVNRepositoryMatchTests(SCMClientTestCase):
     """Unit tests for rbtools.clients.svn.SVNRepositoryInfo."""
 
     payloads = {

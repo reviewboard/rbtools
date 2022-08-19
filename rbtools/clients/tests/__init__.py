@@ -1,19 +1,31 @@
 """Unit tests for RBTools clients."""
 
-from __future__ import unicode_literals
+from __future__ import annotations
 
+import argparse
 import os
 import shutil
+from typing import Any, Dict, Generic, Optional, Type, TypeVar
+from unittest import SkipTest
 
-import six
+import kgb
 
+from rbtools.clients import BaseSCMClient
+from rbtools.clients.errors import SCMClientDependencyError
 from rbtools.deprecation import RemovedInRBTools40Warning
 from rbtools.tests import OptionsStub
 from rbtools.testing import TestCase
 from rbtools.utils.filesystem import make_tempdir
 
 
-class SCMClientTestCase(TestCase):
+_TestSCMClientType = TypeVar('_TestSCMClientType',
+                             bound=BaseSCMClient,
+                             covariant=True)
+
+
+class SCMClientTestCase(Generic[_TestSCMClientType],
+                        kgb.SpyAgency,
+                        TestCase):
     """Base class for RBTools SCM client unit tests.
 
     This takes care of suite-wide and per-test setup common to SCM unit tests.
@@ -38,7 +50,7 @@ class SCMClientTestCase(TestCase):
     #:
     #: Type:
     #:     type
-    scmclient_cls = None
+    scmclient_cls: Optional[Type[_TestSCMClientType]] = None
 
     #: The main checkout directory used by tests.
     #:
@@ -117,7 +129,7 @@ class SCMClientTestCase(TestCase):
     def setUp(self):
         super(SCMClientTestCase, self).setUp()
 
-        self.options = OptionsStub()
+        self.options: argparse.Namespace = OptionsStub()
 
         if self.checkout_dir:
             # Copy over any main/backup repositories back into the working
@@ -132,7 +144,15 @@ class SCMClientTestCase(TestCase):
             # the primary checkout directory.
             os.chdir(self.checkout_dir)
 
-    def build_client(self, options={}, client_kwargs={}):
+    def build_client(
+        self,
+        *,
+        options: Dict[str, Any] = {},
+        client_kwargs: Dict[str, Any] = {},
+        setup: bool = True,
+        allow_dep_checks: bool = True,
+        skip_if_deps_missing: bool = True,
+    ) -> _TestSCMClientType:
         """Build a client for testing.
 
         Version Added:
@@ -145,11 +165,23 @@ class SCMClientTestCase(TestCase):
             client_kwargs (dict, optional):
                 Keyword arguments to pass to the client class.
 
+            setup (bool, optional):
+                Whether to call
+                :py:meth:`~rbtools.clients.perforce.SCMClient.setup` on the
+                client.
+
+            allow_dep_checks (bool, optional):
+                Whether to allow :py:meth:`~rbtools.clients.perforce.SCMClient.
+                check_dependencies` to run on the client.
+
+            skip_if_deps_missing (bool, optional):
+                Whether to skip the unit test if dependencies are missing.
+
         Returns:
-            rbtools.clients.base.BaseSCMClient:
+            rbtools.clients.base.scmclient.BaseSCMClient:
             The client instance.
         """
-        self.assertIsNotNone(self.scmclient_cls)
+        assert self.scmclient_cls is not None
 
         # Set some defaults.
         cmd_options = self.options
@@ -157,10 +189,24 @@ class SCMClientTestCase(TestCase):
         cmd_options.tracking = None
 
         # Set anything from the caller.
-        for key, value in six.iteritems(options):
+        for key, value in options.items():
             setattr(cmd_options, key, value)
 
-        return self.scmclient_cls(options=cmd_options, **client_kwargs)
+        client = self.scmclient_cls(options=cmd_options, **client_kwargs)
+
+        if not allow_dep_checks:
+            self.spy_on(client.check_dependencies, call_original=False)
+
+        if setup:
+            try:
+                client.setup()
+            except SCMClientDependencyError as e:
+                if skip_if_deps_missing:
+                    raise SkipTest(str(e))
+                else:
+                    raise
+
+        return client
 
 
 class SCMClientTests(SCMClientTestCase):

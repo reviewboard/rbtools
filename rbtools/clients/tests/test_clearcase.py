@@ -109,7 +109,7 @@ _WEBVIEW_VIEW_INFO = [
 ]
 
 
-class ClearCaseClientTests(kgb.SpyAgency, SCMClientTestCase):
+class ClearCaseClientTests(SCMClientTestCase):
     """Unit tests for ClearCaseClient."""
 
     scmclient_cls = ClearCaseClient

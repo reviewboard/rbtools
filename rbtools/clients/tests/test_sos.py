@@ -21,7 +21,7 @@ from rbtools.utils.filesystem import make_tempdir
 from rbtools.utils.process import execute
 
 
-class BaseSOSTestCase(kgb.SpyAgency, SCMClientTestCase):
+class BaseSOSTestCase(SCMClientTestCase):
     """Base class for SOS unit tests.
 
     This provides an initial SOS client setup, as well as convenience
