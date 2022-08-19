@@ -33,9 +33,6 @@ import logging
 import os
 import sys
 
-import pkg_resources
-import six
-
 from rbtools.clients.base.patch import PatchAuthor, PatchResult
 from rbtools.clients.base.registry import scmclient_registry
 from rbtools.clients.base.repository import RepositoryInfo
@@ -123,93 +120,48 @@ def scan_usable_client(config, options, client_name=None):
         A 2-tuple, containing the repository info structure and the tool
         instance.
     """
-    repository_info = None
-    tool = None
+    from rbtools.utils.source_tree import scan_scmclients_for_path
 
-    # TODO: We should only load all of the scm clients if the client_name
-    # isn't provided.
-    if SCMCLIENTS is None:
-        load_scmclients(config, options)
+    scmclient_ids = []
 
     if client_name:
-        if client_name not in SCMCLIENTS:
+        if client_name in scmclient_registry:
+            scmclient_ids.append(client_name)
+        else:
             logging.error('The provided repository type "%s" is invalid.',
                           client_name)
             sys.exit(1)
-        else:
-            scmclients = {
-                client_name: SCMCLIENTS[client_name]
-            }
-    else:
-        scmclients = SCMCLIENTS
 
-    # First go through and see if any repositories are configured in
-    # remote-only mode. For example, SVN can post changes purely with a remote
-    # URL and no working directory.
-    for name, tool in six.iteritems(scmclients):
-        if tool.is_remote_only():
-            break
-    else:
-        tool = None
-
-    candidate_tool_names = []
+    repository_url = getattr(options, 'repository_url', None)
+    scmclient_errors = {}
 
     # Now scan through the repositories to find any local working directories.
     # If there are multiple repositories which appear to be active in the CWD,
     # choose the deepest and emit a warning.
-    if tool is None:
-        candidate_repos = []
+    scan_result = scan_scmclients_for_path(
+        path=os.getcwd(),
+        check_remote=bool(repository_url),
+        scmclient_ids=scmclient_ids,
+        scmclient_kwargs={
+            'config': config,
+            'options': options,
+        })
 
-        for name, tool in six.iteritems(scmclients):
-            candidate_tool_names.append(tool.name)
+    if scan_result.found:
+        scmclient = scan_result.scmclient
 
-            logging.debug('Checking for a %s repository...', tool.name)
-            local_path = tool.get_local_path()
-
-            if local_path:
-                candidate_repos.append((local_path, tool))
-
-        if len(candidate_repos) == 1:
-            tool = candidate_repos[0][1]
-        elif candidate_repos:
-            logging.debug('Finding deepest repository of multiple matching '
-                          'repository types.')
-
-            deepest_repo_len = 0
-            deepest_repo_tool = None
-            deepest_local_path = None
-            found_multiple = False
-
-            for local_path, tool in candidate_repos:
-                if len(os.path.normpath(local_path)) > deepest_repo_len:
-                    if deepest_repo_tool is not None:
-                        found_multiple = True
-
-                    deepest_repo_len = len(local_path)
-                    deepest_repo_tool = tool
-                    deepest_local_path = local_path
-
-            if found_multiple:
-                logging.warning('Multiple matching repositories were found. '
-                                'Using %s repository at %s.',
-                                tool.name, deepest_local_path)
-                logging.warning('')
-                logging.warning('Define REPOSITORY_TYPE in .reviewboardrc if '
-                                'you wish to use a different repository.')
-
-            tool = deepest_repo_tool
+        assert scmclient is not None
     else:
-        candidate_tool_names.append(tool.name)
-
-    repository_info = tool and tool.get_repository_info()
-
-    if repository_info is None:
         if client_name:
             logging.error('A %s repository was not detected in the current '
                           'directory.',
                           client_name)
         else:
-            repository_url = getattr(options, 'repository_url', None)
+            scmclient_errors = scan_result.scmclient_errors
+            candidate_scmclient_names: list[str] = [
+                _candidate.scmclient.name or _candidate.scmclient.scmclient_id
+                for _candidate in scan_result.candidates
+            ]
 
             if repository_url:
                 logging.error('A supported repository was not found at %s',
@@ -217,10 +169,16 @@ def scan_usable_client(config, options, client_name=None):
             else:
                 logging.error('A supported repository was not found in the '
                               'the current directory or any parent directory.')
+
+            logging.error('')
+            logging.error('The following types of repositories were '
+                          'tried: %s',
+                          ', '.join(sorted(candidate_scmclient_names)))
+
+            if scmclient_errors:
                 logging.error('')
-                logging.error('The following types of repositories were '
-                              'tried: %s',
-                              ', '.join(sorted(candidate_tool_names)))
+                logging.error('And the following encountered errors: %s',
+                              ', '.join(sorted(scmclient_errors.keys())))
 
             logging.error('')
             logging.error('You may need to set up a .reviewboardrc file '
@@ -235,27 +193,27 @@ def scan_usable_client(config, options, client_name=None):
 
     # Verify that options specific to an SCM Client have not been mis-used.
     if (getattr(options, 'change_only', False) and
-        not tool.supports_changesets):
+        not scmclient.supports_changesets):
         logging.error('The --change-only option is not valid for the '
                       'current SCM client.\n')
         sys.exit(1)
 
     if (getattr(options, 'parent_branch', None) and
-        not tool.supports_parent_diffs):
+        not scmclient.supports_parent_diffs):
         logging.error('The --parent option is not valid for the '
                       'current SCM client.')
         sys.exit(1)
 
     from rbtools.clients.perforce import PerforceClient
 
-    if (not isinstance(tool, PerforceClient) and
+    if (not isinstance(scmclient, PerforceClient) and
         (getattr(options, 'p4_client', None) or
          getattr(options, 'p4_port', None))):
         logging.error('The --p4-client and --p4-port options are not '
                       'valid for the current SCM client.\n')
         sys.exit(1)
 
-    return repository_info, tool
+    return scan_result.repository_info, scmclient
 
 
 __all__ = [

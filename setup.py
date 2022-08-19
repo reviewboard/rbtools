@@ -165,6 +165,7 @@ setup(
         'setuptools',
         'six>=1.8.0',
         'texttable',
+        'typing_extensions>=4.3.0',
         'tqdm',
     ],
     packages=find_packages(exclude=['tests']),
