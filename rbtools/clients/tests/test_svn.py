@@ -343,6 +343,10 @@ class SVNClientTests(kgb.SpyAgency, SCMClientTestCase):
 
     scmclient_cls = SVNClient
 
+    default_scmclient_options = {
+        'svn_show_copies_as_adds': None,
+    }
+
     @classmethod
     def setup_checkout(cls, checkout_dir):
         """Populate a Subversion checkout.
@@ -395,8 +399,6 @@ class SVNClientTests(kgb.SpyAgency, SCMClientTestCase):
             raise unittest.SkipTest('svn not found in path')
 
         super(SVNClientTests, self).setUp()
-
-        self.options.svn_show_copies_as_adds = None
 
     @classmethod
     def _run_svn(cls, command):

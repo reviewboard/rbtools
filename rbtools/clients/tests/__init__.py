@@ -8,12 +8,13 @@ import shutil
 from typing import Any, Dict, Generic, Optional, Type, TypeVar
 from unittest import SkipTest
 
+from typing_extensions import Final, TypeAlias
+
 import kgb
 
 from rbtools.clients import BaseSCMClient
 from rbtools.clients.errors import SCMClientDependencyError
 from rbtools.deprecation import RemovedInRBTools40Warning
-from rbtools.tests import OptionsStub
 from rbtools.testing import TestCase
 from rbtools.utils.filesystem import make_tempdir
 
@@ -21,6 +22,7 @@ from rbtools.utils.filesystem import make_tempdir
 _TestSCMClientType = TypeVar('_TestSCMClientType',
                              bound=BaseSCMClient,
                              covariant=True)
+_TestSCMClientOptions: TypeAlias = Dict[str, Any]
 
 
 class SCMClientTestCase(Generic[_TestSCMClientType],
@@ -41,6 +43,29 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
         * Added support for centralized clone/checkout management and caching.
     """
 
+    #: Default options always set for SCMClients.
+    #:
+    #: These will be set by :py:meth:`build_client` unless overridden.
+    #:
+    #: Version Added:
+    #:     4.0
+    #:
+    #: Type:
+    #:     dict
+    DEFAULT_SCMCLIENT_OPTIONS: Final[_TestSCMClientOptions] = {
+        'debug': True,
+        'description': None,
+        'disable_proxy': False,
+        'guess_description': False,
+        'guess_summary': False,
+        'parent_branch': None,
+        'password': None,
+        'repository_url': None,
+        'summary': None,
+        'tracking': None,
+        'username': None,
+    }
+
     #: The client class.
     #:
     #: This is required by :py:meth:`build_client`.
@@ -51,6 +76,15 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
     #: Type:
     #:     type
     scmclient_cls: Optional[Type[_TestSCMClientType]] = None
+
+    #: Custom default options for SCMClients.
+    #:
+    #: These will be set by :py:meth:`build_client` unless overridden,
+    #: taking precedence after :py:attr:`DEFAULT_SCMCLIENT_OPTIONS`.
+    #:
+    #: Version Added:
+    #:     4.0
+    default_scmclient_options: _TestSCMClientOptions = {}
 
     #: The main checkout directory used by tests.
     #:
@@ -129,7 +163,9 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
     def setUp(self):
         super(SCMClientTestCase, self).setUp()
 
-        self.options: argparse.Namespace = OptionsStub()
+        self.options = argparse.Namespace(
+            **dict(self.DEFAULT_SCMCLIENT_OPTIONS,
+                   **self.default_scmclient_options))
 
         if self.checkout_dir:
             # Copy over any main/backup repositories back into the working
@@ -147,7 +183,7 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
     def build_client(
         self,
         *,
-        options: Dict[str, Any] = {},
+        options: _TestSCMClientOptions = {},
         client_kwargs: Dict[str, Any] = {},
         setup: bool = True,
         allow_dep_checks: bool = True,
@@ -161,6 +197,10 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
         Args:
             options (dict, optional):
                 Parsed command line options to pass to the client class.
+
+                By default, :py:attr:`DEFAULT_SCMCLIENT_OPTIONS` and then
+                :py:attr:`default_scmclient_options` will be set. ``options``
+                may override anything in these.
 
             client_kwargs (dict, optional):
                 Keyword arguments to pass to the client class.
@@ -183,12 +223,9 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
         """
         assert self.scmclient_cls is not None
 
-        # Set some defaults.
+        # Set any options from the caller.
         cmd_options = self.options
-        cmd_options.parent_branch = None
-        cmd_options.tracking = None
 
-        # Set anything from the caller.
         for key, value in options.items():
             setattr(cmd_options, key, value)
 
