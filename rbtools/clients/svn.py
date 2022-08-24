@@ -17,10 +17,14 @@ from rbtools.api.errors import APIError
 from rbtools.clients import BaseSCMClient, PatchResult, RepositoryInfo
 from rbtools.clients.errors import (AuthenticationError,
                                     InvalidRevisionSpecError,
-                                    MinimumVersionError, OptionsCheckError,
-                                    SCMError, TooManyRevisionsError)
+                                    MinimumVersionError,
+                                    OptionsCheckError,
+                                    SCMClientDependencyError,
+                                    SCMError,
+                                    TooManyRevisionsError)
 from rbtools.deprecation import RemovedInRBTools40Warning
-from rbtools.utils.checks import (check_gnu_diff, check_install,
+from rbtools.utils.checks import (check_gnu_diff,
+                                  check_install,
                                   is_valid_version)
 from rbtools.utils.console import get_pass
 from rbtools.utils.diffs import (filename_match_any_patterns, filter_diff,
@@ -77,7 +81,20 @@ class SVNClient(BaseSCMClient):
         self._svn_info_cache = {}
         self._svn_repository_info_cache = None
 
-        self._svn_installed = check_install(['svn', 'help'])
+    def check_dependencies(self) -> None:
+        """Check whether all dependencies for the client are available.
+
+        This checks for the presence of :command:`svn` in the system path.
+
+        Version Added:
+            4.0
+
+        Raises:
+            rbtools.clients.errors.SCMClientDependencyError:
+                A git tool could not be found.
+        """
+        if not check_install(['svn', 'help']):
+            raise SCMClientDependencyError(missing_exes=['svn'])
 
     def is_remote_only(self):
         """Return whether this repository is operating in remote-only mode.
@@ -89,7 +106,8 @@ class SVNClient(BaseSCMClient):
             bool:
             Whether this repository is operating in remote-only mode.
         """
-        if not self._svn_installed:
+        # NOTE: This can be removed once check_dependencies() is mandatory.
+        if not self.has_dependencies(expect_checked=True):
             logging.debug('Unable to execute "svn help": skipping SVN')
             return None
 
@@ -108,7 +126,8 @@ class SVNClient(BaseSCMClient):
             unicode:
             The filesystem path of the repository on the client system.
         """
-        if not self._svn_installed:
+        # NOTE: This can be removed once check_dependencies() is mandatory.
+        if not self.has_dependencies(expect_checked=True):
             logging.debug('Unable to execute "svn help": skipping SVN')
             return None
 
@@ -129,7 +148,8 @@ class SVNClient(BaseSCMClient):
         if self._svn_repository_info_cache:
             return self._svn_repository_info_cache
 
-        if not self._svn_installed:
+        # NOTE: This can be removed once check_dependencies() is mandatory.
+        if not self.has_dependencies(expect_checked=True):
             logging.debug('Unable to execute "svn help": skipping SVN')
             return None
 

@@ -4,10 +4,9 @@ from __future__ import unicode_literals
 
 import json
 import os
+import re
 import sys
 import unittest
-from functools import wraps
-from hashlib import md5
 
 import kgb
 from six.moves.urllib.request import urlopen
@@ -15,11 +14,12 @@ from six.moves.urllib.request import urlopen
 from rbtools.api.client import RBClient
 from rbtools.api.tests.base import MockResponse
 from rbtools.clients.errors import (InvalidRevisionSpecError,
+                                    SCMClientDependencyError,
                                     TooManyRevisionsError)
 from rbtools.clients.svn import SVNRepositoryInfo, SVNClient
 from rbtools.clients.tests import FOO1, FOO2, FOO3, SCMClientTestCase
-from rbtools.utils.checks import is_valid_version
-from rbtools.utils.filesystem import is_exe_in_path
+from rbtools.deprecation import RemovedInRBTools50Warning
+from rbtools.utils.checks import check_install, is_valid_version
 from rbtools.utils.process import execute
 from rbtools.utils.repository import get_repository_resource
 
@@ -338,7 +338,7 @@ class SVNRepositoryMatchTests(SCMClientTestCase):
             '/')
 
 
-class SVNClientTests(kgb.SpyAgency, SCMClientTestCase):
+class SVNClientTests(SCMClientTestCase):
     """Unit tests for SVNClient."""
 
     scmclient_cls = SVNClient
@@ -362,7 +362,9 @@ class SVNClientTests(kgb.SpyAgency, SCMClientTestCase):
             The main checkout directory, or ``None`` if :command:`svn` isn't
             in the path.
         """
-        if not is_exe_in_path('svn'):
+        client = SVNClient()
+
+        if not client.has_dependencies():
             return None
 
         cls.svn_dir = os.path.join(cls.testdata_dir, 'svn-repo')
@@ -394,12 +396,6 @@ class SVNClientTests(kgb.SpyAgency, SCMClientTestCase):
 
         return cls.clone_dir
 
-    def setUp(self):
-        if not is_exe_in_path('svn'):
-            raise unittest.SkipTest('svn not found in path')
-
-        super(SVNClientTests, self).setUp()
-
     @classmethod
     def _run_svn(cls, command):
         return execute(['svn'] + command, env=None, split_lines=False,
@@ -424,6 +420,177 @@ class SVNClientTests(kgb.SpyAgency, SCMClientTestCase):
             os.mkdir(dirname)
 
         self._run_svn(['add', dirname])
+
+    def test_check_dependencies_with_found(self):
+        """Testing SVNClient.check_dependencies with hg found"""
+        self.spy_on(check_install, op=kgb.SpyOpMatchAny([
+            {
+                'args': (['svn', 'help'],),
+                'op': kgb.SpyOpReturn(True),
+            },
+        ]))
+
+        client = self.build_client(setup=False)
+        client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['svn', 'help'])
+
+    def test_check_dependencies_with_missing(self):
+        """Testing SVNClient.check_dependencies with dependencies missing"""
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = "Command line tools ('svn') are missing."
+
+        with self.assertRaisesMessage(SCMClientDependencyError, message):
+            client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['svn', 'help'])
+
+    def test_get_local_path_with_deps_missing(self):
+        """Testing SVNClient.get_local_path with dependencies missing"""
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+        self.spy_on(RemovedInRBTools50Warning.warn)
+
+        client = self.build_client(setup=False)
+
+        # Make sure dependencies are checked for this test before we run
+        # get_local_path(). This will be the expected setup flow.
+        self.assertFalse(client.has_dependencies())
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            local_path = client.get_local_path()
+
+        self.assertIsNone(local_path)
+
+        self.assertEqual(ctx.records[0].msg,
+                         'Unable to execute "svn help": skipping SVN')
+        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['svn', 'help'])
+
+    def test_get_local_path_with_deps_not_checked(self):
+        """Testing SVNClient.get_local_path with dependencies not
+        checked
+        """
+        # A False value is used just to ensure get_local_path() bails early,
+        # and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = re.escape(
+            'Either SVNClient.setup() or SVNClient.has_dependencies() must '
+            'be called before other functions are used. This will be '
+            'required starting in RBTools 5.0.'
+        )
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+                client.get_local_path()
+
+        self.assertEqual(ctx.records[0].msg,
+                         'Unable to execute "svn help": skipping SVN')
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['svn', 'help'])
+
+    def test_get_repository_info_with_deps_missing(self):
+        """Testing SVNClient.get_repository_info with dependencies missing"""
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+        self.spy_on(RemovedInRBTools50Warning.warn)
+
+        client = self.build_client(setup=False)
+
+        # Make sure dependencies are checked for this test before we run
+        # get_repository_info(). This will be the expected setup flow.
+        self.assertFalse(client.has_dependencies())
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            repository_info = client.get_repository_info()
+
+        self.assertIsNone(repository_info)
+
+        self.assertEqual(ctx.records[0].msg,
+                         'Unable to execute "svn help": skipping SVN')
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['svn', 'help'])
+
+    def test_get_repository_info_with_deps_not_checked(self):
+        """Testing SVNClient.get_repository_info with dependencies not checked
+        """
+        # A False value is used just to ensure get_repository_info() bails
+        # early, and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = re.escape(
+            'Either SVNClient.setup() or SVNClient.has_dependencies() must '
+            'be called before other functions are used. This will be '
+            'required starting in RBTools 5.0.'
+        )
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+                client.get_repository_info()
+
+        self.assertEqual(ctx.records[0].msg,
+                         'Unable to execute "svn help": skipping SVN')
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['svn', 'help'])
+
+    def test_is_remote_only_with_deps_missing(self):
+        """Testing SVNClient.is_remote_only with dependencies missing"""
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+        self.spy_on(RemovedInRBTools50Warning.warn)
+
+        client = self.build_client(setup=False)
+
+        # Make sure dependencies are checked for this test before we run
+        # is_remote_only(). This will be the expected setup flow.
+        self.assertFalse(client.has_dependencies())
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            remote_only = client.is_remote_only()
+
+        self.assertIsNone(remote_only)
+
+        self.assertEqual(ctx.records[0].msg,
+                         'Unable to execute "svn help": skipping SVN')
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['svn', 'help'])
+
+    def test_is_remote_only_with_deps_not_checked(self):
+        """Testing SVNClient.is_remote_only with dependencies not checked"""
+        # A False value is used just to ensure is_remote_only() bails
+        # early, and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = re.escape(
+            'Either SVNClient.setup() or SVNClient.has_dependencies() must '
+            'be called before other functions are used. This will be '
+            'required starting in RBTools 5.0.'
+        )
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+                client.is_remote_only()
+
+        self.assertEqual(ctx.records[0].msg,
+                         'Unable to execute "svn help": skipping SVN')
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['svn', 'help'])
 
     def test_parse_revision_spec_no_args(self):
         """Testing SVNClient.parse_revision_spec with no specified revisions"""
