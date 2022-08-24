@@ -16,6 +16,7 @@ import re
 import sqlite3
 from collections import OrderedDict
 from contextlib import contextmanager
+from typing import Optional
 
 import six
 from pydiffx import DiffType, DiffX
@@ -24,9 +25,10 @@ from six.moves import range
 
 from rbtools.clients import BaseSCMClient, RepositoryInfo
 from rbtools.clients.errors import (InvalidRevisionSpecError,
+                                    SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
-from rbtools.utils.checks import check_gnu_diff
+from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.diffs import filename_match_any_patterns
 from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import execute
@@ -216,21 +218,32 @@ class SOSClient(BaseSCMClient):
 
         self._cache = {}
 
-    def get_local_path(self):
+    def check_dependencies(self) -> None:
+        """Check whether all base dependencies are available.
+
+        This checks for the presence of :command:`soscmd` in the system path.
+
+        Version Added:
+            4.0
+
+        Raises:
+            rbtools.clients.errors.SCMClientDependencyError:
+                A :command:`soscmd` tool could not be found.
+        """
+        if not check_install(['soscmd', 'version']):
+            raise SCMClientDependencyError(missing_exes=['soscmd'])
+
+    def get_local_path(self) -> Optional[str]:
         """Return the local path to the working tree.
 
         Returns:
-            unicode:
+            str:
             The filesystem path of the repository on the client system, or
             ``None`` if not inside of a workarea.
         """
-        try:
-            soscmd_version = self._get_sos_version()
-        except Exception:
+        # NOTE: This can be removed once check_dependencies() is mandatory.
+        if not self.has_dependencies(expect_checked=True):
             logger.debug('Unable to execute "soscmd version"; skipping SOS')
-            return None
-
-        if soscmd_version is None:
             return None
 
         # Grab the workarea.

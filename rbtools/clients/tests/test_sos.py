@@ -7,16 +7,19 @@ Version Added:
 from __future__ import unicode_literals
 
 import os
+import re
 
 import kgb
 
 from rbtools.api.resource import ReviewRequestResource
 from rbtools.api.tests.base import MockTransport
 from rbtools.clients.errors import (InvalidRevisionSpecError,
+                                    SCMClientDependencyError,
                                     TooManyRevisionsError)
 from rbtools.clients.tests import SCMClientTestCase
-from rbtools.clients.sos import SOSClient, logger
-from rbtools.utils.checks import check_gnu_diff
+from rbtools.clients.sos import SOSClient
+from rbtools.deprecation import RemovedInRBTools50Warning
+from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.filesystem import make_tempdir
 from rbtools.utils.process import execute
 
@@ -421,68 +424,96 @@ class BaseSOSTestCase(SCMClientTestCase):
 class SOSClientTests(BaseSOSTestCase):
     """Unit tests for rbtools.clients.sos.SOSClient."""
 
+    def test_check_dependencies_with_found(self):
+        """Testing SOSClient.check_dependencies with soscmd found"""
+        self.spy_on(check_install, op=kgb.SpyOpMatchAny([
+            {
+                'args': (['soscmd', 'version'],),
+                'op': kgb.SpyOpReturn(True),
+            },
+        ]))
+
+        client = self.build_client(setup=False)
+        client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['soscmd', 'version'])
+
+    def test_check_dependencies_with_missing(self):
+        """Testing SOSClient.check_dependencies with dependencies
+        missing
+        """
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = "Command line tools ('soscmd') are missing."
+
+        with self.assertRaisesMessage(SCMClientDependencyError, message):
+            client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['soscmd', 'version'])
+
     def test_get_local_path(self):
         """Testing SOSClient.get_local_path"""
         client = self.build_client()
         del client._cache['sos_version']
 
         self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
-            {
-                'args': (['soscmd', 'version'],),
-                'kwargs': {
-                    'cwd': os.getcwd(),
-                },
-                'op': kgb.SpyOpReturn('soscmd version 7.20.xyz'),
-            },
             self.rule_query_wa_root,
         ]))
 
         self.assertEqual(client.get_local_path(), self.workarea_dir)
 
-    def test_get_local_path_without_soscmd(self):
-        """Testing SOSClient.get_local_path without soscmd"""
-        client = self.build_client()
-        del client._cache['sos_version']
+    def test_get_local_path_with_deps_missing(self):
+        """Testing SOSClient.get_local_path with dependencies missing"""
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+        self.spy_on(RemovedInRBTools50Warning.warn)
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
-            {
-                'args': (['soscmd', 'version'],),
-                'kwargs': {
-                    'cwd': os.getcwd(),
-                },
-                'op': kgb.SpyOpRaise(Exception('Invalid command "soscmd"'))
-            },
-        ]))
+        client = self.build_client(setup=False)
 
-        self.spy_on(logger.debug)
+        # Make sure dependencies are checked for this test before we run
+        # get_local_path(). This will be the expected setup flow.
+        self.assertFalse(client.has_dependencies())
 
-        self.assertIsNone(client.get_local_path())
-        self.assertSpyCalledWith(
-            logger.debug,
-            'Unable to execute "soscmd version"; skipping SOS')
+        with self.assertLogs(level='DEBUG') as ctx:
+            local_path = client.get_local_path()
 
-    def test_get_local_path_with_bad_soscmd_version(self):
-        """Testing SOSClient.get_local_path with bad soscmd version string"""
-        client = self.build_client()
-        del client._cache['sos_version']
+        self.assertIsNone(local_path)
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
-            {
-                'args': (['soscmd', 'version'],),
-                'kwargs': {
-                    'cwd': os.getcwd(),
-                },
-                'op': kgb.SpyOpReturn('soscmd version 123')
-            },
-        ]))
+        self.assertEqual(ctx.records[0].msg,
+                         'Unable to execute "soscmd version"; skipping SOS')
+        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
 
-        self.spy_on(logger.debug)
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['soscmd', 'version'])
 
-        self.assertIsNone(client.get_local_path())
-        self.assertSpyCalledWith(
-            logger.debug,
-            'Unexpected result from "soscmd version": "%s"; skipping SOS',
-            'soscmd version 123')
+    def test_get_local_path_with_deps_not_checked(self):
+        """Testing MercurialClient.get_local_path with dependencies not
+        checked
+        """
+        # A False value is used just to ensure get_local_path() bails early,
+        # and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = re.escape(
+            'Either SOSClient.setup() or SOSClient.has_dependencies() must '
+            'be called before other functions are used. This will be '
+            'required starting in RBTools 5.0.'
+        )
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+                client.get_local_path()
+
+        self.assertEqual(ctx.records[0].msg,
+                         'Unable to execute "soscmd version"; skipping SOS')
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['soscmd', 'version'])
 
     def test_get_repository_info(self):
         """Testing SOSClient.get_repository_info"""
@@ -490,13 +521,6 @@ class SOSClientTests(BaseSOSTestCase):
         del client._cache['sos_version']
 
         self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
-            {
-                'args': (['soscmd', 'version'],),
-                'kwargs': {
-                    'cwd': os.getcwd(),
-                },
-                'op': kgb.SpyOpReturn('soscmd version 7.20.xyz'),
-            },
             self.rule_query_wa_root,
             self.rule_query_project,
             self.rule_query_server,
