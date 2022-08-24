@@ -12,6 +12,7 @@ import string
 import subprocess
 import sys
 from fnmatch import fnmatch
+from typing import Optional
 
 import six
 
@@ -19,6 +20,7 @@ from rbtools.clients import BaseSCMClient, RepositoryInfo
 from rbtools.clients.errors import (AmendError,
                                     EmptyChangeError,
                                     InvalidRevisionSpecError,
+                                    SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
 from rbtools.utils.checks import check_gnu_diff, check_install
@@ -46,6 +48,21 @@ class P4Wrapper(object):
                 The parsed command line options.
         """
         self.options = options
+
+    def check_dependencies(self) -> None:
+        """Check whether all base dependencies are available.
+
+        This checks for the presence of :command:`p4` in the system path.
+
+        Version Added:
+            4.0:
+
+        Raises:
+            rbtools.clients.errors.SCMClientDependencyError:
+                A :command:`p4` tool could not be found.
+        """
+        if not self.is_supported():
+            raise SCMClientDependencyError(missing_exes=['p4'])
 
     def is_supported(self):
         """Check whether the p4 command is usable.
@@ -424,14 +441,29 @@ class PerforceClient(BaseSCMClient):
         self.p4 = p4_class(self.options)
         self._p4_info = None
 
-    def get_local_path(self):
+    def check_dependencies(self) -> None:
+        """Check whether all base dependencies are available.
+
+        This checks for the presence of :command:`p4` in the system path.
+
+        Version Added:
+            4.0
+
+        Raises:
+            rbtools.clients.errors.SCMClientDependencyError:
+                A :command:`hg` tool could not be found.
+        """
+        self.p4.check_dependencies()
+
+    def get_local_path(self) -> Optional[str]:
         """Return the local path to the working tree.
 
         Returns:
-            unicode:
+            str:
             The filesystem path of the repository on the client system.
         """
-        if not self.p4.is_supported():
+        # NOTE: This can be removed once check_dependencies() is mandatory.
+        if not self.has_dependencies(expect_checked=True):
             logging.debug('Unable to execute "p4 help": skipping Perforce')
             return None
 

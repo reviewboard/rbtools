@@ -5,14 +5,19 @@ from __future__ import unicode_literals
 import os
 import re
 import time
-from hashlib import md5
+from typing import Type
+
+import kgb
 
 from rbtools.api.capabilities import Capabilities
 from rbtools.clients.errors import (InvalidRevisionSpecError,
+                                    SCMClientDependencyError,
                                     TooManyRevisionsError)
 from rbtools.clients.perforce import PerforceClient, P4Wrapper
 from rbtools.clients.tests import SCMClientTestCase
+from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.testing import TestCase
+from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempfile
 
 
@@ -74,6 +79,12 @@ class PerforceClientTests(SCMClientTestCase):
 
     scmclient_cls = PerforceClient
 
+    default_scmclient_options = {
+        'p4_client': 'myclient',
+        'p4_passwd': '',
+        'p4_port': 'perforce.example.com:1666',
+    }
+
     class P4DiffTestWrapper(P4Wrapper):
         def __init__(self, options):
             super(
@@ -128,7 +139,11 @@ class PerforceClientTests(SCMClientTestCase):
         def run_p4(self, *args, **kwargs):
             assert False
 
-    def build_client(self, wrapper_cls=P4DiffTestWrapper, **kwargs):
+    def build_client(
+        self,
+        wrapper_cls: Type[P4Wrapper] = P4DiffTestWrapper,
+        **kwargs,
+    ) -> PerforceClient:
         """Build a client for testing.
 
         THis will set default command line options for the client and
@@ -152,12 +167,88 @@ class PerforceClientTests(SCMClientTestCase):
             client_kwargs={
                 'p4_class': wrapper_cls,
             },
-            options=dict({
-                'p4_client': 'myclient',
-                'p4_passwd': '',
-                'p4_port': 'perforce.example.com:1666',
-            }, **kwargs.pop('options', {})),
             **kwargs)
+
+    def test_check_dependencies_with_found(self):
+        """Testing PerforceClient.check_dependencies with p4 found"""
+        self.spy_on(check_install, op=kgb.SpyOpMatchAny([
+            {
+                'args': (['p4', 'help'],),
+                'op': kgb.SpyOpReturn(True),
+            },
+        ]))
+
+        client = self.build_client(setup=False)
+        client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['p4', 'help'])
+
+    def test_check_dependencies_with_missing(self):
+        """Testing PerforceClient.check_dependencies with dependencies
+        missing
+        """
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = "Command line tools ('p4') are missing."
+
+        with self.assertRaisesMessage(SCMClientDependencyError, message):
+            client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['p4', 'help'])
+
+    def test_get_local_path_with_deps_missing(self):
+        """Testing PerforceClient.get_local_path with dependencies missing"""
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+        self.spy_on(RemovedInRBTools50Warning.warn)
+
+        client = self.build_client(setup=False)
+
+        # Make sure dependencies are checked for this test before we run
+        # get_local_path(). This will be the expected setup flow.
+        self.assertFalse(client.has_dependencies())
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            local_path = client.get_local_path()
+
+        self.assertIsNone(local_path)
+
+        self.assertEqual(ctx.records[0].msg,
+                         'Unable to execute "p4 help": skipping Perforce')
+        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['p4', 'help'])
+
+    def test_get_local_path_with_deps_not_checked(self):
+        """Testing PerforceClient.get_local_path with dependencies not
+        checked
+        """
+        # A False value is used just to ensure get_local_path() bails early,
+        # and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = re.escape(
+            'Either PerforceClient.setup() or '
+            'PerforceClient.has_dependencies() must be called before other '
+            'functions are used. This will be required starting in '
+            'RBTools 5.0.'
+        )
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+                client.get_local_path()
+
+        self.assertEqual(ctx.records[0].msg,
+                         'Unable to execute "p4 help": skipping Perforce')
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['p4', 'help'])
 
     def test_scan_for_server_with_reviewboard_url(self):
         """Testing PerforceClient.scan_for_server with reviewboard.url"""
@@ -625,7 +716,6 @@ class PerforceClientTests(SCMClientTestCase):
         }
 
         revisions = client.parse_revision_spec(['12345'])
-        diff = client.diff(revisions)
 
         self.assertEqual(
             self._normalize_diff(client.diff(revisions)),
