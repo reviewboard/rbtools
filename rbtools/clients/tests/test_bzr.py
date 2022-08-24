@@ -3,18 +3,312 @@
 from __future__ import unicode_literals
 
 import os
-import unittest
+import re
 from hashlib import md5
 
-import six
+import kgb
 
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.bazaar import BazaarClient
-from rbtools.clients.errors import TooManyRevisionsError
+from rbtools.clients.errors import (SCMClientDependencyError,
+                                    TooManyRevisionsError)
 from rbtools.clients.tests import FOO, FOO1, FOO2, FOO3, SCMClientTestCase
+from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempdir
 from rbtools.utils.process import execute
+
+
+class BazaarClientStandaloneTests(SCMClientTestCase):
+    """Unit tests for BazaarClient not requiring a working bzr tool."""
+
+    scmclient_cls = BazaarClient
+
+    def test_check_dependencies_with_bzr_found_as_bazaar(self):
+        """Testing BazaarClient.check_dependencies with bzr (Bazaar) found"""
+        self.spy_on(execute, op=kgb.SpyOpMatchAny([
+            {
+                'args': (['bzr', '--version'],),
+                'op': kgb.SpyOpReturn('Bazaar 2.7.0'),
+            },
+        ]))
+
+        self.spy_on(check_install, op=kgb.SpyOpMatchAny([
+            {
+                'args': (['brz', 'help'],),
+                'op': kgb.SpyOpReturn(False),
+            },
+            {
+                'args': (['bzr', 'help'],),
+                'op': kgb.SpyOpReturn(True),
+            },
+        ]))
+
+        client = self.build_client(setup=False,
+                                   allow_dep_checks=True)
+        client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 2)
+        self.assertSpyCalledWith(check_install, ['brz', 'help'])
+        self.assertSpyCalledWith(check_install, ['bzr', 'help'])
+        self.assertEqual(client.bzr, 'bzr')
+        self.assertFalse(client.is_breezy)
+
+    def test_check_dependencies_with_bzr_found_as_breezy(self):
+        """Testing BazaarClient.check_dependencies with bzr (Breezy) found"""
+        self.spy_on(execute, op=kgb.SpyOpMatchAny([
+            {
+                'args': (['bzr', '--version'],),
+                'op': kgb.SpyOpReturn('Breezy 3.2.2'),
+            },
+        ]))
+
+        self.spy_on(check_install, op=kgb.SpyOpMatchAny([
+            {
+                'args': (['brz', 'help'],),
+                'op': kgb.SpyOpReturn(False),
+            },
+            {
+                'args': (['bzr', 'help'],),
+                'op': kgb.SpyOpReturn(True),
+            },
+        ]))
+
+        client = self.build_client(setup=False,
+                                   allow_dep_checks=True)
+        client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 2)
+        self.assertSpyCalledWith(check_install, ['brz', 'help'])
+        self.assertSpyCalledWith(check_install, ['bzr', 'help'])
+        self.assertEqual(client.bzr, 'bzr')
+        self.assertTrue(client.is_breezy)
+
+    def test_check_dependencies_with_brz_found(self):
+        """Testing BazaarClient.check_dependencies with brz found"""
+        self.spy_on(check_install, op=kgb.SpyOpMatchAny([
+            {
+                'args': (['brz', 'help'],),
+                'op': kgb.SpyOpReturn(True),
+            },
+            {
+                'args': (['bzr', 'help'],),
+                'op': kgb.SpyOpReturn(False),
+            },
+        ]))
+
+        client = self.build_client(setup=False,
+                                   allow_dep_checks=True)
+        client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['brz', 'help'])
+        self.assertEqual(client.bzr, 'brz')
+        self.assertTrue(client.is_breezy)
+
+    def test_check_dependencies_with_missing(self):
+        """Testing BazaarClient.check_dependencies with dependencies missing"""
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False,
+                                   allow_dep_checks=True)
+
+        message = "Command line tools (one of ('brz', 'bzr')) are missing."
+
+        with self.assertRaisesMessage(SCMClientDependencyError, message):
+            client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 2)
+        self.assertSpyCalledWith(check_install, ['brz', 'help'])
+        self.assertSpyCalledWith(check_install, ['bzr', 'help'])
+
+    def test_bzr_with_deps_missing(self):
+        """Testing BazaarClient.bzr with dependencies missing"""
+        # A False value is used just to ensure get_local_path() bails early,
+        # and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False,
+                                   allow_dep_checks=True)
+
+        self.assertFalse(client.has_dependencies())
+        self.assertEqual(client.bzr, 'bzr')
+
+        self.assertSpyCallCount(check_install, 2)
+        self.assertSpyCalledWith(check_install, ['brz', 'help'])
+        self.assertSpyCalledWith(check_install, ['bzr', 'help'])
+
+    def test_bzr_with_deps_not_checked(self):
+        """Testing BazaarClient.bzr with dependencies not checked"""
+        # A False value is used just to ensure get_local_path() bails early,
+        # and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False,
+                                   allow_dep_checks=True)
+
+        message = re.escape(
+            'Either BazaarClient.setup() or BazaarClient.has_dependencies() '
+            'must be called before other functions are used. This will be '
+            'required starting in RBTools 5.0.'
+        )
+
+        with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+            bzr = client.bzr
+
+        self.assertEqual(bzr, 'bzr')
+
+        self.assertSpyCallCount(check_install, 2)
+        self.assertSpyCalledWith(check_install, ['brz', 'help'])
+        self.assertSpyCalledWith(check_install, ['bzr', 'help'])
+
+    def test_is_breezy_with_deps_missing(self):
+        """Testing BazaarClient.is_breezy with dependencies missing"""
+        # A False value is used just to ensure get_local_path() bails early,
+        # and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False,
+                                   allow_dep_checks=True)
+
+        self.assertFalse(client.has_dependencies())
+        self.assertFalse(client.is_breezy)
+
+        self.assertSpyCallCount(check_install, 2)
+        self.assertSpyCalledWith(check_install, ['brz', 'help'])
+        self.assertSpyCalledWith(check_install, ['bzr', 'help'])
+
+    def test_is_breezy_with_deps_not_checked(self):
+        """Testing BazaarClient.is_breezy with dependencies not checked"""
+        # A False value is used just to ensure get_local_path() bails early,
+        # and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False,
+                                   allow_dep_checks=True)
+
+        message = re.escape(
+            'Either BazaarClient.setup() or BazaarClient.has_dependencies() '
+            'must be called before other functions are used. This will be '
+            'required starting in RBTools 5.0.'
+        )
+
+        with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+            is_breezy = client.is_breezy
+
+        self.assertFalse(is_breezy)
+
+        self.assertSpyCallCount(check_install, 2)
+        self.assertSpyCalledWith(check_install, ['brz', 'help'])
+        self.assertSpyCalledWith(check_install, ['bzr', 'help'])
+
+    def test_get_local_path_with_deps_missing(self):
+        """Testing BazaarClient.get_local_path with dependencies missing"""
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+        self.spy_on(RemovedInRBTools50Warning.warn)
+
+        client = self.build_client(setup=False,
+                                   allow_dep_checks=True)
+
+        # Make sure dependencies are checked for this test before we run
+        # get_local_path(). This will be the expected setup flow.
+        self.assertFalse(client.has_dependencies())
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            local_path = client.get_local_path()
+
+        self.assertIsNone(local_path)
+
+        self.assertEqual(
+            ctx.records[0].msg,
+            'Unable to execute "brz help" or "bzr help": skipping Bazaar')
+        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
+
+        self.assertSpyCallCount(check_install, 2)
+        self.assertSpyCalledWith(check_install, ['brz', 'help'])
+        self.assertSpyCalledWith(check_install, ['bzr', 'help'])
+
+    def test_get_local_path_with_deps_not_checked(self):
+        """Testing BazaarClient.get_local_path with dependencies not checked"""
+        # A False value is used just to ensure get_local_path() bails early,
+        # and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False,
+                                   allow_dep_checks=True)
+
+        message = re.escape(
+            'Either BazaarClient.setup() or BazaarClient.has_dependencies() '
+            'must be called before other functions are used. This will be '
+            'required starting in RBTools 5.0.'
+        )
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+                client.get_local_path()
+
+        self.assertEqual(
+            ctx.records[0].msg,
+            'Unable to execute "brz help" or "bzr help": skipping Bazaar')
+
+        self.assertSpyCallCount(check_install, 2)
+        self.assertSpyCalledWith(check_install, ['brz', 'help'])
+        self.assertSpyCalledWith(check_install, ['bzr', 'help'])
+
+    def test_get_repository_info_with_deps_missing(self):
+        """Testing BazaarClient.get_repository_info with dependencies missing
+        """
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+        self.spy_on(RemovedInRBTools50Warning.warn)
+
+        client = self.build_client(setup=False,
+                                   allow_dep_checks=True)
+
+        # Make sure dependencies are checked for this test before we run
+        # get_repository_info(). This will be the expected setup flow.
+        self.assertFalse(client.has_dependencies())
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            repository_info = client.get_repository_info()
+
+        self.assertIsNone(repository_info)
+
+        self.assertEqual(
+            ctx.records[0].msg,
+            'Unable to execute "brz help" or "bzr help": skipping Bazaar')
+
+        self.assertSpyCallCount(check_install, 2)
+        self.assertSpyCalledWith(check_install, ['brz', 'help'])
+        self.assertSpyCalledWith(check_install, ['bzr', 'help'])
+
+    def test_get_repository_info_with_deps_not_checked(self):
+        """Testing BazaarClient.get_repository_info with dependencies not
+        checked
+        """
+        # A False value is used just to ensure get_repository_info() bails
+        # early, and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False,
+                                   allow_dep_checks=True)
+
+        message = re.escape(
+            'Either BazaarClient.setup() or BazaarClient.has_dependencies() '
+            'must be called before other functions are used. This will be '
+            'required starting in RBTools 5.0.'
+        )
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+                client.get_repository_info()
+
+        self.assertEqual(
+            ctx.records[0].msg,
+            'Unable to execute "brz help" or "bzr help": skipping Bazaar')
+
+        self.assertSpyCallCount(check_install, 2)
+        self.assertSpyCalledWith(check_install, ['brz', 'help'])
+        self.assertSpyCalledWith(check_install, ['bzr', 'help'])
 
 
 class BazaarClientTests(SCMClientTestCase):
@@ -48,14 +342,13 @@ class BazaarClientTests(SCMClientTestCase):
         cls.original_branch = original_branch
         cls.child_branch = child_branch
 
-        if check_install(['bzr', 'help']):
-            cls._bzr = 'bzr'
-        elif check_install(['brz', 'help']):
-            cls._bzr = 'brz'
-        else:
-            cls._bzr = None
+        # Figure out which command line tool we should use, if Bazaar/Breezy
+        # is installed.
+        scmclient = BazaarClient()
 
-        if cls._bzr:
+        if scmclient.has_dependencies():
+            cls._bzr = scmclient.bzr
+
             try:
                 cls._run_bzr(['init', '.'], cwd=original_branch)
                 cls._bzr_add_file_commit(filename='foo.txt',
@@ -66,41 +359,19 @@ class BazaarClientTests(SCMClientTestCase):
                 cls._run_bzr(['branch', '--use-existing-dir', original_branch,
                               child_branch],
                              cwd=original_branch)
-            except Exception as e:
+            except Exception:
                 # We couldn't set up the repository, so skip this. We'll skip
                 # when setting up the client.
                 pass
+        else:
+            cls._bzr = None
 
         return original_branch
 
     def setUp(self):
-        if not self._bzr:
-            raise unittest.SkipTest('bzr not found in path')
-
         super(BazaarClientTests, self).setUp()
 
         self.set_user_home(os.path.join(self.testdata_dir, 'homedir'))
-
-    def build_client(self, **kwargs):
-        """Build a client for testing.
-
-        Version Added:
-            4.0
-
-        Args:
-            **kwargs (dict):
-                Keyword arguments to pass to the parent method.
-
-        Returns:
-            rbtools.clients.bazaar.BazaarClient:
-            The client instance.
-        """
-        client = super(BazaarClientTests, self).build_client(**kwargs)
-
-        # This is temporary, until we improve dependency handling.
-        client.bzr = self._bzr
-
-        return client
 
     @classmethod
     def _run_bzr(cls, command, *args, **kwargs):
@@ -378,7 +649,6 @@ class BazaarClientTests(SCMClientTestCase):
         os.chdir(grand_child_branch)
 
         revisions = client.parse_revision_spec([])
-
         self.assertEqual(
             client.diff(revisions),
             {

@@ -342,7 +342,7 @@ class BaseSCMClient(object):
         """
         return False
 
-    def get_local_path(self):
+    def get_local_path(self) -> Optional[str]:
         """Return the local path to the working tree.
 
         This is expected to be overridden by subclasses.
@@ -351,7 +351,7 @@ class BaseSCMClient(object):
             3.0
 
         Returns:
-            unicode:
+            str:
             The filesystem path of the repository on the client system.
         """
         logging.warning('%s should implement a get_local_path method',
