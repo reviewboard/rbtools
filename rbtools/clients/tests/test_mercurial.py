@@ -8,19 +8,21 @@ import shutil
 import tempfile
 import time
 import unittest
-from hashlib import md5
 from random import randint
 from textwrap import dedent
 
 import kgb
-from six.moves import range
 
 import rbtools.helpers
 from rbtools.clients import PatchAuthor, RepositoryInfo
-from rbtools.clients.errors import CreateCommitError, MergeError
+from rbtools.clients.errors import (CreateCommitError,
+                                    MergeError,
+                                    SCMClientDependencyError)
 from rbtools.clients.mercurial import MercurialClient, MercurialRefType
 from rbtools.clients.tests import (FOO, FOO1, FOO2, FOO3, FOO4, FOO5, FOO6,
                                    SCMClientTestCase)
+from rbtools.deprecation import RemovedInRBTools50Warning
+from rbtools.utils.checks import check_install
 from rbtools.utils.encoding import force_unicode
 from rbtools.utils.filesystem import (is_exe_in_path,
                                       load_config,
@@ -151,10 +153,13 @@ class MercurialClientTests(MercurialTestCase):
                 The top-level directory in which the clone will be placed.
 
         Returns:
+            str:
             The main clone directory, or ``None`` if :command:`hg` isn't
             in the path.
         """
-        if not is_exe_in_path('hg'):
+        client = MercurialClient()
+
+        if not client.has_dependencies():
             return None
 
         cls.hg_dir = os.path.join(cls.testdata_dir, 'hg-repo')
@@ -163,20 +168,102 @@ class MercurialClientTests(MercurialTestCase):
         return checkout_dir
 
     def setUp(self):
-        if not is_exe_in_path('hg'):
-            raise unittest.SkipTest('hg not found in path')
-
         super(MercurialClientTests, self).setUp()
 
         self.clone_dir = self.checkout_dir
-        self.clone_hgrc_path = os.path.join(self.clone_dir, '.hg', 'hgrc')
 
-        with open(self.clone_hgrc_path, 'w') as fp:
-            fp.write(self.CLONE_HGRC % {
-                'hg_dir': self.hg_dir,
-                'clone_dir': self.clone_dir,
-                'test_server': self.TESTSERVER,
-            })
+        if self.clone_dir is not None:
+            self.clone_hgrc_path = os.path.join(self.clone_dir, '.hg', 'hgrc')
+
+            with open(self.clone_hgrc_path, 'w') as fp:
+                fp.write(self.CLONE_HGRC % {
+                    'hg_dir': self.hg_dir,
+                    'clone_dir': self.clone_dir,
+                    'test_server': self.TESTSERVER,
+                })
+        else:
+            self.clone_dir = None
+
+    def test_check_dependencies_with_found(self):
+        """Testing MercurialClient.check_dependencies with hg found"""
+        self.spy_on(check_install, op=kgb.SpyOpMatchAny([
+            {
+                'args': (['hg', '--help'],),
+                'op': kgb.SpyOpReturn(True),
+            },
+        ]))
+
+        client = self.build_client(setup=False)
+        client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['hg', '--help'])
+
+    def test_check_dependencies_with_missing(self):
+        """Testing MercurialClient.check_dependencies with dependencies
+        missing
+        """
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = "Command line tools ('hg') are missing."
+
+        with self.assertRaisesMessage(SCMClientDependencyError, message):
+            client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['hg', '--help'])
+
+    def test_get_local_path_with_deps_missing(self):
+        """Testing MercurialClient.get_local_path with dependencies missing"""
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+        self.spy_on(RemovedInRBTools50Warning.warn)
+
+        client = self.build_client(setup=False)
+
+        # Make sure dependencies are checked for this test before we run
+        # get_local_path(). This will be the expected setup flow.
+        self.assertFalse(client.has_dependencies())
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            local_path = client.get_local_path()
+
+        self.assertIsNone(local_path)
+
+        self.assertEqual(ctx.records[0].msg,
+                         'Unable to execute "hg --help": skipping Mercurial')
+        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['hg', '--help'])
+
+    def test_get_local_path_with_deps_not_checked(self):
+        """Testing MercurialClient.get_local_path with dependencies not
+        checked
+        """
+        # A False value is used just to ensure get_local_path() bails early,
+        # and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = re.escape(
+            'Either MercurialClient.setup() or '
+            'MercurialClient.has_dependencies() must be called before other '
+            'functions are used. This will be required starting in '
+            'RBTools 5.0.'
+        )
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+                client.get_local_path()
+
+        self.assertEqual(ctx.records[0].msg,
+                         'Unable to execute "hg --help": skipping Mercurial')
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['hg', '--help'])
 
     def test_get_repository_info(self):
         """Testing MercurialClient.get_repository_info"""
@@ -193,13 +280,66 @@ class MercurialClientTests(MercurialTestCase):
 
         self.assertEqual(self.hg_dir, hgpath)
 
+    def test_get_repository_info_with_deps_missing(self):
+        """Testing MercurialClient.get_repository_info with dependencies
+        missing
+        """
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+        self.spy_on(RemovedInRBTools50Warning.warn)
+
+        client = self.build_client(setup=False)
+
+        # Make sure dependencies are checked for this test before we run
+        # get_repository_info(). This will be the expected setup flow.
+        self.assertFalse(client.has_dependencies())
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            repository_info = client.get_repository_info()
+
+        self.assertIsNone(repository_info)
+
+        self.assertEqual(ctx.records[0].msg,
+                         'Unable to execute "hg --help": skipping Mercurial')
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['hg', '--help'])
+
+    def test_get_repository_info_with_deps_not_checked(self):
+        """Testing MercurialClient.get_repository_info with dependencies
+        not checked
+        """
+        # A False value is used just to ensure get_repository_info() bails
+        # early, and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = re.escape(
+            'Either MercurialClient.setup() or '
+            'MercurialClient.has_dependencies() must be called before other '
+            'functions are used. This will be required starting in '
+            'RBTools 5.0.'
+        )
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+                client.get_repository_info()
+
+        self.assertEqual(ctx.records[0].msg,
+                         'Unable to execute "hg --help": skipping Mercurial')
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['hg', '--help'])
+
     def test_scan_for_server(self):
         """Testing MercurialClient.scan_for_server"""
+        client = self.build_client()
+        client.hgrc = {}
+
+        assert self.clone_dir is not None
         os.rename(self.clone_hgrc_path,
                   os.path.join(self.clone_dir, '._disabled_hgrc'))
 
-        client = self.build_client()
-        client.hgrc = {}
         client._load_hgrc()
 
         ri = client.get_repository_info()
