@@ -3,13 +3,14 @@
 from __future__ import unicode_literals
 
 import os
+import re
 
 import kgb
-import six
 
 from rbtools.clients.clearcase import ClearCaseClient, ClearCaseRepositoryInfo
-from rbtools.clients.errors import SCMError
+from rbtools.clients.errors import SCMClientDependencyError, SCMError
 from rbtools.clients.tests import SCMClientTestCase
+from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.process import execute
 
@@ -119,19 +120,193 @@ class ClearCaseClientTests(SCMClientTestCase):
 
         self.set_user_home(os.path.join(self.testdata_dir, 'homedir'))
 
-        self.spy_on(check_install, op=kgb.SpyOpMatchInOrder([
+    def test_check_dependencies_with_found(self):
+        """Testing ClearCaseClient.check_dependencies with found"""
+        self.spy_on(check_install, op=kgb.SpyOpMatchAny([
             {
                 'args': (['cleartool', 'help'],),
                 'op': kgb.SpyOpReturn(True),
             },
         ]))
 
-        self.spy_on(ClearCaseClient._get_host_info, op=kgb.SpyOpReturn({
-            'Product name': 'ClearCase',
-            'Product version': '7.0.1.0',
-            'Operating system': 'Linux',
-            'Registry region': 'devel',
-        }))
+        client = self.build_client(setup=False)
+        client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['cleartool', 'help'])
+
+    def test_check_dependencies_with_missing(self):
+        """Testing ClearCaseClient.check_dependencies with dependencies
+        missing
+        """
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = "Command line tools ('cleartool') are missing."
+
+        with self.assertRaisesMessage(SCMClientDependencyError, message):
+            client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['cleartool', 'help'])
+
+    def test_host_properties_with_deps_missing(self):
+        """Testing ClearCaseClient.host_properties with dependencies missing"""
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+        self.spy_on(RemovedInRBTools50Warning.warn)
+
+        client = self.build_client(setup=False)
+
+        # Make sure dependencies are checked for this test before we run
+        # host_properties(). This will be the expected setup flow.
+        self.assertFalse(client.has_dependencies())
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            props = client.host_properties
+
+        self.assertIsNone(props)
+
+        self.assertEqual(
+            ctx.records[0].msg,
+            'Unable to execute "cleartool help": skipping ClearCase')
+        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['cleartool', 'help'])
+
+    def test_host_properties_with_deps_not_checked(self):
+        """Testing ClearCaseClient.host_properties with dependencies not
+        checked
+        """
+        # A False value is used just to ensure host_properties() bails early,
+        # and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = re.escape(
+            'Either ClearCaseClient.setup() or '
+            'ClearCaseClient.has_dependencies() must be called before other '
+            'functions are used. This will be required starting in '
+            'RBTools 5.0.'
+        )
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+                client.host_properties
+
+        self.assertEqual(
+            ctx.records[0].msg,
+            'Unable to execute "cleartool help": skipping ClearCase')
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['cleartool', 'help'])
+
+    def test_get_local_path_with_deps_missing(self):
+        """Testing ClearCaseClient.get_local_path with dependencies missing"""
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+        self.spy_on(RemovedInRBTools50Warning.warn)
+
+        client = self.build_client(setup=False)
+
+        # Make sure dependencies are checked for this test before we run
+        # get_local_path(). This will be the expected setup flow.
+        self.assertFalse(client.has_dependencies())
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            local_path = client.get_local_path()
+
+        self.assertIsNone(local_path)
+
+        self.assertEqual(
+            ctx.records[0].msg,
+            'Unable to execute "cleartool help": skipping ClearCase')
+        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['cleartool', 'help'])
+
+    def test_get_local_path_with_deps_not_checked(self):
+        """Testing ClearCaseClient.get_local_path with dependencies not
+        checked
+        """
+        # A False value is used just to ensure get_local_path() bails early,
+        # and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = re.escape(
+            'Either ClearCaseClient.setup() or '
+            'ClearCaseClient.has_dependencies() must be called before other '
+            'functions are used. This will be required starting in '
+            'RBTools 5.0.'
+        )
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+                client.get_local_path()
+
+        self.assertEqual(
+            ctx.records[0].msg,
+            'Unable to execute "cleartool help": skipping ClearCase')
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['cleartool', 'help'])
+
+    def test_get_repository_info_with_deps_missing(self):
+        """Testing ClearCaseClient.get_repository_info with dependencies
+        missing
+        """
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+        self.spy_on(RemovedInRBTools50Warning.warn)
+
+        client = self.build_client(setup=False)
+
+        # Make sure dependencies are checked for this test before we run
+        # get_repository_info(). This will be the expected setup flow.
+        self.assertFalse(client.has_dependencies())
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            repository_info = client.get_repository_info()
+
+        self.assertIsNone(repository_info)
+
+        self.assertEqual(
+            ctx.records[0].msg,
+            'Unable to execute "cleartool help": skipping ClearCase')
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['cleartool', 'help'])
+
+    def test_get_repository_info_with_deps_not_checked(self):
+        """Testing ClearCaseClient.get_repository_info with dependencies
+        not checked
+        """
+        # A False value is used just to ensure get_repository_info() bails
+        # early, and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = re.escape(
+            'Either ClearCaseClient.setup() or '
+            'ClearCaseClient.has_dependencies() must be called before other '
+            'functions are used. This will be required starting in '
+            'RBTools 5.0.'
+        )
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+                client.get_repository_info()
+
+        self.assertEqual(
+            ctx.records[0].msg,
+            'Unable to execute "cleartool help": skipping ClearCase')
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['cleartool', 'help'])
 
     def test_get_local_path_outside_view(self):
         """Testing ClearCaseClient.get_local_path outside of view"""
@@ -142,7 +317,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             },
         ]))
 
-        client = self.build_client()
+        client = self.build_client(allow_dep_checks=False)
 
         self.assertIsNone(client.get_local_path())
 
@@ -163,7 +338,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             },
         ]))
 
-        client = self.build_client()
+        client = self.build_client(allow_dep_checks=False)
 
         self.assertEqual(client.get_local_path(), '/test/view/vob')
 
@@ -190,7 +365,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             },
         ]))
 
-        client = self.build_client()
+        client = self.build_client(allow_dep_checks=False)
 
         repository_info = client.get_repository_info()
         self.assertEqual(repository_info.path, '/test/view/vob')
@@ -229,7 +404,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             },
         ]))
 
-        client = self.build_client()
+        client = self.build_client(allow_dep_checks=False)
 
         repository_info = client.get_repository_info()
         self.assertEqual(repository_info.path, '/test/view/vob')
@@ -244,7 +419,8 @@ class ClearCaseClientTests(SCMClientTestCase):
         self.assertFalse(client.is_ucm)
 
     def test_get_repository_info_dynamic_UCM(self):
-        """Testing ClearCaseClient.get_repository_info with dynamic view and UCM
+        """Testing ClearCaseClient.get_repository_info with dynamic view and
+        UCM
         """
         self.spy_on(check_gnu_diff, call_original=False)
         self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
@@ -267,7 +443,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             },
         ]))
 
-        client = self.build_client()
+        client = self.build_client(allow_dep_checks=False)
 
         repository_info = client.get_repository_info()
         self.assertEqual(repository_info.path, '/test/view/vob')
@@ -304,12 +480,12 @@ class ClearCaseClientTests(SCMClientTestCase):
             },
         ]))
 
-        client = self.build_client()
+        client = self.build_client(allow_dep_checks=False)
 
         try:
             client.get_repository_info()
         except SCMError as e:
-            self.assertEqual(six.text_type(e),
+            self.assertEqual(str(e),
                              'Webviews and automatic views are not currently '
                              'supported. RBTools commands can only be used in '
                              'dynamic or snapshot views.')
@@ -339,12 +515,12 @@ class ClearCaseClientTests(SCMClientTestCase):
             },
         ]))
 
-        client = self.build_client()
+        client = self.build_client(allow_dep_checks=False)
 
         try:
             client.get_repository_info()
         except SCMError as e:
-            self.assertEqual(six.text_type(e),
+            self.assertEqual(str(e),
                              'Webviews and automatic views are not currently '
                              'supported. RBTools commands can only be used in '
                              'dynamic or snapshot views.')
@@ -426,7 +602,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             },
         ]))
 
-        client = self.build_client()
+        client = self.build_client(allow_dep_checks=False)
 
         self.assertEqual(client._get_vobtag(), '/vob')
 
@@ -442,7 +618,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             },
         ]))
 
-        client = self.build_client()
+        client = self.build_client(allow_dep_checks=False)
 
         with self.assertRaises(SCMError):
             client._get_vobtag()
@@ -505,7 +681,7 @@ class ClearCaseClientTests(SCMClientTestCase):
 
         # Fake a dynamic view, which is required for revision specs with two
         # revisions.
-        client = self.build_client()
+        client = self.build_client(allow_dep_checks=False)
         client.viewtype = 'dynamic'
 
         for spec, base, tip in cases:
@@ -537,7 +713,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             },
         ]))
 
-        client = self.build_client()
+        client = self.build_client(allow_dep_checks=False)
 
         repository_info = ClearCaseRepositoryInfo('/view/test/vob', 'vob')
         repository_info.update_from_remote({}, {
@@ -593,7 +769,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             },
         ]))
 
-        client = self.build_client()
+        client = self.build_client(allow_dep_checks=False)
 
         repository_info = ClearCaseRepositoryInfo('/view/test/vob', 'vob')
         repository_info.update_from_remote({}, {
@@ -659,7 +835,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             },
         ]))
 
-        client = self.build_client()
+        client = self.build_client(allow_dep_checks=False)
 
         self.assertEqual(
             client._diff_directory('.@@/main/1', '.@@/main/CHECKEDOUT'),

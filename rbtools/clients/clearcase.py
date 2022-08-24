@@ -1,6 +1,6 @@
 """A client for ClearCase."""
 
-from __future__ import unicode_literals
+from __future__ import annotations
 
 import datetime
 import itertools
@@ -10,13 +10,16 @@ import re
 import sys
 import threading
 from collections import defaultdict, deque
+from typing import Dict, Optional
 
 import six
 from pydiffx.dom import DiffX
 
 from rbtools.api.errors import APIError
 from rbtools.clients import BaseSCMClient, RepositoryInfo
-from rbtools.clients.errors import InvalidRevisionSpecError, SCMError
+from rbtools.clients.errors import (InvalidRevisionSpecError,
+                                    SCMClientDependencyError,
+                                    SCMError)
 from rbtools.deprecation import RemovedInRBTools40Warning
 from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.filesystem import make_tempfile
@@ -315,16 +318,73 @@ class ClearCaseClient(BaseSCMClient):
         self.viewname = None
         self.is_ucm = False
         self.vobtag = None
-        self.host_properties = self._get_host_info()
 
-    def get_local_path(self):
+        self._host_properties: _HostProperties = None
+        self._host_properties_set: bool = False
+
+    @property
+    def host_properties(self) -> _HostProperties:
+        """A dictionary containing host properties.
+
+        This will fetch the properties on first access, and cache for future
+        usage.
+
+        The contents are the results of :command:`cleartool hostinfo -l`, with
+        the addition of:
+
+        Keys:
+            Product name (str):
+                The name portion of the ``Product`` key.
+
+            Product version (str):
+                The version portion of the ``Product`` key.
+
+        Callers must call :py:meth:`setup` or :py:meth:`has_dependencies`
+        before accessing this.
+
+        They also must check for ``None`` responses and exceptions.
+
+        Version Changed:
+            4.0:
+            Made this a lazily-loaded caching property.
+
+        Type:
+            dict
+
+        Raises:
+            rbtools.clients.errors.SCMError:
+                There was an error fetching host property information.
+        """
+        if not self._host_properties_set:
+            self._host_properties = self._get_host_info()
+            self._host_properties_set = True
+
+        return self._host_properties
+
+    def check_dependencies(self) -> None:
+        """Check whether all dependencies for the client are available.
+
+        This will check for :command:`cleartool` in the path.
+
+        Version Added:
+            4.0
+
+        Raises:
+            rbtools.clients.errors.SCMClientDependencyError:
+                :command:`cleartool` could not be found.
+        """
+        if not check_install(['cleartool', 'help']):
+            raise SCMClientDependencyError(missing_exes=['cleartool'])
+
+    def get_local_path(self) -> Optional[str]:
         """Return the local path to the working tree.
 
         Returns:
-            unicode:
+            str:
             The filesystem path of the repository on the client system.
         """
-        if not check_install(['cleartool', 'help']):
+        # NOTE: This can be removed once check_dependencies() is mandatory.
+        if not self.has_dependencies(expect_checked=True):
             logging.debug('Unable to execute "cleartool help": skipping '
                           'ClearCase')
             return None
@@ -334,7 +394,6 @@ class ClearCaseClient(BaseSCMClient):
 
         if self.viewname.startswith('** NONE'):
             return None
-
 
         # Get the root path of the view.
         self.root_path = execute(['cleartool', 'pwv', '-root'],
@@ -2073,7 +2132,7 @@ class ClearCaseClient(BaseSCMClient):
 
         return metadata
 
-    def _get_host_info(self):
+    def _get_host_info(self) -> _HostProperties:
         """Return the current ClearCase/VersionVault host info.
 
         Returns:
@@ -2084,7 +2143,8 @@ class ClearCaseClient(BaseSCMClient):
             rbtools.clients.errors.SCMError:
                 Could not determine the host info.
         """
-        if not check_install(['cleartool', 'help']):
+        # NOTE: This can be removed once check_dependencies() is mandatory.
+        if not self.has_dependencies(expect_checked=True):
             logging.debug('Unable to execute "cleartool help": skipping '
                           'ClearCase')
             return None
@@ -2225,3 +2285,6 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
             self.update_from_remote(repository, info)
 
         return self
+
+
+_HostProperties = Optional[Dict[str, str]]
