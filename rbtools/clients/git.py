@@ -6,9 +6,9 @@ import logging
 import os
 import re
 import sys
+from typing import List, Optional, cast
 
 import six
-from six.moves import zip
 
 from rbtools.clients import BaseSCMClient, PatchResult, RepositoryInfo
 from rbtools.clients.errors import (AmendError,
@@ -17,6 +17,7 @@ from rbtools.clients.errors import (AmendError,
                                     PushError,
                                     InvalidRevisionSpecError,
                                     TooManyRevisionsError,
+                                    SCMClientDependencyError,
                                     SCMError)
 from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.svn import SVNClient, SVNRepositoryInfo
@@ -26,6 +27,39 @@ from rbtools.utils.diffs import (normalize_patterns,
                                  remove_filenames_matching_patterns)
 from rbtools.utils.errors import EditorError
 from rbtools.utils.process import execute
+
+
+def get_git_candidates(
+    target_platform: str = sys.platform,
+) -> List[str]:
+    """Return candidate names for the git command line tool.
+
+    Results may vary based on platform.
+
+    This should be considered internal API.
+
+    Version Added:
+        4.0
+
+    Args:
+        target_platform (str, optional):
+            The target platform for which to return candidates. Defaults to
+            the current platform.
+
+            This is intended for unit tests.
+
+    Returns:
+        list of str:
+        The list of possible names for :command:`git`.
+    """
+    candidates = ['git']
+
+    # CreateProcess (launched via subprocess, used by check_install)
+    # does not automatically append .cmd for things it finds in PATH.
+    if target_platform.startswith('win'):
+        candidates.append('git.cmd')
+
+    return candidates
 
 
 class GitClient(BaseSCMClient):
@@ -71,9 +105,57 @@ class GitClient(BaseSCMClient):
 
         # Store the 'correct' way to invoke git, just plain old 'git' by
         # default.
-        self.git = 'git'
+        self._git = ''
         self._git_toplevel = None
         self._type = None
+
+    @property
+    def git(self) -> str:
+        """The name of the command line tool for Git.
+
+        Callers must call :py:meth:`setup` or :py:meth:`has_dependencies`
+        before accessing this. This will be required starting in RBTools 5.0.
+
+        This will fall back to "bzr" if neither Bazaar nor Breezy is installed.
+
+        Type:
+            str
+        """
+        git = self._git
+
+        if not git:
+            # This will log a deprecation warning if checking dependencies for
+            # the first time.
+            self.has_dependencies(expect_checked=True)
+
+            if not self._git:
+                # Fall back to "git" as a default.
+                git = 'git'
+                self._git = git
+
+        return cast(str, git)
+
+    def check_dependencies(self) -> None:
+        """Check whether all dependencies for the client are available.
+
+        This checks for the presence of :command:`git` (along with
+        :command:`git.cmd` on Windows) in the system path.
+
+        Version Added:
+            4.0
+
+        Raises:
+            rbtools.clients.errors.SCMClientDependencyError:
+                A git tool could not be found.
+        """
+        candidates = get_git_candidates()
+
+        for git in candidates:
+            if check_install([git, '--help']):
+                self._git = git
+                return
+
+        raise SCMClientDependencyError(missing_exes=[tuple(candidates)])
 
     def _supports_git_config_flag(self):
         """Return whether the installed version of git supports the -c flag.
@@ -239,11 +321,11 @@ class GitClient(BaseSCMClient):
 
         return result
 
-    def get_local_path(self):
+    def get_local_path(self) -> Optional[str]:
         """Return the local path to the working tree.
 
         Returns:
-            unicode:
+            str:
             The filesystem path of the repository on the client system.
         """
         # Temporarily reset the toplevel. This is necessary for making things
@@ -251,17 +333,11 @@ class GitClient(BaseSCMClient):
         # lot.
         self._git_toplevel = None
 
-        if not check_install(['git', '--help']):
-            # CreateProcess (launched via subprocess, used by check_install)
-            # does not automatically append .cmd for things it finds in PATH.
-            # If we're on Windows, and this works, save it for further use.
-            if (sys.platform.startswith('win') and
-                check_install(['git.cmd', '--help'])):
-                self.git = 'git.cmd'
-            else:
-                logging.debug('Unable to execute "git --help" or "git.cmd '
-                              '--help": skipping Git')
-                return None
+        # NOTE: This can be removed once check_dependencies() is mandatory.
+        if not self.has_dependencies(expect_checked=True):
+            logging.debug('Unable to execute "git --help" or "git.cmd '
+                          '--help": skipping Git')
+            return None
 
         self._git_dir = self._get_git_dir()
 

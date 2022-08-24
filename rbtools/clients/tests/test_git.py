@@ -3,17 +3,22 @@
 from __future__ import unicode_literals
 
 import os
+import re
 import unittest
+from typing import Any, List
 
-import six
+import kgb
 
 from rbtools.clients import PatchAuthor, RepositoryInfo
 from rbtools.clients.errors import (CreateCommitError,
                                     MergeError,
                                     PushError,
+                                    SCMClientDependencyError,
                                     TooManyRevisionsError)
-from rbtools.clients.git import GitClient
+from rbtools.clients.git import GitClient, get_git_candidates
 from rbtools.clients.tests import FOO1, FOO2, FOO3, FOO4, SCMClientTestCase
+from rbtools.deprecation import RemovedInRBTools50Warning
+from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import is_exe_in_path
 from rbtools.utils.process import execute
 
@@ -26,6 +31,8 @@ class GitClientTests(SCMClientTestCase):
     TESTSERVER = 'http://127.0.0.1:8080'
     AUTHOR = PatchAuthor(full_name='name',
                          email='email')
+
+    _git: str = ''
 
     @classmethod
     def setup_checkout(cls, checkout_dir):
@@ -43,8 +50,12 @@ class GitClientTests(SCMClientTestCase):
             The main checkout directory, or ``None`` if :command:`git` isn't
             in the path.
         """
-        if not is_exe_in_path('git'):
-            return None
+        scmclient = GitClient()
+
+        if not scmclient.has_dependencies():
+            return
+
+        cls._git = scmclient.git
 
         cls.git_dir = os.path.join(cls.testdata_dir, 'git-repo')
         cls.clone_dir = checkout_dir
@@ -65,17 +76,27 @@ class GitClientTests(SCMClientTestCase):
         return orig_clone_dir
 
     @classmethod
-    def _run_git(cls, command):
-        return execute(['git'] + command,
+    def _run_git(
+        cls,
+        command: List[str],
+    ) -> Any:
+        """Run git with the provided arguments.
+
+        Args:
+            command (list of str):
+                The arguments to pass to :command:`git`.
+
+        Returns:
+            object:
+            The result of the :py:func:`~rbtools.utils.process.execute` call.
+        """
+        return execute([cls._git] + command,
                        env=None,
                        split_lines=False,
                        ignore_errors=False,
                        extra_ignore_errors=())
 
     def setUp(self):
-        if not is_exe_in_path('git'):
-            raise unittest.SkipTest('git not found in path')
-
         super(GitClientTests, self).setUp()
 
         self.set_user_home(os.path.join(self.testdata_dir, 'homedir'))
@@ -87,7 +108,7 @@ class GitClientTests(SCMClientTestCase):
             filename (unicode):
                 The filename to write to.
 
-            data (unicode):
+            data (bytes):
                 The content of the file to write.
 
             msg (unicode):
@@ -102,6 +123,185 @@ class GitClientTests(SCMClientTestCase):
     def _git_get_head(self):
         return self._run_git(['rev-parse', 'HEAD']).strip()
 
+    def test_check_dependencies_with_git_found(self):
+        """Testing GitClient.check_dependencies with git found"""
+        self.spy_on(check_install, op=kgb.SpyOpMatchAny([
+            {
+                'args': (['git', '--help'],),
+                'op': kgb.SpyOpReturn(True),
+            },
+            {
+                'args': (['git.cmd', '--help'],),
+                'op': kgb.SpyOpReturn(True),
+            },
+        ]))
+
+        client = self.build_client(setup=False)
+        client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['git', '--help'])
+
+        self.assertEqual(client.git, 'git')
+
+    def test_check_dependencies_with_gitcmd_found_on_windows(self):
+        """Testing GitClient.check_dependencies with git.cmd found on Windows
+        """
+        self.spy_on(
+            get_git_candidates,
+            op=kgb.SpyOpReturn(get_git_candidates(target_platform='windows')))
+
+        self.spy_on(check_install, op=kgb.SpyOpMatchAny([
+            {
+                'args': (['git', '--help'],),
+                'op': kgb.SpyOpReturn(False),
+            },
+            {
+                'args': (['git.cmd', '--help'],),
+                'op': kgb.SpyOpReturn(True),
+            },
+        ]))
+
+        client = self.build_client(setup=False)
+        client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 2)
+        self.assertSpyCalledWith(check_install.calls[0], ['git', '--help'])
+        self.assertSpyCalledWith(check_install.calls[1], ['git.cmd', '--help'])
+
+        self.assertEqual(client.git, 'git.cmd')
+
+    def test_check_dependencies_with_missing(self):
+        """Testing GitClient.check_dependencies with dependencies
+        missing
+        """
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = "Command line tools ('git') are missing."
+
+        with self.assertRaisesMessage(SCMClientDependencyError, message):
+            client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['git', '--help'])
+
+    def test_check_dependencies_with_missing_on_windows(self):
+        """Testing GitClient.check_dependencies with dependencies
+        missing on Windows
+        """
+        self.spy_on(
+            get_git_candidates,
+            op=kgb.SpyOpReturn(get_git_candidates(target_platform='windows')))
+
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = "Command line tools (one of ('git', 'git.cmd')) are missing."
+
+        with self.assertRaisesMessage(SCMClientDependencyError, message):
+            client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 2)
+        self.assertSpyCalledWith(check_install, ['git', '--help'])
+        self.assertSpyCalledWith(check_install, ['git.cmd', '--help'])
+
+    def test_git_with_deps_missing(self):
+        """Testing GitClient.git with dependencies missing"""
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+        self.spy_on(RemovedInRBTools50Warning.warn)
+
+        client = self.build_client(setup=False)
+
+        # Make sure dependencies are checked for this test before we run
+        # git(). This will be the expected setup flow.
+        self.assertFalse(client.has_dependencies())
+
+        # This will fall back to "git" even if dependencies are missing.
+        self.assertEqual(client.git, 'git')
+
+        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['git', '--help'])
+
+    def test_git_with_deps_not_checked(self):
+        """Testing GitClient.git with dependencies not
+        checked
+        """
+        # A False value is used just to ensure git() bails early,
+        # and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = re.escape(
+            'Either GitClient.setup() or '
+            'GitClient.has_dependencies() must be called before other '
+            'functions are used. This will be required starting in '
+            'RBTools 5.0.'
+        )
+
+        with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+            client.git
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['git', '--help'])
+
+    def test_get_local_path_with_deps_missing(self):
+        """Testing GitClient.get_local_path with dependencies missing"""
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+        self.spy_on(RemovedInRBTools50Warning.warn)
+
+        client = self.build_client(setup=False)
+
+        # Make sure dependencies are checked for this test before we run
+        # get_local_path(). This will be the expected setup flow.
+        self.assertFalse(client.has_dependencies())
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            local_path = client.get_local_path()
+
+        self.assertIsNone(local_path)
+
+        self.assertEqual(
+            ctx.records[0].msg,
+            'Unable to execute "git --help" or "git.cmd --help": skipping Git')
+        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['git', '--help'])
+
+    def test_get_local_path_with_deps_not_checked(self):
+        """Testing GitClient.get_local_path with dependencies not
+        checked
+        """
+        # A False value is used just to ensure get_local_path() bails early,
+        # and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = re.escape(
+            'Either GitClient.setup() or '
+            'GitClient.has_dependencies() must be called before other '
+            'functions are used. This will be required starting in '
+            'RBTools 5.0.'
+        )
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+                client.get_local_path()
+
+        self.assertEqual(
+            ctx.records[0].msg,
+            'Unable to execute "git --help" or "git.cmd --help": skipping Git')
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['git', '--help'])
+
     def test_get_repository_info_simple(self):
         """Testing GitClient get_repository_info, simple case"""
         client = self.build_client()
@@ -110,6 +310,59 @@ class GitClientTests(SCMClientTestCase):
         self.assertIsInstance(ri, RepositoryInfo)
         self.assertEqual(ri.base_path, '')
         self.assertEqual(ri.path.rstrip('/.git'), self.git_dir)
+
+    def test_get_repository_info_with_deps_missing(self):
+        """Testing GitClient.get_repository_info with dependencies
+        missing
+        """
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+        self.spy_on(RemovedInRBTools50Warning.warn)
+
+        client = self.build_client(setup=False)
+
+        # Make sure dependencies are checked for this test before we run
+        # get_repository_info(). This will be the expected setup flow.
+        self.assertFalse(client.has_dependencies())
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            repository_info = client.get_repository_info()
+
+        self.assertIsNone(repository_info)
+
+        self.assertEqual(
+            ctx.records[0].msg,
+            'Unable to execute "git --help" or "git.cmd --help": skipping Git')
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['git', '--help'])
+
+    def test_get_repository_info_with_deps_not_checked(self):
+        """Testing GitClient.get_repository_info with dependencies
+        not checked
+        """
+        # A False value is used just to ensure get_repository_info() bails
+        # early, and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = re.escape(
+            'Either GitClient.setup() or '
+            'GitClient.has_dependencies() must be called before other '
+            'functions are used. This will be required starting in '
+            'RBTools 5.0.'
+        )
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+                client.get_repository_info()
+
+        self.assertEqual(
+            ctx.records[0].msg,
+            'Unable to execute "git --help" or "git.cmd --help": skipping Git')
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['git', '--help'])
 
     def test_scan_for_server_simple(self):
         """Testing GitClient scan_for_server, simple case"""
@@ -1240,7 +1493,7 @@ class GitClientTests(SCMClientTestCase):
                          message='commit message',
                          author=self.AUTHOR)
         except MergeError as e:
-            self.assertTrue(six.text_type(e).startswith(
+            self.assertTrue(str(e).startswith(
                 'Could not checkout to branch "non-existent-branch"'))
         else:
             self.fail('Expected MergeError')
@@ -1257,7 +1510,7 @@ class GitClientTests(SCMClientTestCase):
                          message='commit message',
                          author=self.AUTHOR)
         except MergeError as e:
-            self.assertTrue(six.text_type(e).startswith(
+            self.assertTrue(str(e).startswith(
                 'Could not merge branch "non-existent-branch"'))
         else:
             self.fail('Expected MergeError')
