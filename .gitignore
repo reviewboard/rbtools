@@ -26,6 +26,7 @@ docs/rbtools/api/coderef/python
 pickle
 temp
 
+rbtools/clients/tests/testdata/cvs-repo/CVSROOT/history
 rbtools/clients/tests/testdata/homedir/.bzr.log
 
 contrib/installers/windows/deps

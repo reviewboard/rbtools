@@ -1,0 +1,25 @@
+head	1.1;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.1
+date	2022.08.25.02.40.45;	author chipx86;	state Exp;
+branches;
+next	;
+commitid	8DQdEFw8XI3CNcRD;
+
+
+desc
+@@
+
+
+1.1
+log
+@Added the initial commit for some CVS tests.
+@
+text
+@Howdy
+@
