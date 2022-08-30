@@ -138,8 +138,14 @@ class ChangesetEntry(object):
         3.0
     """
 
-    def __init__(self, root_path, old_path=None, new_path=None,
-                 old_oid=None, new_oid=None, op='modify'):
+    def __init__(self,
+                 root_path,
+                 old_path=None,
+                 new_path=None,
+                 old_oid=None,
+                 new_oid=None,
+                 op='modify',
+                 is_dir=False):
         """Initialize the changeset entry.
 
         Args:
@@ -160,6 +166,9 @@ class ChangesetEntry(object):
 
             op (unicode, optional):
                 The change operation.
+
+            is_dir (bool, optional):
+                Whether the changeset entry represents a directory.
         """
         self.root_path = root_path
 
@@ -174,6 +183,7 @@ class ChangesetEntry(object):
         self._new_version = None
 
         self.op = op
+        self.is_dir = is_dir
 
     @property
     def old_oid(self):
@@ -1552,11 +1562,157 @@ class ClearCaseClient(SCMClient):
         # versions. The chances of this in reality are probably pretty small.
         return self._get_branch_changeset(branch, repository_info)
 
+    def _diff_directories(self,
+                          entry,
+                          repository_info,
+                          diffx_change):
+        """Return a unified diff for a changed directory.
+
+        Args:
+            entry (ChangesetEntry):
+                The changeset entry.
+
+            repository_info (ClearCaseRepositoryInfo):
+                The repository info structure.
+
+            diffx_change (pydiffx.dom.DiffXChangeSection):
+                The DiffX DOM object for writing VersionVault diffs.
+
+        Returns:
+            list of bytes:
+            The diff between the two directory listings, for writing legacy
+            ClearCase diffs.
+        """
+        dl = []
+
+        old_content = self._get_directory_contents(entry.old_path)
+        old_tmp = make_tempfile(content=old_content)
+
+        new_content = self._get_directory_contents(entry.new_path)
+        new_tmp = make_tempfile(content=new_content)
+
+        dl = execute(['diff', '-uN', old_tmp, new_tmp],
+                     extra_ignore_errors=(1, 2),
+                     results_unicode=False,
+                     split_lines=True)
+
+        if dl:
+            dl[0] = dl[0].replace(old_tmp.encode('utf-8'),
+                                  entry.old_path.encode('utf-8'))
+            dl[1] = dl[1].replace(new_tmp.encode('utf-8'),
+                                  entry.new_path.encode('utf-8'))
+
+            if repository_info.is_legacy:
+                index_line = (
+                    b'==== %s %s ====\n'
+                    % (entry.old_oid.encode('utf-8'),
+                       entry.new_oid.encode('utf-8')))
+                dl.insert(2, index_line)
+
+        if not repository_info.is_legacy:
+            # We need oids of files to translate them to paths on reviewboard
+            # repository.
+            vob_oid = execute(['cleartool', 'describe', '-fmt', '%On',
+                               'vob:%s' % (entry.new_path or entry.old_path)])
+
+            vv_metadata = {
+                'directory-diff': 'legacy-filenames',
+                'vob': vob_oid,
+            }
+
+            if entry.op == 'create':
+                path = os.path.relpath(entry.new_path, self.root_path)
+                revision = {
+                    'new': entry.new_version,
+                }
+                vv_metadata['new'] = {
+                    'name': entry.new_name,
+                    'oid': entry.new_oid,
+                    'path': path,
+                }
+            elif entry.op == 'delete':
+                path = os.path.relpath(entry.old_path, self.root_path)
+                revision = {
+                    'old': entry.old_version,
+                }
+                vv_metadata['old'] = {
+                    'name': entry.old_name,
+                    'oid': entry.old_oid,
+                    'path': path,
+                }
+            elif entry.op in ('modify', 'move'):
+                old_path_rel = os.path.relpath(entry.old_path, self.root_path)
+                new_path_rel = os.path.relpath(entry.new_path, self.root_path)
+
+                path = {
+                    'old': old_path_rel,
+                    'new': new_path_rel,
+                }
+                revision = {
+                    'old': entry.old_version,
+                    'new': entry.new_version,
+                }
+                vv_metadata['old'] = {
+                    'name': entry.old_name,
+                    'oid': entry.old_oid,
+                    'path': old_path_rel,
+                }
+                vv_metadata['new'] = {
+                    'name': entry.new_name,
+                    'oid': entry.new_oid,
+                    'path': new_path_rel,
+                }
+            else:
+                logging.warning(
+                    'Unexpected operation "%s" for directory %s %s',
+                    entry.op, entry.old_path, entry.new_path)
+                return []
+
+            diffx_change.add_file(
+                meta={
+                    'op': entry.op,
+                    'path': path,
+                    'revision': revision,
+                    'type': 'directory',
+                    'versionvault': vv_metadata,
+                },
+                diff_type='text',
+                diff=b''.join(dl))
+
+        return dl
+
+    def _get_directory_contents(self, extended_path):
+        """Return an ls-style directory listing for a versioned directory.
+
+        Args:
+            extended_path (unicode):
+                The path of the directory to get the contents for.
+
+        Returns:
+            bytes:
+            The contents of the directory.
+        """
+        output = execute(['cleartool', 'ls', '-short', '-nxname', '-vob_only',
+                          extended_path],
+                         split_lines=True,
+                         results_unicode=False)
+
+        contents = [
+            os.path.basename(absolute_path.strip())
+            for absolute_path in output
+        ]
+
+        # Add one extra empty line so the data passed to diff ends in a
+        # newline.
+        contents.append(b'')
+
+        return b'\n'.join(contents)
+
     def _diff_files(self,
                     entry,
                     repository_info,
                     diffx_change):
-        """Return a unified diff for file.
+        """Return a unified diff for a changed file.
 
         Args:
             entry (ChangesetEntry):
@@ -1606,20 +1762,21 @@ class ClearCaseClient(SCMClient):
             diff_old_file = entry.old_path or make_tempfile()
             diff_new_file = entry.new_path or make_tempfile()
 
-        dl = execute(['diff', '-uN', diff_old_file, diff_new_file],
-                     extra_ignore_errors=(1, 2),
-                     results_unicode=False)
+        diff = execute(['diff', '-uN', diff_old_file, diff_new_file],
+                       extra_ignore_errors=(1, 2),
+                       results_unicode=False)
+
+        # If the input file has ^M characters at end of line, lets ignore them.
+        diff = diff.replace(b'\r\r\n', b'\r\n')
+        dl = diff.splitlines(True)
 
         # Replace temporary filenames in the diff with view-local relative
         # paths.
-        dl = dl.replace(diff_old_file.encode('utf-8'),
-                        old_file_rel.encode('utf-8'))
-        dl = dl.replace(diff_new_file.encode('utf-8'),
-                        new_file_rel.encode('utf-8'))
-
-        # If the input file has ^M characters at end of line, lets ignore them.
-        dl = dl.replace(b'\r\r\n', b'\r\n')
-        dl = dl.splitlines(True)
+        if len(dl) >= 2:
+            dl[0] = dl[0].replace(diff_old_file.encode('utf-8'),
+                                  old_file_rel.encode('utf-8'))
+            dl[1] = dl[1].replace(diff_new_file.encode('utf-8'),
+                                  new_file_rel.encode('utf-8'))
 
         # Special handling for the output of the diff tool on binary files:
         #     diff outputs "Files a and b differ"
@@ -1628,11 +1785,6 @@ class ClearCaseClient(SCMClient):
         if (len(dl) == 1 and
             dl[0].startswith(b'Files ') and dl[0].endswith(b' differ')):
             dl = [b'Binary f%s' % dl[0][1:]]
-
-        # We need oids of files to translate them to paths on reviewboard
-        # repository.
-        vob_oid = execute(['cleartool', 'describe', '-fmt', '%On',
-                           'vob:%s' % (entry.new_path or entry.old_path)])
 
         if dl and dl[0].startswith(b'Binary files '):
             if repository_info.is_legacy:
@@ -1648,6 +1800,11 @@ class ClearCaseClient(SCMClient):
                                             entry.new_oid.encode('utf-8')))
 
         if not repository_info.is_legacy:
+            # We need oids of files to translate them to paths on reviewboard
+            # repository.
+            vob_oid = execute(['cleartool', 'describe', '-fmt', '%On',
+                               'vob:%s' % (entry.new_path or entry.old_path)])
+
             vv_metadata = {
                 'vob': vob_oid,
             }
@@ -1706,6 +1863,7 @@ class ClearCaseClient(SCMClient):
             else:
                 logging.warning('Unexpected operation "%s" for file %s %s',
                                 entry.op, entry.old_path, entry.new_path)
+                return []
 
             diffx_change.add_file(
                 meta={
@@ -1713,6 +1871,7 @@ class ClearCaseClient(SCMClient):
                     'path': path,
                     'op': entry.op,
                     'revision': revision,
+                    'type': 'file',
                 },
                 diff_type=diff_type,
                 diff=b''.join(dl))
@@ -1778,13 +1937,17 @@ class ClearCaseClient(SCMClient):
         for entry in changeset:
             legacy_dl = []
 
-            if self.viewtype == 'snapshot' or cpath.exists(entry.new_path):
-                legacy_dl = self._diff_files(entry, repository_info,
-                                             diffx_change)
+            if entry.is_dir:
+                legacy_dl = self._diff_directories(entry, repository_info,
+                                                   diffx_change)
             else:
-                logging.error('File %s does not exist or access is denied.',
-                              entry.new_path)
-                continue
+                if self.viewtype == 'snapshot' or cpath.exists(entry.new_path):
+                    legacy_dl = self._diff_files(entry, repository_info,
+                                                 diffx_change)
+                else:
+                    logging.error('File %s does not exist or access is denied.',
+                                  entry.new_path)
+                    continue
 
             if repository_info.is_legacy and legacy_dl:
                 legacy_diff.append(b''.join(legacy_dl))
@@ -1844,12 +2007,14 @@ class ClearCaseClient(SCMClient):
         for old_file, new_file in changeset:
             if self._is_dir(new_file):
                 directories.append((old_file, new_file))
+                files.append(ChangesetEntry(self.root_path, old_path=old_file,
+                                            new_path=new_file, is_dir=True))
             else:
                 files.append(ChangesetEntry(self.root_path, old_path=old_file,
                                             new_path=new_file))
 
         for old_dir, new_dir in directories:
-            changes = self._diff_directory(old_dir, new_dir)
+            changes = self._get_file_changes_from_directories(old_dir, new_dir)
 
             for filename, oid in changes['added']:
                 for file in files:
@@ -1908,7 +2073,7 @@ class ClearCaseClient(SCMClient):
 
         return files
 
-    def _diff_directory(self, old_dir, new_dir):
+    def _get_file_changes_from_directories(self, old_dir, new_dir):
         """Get directory differences.
 
         This will query and parse the diff of a directory element, in order to
