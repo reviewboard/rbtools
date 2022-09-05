@@ -152,10 +152,18 @@ def scan_usable_client(config, options, client_name=None):
 
         assert scmclient is not None
     else:
+        dep_errors = scan_result.dependency_errors
+
         if client_name:
-            logging.error('A %s repository was not detected in the current '
-                          'directory.',
-                          client_name)
+            if client_name in dep_errors:
+                logging.error("The current %s repository can't be used. %s",
+                              client_name, dep_errors[client_name])
+                logging.error('')
+                logging.error("Make sure they're installed and try again.")
+            else:
+                logging.error('A %s repository was not detected in the '
+                              'current directory.',
+                              client_name)
         else:
             scmclient_errors = scan_result.scmclient_errors
             candidate_scmclient_names: list[str] = [
@@ -170,14 +178,25 @@ def scan_usable_client(config, options, client_name=None):
                 logging.error('A supported repository was not found in the '
                               'the current directory or any parent directory.')
 
-            logging.error('')
-            logging.error('The following types of repositories were '
-                          'tried: %s',
-                          ', '.join(sorted(candidate_scmclient_names)))
+            if candidate_scmclient_names:
+                logging.error('')
+                logging.error('The following types of repositories were '
+                              'tried: %s',
+                              ', '.join(sorted(candidate_scmclient_names)))
+
+            if dep_errors:
+                logging.error('')
+                logging.error("The following were missing dependencies:")
+                logging.error('')
+
+                for name, dep_error in sorted(dep_errors.items(),
+                                              key=lambda pair: pair[0]):
+                    logging.error('* %s: %s', name, dep_error)
 
             if scmclient_errors:
                 logging.error('')
-                logging.error('And the following encountered errors: %s',
+                logging.error('The following encountered unexpected '
+                              'errors: %s',
                               ', '.join(sorted(scmclient_errors.keys())))
 
             logging.error('')

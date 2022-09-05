@@ -7,10 +7,12 @@ import os
 import kgb
 
 from rbtools.clients import RepositoryInfo
+from rbtools.clients.errors import SCMClientDependencyError
 from rbtools.clients.git import GitClient
 from rbtools.clients.mercurial import MercurialClient
 from rbtools.clients.svn import SVNClient
 from rbtools.testing import TestCase
+from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempdir
 from rbtools.utils.process import execute
 from rbtools.utils.source_tree import scan_scmclients_for_path
@@ -433,3 +435,47 @@ class ScanSCMClientsForPathTests(kgb.SpyAgency, TestCase):
         self.assertEqual(scan_result.scmclient_errors, {
             'git': e,
         })
+
+    def test_with_dependency_errors(self):
+        """Testing scan_scmclients_for_path with dependency_errors"""
+        tempdir = make_tempdir()
+        git_dir = os.path.realpath(os.path.join(tempdir, 'git-repo'))
+
+        execute(['git', 'init', git_dir])
+
+        # Make sure all dep checks fail.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        # And make sure we don't call any of the source tree introspection
+        # methods.
+        self.spy_on(GitClient.get_local_path)
+        self.spy_on(GitClient.get_repository_info)
+        self.spy_on(MercurialClient.get_local_path)
+        self.spy_on(MercurialClient.get_repository_info)
+
+        scan_result = scan_scmclients_for_path(
+            path=git_dir,
+            scmclient_ids=[
+                'git',
+                'mercurial',
+            ],
+            scmclient_kwargs={
+                'options': {},
+            })
+
+        self.assertFalse(scan_result.found)
+        self.assertIsNone(scan_result.local_path)
+        self.assertIsNone(scan_result.scmclient)
+        self.assertIsNone(scan_result.repository_info)
+        self.assertEqual(scan_result.candidates, [])
+        self.assertEqual(scan_result.scmclient_errors, {})
+
+        # Check that we received dependency errors for both.
+        #
+        # We won't bother with the contents of the errors, as those are
+        # covered by the unit tests for each SCMClient.
+        dep_errors = scan_result.dependency_errors
+        self.assertEqual(set(dep_errors.keys()), {'git', 'mercurial'})
+        self.assertIsInstance(dep_errors['git'], SCMClientDependencyError)
+        self.assertIsInstance(dep_errors['mercurial'],
+                              SCMClientDependencyError)

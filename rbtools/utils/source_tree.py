@@ -9,13 +9,14 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from typing_extensions import TypeAlias
 
 from rbtools.clients import (BaseSCMClient,
                              RepositoryInfo,
                              scmclient_registry)
+from rbtools.clients.errors import SCMClientDependencyError
 from rbtools.utils.filesystem import chdir
 
 
@@ -86,7 +87,19 @@ class SCMClientScanResult:
     #:     list of SCMClientScanCandidate
     candidates: SCMClientScanCandidateList
 
-    #: SCMClient errors encountered during the scan.
+    #: SCMClient dependency errors encountered during the scan.
+    #:
+    #: Each key will correspond to the :py:attr:`BaseSCMClient.scmclient_id
+    #: <rbtools.clients.base.scmclient.BaseSCMClient.scmclient_id>` of the
+    #: erroring SCMClient, and each value will be a
+    #: :py:class:`~rbtools.clients.errors.SCMClientDependencyError` containing
+    #: further details.
+    #:
+    #: Type:
+    #:     dict
+    dependency_errors: SCMClientScanDependencyErrors
+
+    #: Unexpected SCMClient errors encountered during the scan.
     #:
     #: Each key will correspond to the :py:attr:`BaseSCMClient.scmclient_id
     #: <rbtools.clients.base.scmclient.BaseSCMClient.scmclient_id>` of the
@@ -113,6 +126,7 @@ def _get_or_create_scmclient_for_scan(
     scmclient_kwargs: dict[str, Any],
     cache: _SCMClientCache,
     errors: SCMClientScanErrors,
+    dep_errors: SCMClientScanDependencyErrors,
 ) -> Optional[BaseSCMClient]:
     """Return a SCMClient instance for an ID, utilizing a cache.
 
@@ -137,8 +151,15 @@ def _get_or_create_scmclient_for_scan(
             and each value is an instance.
 
         errors (dict):
-            A dictionary used to store errors encountered during instantiation.
-            Each key is a SCMClient ID, and each value is an exception.
+            A dictionary used to store unexpected errors encountered during
+            instantiation.  Each key is a SCMClient ID, and each value is an
+            exception.
+
+        dep_errors (dict):
+            A dictionary used to store dependency errors encountered during
+            instantiation.  Each key is a SCMClient ID, and each value is
+            a :py:class:`~rbtools.clients.errors.SCMClientDependencyError`
+            exception.
 
     Returns:
         rbtools.clients.base.scmclient.BaseSCMClient:
@@ -149,8 +170,18 @@ def _get_or_create_scmclient_for_scan(
     try:
         scmclient = cache[scmclient_id]
     except KeyError:
+        # Default this to None. If instantiation fails, we'll still cache it
+        # to avoid a second attempt.
+        scmclient = None
+
         try:
             scmclient = scmclient_cls(**scmclient_kwargs)
+            scmclient.setup()
+        except SCMClientDependencyError as e:
+            logger.debug('[scan] Skipping %s: %s',
+                         scmclient_cls.name, e)
+            dep_errors[scmclient_id] = e
+            scmclient = None
         except Exception as e:
             logger.exception('[scan] Unexpected error loading SCMClient '
                              '%s.%s: %s',
@@ -158,9 +189,6 @@ def _get_or_create_scmclient_for_scan(
                              scmclient_cls.__name__,
                              e)
             errors[scmclient_id] = e
-
-            # We'll cache this even if it's an error, to avoid a second
-            # attempt.
             scmclient = None
 
         cache[scmclient_id] = scmclient
@@ -173,7 +201,7 @@ def _get_scmclient_candidates(
     check_remote: bool,
     scmclient_classes: list[type[BaseSCMClient]],
     scmclient_kwargs: dict[str, Any],
-) -> tuple[SCMClientScanCandidateList, SCMClientScanErrors]:
+) -> _SCMClientCandidatesResult:
     """Return SCMClient candidates and errors for the current directory.
 
     This will go through each registered SCMClient type, returning any that
@@ -207,10 +235,16 @@ def _get_scmclient_candidates(
             1 (dict):
                 A dictionary mapping SCMClient IDs to exceptions raised
                 during scan or initialization.
+
+            2 (dict):
+                A dictionary mapping SCMClient IDs to
+                :py:class:`~rbtools.clients.errors.SCMClientDependencyError`
+                exceptions raised during setup.
     """
     scmclient_cache: _SCMClientCache = {}
     candidates: SCMClientScanCandidateList = []
     errors: SCMClientScanErrors = {}
+    dep_errors: SCMClientScanDependencyErrors = {}
 
     if check_remote:
         # First, go through and see if any repositories are configured in
@@ -221,7 +255,8 @@ def _get_scmclient_candidates(
                 scmclient_cls=scmclient_cls,
                 scmclient_kwargs=scmclient_kwargs,
                 cache=scmclient_cache,
-                errors=errors)
+                errors=errors,
+                dep_errors=dep_errors)
 
             if scmclient is not None:
                 try:
@@ -245,7 +280,8 @@ def _get_scmclient_candidates(
                 scmclient_cls=scmclient_cls,
                 scmclient_kwargs=scmclient_kwargs,
                 cache=scmclient_cache,
-                errors=errors)
+                errors=errors,
+                dep_errors=dep_errors)
 
             if scmclient is not None:
                 logger.debug('[scan] Checking for a %s repository...',
@@ -265,7 +301,7 @@ def _get_scmclient_candidates(
                         local_path=local_path,
                         scmclient=scmclient))
 
-    return candidates, errors
+    return candidates, errors, dep_errors
 
 
 def _get_preferred_candidate_for_scan(
@@ -378,7 +414,7 @@ def scan_scmclients_for_path(
 
     # Fetch the list of candidates.
     with chdir(path):
-        candidates, scmclient_errors = _get_scmclient_candidates(
+        candidates, scmclient_errors, dep_errors = _get_scmclient_candidates(
             check_remote=check_remote,
             scmclient_classes=scmclient_classes,
             scmclient_kwargs=scmclient_kwargs)
@@ -434,11 +470,16 @@ def scan_scmclients_for_path(
                                local_path=local_path,
                                repository_info=repository_info,
                                candidates=candidates,
+                               dependency_errors=dep_errors,
                                scmclient_errors=scmclient_errors)
 
 
 SCMClientScanCandidateList: TypeAlias = List[SCMClientScanCandidate]
 SCMClientScanErrors: TypeAlias = Dict[str, Exception]
+SCMClientScanDependencyErrors: TypeAlias = Dict[str, SCMClientDependencyError]
 
 _SCMClientCache: TypeAlias = Dict[str, Optional[BaseSCMClient]]
 _SCMClientKwargs: TypeAlias = Dict[str, Any]
+_SCMClientCandidatesResult: TypeAlias = Tuple[SCMClientScanCandidateList,
+                                              SCMClientScanErrors,
+                                              SCMClientScanDependencyErrors]
