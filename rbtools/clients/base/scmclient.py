@@ -4,20 +4,216 @@ Version Added:
     4.0
 """
 
-from __future__ import unicode_literals
-
+import argparse
 import logging
 import re
-from typing import Optional, cast
+from typing import Any, Dict, List, Optional, Tuple, cast
 
-from typing_extensions import final
+from typing_extensions import NotRequired, TypedDict, final
 
-import six
-
-from rbtools.clients.base.patch import PatchResult
+from rbtools.api.resource import (ItemResource,
+                                  ListResource,
+                                  ReviewRequestResource)
+from rbtools.clients.base.patch import PatchAuthor, PatchResult
+from rbtools.clients.base.repository import RepositoryInfo
 from rbtools.clients.errors import SCMClientDependencyError, SCMError
-from rbtools.deprecation import RemovedInRBTools50Warning
+from rbtools.deprecation import (RemovedInRBTools50Warning,
+                                 deprecate_non_keyword_only_args)
 from rbtools.utils.process import execute
+
+
+class SCMClientRevisionSpec(TypedDict):
+    """A revision specification parsed from command line arguments.
+
+    This class helps provide type hinting to results from
+    :py:meth:`BaseSCMClient.parse_revision_spec`.
+
+    The dictionary may include other arbitrary keys.
+
+    Version Added:
+        4.0
+    """
+
+    #: A revision to use as the base of the resulting diff.
+    #:
+    #: This is required.
+    #:
+    #: Type:
+    #:     str
+    base: Optional[str]
+
+    #: A revision to use as the tip of the resulting diff.
+    #:
+    #: This is required.
+    #:
+    #: Type:
+    #:     str
+    tip: Optional[str]
+
+    #: The revision to use as the base of a parent diff.
+    #:
+    #: This is optional.
+    #:
+    #: Type:
+    #:     str
+    parent_base: NotRequired[Optional[str]]
+
+    # The commit ID of the single commit being posted, if not using a range.
+    #:
+    #: This is optional.
+    #:
+    #: Type:
+    #:     str
+    commit_id: NotRequired[Optional[str]]
+
+
+class SCMClientDiffResult(TypedDict):
+    """The result of a diff operation.
+
+    This class helps provide type hinting to results from
+    :py:meth:`BaseSCMClient.diff`.
+
+    Version Added:
+        4.0
+    """
+
+    #: The contents of the diff to upload.
+    #:
+    #: This should be ``None`` or an empty string if diff generation fails.
+    #:
+    #: Type:
+    #:     bytes
+    diff: Optional[bytes]
+
+    #: The contents of the parent diff, if available.
+    #:
+    #: Type:
+    #:     bytes
+    parent_diff: NotRequired[Optional[bytes]]
+
+    #: The commit ID to include when posting, if available.
+    #:
+    #: Type:
+    #:     str
+    commit_id: NotRequired[Optional[str]]
+
+    #: The ID of the commit that the change is based on, if available.
+    #:
+    #: This is necessary for some hosting services that don't provide
+    #: individual file access.
+    #:
+    #: Type:
+    #:     str
+    base_commit_id: NotRequired[Optional[str]]
+
+    #: A dictionary of extra_data keys to set on the review request.
+    #:
+    #: If posting a brand-new review request, these fields will be set on
+    #: the review request itself.
+    #:
+    #: If updating an existing review request, these will be set on the draft.
+    #
+    #: This may contain structured data. It will be sent to the server
+    #: as part of a JSON Merge Patch.
+    #:
+    #: This requires Review Board 3.0 or higher.
+    #:
+    #: Version Added:
+    #:     3.1
+    review_request_extra_data: NotRequired[Optional[Dict[str, Any]]]
+
+
+class SCMClientCommitHistoryItem(TypedDict):
+    """A commit in a commit history.
+
+    This class helps provide type hinting to results from
+    :py:meth:`BaseSCMClient.get_commit_history`.
+
+    Version Added:
+        4.0
+    """
+
+    #: The ID of the commit.
+    #:
+    #: Type:
+    #:     str
+    commit_id: str
+
+    #: The ID of the parent commit.
+    #:
+    #: Type:
+    #:     str
+    parent_id: Optional[str]
+
+    #: The commit message.
+    #:
+    #: Type:
+    #:     str
+    commit_message: Optional[str]
+
+    #: The name of the commit's author.
+    #:
+    #: Type:
+    #:     str
+    author_name: Optional[str]
+
+    #: The e-mail address of the commit's author.
+    #:
+    #: Type:
+    #:     str
+    author_email: Optional[str]
+
+    #: The date the commit was authored.
+    #:
+    #: Type:
+    #:     str
+    author_date: Optional[str]
+
+    #: The name of the person or entity who committed the change.
+    #:
+    #: Type:
+    #:     str
+    committer_name: NotRequired[Optional[str]]
+
+    #: The e-mail address of the person or entity who committed the change.
+    #:
+    #: Type:
+    #:     str
+    committer_email: NotRequired[Optional[str]]
+
+    #: The date the commit was made.
+    #:
+    #: Type:
+    #:     str
+    committer_date: NotRequired[Optional[str]]
+
+
+class SCMClientCommitMessage(TypedDict):
+    """A commit message from a local repository.
+
+    This class helps provide type hinting to results from
+    :py:meth:`BaseSCMClient.get_commit_message`.
+
+    Version Added:
+        4.0
+    """
+
+    #: The summary of a commit message.
+    #:
+    #: This should generally match the first line of a commit.
+    #:
+    #: Type:
+    #:     str
+    summary: Optional[str]
+
+    #: The description of a commit message.
+    #:
+    #: This should generally match the remainder of the commit message after
+    #: the summary, if any content remains.
+    #:
+    #: Type:
+    #:     str
+    description: NotRequired[Optional[str]]
 
 
 class BaseSCMClient(object):
@@ -72,8 +268,8 @@ class BaseSCMClient(object):
     #: The name of the client.
     #:
     #: Type:
-    #:     unicode
-    name = None
+    #:     str
+    name: str = ''
 
     #: A comma-separated list of SCMClient names on the server
     #:
@@ -81,8 +277,8 @@ class BaseSCMClient(object):
     #:    3.0
     #:
     #: Type:
-    #:     unicode
-    server_tool_names = None
+    #:     str
+    server_tool_names: Optional[str] = None
 
     #: Whether the SCM uses server-side changesets
     #:
@@ -91,31 +287,31 @@ class BaseSCMClient(object):
     #:
     #: Type:
     #:     bool
-    supports_changesets = False
+    supports_changesets: bool = False
 
     #: Whether the SCM client can generate a commit history.
     #:
     #: Type:
     #:     bool
-    supports_commit_history = False
+    supports_commit_history: bool = False
 
     #: Whether the SCM client's diff method takes the ``extra_args`` parameter.
     #:
     #: Type:
     #:     bool
-    supports_diff_extra_args = False
+    supports_diff_extra_args: bool = False
 
     #: Whether the SCM client supports excluding files from the diff.
     #:
     #: Type:
     #:     bool
-    supports_diff_exclude_patterns = False
+    supports_diff_exclude_patterns: bool = False
 
     #: Whether the SCM client can generate diffs without renamed files.
     #:
     #: Type:
     #:     bool
-    supports_no_renames = False
+    supports_no_renames: bool = False
 
     #: Whether the SCM client supports generating parent diffs.
     #:
@@ -124,57 +320,100 @@ class BaseSCMClient(object):
     #:
     #: Type:
     #:     bool
-    supports_parent_diffs = False
+    supports_parent_diffs: bool = False
 
     #: Whether the SCM client supports reverting patches.
     #:
     #: Type:
     #:     bool
-    supports_patch_revert = False
+    supports_patch_revert: bool = False
 
     #: Whether commits can be amended.
     #:
     #: Type:
     #:     bool
-    can_amend_commit = False
+    can_amend_commit: bool = False
 
     #: Whether the SCM can create merges.
     #:
     #: Type:
     #:     bool
-    can_merge = False
+    can_merge: bool = False
 
     #: Whether commits can be pushed upstream.
     #:
     #: Type:
     #:     bool
-    can_push_upstream = False
+    can_push_upstream: bool = False
 
     #: Whether branch names can be deleted.
     #:
     #: Type:
     #:     bool
-    can_delete_branch = False
+    can_delete_branch: bool = False
 
     #: Whether new branches can be created.
     #:
     #: Type:
     #:     bool
-    can_branch = False
+    can_branch: bool = False
 
     #: Whether new bookmarks can be created.
     #:
     #: Type:
     #:     bool
-    can_bookmark = False
+    can_bookmark: bool = False
 
     #: Whether commits can be squashed during merge.
     #:
     #: Type:
     #:     bool
-    can_squash_merges = False
+    can_squash_merges: bool = False
 
-    def __init__(self, config=None, options=None):
+    ######################
+    # Instance variables #
+    ######################
+
+    #: User configuration.
+    #:
+    #: Any user configuration loaded via :file:`.reviewboardrc` files.
+    #: This may be empty.
+    #:
+    #: Type:
+    #:     dict
+    config: Dict[str, Any]
+
+    #: Command line arguments passed to this client.
+    #:
+    #: This may be empty, and makes assumptions about which command line
+    #: arguments are registered with a command. It's intended for use
+    #: within RBTools.
+    #:
+    #: This may be ``None``.
+    #:
+    #: Type:
+    #:     argparse.Namespace
+    options: Optional[argparse.Namespace]
+
+    #: Whether the client is set up and ready for operations.
+    #:
+    #: Operations may fail or crash if this is ``False``.
+    #:
+    #: Callers must call :py:meth:`setup` or :py:meth:`has_dependencies`
+    #: before performing operations using this client.
+    #:
+    #: Version Added:
+    #:     4.0
+    #:
+    #: Type:
+    #:     bool
+    is_setup: bool
+
+    def __init__(
+        self,
+        config: Optional[Dict[str, Any]] = None,
+        options: Optional[argparse.Namespace] = None,
+    ) -> None:
         """Initialize the client.
 
         Args:
@@ -187,7 +426,7 @@ class BaseSCMClient(object):
         self.config = config or {}
         self.options = options
         self.capabilities = None
-        self.is_setup: bool = False
+        self.is_setup = False
 
         self._has_deps: Optional[bool] = None
 
@@ -327,7 +566,7 @@ class BaseSCMClient(object):
         """
         pass
 
-    def is_remote_only(self):
+    def is_remote_only(self) -> bool:
         """Return whether this repository is operating in remote-only mode.
 
         For some SCMs and some operations, it may be possible to operate
@@ -357,9 +596,13 @@ class BaseSCMClient(object):
         logging.warning('%s should implement a get_local_path method',
                         self.__class__)
         info = self.get_repository_info()
-        return info and info.local_path
 
-    def get_repository_info(self):
+        if info:
+            return info.local_path
+
+        return None
+
+    def get_repository_info(self) -> Optional[RepositoryInfo]:
         """Return repository information for the current working tree.
 
         This is expected to be overridden by subclasses.
@@ -373,7 +616,10 @@ class BaseSCMClient(object):
         """
         return None
 
-    def find_matching_server_repository(self, repositories):
+    def find_matching_server_repository(
+        self,
+        repositories: ListResource,
+    ) -> Tuple[Optional[ItemResource], Optional[ItemResource]]:
         """Find a match for the repository on the server.
 
         Version Added:
@@ -385,13 +631,22 @@ class BaseSCMClient(object):
 
         Returns:
             tuple:
-            A 2-tuple of :py:class:`~rbtools.api.resource.ItemResource`. The
-            first item is the matching repository, and the second is the
-            repository info resource.
+            A 2-tuple of matching repository information:
+
+            Tuple:
+                0 (rbtools.api.resource.ItemResource):
+                    The matching repository resource, if found.
+
+                    If not found, this will be ``None``.
+
+                1 (rbtools.api.resource.ItemResource):
+                    The matching repository information resource, if found.
+
+                    If not found, this will be ``None``.
         """
         return None, None
 
-    def get_repository_name(self):
+    def get_repository_name(self) -> Optional[str]:
         """Return any repository name configured in the repository.
 
         This is used as a fallback from the standard config options, for
@@ -402,12 +657,12 @@ class BaseSCMClient(object):
             3.0
 
         Returns:
-            unicode:
+            str:
             The configured repository name, or None.
         """
         return None
 
-    def check_options(self):
+    def check_options(self) -> None:
         """Verify the command line options.
 
         This is expected to be overridden by subclasses, if they need to do
@@ -421,7 +676,10 @@ class BaseSCMClient(object):
         """
         pass
 
-    def get_changenum(self, revisions):
+    def get_changenum(
+        self,
+        revisions: SCMClientRevisionSpec,
+    ) -> Optional[str]:
         """Return the change number for the given revisions.
 
         This is only used when the client is supposed to send a change number
@@ -429,15 +687,19 @@ class BaseSCMClient(object):
 
         Args:
             revisions (dict):
-                A revisions dictionary as returned by ``parse_revision_spec``.
+                A revisions dictionary as returned by
+                :py:meth:`parse_revision_spec`.
 
         Returns:
-            unicode:
+            str:
             The change number to send to the Review Board server.
         """
         return None
 
-    def scan_for_server(self, repository_info):
+    def scan_for_server(
+        self,
+        repository_info: RepositoryInfo,
+    ) -> Optional[str]:
         """Find the server path.
 
         This will search for the server name in the .reviewboardrc config
@@ -449,12 +711,15 @@ class BaseSCMClient(object):
                 The repository information structure.
 
         Returns:
-            unicode:
+            str:
             The Review Board server URL, if available.
         """
         return None
 
-    def parse_revision_spec(self, revisions=[]):
+    def parse_revision_spec(
+        self,
+        revisions: List[str] = [],
+    ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
         The 'revisions' argument is a list of revisions as specified by the
@@ -464,36 +729,17 @@ class BaseSCMClient(object):
         such syntaxes.
 
         Args:
-            revisions (list of unicode, optional):
+            revisions (list of str, optional):
                 A list of revisions as specified by the user. Items in the list
                 do not necessarily represent a single revision, since the user
                 can use SCM-native syntaxes such as ``r1..r2`` or ``r1:r2``.
                 SCMTool-specific overrides of this method are expected to deal
                 with such syntaxes.
 
-        Raises:
-            rbtools.clients.errors.InvalidRevisionSpecError:
-                The given revisions could not be parsed.
-
-            rbtools.clients.errors.TooManyRevisionsError:
-                The specified revisions list contained too many revisions.
-
         Returns:
             dict:
-            A dictionary with the following keys:
-
-            ``base`` (:py:class:`unicode`):
-                A revision to use as the base of the resulting diff.
-
-            ``tip`` (:py:class:`unicode`):
-                A revision to use as the tip of the resulting diff.
-
-            ``parent_base`` (:py:class:`unicode`, optional):
-                The revision to use as the base of a parent diff.
-
-            ``commit_id`` (:py:class:`unicode`, optional):
-                The ID of the single commit being posted, if not using a
-                range.
+            A dictionary containing keys found in
+            :py:class:`SCMClientRevisionSpec`.
 
             Additional keys may be included by subclasses for their own
             internal use.
@@ -510,14 +756,27 @@ class BaseSCMClient(object):
             relevant for the "current change". The exact definition of what
             "current" means is specific to each SCMTool backend, and documented
             in the implementation classes.
+
+        Raises:
+            rbtools.clients.errors.InvalidRevisionSpecError:
+                The given revisions could not be parsed.
+
+            rbtools.clients.errors.TooManyRevisionsError:
+                The specified revisions list contained too many revisions.
         """
         return {
             'base': None,
             'tip': None,
         }
 
-    def get_tree_matches_review_request(self, review_request, revisions,
-                                        **kwargs):
+    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
+    def get_tree_matches_review_request(
+        self,
+        review_request: ReviewRequestResource,
+        *,
+        revisions: SCMClientRevisionSpec,
+        **kwargs,
+    ) -> Optional[bool]:
         """Return whether a review request matches revisions or tree state.
 
         This works along with review request matching in tools like
@@ -554,8 +813,17 @@ class BaseSCMClient(object):
         """
         return None
 
-    def diff(self, revisions, include_files=[], exclude_patterns=[],
-             no_renames=False, repository_info=None, extra_args=[]):
+    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
+    def diff(
+        self,
+        revisions: SCMClientRevisionSpec,
+        *,
+        include_files: List[str] = [],
+        exclude_patterns: List[str] = [],
+        no_renames: bool = False,
+        repository_info: Optional[RepositoryInfo] = None,
+        extra_args: List[str] = [],
+    ) -> SCMClientDiffResult:
         """Perform a diff using the given revisions.
 
         This is expected to be overridden by subclasses.
@@ -565,10 +833,10 @@ class BaseSCMClient(object):
                 A dictionary of revisions, as returned by
                 :py:meth:`parse_revision_spec`.
 
-            include_files (list of unicode, optional):
+            include_files (list of str, optional):
                 A list of files to whitelist during the diff generation.
 
-            exclude_patterns (list of unicode, optional):
+            exclude_patterns (list of str, optional):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
 
@@ -584,38 +852,8 @@ class BaseSCMClient(object):
 
         Returns:
             dict:
-            A dictionary containing:
-
-            Keys:
-                diff (bytes):
-                    The contents of the diff to upload.
-
-                parent_diff (bytes, optional):
-                    The contents of the parent diff, if available.
-
-                commit_id (unicode, optional):
-                    The commit ID to include when posting, if available.
-
-                base_commit_id (unicode, optional):
-                    The ID of the commit that the change is based on, if
-                    available.  This is necessary for some hosting services
-                    that don't provide individual file access.
-
-                review_request_extra_data (dict, optional):
-                    A dictionary of ``extra_data`` keys to set on the review
-                    request (when posting to Review Board 3.0 or higher).
-
-                    If posting a brand-new review request, this will set the
-                    fields on the review request itself.
-
-                    If updating a review request, this will set them on the
-                    draft.
-
-                    This may contain structured data. It will be sent to the
-                    server as part of a JSON Merge Patch.
-
-                    Version Added:
-                        3.1
+            A dictionary containing keys documented in
+            :py:class:`SCMClientDiffResult`.
         """
         return {
             'diff': None,
@@ -625,7 +863,10 @@ class BaseSCMClient(object):
             'review_request_extra_data': None,
         }
 
-    def get_commit_history(self, revisions):
+    def get_commit_history(
+        self,
+        revisions: SCMClientRevisionSpec,
+    ) -> List[SCMClientCommitHistoryItem]:
         """Return the commit history between the given revisions.
 
         Derived classes must override this method if they support posting with
@@ -641,7 +882,11 @@ class BaseSCMClient(object):
         """
         raise NotImplementedError
 
-    def _get_p_number(self, base_path, base_dir):
+    def _get_p_number(
+        self,
+        base_path: str,
+        base_dir: str,
+    ) -> int:
         """Return the appropriate value for the -p argument to patch.
 
         This function returns an integer. If the integer is -1, then the -p
@@ -649,11 +894,11 @@ class BaseSCMClient(object):
         the argument to :command:`patch -p`.
 
         Args:
-            base_path (unicode):
+            base_path (str):
                 The relative path beetween the repository root and the
                 directory that the diff file was generated in.
 
-            base_dir (unicode):
+            base_dir (str):
                 The current relative path between the repository root and the
                 user's working directory.
 
@@ -666,21 +911,25 @@ class BaseSCMClient(object):
         else:
             return -1
 
-    def _strip_p_num_slashes(self, files, p_num):
+    def _strip_p_num_slashes(
+        self,
+        files: List[str],
+        p_num: int,
+    ) -> List[str]:
         """Strip the smallest prefix containing p_num slashes from filenames.
 
         To match the behavior of the :command:`patch -pX` option, adjacent
         slashes are counted as a single slash.
 
         Args:
-            files (list of unicode):
+            files (list of str):
                 The filenames to process.
 
             p_num (int):
                 The number of prefixes to strip.
 
         Returns:
-            list of unicode:
+            list of str:
             The processed list of filenames.
         """
         if p_num > 0:
@@ -689,7 +938,7 @@ class BaseSCMClient(object):
         else:
             return files
 
-    def has_pending_changes(self):
+    def has_pending_changes(self) -> bool:
         """Return whether there are changes waiting to be committed.
 
         Derived classes should override this method if they wish to support
@@ -702,22 +951,30 @@ class BaseSCMClient(object):
         """
         raise NotImplementedError
 
-    def apply_patch(self, patch_file, base_path, base_dir, p=None,
-                    revert=False):
+    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
+    def apply_patch(
+        self,
+        patch_file: str,
+        *,
+        base_path: str,
+        base_dir: str,
+        p: Optional[str] = None,
+        revert: bool = False,
+    ) -> PatchResult:
         """Apply the patch and return a PatchResult indicating its success.
 
         Args:
-            patch_file (unicode):
+            patch_file (str):
                 The name of the patch file to apply.
 
-            base_path (unicode):
+            base_path (str):
                 The base path that the diff was generated in.
 
-            base_dir (unicode):
+            base_dir (str):
                 The path of the current working directory relative to the root
                 of the repository.
 
-            p (unicode, optional):
+            p (str, optional):
                 The prefix level of the diff.
 
             revert (bool, optional):
@@ -749,7 +1006,7 @@ class BaseSCMClient(object):
                 logging.warning('Unsupported -p value: %d; assuming zero.',
                                 p_num)
 
-        cmd.extend(['-i', six.text_type(patch_file)])
+        cmd.extend(['-i', patch_file])
 
         # Ignore return code 2 in case the patch file consists of only empty
         # files, which 'patch' can't handle. Other 'patch' errors also give
@@ -770,11 +1027,13 @@ class BaseSCMClient(object):
                 with open(patch_file, 'rb') as f:
                     patch = f.read()
             except IOError as e:
-                logging.error('Unable to read file %s: %s', patch_file, e)
-                return
+                raise SCMError('Failed to read patch file "%s": %s'
+                               % (patch_file, e))
 
             patched_empty_files = self.apply_patch_for_empty_files(
-                patch, p_num, revert=revert)
+                patch,
+                p_num=str(p_num),
+                revert=revert)
 
             # If there are no empty files in a "garbage-only" patch, the patch
             # is probably malformed.
@@ -788,26 +1047,33 @@ class BaseSCMClient(object):
         #       and when there are no empty files.
         return PatchResult(applied=(rc == 0), patch_output=patch_output)
 
-    def create_commit(self, message, author, run_editor,
-                      files=[], all_files=False):
+    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
+    def create_commit(
+        self,
+        *,
+        message: str,
+        author: PatchAuthor,
+        run_editor: bool,
+        files: List[str] = [],
+        all_files: bool = False,
+    ) -> None:
         """Create a commit based on the provided message and author.
 
         Derived classes should override this method if they wish to support
         committing changes to their repositories.
 
         Args:
-            message (unicode):
+            message (str):
                 The commit message to use.
 
-            author (object):
-                The author of the commit. This is expected to have ``fullname``
-                and ``email`` attributes.
+            author (rbtools.clients.base.patch.PatchAuthor):
+                The author of the commit.
 
             run_editor (bool):
                 Whether to run the user's editor on the commmit message before
                 committing.
 
-            files (list of unicode, optional):
+            files (list of str, optional):
                 The list of filenames to commit.
 
             all_files (bool, optional):
@@ -824,7 +1090,10 @@ class BaseSCMClient(object):
         """
         raise NotImplementedError
 
-    def get_commit_message(self, revisions):
+    def get_commit_message(
+        self,
+        revisions: SCMClientRevisionSpec,
+    ) -> Optional[SCMClientCommitMessage]:
         """Return the commit message from the commits in the given revisions.
 
         This pulls out the first line from the commit messages of the given
@@ -836,9 +1105,10 @@ class BaseSCMClient(object):
 
         Returns:
             dict:
-            A dictionary containing ``summary`` and ``description`` keys,
-            matching the first line of the commit message and the remainder,
-            respectively.
+            A dictionary containing keys found in
+            :py:class:`SCMClientCommitMessage`.
+
+            This may be ``None``, if no commit message is found.
         """
         commit_message = self.get_raw_commit_message(revisions)
         lines = commit_message.splitlines()
@@ -846,7 +1116,7 @@ class BaseSCMClient(object):
         if not lines:
             return None
 
-        result = {
+        result: SCMClientCommitMessage = {
             'summary': lines[0],
         }
 
@@ -859,11 +1129,17 @@ class BaseSCMClient(object):
 
         return result
 
-    def delete_branch(self, branch_name, merged_only=True):
+    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
+    def delete_branch(
+        self,
+        branch_name: str,
+        *,
+        merged_only: bool = True,
+    ) -> None:
         """Delete the specified branch.
 
         Args:
-            branch_name (unicode):
+            branch_name (str):
                 The name of the branch to delete.
 
             merged_only (bool, optional):
@@ -872,23 +1148,32 @@ class BaseSCMClient(object):
         """
         raise NotImplementedError
 
-    def merge(self, target, destination, message, author, squash=False,
-              run_editor=False, close_branch=True):
+    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
+    def merge(
+        self,
+        *,
+        target: str,
+        destination: str,
+        message: str,
+        author: PatchAuthor,
+        squash: bool = False,
+        run_editor: bool = False,
+        close_branch: bool = True,
+    ) -> None:
         """Merge the target branch with destination branch.
 
         Args:
-            target (unicode):
+            target (str):
                 The name of the branch to merge.
 
-            destination (unicode):
+            destination (str):
                 The name of the branch to merge into.
 
-            message (unicode):
+            message (str):
                 The commit message to use.
 
-            author (object):
-                The author of the commit. This is expected to have ``fullname``
-                and ``email`` attributes.
+            author (rbtools.clients.base.patch.PatchAuthor):
+                The author of the commit.
 
             squash (bool, optional):
                 Whether to squash the commits or do a plain merge.
@@ -906,11 +1191,14 @@ class BaseSCMClient(object):
         """
         raise NotImplementedError
 
-    def push_upstream(self, remote_branch):
+    def push_upstream(
+        self,
+        remote_branch: str,
+    ) -> None:
         """Push the current branch to upstream.
 
         Args:
-            remote_branch (unicode):
+            remote_branch (str):
                 The name of the branch to push to.
 
         Raises:
@@ -919,7 +1207,10 @@ class BaseSCMClient(object):
         """
         raise NotImplementedError
 
-    def get_raw_commit_message(self, revisions):
+    def get_raw_commit_message(
+        self,
+        revisions: SCMClientRevisionSpec,
+    ) -> str:
         """Extract the commit messages on the commits in the given revisions.
 
         Derived classes should override this method in order to allow callers
@@ -936,25 +1227,25 @@ class BaseSCMClient(object):
                 A dictionary containing ``base`` and ``tip`` keys.
 
         Returns:
-            unicode:
+            str:
             The commit messages of all commits between (base, tip].
         """
         raise NotImplementedError
 
-    def get_current_branch(self):
+    def get_current_branch(self) -> str:
         """Return the repository branch name of the current directory.
 
         Derived classes should override this method if they are able to
         determine the current branch of the working directory.
 
         Returns:
-            unicode:
+            str:
             A string with the name of the current branch. If the branch is
             unable to be determined, returns ``None``.
         """
         raise NotImplementedError
 
-    def supports_empty_files(self):
+    def supports_empty_files(self) -> bool:
         """Return whether the server supports added/deleted empty files.
 
         Returns:
@@ -964,31 +1255,45 @@ class BaseSCMClient(object):
         """
         return False
 
-    def apply_patch_for_empty_files(self, patch, p_num, revert=False):
+    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
+    def apply_patch_for_empty_files(
+        self,
+        patch: bytes,
+        *,
+        p_num: str,
+        revert: bool = False,
+    ) -> bool:
         """Return whether any empty files in the patch are applied.
 
         Args:
             patch (bytes):
                 The contents of the patch.
 
-            p_num (unicode):
+            p_num (str):
                 The prefix level of the diff.
 
             revert (bool, optional):
                 Whether the patch should be reverted rather than applied.
 
         Returns:
+            bool:
             ``True`` if there are empty files in the patch. ``False`` if there
             were no empty files, or if an error occurred while applying the
             patch.
         """
         raise NotImplementedError
 
-    def amend_commit_description(self, message, revisions=None):
+    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
+    def amend_commit_description(
+        self,
+        message: str,
+        *,
+        revisions: Optional[SCMClientRevisionSpec] = None,
+    ) -> None:
         """Update a commit message to the given string.
 
         Args:
-            message (unicode):
+            message (str):
                 The commit message to use when amending the commit.
 
             revisions (dict, optional):
