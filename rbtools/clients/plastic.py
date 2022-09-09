@@ -5,23 +5,26 @@ from __future__ import unicode_literals
 import logging
 import os
 import re
+from typing import Optional
 
-from rbtools.clients import SCMClient, RepositoryInfo
+from rbtools.clients import BaseSCMClient, RepositoryInfo
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError,
+                                    SCMClientDependencyError,
                                     SCMError)
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import execute
 
 
-class PlasticClient(SCMClient):
+class PlasticClient(BaseSCMClient):
     """A client for Plastic SCM.
 
     This is a wrapper around the cm executable that fetches repository
     information and generates compatible diffs.
     """
 
+    scmclient_id = 'plastic'
     name = 'Plastic'
     server_tool_names = 'Plastic SCM'
     supports_changesets = True
@@ -38,14 +41,30 @@ class PlasticClient(SCMClient):
         """
         super(PlasticClient, self).__init__(**kwargs)
 
-    def get_local_path(self):
+    def check_dependencies(self) -> None:
+        """Check whether all base dependencies are available.
+
+        This checks for the presence of :command:`cm` in the system path.
+
+        Version Added:
+            4.0
+
+        Raises:
+            rbtools.clients.errors.SCMClientDependencyError:
+                A :command:`cm` tool could not be found.
+        """
+        if not check_install(['cm', 'version']):
+            raise SCMClientDependencyError(missing_exes=['cm'])
+
+    def get_local_path(self) -> Optional[str]:
         """Return the local path to the working tree.
 
         Returns:
-            unicode:
+            str:
             The filesystem path of the repository on the client system.
         """
-        if not check_install(['cm', 'version']):
+        # NOTE: This can be removed once check_dependencies() is mandatory.
+        if not self.has_dependencies(expect_checked=True):
             logging.debug('Unable to execute "cm version": skipping Plastic')
             return None
 
@@ -74,7 +93,7 @@ class PlasticClient(SCMClient):
         """Return repository information for the current working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            rbtools.clients.base.repository.RepositoryInfo:
             The repository info structure.
         """
         local_path = self.get_local_path()

@@ -48,12 +48,12 @@ class CommandTestsMixin(kgb.SpyAgency):
 
                 The command line will receive each item in the list.
 
-            repository_info (rbtools.clients.RepositoryInfo):
+            repository_info (rbtools.clients.base.repository.RepositoryInfo):
                 The repository information to set for the command.
 
                 If being set, ``tool`` must also be set.
 
-            tool (rbtools.clients.SCMClient):
+            tool (rbtools.clients.base.BaseSCMClient):
                 The SCM client to set for the command.
 
                 If being set, ``repository_info`` must also be set.
@@ -110,12 +110,12 @@ class CommandTestsMixin(kgb.SpyAgency):
 
                 The command line will receive each item in the list.
 
-            repository_info (rbtools.clients.RepositoryInfo):
+            repository_info (rbtools.clients.base.repository.RepositoryInfo):
                 The repository information to set for the command.
 
                 If being set, ``tool`` must also be set.
 
-            tool (rbtools.clients.SCMClient):
+            tool (rbtools.clients.base.BaseSCMClient):
                 The SCM client to set for the command.
 
                 If being set, ``repository_info`` must also be set.
@@ -195,12 +195,12 @@ class CommandTestsMixin(kgb.SpyAgency):
 
                 The command line will receive each item in the list.
 
-            repository_info (rbtools.clients.RepositoryInfo):
+            repository_info (rbtools.clients.base.repository.RepositoryInfo):
                 The repository information to set for the command.
 
                 If being set, ``tool`` must also be set.
 
-            tool (rbtools.clients.SCMClient):
+            tool (rbtools.clients.base.BaseSCMClient):
                 The SCM client to set for the command.
 
                 If being set, ``repository_info`` must also be set.

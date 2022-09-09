@@ -6,14 +6,16 @@ import logging
 import os
 import re
 import uuid
+from typing import Optional
 
 import six
 from six.moves.urllib.parse import urlsplit, urlunparse
 
-from rbtools.clients import PatchResult, SCMClient, RepositoryInfo
+from rbtools.clients import BaseSCMClient, PatchResult, RepositoryInfo
 from rbtools.clients.errors import (CreateCommitError,
                                     InvalidRevisionSpecError,
                                     MergeError,
+                                    SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
 from rbtools.clients.svn import SVNClient
@@ -43,13 +45,14 @@ class MercurialRefType(object):
     UNKNOWN = 'unknown'
 
 
-class MercurialClient(SCMClient):
+class MercurialClient(BaseSCMClient):
     """A client for Mercurial.
 
     This is a wrapper around the hg executable that fetches repository
     information and generates compatible diffs.
     """
 
+    scmclient_id = 'mercurial'
     name = 'Mercurial'
     server_tool_names = 'Mercurial,Subversion'
 
@@ -110,6 +113,22 @@ class MercurialClient(SCMClient):
         # falling back to `default` (the last member.)
         self._remote_path_candidates = ['reviewboard', 'origin', 'parent',
                                         'default']
+
+    def check_dependencies(self) -> None:
+        """Check whether all base dependencies are available.
+
+        This checks for the presence of :command:`hg` (or whichever executable
+        is passed in to the client's constructor) in the system path.
+
+        Version Added:
+            4.0
+
+        Raises:
+            rbtools.clients.errors.SCMClientDependencyError:
+                A :command:`hg` tool could not be found.
+        """
+        if not check_install([self._exe, '--help']):
+            raise SCMClientDependencyError(missing_exes=[self._exe])
 
     @property
     def hidden_changesets_supported(self):
@@ -262,14 +281,15 @@ class MercurialClient(SCMClient):
 
         return history
 
-    def get_local_path(self):
+    def get_local_path(self) -> Optional[str]:
         """Return the local path to the working tree.
 
         Returns:
-            unicode:
+            str:
             The filesystem path of the repository on the client system.
         """
-        if not check_install([self._exe, '--help']):
+        # NOTE: This can be removed once check_dependencies() is mandatory.
+        if not self.has_dependencies(expect_checked=True):
             logging.debug('Unable to execute "hg --help": skipping Mercurial')
             return None
 
@@ -279,10 +299,11 @@ class MercurialClient(SCMClient):
         """Return repository information for the current working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            rbtools.clients.base.repository.RepositoryInfo:
             The repository info structure.
         """
-        if not check_install([self._exe, '--help']):
+        # NOTE: This can be removed once check_dependencies() is mandatory.
+        if not self.has_dependencies(expect_checked=True):
             logging.debug('Unable to execute "hg --help": skipping Mercurial')
             return None
 
@@ -512,7 +533,7 @@ class MercurialClient(SCMClient):
                 The SVN info output.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            rbtools.clients.base.repository.RepositoryInfo:
             The repository info structure, if available.
         """
         def _info(r):
@@ -683,7 +704,7 @@ class MercurialClient(SCMClient):
             ``commit_id`` (:py:class:`unicode`, optional):
                 The commit ID to include when posting, if available.
 
-            ``base_commit_id` (:py:class:`unicode`, optional):
+            ``base_commit_id`` (:py:class:`unicode`, optional):
                 The ID of the commit that the change is based on, if available.
                 This is necessary for some hosting services that don't provide
                 individual file access.
@@ -1158,7 +1179,7 @@ class MercurialClient(SCMClient):
         """Find the Review Board server matching this repository.
 
         Args:
-            repository_info (rbtools.clients.RepositoryInfo):
+            repository_info (rbtools.clients.base.repository.RepositoryInfo):
                 The repository information structure.
 
         Returns:
@@ -1258,7 +1279,7 @@ class MercurialClient(SCMClient):
                 Whether the patch should be reverted rather than applied.
 
         Returns:
-            rbtools.clients.PatchResult:
+            rbtools.clients.base.patch.PatchResult:
             The result of the patch operation.
         """
         cmd = [self._exe, 'patch', '--no-commit']

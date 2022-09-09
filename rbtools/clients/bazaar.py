@@ -5,11 +5,13 @@ from __future__ import unicode_literals
 import logging
 import os
 import re
+from typing import Optional, cast
 
 import six
 
-from rbtools.clients import SCMClient, RepositoryInfo
-from rbtools.clients.errors import TooManyRevisionsError
+from rbtools.clients import BaseSCMClient, RepositoryInfo
+from rbtools.clients.errors import (SCMClientDependencyError,
+                                    TooManyRevisionsError)
 from rbtools.utils.checks import check_install
 from rbtools.utils.diffs import filter_diff, normalize_patterns
 from rbtools.utils.process import execute
@@ -18,7 +20,7 @@ from rbtools.utils.process import execute
 USING_PARENT_PREFIX = 'Using parent branch '
 
 
-class BazaarClient(SCMClient):
+class BazaarClient(BaseSCMClient):
     """A client for Bazaar and Breezy.
 
     This is a wrapper that fetches repository information and generates
@@ -31,6 +33,7 @@ class BazaarClient(SCMClient):
         Added support for Breezy.
     """
 
+    scmclient_id = 'bazaar'
     name = 'Bazaar'
     server_tool_names = 'Bazaar'
     supports_diff_exclude_patterns = True
@@ -52,7 +55,7 @@ class BazaarClient(SCMClient):
     # This is the same regex used in bzrlib/option.py:_parse_revision_spec.
     REVISION_SEPARATOR_REGEX = re.compile(r'\.\.(?![\\/])')
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         """Initialize the client.
 
         Args:
@@ -61,35 +64,99 @@ class BazaarClient(SCMClient):
         """
         super(BazaarClient, self).__init__(**kwargs)
 
-        # The command used to execute bzr. This will be 'brz' if Breezy
-        # is used. This will be updated later.
-        self.bzr = 'bzr'
+        # The command used to execute bzr.
+        self._bzr: str = ''
 
         # Separately (since either bzr or brz might be used), we want to
         # maintain a flag indicating if this is Breezy, since it changes
         # some semantics.
-        self.is_breezy = False
+        self._is_breezy: Optional[bool] = None
 
-    def get_local_path(self):
-        """Return the local path to the working tree.
+    @property
+    def bzr(self) -> str:
+        """The name of the command line tool for Breezy or Bazaar.
 
-        Returns:
-            unicode:
-            The filesystem path of the repository on the client system.
+        Callers must call :py:meth:`setup` or :py:meth:`has_dependencies`
+        before accessing this. This will be required starting in RBTools 5.0.
+
+        This will fall back to "bzr" if neither Bazaar nor Breezy is installed.
+
+        Type:
+            str
+        """
+        bzr = self._bzr
+
+        if not bzr:
+            # This will log a deprecation warning if checking dependencies for
+            # the first time.
+            self.has_dependencies(expect_checked=True)
+
+            if not self._bzr:
+                # Fall back to "bzr" as a default.
+                bzr = 'bzr'
+                self._bzr = bzr
+
+        return bzr
+
+    @property
+    def is_breezy(self) -> bool:
+        """Whether the client will be working with Breezy, instead of Bazaar.
+
+        Callers must call :py:meth:`setup` or :py:meth:`has_dependencies`
+        before accessing this. This will be required starting in RBTools 5.0.
+
+        Type:
+            bool
+        """
+        is_breezy = self._is_breezy
+
+        if is_breezy is None:
+            # This will log a deprecation warning if checking dependencies for
+            # the first time.
+            self.has_dependencies(expect_checked=True)
+
+            if self._is_breezy is None:
+                self._is_breezy = False
+
+        return cast(bool, is_breezy)
+
+    def check_dependencies(self) -> None:
+        """Check whether the base dependencies needed are available.
+
+        This will check for both :command:`brz` (Breezy) or :command:`bzr`
+        (which may be Bazaar or a Breezy symlink).
+
+        Version Added:
+            4.0
+
+        Raises:
+            rbtools.clients.errors.SCMClientDependencyError:
+                Neither :command:`bzr` nor :command:`brz` could be found.
         """
         if check_install(['brz', 'help']):
             # This is Breezy.
-            self.bzr = 'brz'
-            self.is_breezy = True
+            self._bzr = 'brz'
+            self._is_breezy = True
         elif check_install(['bzr', 'help']):
             # This is either a legacy Bazaar (aliased to bzr) or the
             # modern Breezy. Let's find out.
             version = execute(['bzr', '--version'],
                               ignore_errors=True)
 
-            self.is_breezy = version.startswith('Breezy')
-            self.bzr = 'bzr'
+            self._is_breezy = version.startswith('Breezy')
+            self._bzr = 'bzr'
         else:
+            raise SCMClientDependencyError(missing_exes=[('brz', 'bzr')])
+
+    def get_local_path(self) -> Optional[str]:
+        """Return the local path to the working tree.
+
+        Returns:
+            str:
+            The filesystem path of the repository on the client system.
+        """
+        # NOTE: This can be removed once check_dependencies() is mandatory.
+        if not self.has_dependencies(expect_checked=True):
             logging.debug('Unable to execute "brz help" or "bzr help": '
                           'skipping Bazaar')
             return None
@@ -121,7 +188,7 @@ class BazaarClient(SCMClient):
         """Return repository information for the current working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            rbtools.clients.base.repository.RepositoryInfo:
             The repository info structure.
         """
         path = self.get_local_path()

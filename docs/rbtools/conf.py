@@ -22,6 +22,8 @@ import os
 import sys
 from datetime import datetime
 
+from beanbag_docutils.sphinx.ext.github import github_linkcode_resolve
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 sys.path.insert(0, os.path.abspath(os.path.join(__file__, '..', '..', '..')))
 sys.path.append(os.path.abspath('_ext'))
@@ -41,10 +43,12 @@ import rbtools
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinx.ext.autodoc',
+    'sphinx.ext.autosummary',
     'sphinx.ext.doctest',
-    'sphinx.ext.intersphinx',
+    'sphinx.ext.linkcode',
+    'beanbag_docutils.sphinx.ext.autodoc_utils',
     'beanbag_docutils.sphinx.ext.extlinks',
+    'beanbag_docutils.sphinx.ext.http_role',
     'beanbag_docutils.sphinx.ext.ref_utils',
     'rbt_commands',
 ]
@@ -229,6 +233,38 @@ latex_documents = [
 suppress_warnings = ['ref.option']
 
 
+# Determine the branch or tag used for code references.
+(rbt_major_version,
+ rbt_minor_version,
+ rbt_micro_version,
+ rbt_patch_version,
+ rbt_release_type,
+ rbt_release_num,
+ rbt_released) = rbtools.VERSION
+
+if rbt_release_type == 'final' or rbt_release_num > 0:
+    git_branch = 'release-%s' % rbt_major_version
+
+    if rbt_released:
+        git_branch += '.%s' % rbt_micro_version
+
+        if rbt_micro_version:
+            git_branch += '.%s' % rbt_micro_version
+
+            if rbt_patch_version:
+                git_branch += '.%s' % rbt_patch_version
+
+        if rbt_release_type != 'final':
+            git_branch += rbt_release_type
+
+            if rbt_release_num:
+                git_branch += '%d' % rbt_release_num
+    else:
+        git_branch += '.x'
+else:
+    git_branch = 'master'
+
+
 # Check whether reviewboard.org intersphinx lookups should use the local
 # server.
 if os.getenv('DOCS_USE_LOCAL_RBWEBSITE') == '1':
@@ -239,12 +275,24 @@ else:
 
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
-    'python': ('https://docs.python.org/2.7', None),
+    'python': ('https://docs.python.org/3', None),
     'rb2.0': ('%s/docs/manual/2.0/' % rbwebsite_url, None),
     'rb2.5': ('%s/docs/manual/2.5/' % rbwebsite_url, None),
     'rb': ('%s/docs/manual/latest/' % rbwebsite_url, None),
 }
 
 extlinks = {
-    'rbintegration': ('https://www.reviewboard.org/integrations/%s', ''),
+    'rbintegration': ('https://www.reviewboard.org/integrations/%s', '%s'),
 }
+
+
+autosummary_generate = True
+
+
+def linkcode_resolve(domain, info):
+    return github_linkcode_resolve(domain=domain,
+                                   info=info,
+                                   allowed_module_names=['rbtools'],
+                                   github_org_id='reviewboard',
+                                   github_repo_id='rbtools',
+                                   branch=git_branch)

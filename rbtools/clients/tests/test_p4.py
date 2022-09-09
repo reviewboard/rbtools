@@ -5,14 +5,19 @@ from __future__ import unicode_literals
 import os
 import re
 import time
-from hashlib import md5
+from typing import Type
+
+import kgb
 
 from rbtools.api.capabilities import Capabilities
 from rbtools.clients.errors import (InvalidRevisionSpecError,
+                                    SCMClientDependencyError,
                                     TooManyRevisionsError)
 from rbtools.clients.perforce import PerforceClient, P4Wrapper
 from rbtools.clients.tests import SCMClientTestCase
+from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.testing import TestCase
+from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempfile
 
 
@@ -35,10 +40,13 @@ class P4WrapperTests(TestCase):
         p4 = TestWrapper(None)
         info = p4.counters()
 
-        self.assertEqual(len(info), 3)
-        self.assertEqual(info['a'], '1')
-        self.assertEqual(info['b'], '2')
-        self.assertEqual(info['c'], '3')
+        self.assertEqual(
+            info,
+            {
+                'a': '1',
+                'b': '2',
+                'c': '3',
+            })
 
     def test_info(self):
         """Testing P4Wrapper.info"""
@@ -55,16 +63,27 @@ class P4WrapperTests(TestCase):
         p4 = TestWrapper(None)
         info = p4.info()
 
-        self.assertEqual(len(info), 5)
-        self.assertEqual(info['User name'], 'myuser')
-        self.assertEqual(info['Client name'], 'myclient')
-        self.assertEqual(info['Client host'], 'myclient.example.com')
-        self.assertEqual(info['Client root'], '/path/to/client')
-        self.assertEqual(info['Server uptime'], '111:43:38')
+        self.assertEqual(
+            info,
+            {
+                'Client host': 'myclient.example.com',
+                'Client name': 'myclient',
+                'Client root': '/path/to/client',
+                'Server uptime': '111:43:38',
+                'User name': 'myuser',
+            })
 
 
 class PerforceClientTests(SCMClientTestCase):
     """Unit tests for PerforceClient."""
+
+    scmclient_cls = PerforceClient
+
+    default_scmclient_options = {
+        'p4_client': 'myclient',
+        'p4_passwd': '',
+        'p4_port': 'perforce.example.com:1666',
+    }
 
     class P4DiffTestWrapper(P4Wrapper):
         def __init__(self, options):
@@ -120,6 +139,117 @@ class PerforceClientTests(SCMClientTestCase):
         def run_p4(self, *args, **kwargs):
             assert False
 
+    def build_client(
+        self,
+        wrapper_cls: Type[P4Wrapper] = P4DiffTestWrapper,
+        **kwargs,
+    ) -> PerforceClient:
+        """Build a client for testing.
+
+        THis will set default command line options for the client and
+        server, and allow for specifying a custom Perforce wrapper class.
+
+        Version Added:
+            4.0
+
+        Args:
+            wrapper_cls (type, optional):
+                The P4 wrapper class to pass to the client.
+
+            **kwargs (dict, optional):
+                Additional keyword arguments to pass to the parent method.
+
+        Returns:
+            rbtools.clients.perforce.PerforceClient:
+            The client instance.
+        """
+        return super(PerforceClientTests, self).build_client(
+            client_kwargs={
+                'p4_class': wrapper_cls,
+            },
+            **kwargs)
+
+    def test_check_dependencies_with_found(self):
+        """Testing PerforceClient.check_dependencies with p4 found"""
+        self.spy_on(check_install, op=kgb.SpyOpMatchAny([
+            {
+                'args': (['p4', 'help'],),
+                'op': kgb.SpyOpReturn(True),
+            },
+        ]))
+
+        client = self.build_client(setup=False)
+        client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['p4', 'help'])
+
+    def test_check_dependencies_with_missing(self):
+        """Testing PerforceClient.check_dependencies with dependencies
+        missing
+        """
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = "Command line tools ('p4') are missing."
+
+        with self.assertRaisesMessage(SCMClientDependencyError, message):
+            client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['p4', 'help'])
+
+    def test_get_local_path_with_deps_missing(self):
+        """Testing PerforceClient.get_local_path with dependencies missing"""
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+        self.spy_on(RemovedInRBTools50Warning.warn)
+
+        client = self.build_client(setup=False)
+
+        # Make sure dependencies are checked for this test before we run
+        # get_local_path(). This will be the expected setup flow.
+        self.assertFalse(client.has_dependencies())
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            local_path = client.get_local_path()
+
+        self.assertIsNone(local_path)
+
+        self.assertEqual(ctx.records[0].msg,
+                         'Unable to execute "p4 help": skipping Perforce')
+        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['p4', 'help'])
+
+    def test_get_local_path_with_deps_not_checked(self):
+        """Testing PerforceClient.get_local_path with dependencies not
+        checked
+        """
+        # A False value is used just to ensure get_local_path() bails early,
+        # and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = re.escape(
+            'Either PerforceClient.setup() or '
+            'PerforceClient.has_dependencies() must be called before other '
+            'functions are used. This will be required starting in '
+            'RBTools 5.0.'
+        )
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+                client.get_local_path()
+
+        self.assertEqual(ctx.records[0].msg,
+                         'Unable to execute "p4 help": skipping Perforce')
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['p4', 'help'])
+
     def test_scan_for_server_with_reviewboard_url(self):
         """Testing PerforceClient.scan_for_server with reviewboard.url"""
         RB_URL = 'http://reviewboard.example.com/'
@@ -131,12 +261,12 @@ class PerforceClientTests(SCMClientTestCase):
                     'foo': 'bar',
                 }
 
-        client = PerforceClient(TestWrapper)
+        client = self.build_client(wrapper_cls=TestWrapper)
         url = client.scan_for_server(None)
 
         self.assertEqual(url, RB_URL)
 
-    def test_repository_info_with_server_address(self):
+    def test_get_repository_info_with_server_address(self):
         """Testing PerforceClient.get_repository_info with server address"""
         SERVER_PATH = 'perforce.example.com:1666'
 
@@ -155,14 +285,14 @@ class PerforceClientTests(SCMClientTestCase):
                                       '(2012/09/18)',
                 }
 
-        client = PerforceClient(TestWrapper)
+        client = self.build_client(wrapper_cls=TestWrapper)
         info = client.get_repository_info()
 
         self.assertIsNotNone(info)
         self.assertEqual(info.path, SERVER_PATH)
         self.assertEqual(client.p4d_version, (2012, 2))
 
-    def test_repository_info_with_broker_address(self):
+    def test_get_repository_info_with_broker_address(self):
         """Testing PerforceClient.get_repository_info with broker address"""
         BROKER_PATH = 'broker.example.com:1666'
         SERVER_PATH = 'perforce.example.com:1666'
@@ -183,14 +313,14 @@ class PerforceClientTests(SCMClientTestCase):
                                       '(2012/09/18)',
                 }
 
-        client = PerforceClient(TestWrapper)
+        client = self.build_client(wrapper_cls=TestWrapper)
         info = client.get_repository_info()
 
         self.assertIsNotNone(info)
         self.assertEqual(info.path, BROKER_PATH)
         self.assertEqual(client.p4d_version, (2012, 2))
 
-    def test_repository_info_with_server_address_and_encrypted(self):
+    def test_get_repository_info_with_server_address_and_encrypted(self):
         """Testing PerforceClient.get_repository_info with server address
         and broker encryption"""
         SERVER_PATH = 'perforce.example.com:1666'
@@ -211,7 +341,7 @@ class PerforceClientTests(SCMClientTestCase):
                                       '(2012/09/18)',
                 }
 
-        client = PerforceClient(TestWrapper)
+        client = self.build_client(wrapper_cls=TestWrapper)
         info = client.get_repository_info()
 
         self.assertIsNotNone(info)
@@ -221,7 +351,7 @@ class PerforceClientTests(SCMClientTestCase):
         ])
         self.assertEqual(client.p4d_version, (2012, 2))
 
-    def test_repository_info_with_broker_address_and_encrypted(self):
+    def test_get_repository_info_with_broker_address_and_encrypted(self):
         """Testing PerforceClient.get_repository_info with broker address
         and broker encryption"""
         BROKER_PATH = 'broker.example.com:1666'
@@ -244,7 +374,7 @@ class PerforceClientTests(SCMClientTestCase):
                                       '(2012/09/18)',
                 }
 
-        client = PerforceClient(TestWrapper)
+        client = self.build_client(wrapper_cls=TestWrapper)
         info = client.get_repository_info()
 
         self.assertIsNotNone(info)
@@ -254,7 +384,7 @@ class PerforceClientTests(SCMClientTestCase):
         ])
         self.assertEqual(client.p4d_version, (2012, 2))
 
-    def test_repository_info_with_repository_name_counter(self):
+    def test_get_repository_info_with_repository_name_counter(self):
         """Testing PerforceClient.get_repository_info with repository name
         counter
         """
@@ -277,16 +407,16 @@ class PerforceClientTests(SCMClientTestCase):
                                       '(2012/09/18)',
                 }
 
-        client = PerforceClient(TestWrapper)
+        client = self.build_client(wrapper_cls=TestWrapper)
         info = client.get_repository_info()
 
-        self.assertNotEqual(info, None)
+        self.assertIsNotNone(info)
         self.assertEqual(info.path, SERVER_PATH)
         self.assertEqual(client.p4d_version, (2012, 2))
 
         self.assertEqual(client.get_repository_name(), 'myrepo')
 
-    def test_repository_info_outside_client_root(self):
+    def test_get_repository_info_outside_client_root(self):
         """Testing PerforceClient.get_repository_info outside client root"""
         SERVER_PATH = 'perforce.example.com:1666'
 
@@ -302,10 +432,10 @@ class PerforceClientTests(SCMClientTestCase):
                                       '(2012/09/18)',
                 }
 
-        client = PerforceClient(TestWrapper)
+        client = self.build_client(wrapper_cls=TestWrapper)
         info = client.get_repository_info()
 
-        self.assertEqual(info, None)
+        self.assertIsNone(info)
 
     def test_scan_for_server_with_reviewboard_url_encoded(self):
         """Testing PerforceClient.scan_for_server with encoded
@@ -321,14 +451,14 @@ class PerforceClientTests(SCMClientTestCase):
                     'foo': 'bar',
                 }
 
-        client = PerforceClient(TestWrapper)
+        client = self.build_client(wrapper_cls=TestWrapper)
         url = client.scan_for_server(None)
 
         self.assertEqual(url, RB_URL)
 
     def test_diff_with_pending_changelist(self):
         """Testing PerforceClient.diff with a pending changelist"""
-        client = self._build_client()
+        client = self.build_client()
         client.p4.repo_files = [
             {
                 'depotFile': '//mydepot/test/README',
@@ -373,8 +503,27 @@ class PerforceClientTests(SCMClientTestCase):
         }
 
         revisions = client.parse_revision_spec(['12345'])
-        diff = client.diff(revisions)
-        self._compare_diff(diff, '07aa18ff67f9aa615fcda7ecddcb354e')
+
+        self.assertEqual(
+            self._normalize_diff(client.diff(revisions)),
+            {
+                'changenum': '12345',
+                'diff': (
+                    b'--- //mydepot/test/README\t//mydepot/test/README#2\n'
+                    b'+++ //mydepot/test/README\t2022-01-02 12:34:56\n'
+                    b'@@ -1 +1 @@\n'
+                    b'-This is a test.\n'
+                    b'+This is a mess.\n'
+                    b'--- //mydepot/test/COPYING\t//mydepot/test/COPYING#0\n'
+                    b'+++ //mydepot/test/COPYING\t2022-01-02 12:34:56\n'
+                    b'@@ -0,0 +1 @@\n'
+                    b'+Copyright 2013 Joe User.\n'
+                    b'--- //mydepot/test/Makefile\t//mydepot/test/Makefile#3\n'
+                    b'+++ //mydepot/test/Makefile\t2022-01-02 12:34:56\n'
+                    b'@@ -1 +0,0 @@\n'
+                    b'-all: all\n'
+                ),
+            })
 
     def test_diff_for_submitted_changelist(self):
         """Testing PerforceClient.diff with a submitted changelist"""
@@ -398,7 +547,7 @@ class PerforceClientTests(SCMClientTestCase):
                     }
                 ]
 
-        client = PerforceClient(TestWrapper)
+        client = self.build_client(wrapper_cls=TestWrapper)
         client.p4.repo_files = [
             {
                 'depotFile': '//mydepot/test/README',
@@ -440,14 +589,34 @@ class PerforceClientTests(SCMClientTestCase):
         ]
 
         revisions = client.parse_revision_spec(['12345'])
-        diff = client.diff(revisions)
-        self._compare_diff(diff, '8af5576f5192ca87731673030efb5f39',
-                           expect_changenum=False)
+
+        self.assertEqual(
+            self._normalize_diff(client.diff(revisions)),
+            {
+                'diff': (
+                    b'--- //mydepot/test/README\t//mydepot/test/README#2\n'
+                    b'+++ //mydepot/test/README\t2022-01-02 12:34:56\n'
+                    b'@@ -1 +1 @@\n'
+                    b'-This is a test.\n'
+                    b'+This is a mess.\n'
+                ),
+            })
 
     def test_diff_with_moved_files_cap_on(self):
         """Testing PerforceClient.diff with moved files and capability on"""
         self._test_diff_with_moved_files(
-            '5926515eaf4cf6d8257a52f7d9f0e530',
+            expected_diff=(
+                b'Moved from: //mydepot/test/README\n'
+                b'Moved to: //mydepot/test/README-new\n'
+                b'--- //mydepot/test/README\t//mydepot/test/README#2\n'
+                b'+++ //mydepot/test/README-new\t2022-01-02 12:34:56\n'
+                b'@@ -1 +1 @@\n'
+                b'-This is a test.\n'
+                b'+This is a mess.\n'
+                b'==== //mydepot/test/COPYING#2 ==MV== '
+                b'//mydepot/test/COPYING-new ====\n'
+                b'\n'
+            ),
             caps={
                 'scmtools': {
                     'perforce': {
@@ -458,10 +627,27 @@ class PerforceClientTests(SCMClientTestCase):
 
     def test_diff_with_moved_files_cap_off(self):
         """Testing PerforceClient.diff with moved files and capability off"""
-        self._test_diff_with_moved_files('20e5ab395e170dce1b062a796e6c2c13')
+        self._test_diff_with_moved_files(expected_diff=(
+            b'--- //mydepot/test/README\t//mydepot/test/README#2\n'
+            b'+++ //mydepot/test/README\t2022-01-02 12:34:56\n'
+            b'@@ -1 +0,0 @@\n'
+            b'-This is a test.\n'
+            b'--- //mydepot/test/README-new\t//mydepot/test/README-new#0\n'
+            b'+++ //mydepot/test/README-new\t2022-01-02 12:34:56\n'
+            b'@@ -0,0 +1 @@\n'
+            b'+This is a mess.\n'
+            b'--- //mydepot/test/COPYING\t//mydepot/test/COPYING#2\n'
+            b'+++ //mydepot/test/COPYING\t2022-01-02 12:34:56\n'
+            b'@@ -1 +0,0 @@\n'
+            b'-Copyright 2013 Joe User.\n'
+            b'--- //mydepot/test/COPYING-new\t//mydepot/test/COPYING-new#0\n'
+            b'+++ //mydepot/test/COPYING-new\t2022-01-02 12:34:56\n'
+            b'@@ -0,0 +1 @@\n'
+            b'+Copyright 2013 Joe User.\n'
+        ))
 
-    def _test_diff_with_moved_files(self, expected_diff_hash, caps={}):
-        client = self._build_client()
+    def _test_diff_with_moved_files(self, expected_diff, caps={}):
+        client = self.build_client()
         client.capabilities = Capabilities(caps)
         client.p4.repo_files = [
             {
@@ -530,47 +716,32 @@ class PerforceClientTests(SCMClientTestCase):
         }
 
         revisions = client.parse_revision_spec(['12345'])
-        diff = client.diff(revisions)
-        self._compare_diff(diff, expected_diff_hash)
 
-    def _build_client(self):
-        self.options.p4_client = 'myclient'
-        self.options.p4_port = 'perforce.example.com:1666'
-        self.options.p4_passwd = ''
-        client = PerforceClient(self.P4DiffTestWrapper, options=self.options)
-        client.p4d_version = (2012, 2)
-        return client
-
-    def _compare_diff(self, diff_info, expected_diff_hash,
-                      expect_changenum=True):
-        self.assertTrue(isinstance(diff_info, dict))
-        self.assertTrue('diff' in diff_info)
-        if expect_changenum:
-            self.assertTrue('changenum' in diff_info)
-
-        diff_content = re.sub(br'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}',
-                              br'1970-01-01 00:00:00',
-                              diff_info['diff'])
-        self.assertEqual(md5(diff_content).hexdigest(), expected_diff_hash)
+        self.assertEqual(
+            self._normalize_diff(client.diff(revisions)),
+            {
+                'changenum': '12345',
+                'diff': expected_diff,
+            })
 
     def test_parse_revision_spec_no_args(self):
         """Testing PerforceClient.parse_revision_spec with no specified
-        revisions"""
-        client = self._build_client()
+        revisions
+        """
+        client = self.build_client()
 
-        revisions = client.parse_revision_spec()
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
         self.assertEqual(
-            revisions['base'], PerforceClient.REVISION_CURRENT_SYNC)
-        self.assertEqual(
-            revisions['tip'],
-            PerforceClient.REVISION_PENDING_CLN_PREFIX + 'default')
+            client.parse_revision_spec(),
+            {
+                'base': PerforceClient.REVISION_CURRENT_SYNC,
+                'tip': ('%sdefault'
+                        % PerforceClient.REVISION_PENDING_CLN_PREFIX),
+            })
 
     def test_parse_revision_spec_pending_cln(self):
         """Testing PerforceClient.parse_revision_spec with a pending
-        changelist"""
+        changelist
+        """
         class TestWrapper(P4Wrapper):
             def change(self, changelist):
                 return [{
@@ -580,22 +751,20 @@ class PerforceClientTests(SCMClientTestCase):
                     'Status': 'pending',
                     'Description': 'My change description\n',
                 }]
-        client = PerforceClient(TestWrapper)
 
-        revisions = client.parse_revision_spec(['12345'])
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' not in revisions)
+        client = self.build_client(wrapper_cls=TestWrapper)
+
         self.assertEqual(
-            revisions['base'], PerforceClient.REVISION_CURRENT_SYNC)
-        self.assertEqual(
-            revisions['tip'],
-            PerforceClient.REVISION_PENDING_CLN_PREFIX + '12345')
+            client.parse_revision_spec(['12345']),
+            {
+                'base': PerforceClient.REVISION_CURRENT_SYNC,
+                'tip': '%s12345' % PerforceClient.REVISION_PENDING_CLN_PREFIX,
+            })
 
     def test_parse_revision_spec_submitted_cln(self):
         """Testing PerforceClient.parse_revision_spec with a submitted
-        changelist"""
+        changelist
+        """
         class TestWrapper(P4Wrapper):
             def change(self, changelist):
                 return [{
@@ -606,19 +775,19 @@ class PerforceClientTests(SCMClientTestCase):
                     'Description': 'My change description\n',
                 }]
 
-        client = PerforceClient(TestWrapper)
+        client = self.build_client(wrapper_cls=TestWrapper)
 
-        revisions = client.parse_revision_spec(['12345'])
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' not in revisions)
-        self.assertEqual(revisions['base'], '12344')
-        self.assertEqual(revisions['tip'], '12345')
+        self.assertEqual(
+            client.parse_revision_spec(['12345']),
+            {
+                'base': '12344',
+                'tip': '12345',
+            })
 
     def test_parse_revision_spec_shelved_cln(self):
         """Testing PerforceClient.parse_revision_spec with a shelved
-        changelist"""
+        changelist
+        """
         class TestWrapper(P4Wrapper):
             def change(self, changelist):
                 return [{
@@ -628,18 +797,15 @@ class PerforceClientTests(SCMClientTestCase):
                     'Status': 'shelved',
                     'Description': 'My change description\n',
                 }]
-        client = PerforceClient(TestWrapper)
 
-        revisions = client.parse_revision_spec(['12345'])
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' not in revisions)
+        client = self.build_client(wrapper_cls=TestWrapper)
+
         self.assertEqual(
-            revisions['base'], PerforceClient.REVISION_CURRENT_SYNC)
-        self.assertEqual(
-            revisions['tip'],
-            PerforceClient.REVISION_PENDING_CLN_PREFIX + '12345')
+            client.parse_revision_spec(['12345']),
+            {
+                'base': PerforceClient.REVISION_CURRENT_SYNC,
+                'tip': '%s12345' % PerforceClient.REVISION_PENDING_CLN_PREFIX,
+            })
 
     def test_parse_revision_spec_two_args(self):
         """Testing PerforceClient.parse_revision_spec with two changelists"""
@@ -663,48 +829,45 @@ class PerforceClientTests(SCMClientTestCase):
 
                 return [change]
 
-        client = PerforceClient(TestWrapper)
+        client = self.build_client(wrapper_cls=TestWrapper)
 
-        revisions = client.parse_revision_spec(['99', '100'])
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' not in revisions)
-        self.assertEqual(revisions['base'], '99')
-        self.assertEqual(revisions['tip'], '100')
+        self.assertEqual(
+            client.parse_revision_spec(['99', '100']),
+            {
+                'base': '99',
+                'tip': '100',
+            })
 
-        self.assertRaises(InvalidRevisionSpecError,
-                          client.parse_revision_spec,
-                          ['99', '101'])
-        self.assertRaises(InvalidRevisionSpecError,
-                          client.parse_revision_spec,
-                          ['99', '102'])
-        self.assertRaises(InvalidRevisionSpecError,
-                          client.parse_revision_spec,
-                          ['101', '100'])
-        self.assertRaises(InvalidRevisionSpecError,
-                          client.parse_revision_spec,
-                          ['102', '100'])
-        self.assertRaises(InvalidRevisionSpecError,
-                          client.parse_revision_spec,
-                          ['102', '10284'])
+        with self.assertRaises(InvalidRevisionSpecError):
+            client.parse_revision_spec(['99', '101'])
+
+        with self.assertRaises(InvalidRevisionSpecError):
+            client.parse_revision_spec(['99', '102'])
+
+        with self.assertRaises(InvalidRevisionSpecError):
+            client.parse_revision_spec(['101', '100'])
+
+        with self.assertRaises(InvalidRevisionSpecError):
+            client.parse_revision_spec(['102', '100'])
+
+        with self.assertRaises(InvalidRevisionSpecError):
+            client.parse_revision_spec(['102', '10284'])
 
     def test_parse_revision_spec_invalid_spec(self):
         """Testing PerforceClient.parse_revision_spec with invalid
-        specifications"""
+        specifications
+        """
         class TestWrapper(P4Wrapper):
             def change(self, changelist):
                 return []
 
-        client = PerforceClient(TestWrapper)
+        client = self.build_client(wrapper_cls=TestWrapper)
 
-        self.assertRaises(InvalidRevisionSpecError,
-                          client.parse_revision_spec,
-                          ['aoeu'])
+        with self.assertRaises(InvalidRevisionSpecError):
+            client.parse_revision_spec(['aoeu'])
 
-        self.assertRaises(TooManyRevisionsError,
-                          client.parse_revision_spec,
-                          ['1', '2', '3'])
+        with self.assertRaises(TooManyRevisionsError):
+            client.parse_revision_spec(['1', '2', '3'])
 
     def test_diff_exclude(self):
         """Testing PerforceClient.normalize_exclude_patterns"""
@@ -718,7 +881,7 @@ class PerforceClientTests(SCMClientTestCase):
                     'Client root': repo_root,
                 }
 
-        client = PerforceClient(ExcludeWrapper)
+        client = self.build_client(wrapper_cls=ExcludeWrapper)
 
         patterns = [
             '//depot/path',
@@ -740,3 +903,31 @@ class PerforceClientTests(SCMClientTestCase):
         result = client.normalize_exclude_patterns(patterns)
 
         self.assertEqual(result, normalized_patterns)
+
+    def _normalize_diff(self, diff_result):
+        """Normalize a diff result for comparison.
+
+        This will ensure that dates are all normalized to a fixed date
+        string, making it possible to compare for equality.
+
+        Version Added:
+            4.0
+
+        Args:
+            diff_result (dict):
+                The diff result.
+
+        Returns:
+            dict:
+            The normalized diff result.
+        """
+        self.assertIsInstance(diff_result, dict)
+
+        for key in ('diff', 'parent_diff'):
+            if diff_result.get(key):
+                diff_result[key] = re.sub(
+                    br'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}',
+                    br'2022-01-02 12:34:56',
+                    diff_result[key])
+
+        return diff_result

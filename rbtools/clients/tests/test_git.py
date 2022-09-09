@@ -3,34 +3,36 @@
 from __future__ import unicode_literals
 
 import os
+import re
 import unittest
-from hashlib import md5
+from typing import Any, List
 
-import six
-from kgb import SpyAgency
+import kgb
 
-from rbtools.clients import RepositoryInfo
+from rbtools.clients import PatchAuthor, RepositoryInfo
 from rbtools.clients.errors import (CreateCommitError,
                                     MergeError,
                                     PushError,
+                                    SCMClientDependencyError,
                                     TooManyRevisionsError)
-from rbtools.clients.git import GitClient
+from rbtools.clients.git import GitClient, get_git_candidates
 from rbtools.clients.tests import FOO1, FOO2, FOO3, FOO4, SCMClientTestCase
+from rbtools.deprecation import RemovedInRBTools50Warning
+from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import is_exe_in_path
 from rbtools.utils.process import execute
 
 
-class GitClientTests(SpyAgency, SCMClientTestCase):
+class GitClientTests(SCMClientTestCase):
     """Unit tests for GitClient."""
 
+    scmclient_cls = GitClient
+
     TESTSERVER = 'http://127.0.0.1:8080'
-    AUTHOR = type(
-        str('Author'),
-        (object,),
-        {
-            'fullname': 'name',
-            'email': 'email'
-        })
+    AUTHOR = PatchAuthor(full_name='name',
+                         email='email')
+
+    _git: str = ''
 
     @classmethod
     def setup_checkout(cls, checkout_dir):
@@ -48,8 +50,12 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
             The main checkout directory, or ``None`` if :command:`git` isn't
             in the path.
         """
-        if not is_exe_in_path('git'):
-            return None
+        scmclient = GitClient()
+
+        if not scmclient.has_dependencies():
+            return
+
+        cls._git = scmclient.git
 
         cls.git_dir = os.path.join(cls.testdata_dir, 'git-repo')
         cls.clone_dir = checkout_dir
@@ -70,24 +76,30 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         return orig_clone_dir
 
     @classmethod
-    def _run_git(cls, command):
-        return execute(['git'] + command,
+    def _run_git(
+        cls,
+        command: List[str],
+    ) -> Any:
+        """Run git with the provided arguments.
+
+        Args:
+            command (list of str):
+                The arguments to pass to :command:`git`.
+
+        Returns:
+            object:
+            The result of the :py:func:`~rbtools.utils.process.execute` call.
+        """
+        return execute([cls._git] + command,
                        env=None,
                        split_lines=False,
                        ignore_errors=False,
                        extra_ignore_errors=())
 
     def setUp(self):
-        if not is_exe_in_path('git'):
-            raise unittest.SkipTest('git not found in path')
-
         super(GitClientTests, self).setUp()
 
         self.set_user_home(os.path.join(self.testdata_dir, 'homedir'))
-
-        self.options.parent_branch = None
-        self.options.tracking = None
-        self.client = GitClient(options=self.options)
 
     def _git_add_file_commit(self, filename, data, msg):
         """Add a file to a git repository.
@@ -96,7 +108,7 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
             filename (unicode):
                 The filename to write to.
 
-            data (unicode):
+            data (bytes):
                 The content of the file to write.
 
             msg (unicode):
@@ -111,58 +123,310 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
     def _git_get_head(self):
         return self._run_git(['rev-parse', 'HEAD']).strip()
 
+    def test_check_dependencies_with_git_found(self):
+        """Testing GitClient.check_dependencies with git found"""
+        self.spy_on(check_install, op=kgb.SpyOpMatchAny([
+            {
+                'args': (['git', '--help'],),
+                'op': kgb.SpyOpReturn(True),
+            },
+            {
+                'args': (['git.cmd', '--help'],),
+                'op': kgb.SpyOpReturn(True),
+            },
+        ]))
+
+        client = self.build_client(setup=False)
+        client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['git', '--help'])
+
+        self.assertEqual(client.git, 'git')
+
+    def test_check_dependencies_with_gitcmd_found_on_windows(self):
+        """Testing GitClient.check_dependencies with git.cmd found on Windows
+        """
+        self.spy_on(
+            get_git_candidates,
+            op=kgb.SpyOpReturn(get_git_candidates(target_platform='windows')))
+
+        self.spy_on(check_install, op=kgb.SpyOpMatchAny([
+            {
+                'args': (['git', '--help'],),
+                'op': kgb.SpyOpReturn(False),
+            },
+            {
+                'args': (['git.cmd', '--help'],),
+                'op': kgb.SpyOpReturn(True),
+            },
+        ]))
+
+        client = self.build_client(setup=False)
+        client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 2)
+        self.assertSpyCalledWith(check_install.calls[0], ['git', '--help'])
+        self.assertSpyCalledWith(check_install.calls[1], ['git.cmd', '--help'])
+
+        self.assertEqual(client.git, 'git.cmd')
+
+    def test_check_dependencies_with_missing(self):
+        """Testing GitClient.check_dependencies with dependencies
+        missing
+        """
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = "Command line tools ('git') are missing."
+
+        with self.assertRaisesMessage(SCMClientDependencyError, message):
+            client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['git', '--help'])
+
+    def test_check_dependencies_with_missing_on_windows(self):
+        """Testing GitClient.check_dependencies with dependencies
+        missing on Windows
+        """
+        self.spy_on(
+            get_git_candidates,
+            op=kgb.SpyOpReturn(get_git_candidates(target_platform='windows')))
+
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = "Command line tools (one of ('git', 'git.cmd')) are missing."
+
+        with self.assertRaisesMessage(SCMClientDependencyError, message):
+            client.check_dependencies()
+
+        self.assertSpyCallCount(check_install, 2)
+        self.assertSpyCalledWith(check_install, ['git', '--help'])
+        self.assertSpyCalledWith(check_install, ['git.cmd', '--help'])
+
+    def test_git_with_deps_missing(self):
+        """Testing GitClient.git with dependencies missing"""
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+        self.spy_on(RemovedInRBTools50Warning.warn)
+
+        client = self.build_client(setup=False)
+
+        # Make sure dependencies are checked for this test before we run
+        # git(). This will be the expected setup flow.
+        self.assertFalse(client.has_dependencies())
+
+        # This will fall back to "git" even if dependencies are missing.
+        self.assertEqual(client.git, 'git')
+
+        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['git', '--help'])
+
+    def test_git_with_deps_not_checked(self):
+        """Testing GitClient.git with dependencies not
+        checked
+        """
+        # A False value is used just to ensure git() bails early,
+        # and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = re.escape(
+            'Either GitClient.setup() or '
+            'GitClient.has_dependencies() must be called before other '
+            'functions are used. This will be required starting in '
+            'RBTools 5.0.'
+        )
+
+        with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+            client.git
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['git', '--help'])
+
+    def test_get_local_path_with_deps_missing(self):
+        """Testing GitClient.get_local_path with dependencies missing"""
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+        self.spy_on(RemovedInRBTools50Warning.warn)
+
+        client = self.build_client(setup=False)
+
+        # Make sure dependencies are checked for this test before we run
+        # get_local_path(). This will be the expected setup flow.
+        self.assertFalse(client.has_dependencies())
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            local_path = client.get_local_path()
+
+        self.assertIsNone(local_path)
+
+        self.assertEqual(
+            ctx.records[0].msg,
+            'Unable to execute "git --help" or "git.cmd --help": skipping Git')
+        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['git', '--help'])
+
+    def test_get_local_path_with_deps_not_checked(self):
+        """Testing GitClient.get_local_path with dependencies not
+        checked
+        """
+        # A False value is used just to ensure get_local_path() bails early,
+        # and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = re.escape(
+            'Either GitClient.setup() or '
+            'GitClient.has_dependencies() must be called before other '
+            'functions are used. This will be required starting in '
+            'RBTools 5.0.'
+        )
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+                client.get_local_path()
+
+        self.assertEqual(
+            ctx.records[0].msg,
+            'Unable to execute "git --help" or "git.cmd --help": skipping Git')
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['git', '--help'])
+
     def test_get_repository_info_simple(self):
         """Testing GitClient get_repository_info, simple case"""
-        ri = self.client.get_repository_info()
-        self.assertTrue(isinstance(ri, RepositoryInfo))
+        client = self.build_client()
+        ri = client.get_repository_info()
+
+        self.assertIsInstance(ri, RepositoryInfo)
         self.assertEqual(ri.base_path, '')
         self.assertEqual(ri.path.rstrip('/.git'), self.git_dir)
 
+    def test_get_repository_info_with_deps_missing(self):
+        """Testing GitClient.get_repository_info with dependencies
+        missing
+        """
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+        self.spy_on(RemovedInRBTools50Warning.warn)
+
+        client = self.build_client(setup=False)
+
+        # Make sure dependencies are checked for this test before we run
+        # get_repository_info(). This will be the expected setup flow.
+        self.assertFalse(client.has_dependencies())
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            repository_info = client.get_repository_info()
+
+        self.assertIsNone(repository_info)
+
+        self.assertEqual(
+            ctx.records[0].msg,
+            'Unable to execute "git --help" or "git.cmd --help": skipping Git')
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['git', '--help'])
+
+    def test_get_repository_info_with_deps_not_checked(self):
+        """Testing GitClient.get_repository_info with dependencies
+        not checked
+        """
+        # A False value is used just to ensure get_repository_info() bails
+        # early, and to minimize side-effects.
+        self.spy_on(check_install, op=kgb.SpyOpReturn(False))
+
+        client = self.build_client(setup=False)
+
+        message = re.escape(
+            'Either GitClient.setup() or '
+            'GitClient.has_dependencies() must be called before other '
+            'functions are used. This will be required starting in '
+            'RBTools 5.0.'
+        )
+
+        with self.assertLogs(level='DEBUG') as ctx:
+            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+                client.get_repository_info()
+
+        self.assertEqual(
+            ctx.records[0].msg,
+            'Unable to execute "git --help" or "git.cmd --help": skipping Git')
+
+        self.assertSpyCallCount(check_install, 1)
+        self.assertSpyCalledWith(check_install, ['git', '--help'])
+
     def test_scan_for_server_simple(self):
         """Testing GitClient scan_for_server, simple case"""
-        ri = self.client.get_repository_info()
+        client = self.build_client()
+        ri = client.get_repository_info()
 
-        server = self.client.scan_for_server(ri)
-        self.assertTrue(server is None)
+        server = client.scan_for_server(ri)
+        self.assertIsNone(server)
 
     def test_scan_for_server_property(self):
         """Testing GitClient scan_for_server using repo property"""
-        self._run_git(['config', 'reviewboard.url', self.TESTSERVER])
-        ri = self.client.get_repository_info()
+        client = self.build_client()
 
-        self.assertEqual(self.client.scan_for_server(ri), self.TESTSERVER)
+        self._run_git(['config', 'reviewboard.url', self.TESTSERVER])
+        ri = client.get_repository_info()
+
+        self.assertEqual(client.scan_for_server(ri), self.TESTSERVER)
 
     def test_diff_simple(self):
         """Testing GitClient simple diff case"""
-        self.client.get_repository_info()
+        client = self.build_client()
+        client.get_repository_info()
         base_commit_id = self._git_get_head()
 
         self._git_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
         commit_id = self._git_get_head()
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions)
-        self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 4)
-        self.assertTrue('diff' in result)
-        self.assertTrue('parent_diff' in result)
-        self.assertTrue('base_commit_id' in result)
-        self.assertTrue('commit_id' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '69d4616cf985f6b10571036db744e2d8')
-        self.assertEqual(result['parent_diff'], None)
-        self.assertEqual(result['base_commit_id'], base_commit_id)
-        self.assertEqual(result['commit_id'], commit_id)
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'base_commit_id': base_commit_id,
+                'commit_id': commit_id,
+                'diff': (
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+                    b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -6,7 +6,4 @@ multa quoque et bello passus, '
+                    b'dum conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                ),
+                'parent_diff': None,
+            })
 
     def test_too_many_revisions(self):
         """Testing GitClient parse_revision_spec with too many revisions"""
-        self.assertRaises(TooManyRevisionsError,
-                          self.client.parse_revision_spec,
-                          [1, 2, 3])
+        client = self.build_client()
+
+        with self.assertRaises(TooManyRevisionsError):
+            client.parse_revision_spec([1, 2, 3])
 
     def test_diff_simple_multiple(self):
         """Testing GitClient simple diff with multiple commits case"""
-        self.client.get_repository_info()
+        client = self.build_client()
+        client.get_repository_info()
 
         base_commit_id = self._git_get_head()
 
@@ -171,44 +435,78 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         self._git_add_file_commit('foo.txt', FOO3, 'commit 1')
         commit_id = self._git_get_head()
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions)
-        self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 4)
-        self.assertTrue('diff' in result)
-        self.assertTrue('parent_diff' in result)
-        self.assertTrue('base_commit_id' in result)
-        self.assertTrue('commit_id' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         'c9a31264f773406edff57a8ed10d9acc')
-        self.assertEqual(result['parent_diff'], None)
-        self.assertEqual(result['base_commit_id'], base_commit_id)
-        self.assertEqual(result['commit_id'], commit_id)
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'base_commit_id': base_commit_id,
+                'commit_id': commit_id,
+                'diff': (
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+                    b'63036ed3fcafe870d567a14dd5884f4fed70126c 100644\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -1,12 +1,11 @@\n ARMA virumque cano, Troiae '
+                    b'qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b' Italiam, fato profugus, Laviniaque venit\n'
+                    b' litora, multum ille et terris iactatus et alto\n'
+                    b' vi superum saevae memorem Iunonis ob iram;\n'
+                    b'-multa quoque et bello passus, dum conderet urbem,\n'
+                    b'+dum conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b'+Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                ),
+                'parent_diff': None,
+            })
 
     def test_diff_exclude(self):
         """Testing GitClient simple diff with file exclusion"""
-        self.client.get_repository_info()
+        client = self.build_client()
+        client.get_repository_info()
         base_commit_id = self._git_get_head()
 
         self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
         self._git_add_file_commit('exclude.txt', FOO2, 'commit 2')
         commit_id = self._git_get_head()
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions, exclude_patterns=['exclude.txt'])
-        self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 4)
-        self.assertTrue('diff' in result)
-        self.assertTrue('parent_diff' in result)
-        self.assertTrue('base_commit_id' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '69d4616cf985f6b10571036db744e2d8')
-        self.assertEqual(result['parent_diff'], None)
-        self.assertEqual(result['base_commit_id'], base_commit_id)
-        self.assertEqual(result['commit_id'], commit_id)
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions, exclude_patterns=['exclude.txt']),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+                    b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -6,7 +6,4 @@ multa quoque et bello passus, dum '
+                    b'conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                ),
+                'parent_diff': None,
+            })
 
     def test_diff_exclude_in_subdir(self):
         """Testing GitClient simple diff with file exclusion in a subdir"""
+        client = self.build_client()
         base_commit_id = self._git_get_head()
 
         os.mkdir('subdir')
@@ -216,27 +514,38 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         self._git_add_file_commit('subdir/exclude.txt', FOO2, 'commit 2')
 
         os.chdir('subdir')
-        self.client.get_repository_info()
+        client.get_repository_info()
 
         commit_id = self._git_get_head()
+        revisions = client.parse_revision_spec([])
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions,
-                                  exclude_patterns=['exclude.txt'])
-
-        self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 4)
-        self.assertTrue('diff' in result)
-        self.assertTrue('parent_diff' in result)
-        self.assertTrue('base_commit_id' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '69d4616cf985f6b10571036db744e2d8')
-        self.assertEqual(result['parent_diff'], None)
-        self.assertEqual(result['base_commit_id'], base_commit_id)
-        self.assertEqual(result['commit_id'], commit_id)
+        self.assertEqual(
+            client.diff(revisions, exclude_patterns=['exclude.txt']),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+                    b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -6,7 +6,4 @@ multa quoque et bello passus, dum '
+                    b'conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                ),
+                'parent_diff': None,
+            })
 
     def test_diff_exclude_root_pattern_in_subdir(self):
         """Testing GitClient diff with file exclusion in the repo root"""
+        client = self.build_client()
         base_commit_id = self._git_get_head()
 
         os.mkdir('subdir')
@@ -244,71 +553,116 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         self._git_add_file_commit('exclude.txt', FOO2, 'commit 2')
         os.chdir('subdir')
 
-        self.client.get_repository_info()
+        client.get_repository_info()
 
         commit_id = self._git_get_head()
+        revisions = client.parse_revision_spec([])
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(
-            revisions,
-            exclude_patterns=[os.path.sep + 'exclude.txt'])
-
-        self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 4)
-        self.assertTrue('diff' in result)
-        self.assertTrue('parent_diff' in result)
-        self.assertTrue('base_commit_id' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '69d4616cf985f6b10571036db744e2d8')
-        self.assertEqual(result['parent_diff'], None)
-        self.assertEqual(result['base_commit_id'], base_commit_id)
-        self.assertEqual(result['commit_id'], commit_id)
+        self.assertEqual(
+            client.diff(revisions,
+                        exclude_patterns=[os.path.sep + 'exclude.txt']),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+                    b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -6,7 +6,4 @@ multa quoque et bello passus, dum '
+                    b'conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                ),
+                'parent_diff': None,
+            })
 
     def test_diff_branch_diverge(self):
         """Testing GitClient diff with divergent branches"""
+        client = self.build_client()
+
         self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
         self._run_git(['checkout', '-b', 'mybranch', '--track',
                       'origin/master'])
         base_commit_id = self._git_get_head()
         self._git_add_file_commit('foo.txt', FOO2, 'commit 2')
         commit_id = self._git_get_head()
-        self.client.get_repository_info()
+        client.get_repository_info()
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions)
-        self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 4)
-        self.assertTrue('diff' in result)
-        self.assertTrue('parent_diff' in result)
-        self.assertTrue('base_commit_id' in result)
-        self.assertTrue('commit_id' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         'cfb79a46f7a35b07e21765608a7852f7')
-        self.assertEqual(result['parent_diff'], None)
-        self.assertEqual(result['base_commit_id'], base_commit_id)
-        self.assertEqual(result['commit_id'], commit_id)
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+                    b'e619c1387f5feb91f0ca83194650bfe4f6c2e347 100644\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -1,4 +1,6 @@\n'
+                    b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b' Italiam, fato profugus, Laviniaque venit\n'
+                    b' litora, multum ille et terris iactatus et alto\n'
+                    b' vi superum saevae memorem Iunonis ob iram;\n'
+                    b'@@ -6,7 +8,4 @@ multa quoque et bello passus, dum '
+                    b'conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                ),
+                'parent_diff': None,
+            })
 
         self._run_git(['checkout', 'master'])
-        self.client.get_repository_info()
+        client.get_repository_info()
         commit_id = self._git_get_head()
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions)
-        self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 4)
-        self.assertTrue('diff' in result)
-        self.assertTrue('parent_diff' in result)
-        self.assertTrue('base_commit_id' in result)
-        self.assertTrue('commit_id' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '69d4616cf985f6b10571036db744e2d8')
-        self.assertEqual(result['parent_diff'], None)
-        self.assertEqual(result['base_commit_id'], base_commit_id)
-        self.assertEqual(result['commit_id'], commit_id)
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+                    b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -6,7 +6,4 @@ multa quoque et bello passus, dum '
+                    b'conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                ),
+                'parent_diff': None,
+            })
 
     def test_diff_tracking_no_origin(self):
-        """Testing GitClient diff with a tracking branch, but no origin
-        remote"""
+        """Testing GitClient diff with a tracking branch, but no origin remote
+        """
+        client = self.build_client()
+
         self._run_git(['remote', 'add', 'quux', self.git_dir])
         self._run_git(['fetch', 'quux'])
         self._run_git(['checkout', '-b', 'mybranch', '--track', 'quux/master'])
@@ -317,24 +671,38 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         self._git_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
         commit_id = self._git_get_head()
 
-        self.client.get_repository_info()
+        client.get_repository_info()
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions)
-        self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 4)
-        self.assertTrue('diff' in result)
-        self.assertTrue('parent_diff' in result)
-        self.assertTrue('base_commit_id' in result)
-        self.assertTrue('commit_id' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '69d4616cf985f6b10571036db744e2d8')
-        self.assertEqual(result['parent_diff'], None)
-        self.assertEqual(result['base_commit_id'], base_commit_id)
-        self.assertEqual(result['commit_id'], commit_id)
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+                    b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -6,7 +6,4 @@ multa quoque et bello passus, dum '
+                    b'conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                ),
+                'parent_diff': None,
+            })
 
     def test_diff_local_tracking(self):
         """Testing GitClient diff with a local tracking branch"""
+        client = self.build_client()
+
         base_commit_id = self._git_get_head()
         self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
 
@@ -342,25 +710,46 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         self._git_add_file_commit('foo.txt', FOO2, 'commit 2')
         commit_id = self._git_get_head()
 
-        self.client.get_repository_info()
+        client.get_repository_info()
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions)
-        self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 4)
-        self.assertTrue('diff' in result)
-        self.assertTrue('parent_diff' in result)
-        self.assertTrue('base_commit_id' in result)
-        self.assertTrue('commit_id' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         'cfb79a46f7a35b07e21765608a7852f7')
-        self.assertEqual(result['parent_diff'], None)
-        self.assertEqual(result['base_commit_id'], base_commit_id)
-        self.assertEqual(result['commit_id'], commit_id)
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+                    b'e619c1387f5feb91f0ca83194650bfe4f6c2e347 100644\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -1,4 +1,6 @@\n'
+                    b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b' Italiam, fato profugus, Laviniaque venit\n'
+                    b' litora, multum ille et terris iactatus et alto\n'
+                    b' vi superum saevae memorem Iunonis ob iram;\n'
+                    b'@@ -6,7 +8,4 @@ multa quoque et bello passus, dum '
+                    b'conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                ),
+                'parent_diff': None,
+            })
 
     def test_diff_tracking_override(self):
         """Testing GitClient diff with option override for tracking branch"""
-        self.options.tracking = 'origin/master'
+        client = self.build_client(options={
+            'tracking': 'origin/master',
+        })
 
         self._run_git(['remote', 'add', 'bad', self.git_dir])
         self._run_git(['fetch', 'bad'])
@@ -371,25 +760,39 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
         commit_id = self._git_get_head()
 
-        self.client.get_repository_info()
+        client.get_repository_info()
+        revisions = client.parse_revision_spec([])
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions)
-        self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 4)
-        self.assertTrue('diff' in result)
-        self.assertTrue('parent_diff' in result)
-        self.assertTrue('base_commit_id' in result)
-        self.assertTrue('commit_id' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         '69d4616cf985f6b10571036db744e2d8')
-        self.assertEqual(result['parent_diff'], None)
-        self.assertEqual(result['base_commit_id'], base_commit_id)
-        self.assertEqual(result['commit_id'], commit_id)
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+                    b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -6,7 +6,4 @@ multa quoque et bello passus, dum '
+                    b'conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                ),
+                'parent_diff': None,
+            })
 
     def test_diff_slash_tracking(self):
         """Testing GitClient diff with tracking branch that has slash in its
-        name"""
+        name
+        """
+        client = self.build_client()
+
         self._run_git(['fetch', 'origin'])
         self._run_git(['checkout', '-b', 'my/branch', '--track',
                        'origin/not-master'])
@@ -397,41 +800,56 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         self._git_add_file_commit('foo.txt', FOO2, 'commit 2')
         commit_id = self._git_get_head()
 
-        self.client.get_repository_info()
+        client.get_repository_info()
+        revisions = client.parse_revision_spec([])
 
-        revisions = self.client.parse_revision_spec([])
-        result = self.client.diff(revisions)
-        self.assertTrue(isinstance(result, dict))
-        self.assertEqual(len(result), 4)
-        self.assertTrue('diff' in result)
-        self.assertTrue('parent_diff' in result)
-        self.assertTrue('base_commit_id' in result)
-        self.assertTrue('commit_id' in result)
-        self.assertEqual(md5(result['diff']).hexdigest(),
-                         'd2015ff5fd0297fd7f1210612f87b6b3')
-        self.assertEqual(result['parent_diff'], None)
-        self.assertEqual(result['base_commit_id'], base_commit_id)
-        self.assertEqual(result['commit_id'], commit_id)
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'index 5e98e9540e1b741b5be24fcb33c40c1c8069c1fb..'
+                    b'e619c1387f5feb91f0ca83194650bfe4f6c2e347 100644\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -1,4 +1,6 @@\n'
+                    b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b' Italiam, fato profugus, Laviniaque venit\n'
+                    b' litora, multum ille et terris iactatus et alto\n'
+                    b' vi superum saevae memorem Iunonis ob iram;\n'
+                ),
+                'parent_diff': None,
+            })
 
     def test_parse_revision_spec_no_args(self):
         """Testing GitClient.parse_revision_spec with no specified revisions"""
+        client = self.build_client()
+
         base_commit_id = self._git_get_head()
         self._git_add_file_commit('foo.txt', FOO2, 'Commit 2')
         tip_commit_id = self._git_get_head()
 
-        self.client.get_repository_info()
+        client.get_repository_info()
 
-        revisions = self.client.parse_revision_spec()
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' not in revisions)
-        self.assertEqual(revisions['base'], base_commit_id)
-        self.assertEqual(revisions['tip'], tip_commit_id)
+        self.assertEqual(
+            client.parse_revision_spec(),
+            {
+                'base': base_commit_id,
+                'commit_id': tip_commit_id,
+                'tip': tip_commit_id,
+            })
 
     def test_parse_revision_spec_no_args_parent(self):
         """Testing GitClient.parse_revision_spec with no specified revisions
-        and a parent diff"""
+        and a parent diff
+        """
+        client = self.build_client(options={
+            'parent_branch': 'parent-branch',
+        })
         parent_base_commit_id = self._git_get_head()
 
         self._run_git(['fetch', 'origin'])
@@ -447,114 +865,125 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         self._git_add_file_commit('foo.txt', FOO3, 'Commit 3')
         tip_commit_id = self._git_get_head()
 
-        self.options.parent_branch = 'parent-branch'
+        client.get_repository_info()
 
-        self.client.get_repository_info()
-
-        revisions = self.client.parse_revision_spec()
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' in revisions)
-        self.assertEqual(revisions['parent_base'], parent_base_commit_id)
-        self.assertEqual(revisions['base'], base_commit_id)
-        self.assertEqual(revisions['tip'], tip_commit_id)
+        self.assertEqual(
+            client.parse_revision_spec(),
+            {
+                'base': base_commit_id,
+                'commit_id': tip_commit_id,
+                'parent_base': parent_base_commit_id,
+                'tip': tip_commit_id,
+            })
 
     def test_parse_revision_spec_one_arg(self):
         """Testing GitClient.parse_revision_spec with one specified revision"""
+        client = self.build_client()
+
         base_commit_id = self._git_get_head()
         self._git_add_file_commit('foo.txt', FOO2, 'Commit 2')
         tip_commit_id = self._git_get_head()
 
-        self.client.get_repository_info()
+        client.get_repository_info()
 
-        revisions = self.client.parse_revision_spec([tip_commit_id])
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' not in revisions)
-        self.assertEqual(revisions['base'], base_commit_id)
-        self.assertEqual(revisions['tip'], tip_commit_id)
+        self.assertEqual(
+            client.parse_revision_spec([tip_commit_id]),
+            {
+                'base': base_commit_id,
+                'commit_id': tip_commit_id,
+                'tip': tip_commit_id,
+            })
 
     def test_parse_revision_spec_one_arg_parent(self):
         """Testing GitClient.parse_revision_spec with one specified revision
-        and a parent diff"""
+        and a parent diff
+        """
+        client = self.build_client()
+
         parent_base_commit_id = self._git_get_head()
         self._git_add_file_commit('foo.txt', FOO2, 'Commit 2')
         base_commit_id = self._git_get_head()
         self._git_add_file_commit('foo.txt', FOO3, 'Commit 3')
         tip_commit_id = self._git_get_head()
 
-        self.client.get_repository_info()
+        client.get_repository_info()
 
-        revisions = self.client.parse_revision_spec([tip_commit_id])
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' in revisions)
-        self.assertEqual(revisions['parent_base'], parent_base_commit_id)
-        self.assertEqual(revisions['base'], base_commit_id)
-        self.assertEqual(revisions['tip'], tip_commit_id)
+        self.assertEqual(
+            client.parse_revision_spec([tip_commit_id]),
+            {
+                'base': base_commit_id,
+                'commit_id': tip_commit_id,
+                'parent_base': parent_base_commit_id,
+                'tip': tip_commit_id,
+            })
 
     def test_parse_revision_spec_two_args(self):
         """Testing GitClient.parse_revision_spec with two specified
-        revisions"""
+        revisions
+        """
+        client = self.build_client()
+
         base_commit_id = self._git_get_head()
         self._run_git(['checkout', '-b', 'topic-branch'])
         self._git_add_file_commit('foo.txt', FOO2, 'Commit 2')
         tip_commit_id = self._git_get_head()
 
-        self.client.get_repository_info()
+        client.get_repository_info()
 
-        revisions = self.client.parse_revision_spec(['master', 'topic-branch'])
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' not in revisions)
-        self.assertEqual(revisions['base'], base_commit_id)
-        self.assertEqual(revisions['tip'], tip_commit_id)
+        self.assertEqual(
+            client.parse_revision_spec(['master', 'topic-branch']),
+            {
+                'base': base_commit_id,
+                'tip': tip_commit_id,
+            })
 
     def test_parse_revision_spec_one_arg_two_revs(self):
         """Testing GitClient.parse_revision_spec with diff-since syntax"""
+        client = self.build_client()
+
         base_commit_id = self._git_get_head()
         self._run_git(['checkout', '-b', 'topic-branch'])
         self._git_add_file_commit('foo.txt', FOO2, 'Commit 2')
         tip_commit_id = self._git_get_head()
 
-        self.client.get_repository_info()
+        client.get_repository_info()
 
-        revisions = self.client.parse_revision_spec(['master..topic-branch'])
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' not in revisions)
-        self.assertEqual(revisions['base'], base_commit_id)
-        self.assertEqual(revisions['tip'], tip_commit_id)
+        self.assertEqual(
+            client.parse_revision_spec(['master...topic-branch']),
+            {
+                'base': base_commit_id,
+                'tip': tip_commit_id,
+            })
 
     def test_parse_revision_spec_one_arg_since_merge(self):
         """Testing GitClient.parse_revision_spec with diff-since-merge
-        syntax"""
+        syntax
+        """
+        client = self.build_client()
+
         base_commit_id = self._git_get_head()
         self._run_git(['checkout', '-b', 'topic-branch'])
         self._git_add_file_commit('foo.txt', FOO2, 'Commit 2')
         tip_commit_id = self._git_get_head()
 
-        self.client.get_repository_info()
+        client.get_repository_info()
 
-        revisions = self.client.parse_revision_spec(['master...topic-branch'])
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' not in revisions)
-        self.assertEqual(revisions['base'], base_commit_id)
-        self.assertEqual(revisions['tip'], tip_commit_id)
+        self.assertEqual(
+            client.parse_revision_spec(['master...topic-branch']),
+            {
+                'base': base_commit_id,
+                'tip': tip_commit_id,
+            })
 
     def test_diff_finding_parent(self):
         """Testing GitClient.parse_revision_spec with target branch off a
-        tracking branch not aligned with the remote"""
+        tracking branch not aligned with the remote
+        """
+        client = self.build_client()
+
         # In this case, the parent must be the non-aligned tracking branch
         # and the parent_base must be the remote tracking branch.
-        self.client.get_repository_info()
+        client.get_repository_info()
 
         self._git_add_file_commit('foo.txt', FOO1, 'on master')
         self._run_git(['checkout', 'not-master'])  # A remote branch
@@ -566,10 +995,7 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         self._git_add_file_commit('foo.txt', FOO4, 'commit 3')
         tip_commit_id = self._git_get_head()
 
-        self.client.get_repository_info()
-
-        revisions = self.client.parse_revision_spec(
-            ['topic-branch', '^not-master'])
+        client.get_repository_info()
 
         # revisions =
         #     {
@@ -587,35 +1013,35 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         #     |/
         #     * 18c5c09 (origin/master, origin/HEAD) Commit 1
         #     * e6a3577 Initial Commit
-
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertEqual(len(revisions), 3)
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' in revisions)
-        self.assertEqual(revisions['base'], parent_commit_id)
-        self.assertEqual(revisions['tip'], tip_commit_id)
-        self.assertEqual(revisions['parent_base'], parent_base_commit_id)
+        self.assertEqual(
+            client.parse_revision_spec(['topic-branch', '^not-master']),
+            {
+                'base': parent_commit_id,
+                'parent_base': parent_base_commit_id,
+                'tip': tip_commit_id,
+            })
 
     def test_diff_finding_parent_case_one(self):
         """Testing GitClient.parse_revision_spec with target branch off a
-        tracking branch aligned with the remote"""
+        tracking branch aligned with the remote
+        """
+        client = self.build_client(options={
+            'tracking': 'origin/not-master',
+        })
+
         # In this case, the parent_base should be the tracking branch aligned
         # with the remote.
-        self.client.get_repository_info()
+        client.get_repository_info()
 
         self._run_git(['fetch', 'origin'])
         self._run_git(['checkout', '-b', 'not-master',
                        '--track', 'origin/not-master'])
-        self.options.tracking = 'origin/not-master'
         parent_commit_id = self._git_get_head()
         self._run_git(['checkout', '-b', 'feature-branch'])
         self._git_add_file_commit('foo.txt', FOO3, 'on feature-branch')
         tip_commit_id = self._git_get_head()
 
-        self.client.get_repository_info()
-
-        revisions = self.client.parse_revision_spec()
+        client.get_repository_info()
 
         # revisions =
         #     {
@@ -629,23 +1055,25 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         #     * 0e88e51 (origin/not-master, not-master) Commit 2
         #     * 18c5c09 (origin/master, origin/HEAD, master) Commit 1
         #     * e6a3577 Initial Commit
-
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertEqual(len(revisions), 3)
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-
+        #
         # Because parent_base == base, parent_base will not be in revisions.
-        self.assertFalse('parent_base' in revisions)
-        self.assertEqual(revisions['base'], parent_commit_id)
-        self.assertEqual(revisions['tip'], tip_commit_id)
+        self.assertEqual(
+            client.parse_revision_spec(),
+            {
+                'base': parent_commit_id,
+                'commit_id': tip_commit_id,
+                'tip': tip_commit_id,
+            })
 
     def test_diff_finding_parent_case_two(self):
         """Testing GitClient.parse_revision_spec with target branch off
-        a tracking branch with changes since the remote"""
+        a tracking branch with changes since the remote
+        """
+        client = self.build_client()
+
         # In this case, the parent_base must be the remote tracking branch,
         # despite the fact that it is a few changes behind.
-        self.client.get_repository_info()
+        client.get_repository_info()
 
         self._run_git(['fetch', 'origin'])
         self._run_git(['checkout', '-b', 'not-master',
@@ -657,10 +1085,7 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         self._git_add_file_commit('foo.txt', FOO3, 'on feature-branch')
         tip_commit_id = self._git_get_head()
 
-        self.client.get_repository_info()
-
-        revisions = self.client.parse_revision_spec(['feature-branch',
-                                                     '^not-master'])
+        client.get_repository_info()
 
         # revisions =
         #     {
@@ -675,23 +1100,23 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         #     * 0e88e51 (origin/not-master) Commit 2
         #     * 18c5c09 (origin/master, origin/HEAD, master) Commit 1
         #     * e6a3577 Initial Commit
-
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertEqual(len(revisions), 3)
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' in revisions)
-        self.assertEqual(revisions['base'], parent_commit_id)
-        self.assertEqual(revisions['tip'], tip_commit_id)
-        self.assertEqual(revisions['parent_base'], parent_base_commit_id)
+        self.assertEqual(
+            client.parse_revision_spec(['feature-branch', '^not-master']),
+            {
+                'base': parent_commit_id,
+                'parent_base': parent_base_commit_id,
+                'tip': tip_commit_id,
+            })
 
     def test_diff_finding_parent_case_three(self):
         """Testing GitClient.parse_revision_spec with target branch off a
-        branch not properly tracking the remote"""
+        branch not properly tracking the remote
+        """
+        client = self.build_client()
 
         # In this case, the parent_base must be the remote tracking branch,
         # even though it is not properly being tracked.
-        self.client.get_repository_info()
+        client.get_repository_info()
 
         self._run_git(['branch', '--no-track', 'not-master',
                        'origin/not-master'])
@@ -701,10 +1126,7 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         self._git_add_file_commit('foo.txt', FOO3, 'on feature-branch')
         tip_commit_id = self._git_get_head()
 
-        self.client.get_repository_info()
-
-        revisions = self.client.parse_revision_spec(['feature-branch',
-                                                     '^not-master'])
+        client.get_repository_info()
 
         # revisions =
         #     {
@@ -717,21 +1139,22 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         #     * 0e88e51 (origin/not-master, not-master) Commit 2
         #     * 18c5c09 (origin/master, origin/HEAD, master) Commit 1
         #     * e6a3577 Initial Commit
-
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertEqual(len(revisions), 2)
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertFalse('parent_base' in revisions)
-        self.assertEqual(revisions['base'], parent_commit_id)
-        self.assertEqual(revisions['tip'], tip_commit_id)
+        self.assertEqual(
+            client.parse_revision_spec(['feature-branch', '^not-master']),
+            {
+                'base': parent_commit_id,
+                'tip': tip_commit_id,
+            })
 
     def test_diff_finding_parent_case_four(self):
         """Testing GitClient.parse_revision_spec with a target branch that
-        merged a tracking branch off another tracking branch"""
+        merged a tracking branch off another tracking branch
+        """
+        client = self.build_client()
+
         # In this case, the parent_base must be the base of the merge, because
         # the user will expect that the diff would show the merged changes.
-        self.client.get_repository_info()
+        client.get_repository_info()
 
         self._run_git(['checkout', 'master'])
         parent_commit_id = self._git_get_head()
@@ -740,9 +1163,7 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         self._run_git(['merge', 'origin/not-master'])
         tip_commit_id = self._git_get_head()
 
-        self.client.get_repository_info()
-
-        revisions = self.client.parse_revision_spec()
+        client.get_repository_info()
 
         # revisions =
         #     {
@@ -760,37 +1181,36 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         #     |/
         #     * 18c5c09 (origin/master, origin/HEAD, master) Commit 1
         #     * e6a3577 Initial Commit
-
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertEqual(len(revisions), 3)
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('commit_id' in revisions)
-        self.assertFalse('parent_base' in revisions)
-        self.assertEqual(revisions['base'], parent_commit_id)
-        self.assertEqual(revisions['tip'], tip_commit_id)
-        self.assertEqual(revisions['commit_id'], tip_commit_id)
+        self.assertEqual(
+            client.parse_revision_spec(),
+            {
+                'base': parent_commit_id,
+                'commit_id': tip_commit_id,
+                'tip': tip_commit_id,
+            })
 
     def test_diff_finding_parent_case_five(self):
         """Testing GitClient.parse_revision_spec with a target branch posted
-        off a tracking branch that merged another tracking branch"""
+        off a tracking branch that merged another tracking branch
+        """
+        client = self.build_client(options={
+            'tracking': 'origin/not-master',
+        })
+
         # In this case, the parent_base must be tracking branch that merged
         # the other tracking branch.
-        self.client.get_repository_info()
+        client.get_repository_info()
 
         self._git_add_file_commit('foo.txt', FOO2, 'on master')
         self._run_git(['checkout', '-b', 'not-master',
                        '--track', 'origin/not-master'])
-        self.options.tracking = 'origin/not-master'
         self._run_git(['merge', 'origin/master'])
         parent_commit_id = self._git_get_head()
         self._run_git(['checkout', '-b', 'feature-branch'])
         self._git_add_file_commit('foo.txt', FOO4, 'on feature-branch')
         tip_commit_id = self._git_get_head()
 
-        self.client.get_repository_info()
-
-        revisions = self.client.parse_revision_spec()
+        client.get_repository_info()
 
         # revisions =
         #     {
@@ -806,23 +1226,23 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         #     |/
         #     * 18c5c09 (origin/master, origin/HEAD) Commit 1
         #     * e6a3577 Initial Commit
-
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertEqual(len(revisions), 3)
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('commit_id' in revisions)
-        self.assertFalse('parent_base' in revisions)
-        self.assertEqual(revisions['base'], parent_commit_id)
-        self.assertEqual(revisions['tip'], tip_commit_id)
-        self.assertEqual(revisions['commit_id'], tip_commit_id)
+        self.assertEqual(
+            client.parse_revision_spec(),
+            {
+                'base': parent_commit_id,
+                'commit_id': tip_commit_id,
+                'tip': tip_commit_id,
+            })
 
     def test_diff_finding_parent_case_six(self):
         """Testing GitClient.parse_revision_spec with a target branch posted
-        off a remote branch without any tracking branches"""
+        off a remote branch without any tracking branches
+        """
+        client = self.build_client()
+
         # In this case, the parent_base must be remote tracking branch. The
         # existence of a tracking branch shouldn't matter much.
-        self.client.get_repository_info()
+        client.get_repository_info()
 
         self._run_git(['checkout', '-b', 'feature-branch',
                        'origin/not-master'])
@@ -830,7 +1250,7 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         self._git_add_file_commit('foo.txt', FOO2, 'on feature-branch')
         tip_commit_id = self._git_get_head()
 
-        self.client.get_repository_info()
+        client.get_repository_info()
 
         # revisions =
         #     {
@@ -844,32 +1264,30 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         #     * 0e88e51 (origin/not-master) Commit 2
         #     * 18c5c09 (origin/master, origin/HEAD, master) Commit 1
         #     * e6a3577 Initial Commit
-
-        revisions = self.client.parse_revision_spec([])
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertEqual(len(revisions), 3)
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('commit_id' in revisions)
-        self.assertFalse('parent_base' in revisions)
-        self.assertEqual(revisions['base'], parent_commit_id)
-        self.assertEqual(revisions['tip'], tip_commit_id)
-        self.assertEqual(revisions['commit_id'], tip_commit_id)
+        self.assertEqual(
+            client.parse_revision_spec([]),
+            {
+                'base': parent_commit_id,
+                'commit_id': tip_commit_id,
+                'tip': tip_commit_id,
+            })
 
     def test_diff_finding_parent_case_seven(self):
         """Testing GitClient.parse_revision_spec with a target branch posted
         off a remote branch that is aligned to the same commit as another
         remote branch
         """
+        client = self.build_client()
+
         # In this case, the parent_base must be common commit that the two
         # remote branches are aligned to.
-        self.client.get_repository_info()
+        client.get_repository_info()
 
         # Since pushing data upstream to the test repo corrupts its state,
         # we need to use the child clone.
         os.chdir(self.child_clone_dir)
 
-        self.client.get_repository_info()
+        client.get_repository_info()
 
         self._run_git(['checkout', '-b', 'remote-branch1'])
         self._git_add_file_commit('foo1.txt', FOO1, 'on remote-branch1')
@@ -892,9 +1310,6 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
 
         tip_commit_id = self._git_get_head()
 
-        revisions = self.client.parse_revision_spec(['feature-branch',
-                                                     '^master'])
-
         # revisions =
         #     {
         #         'base': u'bf0036b',
@@ -909,29 +1324,29 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         #     * eb40eaf (remote-branch1) on remote-branch1
         #     * 18c5c09 (origin/master, origin/HEAD) Commit 1
         #     * e6a3577 Initial Commit
-
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertEqual(len(revisions), 2)
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertFalse('parent_base' in revisions)
-        self.assertEqual(revisions['base'], parent_commit_id)
-        self.assertEqual(revisions['tip'], tip_commit_id)
+        self.assertEqual(
+            client.parse_revision_spec(['feature-branch', '^master']),
+            {
+                'base': parent_commit_id,
+                'tip': tip_commit_id,
+            })
 
     def test_diff_finding_parent_case_eight(self):
         """Testing GitClient.parse_revision_spec with a target branch not
         up-to-date with a remote branch
         """
+        client = self.build_client()
+
         # In this case, there is no good way of detecting the remote branch we
         # are not up-to-date with, so the parent_base must be the common commit
         # that the target branch and remote branch share.
-        self.client.get_repository_info()
+        client.get_repository_info()
 
         # Since pushing data upstream to the test repo corrupts its state,
         # we need to use the child clone.
         os.chdir(self.child_clone_dir)
 
-        self.client.get_repository_info()
+        client.get_repository_info()
 
         self._run_git(['checkout', 'master'])
         self._git_add_file_commit('foo.txt', FOO1, 'on master')
@@ -949,11 +1364,8 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         self._run_git(['checkout', '-b', 'feature-branch'])
         self._git_add_file_commit('foo3.txt', FOO1, 'on feature-branch')
 
-        self.client.get_repository_info()
+        client.get_repository_info()
         tip_commit_id = self._git_get_head()
-
-        revisions = self.client.parse_revision_spec(['feature-branch',
-                                                     '^master'])
 
         # revisions =
         #     {
@@ -970,30 +1382,30 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         #     * 0ff6635 on master
         #     * 18c5c09 (origin/master, origin/HEAD) Commit 1
         #     * e6a3577 Initial Commit
-
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertEqual(len(revisions), 3)
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' in revisions)
-        self.assertEqual(revisions['parent_base'], parent_base_commit_id)
-        self.assertEqual(revisions['base'], parent_commit_id)
-        self.assertEqual(revisions['tip'], tip_commit_id)
+        self.assertEqual(
+            client.parse_revision_spec(['feature-branch', '^master']),
+            {
+                'base': parent_commit_id,
+                'parent_base': parent_base_commit_id,
+                'tip': tip_commit_id,
+            })
 
     def test_diff_finding_parent_case_nine(self):
         """Testing GitClient.parse_revision_spec with a target branch that has
         branches from different remotes in its path
         """
+        client = self.build_client()
+
         # In this case, the other remotes should be ignored and the parent_base
         # should be some origin/*.
-        self.client.get_repository_info()
+        client.get_repository_info()
         self._run_git(['checkout', 'not-master'])
 
         # Since pushing data upstream to the test repo corrupts its state,
         # we need to use the child clone.
         os.chdir(self.grandchild_clone_dir)
 
-        self.client.get_repository_info()
+        client.get_repository_info()
 
         # Adding the original clone as a second remote to our repository.
         self._run_git(['remote', 'add', 'not-origin', self.orig_clone_dir])
@@ -1012,9 +1424,6 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         self._git_add_file_commit('foo3.txt', FOO1, 'on feature-branch')
         tip_commit_id = self._git_get_head()
 
-        revisions = self.client.parse_revision_spec(['feature-branch',
-                                                     '^master'])
-
         # revisions =
         #     {
         #         'base': u'6f23ed0',
@@ -1030,194 +1439,230 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         #     |/
         #     * 18c5c09 (origin/master, origin/HEAD) Commit 1
         #     * e6a3577 Initial Commit
-
-        self.assertTrue(isinstance(revisions, dict))
-        self.assertEqual(len(revisions), 3)
-        self.assertTrue('base' in revisions)
-        self.assertTrue('tip' in revisions)
-        self.assertTrue('parent_base' in revisions)
-        self.assertEqual(revisions['parent_base'], parent_base_commit_id)
-        self.assertEqual(revisions['base'], parent_commit_id)
-        self.assertEqual(revisions['tip'], tip_commit_id)
+        self.assertEqual(
+            client.parse_revision_spec(['feature-branch', '^master']),
+            {
+                'base': parent_commit_id,
+                'parent_base': parent_base_commit_id,
+                'tip': tip_commit_id,
+            })
 
     def test_get_raw_commit_message(self):
         """Testing GitClient.get_raw_commit_message"""
-        self._git_add_file_commit('foo.txt', FOO2, 'Commit 2')
-        self.client.get_repository_info()
-        revisions = self.client.parse_revision_spec()
+        client = self.build_client()
 
-        self.assertEqual(self.client.get_raw_commit_message(revisions),
+        self._git_add_file_commit('foo.txt', FOO2, 'Commit 2')
+        client.get_repository_info()
+        revisions = client.parse_revision_spec()
+
+        self.assertEqual(client.get_raw_commit_message(revisions),
                          'Commit 2')
 
     def test_push_upstream_pull_exception(self):
         """Testing GitClient.push_upstream with an invalid remote branch"""
+        client = self.build_client()
+
         # It must raise a PushError exception because the 'git pull' from an
         # invalid upstream branch will fail.
         with self.assertRaisesMessage(PushError,
                                       'Could not determine remote for branch '
                                       '"non-existent-branch".'):
-            self.client.push_upstream('non-existent-branch')
+            client.push_upstream('non-existent-branch')
 
     def test_push_upstream_no_push_exception(self):
         """Testing GitClient.push_upstream with 'git push' disabled"""
+        client = self.build_client()
+
         # Set the push url to be an invalid one.
         self._run_git(['remote', 'set-url', '--push', 'origin', 'bad-url'])
 
         with self.assertRaisesMessage(PushError,
                                       'Could not push branch "master" to '
                                       'upstream.'):
-            self.client.push_upstream('master')
+            client.push_upstream('master')
 
     def test_merge_invalid_destination(self):
         """Testing GitClient.merge with an invalid destination branch"""
+        client = self.build_client()
+
         # It must raise a MergeError exception because 'git checkout' to the
         # invalid destination branch will fail.
         try:
-            self.client.merge('master', 'non-existent-branch',
-                              'commit message', self.AUTHOR)
+            client.merge(target='master',
+                         destination='non-existent-branch',
+                         message='commit message',
+                         author=self.AUTHOR)
         except MergeError as e:
-            self.assertTrue(six.text_type(e).startswith(
+            self.assertTrue(str(e).startswith(
                 'Could not checkout to branch "non-existent-branch"'))
         else:
             self.fail('Expected MergeError')
 
     def test_merge_invalid_target(self):
         """Testing GitClient.merge with an invalid target branch"""
+        client = self.build_client()
+
         # It must raise a MergeError exception because 'git merge' from an
         # invalid target branch will fail.
         try:
-            self.client.merge('non-existent-branch', 'master',
-                              'commit message', self.AUTHOR)
+            client.merge(target='non-existent-branch',
+                         destination='master',
+                         message='commit message',
+                         author=self.AUTHOR)
         except MergeError as e:
-            self.assertTrue(six.text_type(e).startswith(
+            self.assertTrue(str(e).startswith(
                 'Could not merge branch "non-existent-branch"'))
         else:
             self.fail('Expected MergeError')
 
     def test_merge_with_squash(self):
         """Testing GitClient.merge with squash set to True"""
+        client = self.build_client()
+
         # We use a KGB function spy to check if execute is called with the
         # right arguments i.e. with the '--squash' flag (and not with the
         # '--no-ff' flag.
         self.spy_on(execute)
 
-        self.client.get_repository_info()
+        client.get_repository_info()
 
         # Since pushing data upstream to the test repo corrupts its state,
         # we need to use the child clone.
         os.chdir(self.child_clone_dir)
 
-        self.client.get_repository_info()
+        client.get_repository_info()
 
         self._run_git(['checkout', '-b', 'new-branch'])
         self._git_add_file_commit('foo1.txt', FOO1, 'on new-branch')
         self._run_git(['push', 'origin', 'new-branch'])
 
-        self.client.merge('new-branch', 'master', 'message', self.AUTHOR,
-                          True)
+        client.merge(target='new-branch',
+                     destination='master',
+                     message='message',
+                     author=self.AUTHOR,
+                     squash=True)
 
-        self.assertEqual(execute.spy.calls[-2].args[0],
-                         ['git', 'merge', 'new-branch', '--squash',
-                          '--no-commit'])
+        self.assertSpyCalledWith(
+            execute.calls[-2],
+            ['git', 'merge', 'new-branch', '--squash', '--no-commit'])
 
     def test_merge_without_squash(self):
         """Testing GitClient.merge with squash set to False"""
+        client = self.build_client()
+
         # We use a KGB function spy to check if execute is called with the
         # right arguments i.e. with the '--no-ff' flag (and not with the
         # '--squash' flag).
         self.spy_on(execute)
 
-        self.client.get_repository_info()
+        client.get_repository_info()
 
         # Since pushing data upstream to the test repo corrupts its state,
         # we need to use the child clone.
         os.chdir(self.child_clone_dir)
 
-        self.client.get_repository_info()
+        client.get_repository_info()
 
         self._run_git(['checkout', '-b', 'new-branch'])
         self._git_add_file_commit('foo1.txt', FOO1, 'on new-branch')
         self._run_git(['push', 'origin', 'new-branch'])
 
-        self.client.merge('new-branch', 'master', 'message', self.AUTHOR,
-                          False)
+        client.merge(target='new-branch',
+                     destination='master',
+                     message='message',
+                     author=self.AUTHOR,
+                     squash=False)
 
-        self.assertEqual(execute.spy.calls[-2].args[0],
-                         ['git', 'merge', 'new-branch', '--no-ff',
-                          '--no-commit'])
+        self.assertSpyCalledWith(
+            execute.calls[-2],
+            ['git', 'merge', 'new-branch', '--no-ff', '--no-commit'])
 
     def test_create_commit_with_run_editor_true(self):
         """Testing GitClient.create_commit with run_editor set to True"""
+        client = self.build_client()
+
         self.spy_on(execute)
 
         with open('foo.txt', 'w') as fp:
             fp.write('change')
 
-        self.client.create_commit(message='Test commit message.',
-                                  author=self.AUTHOR,
-                                  run_editor=True,
-                                  files=['foo.txt'])
+        client.create_commit(message='Test commit message.',
+                             author=self.AUTHOR,
+                             run_editor=True,
+                             files=['foo.txt'])
 
-        self.assertTrue(execute.last_called_with(
+        self.assertSpyLastCalledWith(
+            execute,
             ['git', 'commit', '-m', 'TEST COMMIT MESSAGE.',
-             '--author', 'name <email>']))
+             '--author', 'name <email>'])
 
     def test_create_commit_with_run_editor_false(self):
         """Testing GitClient.create_commit with run_editor set to False"""
+        client = self.build_client()
+
         self.spy_on(execute)
 
         with open('foo.txt', 'w') as fp:
             fp.write('change')
 
-        self.client.create_commit(message='Test commit message.',
-                                  author=self.AUTHOR,
-                                  run_editor=False,
-                                  files=['foo.txt'])
+        client.create_commit(message='Test commit message.',
+                             author=self.AUTHOR,
+                             run_editor=False,
+                             files=['foo.txt'])
 
-        self.assertTrue(execute.last_called_with(
+        self.assertSpyLastCalledWith(
+            execute,
             ['git', 'commit', '-m', 'Test commit message.',
-             '--author', 'name <email>']))
+             '--author', 'name <email>'])
 
     def test_create_commit_with_all_files_true(self):
         """Testing GitClient.create_commit with all_files set to True"""
+        client = self.build_client()
+
         self.spy_on(execute)
 
         with open('foo.txt', 'w') as fp:
             fp.write('change')
 
-        self.client.create_commit(message='message',
-                                  author=self.AUTHOR,
-                                  run_editor=False,
-                                  files=[],
-                                  all_files=True)
+        client.create_commit(message='message',
+                             author=self.AUTHOR,
+                             run_editor=False,
+                             files=[],
+                             all_files=True)
 
-        self.assertTrue(execute.calls[0].called_with(
-            ['git', 'add', '--all', ':/']))
-        self.assertTrue(execute.last_called_with(
-            ['git', 'commit', '-m', 'message',
-             '--author', 'name <email>']))
+        self.assertSpyCalledWith(
+            execute.calls[0],
+            ['git', 'add', '--all', ':/'])
+        self.assertSpyLastCalledWith(
+            execute,
+            ['git', 'commit', '-m', 'message', '--author', 'name <email>'])
 
     def test_create_commit_with_all_files_false(self):
         """Testing GitClient.create_commit with all_files set to False"""
+        client = self.build_client()
+
         self.spy_on(execute)
 
         with open('foo.txt', 'w') as fp:
             fp.write('change')
 
-        self.client.create_commit(message='message',
-                                  author=self.AUTHOR,
-                                  run_editor=False,
-                                  files=['foo.txt'],
-                                  all_files=False)
+        client.create_commit(message='message',
+                             author=self.AUTHOR,
+                             run_editor=False,
+                             files=['foo.txt'],
+                             all_files=False)
 
-        self.assertTrue(execute.calls[0].called_with(
-            ['git', 'add', 'foo.txt']))
-        self.assertTrue(execute.last_called_with(
-            ['git', 'commit', '-m', 'message',
-             '--author', 'name <email>']))
+        self.assertSpyCalledWith(
+            execute.calls[0],
+            ['git', 'add', 'foo.txt'])
+        self.assertSpyLastCalledWith(
+            execute,
+            ['git', 'commit', '-m', 'message', '--author', 'name <email>'])
 
     def test_create_commit_with_empty_commit_message(self):
         """Testing GitClient.create_commit with empty commit message"""
+        client = self.build_client()
+
         with open('foo.txt', 'w') as fp:
             fp.write('change')
 
@@ -1228,58 +1673,67 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         )
 
         with self.assertRaisesMessage(CreateCommitError, message):
-            self.client.create_commit(message='',
-                                      author=self.AUTHOR,
-                                      run_editor=True,
-                                      files=['foo.txt'])
+            client.create_commit(message='',
+                                 author=self.AUTHOR,
+                                 run_editor=True,
+                                 files=['foo.txt'])
 
     def test_create_commit_without_author(self):
         """Testing GitClient.create_commit without author information"""
+        client = self.build_client()
+
         self.spy_on(execute)
 
         with open('foo.txt', 'w') as fp:
             fp.write('change')
 
-        self.client.create_commit(message='Test commit message.',
-                                  author=None,
-                                  run_editor=True,
-                                  files=['foo.txt'])
+        client.create_commit(message='Test commit message.',
+                             author=None,
+                             run_editor=True,
+                             files=['foo.txt'])
 
-        self.assertTrue(execute.last_called_with(
-            ['git', 'commit', '-m', 'TEST COMMIT MESSAGE.']))
+        self.assertSpyLastCalledWith(
+            execute,
+            ['git', 'commit', '-m', 'TEST COMMIT MESSAGE.'])
 
     def test_delete_branch_with_merged_only(self):
         """Testing GitClient.delete_branch with merged_only set to True"""
+        client = self.build_client()
+
         # We use a KGB function spy to check if execute is called with the
         # right arguments i.e. with the -d flag (and not the -D flag).
         self.spy_on(execute)
 
         self._run_git(['branch', 'new-branch'])
 
-        self.client.delete_branch('new-branch', True)
+        client.delete_branch('new-branch', merged_only=True)
 
-        self.assertTrue(execute.spy.called)
-        self.assertEqual(execute.spy.last_call.args[0],
-                         ['git', 'branch', '-d', 'new-branch'])
+        self.assertSpyLastCalledWith(
+            execute,
+            ['git', 'branch', '-d', 'new-branch'])
 
     def test_delete_branch_without_merged_only(self):
         """Testing GitClient.delete_branch with merged_only set to False"""
+        client = self.build_client()
+
         # We use a KGB function spy to check if execute is called with the
         # right arguments i.e. with the -D flag (and not the -d flag).
         self.spy_on(execute)
 
         self._run_git(['branch', 'new-branch'])
 
-        self.client.delete_branch('new-branch', False)
+        client.delete_branch('new-branch', merged_only=False)
 
-        self.assertTrue(execute.spy.called)
-        self.assertEqual(execute.spy.last_call.args[0],
-                         ['git', 'branch', '-D', 'new-branch'])
+        self.assertSpyLastCalledWith(
+            execute,
+            ['git', 'branch', '-D', 'new-branch'])
 
     def test_get_parent_branch_with_non_master_default(self):
         """Testing GitClient._get_parent_branch with a non-master default
         branch
         """
+        client = self.build_client()
+
         # Since pushing data upstream to the test repo corrupts its state,
         # we need to use the child clone.
         os.chdir(self.child_clone_dir)
@@ -1287,6 +1741,6 @@ class GitClientTests(SpyAgency, SCMClientTestCase):
         self._run_git(['branch', '-m', 'master', 'main'])
         self._run_git(['push', '-u', 'origin', 'main'])
 
-        self.client.get_repository_info()
+        client.get_repository_info()
 
-        self.assertEqual(self.client._get_parent_branch(), 'origin/main')
+        self.assertEqual(client._get_parent_branch(), 'origin/main')

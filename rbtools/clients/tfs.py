@@ -8,11 +8,13 @@ import re
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
+from typing import Dict, List, Optional, cast
 
 from six.moves.urllib.parse import unquote
 
-from rbtools.clients import RepositoryInfo, SCMClient
+from rbtools.clients import BaseSCMClient, RepositoryInfo
 from rbtools.clients.errors import (InvalidRevisionSpecError,
+                                    SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
 from rbtools.utils.appdirs import user_data_dir
@@ -21,12 +23,14 @@ from rbtools.utils.diffs import filename_match_any_patterns
 from rbtools.utils.process import execute
 
 
-class TFExeWrapper(object):
-    """Implementation wrapper for using VS2017's tf.exe."""
+class BaseTFWrapper:
+    """Base class for TF wrappers.
 
-    REVISION_WORKING_COPY = '--rbtools-working-copy'
+    Version Added:
+        4.0
+    """
 
-    def __init__(self, config=None, options=None):
+    def __init__(self, *, config=None, options=None):
         """Initialize the wrapper.
 
         Args:
@@ -39,11 +43,144 @@ class TFExeWrapper(object):
         self.config = config
         self.options = options
 
-    def get_local_path(self):
+    def check_dependencies(self) -> None:
+        """Check whether all dependencies for the client are available.
+
+        By default, no dependencies are checked.
+        """
+        pass
+
+    def get_local_path(self) -> Optional[str]:
         """Return the local path to the working tree.
 
         Returns:
-            unicode:
+            str:
+            The filesystem path of the repository on the client system.
+        """
+        raise NotImplementedError
+
+    def get_repository_info(self) -> Optional[RepositoryInfo]:
+        """Return repository information for the current working tree.
+
+        Returns:
+            rbtools.clients.base.repository.RepositoryInfo:
+            The repository info structure.
+        """
+        raise NotImplementedError
+
+    def parse_revision_spec(
+        self,
+        revisions: List[str],
+    ) -> Dict[str, str]:
+        """Parse the given revision spec.
+
+        Args:
+            revisions (list of str):
+                A list of revisions as specified by the user. Items in the list
+                do not necessarily represent a single revision, since the user
+                can use the TFS-native syntax of ``r1~r2``. Versions passed in
+                can be any versionspec, such as a changeset number,
+                ``L``-prefixed label name, ``W`` (latest workspace version), or
+                ``T`` (latest upstream version).
+
+        Raises:
+            rbtools.clients.errors.TooManyRevisionsError:
+                Too many revisions were specified.
+
+            rbtools.clients.errors.InvalidRevisionSpecError:
+                The given revision spec could not be parsed.
+
+        Returns:
+            dict:
+            A dictionary with the following keys:
+
+            Keys:
+                base (str):
+                    A revision to use as the base of the resulting diff.
+
+                tip (str):
+                    A revision to use as the tip of the resulting diff.
+
+                parent_base (str, optional):
+                    The revision to use as the base of a parent diff.
+
+            These will be used to generate the diffs to upload to Review Board
+            (or print). The diff for review will include the changes in (base,
+            tip], and the parent diff (if necessary) will include (parent,
+            base].
+
+            If a single revision is passed in, this will return the parent of
+            that revision for "base" and the passed-in revision for "tip".
+
+            If zero revisions are passed in, this will return revisions
+            relevant for the "current change" (changes in the work folder which
+            have not yet been checked in).
+        """
+        raise NotImplementedError
+
+    def diff(self, revisions, include_files, exclude_patterns, **kwargs):
+        """Return the generated diff.
+
+        Args:
+            revisions (dict):
+                A dictionary containing ``base`` and ``tip`` keys.
+
+            include_files (list):
+                A list of file paths to include in the diff.
+
+            exclude_patterns (list):
+                A list of file paths to exclude from the diff.
+
+            **kwargs (dict, unused):
+                Unused keyword arguments.
+
+        Returns:
+            dict:
+            A dictionary containing the following:
+
+            Keys:
+                diff (bytes):
+                    The contents of the diff to upload.
+
+                base_commit_id (str, optional):
+                    The ID of the commit that the change is based on, if
+                    available. This is necessary for some hosting services
+                    that don't provide individual file access.
+        """
+        raise NotImplementedError
+
+
+class TFExeWrapper(BaseTFWrapper):
+    """Implementation wrapper for using VS2017's tf.exe."""
+
+    REVISION_WORKING_COPY = '--rbtools-working-copy'
+
+    def check_dependencies(self) -> None:
+        """Check whether all dependencies for the client are available.
+
+        This will check for ``tf.exe``.
+
+        Raises:
+            rbtools.clients.errors.SCMClientDependencyError:
+                A :command:`tf` tool could not be found.
+        """
+        try:
+            tf_vc_output = execute(['tf', 'vc', 'help'],
+                                   ignore_errors=True,
+                                   none_on_ignored_error=True)
+        except OSError:
+            tf_vc_output = None
+
+        # VS2015 has a tf.exe but it's not good enough.
+        if (not tf_vc_output or
+            'Version Control Tool, Version 15' not in tf_vc_output):
+            raise SCMClientDependencyError(missing_exes=['tf'])
+
+    def get_local_path(self) -> Optional[str]:
+        """Return the local path to the working tree.
+
+        Returns:
+            str:
             The filesystem path of the repository on the client system.
         """
         workfold = self._run_tf(['vc', 'workfold', os.getcwd()])
@@ -56,11 +193,11 @@ class TFExeWrapper(object):
         logging.debug('Could not find the collection from "tf vc workfold"')
         return None
 
-    def get_repository_info(self):
+    def get_repository_info(self) -> Optional[RepositoryInfo]:
         """Return repository information for the current working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            rbtools.clients.base.repository.RepositoryInfo:
             The repository info structure.
         """
         path = self.get_local_path()
@@ -205,7 +342,7 @@ class TFExeWrapper(object):
             ``diff`` (:py:class:`bytes`):
                 The contents of the diff to upload.
 
-            ``base_commit_id` (:py:class:`unicode`, optional):
+            ``base_commit_id`` (:py:class:`unicode`, optional):
                 The ID of the commit that the change is based on, if available.
                 This is necessary for some hosting services that don't provide
                 individual file access.
@@ -276,7 +413,7 @@ class TFExeWrapper(object):
                 filename_match_any_patterns(local_filename,
                                             exclude_patterns,
                                             base_dir=None)):
-                    continue
+                continue
 
             if 'Add' in action:
                 old_filename = b'/dev/null'
@@ -372,31 +509,32 @@ class TFExeWrapper(object):
         return execute(command, ignore_errors=True, **kwargs)
 
 
-class TEEWrapper(object):
+class TEEWrapper(BaseTFWrapper):
     """Implementation wrapper for using Team Explorer Everywhere."""
 
     REVISION_WORKING_COPY = '--rbtools-working-copy'
 
-    def __init__(self, config=None, options=None):
-        """Initialize the wrapper.
+    @classmethod
+    def get_default_tf_locations(
+        self,
+        target_platform: str = sys.platform
+    ) -> List[str]:
+        """Return default locations for tf.cmd for the given platform.
+
+        Version Added:
+            4.0
 
         Args:
-            config (dict, optional):
-                The loaded configuration.
+            target_platform (str):
+                The platform to return paths for.
 
-            options (argparse.Namespace, optional):
-                The command line options.
+        Returns:
+            list of str:
+            The list of possible platforms.
         """
-        self.config = config
-        self.options = options
-
-        self.tf = None
         tf_locations = []
 
-        if options and getattr(options, 'tf_cmd', None):
-            tf_locations.append(options.tf_cmd)
-
-        if sys.platform.startswith('win'):
+        if target_platform.startswith('win'):
             # First check in the system path. If that doesn't work, look in the
             # two standard install locations.
             tf_locations.extend([
@@ -409,12 +547,51 @@ class TEEWrapper(object):
         else:
             tf_locations.append('tf')
 
+        return tf_locations
+
+    def __init__(self, **kwargs):
+        """Initialize the wrapper.
+
+        Args:
+            **kwargs (dict):
+                Keyword arguments to pass to the parent class.
+        """
+        super().__init__(**kwargs)
+
+        self.tf = None
+
+    def check_dependencies(self) -> None:
+        """Check whether all dependencies for the client are available.
+
+        This checks for the presence of :command:`tf` or :command:`tf.cmd`
+        in known locations and in the system path.
+
+        It will also include the :option:`--tf-cmd` location, if provided.
+
+        Version Added:
+            4.0
+
+        Raises:
+            rbtools.clients.errors.SCMClientDependencyError:
+                A :command:`tf` tool could not be found.
+        """
+        options = self.options
+        tf_locations = []
+
+        if options and getattr(options, 'tf_cmd', None):
+            tf_locations.append(options.tf_cmd)
+
+        tf_locations += self.get_default_tf_locations()
+
         for location in tf_locations:
             location = os.path.expandvars(location)
 
             if check_install([location, 'help']):
                 self.tf = location
-                break
+                return
+
+        # To help with debugging, we'll include the full path on each.
+        raise SCMClientDependencyError(missing_exes=[tuple(tf_locations)])
 
     def get_local_path(self):
         """Return the local path to the working tree.
@@ -423,9 +600,7 @@ class TEEWrapper(object):
             unicode:
             The filesystem path of the repository on the client system.
         """
-        if self.tf is None:
-            logging.debug('Unable to execute "tf help": skipping TFS')
-            return None
+        assert self.tf is not None
 
         workfold = self._run_tf(['workfold', os.getcwd()])
 
@@ -441,7 +616,7 @@ class TEEWrapper(object):
         """Return repository information for the current working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            rbtools.clients.base.repository.RepositoryInfo:
             The repository info structure.
         """
         path = self.get_local_path()
@@ -598,7 +773,7 @@ class TEEWrapper(object):
             ``diff`` (:py:class:`bytes`):
                 The contents of the diff to upload.
 
-            ``base_commit_id` (:py:class:`unicode`, optional):
+            ``base_commit_id`` (:py:class:`unicode`, optional):
                 The ID of the commit that the change is based on, if available.
                 This is necessary for some hosting services that don't provide
                 individual file access.
@@ -765,10 +940,14 @@ class TEEWrapper(object):
             unicode:
             The output of the command.
         """
+        assert self.tf is not None
+
         cmdline = [self.tf, '-noprompt']
 
-        if getattr(self.options, 'tfs_login', None):
-            cmdline.append('-login:%s' % self.options.tfs_login)
+        tfs_login = getattr(self.options, 'tfs_login')
+
+        if tfs_login:
+            cmdline.append('-login:%s' % tfs_login)
 
         cmdline += args
 
@@ -781,25 +960,44 @@ class TEEWrapper(object):
         return execute(cmdline, ignore_errors=True, **kwargs)
 
 
-class TFHelperWrapper(object):
+class TFHelperWrapper(BaseTFWrapper):
     """Implementation wrapper using our own helper."""
 
-    def __init__(self, helper_path, config=None, options=None):
+    def __init__(self, **kwargs) -> None:
         """Initialize the wrapper.
 
         Args:
-            helper_path (unicode):
-                The path to the helper binary.
-
-            config (dict, optional):
-                The loaded configuration.
-
-            options (argparse.Namespace, optional):
-                The command line options.
+            **kwargs (dict):
+                Keyword arguments to pass to the parent class.
         """
-        self.helper_path = helper_path
-        self.config = config
-        self.options = options
+        super().__init__(**kwargs)
+
+        self.helper_path = os.path.join(
+            user_data_dir('rbtools'), 'packages', 'tfs', 'rb-tfs.jar')
+
+    def check_dependencies(self) -> None:
+        """Check whether all dependencies for the client are available.
+
+        This will check that :command:`java` is installed, so the provided
+        JAR file can be used.
+
+        Version Added:
+            4.0
+
+        Raises:
+            rbtools.clients.errors.SCMClientDependencyError:
+                :command:`java` could not be found.
+        """
+        missing_exes: SCMClientDependencyError.MissingList = []
+
+        if not os.path.exists(self.helper_path):
+            missing_exes.append(self.helper_path)
+
+        if not check_install(['java']):
+            missing_exes.append('java')
+
+        if missing_exes:
+            raise SCMClientDependencyError(missing_exes=missing_exes)
 
     def get_local_path(self):
         """Return the local path to the working tree.
@@ -820,7 +1018,7 @@ class TFHelperWrapper(object):
         """Return repository information for the current working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            rbtools.clients.base.repository.RepositoryInfo:
             The repository info structure.
         """
         path = self.get_local_path()
@@ -908,7 +1106,7 @@ class TFHelperWrapper(object):
             ``diff`` (:py:class:`bytes`):
                 The contents of the diff to upload.
 
-            ``base_commit_id` (:py:class:`unicode`, optional):
+            ``base_commit_id`` (:py:class:`unicode`, optional):
                 The ID of the commit that the change is based on, if available.
                 This is necessary for some hosting services that don't provide
                 individual file access.
@@ -986,59 +1184,106 @@ class TFHelperWrapper(object):
                        **kwargs)
 
 
-class TFSClient(SCMClient):
+class TFSClient(BaseSCMClient):
     """A client for Team Foundation Server."""
 
+    scmclient_id = 'tfs'
     name = 'Team Foundation Server'
     server_tool_names = 'Team Foundation Server'
     supports_diff_exclude_patterns = True
     supports_patch_revert = True
 
-    def __init__(self, config=None, options=None):
+    def __init__(self, *args, **kwargs):
         """Initialize the client.
 
         Args:
-            config (dict, optional):
-                The loaded configuration.
+            *args (tuple):
+                Positional arguments to pass to the parent class.
 
-            options (argparse.Namespace, optional):
-                The command line options.
+            **kwargs (dict):
+                Keyword arguments to pass to the parent class.
         """
-        super(TFSClient, self).__init__(config, options)
+        super(TFSClient, self).__init__(*args, **kwargs)
 
-        # There are three different backends that can be used to access the
-        # underlying TFS repository. We try them in this order:
-        #     - VS2017+ tf.exe
-        #     - Our custom rb-tfs wrapper, built on the TFS Java SDK
-        #     - Team Explorer Everywhere's tf command
-        use_tf_exe = False
+        self._tf_wrapper: Optional[BaseTFWrapper] = None
 
-        try:
-            tf_vc_output = execute(['tf', 'vc', 'help'], ignore_errors=True,
-                                   none_on_ignored_error=True)
+    @property
+    def tf_wrapper(self) -> BaseTFWrapper:
+        """The wrapper used to communicate with a TF tool.
 
-            # VS2015 has a tf.exe but it's not good enough.
-            if (tf_vc_output and
-                'Version Control Tool, Version 15' in tf_vc_output):
-                use_tf_exe = True
-        except OSError:
-            pass
+        Type:
+            BaseTFWrapper
+        """
+        if self._tf_wrapper is None:
+            # This will log a deprecation warning if checking dependencies for
+            # the first time.
+            self.has_dependencies(expect_checked=True)
 
-        helper_path = os.path.join(user_data_dir('rbtools'), 'packages', 'tfs',
-                                   'rb-tfs.jar')
+        return cast(BaseTFWrapper, self._tf_wrapper)
 
-        if use_tf_exe:
-            self.tf_wrapper = TFExeWrapper(config, options)
-        elif os.path.exists(helper_path):
-            self.tf_wrapper = TFHelperWrapper(helper_path, config, options)
-        else:
-            self.tf_wrapper = TEEWrapper(config, options)
+    def check_dependencies(self):
+        """Check whether all dependencies for the client are available.
 
-    def get_local_path(self):
+        There are three different backends that can be used to access the
+        underlying TFS repository. We try them in this order:
+
+        * VS2017+ :command:`tf.exe`
+        * Our custom rb-tfs wrapper, built on the TFS Java SDK
+        * Team Explorer Everywhere's :command:`tf` command
+
+        This checks for each, setting underlying wrappers to communicate with
+        whichever tool is found.
+
+        If no tool is found, the raised exception will present the high-level
+        possibilities.
+
+        Version Added:
+            4.0
+
+        Raises:
+            rbtools.clients.errors.SCMClientDependencyError:
+                No suitable dependencies could be found.
+        """
+        wrapper_kwargs = {
+            'config': self.config,
+            'options': self.options,
+        }
+
+        wrapper = None
+        found = False
+
+        for wrapper_cls in (TFExeWrapper, TFHelperWrapper, TEEWrapper):
+            wrapper = wrapper_cls(**wrapper_kwargs)
+
+            try:
+                wrapper.check_dependencies()
+
+                found = True
+                break
+            except SCMClientDependencyError:
+                # Skip this one. Go to the next.
+                continue
+
+        # Regardless of any failures above, we'll want a default wrapper set.
+        # We'll use the last one we tried.
+        assert wrapper is not None
+        self._tf_wrapper = wrapper
+
+        if not found:
+            # We'll provide a general version of all the options. The last
+            # entry isn't the name of the executable, but should help people
+            # figure out what to install.
+            raise SCMClientDependencyError(missing_exes=[(
+                'VS2017+ tf',
+                'Team Explorer Everywhere tf.cmd',
+                'Our wrapper (rbt install tfs)',
+            )])
+
+    def get_local_path(self) -> Optional[str]:
         """Return the local path to the working tree.
 
         Returns:
-            unicode:
+            str:
             The filesystem path of the repository on the client system.
         """
         return self.tf_wrapper.get_local_path()
@@ -1047,7 +1292,7 @@ class TFSClient(SCMClient):
         """Return repository information for the current working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            rbtools.clients.base.repository.RepositoryInfo:
             The repository info structure.
         """
         return self.tf_wrapper.get_repository_info()
@@ -1125,7 +1370,7 @@ class TFSClient(SCMClient):
             ``diff`` (:py:class:`bytes`):
                 The contents of the diff to upload.
 
-            ``base_commit_id` (:py:class:`unicode`, optional):
+            ``base_commit_id`` (:py:class:`unicode`, optional):
                 The ID of the commit that the change is based on, if available.
                 This is necessary for some hosting services that don't provide
                 individual file access.

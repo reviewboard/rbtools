@@ -14,13 +14,17 @@ from six.moves import map
 from six.moves.urllib.parse import unquote
 
 from rbtools.api.errors import APIError
-from rbtools.clients import PatchResult, RepositoryInfo, SCMClient
+from rbtools.clients import BaseSCMClient, PatchResult, RepositoryInfo
 from rbtools.clients.errors import (AuthenticationError,
                                     InvalidRevisionSpecError,
-                                    MinimumVersionError, OptionsCheckError,
-                                    SCMError, TooManyRevisionsError)
+                                    MinimumVersionError,
+                                    OptionsCheckError,
+                                    SCMClientDependencyError,
+                                    SCMError,
+                                    TooManyRevisionsError)
 from rbtools.deprecation import RemovedInRBTools40Warning
-from rbtools.utils.checks import (check_gnu_diff, check_install,
+from rbtools.utils.checks import (check_gnu_diff,
+                                  check_install,
                                   is_valid_version)
 from rbtools.utils.console import get_pass
 from rbtools.utils.diffs import (filename_match_any_patterns, filter_diff,
@@ -34,13 +38,14 @@ from rbtools.utils.repository import get_repository_resource
 _fs_encoding = sys.getfilesystemencoding()
 
 
-class SVNClient(SCMClient):
+class SVNClient(BaseSCMClient):
     """A client for Subversion.
 
     This is a wrapper around the svn executable that fetches repository
     information and generates compatible diffs.
     """
 
+    scmclient_id = 'svn'
     name = 'Subversion'
     server_tool_names = 'Subversion'
     supports_diff_exclude_patterns = True
@@ -76,7 +81,20 @@ class SVNClient(SCMClient):
         self._svn_info_cache = {}
         self._svn_repository_info_cache = None
 
-        self._svn_installed = check_install(['svn', 'help'])
+    def check_dependencies(self) -> None:
+        """Check whether all dependencies for the client are available.
+
+        This checks for the presence of :command:`svn` in the system path.
+
+        Version Added:
+            4.0
+
+        Raises:
+            rbtools.clients.errors.SCMClientDependencyError:
+                A git tool could not be found.
+        """
+        if not check_install(['svn', 'help']):
+            raise SCMClientDependencyError(missing_exes=['svn'])
 
     def is_remote_only(self):
         """Return whether this repository is operating in remote-only mode.
@@ -88,7 +106,8 @@ class SVNClient(SCMClient):
             bool:
             Whether this repository is operating in remote-only mode.
         """
-        if not self._svn_installed:
+        # NOTE: This can be removed once check_dependencies() is mandatory.
+        if not self.has_dependencies(expect_checked=True):
             logging.debug('Unable to execute "svn help": skipping SVN')
             return None
 
@@ -107,7 +126,8 @@ class SVNClient(SCMClient):
             unicode:
             The filesystem path of the repository on the client system.
         """
-        if not self._svn_installed:
+        # NOTE: This can be removed once check_dependencies() is mandatory.
+        if not self.has_dependencies(expect_checked=True):
             logging.debug('Unable to execute "svn help": skipping SVN')
             return None
 
@@ -122,13 +142,14 @@ class SVNClient(SCMClient):
         """Return repository information for the current working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            SVNRepositoryInfo:
             The repository info structure.
         """
         if self._svn_repository_info_cache:
             return self._svn_repository_info_cache
 
-        if not self._svn_installed:
+        # NOTE: This can be removed once check_dependencies() is mandatory.
+        if not self.has_dependencies(expect_checked=True):
             logging.debug('Unable to execute "svn help": skipping SVN')
             return None
 
@@ -355,7 +376,7 @@ class SVNClient(SCMClient):
         inside a subversion repository.
 
         Args:
-            repository_info (rbtools.clients.RepositoryInfo):
+            repository_info (SVNRepositoryInfo):
                 The repository information structure.
 
         Returns:
@@ -1076,7 +1097,7 @@ class SVNClient(SCMClient):
                 Whether the patch should be reverted rather than applied.
 
         Returns:
-            rbtools.clients.PatchResult:
+            rbtools.clients.base.patch.PatchResult:
             The result of the patch operation.
         """
         if not is_valid_version(self.subversion_client_version,
@@ -1114,7 +1135,9 @@ class SVNClient(SCMClient):
 
         cmd.append(six.text_type(patch_file))
 
-        rc, patch_output = self._run_svn(cmd, return_error_code=True)
+        rc, patch_output = self._run_svn(cmd,
+                                         results_unicode=False,
+                                         return_error_code=True)
 
         if self.supports_empty_files():
             try:
@@ -1347,7 +1370,7 @@ class SVNRepositoryInfo(RepositoryInfo):
                 ID of the repository in the API. This is used primarily for
                 testing purposes, and is not guaranteed to be set.
 
-            tool (rbtools.clients.SCMClient):
+            tool (rbtools.clients.base.scmclient.BaseSCMClient):
                 The SCM client.
         """
         super(SVNRepositoryInfo, self).__init__(

@@ -5,6 +5,8 @@ import os
 import shutil
 import sys
 import tempfile
+from contextlib import contextmanager
+from typing import Generator
 
 
 CONFIG_FILE = '.reviewboardrc'
@@ -289,6 +291,35 @@ def load_config():
     config.update(nested_config)
 
     return config
+
+
+@contextmanager
+def chdir(
+    path: str,
+) -> Generator[None, None, None]:
+    """Change to the specified directory for the duration of the  context.
+
+    Version Added:
+        4.0
+
+    Args:
+        path (str):
+            The path to change to.
+
+    Context:
+        Operations will run within the specified directory.
+
+    Raises:
+        FileNotFoundError:
+            The provided path does not exist.
+    """
+    old_cwd = os.getcwd()
+    os.chdir(path)
+
+    try:
+        yield
+    finally:
+        os.chdir(old_cwd)
 
 
 # This extracts a dictionary of the built-in globals in order to have a clean

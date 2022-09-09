@@ -19,3 +19,4 @@ documentation, which can be found in the :ref:`rb:webapiguide`.
    overview
    tutorial
    resource-specific
+   coderef/index

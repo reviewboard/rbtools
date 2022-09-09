@@ -227,7 +227,8 @@ def find_review_request_by_change_id(api_client,
         api_root (rbtools.api.resource.RootResource):
             The root resource of the Review Board server.
 
-        repository_info (rbtools.clients.RepositoryInfo, deprecated):
+        repository_info (rbtools.clients.base.repository.RepositoryInfo,
+                         deprecated):
             The repository info object.
 
         repository_name (unicode, deprecated):
@@ -328,10 +329,10 @@ def find_review_request_matches(review_requests,
 
     2. Matching SCMClient-specific extra_data.
 
-       A :py:class:`~rbtools.clients.SCMClient` can provide its own matching
-       logic, comparing state stored on a review request with information
-       from the local clone/checkout. The result may be an exact match or
-       a fuzzy match.
+       A :py:class:`~rbtools.clients.base.BaseSCMClient` can provide its own
+       matching logic, comparing state stored on a review request with
+       information from the local clone/checkout. The result may be an exact
+       match or a fuzzy match.
 
     3. Matching a summary/description, if provided.
 
@@ -353,7 +354,7 @@ def find_review_request_matches(review_requests,
                 repository.  Otherwise, commit ID matching will not be
                 reliable. This is the responsibility of the caller.
 
-        tool (rbtools.clients.SCMClient, optional):
+        tool (rbtools.clients.base.BaseSCMClient, optional):
             An optional client tool used to perform tool-specific matches.
 
         revisions (dict, optional):
@@ -553,7 +554,8 @@ def guess_existing_review_request(repository_info=None,
         deprecated in favor of adding the new ``repository_id`` argument.
 
     Args:
-        repository_info (rbtools.clients.RepositoryInfo, deprecated):
+        repository_info (rbtools.clients.base.repository.RepositoryInfo,
+                         deprecated):
             The repository info object.
 
             Deprecated:
@@ -573,7 +575,7 @@ def guess_existing_review_request(repository_info=None,
         api_client (rbtools.api.client.RBClient):
             The API client.
 
-        tool (rbtools.clients.SCMClient):
+        tool (rbtools.clients.base.BaseSCMClient):
             The SCM client.
 
         revisions (dict):

@@ -633,13 +633,13 @@ class ResourcePayloadFactory(object):
                 The value of the ``testing_done`` field.
 
             testing_done_text_type (unicode, optional):
-                The value of the ``testing_don_text_type `` field.
+                The value of the ``testing_done_text_type`` field.
 
             text_type (unicode, optional):
-                The value of the ``text_type `` field.
+                The value of the ``text_type`` field.
 
             time_added (unicode, optional):
-                The value of the ``time_added `` field.
+                The value of the ``time_added`` field.
 
             latest_diff_id (int, optional):
                 The ID of the last diff on the review request, for use in
@@ -838,10 +838,10 @@ class ResourcePayloadFactory(object):
                 The value of the ``testing_done`` field.
 
             testing_done_text_type (unicode, optional):
-                The value of the ``testing_don_text_type `` field.
+                The value of the ``testing_done_text_type`` field.
 
             text_type (unicode, optional):
-                The value of the ``text_type `` field.
+                The value of the ``text_type`` field.
 
         Returns:
             dict:

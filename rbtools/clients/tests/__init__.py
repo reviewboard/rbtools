@@ -1,17 +1,33 @@
 """Unit tests for RBTools clients."""
 
-from __future__ import unicode_literals
+from __future__ import annotations
 
+import argparse
 import os
 import shutil
+from typing import Any, Dict, Generic, Optional, Type, TypeVar
+from unittest import SkipTest
 
+from typing_extensions import Final, TypeAlias
+
+import kgb
+
+from rbtools.clients import BaseSCMClient
+from rbtools.clients.errors import SCMClientDependencyError
 from rbtools.deprecation import RemovedInRBTools40Warning
-from rbtools.tests import OptionsStub
 from rbtools.testing import TestCase
 from rbtools.utils.filesystem import make_tempdir
 
 
-class SCMClientTestCase(TestCase):
+_TestSCMClientType = TypeVar('_TestSCMClientType',
+                             bound=BaseSCMClient,
+                             covariant=True)
+_TestSCMClientOptions: TypeAlias = Dict[str, Any]
+
+
+class SCMClientTestCase(Generic[_TestSCMClientType],
+                        kgb.SpyAgency,
+                        TestCase):
     """Base class for RBTools SCM client unit tests.
 
     This takes care of suite-wide and per-test setup common to SCM unit tests.
@@ -26,6 +42,49 @@ class SCMClientTestCase(TestCase):
         * Renamed from ``SCMClientTests`` to ``SCMClientTestCase``.
         * Added support for centralized clone/checkout management and caching.
     """
+
+    #: Default options always set for SCMClients.
+    #:
+    #: These will be set by :py:meth:`build_client` unless overridden.
+    #:
+    #: Version Added:
+    #:     4.0
+    #:
+    #: Type:
+    #:     dict
+    DEFAULT_SCMCLIENT_OPTIONS: Final[_TestSCMClientOptions] = {
+        'debug': True,
+        'description': None,
+        'disable_proxy': False,
+        'guess_description': False,
+        'guess_summary': False,
+        'parent_branch': None,
+        'password': None,
+        'repository_url': None,
+        'summary': None,
+        'tracking': None,
+        'username': None,
+    }
+
+    #: The client class.
+    #:
+    #: This is required by :py:meth:`build_client`.
+    #:
+    #: Version Added:
+    #:     4.0
+    #:
+    #: Type:
+    #:     type
+    scmclient_cls: Optional[Type[_TestSCMClientType]] = None
+
+    #: Custom default options for SCMClients.
+    #:
+    #: These will be set by :py:meth:`build_client` unless overridden,
+    #: taking precedence after :py:attr:`DEFAULT_SCMCLIENT_OPTIONS`.
+    #:
+    #: Version Added:
+    #:     4.0
+    default_scmclient_options: _TestSCMClientOptions = {}
 
     #: The main checkout directory used by tests.
     #:
@@ -104,7 +163,9 @@ class SCMClientTestCase(TestCase):
     def setUp(self):
         super(SCMClientTestCase, self).setUp()
 
-        self.options = OptionsStub()
+        self.options = argparse.Namespace(
+            **dict(self.DEFAULT_SCMCLIENT_OPTIONS,
+                   **self.default_scmclient_options))
 
         if self.checkout_dir:
             # Copy over any main/backup repositories back into the working
@@ -118,6 +179,71 @@ class SCMClientTestCase(TestCase):
             # Make sure any commands that are run default to working out of
             # the primary checkout directory.
             os.chdir(self.checkout_dir)
+
+    def build_client(
+        self,
+        *,
+        options: _TestSCMClientOptions = {},
+        client_kwargs: Dict[str, Any] = {},
+        setup: bool = True,
+        allow_dep_checks: bool = True,
+        skip_if_deps_missing: bool = True,
+    ) -> _TestSCMClientType:
+        """Build a client for testing.
+
+        Version Added:
+            4.0
+
+        Args:
+            options (dict, optional):
+                Parsed command line options to pass to the client class.
+
+                By default, :py:attr:`DEFAULT_SCMCLIENT_OPTIONS` and then
+                :py:attr:`default_scmclient_options` will be set. ``options``
+                may override anything in these.
+
+            client_kwargs (dict, optional):
+                Keyword arguments to pass to the client class.
+
+            setup (bool, optional):
+                Whether to call
+                :py:meth:`~rbtools.clients.perforce.SCMClient.setup` on the
+                client.
+
+            allow_dep_checks (bool, optional):
+                Whether to allow :py:meth:`~rbtools.clients.perforce.SCMClient.
+                check_dependencies` to run on the client.
+
+            skip_if_deps_missing (bool, optional):
+                Whether to skip the unit test if dependencies are missing.
+
+        Returns:
+            rbtools.clients.base.scmclient.BaseSCMClient:
+            The client instance.
+        """
+        assert self.scmclient_cls is not None
+
+        # Set any options from the caller.
+        cmd_options = self.options
+
+        for key, value in options.items():
+            setattr(cmd_options, key, value)
+
+        client = self.scmclient_cls(options=cmd_options, **client_kwargs)
+
+        if not allow_dep_checks:
+            self.spy_on(client.check_dependencies, call_original=False)
+
+        if setup:
+            try:
+                client.setup()
+            except SCMClientDependencyError as e:
+                if skip_if_deps_missing:
+                    raise SkipTest(str(e))
+                else:
+                    raise
+
+        return client
 
 
 class SCMClientTests(SCMClientTestCase):

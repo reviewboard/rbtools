@@ -22,7 +22,7 @@ def get_input(prompt, require=False, stderr=sys.stderr, stdin=sys.stdin):
 
     Version Changed:
         3.1:
-        ``stdout`` and ``stderr` streams are now supported. This can now be
+        ``stdout`` and ``stderr`` streams are now supported. This can now be
         used with a non-TTY input stream.
 
     If ``stdin`` is not a TTY, this will read lines of input until it
@@ -85,7 +85,7 @@ def get_pass(prompt, require=False, stderr=sys.stderr, stdin=sys.stdin):
 
     Version Changed:
         3.1:
-        ``stdout`` and ``stderr` streams are now supported. This can now be
+        ``stdout`` and ``stderr`` streams are now supported. This can now be
         used with a non-TTY input stream.
 
     If ``stdin`` is not a TTY, this will read lines of input until it
@@ -151,7 +151,7 @@ def confirm(question, stderr=sys.stderr, stdin=sys.stdin):
 
     Version Changed:
         3.1:
-        ``stdout`` and ``stderr` streams are now supported. This can now be
+        ``stdout`` and ``stderr`` streams are now supported. This can now be
         used with a non-TTY input stream.
 
     Args:
@@ -204,7 +204,7 @@ def confirm_select(question, options_length, stderr=sys.stderr,
 
     Version Changed:
         3.1:
-        ``stdout`` and ``stderr` streams are now supported. This can now be
+        ``stdout`` and ``stderr`` streams are now supported. This can now be
         used with a non-TTY input stream.
 
     Args:

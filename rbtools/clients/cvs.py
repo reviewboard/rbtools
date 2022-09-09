@@ -6,22 +6,25 @@ import logging
 import os
 import re
 import socket
+from typing import Optional
 
-from rbtools.clients import SCMClient, RepositoryInfo
+from rbtools.clients import BaseSCMClient, RepositoryInfo
 from rbtools.clients.errors import (InvalidRevisionSpecError,
+                                    SCMClientDependencyError,
                                     TooManyRevisionsError)
 from rbtools.utils.checks import check_install
 from rbtools.utils.diffs import filter_diff, normalize_patterns
 from rbtools.utils.process import execute
 
 
-class CVSClient(SCMClient):
+class CVSClient(BaseSCMClient):
     """A client for CVS.
 
     This is a wrapper around the cvs executable that fetches repository
     information and generates compatible diffs.
     """
 
+    scmclient_id = 'cvs'
     name = 'CVS'
     server_tool_names = 'CVS'
     supports_diff_exclude_patterns = True
@@ -31,14 +34,30 @@ class CVSClient(SCMClient):
 
     REVISION_WORKING_COPY = '--rbtools-working-copy'
 
-    def get_local_path(self):
+    def check_dependencies(self) -> None:
+        """Check whether all dependencies for the client are available.
+
+        This will check for :command:`cvs` in the path.
+
+        Version Added:
+            4.0
+
+        Raises:
+            rbtools.clients.errors.SCMClientDependencyError:
+                :command:`cvs` could not be found.
+        """
+        if not check_install(['cvs']):
+            raise SCMClientDependencyError(missing_exes=['cvs'])
+
+    def get_local_path(self) -> Optional[str]:
         """Return the local path to the working tree.
 
         Returns:
-            unicode:
+            str:
             The filesystem path of the repository on the client system.
         """
-        if not check_install(['cvs']):
+        # NOTE: This can be removed once check_dependencies() is mandatory.
+        if not self.has_dependencies(expect_checked=True):
             logging.debug('Unable to execute "cvs": skipping CVS')
             return None
 
@@ -71,13 +90,9 @@ class CVSClient(SCMClient):
         """Return repository information for the current working tree.
 
         Returns:
-            rbtools.clients.RepositoryInfo:
+            rbtools.clients.base.repository.RepositoryInfo:
             The repository info structure.
         """
-        if not check_install(['cvs']):
-            logging.debug('Unable to execute "cvs": skipping CVS')
-            return None
-
         repository_path = self.get_local_path()
 
         if not repository_path:

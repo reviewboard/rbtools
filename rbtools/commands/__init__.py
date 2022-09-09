@@ -329,7 +329,7 @@ class Command(object):
         repository (rbtools.api.resource.ItemResource):
             The API resource corresponding to the repository.
 
-        repository_info (rbtools.clients.RepositoryInfo):
+        repository_info (rbtools.clients.base.repository.RepositoryInfo):
             The repository info object. This will be ``None`` if
             :py:attr:`needs_scm_client` is ``False``.
 
@@ -373,7 +373,7 @@ class Command(object):
         stderr_bytes (OutputWrapper):
             Standard byte error output wrapper that subclasses must write to.
 
-        tool (rbtools.clients.SCMClient):
+        tool (rbtools.clients.base.BaseSCMClient):
             The SCM client. This will be ``None`` if
             :py:attr:`needs_scm_client` is ``False``.
     """
@@ -1072,15 +1072,21 @@ class Command(object):
         args = self.options.args
 
         # Check that the proper number of arguments have been provided.
-        argspec = inspect.getargspec(self.main)
-        minargs = len(argspec[0]) - 1
+        if hasattr(inspect, 'getfullargspec'):
+            # Python 3
+            argspec = inspect.getfullargspec(self.main)
+        else:
+            # Python 2
+            argspec = inspect.getargspec(self.main)
+
+        minargs = len(argspec.args) - 1
         maxargs = minargs
 
         # Arguments that have a default value are considered optional.
-        if argspec[3] is not None:
-            minargs -= len(argspec[3])
+        if argspec.defaults is not None:
+            minargs -= len(argspec.defaults)
 
-        if argspec[1] is not None:
+        if argspec.varargs is not None:
             maxargs = None
 
         if len(args) < minargs or (maxargs is not None and
@@ -1187,10 +1193,11 @@ class Command(object):
         """Return the Review Board server url.
 
         Args:
-            repository_info (rbtools.clients.RepositoryInfo, optional):
+            repository_info (rbtools.clients.base.repository.RepositoryInfo,
+                             optional):
                 Information about the current repository
 
-            tool (rbtools.clients.SCMClient, optional):
+            tool (rbtools.clients.base.BaseSCMClient, optional):
                 The repository client.
 
         Returns:
