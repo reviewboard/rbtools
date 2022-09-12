@@ -13,6 +13,7 @@ from typing import Dict, List, Optional, cast
 from six.moves.urllib.parse import unquote
 
 from rbtools.clients import BaseSCMClient, RepositoryInfo
+from rbtools.clients.base.scmclient import SCMClientRevisionSpec
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     SCMError,
@@ -71,7 +72,7 @@ class BaseTFWrapper:
     def parse_revision_spec(
         self,
         revisions: List[str],
-    ) -> Dict[str, str]:
+    ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
         Args:
@@ -264,7 +265,7 @@ class TFExeWrapper(BaseTFWrapper):
         if n_revisions == 0:
             # Most recent checked-out revision -- working copy
             return {
-                'base': self._convert_symbolic_revision('W'),
+                'base': str(self._convert_symbolic_revision('W')),
                 'tip': self.REVISION_WORKING_COPY,
             }
         elif n_revisions == 1:
@@ -272,22 +273,17 @@ class TFExeWrapper(BaseTFWrapper):
             revision = self._convert_symbolic_revision(revisions[0])
 
             return {
-                'base': revision - 1,
-                'tip': revision,
+                'base': str(revision - 1),
+                'tip': str(revision),
             }
         elif n_revisions == 2:
             # Diff between two numeric revisions
             return {
-                'base': self._convert_symbolic_revision(revisions[0]),
-                'tip': self._convert_symbolic_revision(revisions[1]),
+                'base': str(self._convert_symbolic_revision(revisions[0])),
+                'tip': str(self._convert_symbolic_revision(revisions[1])),
             }
         else:
             raise TooManyRevisionsError
-
-        return {
-            'base': None,
-            'tip': None,
-        }
 
     def _convert_symbolic_revision(self, revision, path=None):
         """Convert a symbolic revision into a numeric changeset.
@@ -310,6 +306,7 @@ class TFExeWrapper(BaseTFWrapper):
         data = self._run_tf(['vc', 'history', '/stopafter:1', '/recursive',
                              '/format:detailed', '/version:%s' % revision,
                              path or os.getcwd()])
+        assert isinstance(data, str)
 
         m = re.search(r'^Changeset: (\d+)$', data, re.MULTILINE)
 
@@ -318,6 +315,8 @@ class TFExeWrapper(BaseTFWrapper):
                           data)
             raise InvalidRevisionSpecError(
                 '"%s" does not appear to be a valid versionspec' % revision)
+
+        return int(m.group(1))
 
     def diff(self, revisions, include_files, exclude_patterns, **kwargs):
         """Return the generated diff.
@@ -683,7 +682,7 @@ class TEEWrapper(BaseTFWrapper):
         if n_revisions == 0:
             # Most recent checked-out revision -- working copy
             return {
-                'base': self._convert_symbolic_revision('W'),
+                'base': str(self._convert_symbolic_revision('W')),
                 'tip': self.REVISION_WORKING_COPY,
             }
         elif n_revisions == 1:
@@ -691,22 +690,17 @@ class TEEWrapper(BaseTFWrapper):
             revision = self._convert_symbolic_revision(revisions[0])
 
             return {
-                'base': revision - 1,
-                'tip': revision,
+                'base': str(revision - 1),
+                'tip': str(revision),
             }
         elif n_revisions == 2:
             # Diff between two numeric revisions
             return {
-                'base': self._convert_symbolic_revision(revisions[0]),
-                'tip': self._convert_symbolic_revision(revisions[1]),
+                'base': str(self._convert_symbolic_revision(revisions[0])),
+                'tip': str(self._convert_symbolic_revision(revisions[1])),
             }
         else:
             raise TooManyRevisionsError
-
-        return {
-            'base': None,
-            'tip': None,
-        }
 
     def _convert_symbolic_revision(self, revision, path=None):
         """Convert a symbolic revision into a numeric changeset.
@@ -737,6 +731,7 @@ class TEEWrapper(BaseTFWrapper):
         # always be UTF-8, and are well-formed with the encoding specified. We
         # can therefore let ElementTree determine how to decode it.
         data = self._run_tf(args, results_unicode=False)
+        assert isinstance(data, bytes)
 
         try:
             root = ET.fromstring(data)
@@ -944,7 +939,7 @@ class TEEWrapper(BaseTFWrapper):
 
         cmdline = [self.tf, '-noprompt']
 
-        tfs_login = getattr(self.options, 'tfs_login')
+        tfs_login = getattr(self.options, 'tfs_login', None)
 
         if tfs_login:
             cmdline.append('-login:%s' % tfs_login)
@@ -1028,7 +1023,10 @@ class TFHelperWrapper(BaseTFWrapper):
 
         return None
 
-    def parse_revision_spec(self, revisions):
+    def parse_revision_spec(
+        self,
+        revisions: list[str],
+    ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
         Args:
@@ -1075,16 +1073,19 @@ class TFHelperWrapper(BaseTFWrapper):
         if len(revisions) > 2:
             raise TooManyRevisionsError
 
-        rc, revisions, errors = self._run_helper(
+        rc, parsed_revisions, errors = self._run_helper(
             ['parse-revision'] + revisions, split_lines=True)
 
         if rc == 0:
             return {
-                'base': revisions[0].strip(),
-                'tip': revisions[1].strip()
+                'base': parsed_revisions[0].decode('utf-8').strip(),
+                'tip': parsed_revisions[1].decode('utf-8').strip(),
             }
         else:
-            raise InvalidRevisionSpecError('\n'.join(errors))
+            raise InvalidRevisionSpecError(
+                b'\n'.join(errors).decode('utf-8').strip() or
+                ('Unexpected error while parsing revision spec %r'
+                 % (revisions,)))
 
     def diff(self, revisions, include_files, exclude_patterns):
         """Return the generated diff.
