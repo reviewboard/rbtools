@@ -1,7 +1,5 @@
 """Base test cases for RBTools unit tests."""
 
-from __future__ import unicode_literals
-
 import os
 import re
 import shutil
@@ -9,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from contextlib import contextmanager
+from typing import List
 
 import kgb
 import six
@@ -185,16 +184,35 @@ class TestCase(unittest.TestCase):
             AssertionError:
                 The test suite class did not mix in :py:class:`kgb.SpyAgency`.
         """
-        assert hasattr(self, 'spy_on'), (
+        spy_for = getattr(self, 'spy_for', None)
+
+        assert spy_for, (
             '%r must mix in kgb.SpyAgency in order to call this method.'
             % self.__class__)
 
-        tmpfiles = [
+        tmpfiles: List[str] = [
             make_tempfile()
             for i in range(count)
         ]
 
-        self.spy_on(make_tempfile, op=kgb.SpyOpReturnInOrder(tmpfiles))
+        tmpfiles_iter = iter(tmpfiles)
+
+        @spy_for(make_tempfile)
+        def _return_next_tempfile(*args, **kwargs) -> str:
+            try:
+                tmpfile = next(tmpfiles_iter)
+            except StopIteration:
+                self.fail('Too many calls to make_tempfile(). Expected %s, '
+                          'got %s.'
+                          % (count, count + 1))
+
+            content = kwargs.get('content')
+
+            if content:
+                with open(tmpfile, 'wb') as fp:
+                    fp.write(content)
+
+            return tmpfile
 
         return tmpfiles
 

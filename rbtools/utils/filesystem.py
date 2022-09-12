@@ -6,12 +6,15 @@ import shutil
 import sys
 import tempfile
 from contextlib import contextmanager
-from typing import Generator
+from typing import Generator, List, Optional
+
+from rbtools.deprecation import (RemovedInRBTools50Warning,
+                                 deprecate_non_keyword_only_args)
 
 
 CONFIG_FILE = '.reviewboardrc'
 
-tempfiles = []
+tempfiles: List[str] = []
 tempdirs = []
 builtin = {}
 
@@ -75,7 +78,14 @@ def _load_python_file(filename, config):
         return config
 
 
-def make_tempfile(content=None, prefix='rbtools.', suffix=None, filename=None):
+@deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
+def make_tempfile(
+    *,
+    content: Optional[bytes] = None,
+    prefix: str = 'rbtools.',
+    suffix: Optional[str] = None,
+    filename: Optional[str] = None,
+) -> str:
     """Create a temporary file and return the path.
 
     If not manually removed, then the resulting temp file will be removed when
@@ -90,18 +100,18 @@ def make_tempfile(content=None, prefix='rbtools.', suffix=None, filename=None):
         content (bytes, optional):
             The content for the text file.
 
-        prefix (bool, optional):
+        prefix (str, optional):
             The prefix for the temp filename. This defaults to ``rbtools.``.
 
-        suffix (bool, optional):
+        suffix (str, optional):
             The suffix for the temp filename.
 
-        filename (unicode, optional):
+        filename (str, optional):
             An explicit name of the file. If provided, this will override
             ``suffix`` and ``prefix``.
 
     Returns:
-        unicode:
+        str:
         The temp file path.
     """
     if filename is not None:
