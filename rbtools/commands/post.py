@@ -854,9 +854,6 @@ class Post(Command):
                 '-X/--exclude command line options or the EXCLUDE_PATTERNS '
                 '.reviewboardrc option.' % self.tool.name)
 
-        self.repository_info = \
-            self.repository_info.find_server_repository_info(self.api_root)
-
         if self.repository is None:
             raise CommandError('Could not find the repository on the Review '
                                'Board server.')
