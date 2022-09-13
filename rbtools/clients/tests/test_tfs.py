@@ -17,7 +17,7 @@ from rbtools.clients.tfs import (BaseTFWrapper,
                                  TFSClient)
 from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.checks import check_install
-from rbtools.utils.process import execute
+from rbtools.utils.process import run_process_exec
 
 
 class TFExeWrapperTests(SCMClientTestCase):
@@ -25,38 +25,34 @@ class TFExeWrapperTests(SCMClientTestCase):
 
     def test_check_dependencies_with_found(self):
         """Testing TFExeWrapper.check_dependencies with tf.exe found"""
-        self.spy_on(execute, op=kgb.SpyOpMatchAny([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchAny([
             {
                 'args': (['tf', 'vc', 'help'],),
-                'kwargs': {
-                    'results_unicode': True,
-                    'split_lines': False,
-                    'return_error_code': False,
-                    'return_errors': False,
-                },
-                'op': kgb.SpyOpReturn('Version Control Tool, Version 15\n'),
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'Version Control Tool, Version 15\n',
+                    b'',
+                )),
             },
         ]))
 
         wrapper = TFExeWrapper()
         wrapper.check_dependencies()
 
-        self.assertSpyCallCount(execute, 1)
+        self.assertSpyCallCount(run_process_exec, 1)
 
     def test_check_dependencies_with_found_wrong_version(self):
         """Testing TFExeWrapper.check_dependencies with tf.exe found but
         wrong version
         """
-        self.spy_on(execute, op=kgb.SpyOpMatchAny([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchAny([
             {
                 'args': (['tf', 'vc', 'help'],),
-                'kwargs': {
-                    'results_unicode': True,
-                    'split_lines': False,
-                    'return_error_code': False,
-                    'return_errors': False,
-                },
-                'op': kgb.SpyOpReturn('Version Control Tool, Version 14\n'),
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'Version Control Tool, Version 14\n',
+                    b'',
+                )),
             },
         ]))
 
@@ -65,21 +61,15 @@ class TFExeWrapperTests(SCMClientTestCase):
         with self.assertRaises(SCMClientDependencyError) as ctx:
             wrapper.check_dependencies()
 
-        self.assertSpyCallCount(execute, 1)
+        self.assertSpyCallCount(run_process_exec, 1)
         self.assertEqual(ctx.exception.missing_exes, ['tf'])
 
     def test_check_dependencies_with_not_found(self):
         """Testing TFExeWrapper.check_dependencies with tf.exe not found"""
-        self.spy_on(execute, op=kgb.SpyOpMatchAny([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchAny([
             {
                 'args': (['tf', 'vc', 'help'],),
-                'kwargs': {
-                    'results_unicode': True,
-                    'split_lines': False,
-                    'return_error_code': False,
-                    'return_errors': False,
-                },
-                'op': kgb.SpyOpReturn(None),
+                'op': kgb.SpyOpRaise(FileNotFoundError),
             },
         ]))
 
@@ -88,27 +78,25 @@ class TFExeWrapperTests(SCMClientTestCase):
         with self.assertRaises(SCMClientDependencyError) as ctx:
             wrapper.check_dependencies()
 
-        self.assertSpyCallCount(execute, 1)
+        self.assertSpyCallCount(run_process_exec, 1)
         self.assertEqual(ctx.exception.missing_exes, ['tf'])
 
     def test_parse_revision_spec_with_0_revisions(self):
         """Testing TFExeWrapper.parse_revision_spec with 0 revisions"""
         cwd = os.getcwd()
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ([
                     'tf', 'vc', 'history', '/stopafter:1',
                     '/recursive', '/format:detailed', '/version:W',
                     cwd, '/noprompt',
                 ],),
-                'kwargs': {
-                    'results_unicode': True,
-                    'split_lines': False,
-                    'return_error_code': False,
-                    'return_errors': False,
-                },
-                'op': kgb.SpyOpReturn('Changeset: 123\n')
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'Changeset: 123\n',
+                    b'',
+                )),
             },
         ]))
 
@@ -121,26 +109,24 @@ class TFExeWrapperTests(SCMClientTestCase):
                 'tip': '--rbtools-working-copy',
             })
 
-        self.assertSpyCallCount(execute, 1)
+        self.assertSpyCallCount(run_process_exec, 1)
 
     def test_parse_revision_spec_with_1_revision(self):
         """Testing TFExeWrapper.parse_revision_spec with 1 revision"""
         cwd = os.getcwd()
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ([
                     'tf', 'vc', 'history', '/stopafter:1',
                     '/recursive', '/format:detailed', '/version:Lrev',
                     cwd, '/noprompt',
                 ],),
-                'kwargs': {
-                    'results_unicode': True,
-                    'split_lines': False,
-                    'return_error_code': False,
-                    'return_errors': False,
-                },
-                'op': kgb.SpyOpReturn('Changeset: 123\n')
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'Changeset: 123\n',
+                    b'',
+                )),
             },
         ]))
 
@@ -153,26 +139,24 @@ class TFExeWrapperTests(SCMClientTestCase):
                 'tip': '123',
             })
 
-        self.assertSpyCallCount(execute, 1)
+        self.assertSpyCallCount(run_process_exec, 1)
 
     def test_parse_revision_spec_with_2_revisions(self):
         """Testing TFExeWrapper.parse_revision_spec with 2 revisions"""
         cwd = os.getcwd()
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ([
                     'tf', 'vc', 'history', '/stopafter:1',
                     '/recursive', '/format:detailed', '/version:Lrev1',
                     cwd, '/noprompt',
                 ],),
-                'kwargs': {
-                    'results_unicode': True,
-                    'split_lines': False,
-                    'return_error_code': False,
-                    'return_errors': False,
-                },
-                'op': kgb.SpyOpReturn('Changeset: 123\n')
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'Changeset: 123\n',
+                    b'',
+                )),
             },
             {
                 'args': ([
@@ -180,13 +164,11 @@ class TFExeWrapperTests(SCMClientTestCase):
                     '/recursive', '/format:detailed', '/version:124',
                     cwd, '/noprompt',
                 ],),
-                'kwargs': {
-                    'results_unicode': True,
-                    'split_lines': False,
-                    'return_error_code': False,
-                    'return_errors': False,
-                },
-                'op': kgb.SpyOpReturn('Changeset: 124\n')
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'Changeset: 124\n',
+                    b'',
+                )),
             },
         ]))
 
@@ -199,7 +181,7 @@ class TFExeWrapperTests(SCMClientTestCase):
                 'tip': '124',
             })
 
-        self.assertSpyCallCount(execute, 2)
+        self.assertSpyCallCount(run_process_exec, 2)
 
     def test_parse_revision_spec_with_3_revisions(self):
         """Testing TFExeWrapper.parse_revision_spec with 3 revisions"""
@@ -212,20 +194,18 @@ class TFExeWrapperTests(SCMClientTestCase):
         """Testing TFExeWrapper.parse_revision_spec with r1~r2"""
         cwd = os.getcwd()
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ([
                     'tf', 'vc', 'history', '/stopafter:1',
                     '/recursive', '/format:detailed', '/version:Lrev1',
                     cwd, '/noprompt',
                 ],),
-                'kwargs': {
-                    'results_unicode': True,
-                    'split_lines': False,
-                    'return_error_code': False,
-                    'return_errors': False,
-                },
-                'op': kgb.SpyOpReturn('Changeset: 123\n')
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'Changeset: 123\n',
+                    b'',
+                )),
             },
             {
                 'args': ([
@@ -233,13 +213,11 @@ class TFExeWrapperTests(SCMClientTestCase):
                     '/recursive', '/format:detailed', '/version:Lrev2',
                     cwd, '/noprompt',
                 ],),
-                'kwargs': {
-                    'results_unicode': True,
-                    'split_lines': False,
-                    'return_error_code': False,
-                    'return_errors': False,
-                },
-                'op': kgb.SpyOpReturn('Changeset: 456\n')
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'Changeset: 456\n',
+                    b'',
+                )),
             },
         ]))
 
@@ -252,26 +230,24 @@ class TFExeWrapperTests(SCMClientTestCase):
                 'tip': '456',
             })
 
-        self.assertSpyCallCount(execute, 2)
+        self.assertSpyCallCount(run_process_exec, 2)
 
     def test_parse_revision_spec_with_no_changeset_found(self):
         """Testing TFExeWrapper.parse_revision_spec with no changeset found"""
         cwd = os.getcwd()
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ([
                     'tf', 'vc', 'history', '/stopafter:1',
                     '/recursive', '/format:detailed', '/version:W',
                     cwd, '/noprompt',
                 ],),
-                'kwargs': {
-                    'results_unicode': True,
-                    'split_lines': False,
-                    'return_error_code': False,
-                    'return_errors': False,
-                },
-                'op': kgb.SpyOpReturn('')
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'',
+                    b'',
+                )),
             },
         ]))
 
@@ -364,22 +340,16 @@ class TFHelperWrapperTests(SCMClientTestCase):
 
     def test_parse_revision_spec_with_0_revisions(self):
         """Testing TFHelperWrapper.parse_revision_spec with 0 revisions"""
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ([
                     'java', '-Xmx2048M', '-jar', '/path/to/rb-tfs.jar',
                     'parse-revision',
                 ],),
-                'kwargs': {
-                    'results_unicode': False,
-                    'split_lines': True,
-                    'return_error_code': True,
-                    'return_errors': True,
-                },
                 'op': kgb.SpyOpReturn((
                     0,
-                    [b'123\n', b'--rb-tfs-working-copy\n'],
-                    [b''],
+                    b'123\n--rb-tfs-working-copy\n',
+                    b'',
                 )),
             },
         ]))
@@ -394,26 +364,20 @@ class TFHelperWrapperTests(SCMClientTestCase):
                 'tip': '--rb-tfs-working-copy',
             })
 
-        self.assertSpyCallCount(execute, 1)
+        self.assertSpyCallCount(run_process_exec, 1)
 
     def test_parse_revision_spec_with_1_revision(self):
         """Testing TFHelperWrapper.parse_revision_spec with 1 revision"""
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ([
                     'java', '-Xmx2048M', '-jar', '/path/to/rb-tfs.jar',
                     'parse-revision', 'Lrev',
                 ],),
-                'kwargs': {
-                    'results_unicode': False,
-                    'split_lines': True,
-                    'return_error_code': True,
-                    'return_errors': True,
-                },
                 'op': kgb.SpyOpReturn((
                     0,
-                    [b'122\n', b'123'],
-                    [b''],
+                    b'122\n123\n',
+                    b'',
                 )),
             },
         ]))
@@ -428,26 +392,20 @@ class TFHelperWrapperTests(SCMClientTestCase):
                 'tip': '123',
             })
 
-        self.assertSpyCallCount(execute, 1)
+        self.assertSpyCallCount(run_process_exec, 1)
 
     def test_parse_revision_spec_with_2_revisions(self):
         """Testing TFHelperWrapper.parse_revision_spec with 2 revisions"""
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ([
                     'java', '-Xmx2048M', '-jar', '/path/to/rb-tfs.jar',
                     'parse-revision', 'Lrev1', '124',
                 ],),
-                'kwargs': {
-                    'results_unicode': False,
-                    'split_lines': True,
-                    'return_error_code': True,
-                    'return_errors': True,
-                },
                 'op': kgb.SpyOpReturn((
                     0,
-                    [b'123\n', b'124'],
-                    [b''],
+                    b'123\n124\n',
+                    b'',
                 )),
             },
         ]))
@@ -462,7 +420,7 @@ class TFHelperWrapperTests(SCMClientTestCase):
                 'tip': '124',
             })
 
-        self.assertSpyCallCount(execute, 1)
+        self.assertSpyCallCount(run_process_exec, 1)
 
     def test_parse_revision_spec_with_3_revisions(self):
         """Testing TFHelperWrapper.parse_revision_spec with 3 revisions"""
@@ -473,22 +431,16 @@ class TFHelperWrapperTests(SCMClientTestCase):
 
     def test_parse_revision_spec_with_r1_tilde_t2(self):
         """Testing TFHelperWrapper.parse_revision_spec with r1~r2"""
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ([
                     'java', '-Xmx2048M', '-jar', '/path/to/rb-tfs.jar',
                     'parse-revision', 'Lrev1~Lrev2',
                 ],),
-                'kwargs': {
-                    'results_unicode': False,
-                    'split_lines': True,
-                    'return_error_code': True,
-                    'return_errors': True,
-                },
                 'op': kgb.SpyOpReturn((
                     0,
-                    [b'123\n', b'456\n'],
-                    [],
+                    b'123\n456\n',
+                    b'',
                 )),
             },
         ]))
@@ -503,28 +455,22 @@ class TFHelperWrapperTests(SCMClientTestCase):
                 'tip': '456',
             })
 
-        self.assertSpyCallCount(execute, 1)
+        self.assertSpyCallCount(run_process_exec, 1)
 
     def test_parse_revision_spec_with_no_changeset_found(self):
         """Testing TFHelperWrapper.parse_revision_spec with no changeset
         found
         """
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ([
                     'java', '-Xmx2048M', '-jar', '/path/to/rb-tfs.jar',
                     'parse-revision',
                 ],),
-                'kwargs': {
-                    'results_unicode': False,
-                    'split_lines': True,
-                    'return_error_code': True,
-                    'return_errors': True,
-                },
                 'op': kgb.SpyOpReturn((
                     1,
-                    [],
-                    [b'"W" does not appear to be a valid versionspec\n']
+                    b'',
+                    b'"W" does not appear to be a valid versionspec\n',
                 )),
             },
         ]))
@@ -541,22 +487,16 @@ class TFHelperWrapperTests(SCMClientTestCase):
         """Testing TFHelperWrapper.parse_revision_spec with no changeset
         found and no error result
         """
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ([
                     'java', '-Xmx2048M', '-jar', '/path/to/rb-tfs.jar',
                     'parse-revision', 'blah',
                 ],),
-                'kwargs': {
-                    'results_unicode': False,
-                    'split_lines': True,
-                    'return_error_code': True,
-                    'return_errors': True,
-                },
                 'op': kgb.SpyOpReturn((
                     1,
-                    [],
-                    [],
+                    b'',
+                    b'',
                 )),
             },
         ]))
@@ -711,19 +651,15 @@ class TEEWrapperTests(SCMClientTestCase):
         """Testing TEEWrapper.parse_revision_spec with 0 revisions"""
         cwd = os.getcwd()
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ([
                     'tf', '-noprompt', 'history', '-stopafter:1',
                     '-recursive', '-format:xml', cwd,
                 ],),
-                'kwargs': {
-                    'results_unicode': False,
-                    'split_lines': False,
-                    'return_error_code': False,
-                    'return_errors': False,
-                },
-                'op': kgb.SpyOpReturn(
+                'op': kgb.SpyOpReturn((
+                    0,
+
                     # NOTE: We are not sensitive to the root element name,
                     #       and at the time of this writing, there is no
                     #       public documentation (or local setup) capable
@@ -733,8 +669,10 @@ class TEEWrapperTests(SCMClientTestCase):
                     b'\n'
                     b'<changesets>\n'
                     b' <changeset id="123"/>\n'
-                    b'</changesets>\n'
-                ),
+                    b'</changesets>\n',
+
+                    b'',
+                )),
             },
         ]))
 
@@ -748,25 +686,21 @@ class TEEWrapperTests(SCMClientTestCase):
                 'tip': '--rbtools-working-copy',
             })
 
-        self.assertSpyCallCount(execute, 1)
+        self.assertSpyCallCount(run_process_exec, 1)
 
     def test_parse_revision_spec_with_1_revision(self):
         """Testing TEEWrapper.parse_revision_spec with 1 revision"""
         cwd = os.getcwd()
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ([
                     'tf', '-noprompt', 'history', '-stopafter:1',
                     '-recursive', '-format:xml', '-version:Lrev', cwd,
                 ],),
-                'kwargs': {
-                    'results_unicode': False,
-                    'split_lines': False,
-                    'return_error_code': False,
-                    'return_errors': False,
-                },
-                'op': kgb.SpyOpReturn(
+                'op': kgb.SpyOpReturn((
+                    0,
+
                     # NOTE: We are not sensitive to the root element name,
                     #       and at the time of this writing, there is no
                     #       public documentation (or local setup) capable
@@ -776,8 +710,10 @@ class TEEWrapperTests(SCMClientTestCase):
                     b'\n'
                     b'<changesets>\n'
                     b' <changeset id="123"/>\n'
-                    b'</changesets>\n'
-                ),
+                    b'</changesets>\n',
+
+                    b'',
+                )),
             },
         ]))
 
@@ -791,25 +727,21 @@ class TEEWrapperTests(SCMClientTestCase):
                 'tip': '123',
             })
 
-        self.assertSpyCallCount(execute, 1)
+        self.assertSpyCallCount(run_process_exec, 1)
 
     def test_parse_revision_spec_with_2_revisions(self):
         """Testing TEEWrapper.parse_revision_spec with 2 revisions"""
         cwd = os.getcwd()
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ([
                     'tf', '-noprompt', 'history', '-stopafter:1',
                     '-recursive', '-format:xml', '-version:Lrev1', cwd,
                 ],),
-                'kwargs': {
-                    'results_unicode': False,
-                    'split_lines': False,
-                    'return_error_code': False,
-                    'return_errors': False,
-                },
-                'op': kgb.SpyOpReturn(
+                'op': kgb.SpyOpReturn((
+                    0,
+
                     # NOTE: We are not sensitive to the root element name,
                     #       and at the time of this writing, there is no
                     #       public documentation (or local setup) capable
@@ -819,27 +751,27 @@ class TEEWrapperTests(SCMClientTestCase):
                     b'\n'
                     b'<changesets>\n'
                     b' <changeset id="123"/>\n'
-                    b'</changesets>\n'
-                ),
+                    b'</changesets>\n',
+
+                    b'',
+                )),
             },
             {
                 'args': ([
                     'tf', '-noprompt', 'history', '-stopafter:1',
                     '-recursive', '-format:xml', '-version:124', cwd,
                 ],),
-                'kwargs': {
-                    'results_unicode': False,
-                    'split_lines': False,
-                    'return_error_code': False,
-                    'return_errors': False,
-                },
-                'op': kgb.SpyOpReturn(
+                'op': kgb.SpyOpReturn((
+                    0,
+
                     b'<?xml version="1.0" encoding="utf-8"?>\n'
                     b'\n'
                     b'<changesets>\n'
                     b' <changeset id="124"/>\n'
-                    b'</changesets>\n'
-                ),
+                    b'</changesets>\n',
+
+                    b'',
+                )),
             },
         ]))
 
@@ -853,7 +785,7 @@ class TEEWrapperTests(SCMClientTestCase):
                 'tip': '124',
             })
 
-        self.assertSpyCallCount(execute, 2)
+        self.assertSpyCallCount(run_process_exec, 2)
 
     def test_parse_revision_spec_with_3_revisions(self):
         """Testing TEEWrapper.parse_revision_spec with 3 revisions"""
@@ -866,19 +798,15 @@ class TEEWrapperTests(SCMClientTestCase):
         """Testing TEEWrapper.parse_revision_spec with r1~r2"""
         cwd = os.getcwd()
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ([
                     'tf', '-noprompt', 'history', '-stopafter:1',
                     '-recursive', '-format:xml', '-version:Lrev1', cwd,
                 ],),
-                'kwargs': {
-                    'results_unicode': False,
-                    'split_lines': False,
-                    'return_error_code': False,
-                    'return_errors': False,
-                },
-                'op': kgb.SpyOpReturn(
+                'op': kgb.SpyOpReturn((
+                    0,
+
                     # NOTE: We are not sensitive to the root element name,
                     #       and at the time of this writing, there is no
                     #       public documentation (or local setup) capable
@@ -888,21 +816,19 @@ class TEEWrapperTests(SCMClientTestCase):
                     b'\n'
                     b'<changesets>\n'
                     b' <changeset id="123"/>\n'
-                    b'</changesets>\n'
-                ),
+                    b'</changesets>\n',
+
+                    b'',
+                )),
             },
             {
                 'args': ([
                     'tf', '-noprompt', 'history', '-stopafter:1',
                     '-recursive', '-format:xml', '-version:Lrev2', cwd,
                 ],),
-                'kwargs': {
-                    'results_unicode': False,
-                    'split_lines': False,
-                    'return_error_code': False,
-                    'return_errors': False,
-                },
-                'op': kgb.SpyOpReturn(
+                'op': kgb.SpyOpReturn((
+                    0,
+
                     # NOTE: We are not sensitive to the root element name,
                     #       and at the time of this writing, there is no
                     #       public documentation (or local setup) capable
@@ -912,8 +838,10 @@ class TEEWrapperTests(SCMClientTestCase):
                     b'\n'
                     b'<changesets>\n'
                     b' <changeset id="456"/>\n'
-                    b'</changesets>\n'
-                ),
+                    b'</changesets>\n',
+
+                    b'',
+                )),
             },
         ]))
 
@@ -927,25 +855,21 @@ class TEEWrapperTests(SCMClientTestCase):
                 'tip': '456',
             })
 
-        self.assertSpyCallCount(execute, 2)
+        self.assertSpyCallCount(run_process_exec, 2)
 
     def test_parse_revision_spec_with_no_changeset_found(self):
         """Testing TEEWrapper.parse_revision_spec with no changeset found"""
         cwd = os.getcwd()
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ([
                     'tf', '-noprompt', 'history', '-stopafter:1',
                     '-recursive', '-format:xml', cwd,
                 ],),
-                'kwargs': {
-                    'results_unicode': False,
-                    'split_lines': False,
-                    'return_error_code': False,
-                    'return_errors': False,
-                },
-                'op': kgb.SpyOpReturn(
+                'op': kgb.SpyOpReturn((
+                    0,
+
                     # NOTE: We are not sensitive to the root element name,
                     #       and at the time of this writing, there is no
                     #       public documentation (or local setup) capable
@@ -953,8 +877,10 @@ class TEEWrapperTests(SCMClientTestCase):
                     #       possibility.
                     b'<?xml version="1.0" encoding="utf-8"?>\n'
                     b'\n'
-                    b'<changesets/>\n'
-                ),
+                    b'<changesets/>\n',
+
+                    b'',
+                )),
             },
         ]))
 

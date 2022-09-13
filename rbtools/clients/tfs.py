@@ -8,7 +8,7 @@ import re
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
-from typing import Dict, List, Optional, cast
+from typing import List, Optional, cast
 
 from six.moves.urllib.parse import unquote
 
@@ -21,7 +21,9 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
 from rbtools.utils.appdirs import user_data_dir
 from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.diffs import filename_match_any_patterns
-from rbtools.utils.process import execute
+from rbtools.utils.process import (RunProcessError,
+                                   RunProcessResult,
+                                   run_process)
 
 
 class BaseTFWrapper:
@@ -165,16 +167,20 @@ class TFExeWrapper(BaseTFWrapper):
             rbtools.clients.errors.SCMClientDependencyError:
                 A :command:`tf` tool could not be found.
         """
+        tf_vc_output: bytes
+
         try:
-            tf_vc_output = execute(['tf', 'vc', 'help'],
-                                   ignore_errors=True,
-                                   none_on_ignored_error=True)
-        except OSError:
-            tf_vc_output = None
+            tf_vc_output = (
+                run_process(['tf', 'vc', 'help'])
+                .stdout_bytes
+                .read()
+            )
+        except Exception:
+            tf_vc_output = b''
 
         # VS2015 has a tf.exe but it's not good enough.
         if (not tf_vc_output or
-            'Version Control Tool, Version 15' not in tf_vc_output):
+            b'Version Control Tool, Version 15' not in tf_vc_output):
             raise SCMClientDependencyError(missing_exes=['tf'])
 
     def get_local_path(self) -> Optional[str]:
@@ -184,7 +190,11 @@ class TFExeWrapper(BaseTFWrapper):
             str:
             The filesystem path of the repository on the client system.
         """
-        workfold = self._run_tf(['vc', 'workfold', os.getcwd()])
+        workfold = (
+            self._run_tf(['vc', 'workfold', os.getcwd()])
+            .stdout
+            .read()
+        )
 
         m = re.search('^Collection: (.*)$', workfold, re.MULTILINE)
 
@@ -303,12 +313,21 @@ class TFExeWrapper(BaseTFWrapper):
         # encoding to decode the output, but the XML results we get should
         # always be UTF-8, and are well-formed with the encoding specified. We
         # can therefore let ElementTree determine how to decode it.
-        data = self._run_tf(['vc', 'history', '/stopafter:1', '/recursive',
-                             '/format:detailed', '/version:%s' % revision,
-                             path or os.getcwd()])
-        assert isinstance(data, str)
+        data = (
+            self._run_tf([
+                'vc',
+                'history',
+                '/stopafter:1',
+                '/recursive',
+                '/format:detailed',
+                '/version:%s' % revision,
+                path or os.getcwd(),
+            ])
+            .stdout_bytes
+            .read()
+        )
 
-        m = re.search(r'^Changeset: (\d+)$', data, re.MULTILINE)
+        m = re.search(br'^Changeset: (\d+)$', data, re.MULTILINE)
 
         if not m:
             logging.debug('Failed to parse output from "tf vc history":\n%s',
@@ -380,8 +399,11 @@ class TFExeWrapper(BaseTFWrapper):
         # encoding, but the XML results we get should always be UTF-8, and are
         # well-formed with the encoding specified. We can therefore let
         # ElementTree determine how to decode it.
-        status = self._run_tf(['vc', 'status', '/format:xml'],
-                              results_unicode=False)
+        status = (
+            self._run_tf(['vc', 'status', '/format:xml'])
+            .stdout_bytes
+            .read()
+        )
         root = ET.fromstring(status)
 
         diff = []
@@ -423,18 +445,30 @@ class TFExeWrapper(BaseTFWrapper):
 
                     old_data = b''
             elif 'Delete' in action:
-                old_data = self._run_tf(
-                    ['vc', 'view', '/version:%s' % old_version.decode('utf-8'),
-                     old_filename.decode('utf-8')],
-                    results_unicode=False)
+                old_data = (
+                    self._run_tf([
+                        'vc',
+                        'view',
+                        old_filename.decode('utf-8'),
+                        '/version:%s' % old_version.decode('utf-8'),
+                    ])
+                    .stdout_bytes
+                    .read()
+                )
                 new_data = b''
                 new_version = b'(deleted)'
             elif 'Edit' in action:
                 if not binary:
-                    old_data = self._run_tf(
-                        ['vc', 'view', old_filename.decode('utf-8'),
-                         '/version:%s' % old_version.decode('utf-8')],
-                        results_unicode=False)
+                    old_data = (
+                        self._run_tf([
+                            'vc',
+                            'view',
+                            old_filename.decode('utf-8'),
+                            '/version:%s' % old_version.decode('utf-8'),
+                        ])
+                        .stdout_bytes
+                        .read()
+                    )
 
                     with open(local_filename, 'rb') as f:
                         new_data = f.read()
@@ -466,14 +500,22 @@ class TFExeWrapper(BaseTFWrapper):
                 new_tmp.write(new_data)
                 new_tmp.close()
 
-                unified_diff = execute(
-                    ['diff', '-u',
-                     '--label', old_label.decode('utf-8'),
-                     '--label', new_label.decode('utf-8'),
-                     old_tmp.name, new_tmp.name],
-                    extra_ignore_errors=(1,),
-                    log_output_on_error=False,
-                    results_unicode=False)
+                unified_diff = (
+                    run_process(
+                        [
+                            'diff',
+                            '-u',
+                            '--label', old_label.decode('utf-8'),
+                            '--label', new_label.decode('utf-8'),
+                            old_tmp.name,
+                            new_tmp.name,
+                        ],
+                        ignore_errors=(1,),
+                        log_debug_output_on_error=False
+                    )
+                    .stdout_bytes
+                    .read()
+                )
 
                 diff.append(unified_diff)
 
@@ -486,26 +528,28 @@ class TFExeWrapper(BaseTFWrapper):
             'base_commit_id': base,
         }
 
-    def _run_tf(self, args, **kwargs):
+    def _run_tf(
+        self,
+        args: List[str],
+    ) -> RunProcessResult:
         """Run the "tf" command.
 
         Args:
             args (list):
                 A list of arguments to pass to rb-tfs.
 
-            **kwargs (dict):
-                Additional keyword arguments for the :py:meth:`execute` call.
-
         Returns:
-            unicode:
-            The output of the command.
+            rbtools.utils.process.RunProcessResult:
+            The result of the command.
         """
         command = ['tf'] + args + ['/noprompt']
 
-        if getattr(self.options, 'tfs_login', None):
-            command.append('/login:%s' % self.options.tfs_login)
+        tfs_login = getattr(self.options, 'tfs_login', None)
 
-        return execute(command, ignore_errors=True, **kwargs)
+        if tfs_login:
+            command.append('/login:%s' % tfs_login)
+
+        return run_process(command, ignore_errors=True)
 
 
 class TEEWrapper(BaseTFWrapper):
@@ -592,16 +636,20 @@ class TEEWrapper(BaseTFWrapper):
         # To help with debugging, we'll include the full path on each.
         raise SCMClientDependencyError(missing_exes=[tuple(tf_locations)])
 
-    def get_local_path(self):
+    def get_local_path(self) -> Optional[str]:
         """Return the local path to the working tree.
 
         Returns:
-            unicode:
+            str:
             The filesystem path of the repository on the client system.
         """
         assert self.tf is not None
 
-        workfold = self._run_tf(['workfold', os.getcwd()])
+        workfold = (
+            self._run_tf(['workfold', os.getcwd()])
+            .stdout
+            .read()
+        )
 
         m = re.search('^Collection: (.*)$', workfold, re.MULTILINE)
 
@@ -726,12 +774,14 @@ class TEEWrapper(BaseTFWrapper):
 
         args.append(path or os.getcwd())
 
-        # We pass results_unicode=False because that uses the filesystem
-        # encoding to decode the output, but the XML results we get should
-        # always be UTF-8, and are well-formed with the encoding specified. We
-        # can therefore let ElementTree determine how to decode it.
-        data = self._run_tf(args, results_unicode=False)
-        assert isinstance(data, bytes)
+        # We access stdout_bytes, even though the XML results we get should
+        # always be UTF-8. They are well-formed with the encoding specified,
+        # so we can let ElementTree determine how to decode it.
+        data = (
+            self._run_tf(args)
+            .stdout_bytes
+            .read()
+        )
 
         try:
             root = ET.fromstring(data)
@@ -803,11 +853,14 @@ class TEEWrapper(BaseTFWrapper):
             ``base_commit_id`` keys. In the case of TFS, the parent diff key
             will always be ``None``.
         """
-        # We pass results_unicode=False because that uses the filesystem
-        # encoding, but the XML results we get should always be UTF-8, and are
-        # well-formed with the encoding specified. We can therefore let
-        # ElementTree determine how to decode it.
-        status = self._run_tf(['status', '-format:xml'], results_unicode=False)
+        # We access stdout_bytes, even though the XML results we get should
+        # always be UTF-8. They are well-formed with the encoding specified,
+        # so we can let ElementTree determine how to decode it.
+        status = (
+            self._run_tf(['status', '-format:xml'])
+            .stdout_bytes
+            .read()
+        )
         root = ET.fromstring(status)
 
         diff = []
@@ -854,17 +907,27 @@ class TEEWrapper(BaseTFWrapper):
                         new_data = f.read()
                 old_data = b''
             elif 'delete' in action:
-                old_data = self._run_tf(
-                    ['print', '-version:%s' % old_version.decode('utf-8'),
-                     old_filename.decode('utf-8')],
-                    results_unicode=False)
+                old_data = (
+                    self._run_tf([
+                        'print',
+                        '-version:%s' % old_version.decode('utf-8'),
+                        old_filename.decode('utf-8'),
+                    ])
+                    .stdout_bytes
+                    .read()
+                )
                 new_data = b''
                 new_version = b'(deleted)'
             elif 'edit' in action:
-                old_data = self._run_tf(
-                    ['print', '-version:%s' % old_version.decode('utf-8'),
-                     old_filename.decode('utf-8')],
-                    results_unicode=False)
+                old_data = (
+                    self._run_tf([
+                        'print',
+                        '-version:%s' % old_version.decode('utf-8'),
+                        old_filename.decode('utf-8'),
+                    ])
+                    .stdout_bytes
+                    .read()
+                )
 
                 with open(local_filename) as f:
                     new_data = f.read()
@@ -896,14 +959,22 @@ class TEEWrapper(BaseTFWrapper):
                 new_tmp.write(new_data)
                 new_tmp.close()
 
-                unified_diff = execute(
-                    ['diff', '-u',
-                     '--label', old_label.decode('utf-8'),
-                     '--label', new_label.decode('utf-8'),
-                     old_tmp.name, new_tmp.name],
-                    extra_ignore_errors=(1,),
-                    log_output_on_error=False,
-                    results_unicode=False)
+                unified_diff = (
+                    run_process(
+                        [
+                            'diff',
+                            '-u',
+                            '--label', old_label.decode('utf-8'),
+                            '--label', new_label.decode('utf-8'),
+                            old_tmp.name,
+                            new_tmp.name,
+                        ],
+                        ignore_errors=(1,),
+                        log_debug_output_on_error=False
+                    )
+                    .stdout_bytes
+                    .read()
+                )
 
                 diff.append(unified_diff)
 
@@ -921,23 +992,23 @@ class TEEWrapper(BaseTFWrapper):
             'base_commit_id': base,
         }
 
-    def _run_tf(self, args, **kwargs):
+    def _run_tf(
+        self,
+        args: List[str],
+    ) -> RunProcessResult:
         """Run the "tf" command.
 
         Args:
-            args (list):
+            args (list of str):
                 A list of arguments to pass to rb-tfs.
 
-            **kwargs (dict):
-                Additional keyword arguments for the :py:meth:`execute` call.
-
         Returns:
-            unicode:
-            The output of the command.
+            rbtools.utils.process.RunProcessResult
+            The result of the command.
         """
         assert self.tf is not None
 
-        cmdline = [self.tf, '-noprompt']
+        cmdline: List[str] = [self.tf, '-noprompt']
 
         tfs_login = getattr(self.options, 'tfs_login', None)
 
@@ -952,7 +1023,7 @@ class TEEWrapper(BaseTFWrapper):
                 if arg.startswith('-'):
                     cmdline[i] = '/' + arg[1:]
 
-        return execute(cmdline, ignore_errors=True, **kwargs)
+        return run_process(cmdline, ignore_errors=True)
 
 
 class TFHelperWrapper(BaseTFWrapper):
@@ -1001,13 +1072,15 @@ class TFHelperWrapper(BaseTFWrapper):
             unicode:
             The filesystem path of the repository on the client system.
         """
-        rc, path, errors = self._run_helper(['get-collection'],
-                                            ignore_errors=True)
-
-        if rc == 0:
-            return path.strip()
-
-        return None
+        try:
+            return (
+                self._run_helper(['get-collection'])
+                .stdout
+                .read()
+                .strip()
+            )
+        except Exception:
+            return None
 
     def get_repository_info(self):
         """Return repository information for the current working tree.
@@ -1073,19 +1146,26 @@ class TFHelperWrapper(BaseTFWrapper):
         if len(revisions) > 2:
             raise TooManyRevisionsError
 
-        rc, parsed_revisions, errors = self._run_helper(
-            ['parse-revision'] + revisions, split_lines=True)
+        try:
+            result = self._run_helper(['parse-revision'] + revisions)
+        except Exception as e:
+            if isinstance(e, RunProcessError):
+                errors = e.result.stderr.read().strip()
+            else:
+                errors = ''
 
-        if rc == 0:
-            return {
-                'base': parsed_revisions[0].decode('utf-8').strip(),
-                'tip': parsed_revisions[1].decode('utf-8').strip(),
-            }
-        else:
-            raise InvalidRevisionSpecError(
-                b'\n'.join(errors).decode('utf-8').strip() or
-                ('Unexpected error while parsing revision spec %r'
-                 % (revisions,)))
+            if not errors:
+                errors = ('Unexpected error while parsing revision spec %r'
+                          % (revisions,))
+
+            raise InvalidRevisionSpecError(errors)
+
+        parsed_revisions = result.stdout.readlines()
+
+        return {
+            'base': parsed_revisions[0].strip(),
+            'tip': parsed_revisions[1].strip(),
+        }
 
     def diff(self, revisions, include_files, exclude_patterns):
         """Return the generated diff.
@@ -1119,13 +1199,15 @@ class TFHelperWrapper(BaseTFWrapper):
         base = revisions['base']
         tip = revisions['tip']
 
-        rc, diff, errors = self._run_helper(['diff', '--', base, tip],
-                                            ignore_errors=True,
-                                            results_unicode=False,
-                                            log_output_on_error=False)
+        assert base is not None
+        assert tip is not None
 
-        if rc in (0, 2):
-            if rc == 2:
+        result = self._run_helper(['diff', '--', base, tip],
+                                  ignore_errors=True,
+                                  log_debug_output_on_error=False)
+
+        if result.exit_code in (0, 2):
+            if result.exit_code == 2:
                 # Magic return code that means success, but there were
                 # un-tracked files in the working directory.
                 logging.warning('There are added or deleted files which have '
@@ -1133,14 +1215,18 @@ class TFHelperWrapper(BaseTFWrapper):
                                 'included in your review request.')
 
             return {
-                'diff': diff,
+                'diff': result.stdout_bytes.read(),
                 'parent_diff': None,
                 'base_commit_id': None,
             }
         else:
-            raise SCMError(errors.strip())
+            raise SCMError(result.stderr.read().strip())
 
-    def _run_helper(self, args, **kwargs):
+    def _run_helper(
+        self,
+        args: List[str],
+        **kwargs,
+    ) -> RunProcessResult:
         """Run the rb-tfs binary.
 
         Args:
@@ -1148,12 +1234,12 @@ class TFHelperWrapper(BaseTFWrapper):
                 A list of arguments to pass to rb-tfs.
 
             **kwargs (dict):
-                Additional keyword arguments for the :py:meth:`execute` call.
+                Additional keyword arguments for the
+                :py:func:`~rbtools.utils.process.run_process` call.
 
         Returns:
-            tuple:
-            A 3-tuple of return code, output, and error output. The output and
-            error output may be lists depending on the contents of ``kwargs``.
+            rbtools.utils.process.RunProcessResult:
+            The result of the command.
         """
         if len(args) == 0:
             raise ValueError('_run_helper called without any arguments')
@@ -1177,12 +1263,7 @@ class TFHelperWrapper(BaseTFWrapper):
 
         cmdline += args[1:]
 
-        return execute(cmdline,
-                       with_errors=False,
-                       results_unicode=False,
-                       return_error_code=True,
-                       return_errors=True,
-                       **kwargs)
+        return run_process(cmdline, **kwargs)
 
 
 class TFSClient(BaseSCMClient):
