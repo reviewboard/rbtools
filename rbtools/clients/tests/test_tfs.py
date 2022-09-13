@@ -3,11 +3,13 @@
 import argparse
 import os
 import re
+from typing import Any, Dict, List
 
 import kgb
 
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
+                                    SCMError,
                                     TooManyRevisionsError)
 from rbtools.clients.tests import SCMClientTestCase
 from rbtools.clients.tfs import (BaseTFWrapper,
@@ -17,11 +19,125 @@ from rbtools.clients.tfs import (BaseTFWrapper,
                                  TFSClient)
 from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.checks import check_install
+from rbtools.utils.filesystem import chdir, make_tempdir
 from rbtools.utils.process import run_process_exec
 
 
 class TFExeWrapperTests(SCMClientTestCase):
     """Unit tests for TFExeWrapper."""
+
+    def make_vc_status_rule(
+        self,
+        changes: List[Dict[str, str]],
+    ) -> Dict[str, Any]:
+        """Return a rule for fetching change history.
+
+        Args:
+            changes (list of dict):
+                The list of changes and the attribute for each.
+
+        Returns:
+            dict:
+            The rule to use for kgb.
+        """
+        payload_parts = [
+            b'<?xml version="1.0" encoding="utf-8"?>\n'
+            b'\n'
+            b'<PendingSets>\n'
+            b' <PendingSet>\n'
+            b'  <PendingChanges>\n'
+        ] + [
+            b'   <PendingChange %s/>\n' % ' '.join([
+                '%s="%s"' % _pair
+                for _pair in _change.items()
+            ]).encode('utf-8')
+            for _change in changes
+        ] + [
+            b'  </PendingChanges>\n'
+            b' </PendingSet>\n'
+            b'</PendingSets>',
+        ]
+
+        return {
+            'args': (['tf', 'vc', 'status', '/format:xml', '/noprompt'],),
+            'op': kgb.SpyOpReturn((
+                0,
+                b''.join(payload_parts),
+                b'',
+            )),
+        }
+
+    def make_vc_view_rule(
+        self,
+        filename: str,
+        revision: str,
+        content: bytes,
+    ) -> Dict[str, Any]:
+        """Return a rule for fetching contents of a file.
+
+        Args:
+            filename (str):
+                The filename to fetch.
+
+            revision (str):
+                The revision to fetch.
+
+            content (bytes):
+                The content to return.
+
+        Returns:
+            dict:
+            The rule to use for kgb.
+        """
+        return {
+            'args': ([
+                'tf', 'vc', 'view', filename, '/version:%s' % revision,
+                '/noprompt',
+            ],),
+            'op': kgb.SpyOpReturn((
+                0,
+                content,
+                b'',
+            )),
+        }
+
+    def make_diff_rule(
+        self,
+        *,
+        orig_label: str,
+        modified_label: str,
+        orig_file: str,
+        modified_file: str,
+    ) -> Dict[str, Any]:
+        """Return a rule for building a diff.
+
+        Args:
+            orig_label (str):
+                The label to use for the original filename.
+
+            modified_label (str):
+                The label to use for the modified filename.
+
+            orig_file (str):
+                The original file to diff against.
+
+            modified_file (str):
+                The modified file to diff against.
+
+        Returns:
+            dict:
+            The rule to use for kgb.
+        """
+        return {
+            'args': ([
+                'diff',
+                '-u',
+                '--label', orig_label,
+                '--label', modified_label,
+                orig_file,
+                modified_file,
+            ],),
+        }
 
     def test_check_dependencies_with_found(self):
         """Testing TFExeWrapper.check_dependencies with tf.exe found"""
@@ -257,6 +373,378 @@ class TFExeWrapperTests(SCMClientTestCase):
 
         with self.assertRaisesMessage(InvalidRevisionSpecError, message):
             wrapper.parse_revision_spec([])
+
+    def test_diff_with_add(self):
+        """Testing TFExeWrapper.diff with chg=Add"""
+        tmpfiles = self.precreate_tempfiles(4)
+
+        self._run_diff_test(
+            rules=[
+                self.make_vc_status_rule(changes=[
+                    {
+                        'chg': 'Add',
+                        'item': 'file1',
+                        'local': 'file1',
+                        'type': 'file',
+                        'enc': '0',
+                    },
+                    {
+                        'chg': 'Add',
+                        'item': 'file2',
+                        'local': 'file2',
+                        'type': 'file',
+                        'enc': '0',
+                    },
+                    {
+                        'chg': 'Add',
+                        'item': 'ignored-file',
+                        'local': 'ignored-file',
+                        'type': 'file',
+                        'enc': '0',
+                    },
+                    {
+                        'chg': 'Add',
+                        'item': 'binary.bin',
+                        'local': 'binary.bin',
+                        'type': 'file',
+                        'enc': '-1',
+                    },
+                ]),
+                self.make_diff_rule(orig_label='/dev/null\t0',
+                                    modified_label='file1\t(pending)',
+                                    orig_file=tmpfiles[0],
+                                    modified_file=tmpfiles[1]),
+                self.make_diff_rule(orig_label='/dev/null\t0',
+                                    modified_label='file2\t(pending)',
+                                    orig_file=tmpfiles[2],
+                                    modified_file=tmpfiles[3]),
+            ],
+            expected_diff_result={
+                'base_commit_id': '123',
+                'diff': (
+                    b'--- /dev/null\t0\n'
+                    b'+++ file1\t(pending)\n'
+                    b'@@ -0,0 +1 @@\n'
+                    b'+file 1.\n'
+                    b'--- /dev/null\t0\n'
+                    b'+++ file2\t(pending)\n'
+                    b'@@ -0,0 +1 @@\n'
+                    b'+file 2.\n'
+                    b'--- /dev/null\t0\n'
+                    b'+++ binary.bin\t(pending)\n'
+                    b'Binary files binary.bin and binary.bin differ\n'
+                ),
+                'parent_diff': None,
+            })
+
+    def test_diff_with_delete(self):
+        """Testing TFExeWrapper.diff with chg=Delete"""
+        tmpfiles = self.precreate_tempfiles(4)
+
+        self._run_diff_test(
+            rules=[
+                self.make_vc_status_rule(changes=[
+                    {
+                        'chg': 'Delete',
+                        'srcitem': 'file1',
+                        'item': 'file1',
+                        'local': 'file1',
+                        'svrfm': '123',
+                        'type': 'file',
+                        'enc': '0',
+                    },
+                    {
+                        'chg': 'Delete',
+                        'srcitem': 'file2',
+                        'item': 'file2',
+                        'local': 'file2',
+                        'svrfm': '456',
+                        'type': 'file',
+                        'enc': '0',
+                    },
+                    {
+                        'chg': 'Delete',
+                        'srcitem': 'ignored-file',
+                        'item': 'ignored-file',
+                        'local': 'ignored-file',
+                        'svrfm': '999',
+                        'type': 'file',
+                        'enc': '0',
+                    },
+                    {
+                        'chg': 'Delete',
+                        'srcitem': 'binary.bin',
+                        'item': 'binary.bin',
+                        'local': 'binary.bin',
+                        'svrfm': '789',
+                        'type': 'file',
+                        'enc': '-1',
+                    },
+                ]),
+                self.make_vc_view_rule(
+                    filename='file1',
+                    revision='123',
+                    content=b'old file 1.\n'),
+                self.make_diff_rule(orig_label='file1\t123',
+                                    modified_label='file1\t(deleted)',
+                                    orig_file=tmpfiles[0],
+                                    modified_file=tmpfiles[1]),
+                self.make_vc_view_rule(
+                    filename='file2',
+                    revision='456',
+                    content=b'old file 2.\n'),
+                self.make_diff_rule(orig_label='file2\t456',
+                                    modified_label='file2\t(deleted)',
+                                    orig_file=tmpfiles[2],
+                                    modified_file=tmpfiles[3]),
+            ],
+            expected_diff_result={
+                'base_commit_id': '123',
+                'diff': (
+                    b'--- file1\t123\n'
+                    b'+++ file1\t(deleted)\n'
+                    b'@@ -1 +0,0 @@\n'
+                    b'-old file 1.\n'
+                    b'--- file2\t456\n'
+                    b'+++ file2\t(deleted)\n'
+                    b'@@ -1 +0,0 @@\n'
+                    b'-old file 2.\n'
+                    b'--- binary.bin\t789\n'
+                    b'+++ binary.bin\t(deleted)\n'
+                    b'Binary files binary.bin and binary.bin differ\n'
+                ),
+                'parent_diff': None,
+            })
+
+    def test_diff_with_edit(self):
+        """Testing TFExeWrapper.diff with chg=Edit"""
+        tmpfiles = self.precreate_tempfiles(4)
+
+        self._run_diff_test(
+            rules=[
+                self.make_vc_status_rule(changes=[
+                    {
+                        'chg': 'Edit',
+                        'srcitem': 'file1',
+                        'item': 'file1',
+                        'local': 'file1',
+                        'svrfm': '123',
+                        'type': 'file',
+                        'enc': '0',
+                    },
+                    {
+                        'chg': 'Edit',
+                        'srcitem': 'file2',
+                        'item': 'renamed-file',
+                        'local': 'renamed-file',
+                        'svrfm': '456',
+                        'type': 'file',
+                        'enc': '0',
+                    },
+                    {
+                        'chg': 'Edit',
+                        'srcitem': 'ignored-file',
+                        'item': 'ignored-file',
+                        'local': 'ignored-file',
+                        'svrfm': '999',
+                        'type': 'file',
+                        'enc': '0',
+                    },
+                    {
+                        'chg': 'Edit',
+                        'srcitem': 'binary.bin',
+                        'item': 'binary.bin',
+                        'local': 'binary.bin',
+                        'svrfm': '789',
+                        'type': 'file',
+                        'enc': '-1',
+                    },
+                ]),
+                self.make_vc_view_rule(
+                    filename='file1',
+                    revision='123',
+                    content=b'old file 1.\n'),
+                self.make_diff_rule(orig_label='file1\t123',
+                                    modified_label='file1\t(pending)',
+                                    orig_file=tmpfiles[0],
+                                    modified_file=tmpfiles[1]),
+                self.make_vc_view_rule(
+                    filename='file2',
+                    revision='456',
+                    content=b'old file 2.\n'),
+                self.make_diff_rule(orig_label='file2\t456',
+                                    modified_label='renamed-file\t(pending)',
+                                    orig_file=tmpfiles[2],
+                                    modified_file=tmpfiles[3]),
+            ],
+            expected_diff_result={
+                'base_commit_id': '123',
+                'diff': (
+                    b'--- file1\t123\n'
+                    b'+++ file1\t(pending)\n'
+                    b'@@ -1 +1 @@\n'
+                    b'-old file 1.\n'
+                    b'+file 1.\n'
+                    b'--- file2\t456\n'
+                    b'+++ renamed-file\t(pending)\n'
+                    b'@@ -1 +1 @@\n'
+                    b'-old file 2.\n'
+                    b'+renamed file.\n'
+                    b'--- binary.bin\t789\n'
+                    b'+++ binary.bin\t(pending)\n'
+                    b'Binary files binary.bin and binary.bin differ\n'
+                ),
+                'parent_diff': None,
+            })
+
+    def test_diff_with_edit_branch(self):
+        """Testing TFExeWrapper.diff with chg='Edit Branch'"""
+        tmpfiles = self.precreate_tempfiles(4)
+
+        self._run_diff_test(
+            rules=[
+                self.make_vc_status_rule(changes=[
+                    {
+                        'chg': 'Edit Branch',
+                        'srcitem': 'file1',
+                        'item': 'file2',
+                        'local': 'file2',
+                        'svrfm': '123',
+                        'type': 'file',
+                        'enc': '0',
+                    },
+                    {
+                        'chg': 'Edit',
+                        'srcitem': 'ignored-file',
+                        'item': 'ignored-file2',
+                        'local': 'ignored-file2',
+                        'svrfm': '999',
+                        'type': 'file',
+                        'enc': '0',
+                    },
+                    {
+                        'chg': 'Edit Branch',
+                        'srcitem': 'file2',
+                        'item': 'renamed-file',
+                        'local': 'renamed-file',
+                        'svrfm': '456',
+                        'type': 'file',
+                        'enc': '0',
+                    },
+                ]),
+                self.make_vc_view_rule(
+                    filename='file1',
+                    revision='123',
+                    content=b'old file.\n'),
+                self.make_diff_rule(orig_label='file1\t123',
+                                    modified_label='file2\t(pending)',
+                                    orig_file=tmpfiles[0],
+                                    modified_file=tmpfiles[1]),
+                self.make_vc_view_rule(
+                    filename='file2',
+                    revision='456',
+                    content=b'old file 2.\n'),
+                self.make_diff_rule(orig_label='file2\t456',
+                                    modified_label='renamed-file\t(pending)',
+                                    orig_file=tmpfiles[2],
+                                    modified_file=tmpfiles[3]),
+            ],
+            expected_diff_result={
+                'base_commit_id': '123',
+                'diff': (
+                    b'Copied from: file1\n'
+                    b'--- file1\t123\n'
+                    b'+++ file2\t(pending)\n'
+                    b'@@ -1 +1 @@\n'
+                    b'-old file.\n'
+                    b'+file 2.\n'
+                    b'Copied from: file2\n'
+                    b'--- file2\t456\n'
+                    b'+++ renamed-file\t(pending)\n'
+                    b'@@ -1 +1 @@\n'
+                    b'-old file 2.\n'
+                    b'+renamed file.\n'
+                ),
+                'parent_diff': None,
+            })
+
+    def test_diff_with_non_working_copy_tip(self):
+        """Testing TFExeWrapper.diff with non-working copy tip"""
+        wrapper = TFExeWrapper()
+
+        message = (
+            'Posting committed changes is not yet supported for TFS when '
+            'using the tf.exe wrapper.'
+        )
+
+        with self.assertRaisesMessage(SCMError, message):
+            wrapper.diff(
+                revisions={
+                    'base': '123',
+                    'tip': '124',
+                },
+                include_files=[],
+                exclude_patterns=[])
+
+    def _run_diff_test(
+        self,
+        *,
+        rules: List[Dict[str, Any]],
+        expected_diff_result: Dict[str, Any],
+    ) -> None:
+        """Run a test of TFExeWrapper.diff.
+
+        This will set up some files in a directory and attempt to diff
+        against them, using the simulated output from :command:`tf.exe`
+        commands.
+
+        Args:
+            rules (list of dict):
+                The list of kgb match rules for
+                :py:func:`~rbtools.utils.process.run_process_exec` to run.
+
+            expected_diff_result (dict):
+                The expected diff result.
+
+        Raises:
+            AssertionError:
+                An expectation failed.
+        """
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder(rules))
+
+        workdir = make_tempdir()
+
+        with open(os.path.join(workdir, 'file1'), 'w') as fp:
+            fp.write('file 1.\n')
+
+        with open(os.path.join(workdir, 'file2'), 'w') as fp:
+            fp.write('file 2.\n')
+
+        with open(os.path.join(workdir, 'renamed-file'), 'w') as fp:
+            fp.write('renamed file.\n')
+
+        with open(os.path.join(workdir, 'ignored-file'), 'w') as fp:
+            fp.write('ignored!\n')
+
+        with open(os.path.join(workdir, 'ignored-file2'), 'w') as fp:
+            fp.write('ignored!\n')
+
+        with open(os.path.join(workdir, 'binary.bin'), 'wb') as fp:
+            fp.write(b'\x00\x01\x02')
+
+        wrapper = TFExeWrapper()
+
+        with chdir(workdir):
+            diff_result = wrapper.diff(
+                revisions={
+                    'base': '123',
+                    'tip': TFExeWrapper.REVISION_WORKING_COPY,
+                },
+                include_files=[],
+                exclude_patterns=['ignored*'])
+
+        self.assertEqual(diff_result, expected_diff_result)
+        self.assertSpyCallCount(run_process_exec, len(rules))
 
 
 class TFHelperWrapperTests(SCMClientTestCase):
@@ -509,9 +997,300 @@ class TFHelperWrapperTests(SCMClientTestCase):
         with self.assertRaisesMessage(InvalidRevisionSpecError, message):
             wrapper.parse_revision_spec(['blah'])
 
+    def test_diff(self):
+        """Testing TFHelperWrapper.diff"""
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': ([
+                    'java', '-Xmx2048M', '-jar', '/path/to/rb-tfs.jar',
+                    'diff', '--', '123', '--rbtools-working-copy',
+                ],),
+                'op': kgb.SpyOpReturn((
+                    0,
+
+                    b'--- file1\t123\n'
+                    b'+++ file2\t(pending)\n'
+                    b'@@ -1 +1 @@\n'
+                    b'-old file.\n'
+                    b'+file 2.\n',
+
+                    b'',
+                )),
+            },
+        ]))
+
+        wrapper = TFHelperWrapper()
+        wrapper.helper_path = '/path/to/rb-tfs.jar'
+
+        diff_result = wrapper.diff(
+            revisions={
+                'base': '123',
+                'tip': TEEWrapper.REVISION_WORKING_COPY,
+            },
+            include_files=[],
+            exclude_patterns=['ignored*'])
+
+        self.assertEqual(
+            diff_result,
+            {
+                'base_commit_id': None,
+                'diff': (
+                    b'--- file1\t123\n'
+                    b'+++ file2\t(pending)\n'
+                    b'@@ -1 +1 @@\n'
+                    b'-old file.\n'
+                    b'+file 2.\n'
+                ),
+                'parent_diff': None,
+            })
+        self.assertSpyCallCount(run_process_exec, 1)
+
+    def test_diff_with_error_1(self):
+        """Testing TFHelperWrapper.diff with exit code 1"""
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': ([
+                    'java', '-Xmx2048M', '-jar', '/path/to/rb-tfs.jar',
+                    'diff', '--', '123', '--rbtools-working-copy',
+                ],),
+                'op': kgb.SpyOpReturn((
+                    1,
+
+                    b'',
+
+                    b'Oh no.\n',
+                )),
+            },
+        ]))
+
+        wrapper = TFHelperWrapper()
+        wrapper.helper_path = '/path/to/rb-tfs.jar'
+
+        with self.assertRaisesMessage(SCMError, 'Oh no.'):
+            wrapper.diff(
+                revisions={
+                    'base': '123',
+                    'tip': TEEWrapper.REVISION_WORKING_COPY,
+                },
+                include_files=[],
+                exclude_patterns=['ignored*'])
+
+        self.assertSpyCallCount(run_process_exec, 1)
+
+    def test_diff_with_error_2(self):
+        """Testing TFHelperWrapper.diff with exit code 2"""
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': ([
+                    'java', '-Xmx2048M', '-jar', '/path/to/rb-tfs.jar',
+                    'diff', '--', '123', '--rbtools-working-copy',
+                ],),
+                'op': kgb.SpyOpReturn((
+                    2,
+
+                    b'--- file1\t123\n'
+                    b'+++ file2\t(pending)\n'
+                    b'@@ -1 +1 @@\n'
+                    b'-old file.\n'
+                    b'+file 2.\n',
+
+                    b'',
+                )),
+            },
+        ]))
+
+        wrapper = TFHelperWrapper()
+        wrapper.helper_path = '/path/to/rb-tfs.jar'
+
+        with self.assertLogs(level='WARNING') as log_ctx:
+            diff_result = wrapper.diff(
+                revisions={
+                    'base': '123',
+                    'tip': TEEWrapper.REVISION_WORKING_COPY,
+                },
+                include_files=[],
+                exclude_patterns=['ignored*'])
+
+        self.assertEqual(
+            diff_result,
+            {
+                'base_commit_id': None,
+                'diff': (
+                    b'--- file1\t123\n'
+                    b'+++ file2\t(pending)\n'
+                    b'@@ -1 +1 @@\n'
+                    b'-old file.\n'
+                    b'+file 2.\n'
+                ),
+                'parent_diff': None,
+            })
+        self.assertSpyCallCount(run_process_exec, 1)
+
+        self.assertEqual(
+            log_ctx.output,
+            [
+                'WARNING:root:There are added or deleted files which have '
+                'not been added to TFS. These will not be included in your '
+                'review request.',
+            ])
+
 
 class TEEWrapperTests(SCMClientTestCase):
     """Unit tests for TEEWrapper."""
+
+    def make_status_rule(
+        self,
+        changes: List[Dict[str, str]],
+    ) -> Dict[str, Any]:
+        """Return a rule for fetching change history.
+
+        Args:
+            changes (list of dict):
+                The list of changes and the attribute for each.
+
+        Returns:
+            dict:
+            The rule to use for kgb.
+        """
+        payload_parts = [
+            b'<?xml version="1.0" encoding="utf-8"?>\n'
+            b'\n'
+            b'<root>\n'
+            b' <pending-changes>\n'
+        ] + [
+            b'  <pending-change %s/>\n' % ' '.join([
+                '%s="%s"' % _pair
+                for _pair in _change.items()
+            ]).encode('utf-8')
+            for _change in changes
+        ] + [
+            b' </pending-changes>\n'
+            b'</root>',
+        ]
+
+        return {
+            'args': (['tf', '-noprompt', 'status', '-format:xml'],),
+            'op': kgb.SpyOpReturn((
+                0,
+                b''.join(payload_parts),
+                b'',
+            )),
+        }
+
+    def make_vc_view_rule(
+        self,
+        filename: str,
+        revision: str,
+        content: bytes,
+    ) -> Dict[str, Any]:
+        """Return a rule for fetching contents of a file.
+
+        Args:
+            filename (str):
+                The filename to fetch.
+
+            revision (str):
+                The revision to fetch.
+
+            content (bytes):
+                The content to return.
+
+        Returns:
+            dict:
+            The rule to use for kgb.
+        """
+        return {
+            'args': ([
+                'tf', '-noprompt', 'print', '-version:%s' % revision,
+                filename,
+            ],),
+            'op': kgb.SpyOpReturn((
+                0,
+                content,
+                b'',
+            )),
+        }
+
+    def make_get_source_revision_rule(
+        self,
+        path: str,
+        revision: str,
+    ) -> Dict[str, Any]:
+        """Return history for a file.
+
+        Args:
+            path (str):
+                The path to look up.
+
+            revision (str):
+                The resulting revision.
+
+        Returns:
+            dict:
+            The rule to use for kgb.
+        """
+        return {
+            'args': ([
+                'tf', '-noprompt', 'history', '-stopafter:1',
+                '-recursive', '-format:xml', path,
+            ],),
+            'op': kgb.SpyOpReturn((
+                0,
+
+                # NOTE: We are not sensitive to the root element name,
+                #       and at the time of this writing, there is no
+                #       public documentation (or local setup) capable
+                #       of showing this. <changesets> is used as a
+                #       possibility.
+                b'<?xml version="1.0" encoding="utf-8"?>\n'
+                b'\n'
+                b'<changesets>\n'
+                b' <changeset id="%s"/>\n'
+                b'</changesets>\n'
+                % revision.encode('utf-8'),
+
+                b'',
+            )),
+        }
+
+    def make_diff_rule(
+        self,
+        *,
+        orig_label: str,
+        modified_label: str,
+        orig_file: str,
+        modified_file: str,
+    ) -> Dict[str, Any]:
+        """Return a rule for building a diff.
+
+        Args:
+            orig_label (str):
+                The label to use for the original filename.
+
+            modified_label (str):
+                The label to use for the modified filename.
+
+            orig_file (str):
+                The original file to diff against.
+
+            modified_file (str):
+                The modified file to diff against.
+
+        Returns:
+            dict:
+            The rule to use for kgb.
+        """
+        return {
+            'args': ([
+                'diff',
+                '-u',
+                '--label', orig_label,
+                '--label', modified_label,
+                orig_file,
+                modified_file,
+            ],),
+        }
+
 
     def test_check_dependencies_with_found_on_windows(self):
         """Testing TEEWrapper.check_dependencies with found on Windows"""
@@ -891,6 +1670,374 @@ class TEEWrapperTests(SCMClientTestCase):
 
         with self.assertRaisesMessage(InvalidRevisionSpecError, message):
             wrapper.parse_revision_spec([])
+
+    def test_diff_with_add(self):
+        """Testing TEEWrapper.diff with change-type=add"""
+        tmpfiles = self.precreate_tempfiles(4)
+
+        self._run_diff_test(
+            rules=[
+                self.make_status_rule(changes=[
+                    {
+                        'change-type': 'add',
+                        'server-item': 'file1',
+                        'local-item': 'file1',
+                        'file-type': 'file',
+                        'version': '0',
+                    },
+                    {
+                        'change-type': 'add',
+                        'server-item': 'file2',
+                        'local-item': 'file2',
+                        'file-type': 'file',
+                        'version': '0',
+                    },
+                    {
+                        'change-type': 'add',
+                        'server-item': 'ignored-file',
+                        'local-item': 'ignored-file',
+                        'file-type': 'file',
+                        'version': '0',
+                    },
+                    {
+                        'change-type': 'add',
+                        'server-item': 'binary.bin',
+                        'local-item': 'binary.bin',
+                        'file-type': 'binary',
+                        'version': '0',
+                    },
+                ]),
+                self.make_diff_rule(orig_label='/dev/null\t0',
+                                    modified_label='file1\t(pending)',
+                                    orig_file=tmpfiles[0],
+                                    modified_file=tmpfiles[1]),
+                self.make_diff_rule(orig_label='/dev/null\t0',
+                                    modified_label='file2\t(pending)',
+                                    orig_file=tmpfiles[2],
+                                    modified_file=tmpfiles[3]),
+            ],
+            expected_diff_result={
+                'base_commit_id': '123',
+                'diff': (
+                    b'--- /dev/null\t0\n'
+                    b'+++ file1\t(pending)\n'
+                    b'@@ -0,0 +1 @@\n'
+                    b'+file 1.\n'
+                    b'--- /dev/null\t0\n'
+                    b'+++ file2\t(pending)\n'
+                    b'@@ -0,0 +1 @@\n'
+                    b'+file 2.\n'
+                    b'--- /dev/null\t0\n'
+                    b'+++ binary.bin\t(pending)\n'
+                    b'Binary files binary.bin and binary.bin differ\n'
+                ),
+                'parent_diff': None,
+            })
+
+    def test_diff_with_delete(self):
+        """Testing TEEWrapper.diff with change-type=delete"""
+        tmpfiles = self.precreate_tempfiles(4)
+
+        self._run_diff_test(
+            rules=[
+                self.make_status_rule(changes=[
+                    {
+                        'change-type': 'delete',
+                        'server-item': 'file1',
+                        'source-item': 'file1',
+                        'local-item': 'file1',
+                        'version': '123',
+                        'file-type': 'file',
+                    },
+                    {
+                        'change-type': 'delete',
+                        'server-item': 'file2',
+                        'source-item': 'file2',
+                        'local-item': 'file2',
+                        'version': '456',
+                        'file-type': 'file',
+                    },
+                    {
+                        'change-type': 'delete',
+                        'server-item': 'ignored-file',
+                        'source-item': 'ignored-file',
+                        'local-item': 'ignored-file',
+                        'version': '999',
+                        'file-type': 'file',
+                    },
+                    {
+                        'change-type': 'delete',
+                        'server-item': 'binary.bin',
+                        'source-item': 'binary.bin',
+                        'local-item': 'binary.bin',
+                        'version': '789',
+                        'file-type': 'binary',
+                    },
+                ]),
+                self.make_vc_view_rule(
+                    filename='file1',
+                    revision='123',
+                    content=b'old file 1.\n'),
+                self.make_diff_rule(orig_label='file1\t123',
+                                    modified_label='file1\t(deleted)',
+                                    orig_file=tmpfiles[0],
+                                    modified_file=tmpfiles[1]),
+                self.make_vc_view_rule(
+                    filename='file2',
+                    revision='456',
+                    content=b'old file 2.\n'),
+                self.make_diff_rule(orig_label='file2\t456',
+                                    modified_label='file2\t(deleted)',
+                                    orig_file=tmpfiles[2],
+                                    modified_file=tmpfiles[3]),
+            ],
+            expected_diff_result={
+                'base_commit_id': '123',
+                'diff': (
+                    b'--- file1\t123\n'
+                    b'+++ file1\t(deleted)\n'
+                    b'@@ -1 +0,0 @@\n'
+                    b'-old file 1.\n'
+                    b'--- file2\t456\n'
+                    b'+++ file2\t(deleted)\n'
+                    b'@@ -1 +0,0 @@\n'
+                    b'-old file 2.\n'
+                    b'--- binary.bin\t789\n'
+                    b'+++ binary.bin\t(deleted)\n'
+                    b'Binary files binary.bin and binary.bin differ\n'
+                ),
+                'parent_diff': None,
+            })
+
+    def test_diff_with_edit(self):
+        """Testing TEEWrapper.diff with change-type=edit"""
+        tmpfiles = self.precreate_tempfiles(4)
+
+        self._run_diff_test(
+            rules=[
+                self.make_status_rule(changes=[
+                    {
+                        'change-type': 'edit',
+                        'server-item': 'file1',
+                        'source-item': 'file1',
+                        'local-item': 'file1',
+                        'version': '123',
+                        'file-type': 'file',
+                    },
+                    {
+                        'change-type': 'edit, rename',
+                        'server-item': 'renamed-file',
+                        'source-item': 'file2',
+                        'local-item': 'renamed-file',
+                        'version': '456',
+                        'file-type': 'file',
+                    },
+                    {
+                        'change-type': 'edit',
+                        'server-item': 'ignored-file',
+                        'source-item': 'ignored-file',
+                        'local-item': 'ignored-file',
+                        'version': '999',
+                        'file-type': 'file',
+                    },
+                    {
+                        'change-type': 'edit',
+                        'server-item': 'binary.bin',
+                        'source-item': 'binary.bin',
+                        'local-item': 'binary.bin',
+                        'version': '789',
+                        'file-type': 'binary',
+                    },
+                ]),
+                self.make_vc_view_rule(
+                    filename='file1',
+                    revision='123',
+                    content=b'old file 1.\n'),
+                self.make_diff_rule(orig_label='file1\t123',
+                                    modified_label='file1\t(pending)',
+                                    orig_file=tmpfiles[0],
+                                    modified_file=tmpfiles[1]),
+                self.make_vc_view_rule(
+                    filename='file2',
+                    revision='456',
+                    content=b'old file 2.\n'),
+                self.make_diff_rule(orig_label='file2\t456',
+                                    modified_label='renamed-file\t(pending)',
+                                    orig_file=tmpfiles[2],
+                                    modified_file=tmpfiles[3]),
+            ],
+            expected_diff_result={
+                'base_commit_id': '123',
+                'diff': (
+                    b'--- file1\t123\n'
+                    b'+++ file1\t(pending)\n'
+                    b'@@ -1 +1 @@\n'
+                    b'-old file 1.\n'
+                    b'+file 1.\n'
+                    b'--- file2\t456\n'
+                    b'+++ renamed-file\t(pending)\n'
+                    b'@@ -1 +1 @@\n'
+                    b'-old file 2.\n'
+                    b'+renamed file.\n'
+                    b'--- binary.bin\t789\n'
+                    b'+++ binary.bin\t(pending)\n'
+                    b'Binary files binary.bin and binary.bin differ\n'
+                ),
+                'parent_diff': None,
+            })
+
+    def test_diff_with_edit_branch(self):
+        """Testing TEEWrapper.diff with change-type='edit, branch'"""
+        tmpfiles = self.precreate_tempfiles(4)
+
+        self._run_diff_test(
+            rules=[
+                self.make_status_rule(changes=[
+                    {
+                        'change-type': 'edit, branch',
+                        'source-item': 'file1',
+                        'server-item': 'file2',
+                        'local-item': 'file2',
+                        'version': '123',
+                        'file-type': 'file',
+                    },
+                    {
+                        'change-type': 'edit, branch',
+                        'source-item': 'ignored-file',
+                        'server-item': 'ignored-file2',
+                        'local-item': 'ignored-file2',
+                        'version': '999',
+                        'file-type': 'file',
+                    },
+                    {
+                        'change-type': 'edit, branch',
+                        'source-item': 'file2',
+                        'server-item': 'renamed-file',
+                        'local-item': 'renamed-file',
+                        'version': '456',
+                        'file-type': 'file',
+                    },
+                ]),
+                self.make_get_source_revision_rule(
+                    path='file1',
+                    revision='123'),
+                self.make_vc_view_rule(
+                    filename='file1',
+                    revision='123',
+                    content=b'old file.\n'),
+                self.make_diff_rule(orig_label='file1\t123',
+                                    modified_label='file2\t(pending)',
+                                    orig_file=tmpfiles[0],
+                                    modified_file=tmpfiles[1]),
+                self.make_get_source_revision_rule(
+                    path='file2',
+                    revision='456'),
+                self.make_vc_view_rule(
+                    filename='file2',
+                    revision='456',
+                    content=b'old file 2.\n'),
+                self.make_diff_rule(orig_label='file2\t456',
+                                    modified_label='renamed-file\t(pending)',
+                                    orig_file=tmpfiles[2],
+                                    modified_file=tmpfiles[3]),
+            ],
+            expected_diff_result={
+                'base_commit_id': '123',
+                'diff': (
+                    b'Copied from: file1\n'
+                    b'--- file1\t123\n'
+                    b'+++ file2\t(pending)\n'
+                    b'@@ -1 +1 @@\n'
+                    b'-old file.\n'
+                    b'+file 2.\n'
+                    b'Copied from: file2\n'
+                    b'--- file2\t456\n'
+                    b'+++ renamed-file\t(pending)\n'
+                    b'@@ -1 +1 @@\n'
+                    b'-old file 2.\n'
+                    b'+renamed file.\n'
+                ),
+                'parent_diff': None,
+            })
+
+    def test_diff_with_non_working_copy_tip(self):
+        """Testing TEEWrapper.diff with non-working copy tip"""
+        wrapper = TEEWrapper()
+
+        message = (
+            'Posting committed changes is not yet supported for TFS when '
+            'using the Team Explorer Everywhere wrapper.'
+        )
+
+        with self.assertRaisesMessage(SCMError, message):
+            wrapper.diff(
+                revisions={
+                    'base': '123',
+                    'tip': '124',
+                },
+                include_files=[],
+                exclude_patterns=[])
+
+    def _run_diff_test(
+        self,
+        *,
+        rules: List[Dict[str, Any]],
+        expected_diff_result: Dict[str, Any],
+    ) -> None:
+        """Run a test of TEEWrapper.diff.
+
+        This will set up some files in a directory and attempt to diff
+        against them, using the simulated output from :command:`tf.exe`
+        commands.
+
+        Args:
+            rules (list of dict):
+                The list of kgb match rules for
+                :py:func:`~rbtools.utils.process.run_process_exec` to run.
+
+            expected_diff_result (dict):
+                The expected diff result.
+
+        Raises:
+            AssertionError:
+                An expectation failed.
+        """
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder(rules))
+
+        workdir = make_tempdir()
+
+        with open(os.path.join(workdir, 'file1'), 'w') as fp:
+            fp.write('file 1.\n')
+
+        with open(os.path.join(workdir, 'file2'), 'w') as fp:
+            fp.write('file 2.\n')
+
+        with open(os.path.join(workdir, 'renamed-file'), 'w') as fp:
+            fp.write('renamed file.\n')
+
+        with open(os.path.join(workdir, 'ignored-file'), 'w') as fp:
+            fp.write('ignored!\n')
+
+        with open(os.path.join(workdir, 'ignored-file2'), 'w') as fp:
+            fp.write('ignored!\n')
+
+        with open(os.path.join(workdir, 'binary.bin'), 'wb') as fp:
+            fp.write(b'\x00\x01\x02')
+
+        wrapper = TEEWrapper()
+        wrapper.tf = 'tf'
+
+        with chdir(workdir):
+            diff_result = wrapper.diff(
+                revisions={
+                    'base': '123',
+                    'tip': TEEWrapper.REVISION_WORKING_COPY,
+                },
+                include_files=[],
+                exclude_patterns=['ignored*'])
+
+        self.assertEqual(diff_result, expected_diff_result)
+        self.assertSpyCallCount(run_process_exec, len(rules))
 
 
 class TFSClientTests(SCMClientTestCase):

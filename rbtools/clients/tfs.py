@@ -23,6 +23,7 @@ from rbtools.deprecation import (RemovedInRBTools50Warning,
 from rbtools.utils.appdirs import user_data_dir
 from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.diffs import filename_match_any_patterns
+from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import (RunProcessError,
                                    RunProcessResult,
                                    run_process)
@@ -448,16 +449,18 @@ class TFExeWrapper(BaseTFWrapper):
 
                     old_data = b''
             elif 'Delete' in action:
-                old_data = (
-                    self._run_tf([
-                        'vc',
-                        'view',
-                        old_filename.decode('utf-8'),
-                        '/version:%s' % old_version.decode('utf-8'),
-                    ])
-                    .stdout_bytes
-                    .read()
-                )
+                if not binary:
+                    old_data = (
+                        self._run_tf([
+                            'vc',
+                            'view',
+                            old_filename.decode('utf-8'),
+                            '/version:%s' % old_version.decode('utf-8'),
+                        ])
+                        .stdout_bytes
+                        .read()
+                    )
+
                 new_data = b''
                 new_version = b'(deleted)'
             elif 'Edit' in action:
@@ -495,13 +498,8 @@ class TFExeWrapper(BaseTFWrapper):
                 diff.append(b'--- %s\n' % old_label)
                 diff.append(b'+++ %s\n' % new_label)
             else:
-                old_tmp = tempfile.NamedTemporaryFile(delete=False)
-                old_tmp.write(old_data)
-                old_tmp.close()
-
-                new_tmp = tempfile.NamedTemporaryFile(delete=False)
-                new_tmp.write(new_data)
-                new_tmp.close()
+                old_tmp = make_tempfile(content=old_data)
+                new_tmp = make_tempfile(content=new_data)
 
                 unified_diff = (
                     run_process(
@@ -510,8 +508,8 @@ class TFExeWrapper(BaseTFWrapper):
                             '-u',
                             '--label', old_label.decode('utf-8'),
                             '--label', new_label.decode('utf-8'),
-                            old_tmp.name,
-                            new_tmp.name,
+                            old_tmp,
+                            new_tmp,
                         ],
                         ignore_errors=(1,),
                         log_debug_output_on_error=False
@@ -522,8 +520,8 @@ class TFExeWrapper(BaseTFWrapper):
 
                 diff.append(unified_diff)
 
-                os.unlink(old_tmp.name)
-                os.unlink(new_tmp.name)
+                os.unlink(old_tmp)
+                os.unlink(new_tmp)
 
         return {
             'diff': b''.join(diff),
@@ -927,30 +925,33 @@ class TEEWrapper(BaseTFWrapper):
 
                 old_data = b''
             elif 'delete' in action:
-                old_data = (
-                    self._run_tf([
-                        'print',
-                        '-version:%s' % old_version.decode('utf-8'),
-                        old_filename.decode('utf-8'),
-                    ])
-                    .stdout_bytes
-                    .read()
-                )
+                if file_type != 'binary':
+                    old_data = (
+                        self._run_tf([
+                            'print',
+                            '-version:%s' % old_version.decode('utf-8'),
+                            old_filename.decode('utf-8'),
+                        ])
+                        .stdout_bytes
+                        .read()
+                    )
+
                 new_data = b''
                 new_version = b'(deleted)'
             elif 'edit' in action:
-                old_data = (
-                    self._run_tf([
-                        'print',
-                        '-version:%s' % old_version.decode('utf-8'),
-                        old_filename.decode('utf-8'),
-                    ])
-                    .stdout_bytes
-                    .read()
-                )
+                if file_type != 'binary':
+                    old_data = (
+                        self._run_tf([
+                            'print',
+                            '-version:%s' % old_version.decode('utf-8'),
+                            old_filename.decode('utf-8'),
+                        ])
+                        .stdout_bytes
+                        .read()
+                    )
 
-                with open(local_filename, 'rb') as f:
-                    new_data = f.read()
+                    with open(local_filename, 'rb') as f:
+                        new_data = f.read()
 
             old_label = b'%s\t%s' % (old_filename, old_version)
             new_label = b'%s\t%s' % (new_filename, new_version)
@@ -971,13 +972,8 @@ class TEEWrapper(BaseTFWrapper):
                 diff.append(b'--- %s\n' % old_label)
                 diff.append(b'+++ %s\n' % new_label)
             else:
-                old_tmp = tempfile.NamedTemporaryFile(delete=False)
-                old_tmp.write(old_data)
-                old_tmp.close()
-
-                new_tmp = tempfile.NamedTemporaryFile(delete=False)
-                new_tmp.write(new_data)
-                new_tmp.close()
+                old_tmp = make_tempfile(content=old_data)
+                new_tmp = make_tempfile(content=new_data)
 
                 unified_diff = (
                     run_process(
@@ -986,8 +982,8 @@ class TEEWrapper(BaseTFWrapper):
                             '-u',
                             '--label', old_label.decode('utf-8'),
                             '--label', new_label.decode('utf-8'),
-                            old_tmp.name,
-                            new_tmp.name,
+                            old_tmp,
+                            new_tmp,
                         ],
                         ignore_errors=(1,),
                         log_debug_output_on_error=False
@@ -998,8 +994,8 @@ class TEEWrapper(BaseTFWrapper):
 
                 diff.append(unified_diff)
 
-                os.unlink(old_tmp.name)
-                os.unlink(new_tmp.name)
+                os.unlink(old_tmp)
+                os.unlink(new_tmp)
 
         if len(root.findall('./candidate-pending-changes/pending-change')) > 0:
             logging.warning('There are added or deleted files which have not '
