@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 
 import os
 import re
-from hashlib import md5
+from typing import Dict, Optional
 
 import kgb
 
@@ -438,48 +438,6 @@ class BazaarClientTests(SCMClientTestCase):
         cls._run_bzr(['commit', '-m', msg, '--author', 'Test User'],
                      cwd=cwd, *args, **kwargs)
 
-    def _compare_diffs(self, filename, full_diff, expected_diff_digest,
-                       change_type='modified'):
-        """Compare expected metadata to a generated diff.
-
-        Args:
-            filename (unicode):
-                The expected filename in the diff.
-
-            full_diff (bytes):
-                The generated diff content.
-
-            expected_diff_digest (bytes):
-                The expected MD5 digest of the diff, past the headers
-                (starting on the 3rd line).
-
-            change_type (unicode, optional):
-                The expected change type listed in the header.
-
-        Raises:
-            AssertionError:
-                One of the expectations failed.
-        """
-        filename = filename.encode('utf-8')
-        change_type = change_type.encode('utf-8')
-
-        diff_lines = full_diff.splitlines()
-
-        self.assertEqual(diff_lines[0],
-                         b"=== %s file '%s'" % (change_type, filename))
-        self.assertTrue(diff_lines[1].startswith(b'--- %s\t' % filename))
-        self.assertTrue(diff_lines[2].startswith(b'+++ %s\t' % filename))
-
-        diff_body = b'\n'.join(diff_lines[3:])
-        self.assertEqual(md5(diff_body).hexdigest(), expected_diff_digest)
-
-    def _count_files_in_diff(self, diff):
-        return len([
-            line
-            for line in diff.split(b'\n')
-            if line.startswith(b'===')
-        ])
-
     def test_get_repository_info_original_branch(self):
         """Testing BazaarClient get_repository_info with original branch"""
         client = self.build_client()
@@ -521,23 +479,37 @@ class BazaarClientTests(SCMClientTestCase):
         with self.assertRaises(TooManyRevisionsError):
             client.parse_revision_spec([1, 2, 3])
 
-    def test_diff_simple(self):
-        """Testing BazaarClient simple diff case"""
+    def test_diff(self):
+        """Testing BazaarClient.diff"""
         client = self.build_client()
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
 
         revisions = client.parse_revision_spec([])
-        result = client.diff(revisions)
-        self.assertIsInstance(result, dict)
-        self.assertIn('diff', result)
 
-        self._compare_diffs('foo.txt', result['diff'],
-                            'a6326b53933f8b255a4b840485d8e210')
+        self.assertEqual(
+            self._normalize_diff(client.diff(revisions)),
+            {
+                'diff': (
+                    b"=== modified file 'foo.txt'\n"
+                    b"--- foo.txt\t2022-01-02 12:34:56 +0000\n"
+                    b"+++ foo.txt\t2022-01-02 12:34:56 +0000\n"
+                    b"@@ -6,7 +6,4 @@\n"
+                    b" inferretque deos Latio, genus unde Latinum,\n"
+                    b" Albanique patres, atque altae moenia Romae.\n"
+                    b" Musa, mihi causas memora, quo numine laeso,\n"
+                    b"-quidve dolens, regina deum tot volvere casus\n"
+                    b"-insignem pietate virum, tot adire labores\n"
+                    b"-impulerit. Tantaene animis caelestibus irae?\n"
+                    b" \n"
+                    b"\n"
+                ),
+                'parent_diff': None,
+            })
 
-    def test_diff_exclude(self):
-        """Testing BazaarClient diff with file exclusion"""
+    def test_diff_with_exclude_patterns(self):
+        """Testing BazaarClient.diff with exclude_patterns"""
         client = self.build_client()
         os.chdir(self.child_branch)
 
@@ -545,17 +517,32 @@ class BazaarClientTests(SCMClientTestCase):
         self._bzr_add_file_commit('exclude.txt', FOO2, 'commit 2')
 
         revisions = client.parse_revision_spec([])
-        result = client.diff(revisions, exclude_patterns=['exclude.txt'])
-        self.assertIsInstance(result, dict)
-        self.assertIn('diff', result)
 
-        self._compare_diffs('foo.txt', result['diff'],
-                            'a6326b53933f8b255a4b840485d8e210')
+        self.assertEqual(
+            self._normalize_diff(client.diff(
+                revisions,
+                exclude_patterns=['exclude.txt'])),
+            {
+                'diff': (
+                    b"=== modified file 'foo.txt'\n"
+                    b"--- foo.txt\t2022-01-02 12:34:56 +0000\n"
+                    b"+++ foo.txt\t2022-01-02 12:34:56 +0000\n"
+                    b"@@ -6,7 +6,4 @@\n"
+                    b" inferretque deos Latio, genus unde Latinum,\n"
+                    b" Albanique patres, atque altae moenia Romae.\n"
+                    b" Musa, mihi causas memora, quo numine laeso,\n"
+                    b"-quidve dolens, regina deum tot volvere casus\n"
+                    b"-insignem pietate virum, tot adire labores\n"
+                    b"-impulerit. Tantaene animis caelestibus irae?\n"
+                    b" \n"
+                    b"\n"
+                ),
+                'parent_diff': None,
+            })
 
-        self.assertEqual(self._count_files_in_diff(result['diff']), 1)
-
-    def test_diff_exclude_in_subdir(self):
-        """Testing BazaarClient diff with file exclusion in a subdirectory"""
+    def test_diff_with_exclude_patterns_in_subdir(self):
+        """Testing BazaarClient.diff with exclude_patterns= in a subdirectory
+        """
         client = self.build_client()
         os.chdir(self.child_branch)
 
@@ -567,18 +554,31 @@ class BazaarClientTests(SCMClientTestCase):
         self._bzr_add_file_commit('exclude.txt', FOO2, 'commit 2')
 
         revisions = client.parse_revision_spec([])
-        result = client.diff(revisions,
-                             exclude_patterns=['exclude.txt', '.'])
-        self.assertIsInstance(result, dict)
-        self.assertIn('diff', result)
 
-        self._compare_diffs('foo.txt', result['diff'],
-                            'a6326b53933f8b255a4b840485d8e210')
+        self.assertEqual(
+            self._normalize_diff(client.diff(
+                revisions,
+                exclude_patterns=['exclude.txt', '.'])),
+            {
+                'diff': (
+                    b"=== modified file 'foo.txt'\n"
+                    b"--- foo.txt\t2022-01-02 12:34:56 +0000\n"
+                    b"+++ foo.txt\t2022-01-02 12:34:56 +0000\n"
+                    b"@@ -6,7 +6,4 @@\n"
+                    b" inferretque deos Latio, genus unde Latinum,\n"
+                    b" Albanique patres, atque altae moenia Romae.\n"
+                    b" Musa, mihi causas memora, quo numine laeso,\n"
+                    b"-quidve dolens, regina deum tot volvere casus\n"
+                    b"-insignem pietate virum, tot adire labores\n"
+                    b"-impulerit. Tantaene animis caelestibus irae?\n"
+                    b" \n"
+                    b"\n"
+                ),
+                'parent_diff': None,
+            })
 
-        self.assertEqual(self._count_files_in_diff(result['diff']), 1)
-
-    def test_diff_exclude_root_pattern_in_subdir(self):
-        """Testing BazaarClient diff with file exclusion in the repo root"""
+    def test_diff_with_exclude_patterns_in_repo_root(self):
+        """Testing BazaarClient.diff with exclude_patterns= in the repo root"""
         client = self.build_client()
         os.chdir(self.child_branch)
 
@@ -590,20 +590,36 @@ class BazaarClientTests(SCMClientTestCase):
         self._bzr_add_file_commit('foo.txt', FOO1, 'commit 2')
 
         revisions = client.parse_revision_spec([])
-        result = client.diff(
-            revisions,
-            exclude_patterns=[os.path.sep + 'exclude.txt',
-                              os.path.sep + 'subdir'])
 
-        self.assertIsInstance(result, dict)
-        self.assertIn('diff', result)
+        self.assertEqual(
+            self._normalize_diff(client.diff(
+                revisions,
+                exclude_patterns=[
+                    os.path.sep + 'exclude.txt',
+                    os.path.sep + 'subdir',
+                ])),
+            {
+                'diff': (
+                    b"=== added file 'subdir/foo.txt'\n"
+                    b"--- subdir/foo.txt\t2022-01-02 12:34:56 +0000\n"
+                    b"+++ subdir/foo.txt\t2022-01-02 12:34:56 +0000\n"
+                    b"@@ -0,0 +1,9 @@\n"
+                    b"+ARMA virumque cano, Troiae qui primus ab oris\n"
+                    b"+Italiam, fato profugus, Laviniaque venit\n"
+                    b"+litora, multum ille et terris iactatus et alto\n"
+                    b"+vi superum saevae memorem Iunonis ob iram;\n"
+                    b"+multa quoque et bello passus, dum conderet urbem,\n"
+                    b"+inferretque deos Latio, genus unde Latinum,\n"
+                    b"+Albanique patres, atque altae moenia Romae.\n"
+                    b"+Musa, mihi causas memora, quo numine laeso,\n"
+                    b"+\n"
+                    b"\n"
+                ),
+                'parent_diff': None,
+            })
 
-        self._compare_diffs(os.path.join('subdir', 'foo.txt'), result['diff'],
-                            '4deffcb296180fa166eddff2512bd0e4',
-                            change_type='added')
-
-    def test_diff_specific_files(self):
-        """Testing BazaarClient diff with specific files"""
+    def test_diff_with_include_files(self):
+        """Testing BazaarClient.diff with include_files="""
         client = self.build_client()
         os.chdir(self.child_branch)
 
@@ -611,15 +627,31 @@ class BazaarClientTests(SCMClientTestCase):
         self._bzr_add_file_commit('bar.txt', b'baz', 'added bar')
 
         revisions = client.parse_revision_spec([])
-        result = client.diff(revisions, ['foo.txt'])
-        self.assertIsInstance(result, dict)
-        self.assertIn('diff', result)
 
-        self._compare_diffs('foo.txt', result['diff'],
-                            'a6326b53933f8b255a4b840485d8e210')
+        self.assertEqual(
+            self._normalize_diff(client.diff(
+                revisions,
+                include_files=['foo.txt'])),
+            {
+                'diff': (
+                    b"=== modified file 'foo.txt'\n"
+                    b"--- foo.txt\t2022-01-02 12:34:56 +0000\n"
+                    b"+++ foo.txt\t2022-01-02 12:34:56 +0000\n"
+                    b"@@ -6,7 +6,4 @@\n"
+                    b" inferretque deos Latio, genus unde Latinum,\n"
+                    b" Albanique patres, atque altae moenia Romae.\n"
+                    b" Musa, mihi causas memora, quo numine laeso,\n"
+                    b"-quidve dolens, regina deum tot volvere casus\n"
+                    b"-insignem pietate virum, tot adire labores\n"
+                    b"-impulerit. Tantaene animis caelestibus irae?\n"
+                    b" \n"
+                    b"\n"
+                ),
+                'parent_diff': None,
+            })
 
-    def test_diff_simple_multiple(self):
-        """Testing BazaarClient simple diff with multiple commits case"""
+    def test_diff_with_multiple_commits(self):
+        """Testing BazaarClient.diff with multiple commits"""
         client = self.build_client()
         os.chdir(self.child_branch)
 
@@ -628,15 +660,37 @@ class BazaarClientTests(SCMClientTestCase):
         self._bzr_add_file_commit('foo.txt', FOO3, 'commit 3')
 
         revisions = client.parse_revision_spec([])
-        result = client.diff(revisions)
-        self.assertIsInstance(result, dict)
-        self.assertIn('diff', result)
 
-        self._compare_diffs('foo.txt', result['diff'],
-                            '4109cc082dce22288c2f1baca9b107b6')
+        self.assertEqual(
+            self._normalize_diff(client.diff(revisions)),
+            {
+                'diff': (
+                    b"=== modified file 'foo.txt'\n"
+                    b"--- foo.txt\t2022-01-02 12:34:56 +0000\n"
+                    b"+++ foo.txt\t2022-01-02 12:34:56 +0000\n"
+                    b"@@ -1,12 +1,11 @@\n"
+                    b" ARMA virumque cano, Troiae qui primus ab oris\n"
+                    b"+ARMA virumque cano, Troiae qui primus ab oris\n"
+                    b" Italiam, fato profugus, Laviniaque venit\n"
+                    b" litora, multum ille et terris iactatus et alto\n"
+                    b" vi superum saevae memorem Iunonis ob iram;\n"
+                    b"-multa quoque et bello passus, dum conderet urbem,\n"
+                    b"+dum conderet urbem,\n"
+                    b" inferretque deos Latio, genus unde Latinum,\n"
+                    b" Albanique patres, atque altae moenia Romae.\n"
+                    b"+Albanique patres, atque altae moenia Romae.\n"
+                    b" Musa, mihi causas memora, quo numine laeso,\n"
+                    b"-quidve dolens, regina deum tot volvere casus\n"
+                    b"-insignem pietate virum, tot adire labores\n"
+                    b"-impulerit. Tantaene animis caelestibus irae?\n"
+                    b" \n"
+                    b"\n"
+                ),
+                'parent_diff': None,
+            })
 
-    def test_diff_parent(self):
-        """Testing BazaarClient diff with changes only in the parent branch"""
+    def test_diff_with_changes_in_parent_branch(self):
+        """Testing BazaarClient.diff with changes only in the parent branch"""
         client = self.build_client()
 
         self._bzr_add_file_commit('foo.txt', FOO1, 'delete and modify stuff',
@@ -656,8 +710,8 @@ class BazaarClientTests(SCMClientTestCase):
                 'parent_diff': None,
             })
 
-    def test_diff_grand_parent(self):
-        """Testing BazaarClient diff with changes between a 2nd level
+    def test_diff_with_changes_since_grandparent(self):
+        """Testing BazaarClient.diff with changes between a 2nd level
         descendant
         """
         # Requesting the diff between the grand child branch and its grand
@@ -676,12 +730,39 @@ class BazaarClientTests(SCMClientTestCase):
         os.chdir(grand_child_branch)
 
         revisions = client.parse_revision_spec([])
-        result = client.diff(revisions)
-        self.assertIsInstance(result, dict)
-        self.assertIn('diff', result)
 
-        self._compare_diffs('foo.txt', result['diff'],
-                            'a6326b53933f8b255a4b840485d8e210')
+        self.assertEqual(
+            self._normalize_diff(client.diff(revisions)),
+            {
+                'diff': (
+                    b"=== modified file 'foo.txt'\n"
+                    b"--- foo.txt\t2022-01-02 12:34:56 +0000\n"
+                    b"+++ foo.txt\t2022-01-02 12:34:56 +0000\n"
+                    b"@@ -6,7 +6,4 @@\n"
+                    b" inferretque deos Latio, genus unde Latinum,\n"
+                    b" Albanique patres, atque altae moenia Romae.\n"
+                    b" Musa, mihi causas memora, quo numine laeso,\n"
+                    b"-quidve dolens, regina deum tot volvere casus\n"
+                    b"-insignem pietate virum, tot adire labores\n"
+                    b"-impulerit. Tantaene animis caelestibus irae?\n"
+                    b" \n"
+                    b"\n"
+                ),
+                'parent_diff': (
+                    b"=== modified file 'foo.txt'\n"
+                    b"--- foo.txt\t2022-01-02 12:34:56 +0000\n"
+                    b"+++ foo.txt\t2022-01-02 12:34:56 +0000\n"
+                    b"@@ -6,4 +6,7 @@\n"
+                    b" inferretque deos Latio, genus unde Latinum,\n"
+                    b" Albanique patres, atque altae moenia Romae.\n"
+                    b" Musa, mihi causas memora, quo numine laeso,\n"
+                    b"+quidve dolens, regina deum tot volvere casus\n"
+                    b"+insignem pietate virum, tot adire labores\n"
+                    b"+impulerit. Tantaene animis caelestibus irae?\n"
+                    b" \n"
+                    b"\n"
+                ),
+            })
 
     def test_guessed_summary_and_description(self):
         """Testing BazaarClient guessing summary and description"""
@@ -871,3 +952,36 @@ class BazaarClientTests(SCMClientTestCase):
                 'base': base_commit_id,
                 'tip': tip_commit_id,
             })
+
+    def _normalize_diff(
+        self,
+        diff_result: Dict[str, Optional[bytes]],
+    ) -> Dict[str, Optional[bytes]]:
+        """Normalize a diff result for comparison.
+
+        This will ensure that dates are all normalized to a fixed date
+        string, making it possible to compare for equality.
+
+        Version Added:
+            4.0
+
+        Args:
+            diff_result (dict):
+                The diff result.
+
+        Returns:
+            dict:
+            The normalized diff result.
+        """
+        self.assertIsInstance(diff_result, dict)
+
+        for key in ('diff', 'parent_diff'):
+            diff = diff_result.get(key)
+
+            if diff:
+                diff_result[key] = re.sub(
+                    br'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}',
+                    br'2022-01-02 12:34:56',
+                    diff)
+
+        return diff_result
