@@ -325,21 +325,17 @@ _DIFFX_DIRECTORY_DIFF = b"""#diffx: encoding=utf-8, version=1.0
     }
 }
 #...diff: length=132, line_endings=unix, type=text
---- test-dir@@/main/0\t2022-09-05 23:49:05.000000000 -0600
-+++ test-dir\t2022-09-05 23:49:09.000000000 -0600
+--- test-dir@@/main/0	2022-09-05 23:49:05.000000000 -0600
++++ test-dir	2022-09-05 23:49:09.000000000 -0600
 @@ -0,0 +1 @@
 +empty-dir
 #..file:
-#...meta: format=json, length=658
+#...meta: format=json, length=398
 {
-    "op": "modify",
-    "path": {
-        "new": "test-dir/empty-dir",
-        "old": "test-dir/empty-dir@@/main/0"
-    },
+    "op": "create",
+    "path": "test-dir/empty-dir",
     "revision": {
-        "new": "empty-dir-new-version",
-        "old": "empty-dir-old-version"
+        "new": "empty-dir-new-version"
     },
     "type": "directory",
     "versionvault": {
@@ -348,11 +344,6 @@ _DIFFX_DIRECTORY_DIFF = b"""#diffx: encoding=utf-8, version=1.0
             "name": "empty-dir",
             "oid": "empty-dir-new-oid",
             "path": "test-dir/empty-dir"
-        },
-        "old": {
-            "name": "empty-dir",
-            "oid": "empty-dir-old-oid",
-            "path": "test-dir/empty-dir@@/main/0"
         },
         "vob": "empty-dir-vob-oid"
     }
@@ -1371,20 +1362,35 @@ class ClearCaseClientTests(SCMClientTestCase):
             {
                 'args': (['cleartool', 'diff', '-ser', 'test-dir@@/main/0',
                           'test-dir'],),
-                'op': kgb.SpyOpReturn(
-                    '********************************\n'
-                    '<<< directory 1: test-dir@@/main/0\n'
-                    '>>> directory 2: test-dir\n'
-                    '********************************\n'
-                    '-----[ added ]-----\n'
-                    '> empty-dir/ --08-30T23:13 user\n'
-                ),
+                'op': kgb.SpyOpReturn([
+                    '********************************',
+                    '<<< directory 1: test-dir@@/main/0',
+                    '>>> directory 2: test-dir',
+                    '********************************',
+                    '-----[ added ]-----',
+                    '> empty-dir/ --08-30T23:13 user',
+                ]),
+            },
+            {
+                'args': (['cleartool', 'desc', '-fmt', '%On',
+                          'test-dir/empty-dir/'],),
+                'op': kgb.SpyOpReturn('empty-dir-new-oid'),
+            },
+            {
+                'args': (['cleartool', 'describe', '-fmt', '%On',
+                          'test-dir'],),
+                'op': kgb.SpyOpReturn('test-dir-new-oid'),
+            },
+            {
+                'args': (['cleartool', 'describe', '-fmt', '%On',
+                          'test-dir/empty-dir'],),
+                'op': kgb.SpyOpReturn('empty-dir-new-oid'),
             },
             {
                 'args': (['cleartool', 'diff', '-ser',
                           'test-dir/empty-dir@@/main/0',
                           'test-dir/empty-dir'],),
-                'op': kgb.SpyOpReturn('Directories are identical')
+                'op': kgb.SpyOpReturn(['Directories are identical'])
             },
             {
                 'args': (['cleartool', 'ls', '-short', '-nxname', '-vob_only',
@@ -1413,6 +1419,20 @@ class ClearCaseClientTests(SCMClientTestCase):
                 'op': kgb.SpyOpReturn('test-dir-old-oid'),
             },
             {
+                'args': (['cleartool', 'ls', '-short', '-nxname', '-vob_only',
+                          'test-dir/empty-dir@@/main/0'],),
+                'op': kgb.SpyOpReturn([]),
+            },
+            {
+                'args': (['cleartool', 'ls', '-short', '-nxname', '-vob_only',
+                          'test-dir/empty-dir'],),
+                'op': kgb.SpyOpReturn([]),
+            },
+            {
+                'args': (['diff', '-uN', tmpfiles[2], tmpfiles[3]],),
+                'op': kgb.SpyOpReturn(b''),
+            },
+            {
                 'args': (['cleartool', 'describe', '-fmt', '%On',
                           'test-dir'],),
                 'op': kgb.SpyOpReturn('test-dir-new-oid'),
@@ -1426,10 +1446,6 @@ class ClearCaseClientTests(SCMClientTestCase):
                 'args': (['cleartool', 'ls', '-short', '-nxname', '-vob_only',
                           'test-dir/empty-dir'],),
                 'op': kgb.SpyOpReturn([]),
-            },
-            {
-                'args': (['diff', '-uN', tmpfiles[2], tmpfiles[3]],),
-                'op': kgb.SpyOpReturn(b''),
             },
             {
                 'args': (['cleartool', 'describe', '-fmt', '%On',
@@ -1481,20 +1497,35 @@ class ClearCaseClientTests(SCMClientTestCase):
             {
                 'args': (['cleartool', 'diff', '-ser', 'test-dir@@/main/0',
                           'test-dir'],),
-                'op': kgb.SpyOpReturn(
-                    '********************************\n'
-                    '<<< directory 1: test-dir@@/main/0\n'
-                    '>>> directory 2: test-dir\n'
-                    '********************************\n'
-                    '-----[ added ]-----\n'
-                    '> empty-dir/ --08-30T23:13 user\n'
-                ),
+                'op': kgb.SpyOpReturn([
+                    '********************************',
+                    '<<< directory 1: test-dir@@/main/0',
+                    '>>> directory 2: test-dir',
+                    '********************************',
+                    '-----[ added ]-----',
+                    '> empty-dir/ --08-30T23:13 user',
+                ]),
+            },
+            {
+                'args': (['cleartool', 'desc', '-fmt', '%On',
+                          'test-dir/empty-dir/'],),
+                'op': kgb.SpyOpReturn('empty-dir-new-oid'),
+            },
+            {
+                'args': (['cleartool', 'describe', '-fmt', '%On',
+                          'test-dir'],),
+                'op': kgb.SpyOpReturn('test-dir-new-oid'),
+            },
+            {
+                'args': (['cleartool', 'describe', '-fmt', '%On',
+                          'test-dir/empty-dir'],),
+                'op': kgb.SpyOpReturn('empty-dir-new-oid'),
             },
             {
                 'args': (['cleartool', 'diff', '-ser',
                           'test-dir/empty-dir@@/main/0',
                           'test-dir/empty-dir'],),
-                'op': kgb.SpyOpReturn('Directories are identical')
+                'op': kgb.SpyOpReturn(['Directories are identical'])
             },
             {
                 'args': (['cleartool', 'ls', '-short', '-nxname', '-vob_only',
@@ -1533,11 +1564,6 @@ class ClearCaseClientTests(SCMClientTestCase):
                 'op': kgb.SpyOpReturn('test-dir-old-version'),
             },
             {
-                'args': (['cleartool', 'describe', '-fmt', '%On',
-                          'test-dir'],),
-                'op': kgb.SpyOpReturn('test-dir-new-oid'),
-            },
-            {
                 'args': (['cleartool', 'describe', '-fmt', '%Vn',
                           'oid:test-dir-new-oid'],),
                 'op': kgb.SpyOpReturn('test-dir-new-version'),
@@ -1570,6 +1596,16 @@ class ClearCaseClientTests(SCMClientTestCase):
                 'args': (['cleartool', 'describe', '-fmt', '%On',
                           'vob:test-dir/empty-dir'],),
                 'op': kgb.SpyOpReturn('empty-dir-vob-oid'),
+            },
+            {
+                'args': (['cleartool', 'describe', '-fmt', '%Vn',
+                          'oid:empty-dir-new-oid'],),
+                'op': kgb.SpyOpReturn('empty-dir-new-version'),
+            },
+            {
+                'args': (['cleartool', 'describe', '-fmt', '%En',
+                          'test-dir/empty-dir'],),
+                'op': kgb.SpyOpReturn('empty-dir'),
             },
             {
                 'args': (['cleartool', 'describe', '-fmt', '%On',
