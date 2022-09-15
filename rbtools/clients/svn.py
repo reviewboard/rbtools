@@ -1136,6 +1136,7 @@ class SVNClient(BaseSCMClient):
         cmd.append(six.text_type(patch_file))
 
         rc, patch_output = self._run_svn(cmd,
+                                         ignore_errors=True,
                                          results_unicode=False,
                                          return_error_code=True)
 
