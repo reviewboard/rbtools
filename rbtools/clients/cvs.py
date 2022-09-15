@@ -212,6 +212,12 @@ class CVSClient(BaseSCMClient):
 
             This will only populate the ``diff`` key.
         """
+        base = revisions['base']
+        tip = revisions['tip']
+
+        assert base is not None
+        assert tip is not None
+
         # CVS paths are always relative to the current working directory.
         cwd = os.getcwd()
         exclude_patterns = normalize_patterns(
@@ -219,21 +225,20 @@ class CVSClient(BaseSCMClient):
             base_dir=cwd,
             cwd=cwd)
 
-        include_files = include_files or []
-
-        # Diff returns "1" if differences were found.
+        # Bulid the command to diff the files.
         diff_cmd = ['cvs', 'diff', '-uN']
-
-        base = revisions['base']
-        tip = revisions['tip']
-
-        assert base is not None
-        assert tip is not None
 
         if not (base == 'BASE' and
                 tip == self.REVISION_WORKING_COPY):
             diff_cmd += ['-r', base, '-r', tip]
 
+        if include_files:
+            diff_cmd += include_files
+
+        # Generate the diff.
+        #
+        # Note that `cvs diff` returns "1" if differences were found, so we
+        # have to ignore that as an error.
         diff = iter(
             run_process(diff_cmd + include_files,
                         ignore_errors=(1,),
@@ -249,5 +254,5 @@ class CVSClient(BaseSCMClient):
                                base_dir=cwd)
 
         return {
-            'diff': b''.join(diff)
+            'diff': b''.join(diff),
         }
