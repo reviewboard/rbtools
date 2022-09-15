@@ -489,7 +489,7 @@ class BazaarClientTests(SCMClientTestCase):
         revisions = client.parse_revision_spec([])
 
         self.assertEqual(
-            self._normalize_diff(client.diff(revisions)),
+            self.normalize_diff_result(client.diff(revisions)),
             {
                 'diff': (
                     b"=== modified file 'foo.txt'\n"
@@ -519,7 +519,7 @@ class BazaarClientTests(SCMClientTestCase):
         revisions = client.parse_revision_spec([])
 
         self.assertEqual(
-            self._normalize_diff(client.diff(
+            self.normalize_diff_result(client.diff(
                 revisions,
                 exclude_patterns=['exclude.txt'])),
             {
@@ -556,7 +556,7 @@ class BazaarClientTests(SCMClientTestCase):
         revisions = client.parse_revision_spec([])
 
         self.assertEqual(
-            self._normalize_diff(client.diff(
+            self.normalize_diff_result(client.diff(
                 revisions,
                 exclude_patterns=['exclude.txt', '.'])),
             {
@@ -592,7 +592,7 @@ class BazaarClientTests(SCMClientTestCase):
         revisions = client.parse_revision_spec([])
 
         self.assertEqual(
-            self._normalize_diff(client.diff(
+            self.normalize_diff_result(client.diff(
                 revisions,
                 exclude_patterns=[
                     os.path.sep + 'exclude.txt',
@@ -629,7 +629,7 @@ class BazaarClientTests(SCMClientTestCase):
         revisions = client.parse_revision_spec([])
 
         self.assertEqual(
-            self._normalize_diff(client.diff(
+            self.normalize_diff_result(client.diff(
                 revisions,
                 include_files=['foo.txt'])),
             {
@@ -662,7 +662,7 @@ class BazaarClientTests(SCMClientTestCase):
         revisions = client.parse_revision_spec([])
 
         self.assertEqual(
-            self._normalize_diff(client.diff(revisions)),
+            self.normalize_diff_result(client.diff(revisions)),
             {
                 'diff': (
                     b"=== modified file 'foo.txt'\n"
@@ -732,7 +732,7 @@ class BazaarClientTests(SCMClientTestCase):
         revisions = client.parse_revision_spec([])
 
         self.assertEqual(
-            self._normalize_diff(client.diff(revisions)),
+            self.normalize_diff_result(client.diff(revisions)),
             {
                 'diff': (
                     b"=== modified file 'foo.txt'\n"
@@ -952,36 +952,3 @@ class BazaarClientTests(SCMClientTestCase):
                 'base': base_commit_id,
                 'tip': tip_commit_id,
             })
-
-    def _normalize_diff(
-        self,
-        diff_result: Dict[str, Optional[bytes]],
-    ) -> Dict[str, Optional[bytes]]:
-        """Normalize a diff result for comparison.
-
-        This will ensure that dates are all normalized to a fixed date
-        string, making it possible to compare for equality.
-
-        Version Added:
-            4.0
-
-        Args:
-            diff_result (dict):
-                The diff result.
-
-        Returns:
-            dict:
-            The normalized diff result.
-        """
-        self.assertIsInstance(diff_result, dict)
-
-        for key in ('diff', 'parent_diff'):
-            diff = diff_result.get(key)
-
-            if diff:
-                diff_result[key] = re.sub(
-                    br'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}',
-                    br'2022-01-02 12:34:56',
-                    diff)
-
-        return diff_result

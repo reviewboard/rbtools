@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
+from datetime import datetime
 from typing import Any, Dict, Generic, Optional, Type, TypeVar
 from unittest import SkipTest
 
@@ -244,6 +246,63 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
                     raise
 
         return client
+
+    def normalize_diff_result(
+        self,
+        diff_result: Dict[str, Optional[bytes]],
+        *,
+        date_format: str = '%Y-%m-%d %H:%M:%S'
+    ) -> Dict[str, Optional[bytes]]:
+        """Normalize a diff result for comparison.
+
+        This will ensure that dates are all normalized to a fixed date
+        string, making it possible to compare for equality.
+
+        Version Added:
+            4.0
+
+        Args:
+            diff_result (dict):
+                The diff result.
+
+            date_format (str, optional):
+                The optional date string format used to match and generate
+                timestamps.
+
+        Returns:
+            dict:
+            The normalized diff result.
+        """
+        self.assertIsInstance(diff_result, dict)
+
+        format_patterns: Dict[bytes, bytes] = {
+            b'%H': br'\d{2}',
+            b'%M': br'\d{2}',
+            b'%S': br'\d{2}',
+            b'%Y': br'\d{4}',
+            b'%b': br'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)',
+            b'%d': br'\d{1,2}',
+            b'%m': br'\d{2}',
+        }
+
+        date_re = re.compile(
+            re.sub(b'|'.join(format_patterns.keys()),
+                   lambda m: format_patterns[m.group(0)],
+                   date_format.encode('utf-8')))
+
+        new_date = (
+            datetime(2022, 1, 2, 12, 34, 56)
+            .strftime(date_format)
+            .encode('utf-8')
+        )
+
+        for key in ('diff', 'parent_diff'):
+            diff = diff_result.get(key)
+
+            if diff:
+                diff_result[key] = date_re.sub(new_date, diff)
+
+        return diff_result
 
 
 class SCMClientTests(SCMClientTestCase):
