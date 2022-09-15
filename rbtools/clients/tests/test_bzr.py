@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 
 import os
 import re
-from typing import Dict, Optional
+from typing import List
 
 import kgb
 
@@ -16,7 +16,9 @@ from rbtools.clients.tests import FOO, FOO1, FOO2, FOO3, SCMClientTestCase
 from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempdir
-from rbtools.utils.process import execute
+from rbtools.utils.process import (RunProcessResult,
+                                   run_process,
+                                   run_process_exec)
 
 
 class BazaarClientStandaloneTests(SCMClientTestCase):
@@ -26,10 +28,14 @@ class BazaarClientStandaloneTests(SCMClientTestCase):
 
     def test_check_dependencies_with_bzr_found_as_bazaar(self):
         """Testing BazaarClient.check_dependencies with bzr (Bazaar) found"""
-        self.spy_on(execute, op=kgb.SpyOpMatchAny([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchAny([
             {
                 'args': (['bzr', '--version'],),
-                'op': kgb.SpyOpReturn('Bazaar 2.7.0'),
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'Bazaar 2.7.0',
+                    b'',
+                )),
             },
         ]))
 
@@ -56,10 +62,14 @@ class BazaarClientStandaloneTests(SCMClientTestCase):
 
     def test_check_dependencies_with_bzr_found_as_breezy(self):
         """Testing BazaarClient.check_dependencies with bzr (Breezy) found"""
-        self.spy_on(execute, op=kgb.SpyOpMatchAny([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchAny([
             {
                 'args': (['bzr', '--version'],),
-                'op': kgb.SpyOpReturn('Breezy 3.2.2'),
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'Breezy 3.2.2',
+                    b'',
+                )),
             },
         ]))
 
@@ -316,6 +326,8 @@ class BazaarClientTests(SCMClientTestCase):
 
     scmclient_cls = BazaarClient
 
+    _bzr: str
+
     @classmethod
     def setup_checkout(cls, checkout_dir):
         """Populate two Bazaar clones.
@@ -364,7 +376,7 @@ class BazaarClientTests(SCMClientTestCase):
                 # when setting up the client.
                 pass
         else:
-            cls._bzr = None
+            cls._bzr = ''
 
         return original_branch
 
@@ -374,7 +386,11 @@ class BazaarClientTests(SCMClientTestCase):
         self.set_user_home(os.path.join(self.testdata_dir, 'homedir'))
 
     @classmethod
-    def _run_bzr(cls, command, *args, **kwargs):
+    def _run_bzr(
+        cls,
+        command: List[str],
+        **kwargs,
+    ) -> RunProcessResult:
         """Run Bazaar/Breezy with the provided arguments.
 
         Args:
@@ -393,13 +409,12 @@ class BazaarClientTests(SCMClientTestCase):
             object:
             The result of the :py:func:`~rtools.utils.process.execute` call.
         """
-        return execute(
+        return run_process(
             [cls._bzr] + command,
             env={
                 'BRZ_EMAIL': 'Test User <test@example.com>',
                 'BZR_EMAIL': 'Test User <test@example.com>',
             },
-            *args,
             **kwargs)
 
     @classmethod
