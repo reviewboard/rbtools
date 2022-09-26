@@ -10,7 +10,10 @@ from typing import List, Optional, cast
 
 import six
 
-from rbtools.clients import BaseSCMClient, PatchResult, RepositoryInfo
+from rbtools.clients import PatchResult, RepositoryInfo
+from rbtools.clients.base.scmclient import (BaseSCMClient,
+                                            SCMClientDiffResult,
+                                            SCMClientRevisionSpec)
 from rbtools.clients.errors import (AmendError,
                                     CreateCommitError,
                                     MergeError,
@@ -21,6 +24,8 @@ from rbtools.clients.errors import (AmendError,
                                     SCMError)
 from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.svn import SVNClient, SVNRepositoryInfo
+from rbtools.deprecation import (RemovedInRBTools50Warning,
+                                 deprecate_non_keyword_only_args)
 from rbtools.utils.checks import check_install, is_valid_version
 from rbtools.utils.console import edit_text
 from rbtools.utils.diffs import (normalize_patterns,
@@ -708,9 +713,18 @@ class GitClient(BaseSCMClient):
                       youngest_remote_commit)
         return youngest_remote_commit
 
-    def diff(self, revisions, include_files=[], exclude_patterns=[],
-             no_renames=False, extra_args=[], with_parent_diff=True,
-             git_find_renames_threshold=None, **kwargs):
+    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
+    def diff(
+        self,
+        revisions: SCMClientRevisionSpec,
+        *,
+        include_files: List[str] = [],
+        exclude_patterns: List[str] = [],
+        no_renames: bool = False,
+        repository_info: Optional[RepositoryInfo] = None,
+        with_parent_diff: bool = True,
+        **kwargs,
+    ) -> SCMClientDiffResult:
         """Perform a diff using the given revisions.
 
         If no revisions are specified, this will do a diff of the contents of
@@ -738,37 +752,20 @@ class GitClient(BaseSCMClient):
             no_renames (bool, optional):
                 Whether to avoid rename detection.
 
-            extra_args (list, unused):
-                Additional arguments to be passed to the diff generation.
-                Unused for git.
-
             with_parent_diff (bool, optional):
                 Whether or not to compute a parent diff.
-
-            git_find_renames_threshold (unicode, optional):
-                The threshold to pass to ``--find-renames``, if any.
 
             **kwargs (dict, unused):
                 Unused keyword arguments.
 
         Returns:
             dict:
-            A dictionary containing the following keys:
-
-            ``diff`` (:py:class:`bytes`):
-                The contents of the diff to upload.
-
-            ``parent_diff`` (:py:class:`bytes`, optional):
-                The contents of the parent diff, if available.
-
-            ``commit_id`` (:py:class:`unicode`, optional):
-                The commit ID to include when posting, if available.
-
-            ``base_commit_id`` (:py:class:`unicode`, optional):
-                The ID of the commit that the change is based on, if available.
-                This is necessary for some hosting services that don't provide
-                individual file access.
+            A dictionary containing keys documented in
+            :py:class:`~rbtools.clients.base.scmclient.SCMClientDiffResult`.
         """
+        git_find_renames_threshold = \
+            getattr(self.options, 'git_find_renames_threshold', None)
+
         exclude_patterns = normalize_patterns(exclude_patterns,
                                               self._git_toplevel,
                                               cwd=os.getcwd())

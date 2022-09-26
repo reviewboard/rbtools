@@ -1460,18 +1460,12 @@ class Post(Command):
         """
         options = self.options
 
-        diff_kwargs = {
+        return {
             'exclude_patterns': options.exclude_patterns or [],
             'extra_args': extra_args,
             'include_files': options.include_files or [],
             'repository_info': self.repository_info,
         }
-
-        if options.git_find_renames_threshold is not None:
-            diff_kwargs['git_find_renames_threshold'] = \
-                options.git_find_renames_threshold
-
-        return diff_kwargs
 
     def _post_diff_history(self, review_request, diff_history):
         """Post the diff history to the review request.

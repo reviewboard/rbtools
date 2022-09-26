@@ -91,6 +91,12 @@ class SCMClientDiffResult(TypedDict):
     #:     bytes
     parent_diff: NotRequired[Optional[bytes]]
 
+    #: The change number to include when posting, if available.
+    #:
+    #: Type:
+    #:     str
+    changenum: NotRequired[Optional[str]]
+
     #: The commit ID to include when posting, if available.
     #:
     #: Type:
@@ -823,10 +829,14 @@ class BaseSCMClient(object):
         no_renames: bool = False,
         repository_info: Optional[RepositoryInfo] = None,
         extra_args: List[str] = [],
+        with_parent_diff: bool = True,
     ) -> SCMClientDiffResult:
         """Perform a diff using the given revisions.
 
         This is expected to be overridden by subclasses.
+
+        Subclasses that need to support special arguments should use
+        :py:attr:`options`.
 
         Args:
             revisions (dict):
@@ -840,6 +850,9 @@ class BaseSCMClient(object):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
 
+            no_renames (bool, optional):
+                Whether to avoid rename detection.
+
             repository_info (rbtools.clients.base.repository.RepositoryInfo,
                              optional):
                 The repository info structure.
@@ -847,8 +860,8 @@ class BaseSCMClient(object):
             extra_args (list, unused):
                 Additional arguments to be passed to the diff generation.
 
-            **kwargs (dict, unused):
-                Unused keyword arguments.
+            with_parent_diff (bool, optional):
+                Whether or not to compute a parent diff.
 
         Returns:
             dict:

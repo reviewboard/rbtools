@@ -8,13 +8,17 @@ import posixpath
 import re
 import sys
 from xml.etree import ElementTree
+from typing import List
 
 import six
 from six.moves import map
 from six.moves.urllib.parse import unquote
 
 from rbtools.api.errors import APIError
-from rbtools.clients import BaseSCMClient, PatchResult, RepositoryInfo
+from rbtools.clients import PatchResult, RepositoryInfo
+from rbtools.clients.base.scmclient import (BaseSCMClient,
+                                            SCMClientDiffResult,
+                                            SCMClientRevisionSpec)
 from rbtools.clients.errors import (AuthenticationError,
                                     InvalidRevisionSpecError,
                                     MinimumVersionError,
@@ -22,7 +26,9 @@ from rbtools.clients.errors import (AuthenticationError,
                                     SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
-from rbtools.deprecation import RemovedInRBTools40Warning
+from rbtools.deprecation import (RemovedInRBTools40Warning,
+                                 RemovedInRBTools50Warning,
+                                 deprecate_non_keyword_only_args)
 from rbtools.utils.checks import (check_gnu_diff,
                                   check_install,
                                   is_valid_version)
@@ -436,8 +442,15 @@ class SVNClient(BaseSCMClient):
 
         return '\n\n'.join(message.text for message in messages)
 
-    def diff(self, revisions, include_files=[], exclude_patterns=[],
-             extra_args=[], **kwargs):
+    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
+    def diff(
+        self,
+        revisions: SCMClientRevisionSpec,
+        *,
+        include_files: List[str] = [],
+        exclude_patterns: List[str] = [],
+        **kwargs,
+    ) -> SCMClientDiffResult:
         """Perform a diff in a Subversion repository.
 
         If the given revision spec is empty, this will do a diff of the
@@ -460,10 +473,6 @@ class SVNClient(BaseSCMClient):
             exclude_patterns (list of unicode, optional):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
-
-            extra_args (list, unused):
-                Additional arguments to be passed to the diff generation.
-                Unused for SVN.
 
             **kwargs (dict, unused):
                 Unused keyword arguments.

@@ -7,7 +7,10 @@ import os
 import re
 from typing import Optional
 
-from rbtools.clients import BaseSCMClient, RepositoryInfo
+from rbtools.clients import RepositoryInfo
+from rbtools.clients.base.scmclient import (BaseSCMClient,
+                                            SCMClientDiffResult,
+                                            SCMClientRevisionSpec)
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError,
                                     SCMClientDependencyError,
@@ -150,40 +153,27 @@ class PlasticClient(BaseSCMClient):
         else:
             raise TooManyRevisionsError
 
-    def diff(self, revisions, include_files=[], exclude_patterns=[],
-             extra_args=[], **kwargs):
+    def diff(
+        self,
+        revisions: SCMClientRevisionSpec,
+        **kwargs,
+    ) -> SCMClientDiffResult:
         """Perform a diff across all modified files in a Plastic workspace.
 
-        Parent diffs are not supported (the second value in the tuple).
+        Parent diffs are not supported.
 
         Args:
             revisions (dict):
                 A dictionary of revisions, as returned by
                 :py:meth:`parse_revision_spec`.
 
-            include_files (list of unicode, optional):
-                A list of files to whitelist during the diff generation.
-
-            exclude_patterns (list of unicode, optional):
-                A list of shell-style glob patterns to blacklist during diff
-                generation.
-
-            extra_args (list, unused):
-                Additional arguments to be passed to the diff generation.
-
             **kwargs (dict, unused):
                 Unused keyword arguments.
 
         Returns:
             dict:
-            A dictionary containing the following keys:
-
-            ``diff`` (:py:class:`bytes`):
-                The contents of the diff to upload.
-
-            ``changenum`` (:py:class:`unicode`):
-                The number of the changeset being posted (if ``revisions``
-                represents a single changeset).
+            A dictionary containing keys documented in
+            :py:class:`~rbtools.clients.base.scmclient.SCMClientDiffResult`.
         """
         # TODO: use 'files'
         changenum = None

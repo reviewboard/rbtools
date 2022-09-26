@@ -6,12 +6,15 @@ import logging
 import os
 import re
 import uuid
-from typing import Optional
+from typing import List, Optional
 
 import six
 from six.moves.urllib.parse import urlsplit, urlunparse
 
-from rbtools.clients import BaseSCMClient, PatchResult, RepositoryInfo
+from rbtools.clients import PatchResult, RepositoryInfo
+from rbtools.clients.base.scmclient import (BaseSCMClient,
+                                            SCMClientDiffResult,
+                                            SCMClientRevisionSpec)
 from rbtools.clients.errors import (CreateCommitError,
                                     InvalidRevisionSpecError,
                                     MergeError,
@@ -19,6 +22,8 @@ from rbtools.clients.errors import (CreateCommitError,
                                     SCMError,
                                     TooManyRevisionsError)
 from rbtools.clients.svn import SVNClient
+from rbtools.deprecation import (RemovedInRBTools50Warning,
+                                 deprecate_non_keyword_only_args)
 from rbtools.utils.checks import check_install
 from rbtools.utils.console import edit_file
 from rbtools.utils.errors import EditorError
@@ -660,8 +665,16 @@ class MercurialClient(BaseSCMClient):
 
         return '\n\n'.join(desc.strip() for desc in descs)
 
-    def diff(self, revisions, include_files=[], exclude_patterns=[],
-             extra_args=[], with_parent_diff=True, **kwargs):
+    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
+    def diff(
+        self,
+        revisions: SCMClientRevisionSpec,
+        *,
+        include_files: List[str] = [],
+        exclude_patterns: List[str] = [],
+        with_parent_diff: bool = True,
+        **kwargs,
+    ) -> SCMClientDiffResult:
         """Perform a diff using the given revisions.
 
         This will generate a Git-style diff and parent diff (if needed) for
@@ -674,16 +687,12 @@ class MercurialClient(BaseSCMClient):
                 A dictionary of revisions, as returned by
                 :py:meth:`parse_revision_spec`.
 
-            include_files (list of unicode, optional):
+            include_files (list of str, optional):
                 A list of files to whitelist during the diff generation.
 
-            exclude_patterns (list of unicode, optional):
+            exclude_patterns (list of str, optional):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
-
-            extra_args (list, unused):
-                Additional arguments to be passed to the diff generation.
-                Unused for mercurial.
 
             with_parent_diff (bool, optional):
                 Whether or not to include the parent diff in the result.
@@ -693,21 +702,8 @@ class MercurialClient(BaseSCMClient):
 
         Returns:
             dict:
-            A dictionary containing the following keys:
-
-            ``diff`` (:py:class:`bytes`):
-                The contents of the diff to upload.
-
-            ``parent_diff`` (:py:class:`bytes`, optional):
-                The contents of the parent diff, if available.
-
-            ``commit_id`` (:py:class:`unicode`, optional):
-                The commit ID to include when posting, if available.
-
-            ``base_commit_id`` (:py:class:`unicode`, optional):
-                The ID of the commit that the change is based on, if available.
-                This is necessary for some hosting services that don't provide
-                individual file access.
+            A dictionary containing keys documented in
+            :py:class:`~rbtools.clients.base.scmclient.SCMClientDiffResult`.
         """
         self._init()
 

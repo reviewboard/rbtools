@@ -1437,6 +1437,7 @@ class TFSClient(BaseSCMClient):
     def diff(
         self,
         revisions: SCMClientRevisionSpec,
+        *,
         include_files: List[str] = [],
         exclude_patterns: List[str] = [],
         **kwargs,
@@ -1452,9 +1453,6 @@ class TFSClient(BaseSCMClient):
 
             exclude_patterns (list, optional):
                 A list of file paths to exclude from the diff.
-
-            extra_args (list, optional):
-                Unused.
 
             **kwargs (dict, unused):
                 Unused keyword arguments.

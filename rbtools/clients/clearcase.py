@@ -10,17 +10,22 @@ import re
 import sys
 import threading
 from collections import defaultdict, deque
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 import six
 from pydiffx.dom import DiffX
 
 from rbtools.api.errors import APIError
-from rbtools.clients import BaseSCMClient, RepositoryInfo
+from rbtools.clients.base.repository import RepositoryInfo
+from rbtools.clients.base.scmclient import (BaseSCMClient,
+                                            SCMClientDiffResult,
+                                            SCMClientRevisionSpec)
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     SCMError)
-from rbtools.deprecation import RemovedInRBTools40Warning
+from rbtools.deprecation import (RemovedInRBTools40Warning,
+                                 RemovedInRBTools50Warning,
+                                 deprecate_non_keyword_only_args)
 from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import execute
@@ -664,8 +669,18 @@ class ClearCaseClient(BaseSCMClient):
             'tip': pairs,
         }
 
-    def diff(self, revisions, include_files=[], exclude_patterns=[],
-             repository_info=None, extra_args=[], **kwargs):
+    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
+    def diff(
+        self,
+        revisions: SCMClientRevisionSpec,
+        *,
+        include_files: List[str] = [],
+        exclude_patterns: List[str] = [],
+        no_renames: bool = False,
+        repository_info: Optional[RepositoryInfo] = None,
+        extra_args: List[str] = [],
+        **kwargs,
+    ) -> SCMClientDiffResult:
         """Perform a diff using the given revisions.
 
         Args:

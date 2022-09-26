@@ -12,17 +12,22 @@ import string
 import subprocess
 import sys
 from fnmatch import fnmatch
-from typing import Optional
+from typing import List, Optional
 
 import six
 
-from rbtools.clients import BaseSCMClient, RepositoryInfo
+from rbtools.clients import RepositoryInfo
+from rbtools.clients.base.scmclient import (BaseSCMClient,
+                                            SCMClientDiffResult,
+                                            SCMClientRevisionSpec)
 from rbtools.clients.errors import (AmendError,
                                     EmptyChangeError,
                                     InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
+from rbtools.deprecation import (RemovedInRBTools50Warning,
+                                 deprecate_non_keyword_only_args)
 from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.encoding import force_unicode
 from rbtools.utils.filesystem import make_empty_files, make_tempfile
@@ -803,8 +808,16 @@ class PerforceClient(BaseSCMClient):
 
         return None
 
-    def diff(self, revisions, include_files=[], exclude_patterns=[],
-             extra_args=[], **kwargs):
+    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
+    def diff(
+        self,
+        revisions: SCMClientRevisionSpec,
+        *,
+        include_files: List[str] = [],
+        exclude_patterns: List[str] = [],
+        extra_args: List[str] = [],
+        **kwargs,
+    ) -> SCMClientDiffResult:
         """Perform a diff using the given revisions.
 
         This goes through the hard work of generating a diff on Perforce in

@@ -16,18 +16,23 @@ import re
 import sqlite3
 from collections import OrderedDict
 from contextlib import contextmanager
-from typing import Optional
+from typing import List, Optional
 
 import six
 from pydiffx import DiffType, DiffX
 from pydiffx.utils.text import guess_line_endings
 from six.moves import range
 
-from rbtools.clients import BaseSCMClient, RepositoryInfo
+from rbtools.clients import RepositoryInfo
+from rbtools.clients.base.scmclient import (BaseSCMClient,
+                                            SCMClientDiffResult,
+                                            SCMClientRevisionSpec)
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
+from rbtools.deprecation import (RemovedInRBTools50Warning,
+                                 deprecate_non_keyword_only_args)
 from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.diffs import filename_match_any_patterns
 from rbtools.utils.filesystem import make_tempfile
@@ -396,8 +401,16 @@ class SOSClient(BaseSCMClient):
                 project == self._query_sos_info('project') and
                 server == self._query_sos_info('server'))
 
-    def diff(self, revisions, include_files=[], exclude_patterns=[],
-             extra_args=[], **kwargs):
+    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
+    def diff(
+        self,
+        revisions: SCMClientRevisionSpec,
+        *,
+        include_files: List[str] = [],
+        exclude_patterns: List[str] = [],
+        with_parent_diff: bool = True,
+        **kwargs,
+    ) -> SCMClientDiffResult:
         """Perform a diff using the given revisions.
 
         This goes through the work of generating a diff for SOS, generating a
@@ -432,23 +445,13 @@ class SOSClient(BaseSCMClient):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
 
-            extra_args (list, unused):
-                Additional arguments to be passed to the diff generation.
-                Unused for git.
-
             **kwargs (dict, unused):
                 Unused keyword arguments.
 
         Returns:
             dict:
-            A dictionary containing the following keys:
-
-            Keys:
-                diff (bytes):
-                    The contents of the diff to upload.
-
-                review_request_extra_data (dict):
-                    Extra data to store on the posted review request.
+            A dictionary containing keys documented in
+            :py:class:`~rbtools.clients.base.scmclient.SCMClientDiffResult`.
         """
         wa_root = self._get_wa_root()
         changelist = None
