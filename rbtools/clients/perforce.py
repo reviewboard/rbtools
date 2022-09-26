@@ -621,16 +621,43 @@ class PerforceClient(BaseSCMClient):
         counters = self.p4.counters()
         return counters.get('reviewboard.repository_name', None)
 
-    def parse_revision_spec(self, revisions=[]):
+    def parse_revision_spec(
+        self,
+        revisions: List[str] = [],
+    ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
+        These will be used to generate the diffs to upload to Review Board
+        (or print). The diff for review will include the changes in (base,
+        tip].
+
+        If zero revisions are passed in, this will return the current sync
+        changelist as "tip", and the upstream branch as "base". The result
+        may have special internal revisions or prefixes based on whether
+        the changeset is submitted, pending, or shelved.
+
+        If a single revision is passed in, this will return the parent of
+        that revision for "base" and the passed-in revision for "tip".
+
+        If two revisions are passed in, they need to both be submitted
+        changesets.
+
         Args:
-            revisions (list of unicode, optional):
+            revisions (list of str, optional):
                 A list of revisions as specified by the user. Items in the list
                 do not necessarily represent a single revision, since the user
                 can use SCM-native syntaxes such as ``r1..r2`` or ``r1:r2``.
                 SCMTool-specific overrides of this method are expected to deal
                 with such syntaxes.
+
+        Returns:
+            dict:
+            The parsed revision spec.
+
+            See :py:class:`~rbtools.clients.base.scmclient.
+            SCMClientRevisionSpec` for the format of this dictionary.
+
+            This always populates the ``base`` and ``tip`` keys.
 
         Raises:
             rbtools.clients.errors.InvalidRevisionSpecError:
@@ -638,31 +665,6 @@ class PerforceClient(BaseSCMClient):
 
             rbtools.clients.errors.TooManyRevisionsError:
                 The specified revisions list contained too many revisions.
-
-        Returns:
-            dict:
-            A dictionary with the following keys:
-
-            ``base`` (:py:class:`unicode`):
-                A revision to use as the base of the resulting diff.
-
-            ``tip`` (:py:class:`unicode`):
-                A revision to use as the tip of the resulting diff.
-
-            These will be used to generate the diffs to upload to Review Board
-            (or print). The diff for review will include the changes in (base,
-            tip].
-
-            If zero revisions are passed in, this will return the current sync
-            changelist as "tip", and the upstream branch as "base". The result
-            may have special internal revisions or prefixes based on whether
-            the changeset is submitted, pending, or shelved.
-
-            If a single revision is passed in, this will return the parent of
-            that revision for "base" and the passed-in revision for "tip".
-
-            If two revisions are passed in, they need to both be submitted
-            changesets.
         """
         n_revs = len(revisions)
 
@@ -715,35 +717,34 @@ class PerforceClient(BaseSCMClient):
                     '%s does not appear to be a valid changelist' %
                     revisions[0])
         elif n_revs == 2:
-            result = {}
-
-            # The base revision must be a submitted CLN
+            # The base revision must be a submitted CLN.
             status = self._get_changelist_status(revisions[0])
-            if status == 'submitted':
-                result['base'] = revisions[0]
-            elif status in ('pending', 'shelved'):
+
+            if status in ('pending', 'shelved'):
                 raise InvalidRevisionSpecError(
                     '%s cannot be used as the base CLN for a diff because '
                     'it is %s.' % (revisions[0], status))
-            else:
+            elif status != 'submitted':
                 raise InvalidRevisionSpecError(
                     '%s does not appear to be a valid changelist' %
                     revisions[0])
 
-            # Tip revision can be any of submitted, pending, or shelved CLNs
+            # Tip revision can be any of submitted, pending, or shelved CLNs.
             status = self._get_changelist_status(revisions[1])
-            if status == 'submitted':
-                result['tip'] = revisions[1]
-            elif status in ('pending', 'shelved'):
+
+            if status in ('pending', 'shelved'):
                 raise InvalidRevisionSpecError(
                     '%s cannot be used for a revision range diff because it '
                     'is %s' % (revisions[1], status))
-            else:
+            elif status != 'submitted':
                 raise InvalidRevisionSpecError(
                     '%s does not appear to be a valid changelist' %
                     revisions[1])
 
-            return result
+            return {
+                'base': revisions[0],
+                'tip': revisions[1],
+            }
         else:
             raise TooManyRevisionsError
 
@@ -877,6 +878,9 @@ class PerforceClient(BaseSCMClient):
 
         base = revisions['base']
         tip = revisions['tip']
+
+        assert isinstance(base, str)
+        assert isinstance(tip, str)
 
         cl_is_pending = tip.startswith(self.REVISION_PENDING_CLN_PREFIX)
         cl_is_shelved = False

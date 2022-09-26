@@ -190,16 +190,38 @@ class GitClient(BaseSCMClient):
 
         return self._git_version_at_least_180
 
-    def parse_revision_spec(self, revisions=[]):
+    def parse_revision_spec(
+        self,
+        revisions: List[str] = [],
+    ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
+        These will be used to generate the diffs to upload to Review Board
+        (or print). The diff for review will include the changes in (base,
+        tip], and the parent diff (if necessary) will include (parent_base,
+        base].
+
+        If a single revision is passed in, this will return the parent of
+        that revision for "base" and the passed-in revision for "tip".
+
+        If zero revisions are passed in, this will return the current HEAD
+        as "tip", and the upstream branch as "base", taking into account
+        parent branches explicitly specified via :option:`--parent`.
+
         Args:
-            revisions (list of unicode, optional):
-                A list of revisions as specified by the user. Items in the list
-                do not necessarily represent a single revision, since the user
-                can use SCM-native syntaxes such as ``r1..r2`` or ``r1:r2``.
-                SCMTool-specific overrides of this method are expected to deal
-                with such syntaxes.
+            revisions (list of str, optional):
+                A list of revisions as specified by the user.
+
+        Returns:
+            dict:
+            The parsed revision spec.
+
+            See :py:class:`~rbtools.clients.base.scmclient.
+            SCMClientRevisionSpec` for the format of this dictionary.
+
+            This always populates ``base``, ``commit_id``, and ``tip``.
+
+            ``parent_base`` may also be populated.
 
         Raises:
             rbtools.clients.errors.InvalidRevisionSpecError:
@@ -207,37 +229,9 @@ class GitClient(BaseSCMClient):
 
             rbtools.clients.errors.TooManyRevisionsError:
                 The specified revisions list contained too many revisions.
-
-        Returns:
-            dict:
-            A dictionary with the following keys:
-
-            ``base`` (:py:class:`unicode`):
-                A revision to use as the base of the resulting diff.
-
-            ``tip`` (:py:class:`unicode`):
-                A revision to use as the tip of the resulting diff.
-
-            ``parent_base`` (:py:class:`unicode`, optional):
-                The revision to use as the base of a parent diff.
-
-            ``commit_id`` (:py:class:`unicode`, optional):
-                The ID of the single commit being posted, if not using a range.
-
-            These will be used to generate the diffs to upload to Review Board
-            (or print). The diff for review will include the changes in (base,
-            tip], and the parent diff (if necessary) will include (parent_base,
-            base].
-
-            If a single revision is passed in, this will return the parent of
-            that revision for "base" and the passed-in revision for "tip".
-
-            If zero revisions are passed in, this will return the current HEAD
-            as "tip", and the upstream branch as "base", taking into account
-            parent branches explicitly specified via --parent.
         """
         n_revs = len(revisions)
-        result = {}
+        result: SCMClientRevisionSpec
 
         if n_revs == 0:
             # No revisions were passed in. Start with HEAD, and find the
@@ -252,8 +246,8 @@ class GitClient(BaseSCMClient):
 
             result = {
                 'base': parent_ref,
-                'tip': head_ref,
                 'commit_id': head_ref,
+                'tip': head_ref,
             }
 
             if parent_ref != merge_base:

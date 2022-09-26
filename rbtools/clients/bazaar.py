@@ -227,15 +227,11 @@ class BazaarClient(BaseSCMClient):
 
         If zero revisions are passed in, this will return the current HEAD
         as 'tip', and the upstream branch as 'base', taking into account
-        parent branches explicitly specified via --parent.
+        parent branches explicitly specified via :option:`--parent`.
 
         Args:
             revisions (list of str, optional):
-                A list of revisions as specified by the user. Items in the
-                list do not necessarily represent a single revision, since the
-                user can use SCM-native syntaxes such as ``r1..r2`` or
-                ``r1:r2``. SCMTool-specific overrides of this method are
-                expected to deal with such syntaxes.
+                A list of revisions as specified by the user.
 
         Returns:
             dict:
@@ -243,6 +239,11 @@ class BazaarClient(BaseSCMClient):
 
             See :py:class:`~rbtools.clients.base.scmclient.
             SCMClientRevisionSpec` for the format of this dictionary.
+
+            This always populates ``base`` and ``tip``.
+
+            ``parent_base`` will be populated if using
+            :option:`--parent`.
 
         Raises:
             rbtools.clients.errors.InvalidRevisionSpecError:
@@ -252,10 +253,7 @@ class BazaarClient(BaseSCMClient):
                 The specified revisions list contained too many revisions.
         """
         n_revs = len(revisions)
-        result: SCMClientRevisionSpec = {
-            'base': None,
-            'tip': None,
-        }
+        result: SCMClientRevisionSpec
 
         # TODO: Update _get_revno() to raise exceptions if we fail to parse
         #       revisions, rather than returning `None` values.
@@ -263,8 +261,10 @@ class BazaarClient(BaseSCMClient):
         if n_revs == 0:
             # No revisions were passed in--start with HEAD, and find the
             # submit branch automatically.
-            result['tip'] = self._get_revno()
-            result['base'] = self._get_revno('ancestor:')
+            result = {
+                'base': self._get_revno('ancestor:'),
+                'tip': self._get_revno(),
+            }
         elif n_revs == 1 or n_revs == 2:
             # If there's a single argument, try splitting it on '..'
             if n_revs == 1:
@@ -274,12 +274,16 @@ class BazaarClient(BaseSCMClient):
             if n_revs == 1:
                 # Single revision. Extract the parent of that revision to use
                 # as the base.
-                result['base'] = self._get_revno('before:' + revisions[0])
-                result['tip'] = self._get_revno(revisions[0])
+                result = {
+                    'base': self._get_revno('before:' + revisions[0]),
+                    'tip': self._get_revno(revisions[0]),
+                }
             elif n_revs == 2:
                 # Two revisions.
-                result['base'] = self._get_revno(revisions[0])
-                result['tip'] = self._get_revno(revisions[1])
+                result = {
+                    'base': self._get_revno(revisions[0]),
+                    'tip': self._get_revno(revisions[1]),
+                }
             else:
                 raise TooManyRevisionsError
 
@@ -398,6 +402,8 @@ class BazaarClient(BaseSCMClient):
                                     exclude_patterns=exclude_patterns)
 
         if parent_base:
+            assert isinstance(parent_base, str)
+
             parent_diff = self._get_range_diff(
                 base=parent_base,
                 tip=base,
@@ -497,8 +503,8 @@ class BazaarClient(BaseSCMClient):
         base = revisions['base']
         tip = revisions['tip']
 
-        assert base is not None
-        assert tip is not None
+        assert isinstance(base, str)
+        assert isinstance(tip, str)
 
         # The result is content in the form of:
         #

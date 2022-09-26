@@ -16,13 +16,15 @@ import re
 import sqlite3
 from collections import OrderedDict
 from contextlib import contextmanager
-from typing import List, Optional
+from typing import List, Optional, cast
 
 import six
 from pydiffx import DiffType, DiffX
 from pydiffx.utils.text import guess_line_endings
 from six.moves import range
+from typing_extensions import NotRequired, TypedDict
 
+from rbtools.api.resource import ReviewRequestResource
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
                                             SCMClientDiffResult,
@@ -40,6 +42,44 @@ from rbtools.utils.process import execute
 
 
 logger = logging.getLogger(__name__)
+
+
+class SOSRevisionSpecExtra(TypedDict):
+    """Extra revision information for a SOS revision specification.
+
+    This contains information on the SOS changelist or selection, computed
+    based on the revision information provided to SOS.
+
+    This goes into the ``extra`` key in
+    :py:class:`~rbtools.clients.base.scmclient.SCMClientRevisionSpec`.
+
+    Version Added:
+        4.0:
+        In prior versions, these keys lived directly in the base of the
+        revision spec.
+    """
+
+    #: Whether an explicit selection was provided.
+    #:
+    #: If ``False``, a default selection will be used instead.
+    #:
+    #: This is only present if :py:attr:`sos_selection` is present.
+    #:
+    #: Type:
+    #:     bool
+    has_explicit_selection: NotRequired[bool]
+
+    #: The changelist ID being posted for review.
+    #:
+    #: Type:
+    #:     str
+    sos_changelist: NotRequired[str]
+
+    #: A list of SOS selection flags representing files to post for review.
+    #:
+    #: Type:
+    #:     list of str
+    sos_selection: NotRequired[List[str]]
 
 
 class SOSObjectType(object):
@@ -283,43 +323,38 @@ class SOSClient(BaseSCMClient):
         return RepositoryInfo(path='SOS:%s:%s' % (server, project),
                               local_path=local_path)
 
-    def parse_revision_spec(self, revisions=[]):
+    def parse_revision_spec(
+        self,
+        revisions: List[str] = [],
+    ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
+        If a single revision is passed in, and it begins with ``select:``,
+        then anything after is expected to be SOS selection flags to
+        match files to post.
+
+        If a single revision is passed in, and it does not begin with
+        ``select:``, then it's assumed to be a changelist ID.
+
+        If zero revisions are passed in, a default selection of ``-scm``
+        will be used.
+
+        Anything else is unsupported.
+
         Args:
-            revisions (list of unicode, optional):
+            revisions (list of str, optional):
                 A list of SOS selection patterns or changelist IDs, as
                 specified by the user.
 
-                If this is empty, the default selection (``-scm``) will be
-                used.
-
-                If this has one value, and it begins with ``select:``, then
-                anything after is expected to be SOS selection flags to
-                match files to post.
-
-                If this has one value and does not start with ``select:``,
-                then it's a changelist ID.
-
-                Anything else is unsupported.
-
         Returns:
             dict:
-            A dictionary with one (and only one) of the following keys:
+            The parsed revision spec.
 
-            Keys:
-                sos_changelist (unicode):
-                    The changelist ID being posted for review.
+            See :py:class:`~rbtools.clients.base.scmclient.
+            SCMClientRevisionSpec` for the format of this dictionary.
 
-                sos_selection (list of unicode):
-                    A list of SOS selection flags representing files to
-                    post for review.
-
-                has_explicit_selection (bool):
-                    ``True`` if an explicit selection has been provided,
-                    or ``False`` if using the default.
-
-                    This is only present if ``sos_selection`` is present.
+            This only makes use of the ``extra`` field, which is documented
+            in :py:class:`SOSRevisionSpecExtra`.
 
         Raises:
             rbtools.clients.errors.InvalidRevisionSpecError:
@@ -330,20 +365,22 @@ class SOSClient(BaseSCMClient):
         """
         n_revs = len(revisions)
 
+        sos_revisions: SOSRevisionSpecExtra
+
         if n_revs == 0:
-            return {
+            sos_revisions = {
                 'sos_selection': self.DEFAULT_SELECTION,
                 'has_explicit_selection': False,
             }
         elif n_revs == 1:
             if revisions[0].startswith('select:'):
                 # The user is providing an SOS selection.
-                return {
+                sos_revisions = {
                     'sos_selection': revisions[0].split(':', 1)[1].split(' '),
                     'has_explicit_selection': True,
                 }
             elif self._has_changelist_support():
-                return {
+                sos_revisions = {
                     'sos_changelist': revisions[0],
                 }
             else:
@@ -354,8 +391,18 @@ class SOSClient(BaseSCMClient):
         else:
             raise TooManyRevisionsError
 
-    def get_tree_matches_review_request(self, review_request, revisions,
-                                        **kwargs):
+        return {
+            'base': None,
+            'tip': None,
+            'extra': sos_revisions,
+        }
+
+    def get_tree_matches_review_request(
+        self,
+        review_request: ReviewRequestResource,
+        revisions: SCMClientRevisionSpec,
+        **kwargs,
+    ) -> bool:
         """Return whether a tree matches metadata in a review request.
 
         This will compare the stored state in a review request (set when
@@ -381,7 +428,10 @@ class SOSClient(BaseSCMClient):
             ``True`` if the review request matches the tree. ``False`` if it
             does not.
         """
-        local_changelist_id = revisions.get('sos_changelist')
+        assert 'extra' in revisions
+        revisions_extra = cast(SOSRevisionSpecExtra, revisions['extra'])
+
+        local_changelist_id = revisions_extra.get('sos_changelist')
 
         if not local_changelist_id:
             return False
@@ -453,6 +503,9 @@ class SOSClient(BaseSCMClient):
             A dictionary containing keys documented in
             :py:class:`~rbtools.clients.base.scmclient.SCMClientDiffResult`.
         """
+        assert 'extra' in revisions
+        revisions_extra = cast(SOSRevisionSpecExtra, revisions['extra'])
+
         wa_root = self._get_wa_root()
         changelist = None
 
@@ -471,16 +524,16 @@ class SOSClient(BaseSCMClient):
             # files as part of the selection criteria.
             selection = None
 
-            if 'sos_changelist' in revisions:
-                changelist = revisions['sos_changelist']
-            elif 'sos_selection' in revisions:
+            if 'sos_changelist' in revisions_extra:
+                changelist = revisions_extra['sos_changelist']
+            elif 'sos_selection' in revisions_extra:
                 if (include_files and
-                    not revisions.get('has_explicit_selection')):
+                    not revisions_extra.get('has_explicit_selection')):
                     # Select all specified files (-sfo) or directories (-sdo),
                     # and allow for unmanaged files (-sunm).
                     selection = self.INCLUDE_FILES_SELECTION + include_files
                 else:
-                    selection = revisions['sos_selection']
+                    selection = revisions_extra['sos_selection']
             else:
                 raise KeyError(
                     'revisions is missing either a "sos_changelist" or '

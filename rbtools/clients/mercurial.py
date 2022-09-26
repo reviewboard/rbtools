@@ -332,16 +332,44 @@ class MercurialClient(BaseSCMClient):
                                   base_path=base_path,
                                   local_path=self.hg_root)
 
-    def parse_revision_spec(self, revisions=[]):
+    def parse_revision_spec(
+        self,
+        revisions: List[str] = [],
+    ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
+        These will be used to generate the diffs to upload to Review Board
+        (or print). The diff for review will include the changes in (base,
+        tip], and the parent diff (if necessary) will include (parent,
+        base].
+
+        If zero revisions are passed in, this will return the outgoing
+        changes from the parent of the working directory.
+
+        If a single revision is passed in, this will return the parent of
+        that revision for "base" and the passed-in revision for "tip". This
+        will result in generating a diff for the changeset specified.
+
+        If two revisions are passed in, they will be used for the "base"
+        and "tip" revisions, respectively.
+
+        In all cases, a parent base will be calculated automatically from
+        changesets not present on the remote.
+
         Args:
-            revisions (list of unicode, optional):
-                A list of revisions as specified by the user. Items in the list
-                do not necessarily represent a single revision, since the user
-                can use SCM-native syntaxes such as ``r1..r2`` or ``r1:r2``.
-                SCMTool-specific overrides of this method are expected to deal
-                with such syntaxes.
+            revisions (list of str, optional):
+                A list of revisions as specified by the user.
+
+        Returns:
+            dict:
+            The parsed revision spec.
+
+            See :py:class:`~rbtools.clients.base.scmclient.
+            SCMClientRevisionSpec` for the format of this dictionary.
+
+            This always populates ``base`` and ``tip``.
+
+            ``commit_id`` and ``parent_base`` may also be populated.
 
         Raises:
             rbtools.clients.errors.InvalidRevisionSpecError:
@@ -349,41 +377,9 @@ class MercurialClient(BaseSCMClient):
 
             rbtools.clients.errors.TooManyRevisionsError:
                 The specified revisions list contained too many revisions.
-
-        Returns:
-            dict:
-            A dictionary with the following keys:
-
-            ``base`` (:py:class:`unicode`):
-                A revision to use as the base of the resulting diff.
-
-            ``tip`` (:py:class:`unicode`):
-                A revision to use as the tip of the resulting diff.
-
-            ``parent_base`` (:py:class:`unicode`, optional):
-                The revision to use as the base of a parent diff.
-
-            ``commit_id`` (:py:class:`unicode`, optional):
-                The ID of the single commit being posted, if not using a range.
-
-            These will be used to generate the diffs to upload to Review Board
-            (or print). The diff for review will include the changes in (base,
-            tip], and the parent diff (if necessary) will include (parent,
-            base].
-
-            If zero revisions are passed in, this will return the outgoing
-            changes from the parent of the working directory.
-
-            If a single revision is passed in, this will return the parent of
-            that revision for "base" and the passed-in revision for "tip". This
-            will result in generating a diff for the changeset specified.
-
-            If two revisions are passed in, they will be used for the "base"
-            and "tip" revisions, respectively.
-
-            In all cases, a parent base will be calculated automatically from
-            changesets not present on the remote.
         """
+        result: SCMClientRevisionSpec
+
         self._init()
 
         n_revisions = len(revisions)
@@ -395,16 +391,16 @@ class MercurialClient(BaseSCMClient):
             revisions = re.split(r'\.\.|::', revisions[0])
             n_revisions = len(revisions)
 
-        result = {}
-
         if n_revisions == 0:
             # No revisions: Find the outgoing changes. Only consider the
             # working copy revision and ancestors because that makes sense.
             # If a user wishes to include other changesets, they can run
             # `hg up` or specify explicit revisions as command arguments.
             if self._type == 'svn':
-                result['base'] = self._get_parent_for_hgsubversion()
-                result['tip'] = '.'
+                result = {
+                    'base': self._get_parent_for_hgsubversion(),
+                    'tip': '.',
+                }
             else:
                 # Ideally, generating a diff for outgoing changes would be as
                 # simple as just running `hg outgoing --patch <remote>`, but
@@ -435,12 +431,19 @@ class MercurialClient(BaseSCMClient):
                 # such nonsense :)
                 outgoing = \
                     self._get_bottom_and_top_outgoing_revs_for_remote(rev='.')
+
                 if outgoing[0] is None or outgoing[1] is None:
                     raise InvalidRevisionSpecError(
                         'There are no outgoing changes')
-                result['base'] = self._identify_revision(outgoing[0])
-                result['tip'] = self._identify_revision(outgoing[1])
-                result['commit_id'] = result['tip']
+
+                tip = self._identify_revision(outgoing[1])
+
+                result = {
+                    'base': self._identify_revision(outgoing[0]),
+                    'commit_id': tip,
+                    'tip': tip,
+                }
+
                 # Since the user asked us to operate on tip, warn them about a
                 # dirty working directory.
                 if (self.has_pending_changes() and
@@ -450,32 +453,35 @@ class MercurialClient(BaseSCMClient):
                                     'to a branch will not be included in your '
                                     'review request.')
 
-            if self.options.parent_branch:
+            if self.options and self.options.parent_branch:
                 result['parent_base'] = result['base']
                 result['base'] = self._identify_revision(
                     self.options.parent_branch)
         elif n_revisions == 1:
             # One revision: Use the given revision for tip, and find its parent
             # for base.
-            result['tip'] = self._identify_revision(revisions[0])
-            result['commit_id'] = result['tip']
-            result['base'] = self._execute(
-                [self._exe, 'parents', '--hidden', '-r', result['tip'],
+            tip = self._identify_revision(revisions[0])
+            base = self._execute(
+                [self._exe, 'parents', '--hidden', '-r', tip,
                  '--template', '{node|short}']).split()[0]
-            if len(result['base']) != 12:
+
+            if len(base) != 12:
                 raise InvalidRevisionSpecError(
-                    "Can't determine parent revision"
-                )
+                    "Can't determine parent revision")
+
+            result = {
+                'base': base,
+                'commit_id': tip,
+                'tip': tip,
+            }
         elif n_revisions == 2:
             # Two revisions: Just use the given revisions
-            result['base'] = self._identify_revision(revisions[0])
-            result['tip'] = self._identify_revision(revisions[1])
+            result = {
+                'base': self._identify_revision(revisions[0]),
+                'tip': self._identify_revision(revisions[1]),
+            }
         else:
             raise TooManyRevisionsError
-
-        if 'base' not in result or 'tip' not in result:
-            raise InvalidRevisionSpecError(
-                '"%s" does not appear to be a valid revision spec' % revisions)
 
         if self._type == 'hg' and 'parent_base' not in result:
             # If there are missing changesets between base and the remote, we

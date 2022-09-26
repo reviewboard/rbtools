@@ -529,16 +529,32 @@ class ClearCaseClient(BaseSCMClient):
 
         return None, None
 
-    def parse_revision_spec(self, revisions):
+    def parse_revision_spec(
+        self,
+        revisions: List[str] = [],
+    ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
+        These will be used to generate the diffs to upload to Review Board
+        (or print).
+
+        There are many different ways to generate diffs for ClearCase,
+        because there are so many different workflows. This method serves
+        more as a way to validate the passed-in arguments than actually
+        parsing them in the way that other clients do.
+
         Args:
-            revisions (list of unicode, optional):
-                A list of revisions as specified by the user. Items in the list
-                do not necessarily represent a single revision, since the user
-                can use SCM-native syntaxes such as ``r1..r2`` or ``r1:r2``.
-                SCMTool-specific overrides of this method are expected to deal
-                with such syntaxes.
+            revisions (list of str, optional):
+                A list of revisions as specified by the user.
+
+        Returns:
+            dict:
+            The parsed revision spec.
+
+            See :py:class:`~rbtools.clients.base.scmclient.
+            SCMClientRevisionSpec` for the format of this dictionary.
+
+            This always populates ``base`` and ``tip``.
 
         Raises:
             rbtools.clients.errors.InvalidRevisionSpecError:
@@ -546,24 +562,6 @@ class ClearCaseClient(BaseSCMClient):
 
             rbtools.clients.errors.TooManyRevisionsError:
                 The specified revisions list contained too many revisions.
-
-        Returns:
-            dict:
-            A dictionary with the following keys:
-
-            ``base`` (:py:class:`unicode`):
-                A revision to use as the base of the resulting diff.
-
-            ``tip`` (:py:class:`unicode`):
-                A revision to use as the tip of the resulting diff.
-
-            These will be used to generate the diffs to upload to Review Board
-            (or print).
-
-            There are many different ways to generate diffs for clearcase,
-            because there are so many different workflows. This method serves
-            more as a way to validate the passed-in arguments than actually
-            parsing them in the way that other clients do.
         """
         n_revs = len(revisions)
 
@@ -655,6 +653,7 @@ class ClearCaseClient(BaseSCMClient):
         # None of the "special" types have been found. Assume that the list of
         # items are one or more pairs of files to compare.
         pairs = []
+
         for r in revisions:
             p = r.split(':')
 

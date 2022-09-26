@@ -99,12 +99,13 @@ class BaseTFWrapper:
 
         Args:
             revisions (list of str):
-                A list of revisions as specified by the user. Items in the list
-                do not necessarily represent a single revision, since the user
-                can use the TFS-native syntax of ``r1~r2``. Versions passed in
-                can be any versionspec, such as a changeset number,
-                ``L``-prefixed label name, ``W`` (latest workspace version), or
-                ``T`` (latest upstream version).
+                A list of revisions as specified by the user.
+
+                Items in the list do not necessarily represent a single
+                revision, since the user can use the TFS-native syntax of
+                ``r1~r2``. Versions passed in can be any versionspec, such as a
+                changeset number, ``L``-prefixed label name, ``W`` (latest
+                workspace version), or ``T`` (latest upstream version).
 
         Returns:
             dict:
@@ -112,6 +113,8 @@ class BaseTFWrapper:
 
             See :py:class:`~rbtools.clients.base.scmclient.
             SCMClientRevisionSpec` for the format of this dictionary.
+
+            This always populates ``base`` and ``tip``.
 
         Raises:
             rbtools.clients.errors.TooManyRevisionsError:
@@ -241,14 +244,19 @@ class TFExeWrapper(BaseTFWrapper):
         relevant for the "current change" (changes in the work folder which
         have not yet been checked in).
 
+        Versions passed in can be any versionspec, such as a changeset number,
+        ``L``-prefixed label name, ``W`` (latest workspace version), or ``T``
+        (latest upstream version).
+
         Args:
             revisions (list of str):
-                A list of revisions as specified by the user. Items in the list
-                do not necessarily represent a single revision, since the user
-                can use the TFS-native syntax of ``r1~r2``. Versions passed in
-                can be any versionspec, such as a changeset number,
-                ``L``-prefixed label name, ``W`` (latest workspace version), or
-                ``T`` (latest upstream version).
+                A list of revisions as specified by the user.
+
+                Items in the list do not necessarily represent a single
+                revision, since the user can use the TFS-native syntax of
+                ``r1~r2``. Versions passed in can be any versionspec, such as a
+                changeset number, ``L``-prefixed label name, ``W`` (latest
+                workspace version), or ``T`` (latest upstream version).
 
         Returns:
             dict:
@@ -256,6 +264,8 @@ class TFExeWrapper(BaseTFWrapper):
 
             See :py:class:`~rbtools.clients.base.scmclient.
             SCMClientRevisionSpec` for the format of this dictionary.
+
+            This always populates ``base`` and ``tip``.
 
         Raises:
             rbtools.clients.errors.TooManyRevisionsError:
@@ -364,8 +374,8 @@ class TFExeWrapper(BaseTFWrapper):
         base = revisions['base']
         tip = revisions['tip']
 
-        assert base is not None
-        assert tip is not None
+        assert isinstance(base, str)
+        assert isinstance(tip, str)
 
         if tip == self.REVISION_WORKING_COPY:
             # TODO: support committed revisions
@@ -698,12 +708,13 @@ class TEEWrapper(BaseTFWrapper):
 
         Args:
             revisions (list of str):
-                A list of revisions as specified by the user. Items in the list
-                do not necessarily represent a single revision, since the user
-                can use the TFS-native syntax of ``r1~r2``. Versions passed in
-                can be any versionspec, such as a changeset number,
-                ``L``-prefixed label name, ``W`` (latest workspace version), or
-                ``T`` (latest upstream version).
+                A list of revisions as specified by the user.
+
+                Items in the list do not necessarily represent a single
+                revision, since the user can use the TFS-native syntax of
+                ``r1~r2``. Versions passed in can be any versionspec, such as a
+                changeset number, ``L``-prefixed label name, ``W`` (latest
+                workspace version), or ``T`` (latest upstream version).
 
         Returns:
             dict:
@@ -711,6 +722,8 @@ class TEEWrapper(BaseTFWrapper):
 
             See :py:class:`~rbtools.clients.base.scmclient.
             SCMClientRevisionSpec` for the format of this dictionary.
+
+            This always populates ``base`` and ``tip``.
 
         Raises:
             rbtools.clients.errors.TooManyRevisionsError:
@@ -831,8 +844,8 @@ class TEEWrapper(BaseTFWrapper):
         base = revisions['base']
         tip = revisions['tip']
 
-        assert base is not None
-        assert tip is not None
+        assert isinstance(base, str)
+        assert isinstance(tip, str)
 
         if tip == self.REVISION_WORKING_COPY:
             return self._diff_working_copy(base=base,
@@ -1132,12 +1145,13 @@ class TFHelperWrapper(BaseTFWrapper):
 
         Args:
             revisions (list of str):
-                A list of revisions as specified by the user. Items in the list
-                do not necessarily represent a single revision, since the user
-                can use the TFS-native syntax of ``r1~r2``. Versions passed in
-                can be any versionspec, such as a changeset number,
-                ``L``-prefixed label name, ``W`` (latest workspace version), or
-                ``T`` (latest upstream version).
+                A list of revisions as specified by the user.
+
+                Items in the list do not necessarily represent a single
+                revision, since the user can use the TFS-native syntax of
+                ``r1~r2``. Versions passed in can be any versionspec, such as a
+                changeset number, ``L``-prefixed label name, ``W`` (latest
+                workspace version), or ``T`` (latest upstream version).
 
         Returns:
             dict:
@@ -1145,6 +1159,8 @@ class TFHelperWrapper(BaseTFWrapper):
 
             See :py:class:`~rbtools.clients.base.scmclient.
             SCMClientRevisionSpec` for the format of this dictionary.
+
+            This always populates ``base`` and ``tip``.
 
         Raises:
             rbtools.clients.errors.TooManyRevisionsError:
@@ -1210,8 +1226,8 @@ class TFHelperWrapper(BaseTFWrapper):
         base = revisions['base']
         tip = revisions['tip']
 
-        assert base is not None
-        assert tip is not None
+        assert isinstance(base, str)
+        assert isinstance(tip, str)
 
         result = self._run_helper(['diff', '--', base, tip],
                                   ignore_errors=True,
@@ -1409,7 +1425,7 @@ class TFSClient(BaseSCMClient):
         have not yet been checked in).
 
         Args:
-            revisions (list of str):
+            revisions (list of str, optional):
                 A list of revisions as specified by the user. Items in the list
                 do not necessarily represent a single revision, since the user
                 can use the TFS-native syntax of ``r1~r2``. Versions passed in
@@ -1423,6 +1439,8 @@ class TFSClient(BaseSCMClient):
 
             See :py:class:`~rbtools.clients.base.scmclient.
             SCMClientRevisionSpec` for the format of this dictionary.
+
+            This always populates ``base`` and ``tip``.
 
         Raises:
             rbtools.clients.errors.TooManyRevisionsError:

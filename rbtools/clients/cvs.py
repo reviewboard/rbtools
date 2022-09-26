@@ -137,11 +137,7 @@ class CVSClient(BaseSCMClient):
 
         Args:
             revisions (list of str, optional):
-                A list of revisions as specified by the user. Items in the list
-                do not necessarily represent a single revision, since the user
-                can use SCM-native syntaxes such as ``r1..r2`` or ``r1:r2``.
-                SCMTool-specific overrides of this method are expected to deal
-                with such syntaxes.
+                A list of revisions as specified by the user.
 
         Returns:
             dict:
@@ -149,6 +145,8 @@ class CVSClient(BaseSCMClient):
 
             See :py:class:`~rbtools.clients.base.scmclient.
             SCMClientRevisionSpec` for the format of this dictionary.
+
+            This always populates ``base`` and ``tip``.
 
         Raises:
             rbtools.clients.errors.InvalidRevisionSpecError:
@@ -215,8 +213,8 @@ class CVSClient(BaseSCMClient):
         base = revisions['base']
         tip = revisions['tip']
 
-        assert base is not None
-        assert tip is not None
+        assert isinstance(base, str)
+        assert isinstance(tip, str)
 
         # CVS paths are always relative to the current working directory.
         cwd = os.getcwd()

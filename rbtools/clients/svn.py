@@ -233,16 +233,39 @@ class SVNClient(BaseSCMClient):
 
         return None, None
 
-    def parse_revision_spec(self, revisions=[]):
+    def parse_revision_spec(
+        self,
+        revisions: List[str] = [],
+    ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
+        These will be used to generate the diffs to upload to Review Board
+        (or print). The diff for review will include the changes in (base,
+        tip].
+
+        If a single revision is passed in, this will return the parent of
+        that revision for "base" and the passed-in revision for "tip".
+
+        If zero revisions are passed in, this will return the most recently
+        checked-out revision for 'base' and a special string indicating the
+        working copy for "tip".
+
+        The SVN SCMClient never fills in the 'parent_base' key. Users who
+        are using other patch-stack tools who want to use parent diffs with
+        SVN will have to generate their diffs by hand.
+
         Args:
-            revisions (list of unicode, optional):
-                A list of revisions as specified by the user. Items in the list
-                do not necessarily represent a single revision, since the user
-                can use SCM-native syntaxes such as ``r1..r2`` or ``r1:r2``.
-                SCMTool-specific overrides of this method are expected to deal
-                with such syntaxes.
+            revisions (list of str, optional):
+                A list of revisions as specified by the user.
+
+        Returns:
+            dict:
+            The parsed revision spec.
+
+            See :py:class:`~rbtools.clients.base.scmclient.
+            SCMClientRevisionSpec` for the format of this dictionary.
+
+            This always populates ``base`` and ``tip``.
 
         Raises:
             rbtools.clients.errors.InvalidRevisionSpecError:
@@ -250,31 +273,6 @@ class SVNClient(BaseSCMClient):
 
             rbtools.clients.errors.TooManyRevisionsError:
                 The specified revisions list contained too many revisions.
-
-        Returns:
-            dict:
-            A dictionary with the following keys:
-
-            ``base`` (:py:class:`unicode`):
-                A revision to use as the base of the resulting diff.
-
-            ``tip`` (:py:class:`unicode`):
-                A revision to use as the tip of the resulting diff.
-
-            These will be used to generate the diffs to upload to Review Board
-            (or print). The diff for review will include the changes in (base,
-            tip].
-
-            If a single revision is passed in, this will return the parent of
-            that revision for "base" and the passed-in revision for "tip".
-
-            If zero revisions are passed in, this will return the most recently
-            checked-out revision for 'base' and a special string indicating the
-            working copy for "tip".
-
-            The SVN SCMClient never fills in the 'parent_base' key. Users who
-            are using other patch-stack tools who want to use parent diffs with
-            SVN will have to generate their diffs by hand.
         """
         n_revisions = len(revisions)
 
@@ -293,9 +291,10 @@ class SVNClient(BaseSCMClient):
             }
         elif n_revisions == 1:
             # Either a numeric revision (n-1:n) or a changelist
-            revision = revisions[0]
+            revision_str = revisions[0]
+
             try:
-                revision = self._convert_symbolic_revision(revision)
+                revision = self._convert_symbolic_revision(revision_str)
                 return {
                     'base': revision - 1,
                     'tip': revision,
@@ -303,24 +302,27 @@ class SVNClient(BaseSCMClient):
             except ValueError:
                 # It's not a revision--let's try a changelist. This only makes
                 # sense if we have a working copy.
-                if not self.options.repository_url:
+                if not self.options or not self.options.repository_url:
                     status = self._run_svn(
-                        ['status', '--cl', six.text_type(revision),
+                        ['status', '--cl', revision_str,
                          '--ignore-externals', '--xml'],
                         results_unicode=False)
                     cl = ElementTree.fromstring(status).find('changelist')
+
                     if cl is not None:
                         # TODO: this should warn about mixed-revision working
                         # copies that affect the list of files changed (see
                         # bug 2392).
                         return {
                             'base': 'BASE',
-                            'tip': self.REVISION_CHANGELIST_PREFIX + revision
+                            'tip': (self.REVISION_CHANGELIST_PREFIX +
+                                    revision_str),
                         }
 
                 raise InvalidRevisionSpecError(
                     '"%s" does not appear to be a valid revision or '
-                    'changelist name' % revision)
+                    'changelist name'
+                    % revision_str)
         elif n_revisions == 2:
             # Diff between two numeric revisions
             try:

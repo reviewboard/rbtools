@@ -7,7 +7,7 @@ Version Added:
 import argparse
 import logging
 import re
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Mapping, Optional, Tuple, cast
 
 from typing_extensions import NotRequired, TypedDict, final
 
@@ -36,35 +36,52 @@ class SCMClientRevisionSpec(TypedDict):
 
     #: A revision to use as the base of the resulting diff.
     #:
+    #: The value is considered an opaque value, dependent on the SCMClient.
+    #:
     #: This is required.
     #:
     #: Type:
-    #:     str
-    base: Optional[str]
+    #:     object
+    base: Optional[object]
 
     #: A revision to use as the tip of the resulting diff.
     #:
+    #: The value is considered an opaque value, dependent on the SCMClient.
+    #:
     #: This is required.
     #:
     #: Type:
-    #:     str
-    tip: Optional[str]
+    #:     object
+    tip: Optional[object]
 
     #: The revision to use as the base of a parent diff.
+    #:
+    #: The value is considered an opaque value, dependent on the SCMClient.
     #:
     #: This is optional.
     #:
     #: Type:
-    #:     str
-    parent_base: NotRequired[Optional[str]]
+    #:     object
+    parent_base: NotRequired[Optional[object]]
 
-    # The commit ID of the single commit being posted, if not using a range.
+    #: The commit ID of the single commit being posted, if not using a range.
     #:
     #: This is optional.
     #:
     #: Type:
     #:     str
     commit_id: NotRequired[Optional[str]]
+
+    #: Any extra revision state not used above.
+    #:
+    #: If a SCMClient needs to provide information in addition or instead of
+    #: the above, they should populate this field, rather than placing the
+    #: information in the main revision dictionary. This helps ensure a stable,
+    #: typed interface for all revision data.
+    #:
+    #: Version Added:
+    #:     4.0
+    extra: NotRequired[Optional[Mapping[str, Any]]]
 
 
 class SCMClientDiffResult(TypedDict):

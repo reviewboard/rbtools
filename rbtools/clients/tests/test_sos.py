@@ -633,8 +633,12 @@ class SOSClientTests(BaseSOSTestCase):
         self.assertEqual(
             client.parse_revision_spec(),
             {
-                'sos_selection': ['-scm'],
-                'has_explicit_selection': False,
+                'base': None,
+                'extra': {
+                    'sos_selection': ['-scm'],
+                    'has_explicit_selection': False,
+                },
+                'tip': None,
             })
 
     def test_parse_revision_spec_with_1_arg_select(self):
@@ -644,8 +648,12 @@ class SOSClientTests(BaseSOSTestCase):
         self.assertEqual(
             client.parse_revision_spec(['select:-scm -sor -sunm']),
             {
-                'sos_selection': ['-scm', '-sor', '-sunm'],
-                'has_explicit_selection': True,
+                'base': None,
+                'extra': {
+                    'sos_selection': ['-scm', '-sor', '-sunm'],
+                    'has_explicit_selection': True,
+                },
+                'tip': None,
             })
 
     def test_parse_revision_spec_with_1_arg_changelist_supported(self):
@@ -657,7 +665,11 @@ class SOSClientTests(BaseSOSTestCase):
         self.assertEqual(
             client.parse_revision_spec(['my_changelist']),
             {
-                'sos_changelist': 'my_changelist',
+                'base': None,
+                'extra': {
+                    'sos_changelist': 'my_changelist',
+                },
+                'tip': None,
             })
 
     def test_parse_revision_spec_with_1_arg_changelist_not_supported(self):
@@ -704,7 +716,11 @@ class SOSClientTests(BaseSOSTestCase):
         self.assertTrue(client.get_tree_matches_review_request(
             review_request=review_request,
             revisions={
-                'sos_changelist': 'my_changelist',
+                'base': None,
+                'extra': {
+                    'sos_changelist': 'my_changelist',
+                },
+                'tip': None,
             }))
 
     def test_get_tree_matches_review_request_without_match(self):
@@ -729,7 +745,11 @@ class SOSClientTests(BaseSOSTestCase):
         self.assertFalse(client.get_tree_matches_review_request(
             review_request=review_request,
             revisions={
-                'sos_changelist': 'my_changelist',
+                'base': None,
+                'extra': {
+                    'sos_changelist': 'my_changelist',
+                },
+                'tip': None,
             }))
 
     def test_get_tree_matches_review_request_without_sos(self):
@@ -751,7 +771,11 @@ class SOSClientTests(BaseSOSTestCase):
         self.assertFalse(client.get_tree_matches_review_request(
             review_request=review_request,
             revisions={
-                'sos_changelist': 'my_changelist',
+                'base': None,
+                'extra': {
+                    'sos_changelist': 'my_changelist',
+                },
+                'tip': None,
             }))
 
     def test_diff_with_changelist(self):
@@ -835,7 +859,11 @@ class SOSClientTests(BaseSOSTestCase):
 
         client = self.build_client()
         result = client.diff(revisions={
-            'sos_changelist': 'my_changelist',
+            'base': None,
+            'extra': {
+                'sos_changelist': 'my_changelist',
+            },
+            'tip': None,
         })
 
         self.assertDiffEqual(
@@ -982,7 +1010,11 @@ class SOSClientTests(BaseSOSTestCase):
 
         client = self.build_client()
         result = client.diff(revisions={
-            'sos_changelist': 'my_changelist',
+            'base': None,
+            'extra': {
+                'sos_changelist': 'my_changelist',
+            },
+            'tip': None,
         })
 
         self.assertDiffEqual(
@@ -1126,7 +1158,11 @@ class SOSClientTests(BaseSOSTestCase):
 
         client = self.build_client()
         result = client.diff(revisions={
-            'sos_changelist': 'my_changelist',
+            'base': None,
+            'extra': {
+                'sos_changelist': 'my_changelist',
+            },
+            'tip': None,
         })
 
         self.assertDiffEqual(
@@ -1299,7 +1335,11 @@ class SOSClientTests(BaseSOSTestCase):
 
         client = self.build_client()
         result = client.diff(revisions={
-            'sos_changelist': 'my_changelist',
+            'base': None,
+            'extra': {
+                'sos_changelist': 'my_changelist',
+            },
+            'tip': None,
         })
 
         self.assertDiffEqual(
@@ -1452,7 +1492,11 @@ class SOSClientTests(BaseSOSTestCase):
 
         client = self.build_client()
         result = client.diff(revisions={
-            'sos_changelist': 'my_changelist',
+            'base': None,
+            'extra': {
+                'sos_changelist': 'my_changelist',
+            },
+            'tip': None,
         })
 
         self.assertDiffEqual(
@@ -1664,7 +1708,11 @@ class SOSClientTests(BaseSOSTestCase):
 
         client = self.build_client()
         result = client.diff(revisions={
-            'sos_changelist': 'my_changelist',
+            'base': None,
+            'extra': {
+                'sos_changelist': 'my_changelist',
+            },
+            'tip': None,
         })
 
         self.assertDiffEqual(
@@ -1924,7 +1972,11 @@ class SOSClientTests(BaseSOSTestCase):
         client = self.build_client()
         result = client.diff(
             revisions={
-                'sos_changelist': 'my_changelist',
+                'base': None,
+                'extra': {
+                    'sos_changelist': 'my_changelist',
+                },
+                'tip': None,
             },
             include_files=[
                 'README',
@@ -2143,7 +2195,11 @@ class SOSClientTests(BaseSOSTestCase):
         client = self.build_client()
         result = client.diff(
             revisions={
-                'sos_changelist': 'my_changelist',
+                'base': None,
+                'extra': {
+                    'sos_changelist': 'my_changelist',
+                },
+                'tip': None,
             },
             exclude_patterns=[
                 '*.md',
@@ -2323,8 +2379,12 @@ class SOSClientTests(BaseSOSTestCase):
 
         client = self.build_client()
         result = client.diff(revisions={
-            'sos_selection': ['-scm'],
-            'has_explicit_selection': False,
+            'base': None,
+            'extra': {
+                'sos_selection': ['-scm'],
+                'has_explicit_selection': False,
+            },
+            'tip': None,
         })
 
         self.assertDiffEqual(
@@ -2451,8 +2511,12 @@ class SOSClientTests(BaseSOSTestCase):
 
         client = self.build_client()
         result = client.diff(revisions={
-            'sos_selection': ['-scm'],
-            'has_explicit_selection': False,
+            'base': None,
+            'extra': {
+                'sos_selection': ['-scm'],
+                'has_explicit_selection': False,
+            },
+            'tip': None,
         })
 
         self.assertDiffEqual(
@@ -2593,8 +2657,12 @@ class SOSClientTests(BaseSOSTestCase):
 
         client = self.build_client()
         result = client.diff(revisions={
-            'sos_selection': ['-scm'],
-            'has_explicit_selection': False,
+            'base': None,
+            'extra': {
+                'sos_selection': ['-scm'],
+                'has_explicit_selection': False,
+            },
+            'tip': None,
         })
 
         self.assertDiffEqual(
@@ -2758,8 +2826,12 @@ class SOSClientTests(BaseSOSTestCase):
 
         client = self.build_client()
         result = client.diff(revisions={
-            'sos_selection': ['-scm'],
-            'has_explicit_selection': False,
+            'base': None,
+            'extra': {
+                'sos_selection': ['-scm'],
+                'has_explicit_selection': False,
+            },
+            'tip': None,
         })
 
         self.assertDiffEqual(
@@ -2917,8 +2989,12 @@ class SOSClientTests(BaseSOSTestCase):
 
         client = self.build_client()
         result = client.diff(revisions={
-            'sos_selection': ['-scm'],
-            'has_explicit_selection': False,
+            'base': None,
+            'extra': {
+                'sos_selection': ['-scm'],
+                'has_explicit_selection': False,
+            },
+            'tip': None,
         })
 
         self.assertDiffEqual(
@@ -3070,8 +3146,12 @@ class SOSClientTests(BaseSOSTestCase):
 
         client = self.build_client()
         result = client.diff(revisions={
-            'sos_selection': ['-scm'],
-            'has_explicit_selection': False,
+            'base': None,
+            'extra': {
+                'sos_selection': ['-scm'],
+                'has_explicit_selection': False,
+            },
+            'tip': None,
         })
 
         self.assertDiffEqual(
@@ -3249,8 +3329,12 @@ class SOSClientTests(BaseSOSTestCase):
         client = self.build_client()
         result = client.diff(
             revisions={
-                'sos_selection': ['-scm'],
-                'has_explicit_selection': False,
+                'base': None,
+                'extra': {
+                    'sos_selection': ['-scm'],
+                    'has_explicit_selection': False,
+                },
+                'tip': None,
             },
             include_files=[
                 'README',
@@ -3455,8 +3539,12 @@ class SOSClientTests(BaseSOSTestCase):
         client = self.build_client()
         result = client.diff(
             revisions={
-                'sos_selection': ['-scm'],
-                'has_explicit_selection': False,
+                'base': None,
+                'extra': {
+                    'sos_selection': ['-scm'],
+                    'has_explicit_selection': False,
+                },
+                'tip': None,
             },
             exclude_patterns=[
                 '*.md',
