@@ -1,12 +1,11 @@
-from __future__ import unicode_literals
-
 import logging
 import os
 import shutil
 import sys
 import tempfile
 from contextlib import contextmanager
-from typing import Generator, List, Optional
+from functools import lru_cache
+from typing import Generator, Iterable, List, Optional
 
 from rbtools.deprecation import (RemovedInRBTools50Warning,
                                  deprecate_non_keyword_only_args)
@@ -18,10 +17,10 @@ tempfiles: List[str] = []
 tempdirs = []
 builtin = {}
 
-_exe_in_path_cache = {}
 
-
-def is_exe_in_path(name):
+def is_exe_in_path(
+    name: str,
+) -> bool:
     """Return whether an executable is in the user's search path.
 
     This expects a name without any system-specific executable extension.
@@ -36,29 +35,45 @@ def is_exe_in_path(name):
         The result is now cached.
 
     Args:
-        name (unicode):
+        name (str):
             The name of the executable.
 
     Returns:
         bool:
         ``True`` if the executable is in the path. ``False`` if it is not.
     """
+    return any(iter_exes_in_path(name))
+
+
+@lru_cache
+def iter_exes_in_path(
+    name: str,
+) -> Iterable[str]:
+    """Iterate through all executables with a name in the user's search path.
+
+    This expects a name without any system-specific executable extension. It
+    will append the proper extension as necessary. For example, use "myapp"
+    and not "myapp.exe".
+
+    Version Added:
+        4.0
+
+    Args:
+        name (str):
+            The name of the executable.
+
+    Yields:
+        str:
+        The location of an executable in the path.
+    """
     if sys.platform == 'win32' and not name.endswith('.exe'):
         name += '.exe'
 
-    try:
-        found = _exe_in_path_cache[name]
-    except KeyError:
-        found = False
+    for dirname in os.environ['PATH'].split(os.pathsep):
+        path = os.path.join(dirname, name)
 
-        for dir in os.environ['PATH'].split(os.pathsep):
-            if os.path.exists(os.path.join(dir, name)):
-                found = True
-                break
-
-        _exe_in_path_cache[name] = found
-
-    return found
+        if os.path.exists(path):
+            yield path
 
 
 def cleanup_tempfiles():
