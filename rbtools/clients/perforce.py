@@ -497,7 +497,7 @@ class PerforceClient(BaseSCMClient):
 
         return None
 
-    def get_repository_info(self):
+    def get_repository_info(self) -> Optional[RepositoryInfo]:
         """Return repository information for the current working tree.
 
         Returns:
@@ -510,6 +510,7 @@ class PerforceClient(BaseSCMClient):
             return None
 
         p4_info = self._p4_info
+        assert p4_info is not None
 
         # Check the server address. If we don't get something we expect here,
         # we'll want to bail early.
@@ -547,7 +548,8 @@ class PerforceClient(BaseSCMClient):
         # Validate the repository path we got above to see if it's something
         # that makes sense.
         parts = server_address.split(':')
-        hostname = None
+        hostname: Optional[str] = None
+        port: Optional[str] = None
 
         if len(parts) == 3 and parts[0] == 'ssl':
             hostname = parts[1]
@@ -559,7 +561,7 @@ class PerforceClient(BaseSCMClient):
         elif len(parts) == 2:
             hostname, port = parts
 
-        if not hostname:
+        if not hostname or not port:
             raise SCMError('Path %s is not a valid Perforce P4PORT'
                            % server_address)
 
@@ -581,8 +583,12 @@ class PerforceClient(BaseSCMClient):
             # a network disconnect, or it might just be a unit test.
             pass
 
+        # Now that we know it's Perforce, make sure we have GNU diff
+        # installed, and error out if we don't.
+        check_gnu_diff()
+
         # Build the final list of repository paths.
-        repository_paths = []
+        repository_paths: List[str] = []
 
         for server in servers:
             repository_path = '%s:%s' % (server, port)
@@ -597,14 +603,11 @@ class PerforceClient(BaseSCMClient):
         # a string. This doesn't have any impact on performance these days,
         # but the result is more consistent with other SCMs.
         if len(repository_paths) == 1:
-            repository_paths = repository_paths[0]
-
-        # Now that we know it's Perforce, make sure we have GNU diff
-        # installed, and error out if we don't.
-        check_gnu_diff()
-
-        return RepositoryInfo(path=repository_paths,
-                              local_path=local_path)
+            return RepositoryInfo(path=repository_paths[0],
+                                  local_path=local_path)
+        else:
+            return RepositoryInfo(path=repository_paths,
+                                  local_path=local_path)
 
     def get_repository_name(self):
         """Return any repository name configured in the repository.

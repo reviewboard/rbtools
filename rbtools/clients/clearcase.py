@@ -421,7 +421,7 @@ class ClearCaseClient(BaseSCMClient):
 
         return os.path.join(self.root_path, vobtag)
 
-    def get_repository_info(self):
+    def get_repository_info(self) -> Optional[RepositoryInfo]:
         """Return repository information for the current working tree.
 
         Returns:

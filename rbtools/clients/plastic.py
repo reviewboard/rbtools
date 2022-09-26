@@ -92,7 +92,7 @@ class PlasticClient(BaseSCMClient):
 
         return m.group(1)
 
-    def get_repository_info(self):
+    def get_repository_info(self) -> Optional[RepositoryInfo]:
         """Return repository information for the current working tree.
 
         Returns:

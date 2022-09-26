@@ -300,7 +300,7 @@ class MercurialClient(BaseSCMClient):
 
         return self.hg_root
 
-    def get_repository_info(self):
+    def get_repository_info(self) -> Optional[RepositoryInfo]:
         """Return repository information for the current working tree.
 
         Returns:

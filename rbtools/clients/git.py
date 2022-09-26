@@ -365,7 +365,7 @@ class GitClient(BaseSCMClient):
 
         return self._git_toplevel
 
-    def get_repository_info(self):
+    def get_repository_info(self) -> Optional[RepositoryInfo]:
         """Return repository information for the current working tree.
 
         Returns:
@@ -376,6 +376,8 @@ class GitClient(BaseSCMClient):
 
         if not local_path:
             return None
+
+        assert self._git_dir
 
         self._head_ref = self._execute(
             [self.git, 'symbolic-ref', '-q', 'HEAD'],
@@ -466,8 +468,10 @@ class GitClient(BaseSCMClient):
         self._type = self.TYPE_GIT
         url = None
 
-        if getattr(self.options, 'repository_url', None):
-            url = self.options.repository_url
+        repository_url = getattr(self.options, 'repository_url', None)
+
+        if repository_url:
+            url = repository_url
         else:
             upstream_branch = self._get_parent_branch()
             url = self._get_origin(upstream_branch).rstrip('/')

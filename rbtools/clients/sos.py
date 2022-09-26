@@ -298,7 +298,7 @@ class SOSClient(BaseSCMClient):
             # This is not a SOS workarea.
             return None
 
-    def get_repository_info(self):
+    def get_repository_info(self) -> Optional[RepositoryInfo]:
         """Return repository information for the current SOS workarea.
 
         Returns:

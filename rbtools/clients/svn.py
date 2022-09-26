@@ -8,7 +8,7 @@ import posixpath
 import re
 import sys
 from xml.etree import ElementTree
-from typing import List
+from typing import List, Optional, Tuple
 
 import six
 from six.moves import map
@@ -75,6 +75,12 @@ class SVNClient(BaseSCMClient):
     SHOW_COPIES_AS_ADDS_MIN_VERSION = (1, 7, 0)
     PATCH_MIN_VERSION = (1, 7, 0)
 
+    ######################
+    # Instance variables #
+    ######################
+
+    subversion_client_version: Tuple[int, int, int]
+
     def __init__(self, **kwargs):
         """Initialize the client.
 
@@ -125,11 +131,11 @@ class SVNClient(BaseSCMClient):
 
         return None
 
-    def get_local_path(self):
+    def get_local_path(self) -> Optional[str]:
         """Return the local path to the working tree.
 
         Returns:
-            unicode:
+            str:
             The filesystem path of the repository on the client system.
         """
         # NOTE: This can be removed once check_dependencies() is mandatory.
@@ -144,7 +150,7 @@ class SVNClient(BaseSCMClient):
 
         return None
 
-    def get_repository_info(self):
+    def get_repository_info(self) -> Optional[RepositoryInfo]:
         """Return repository information for the current working tree.
 
         Returns:
@@ -184,12 +190,16 @@ class SVNClient(BaseSCMClient):
         ver_string = self._run_svn(['--version', '-q'], ignore_errors=True)
         m = self.VERSION_NUMBER_RE.match(ver_string)
 
-        if not m:
+        if m:
+            self.subversion_client_version = (
+                int(m.group(1)),
+                int(m.group(2)),
+                int(m.group(3)),
+            )
+        else:
             logging.warn('Unable to parse SVN client version triple from '
                          '"%s". Assuming version 0.0.0.', ver_string.strip())
             self.subversion_client_version = (0, 0, 0)
-        else:
-            self.subversion_client_version = tuple(map(int, m.groups()))
 
         self._svn_repository_info_cache = SVNRepositoryInfo(
             path=path,
@@ -336,7 +346,10 @@ class SVNClient(BaseSCMClient):
         else:
             raise TooManyRevisionsError
 
-    def _convert_symbolic_revision(self, revision):
+    def _convert_symbolic_revision(
+        self,
+        revision: str,
+    ) -> int:
         """Convert a symbolic revision to a numbered revision.
 
         Args:
