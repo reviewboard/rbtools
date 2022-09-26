@@ -7,6 +7,7 @@ import os
 import re
 import sys
 import unittest
+from typing import List
 
 import kgb
 from six.moves.urllib.request import urlopen
@@ -20,7 +21,9 @@ from rbtools.clients.svn import SVNRepositoryInfo, SVNClient
 from rbtools.clients.tests import FOO1, FOO2, FOO3, SCMClientTestCase
 from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.checks import check_install, is_valid_version
-from rbtools.utils.process import execute
+from rbtools.utils.process import (RunProcessResult,
+                                   run_process,
+                                   run_process_exec)
 from rbtools.utils.repository import get_repository_resource
 
 
@@ -375,7 +378,12 @@ class SVNClientTests(SCMClientTestCase):
         os.chdir(checkout_dir)
         cls._run_svn(['co', cls.svn_repo_url, cls.clone_dir])
 
-        svn_version = cls._run_svn(['--version', '-q'])
+        svn_version = (
+            cls._run_svn(['--version', '-q'])
+            .stdout
+            .read()
+        )
+
         cls.svn_version = tuple(
             int(_v)
             for _v in svn_version.split('.')
@@ -397,9 +405,22 @@ class SVNClientTests(SCMClientTestCase):
         return cls.clone_dir
 
     @classmethod
-    def _run_svn(cls, command):
-        return execute(['svn'] + command, env=None, split_lines=False,
-                       ignore_errors=False, extra_ignore_errors=())
+    def _run_svn(
+        cls,
+        command: List[str],
+    ) -> RunProcessResult:
+        """Run svn with the provided arguments.
+
+        Args:
+            command (list of str):
+                The arguments to pass to :command:`svn`.
+
+        Returns:
+            rbtools.utils.process.RunProcessResult:
+            The result of the :py:func:`~rbtools.utils.process.run_process`
+            call.
+        """
+        return run_process(['svn'] + command)
 
     def _svn_add_file(self, filename, data, changelist=None):
         """Add a file to the test repo."""
@@ -1300,21 +1321,19 @@ class SVNClientTests(SCMClientTestCase):
         client = self.build_client()
         repository_info = client.get_repository_info()
 
-        self.spy_on(execute,
-                    op=kgb.SpyOpReturn((0, b'test')))
+        self.spy_on(run_process_exec,
+                    op=kgb.SpyOpReturn((0, b'test', b'')))
 
         result = client.apply_patch(base_path=repository_info.base_path,
                                     base_dir='',
                                     patch_file='test.diff')
 
         self.assertSpyCalledWith(
-            execute,
+            run_process_exec,
             [
                 'svn', '--non-interactive', 'patch', '--strip=1', 'test.diff',
             ],
-            with_errors=True,
-            return_error_code=True,
-            results_unicode=False)
+            redirect_stderr=True)
 
         self.assertTrue(result.applied)
         self.assertFalse(result.has_conflicts)
@@ -1326,8 +1345,8 @@ class SVNClientTests(SCMClientTestCase):
         client = self.build_client()
         repository_info = client.get_repository_info()
 
-        self.spy_on(execute,
-                    op=kgb.SpyOpReturn((0, b'test')))
+        self.spy_on(run_process_exec,
+                    op=kgb.SpyOpReturn((0, b'test', b'')))
 
         result = client.apply_patch(base_path=repository_info.base_path,
                                     base_dir='',
@@ -1335,13 +1354,11 @@ class SVNClientTests(SCMClientTestCase):
                                     p=3)
 
         self.assertSpyCalledWith(
-            execute,
+            run_process_exec,
             [
                 'svn', '--non-interactive', 'patch', '--strip=3', 'test.diff',
             ],
-            with_errors=True,
-            return_error_code=True,
-            results_unicode=False)
+            redirect_stderr=True)
 
         self.assertTrue(result.applied)
         self.assertFalse(result.has_conflicts)
@@ -1353,8 +1370,13 @@ class SVNClientTests(SCMClientTestCase):
         client = self.build_client()
         repository_info = client.get_repository_info()
 
-        self.spy_on(execute,
-                    op=kgb.SpyOpReturn((1, 'bád'.encode('utf-8'))))
+        self.spy_on(
+            run_process_exec,
+            op=kgb.SpyOpReturn((
+                1,
+                'bád'.encode('utf-8'),
+                b'',
+            )))
 
         result = client.apply_patch(base_path=repository_info.base_path,
                                     base_dir='',
@@ -1362,13 +1384,11 @@ class SVNClientTests(SCMClientTestCase):
                                     p=3)
 
         self.assertSpyCalledWith(
-            execute,
+            run_process_exec,
             [
                 'svn', '--non-interactive', 'patch', '--strip=3', 'test.diff',
             ],
-            with_errors=True,
-            return_error_code=True,
-            results_unicode=False)
+            redirect_stderr=True)
 
         self.assertFalse(result.applied)
         self.assertFalse(result.has_conflicts)

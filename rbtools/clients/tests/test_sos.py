@@ -8,6 +8,7 @@ from __future__ import unicode_literals
 
 import os
 import re
+from typing import Any, Dict, List
 
 import kgb
 
@@ -21,7 +22,7 @@ from rbtools.clients.sos import SOSClient
 from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.checks import check_gnu_diff, check_install
 from rbtools.utils.filesystem import make_tempdir
-from rbtools.utils.process import execute
+from rbtools.utils.process import run_process_exec
 
 
 class BaseSOSTestCase(SCMClientTestCase):
@@ -44,7 +45,7 @@ class BaseSOSTestCase(SCMClientTestCase):
         self.workarea_dir = make_tempdir()
 
     @property
-    def rule_query_wa_root(self):
+    def rule_query_wa_root(self) -> Dict[str, Any]:
         """A spy match rule for querying the workarea root.
 
         Type:
@@ -52,7 +53,11 @@ class BaseSOSTestCase(SCMClientTestCase):
         """
         return {
             'args': (['soscmd', 'query', 'wa_root'],),
-            'op': kgb.SpyOpReturn((0, '%s\n' % self.workarea_dir)),
+            'op': kgb.SpyOpReturn((
+                0,
+                b'%s\n' % self.workarea_dir.encode('utf-8'),
+                b'',
+            )),
         }
 
     @property
@@ -67,11 +72,15 @@ class BaseSOSTestCase(SCMClientTestCase):
             'kwargs': {
                 'cwd': os.getcwd(),
             },
-            'op': kgb.SpyOpReturn((0, 'test-project\n')),
+            'op': kgb.SpyOpReturn((
+                0,
+                b'test-project\n',
+                b'',
+            )),
         }
 
     @property
-    def rule_query_server(self):
+    def rule_query_server(self) -> Dict[str, Any]:
         """A spy match rule for querying the current SOS server.
 
         Type:
@@ -82,7 +91,11 @@ class BaseSOSTestCase(SCMClientTestCase):
             'kwargs': {
                 'cwd': os.getcwd(),
             },
-            'op': kgb.SpyOpReturn((0, 'test-server\n')),
+            'op': kgb.SpyOpReturn((
+                0,
+                b'test-server\n',
+                b'',
+            )),
         }
 
     @property
@@ -94,16 +107,23 @@ class BaseSOSTestCase(SCMClientTestCase):
         """
         return {
             'args': (['soscmd', 'query', 'rso'],),
-            'op': kgb.SpyOpReturn((0, 'main, test')),
+            'op': kgb.SpyOpReturn((
+                0,
+                b'main, test\n',
+                b'',
+            )),
         }
 
-    def make_rule_stash_selection(self, result):
+    def make_rule_stash_selection(
+        self,
+        result: List[bytes],
+    ) -> Dict[str, Any]:
         """Return a spy match rule for stashing the current selection.
 
         Args:
-            result (list of unicode):
-                The selected file paths to simulate being stashed. These
-                will be written to the stash temp file.
+            result (list of bytes):
+                The list of selected file paths to simulate being stashed.
+                These will be written to the stash temp file.
 
         Returns:
             dict:
@@ -113,13 +133,21 @@ class BaseSOSTestCase(SCMClientTestCase):
             'args': (['soscmd', 'status', '-f%P'],),
             'kwargs': {
                 'cwd': self.workarea_dir,
-                'results_unicode': False,
-                'split_lines': True,
             },
-            'op': kgb.SpyOpReturn(result),
+            'op': kgb.SpyOpReturn((
+                0,
+                b''.join(
+                    b'%s\n' % _item
+                    for _item in result
+                ),
+                b'',
+            )),
         }
 
-    def make_rule_restore_selection(self, filename):
+    def make_rule_restore_selection(
+        self,
+        filename: str,
+    ) -> Dict[str, Any]:
         """Return a spy match rule for restoring the stashed selection.
 
         Args:
@@ -137,19 +165,27 @@ class BaseSOSTestCase(SCMClientTestCase):
             'kwargs': {
                 'cwd': self.workarea_dir,
             },
-            'call_original': False,
+            'op': kgb.SpyOpReturn((
+                0,
+                b'',
+                b'',
+            )),
         }
 
-    def make_rule_list_changelist(self, name, results):
+    def make_rule_list_changelist(
+        self,
+        name: str,
+        results: List[str],
+    ) -> Dict[str, Any]:
         """A spy match rule for listing files in a SOS changelist.
 
         Args:
-            name (unicode):
+            name (str):
                 The expected name of the changelist.
 
-            results (list of unicode):
-                Newline-terminated lines of simulated results from the
-                changelist.
+            results (list of str):
+                A list of newline-terminated lines of simulated results from
+                the changelist.
 
         Returns:
             dict:
@@ -159,17 +195,23 @@ class BaseSOSTestCase(SCMClientTestCase):
             'args': (['soscmd', 'add', '-s', '-c', name],),
             'kwargs': {
                 'cwd': self.workarea_dir,
-                'results_unicode': True,
-                'split_lines': True,
             },
-            'op': kgb.SpyOpReturn(results),
+            'op': kgb.SpyOpReturn((
+                0,
+                ''.join(results).encode('utf-8'),
+                b'',
+            )),
         }
 
-    def make_rule_status(self, results, selection=['-scm']):
+    def make_rule_status(
+        self,
+        results: List[bytes],
+        selection: List[str] = ['-scm'],
+    ) -> Dict[str, Any]:
         """A spy match rule for fetching the current selection status.
 
         Args:
-            results (list of unicode):
+            results (list of bytes):
                 Lines of simulated results from the status command.
 
             selection (list of unicode):
@@ -186,13 +228,23 @@ class BaseSOSTestCase(SCMClientTestCase):
             ),
             'kwargs': {
                 'cwd': self.workarea_dir,
-                'results_unicode': False,
-                'split_lines': True,
             },
-            'op': kgb.SpyOpReturn(results),
+            'op': kgb.SpyOpReturn((
+                0,
+                b''.join(
+                    b'%s\n' % _item
+                    for _item in results
+                ),
+                b'',
+            )),
         }
 
-    def make_rule_exportrev(self, sos_path, out_filename, content):
+    def make_rule_exportrev(
+        self,
+        sos_path: str,
+        out_filename: str,
+        content: bytes,
+    ) -> Dict[str, Any]:
         """A spy match rule for exporting a file.
 
         This will write the provided contents to the path once the spy
@@ -212,6 +264,11 @@ class BaseSOSTestCase(SCMClientTestCase):
             dict:
             The match rule.
         """
+        def _on_run_process(*args, **kwargs):
+            self.write_workarea_file(out_filename, content)
+
+            return 0, b'', b''
+
         return {
             'args': ([
                 'soscmd', 'exportrev', sos_path, '-out%s' % out_filename,
@@ -219,11 +276,13 @@ class BaseSOSTestCase(SCMClientTestCase):
             'kwargs': {
                 'cwd': self.workarea_dir,
             },
-            'call_fake': lambda *args, **kwargs:
-                self.write_workarea_file(out_filename, content),
+            'call_fake': _on_run_process,
         }
 
-    def make_rule_delete(self, sos_path):
+    def make_rule_delete(
+        self,
+        sos_path: str,
+    ) -> Dict[str, Any]:
         """A spy match rule for deleting a file.
 
         This will perform a standard filesystem delete once the spy operation
@@ -237,19 +296,27 @@ class BaseSOSTestCase(SCMClientTestCase):
             dict:
             The match rule.
         """
+        def _on_run_process(*args, **kwargs):
+            os.unlink(os.path.join(
+                self.workarea_dir,
+                os.path.join(self.workarea_dir, sos_path)))
+
+            return 0, b'', b''
+
         return {
             'args': (['soscmd', 'delete', sos_path],),
             'kwargs': {
                 'cwd': self.workarea_dir,
             },
-            'call_fake': lambda cmdline, **kwargs:
-                os.unlink(os.path.join(
-                    self.workarea_dir,
-                    os.path.join(self.workarea_dir, sos_path))),
+            'call_fake': _on_run_process,
         }
 
-    def make_rule_undelete(self, dirname, filename,
-                           content=b'old file content\n'):
+    def make_rule_undelete(
+        self,
+        dirname: str,
+        filename: str,
+        content: bytes = b'old file content\n',
+    ) -> Dict[str, Any]:
         """A spy match rule for undeleting a file.
 
         This will simulate the undelete by writing the specified file
@@ -269,28 +336,37 @@ class BaseSOSTestCase(SCMClientTestCase):
             dict:
             The match rule.
         """
+        def _on_run_process(*args, **kwargs):
+            self.write_workarea_file(
+                os.path.join(dirname, filename),
+                content=content)
+
+            return 0, b'', b''
+
         return {
             'args': (['soscmd', 'undelete', dirname, filename],),
             'kwargs': {
                 'cwd': self.workarea_dir,
             },
-            'call_fake': lambda cmdline, **kwargs:
-                self.write_workarea_file(
-                    os.path.join(dirname, filename),
-                    content=content),
+            'call_fake': _on_run_process,
         }
 
-    def make_rule_nobjstatus(self, sos_paths, flags, results):
+    def make_rule_nobjstatus(
+        self,
+        sos_paths: List[str],
+        flags: List[str],
+        results: List[str],
+    ) -> Dict[str, Any]:
         """A spy match rule for fetching attributes for one or more files.
 
         Args:
-            sos_paths (list of unicode):
+            sos_paths (list of str):
                 The expected list of file paths.
 
-            flags (list of unicode):
+            flags (list of str):
                 The expected list of attribute matcher flags.
 
-            reuslts (list of unicode):
+            results (list of str):
                 The simulated list of results from the command.
 
         Returns:
@@ -301,12 +377,22 @@ class BaseSOSTestCase(SCMClientTestCase):
             'args': (['soscmd', 'nobjstatus', '-ucl'] + flags + sos_paths,),
             'kwargs': {
                 'cwd': self.workarea_dir,
-                'split_lines': True,
             },
-            'op': kgb.SpyOpReturn(results),
+            'op': kgb.SpyOpReturn((
+                0,
+                ''.join(
+                    '%s\n' % _item
+                    for _item in results
+                ).encode('utf-8'),
+                b'',
+            )),
         }
 
-    def make_rule_diff(self, old_filename, new_filename):
+    def make_rule_diff(
+        self,
+        old_filename: str,
+        new_filename: str,
+    ) -> Dict[str, Any]:
         """A spy match rule for diffing two files.
 
         This will perform an actual diff between the two files. The paths
@@ -328,15 +414,14 @@ class BaseSOSTestCase(SCMClientTestCase):
                 'diff', '-urNp', old_filename,
                 os.path.join(self.workarea_dir, new_filename),
             ],),
-            'kwargs': {
-                'extra_ignore_errors': (1, 2),
-                'log_output_on_error': False,
-                'results_unicode': False,
-                'split_lines': True,
-            },
         }
 
-    def make_rule_diff_tree(self, sos_path, lines, dir_revision='1'):
+    def make_rule_diff_tree(
+        self,
+        sos_path: str,
+        lines: List[str],
+        dir_revision: str = '1',
+    ) -> Dict[str, Any]:
         """A spy match rule for diffing pending file operations on a directory.
 
         Args:
@@ -358,25 +443,31 @@ class BaseSOSTestCase(SCMClientTestCase):
         # bare minimum for what SOSClient needs (the "<" and ">" lines).
         sep = '%s\n' % ('=' * 80)
 
+        output = [
+            "** The differences for '%s' have been written to file "
+            "'./diff.out'.\n" % sos_path,
+            sep,
+            'Reference:     %s\n' % sos_path,
+            'Compare:       %s\n' % sos_path,
+            '< Revision:    %s\n' % dir_revision,
+            '> Revision:    %s [In workarea]\n' % dir_revision,
+            'Generated at:  2021/08/20 03:25:25\n',
+            sep,
+            '2a3\n',
+        ] + lines + [
+            sep,
+        ]
+
         return {
             'args': (['soscmd', 'diff', sos_path],),
             'kwargs': {
                 'cwd': self.workarea_dir,
             },
-            'op': kgb.SpyOpReturn([
-                "** The differences for '%s' have been written to file "
-                "'./diff.out'.\n" % sos_path,
-                sep,
-                'Reference:     %s\n' % sos_path,
-                'Compare:       %s\n' % sos_path,
-                '< Revision:    %s\n' % dir_revision,
-                '> Revision:    %s [In workarea]\n' % dir_revision,
-                'Generated at:  2021/08/20 03:25:25\n',
-                sep,
-                '2a3\n',
-            ] + lines + [
-                sep,
-            ]),
+            'op': kgb.SpyOpReturn((
+                0,
+                ''.join(output).encode('utf-8'),
+                b'',
+            )),
         }
 
     def build_client(self, **kwargs):
@@ -399,7 +490,11 @@ class BaseSOSTestCase(SCMClientTestCase):
 
         return client
 
-    def write_workarea_file(self, out_filename, content):
+    def write_workarea_file(
+        self,
+        out_filename: str,
+        content: bytes,
+    ) -> None:
         """Write a file to the workarea.
 
         This will create any paths as necessary.
@@ -460,7 +555,7 @@ class SOSClientTests(BaseSOSTestCase):
         client = self.build_client()
         del client._cache['sos_version']
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             self.rule_query_wa_root,
         ]))
 
@@ -520,7 +615,7 @@ class SOSClientTests(BaseSOSTestCase):
         client = self.build_client()
         del client._cache['sos_version']
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             self.rule_query_wa_root,
             self.rule_query_project,
             self.rule_query_server,
@@ -670,7 +765,7 @@ class SOSClientTests(BaseSOSTestCase):
         self.write_workarea_file(os.path.join('doc', 'index.md'),
                                  b'# new header line\n')
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             self.rule_query_wa_root,
             self.make_rule_stash_selection([
                 b'README',
@@ -858,7 +953,7 @@ class SOSClientTests(BaseSOSTestCase):
         self.write_workarea_file(os.path.join('src', 'newfile2'),
                                  b'another new file!\n')
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             self.rule_query_wa_root,
             self.make_rule_stash_selection([
                 b'README',
@@ -967,7 +1062,7 @@ class SOSClientTests(BaseSOSTestCase):
         """Testing SOSClient.diff with changelist and deleted files"""
         tmpfiles = self.precreate_tempfiles(3)
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             self.rule_query_wa_root,
             self.make_rule_stash_selection([
                 b'README',
@@ -1132,7 +1227,7 @@ class SOSClientTests(BaseSOSTestCase):
         self.write_workarea_file('newfile1', b'new content 1\n')
         self.write_workarea_file('newfile2', b'unchanged content\n')
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             self.rule_query_wa_root,
             self.make_rule_stash_selection([
                 b'README',
@@ -1301,7 +1396,7 @@ class SOSClientTests(BaseSOSTestCase):
         self.write_workarea_file(os.path.join('images', 'image.png'),
                                  b'\x00\x04\x05')
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             self.rule_query_wa_root,
             self.make_rule_stash_selection([
                 b'README',
@@ -1451,7 +1546,7 @@ class SOSClientTests(BaseSOSTestCase):
         self.write_workarea_file(os.path.join('src', 'new-name2'),
                                  b'unchanged content\n')
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             self.rule_query_wa_root,
             self.make_rule_stash_selection([
                 b'README',
@@ -1738,7 +1833,7 @@ class SOSClientTests(BaseSOSTestCase):
         self.write_workarea_file(os.path.join('src', 'newfile2'),
                                  b'another new file!\n')
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             self.rule_query_wa_root,
             self.make_rule_stash_selection([
                 b'README',
@@ -1957,7 +2052,7 @@ class SOSClientTests(BaseSOSTestCase):
         self.write_workarea_file(os.path.join('src', 'newfile2'),
                                  b'another new file!\n')
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             self.rule_query_wa_root,
             self.make_rule_stash_selection([
                 b'README',
@@ -2171,7 +2266,7 @@ class SOSClientTests(BaseSOSTestCase):
         self.write_workarea_file(os.path.join('doc', 'index.md'),
                                  b'# new header line\n')
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             self.rule_query_wa_root,
             self.make_rule_stash_selection([
                 b'README',
@@ -2329,7 +2424,7 @@ class SOSClientTests(BaseSOSTestCase):
         self.write_workarea_file(os.path.join('src', 'newfile2'),
                                  b'another new file!\n')
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             self.rule_query_wa_root,
             self.make_rule_stash_selection([
                 b'README',
@@ -2435,7 +2530,7 @@ class SOSClientTests(BaseSOSTestCase):
         """Testing SOSClient.diff with selection and deleted files"""
         tmpfiles = self.precreate_tempfiles(3)
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             self.rule_query_wa_root,
             self.make_rule_stash_selection([
                 b'README',
@@ -2597,7 +2692,7 @@ class SOSClientTests(BaseSOSTestCase):
         self.write_workarea_file(os.path.join('src', 'newfile2'),
                                  b'unchanged content\n')
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             self.rule_query_wa_root,
             self.make_rule_stash_selection([
                 b'README',
@@ -2760,7 +2855,7 @@ class SOSClientTests(BaseSOSTestCase):
         self.write_workarea_file(os.path.join('src2', 'subdir', 'testfile2'),
                                  b'content 2\n')
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             self.rule_query_wa_root,
             self.make_rule_stash_selection([
                 b'README',
@@ -2918,7 +3013,7 @@ class SOSClientTests(BaseSOSTestCase):
         self.write_workarea_file(os.path.join('images', 'image.png'),
                                  b'\x03\x04\x05')
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             self.rule_query_wa_root,
             self.make_rule_stash_selection([
                 b'README',
@@ -3067,7 +3162,7 @@ class SOSClientTests(BaseSOSTestCase):
         self.write_workarea_file(os.path.join('src', 'newfile2'),
                                  b'another new file!\n')
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             self.rule_query_wa_root,
             self.make_rule_stash_selection([
                 b'README',
@@ -3281,7 +3376,7 @@ class SOSClientTests(BaseSOSTestCase):
         self.write_workarea_file(os.path.join('src', 'newfile2'),
                                  b'another new file!\n')
 
-        self.spy_on(execute, op=kgb.SpyOpMatchInOrder([
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             self.rule_query_wa_root,
             self.make_rule_stash_selection([
                 b'README',

@@ -10,6 +10,7 @@ import time
 import unittest
 from random import randint
 from textwrap import dedent
+from typing import List
 
 import kgb
 
@@ -23,11 +24,12 @@ from rbtools.clients.tests import (FOO, FOO1, FOO2, FOO3, FOO4, FOO5, FOO6,
                                    SCMClientTestCase)
 from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.checks import check_install
-from rbtools.utils.encoding import force_unicode
 from rbtools.utils.filesystem import (is_exe_in_path,
                                       load_config,
                                       make_tempdir)
-from rbtools.utils.process import execute
+from rbtools.utils.process import (RunProcessResult,
+                                   run_process,
+                                   run_process_exec)
 
 
 hgext_path = os.path.abspath(os.path.join(rbtools.helpers.__file__, '..',
@@ -38,7 +40,11 @@ class MercurialTestCase(SCMClientTestCase):
     """Base class for all Mercurial unit tests."""
 
     @classmethod
-    def run_hg(cls, command, **kwargs):
+    def run_hg(
+        cls,
+        command: List[str],
+        **kwargs
+    ) -> RunProcessResult:
         """Run a Mercurial command.
 
         Args:
@@ -47,20 +53,17 @@ class MercurialTestCase(SCMClientTestCase):
 
             **kwargs (dict):
                 Additional keyword arguments to pass to
-                :py:func:`~rbtools.utils.process.execute`.
+                :py:func:`~rbtools.utils.process.run_process`.
 
         Returns:
-            object:
-            The result of :py:func:`~rbtools.utils.process.execute`.
+            rbtools.utils.process.RunProcessResult:
+            The result of :py:func:`~rbtools.utils.process.run_process`.
         """
-        return execute(
+        return run_process(
             ['hg'] + command,
             env={
                 'HGPLAIN': '1',
             },
-            split_lines=False,
-            results_unicode=False,
-            with_errors=False,
             **kwargs)
 
     def hg_add_file_commit(self, filename='test.txt', data=b'Test',
@@ -1638,20 +1641,17 @@ class MercurialClientTests(MercurialTestCase):
         """Testing MercurialClient.apply_patch"""
         client = self.build_client()
 
-        self.spy_on(execute,
-                    op=kgb.SpyOpReturn((0, b'test')))
+        self.spy_on(run_process_exec,
+                    op=kgb.SpyOpReturn((0, b'test', b'')))
 
         result = client.apply_patch(patch_file='test.diff')
 
         self.assertSpyCalledWith(
-            execute,
+            run_process_exec,
             [
                 'hg', 'patch', '--no-commit', 'test.diff',
                 '--config', 'extensions.rbtoolsnormalize=%s' % hgext_path,
-            ],
-            with_errors=True,
-            return_error_code=True,
-            results_unicode=False)
+            ])
 
         self.assertTrue(result.applied)
         self.assertFalse(result.has_conflicts)
@@ -1662,21 +1662,18 @@ class MercurialClientTests(MercurialTestCase):
         """Testing MercurialClient.apply_patch with p="""
         client = self.build_client()
 
-        self.spy_on(execute,
-                    op=kgb.SpyOpReturn((0, b'test')))
+        self.spy_on(run_process_exec,
+                    op=kgb.SpyOpReturn((0, b'test', b'')))
 
         result = client.apply_patch(patch_file='test.diff',
                                     p='1')
 
         self.assertSpyCalledWith(
-            execute,
+            run_process_exec,
             [
                 'hg', 'patch', '--no-commit', '-p', '1', 'test.diff',
                 '--config', 'extensions.rbtoolsnormalize=%s' % hgext_path,
-            ],
-            with_errors=True,
-            return_error_code=True,
-            results_unicode=False)
+            ])
 
         self.assertTrue(result.applied)
         self.assertFalse(result.has_conflicts)
@@ -1687,20 +1684,18 @@ class MercurialClientTests(MercurialTestCase):
         """Testing MercurialClient.apply_patch with error"""
         client = self.build_client()
 
-        self.spy_on(execute,
-                    op=kgb.SpyOpReturn((1, b'bad')))
+        self.spy_on(run_process_exec,
+                    op=kgb.SpyOpReturn((1, b'bad', b'')))
 
         result = client.apply_patch(patch_file='test.diff')
 
         self.assertSpyCalledWith(
-            execute,
+            run_process_exec,
             [
                 'hg', 'patch', '--no-commit', 'test.diff',
                 '--config', 'extensions.rbtoolsnormalize=%s' % hgext_path,
             ],
-            with_errors=True,
-            return_error_code=True,
-            results_unicode=False)
+            redirect_stderr=True)
 
         self.assertFalse(result.applied)
         self.assertFalse(result.has_conflicts)
@@ -1729,7 +1724,12 @@ class MercurialClientTests(MercurialTestCase):
             # full ID.
             cmdline.append('--debug')
 
-        return force_unicode(self.run_hg(cmdline).split()[0])
+        return (
+            self.run_hg(cmdline)
+            .stdout
+            .read()
+            .split()[0]
+        )
 
 
 class MercurialSubversionClientTests(MercurialTestCase):
@@ -1753,11 +1753,17 @@ class MercurialSubversionClientTests(MercurialTestCase):
             has_hgsubversion = False
 
             try:
-                output = execute(
-                    ['hg', '--config', 'extensions.hgsubversion=',
-                     'svn', '--help'],
-                    ignore_errors=True,
-                    extra_ignore_errors=(255,))
+                output = (
+                    run_process(
+                        [
+                            'hg', '--config', 'extensions.hgsubversion=',
+                            'svn', '--help',
+                        ],
+                        ignore_errors=True)
+                    .stdout
+                    .read()
+                )
+
                 has_hgsubversion = \
                     not re.search('unknown command [\'"]svn[\'"]',
                                   output, re.I)
@@ -1780,18 +1786,18 @@ class MercurialSubversionClientTests(MercurialTestCase):
         cls._svn_temp_base_path = temp_base_path
 
         svn_repo_path = os.path.join(temp_base_path, 'svnrepo')
-        execute(['svnadmin', 'create', svn_repo_path])
+        run_process(['svnadmin', 'create', svn_repo_path])
 
         # Fill it with content. First, though, we have to clone it.
         svn_checkout_path = os.path.join(temp_base_path, 'checkout.svn')
-        execute(['svn', 'checkout', 'file://%s' % svn_repo_path,
-                 svn_checkout_path])
+        run_process(['svn', 'checkout', 'file://%s' % svn_repo_path,
+                     svn_checkout_path])
         os.chdir(svn_checkout_path)
 
-        execute(['svn', 'propset', 'reviewboard:url', cls.TESTSERVER,
-                 svn_checkout_path])
-        execute(['svn', 'mkdir', 'trunk', 'branches', 'tags'])
-        execute(['svn', 'commit', '-m', 'Initial commit.'])
+        run_process(['svn', 'propset', 'reviewboard:url', cls.TESTSERVER,
+                     svn_checkout_path])
+        run_process(['svn', 'mkdir', 'trunk', 'branches', 'tags'])
+        run_process(['svn', 'commit', '-m', 'Initial commit.'])
         os.chdir(os.path.join(svn_checkout_path, 'trunk'))
 
         for i, data in enumerate([FOO, FOO1, FOO2]):
@@ -1806,8 +1812,10 @@ class MercurialSubversionClientTests(MercurialTestCase):
 
         pid_file = os.path.join(temp_base_path, 'svnserve.pid')
 
-        execute(['svnserve', '--single-thread', '--pid-file', pid_file, '-d',
-                 '--listen-port', svnserve_port, '-r', temp_base_path])
+        run_process([
+            'svnserve', '--single-thread', '--pid-file', pid_file, '-d',
+            '--listen-port', svnserve_port, '-r', temp_base_path,
+        ])
 
         for i in range(0, cls.SVNSERVE_MAX_RETRIES):
             try:
@@ -1869,9 +1877,9 @@ class MercurialSubversionClientTests(MercurialTestCase):
             fp.write(data)
 
         if add_file:
-            execute(['svn', 'add', filename], ignore_errors=True)
+            run_process(['svn', 'add', filename], ignore_errors=True)
 
-        execute(['svn', 'commit', '-m', msg])
+        run_process(['svn', 'commit', '-m', msg])
 
     def test_get_repository_info(self):
         """Testing MercurialClient.get_repository_info with SVN"""
