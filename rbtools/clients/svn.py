@@ -1,20 +1,22 @@
 """A client for Subversion."""
 
-from __future__ import unicode_literals
+from __future__ import annotations
 
+import argparse
 import logging
 import os
 import posixpath
 import re
 import sys
 from xml.etree import ElementTree
-from typing import List, Optional, Tuple, Union
+from typing import Dict, Iterable, List, Optional, Tuple, Union, cast
 
-import six
-from six.moves import map
 from six.moves.urllib.parse import unquote
 
 from rbtools.api.errors import APIError
+from rbtools.api.resource import (ItemResource,
+                                  ListResource,
+                                  RootResource)
 from rbtools.clients import PatchResult, RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
                                             SCMClientDiffResult,
@@ -83,7 +85,7 @@ class SVNClient(BaseSCMClient):
 
     subversion_client_version: Tuple[int, int, int]
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         """Initialize the client.
 
         Args:
@@ -92,8 +94,8 @@ class SVNClient(BaseSCMClient):
         """
         super(SVNClient, self).__init__(**kwargs)
 
-        self._svn_info_cache = {}
-        self._svn_repository_info_cache = None
+        self._svn_info_cache: Dict[str, Optional[Dict[str, str]]] = {}
+        self._svn_repository_info_cache: Optional[SVNRepositoryInfo] = None
 
     def check_dependencies(self) -> None:
         """Check whether all dependencies for the client are available.
@@ -110,7 +112,7 @@ class SVNClient(BaseSCMClient):
         if not check_install(['svn', 'help']):
             raise SCMClientDependencyError(missing_exes=['svn'])
 
-    def is_remote_only(self):
+    def is_remote_only(self) -> bool:
         """Return whether this repository is operating in remote-only mode.
 
         For SVN, if a user provides the repository URL on the command line or
@@ -123,7 +125,7 @@ class SVNClient(BaseSCMClient):
         # NOTE: This can be removed once check_dependencies() is mandatory.
         if not self.has_dependencies(expect_checked=True):
             logging.debug('Unable to execute "svn help": skipping SVN')
-            return None
+            return False
 
         repository_url = getattr(self.options, 'repository_url', None)
 
@@ -131,7 +133,7 @@ class SVNClient(BaseSCMClient):
             info = self.svn_info(path=repository_url, ignore_errors=True)
             return bool(info and 'Repository Root' in info)
 
-        return None
+        return False
 
     def get_local_path(self) -> Optional[str]:
         """Return the local path to the working tree.
@@ -208,7 +210,10 @@ class SVNClient(BaseSCMClient):
 
         return self._svn_repository_info_cache
 
-    def find_matching_server_repository(self, repositories):
+    def find_matching_server_repository(
+        self,
+        repositories: ListResource,
+    ) -> Tuple[Optional[ItemResource], Optional[ItemResource]]:
         """Find a match for the repository on the server.
 
         Args:
@@ -225,19 +230,17 @@ class SVNClient(BaseSCMClient):
         info = self.svn_info(path=repository_url,
                              ignore_errors=True)
 
-        if not info:
-            return None
+        if info:
+            uuid = info['Repository UUID']
 
-        uuid = info['Repository UUID']
+            for repository in repositories.all_items:
+                try:
+                    server_info = repository.get_info()
+                except APIError:
+                    continue
 
-        for repository in repositories.all_items:
-            try:
-                server_info = repository.get_info()
-            except APIError:
-                continue
-
-            if server_info and uuid == server_info['uuid']:
-                return repository, server_info
+                if server_info and uuid == server_info['uuid']:
+                    return repository, server_info
 
         return None, None
 
@@ -351,7 +354,7 @@ class SVNClient(BaseSCMClient):
         """Convert a symbolic revision to a numbered revision.
 
         Args:
-            revision (unicode):
+            revision (str):
                 The name of a symbolic revision.
 
         Raises:
@@ -362,10 +365,12 @@ class SVNClient(BaseSCMClient):
             int:
             The revision number.
         """
-        command = ['-r', six.text_type(revision), '-l', '1']
+        command: List[str] = ['-r', str(revision), '-l', '1']
 
-        if getattr(self.options, 'repository_url', None):
-            command.append(self.options.repository_url)
+        repository_url = getattr(self.options, 'repository_url', None)
+
+        if repository_url:
+            command.append(repository_url)
 
         log = self.svn_log_xml(command)
 
@@ -387,7 +392,10 @@ class SVNClient(BaseSCMClient):
 
         raise ValueError
 
-    def scan_for_server(self, repository_info):
+    def scan_for_server(
+        self,
+        repository_info: RepositoryInfo,
+    ) -> Optional[str]:
         """Scan for the reviewboard:url property in the repository.
 
         This method looks for the reviewboard:url property, which is an
@@ -399,7 +407,7 @@ class SVNClient(BaseSCMClient):
                 The repository information structure.
 
         Returns:
-            unicode:
+            str:
             The Review Board server URL, if available.
         """
         def get_url_prop(path):
@@ -418,7 +426,10 @@ class SVNClient(BaseSCMClient):
 
         return get_url_prop(repository_info.path)
 
-    def get_raw_commit_message(self, revisions):
+    def get_raw_commit_message(
+        self,
+        revisions: SCMClientRevisionSpec,
+    ) -> str:
         """Return the raw commit message(s) for the given revisions.
 
         Args:
@@ -427,22 +438,24 @@ class SVNClient(BaseSCMClient):
                 ``tip`` and ``base`` keys.
 
         Returns:
-            unicode:
+            str:
             The commit messages for all the requested revisions.
         """
-        base = six.text_type(revisions['base'])
-        tip = six.text_type(revisions['tip'])
+        base = str(revisions['base'])
+        tip = str(revisions['tip'])
 
         if (tip == SVNClient.REVISION_WORKING_COPY or
             tip.startswith(SVNClient.REVISION_CHANGELIST_PREFIX)):
             return ''
 
-        command = ['-r', '%s:%s' % (base, tip)]
+        repository_url = getattr(self.options, 'repository_url', None)
 
-        if getattr(self.options, 'repository_url', None):
-            command.append(self.options.repository_url)
+        command: List[str] = ['-r', '%s:%s' % (base, tip)]
 
-        log = self.svn_log_xml(command)
+        if repository_url:
+            command.append(repository_url)
+
+        log = self.svn_log_xml(command) or b''
 
         try:
             root = ElementTree.fromstring(log)
@@ -453,7 +466,11 @@ class SVNClient(BaseSCMClient):
         # corresponding to the changes that will be included in the diff.
         messages = root.findall('.//msg')[1:]
 
-        return '\n\n'.join(message.text for message in messages)
+        return '\n\n'.join(
+            message.text
+            for message in messages
+            if message.text is not None
+        )
 
     @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def diff(
@@ -480,10 +497,10 @@ class SVNClient(BaseSCMClient):
                 A dictionary of revisions, as returned by
                 :py:meth:`parse_revision_spec`.
 
-            include_files (list of unicode, optional):
+            include_files (list of str, optional):
                 A list of files to whitelist during the diff generation.
 
-            exclude_patterns (list of unicode, optional):
+            exclude_patterns (list of str, optional):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
 
@@ -492,12 +509,11 @@ class SVNClient(BaseSCMClient):
 
         Returns:
             dict:
-            A dictionary containing the following keys:
-
-            ``diff`` (:py:class:`bytes`):
-                The contents of the diff to upload.
+            A dictionary containing keys documented in
+            :py:class:`rbtools.clients.base.scmclient.SCMClientDiffResult`.
         """
         repository_info = self.get_repository_info()
+        assert repository_info is not None
 
         # SVN paths are always relative to the root of the repository, so we
         # compute the current path we are checked out at and use that as the
@@ -509,28 +525,33 @@ class SVNClient(BaseSCMClient):
                                               repository_info.base_path)
 
         # Keep track of information needed for handling empty files later.
-        empty_files_revisions = {
+        empty_files_revisions: SCMClientRevisionSpec = {
             'base': None,
             'tip': None,
         }
 
-        base = six.text_type(revisions['base'])
-        tip = six.text_type(revisions['tip'])
+        base = str(revisions['base'])
+        tip = str(revisions['tip'])
 
-        diff_cmd = ['diff', '--diff-cmd=diff', '--notice-ancestry']
-        changelist = None
+        diff_cmd: List[str] = ['diff', '--diff-cmd=diff', '--notice-ancestry']
+        changelist: Optional[str] = None
 
         if tip == self.REVISION_WORKING_COPY:
             # Posting the working copy
-            diff_cmd.extend(['-r', base])
+            diff_cmd += ['-r', base]
         elif tip.startswith(self.REVISION_CHANGELIST_PREFIX):
             # Posting a changelist
             changelist = tip[len(self.REVISION_CHANGELIST_PREFIX):]
-            diff_cmd.extend(['--changelist', changelist])
+            diff_cmd += ['--changelist', changelist]
         else:
             # Diff between two separate revisions. Behavior depends on whether
             # or not there's a working copy
-            if self.options.repository_url:
+            repository_url = getattr(self.options, 'repository_url', None)
+
+            if repository_url:
+                assert isinstance(repository_info.path, str)
+                assert repository_info.base_path
+
                 # No working copy--create 'old' and 'new' URLs
                 if len(include_files) == 1:
                     # If there's a single file or directory passed in, we use
@@ -555,7 +576,7 @@ class SVNClient(BaseSCMClient):
                     old_url = (repository_info.path +
                                repository_info.base_path + '@' + base)
 
-                diff_cmd.extend([old_url, new_url])
+                diff_cmd += [old_url, new_url]
 
                 empty_files_revisions['base'] = '(revision %s)' % base
                 empty_files_revisions['tip'] = '(revision %s)' % tip
@@ -566,7 +587,7 @@ class SVNClient(BaseSCMClient):
                 empty_files_revisions['base'] = '(revision %s)' % base
                 empty_files_revisions['tip'] = '(revision %s)' % tip
 
-        diff_cmd.extend(include_files)
+        diff_cmd += include_files
 
         # Check for and validate --svn-show-copies-as-adds option, or evaluate
         # working copy to determine if scheduled commit will contain
@@ -581,7 +602,8 @@ class SVNClient(BaseSCMClient):
                 self.options, 'svn_show_copies_as_adds', None)
 
             if svn_show_copies_as_adds is None:
-                if self.history_scheduled_with_commit(changelist,
+                if self.history_scheduled_with_commit(repository_info,
+                                                      changelist,
                                                       include_files,
                                                       exclude_patterns):
                     sys.stderr.write(
@@ -593,37 +615,50 @@ class SVNClient(BaseSCMClient):
                 if svn_show_copies_as_adds in 'Yy':
                     diff_cmd.append('--show-copies-as-adds')
 
-        diff = self._run_svn(diff_cmd,
-                             split_lines=True,
-                             results_unicode=False,
-                             log_output_on_error=False)
-        diff = self.handle_renames(diff)
+        diff_lines = self._run_svn(diff_cmd,
+                                   split_lines=True,
+                                   results_unicode=False,
+                                   log_output_on_error=False)
+        diff_lines = self.handle_renames(diff_lines)
 
         if self.supports_empty_files():
-            diff = self._handle_empty_files(diff, diff_cmd,
-                                            empty_files_revisions)
+            diff_lines = self._handle_empty_files(diff_lines,
+                                                  diff_cmd,
+                                                  empty_files_revisions)
 
-        diff = self.convert_to_absolute_paths(diff, repository_info)
+        diff_lines = self.convert_to_absolute_paths(diff_lines,
+                                                    repository_info)
+
+        diff_iter: Iterable[bytes]
 
         if exclude_patterns:
-            diff = filter_diff(diff, self.INDEX_FILE_RE, exclude_patterns)
+            diff_iter = filter_diff(diff=diff_lines,
+                                    file_index_re=self.INDEX_FILE_RE,
+                                    exclude_patterns=exclude_patterns)
+        else:
+            diff_iter = diff_lines
 
         return {
-            'diff': b''.join(diff),
+            'diff': b''.join(diff_iter),
         }
 
-    def history_scheduled_with_commit(self, changelist, include_files,
-                                      exclude_patterns):
+    def history_scheduled_with_commit(
+        self,
+        repository_info: RepositoryInfo,
+        changelist: Optional[str],
+        include_files: List[str],
+        exclude_patterns: List[str],
+    ) -> bool:
         """Return whether any files have history scheduled.
 
         Args:
-            changelist (unicode):
+            changelist (str):
                 The changelist name, if specified.
 
-            include_files (list of unicode):
+            include_files (list of str):
                 A list of files to whitelist during the diff generation.
 
-            exclude_patterns (list of unicode):
+            exclude_patterns (list of str):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
 
@@ -632,13 +667,16 @@ class SVNClient(BaseSCMClient):
             ``True`` if any new files have been scheduled including their
             history.
         """
-        status_cmd = ['status', '-q', '--ignore-externals']
+        base_path = repository_info.base_path
+        assert base_path
+
+        status_cmd: List[str] = ['status', '-q', '--ignore-externals']
 
         if changelist:
-            status_cmd.extend(['--changelist', changelist])
+            status_cmd += ['--changelist', changelist]
 
         if include_files:
-            status_cmd.extend(include_files)
+            status_cmd += include_files
 
         for p in self._run_svn(status_cmd, split_lines=True,
                                results_unicode=False):
@@ -665,7 +703,10 @@ class SVNClient(BaseSCMClient):
 
         return False
 
-    def find_copyfrom(self, path):
+    def find_copyfrom(
+        self,
+        path: str,
+    ) -> Optional[str]:
         """Find the source filename for copied files.
 
         The output of 'svn info' reports the "Copied From" header when invoked
@@ -676,21 +717,24 @@ class SVNClient(BaseSCMClient):
         try.
 
         Args:
-            path (unicode):
+            path (str):
                 The filename of the copied file.
 
         Returns:
-            unicode:
+            str:
             The filename of the source of the copy.
         """
-        def smart_join(p1, p2):
+        def smart_join(
+            p1: str,
+            p2: Optional[str],
+        ) -> str:
             if p2:
                 return os.path.join(p1, p2)
             else:
                 return p1
 
-        path1 = path
-        path2 = None
+        path1: Optional[str] = path
+        path2: Optional[str] = None
 
         while path1:
             info = self.svn_info(path1, ignore_errors=True) or {}
@@ -715,7 +759,10 @@ class SVNClient(BaseSCMClient):
 
         return None
 
-    def handle_renames(self, diff_content):
+    def handle_renames(
+        self,
+        diff_content: List[bytes],
+    ) -> List[bytes]:
         """Fix up diff headers to properly show renames.
 
         The output of :command:`svn diff` is incorrect when the file in
@@ -725,20 +772,20 @@ class SVNClient(BaseSCMClient):
         portray this relationship.
 
         Args:
-            diff_content (bytes):
+            diff_content (list of bytes):
                 The content of the diffs.
 
         Returns:
-            bytes:
+            list of bytes:
             The processed diff.
         """
         # svn diff against a repository URL on two revisions appears to
         # handle moved files properly, so only adjust the diff file names
         # if they were created using a working copy.
-        if self.options.repository_url:
+        if getattr(self.options, 'repository_url', None):
             return diff_content
 
-        result = []
+        result: List[bytes] = []
         num_lines = len(diff_content)
         i = 0
 
@@ -784,7 +831,12 @@ class SVNClient(BaseSCMClient):
 
         return result
 
-    def _handle_empty_files(self, diff_content, diff_cmd, revisions):
+    def _handle_empty_files(
+        self,
+        diff_content: List[bytes],
+        diff_cmd: List[str],
+        revisions: SCMClientRevisionSpec,
+    ) -> List[bytes]:
         """Handle added and deleted 0-length files in the diff output.
 
         Since the diff output from :command:`svn diff` does not give enough
@@ -806,7 +858,7 @@ class SVNClient(BaseSCMClient):
             diff_content (list of bytes):
                 The content of the diff, split into lines.
 
-            diff_cmd (list of unicode):
+            diff_cmd (list of str):
                 A partial command line to run :command:`svn diff`.
 
             revisions (dict):
@@ -835,6 +887,9 @@ class SVNClient(BaseSCMClient):
         num_lines = len(diff_content)
         i = 0
 
+        base: str
+        tip: str
+
         while i < num_lines:
             line = diff_content[i]
 
@@ -862,8 +917,8 @@ class SVNClient(BaseSCMClient):
                         else:
                             continue
                     else:
-                        base = revisions['base']
-                        tip = revisions['tip']
+                        base = str(revisions['base'])
+                        tip = str(revisions['tip'])
                 else:
                     # Added empty file.
                     index_tag = b'added'
@@ -871,8 +926,8 @@ class SVNClient(BaseSCMClient):
                     if not revisions['base'] and not revisions['tip']:
                         base = tip = '(revision 0)'
                     else:
-                        base = revisions['base']
-                        tip = revisions['tip']
+                        base = str(revisions['base'])
+                        tip = str(revisions['tip'])
 
                 diff_writer.write_index(b'%s\t(%s)' % (filename, index_tag))
                 diff_writer.write_file_headers(
@@ -892,7 +947,11 @@ class SVNClient(BaseSCMClient):
 
         return diff_writer.readlines()
 
-    def convert_to_absolute_paths(self, diff_content, repository_info):
+    def convert_to_absolute_paths(
+        self,
+        diff_content: List[bytes],
+        repository_info: RepositoryInfo,
+    ) -> List[bytes]:
         """Convert relative paths in a diff output to absolute paths.
 
         This handles paths that have been svn switched to other parts of the
@@ -909,11 +968,17 @@ class SVNClient(BaseSCMClient):
             bytes:
             The processed diff.
         """
-        result = []
+        result: List[bytes] = []
+
+        repository_url = getattr(self.options, 'repository_url', None)
+        base_path = repository_info.base_path
+
+        assert base_path
 
         for line in diff_content:
-            front = None
-            orig_line = line
+            front: Optional[bytes] = None
+            orig_line: bytes = line
+
             if (self.DIFF_NEW_FILE_LINE_RE.match(line) or
                 self.DIFF_ORIG_FILE_LINE_RE.match(line) or
                 line.startswith(b'Index: ')):
@@ -930,11 +995,10 @@ class SVNClient(BaseSCMClient):
                     # If working with a diff generated outside of a working
                     # copy, then file paths are already absolute, so just
                     # add initial slash.
-                    if self.options.repository_url:
-                        path = unquote(
-                            posixpath.join(repository_info.base_path, file))
+                    if repository_url:
+                        path = unquote(posixpath.join(base_path, file))
                     else:
-                        info = self.svn_info(file, True)
+                        info = self.svn_info(file, ignore_errors=True)
 
                         if info is None:
                             result.append(orig_line)
@@ -955,7 +1019,7 @@ class SVNClient(BaseSCMClient):
         """Return a dict which is the result of 'svn info' at a given path.
 
         Args:
-            path (unicode):
+            path (str):
                 The path to the file being accessed.
 
             ignore_errors (bool, optional):
@@ -973,10 +1037,10 @@ class SVNClient(BaseSCMClient):
             path += '@'
 
         if path not in self._svn_info_cache:
+            cmdline: List[str] = ['info']
+
             if path is not None:
-                cmdline = ['info', path]
-            else:
-                cmdline = ['info']
+                cmdline.append(path)
 
             result = self._run_svn(cmdline,
                                    split_lines=True,
@@ -998,7 +1062,10 @@ class SVNClient(BaseSCMClient):
 
         return self._svn_info_cache[path]
 
-    def parse_filename_header(self, diff_line):
+    def parse_filename_header(
+        self,
+        diff_line: bytes,
+    ) -> Tuple[str, bytes]:
         """Parse the filename header from a diff.
 
         Args:
@@ -1006,11 +1073,11 @@ class SVNClient(BaseSCMClient):
                 The line of the diff being parsed.
 
         Returns:
-            tuple of (unicode, bytes):
+            tuple of (str, bytes):
             The parsed header line. The filename will be decoded using the
             system filesystem encoding.
         """
-        parts = None
+        parts: List[bytes] = []
 
         if b'\t' in diff_line:
             # There's a \t separating the filename and info. This is the
@@ -1034,11 +1101,28 @@ class SVNClient(BaseSCMClient):
         return (diff_line.split(b'\n')[0].decode(_fs_encoding),
                 b'\n')
 
-    def _get_p_number(self, base_path, base_dir):
+    def _get_p_number(
+        self,
+        base_path: str,
+        base_dir: str,
+    ) -> int:
         """Return the argument for --strip in svn patch.
 
         This determines the number of path components to remove from file paths
         in the diff to be applied.
+
+        Args:
+            base_path (str):
+                The relative path beetween the repository root and the
+                directory that the diff file was generated in.
+
+            base_dir (str, unused):
+                The current relative path between the repository root and the
+                user's working directory.
+
+        Returns:
+            int:
+            The prefix number to pass into the :command:`patch` command.
         """
         if base_path == '/':
             # We always need to strip off the leading forward slash.
@@ -1048,22 +1132,32 @@ class SVNClient(BaseSCMClient):
             # directory will not be suffixed with a slash.
             return base_path.count('/') + 1
 
-    def _exclude_files_not_in_tree(self, patch_file, base_path):
+    def _exclude_files_not_in_tree(
+        self,
+        patch_file: str,
+        base_path: str,
+    ) -> Tuple[bool, bool]:
         """Process a diff and remove entries not in the current directory.
 
         Args:
-            patch_file (unicode):
+            patch_file (str):
                 The filename of the patch file to process. This file will be
                 overwritten by the processed patch.
 
-            base_path (unicode):
+            base_path (str):
                 The relative path between the root of the repository and the
                 directory that the patch was created in.
 
         Returns:
-            tuple of bool:
-            A tuple with two values, representing whether any files have been
-            excluded and whether the resulting diff is empty.
+            tuple:
+            A 2-tuple of:
+
+            Tuple:
+                0 (bool):
+                    Whether any files have been excluded.
+
+                1 (bool):
+                    Whether the diff is empty.
         """
         excluded_files = False
         empty_patch = True
@@ -1100,7 +1194,7 @@ class SVNClient(BaseSCMClient):
 
         os.rename(filtered_patch_name, patch_file)
 
-        return (excluded_files, empty_patch)
+        return excluded_files, empty_patch
 
     def apply_patch(self, patch_file, base_path, base_dir, p=None,
                     revert=False):
@@ -1155,7 +1249,7 @@ class SVNClient(BaseSCMClient):
                 if empty:
                     logging.warn('All files were excluded from the patch.')
 
-        cmd = ['patch']
+        cmd: List[str] = ['patch']
         p_num = p or self._get_p_number(base_path, base_dir)
 
         if p_num >= 0:
@@ -1164,7 +1258,7 @@ class SVNClient(BaseSCMClient):
         if revert:
             cmd.append('--reverse-diff')
 
-        cmd.append(six.text_type(patch_file))
+        cmd.append(patch_file)
 
         rc, patch_output = self._run_svn(cmd,
                                          ignore_errors=True,
@@ -1288,7 +1382,7 @@ class SVNClient(BaseSCMClient):
 
         return patched_empty_files
 
-    def supports_empty_files(self):
+    def supports_empty_files(self) -> bool:
         """Check if the server supports added/deleted empty files.
 
         Returns:
@@ -1296,7 +1390,7 @@ class SVNClient(BaseSCMClient):
             Whether the Review Board server supports empty added or deleted
             files.
         """
-        return (self.capabilities and
+        return (self.capabilities is not None and
                 self.capabilities.has_capability('scmtools', 'svn',
                                                  'empty_files'))
 
@@ -1304,7 +1398,7 @@ class SVNClient(BaseSCMClient):
         """Run the ``svn`` command.
 
         Args:
-            svn_args (list of unicode):
+            svn_args (list of str):
                 A list of additional arguments to add to the SVN command line.
 
             *args (list):
@@ -1319,21 +1413,34 @@ class SVNClient(BaseSCMClient):
             tuple:
             The value returned by :py:func:`rbtools.utils.process.execute`.
         """
-        cmdline = ['svn', '--non-interactive'] + svn_args
+        options = self.options or argparse.Namespace()
+        svn_username = getattr(options, 'svn_username', None)
+        svn_password = getattr(options, 'svn_password', None)
+        svn_prompt_password = getattr(options, 'svn_prompt_password', False)
 
-        if getattr(self.options, 'svn_username', None):
-            cmdline += ['--username', self.options.svn_username]
+        cmdline: List[str] = ['svn', '--non-interactive'] + svn_args
 
-        if getattr(self.options, 'svn_prompt_password', None):
-            self.options.svn_prompt_password = False
-            self.options.svn_password = get_pass('SVN Password: ')
+        if svn_username:
+            cmdline += ['--username', svn_username]
 
-        if getattr(self.options, 'svn_password', None):
-            cmdline += ['--password', self.options.svn_password]
+        if svn_prompt_password:
+            # TODO: Remove this from here and move it somewhere less likely
+            #       to cause problems.
+            svn_password = get_pass('SVN Password: ')
+            options.svn_prompt_password = False
+            options.svn_password = svn_password
+
+        if svn_password:
+            cmdline += ['--password', svn_password]
 
         return execute(cmdline, *args, **kwargs)
 
-    def svn_log_xml(self, svn_args, *args, **kwargs):
+    def svn_log_xml(
+        self,
+        svn_args: List[str],
+        *args,
+        **kwargs,
+    ) -> Optional[bytes]:
         """Run SVN log non-interactively and retrieve XML output.
 
         We cannot run SVN log interactively and retrieve XML output because the
@@ -1344,7 +1451,7 @@ class SVNClient(BaseSCMClient):
         ``True``) if an error occurs that is not an authentication error.
 
         Args:
-            svn_args (list of unicode):
+            svn_args (list of str):
                 A list of additional arguments to add to the SVN command line.
 
             *args (list):
@@ -1387,7 +1494,7 @@ class SVNClient(BaseSCMClient):
 
         return result
 
-    def check_options(self):
+    def check_options(self) -> None:
         """Verify the command line options.
 
         Raises:
@@ -1396,13 +1503,16 @@ class SVNClient(BaseSCMClient):
                 particular, if a file has history scheduled with the commit,
                 the user needs to explicitly choose what behavior they want.
         """
-        if getattr(self.options, 'svn_show_copies_as_adds', None):
-            if (len(self.options.svn_show_copies_as_adds) > 1 or
-                self.options.svn_show_copies_as_adds not in 'YyNn'):
-                raise OptionsCheckError(
-                    'Invalid value \'%s\' for --svn-show-copies-as-adds '
-                    'option. Valid values are \'y\' or \'n\'.' %
-                    self.options.svn_show_copies_as_adds)
+        show_copies_as_adds = getattr(self.options, 'svn_show_copies_as_adds',
+                                      None)
+
+        if (show_copies_as_adds and
+            (len(show_copies_as_adds) > 1 or
+             show_copies_as_adds not in 'YyNn')):
+            raise OptionsCheckError(
+                'Invalid value \'%s\' for --svn-show-copies-as-adds '
+                'option. Valid values are \'y\' or \'n\'.' %
+                show_copies_as_adds)
 
 
 class SVNRepositoryInfo(RepositoryInfo):
@@ -1411,33 +1521,57 @@ class SVNRepositoryInfo(RepositoryInfo):
     This stores information on the path and, optionally, UUID of a Subversion
     repository. It can match a local repository against those on a Review Board
     server.
-
-    Attributes:
-        repository_id (int):
-            ID of the repository in the API. This is used primarily for
-            testing purposes, and is not guaranteed to be set.
-
-        uuid (unicode):
-            UUID of the Subversion repository.
     """
 
-    def __init__(self, path=None, base_path=None, uuid=None, local_path=None,
-                 repository_id=None, tool=None):
+    ######################
+    # Instance variables #
+    ######################
+
+    #: ID of the repository in the API.
+    #:
+    #: This is used primarily for testing purposes, and is not guaranteed to be
+    #: set.
+    #:
+    #: Type:
+    #:     int
+    repository_id: Optional[int]
+
+    #: UUID of the Subversion repository.
+    #:
+    #: Type:
+    #:     str
+    uuid: Optional[str]
+
+    #: The SVN client that owns this repository information.
+    #:
+    #: Type:
+    #:     SVNClient
+    tool: Optional[SVNClient]
+
+    def __init__(
+        self,
+        path: Optional[str] = None,
+        base_path: Optional[str] = None,
+        uuid: Optional[str] = None,
+        local_path: Optional[str] = None,
+        repository_id: Optional[int] = None,
+        tool: Optional[SVNClient] = None,
+    ) -> None:
         """Initialize the repository information.
 
         Args:
-            path (unicode):
+            path (str):
                 Subversion checkout path.
 
-            base_path (unicode):
+            base_path (str):
                 Root of the Subversion repository.
 
-            local_path (unicode):
+            local_path (str):
                 The local filesystem path for the repository. This can
                 sometimes be the same as ``path``, but may not be (since that
                 can contain a remote repository path).
 
-            uuid (unicode):
+            uuid (str):
                 UUID of the Subversion repository.
 
             repository_id (int, optional):
@@ -1456,7 +1590,11 @@ class SVNRepositoryInfo(RepositoryInfo):
         self.repository_id = repository_id
         self.tool = tool
 
-    def update_from_remote(self, repository, info):
+    def update_from_remote(
+        self,
+        repository: ItemResource,
+        info: ItemResource,
+    ) -> None:
         """Update the info from a remote repository.
 
         Args:
@@ -1466,15 +1604,21 @@ class SVNRepositoryInfo(RepositoryInfo):
             info (rbtools.api.resource.ItemResource):
                 The repository info resource.
         """
-        repos_base_path = info['url'][len(info['root_url']):]
+        url = cast(str, info['url'])
+        root_url = cast(str, info['root_url'])
+
+        repos_base_path = url[len(root_url):]
         relpath = self._get_relative_path(self.base_path, repos_base_path)
 
         if relpath:
-            self.path = info['url']
+            self.path = url
             self.base_path = relpath
-            self.repository_id = repository.id
+            self.repository_id = cast(int, repository.id)
 
-    def find_server_repository_info(self, api_root):
+    def find_server_repository_info(
+        self,
+        api_root: RootResource,
+    ) -> SVNRepositoryInfo:
         """Return server-side information on the current Subversion repository.
 
         The point of this function is to find a repository on the server that
@@ -1514,7 +1658,11 @@ class SVNRepositoryInfo(RepositoryInfo):
 
         return self
 
-    def _get_relative_path(self, path, root):
+    def _get_relative_path(
+        self,
+        path: str,
+        root: str,
+    ) -> Optional[str]:
         pathdirs = self._split_on_slash(path)
         rootdirs = self._split_on_slash(root)
 
@@ -1535,7 +1683,10 @@ class SVNRepositoryInfo(RepositoryInfo):
         else:
             return '/' + '/'.join(pathdirs[len(rootdirs):])
 
-    def _split_on_slash(self, path):
+    def _split_on_slash(
+        self,
+        path: str,
+    ) -> List[str]:
         # Split on slashes, but ignore multiple slashes and throw away any
         # trailing slashes.
         split = re.split('/+', path)

@@ -588,7 +588,7 @@ class SVNClientTests(SCMClientTestCase):
         with self.assertLogs(level='DEBUG') as ctx:
             remote_only = client.is_remote_only()
 
-        self.assertIsNone(remote_only)
+        self.assertFalse(remote_only)
 
         self.assertEqual(ctx.records[0].msg,
                          'Unable to execute "svn help": skipping SVN')
