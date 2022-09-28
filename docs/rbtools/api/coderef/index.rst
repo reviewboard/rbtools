@@ -71,6 +71,19 @@ Client Implementations
    rbtools.clients.tfs
 
 
+Diff Generation/Processing
+--------------------------
+
+.. autosummary::
+   :toctree: python
+
+   rbtools.diffs
+   rbtools.diffs.tools
+   rbtools.diffs.tools.base
+   rbtools.diffs.tools.base.diff_file_result
+   rbtools.diffs.tools.base.diff_tool
+
+
 RBTools Commands
 ================
 
