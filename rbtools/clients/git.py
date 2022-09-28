@@ -24,6 +24,7 @@ from rbtools.utils.checks import check_install, is_valid_version
 from rbtools.utils.console import edit_text
 from rbtools.utils.diffs import (normalize_patterns,
                                  remove_filenames_matching_patterns)
+from rbtools.utils.encoding import force_unicode
 from rbtools.utils.errors import EditorError
 from rbtools.utils.process import execute
 
@@ -966,12 +967,15 @@ class GitClient(SCMClient):
             bytes:
             The reformatted diff contents.
         """
+        base_path = b''
         diff_data = b''
         filename = b''
         p4rev = b''
 
         # Find which depot changelist we're based on
-        log = self._execute([self.git, 'log', merge_base], ignore_errors=True)
+        log = self._execute([self.git, 'log', merge_base],
+                            ignore_errors=True,
+                            results_unicode=False)
 
         for line in log:
             m = re.search(br'[rd]epo.-paths = "(.+)": change = (\d+).*\]',
@@ -997,16 +1001,17 @@ class GitClient(SCMClient):
                 pass
             elif (line.startswith(b'--- ') and i + 1 < len(diff_lines) and
                   diff_lines[i + 1].startswith(b'+++ ')):
-                data = self._execute(
-                    ['p4', 'files', base_path + filename + '@' + p4rev],
-                    ignore_errors=True, results_unicode=False)
+                p4path = force_unicode(base_path + filename + b'@' + p4rev)
+                data = self._execute(['p4', 'files', p4path],
+                                     ignore_errors=True,
+                                     results_unicode=False)
                 m = re.search(br'^%s%s#(\d+).*$' % (re.escape(base_path),
                                                     re.escape(filename)),
                               data, re.M)
                 if m:
                     file_version = m.group(1).strip()
                 else:
-                    file_version = 1
+                    file_version = b'1'
 
                 diff_data += b'--- %s%s\t%s%s#%s\n' % (base_path, filename,
                                                        base_path, filename,
