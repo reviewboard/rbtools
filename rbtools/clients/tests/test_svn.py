@@ -1,7 +1,5 @@
 """Unit tests for SubversionClient."""
 
-from __future__ import unicode_literals
-
 import json
 import os
 import re
@@ -14,6 +12,7 @@ from six.moves.urllib.request import urlopen
 
 from rbtools.api.client import RBClient
 from rbtools.api.tests.base import MockResponse
+from rbtools.clients.base.scmclient import SCMClientDiffResult
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     TooManyRevisionsError)
@@ -348,6 +347,14 @@ class SVNClientTests(SCMClientTestCase):
 
     default_scmclient_options = {
         'svn_show_copies_as_adds': None,
+    }
+
+    default_scmclient_caps = {
+        'scmtools': {
+            'svn': {
+                'empty_files': True,
+            },
+        },
     }
 
     @classmethod
@@ -1017,6 +1024,33 @@ class SVNClientTests(SCMClientTestCase):
                 ) % self.new_file_diff_orig_version,
             })
 
+    def test_diff_with_empty_files(self):
+        """Testing SVNClient.diff with empty files"""
+        client = self.build_client(needs_diff=True)
+
+        self._run_svn(['rm', 'empty-file'])
+        self._svn_add_file(filename='new-empty-file',
+                           data=b'')
+
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'diff': (
+                    b'Index: /empty-file\t(deleted)\n'
+                    b'======================================================='
+                    b'============\n'
+                    b'--- /empty-file\t(revision 6)\n'
+                    b'+++ /empty-file\t(working copy)\n'
+                    b'Index: /new-empty-file\t(added)\n'
+                    b'======================================================='
+                    b'============\n'
+                    b'--- /new-empty-file\t(revision 0)\n'
+                    b'+++ /new-empty-file\t(revision 0)\n'
+                ),
+            })
+
     def test_show_copies_as_adds_enabled(self):
         """Testing SVNClient with --show-copies-as-adds functionality
         enabled
@@ -1052,9 +1086,11 @@ class SVNClientTests(SCMClientTestCase):
         if self.svn_version >= (1, 9):
             # Subversion >= 1.9
             diff = (
-                b'Index: /dir1/foo.txt\n'
+                b'Index: /dir1/foo.txt\t(added)\n'
                 b'==========================================='
                 b'========================\n'
+                b'--- /dir1/foo.txt\t(revision 0)\n'
+                b'+++ /dir1/foo.txt\t(revision 0)\n'
             )
         else:
             # Subversion < 1.9
@@ -1066,7 +1102,34 @@ class SVNClientTests(SCMClientTestCase):
                 'diff': diff,
             })
 
-    def check_show_copies_as_adds(self, state, expected_diff_result):
+    def test_show_copies_as_adds_disabled_and_no_empty_files_cap(self):
+        """Testing SVNClient with --show-copies-as-adds functionality
+        disabled and no empty files capability
+        """
+        if self.svn_version >= (1, 9):
+            # Subversion >= 1.9
+            diff = (
+                b'Index: /dir1/foo.txt\n'
+                b'==========================================='
+                b'========================\n'
+            )
+        else:
+            # Subversion < 1.9
+            diff = b''
+
+        self.check_show_copies_as_adds(
+            state='n',
+            empty_files_cap=False,
+            expected_diff_result={
+                'diff': diff,
+            })
+
+    def check_show_copies_as_adds(
+        self,
+        state: str,
+        expected_diff_result: SCMClientDiffResult,
+        empty_files_cap: bool = True,
+    ) -> None:
         """Helper function to evaluate --show-copies-as-adds.
 
         Args:
@@ -1076,12 +1139,23 @@ class SVNClientTests(SCMClientTestCase):
             expected_diff_result (dict):
                 The expected result of the diff call.
 
+            empty_files_cap (bool, optional):
+                The value to use for the Subversion ``empty_files``
+                capability.
+
         Raises:
             AssertionError:
                 One of the checks failed.
         """
         client = self.build_client(
             needs_diff=True,
+            caps={
+                'scmtools': {
+                    'svn': {
+                        'empty_files': empty_files_cap,
+                    },
+                },
+            },
             options={
                 'svn_show_copies_as_adds': state,
             })
@@ -1312,7 +1386,7 @@ class SVNClientTests(SCMClientTestCase):
                     b'Index: /bug-4546.txt\n'
                     b'==========================================='
                     b'========================\n'
-                    b'--- /bug-4546.txt\t(revision 5)\n'
+                    b'--- /bug-4546.txt\t(revision 6)\n'
                     b'+++ /bug-4546.txt\t(working copy)\n'
                     b'@@ -1,4 +1,3 @@\n'
                     b' -- test line1\n'
@@ -1511,6 +1585,135 @@ class SVNClientTests(SCMClientTestCase):
             result.patch_output,
             b'U         \xc3\xa2.txt\n'
             b'U         foo.txt\n')
+
+    def test_apply_patch_with_empty_files(self):
+        """Testing SVNClient.apply_patch with empty files"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(
+            run_process_exec,
+            op=kgb.SpyOpMatchInOrder([
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'patch', '--strip=1',
+                        'test.diff',
+                    ],),
+                    'kwargs': {
+                        'redirect_stderr': True,
+                    },
+                },
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'add', '--force',
+                        'new-empty-file-1', 'new-empty-file-2',
+                    ],),
+                },
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'delete', '--force',
+                        'empty-file',
+                    ],),
+                },
+            ]))
+
+        with open('test.diff', 'wb') as fp:
+            fp.write(
+                b'Index: empty-file\t(deleted)\n'
+                b'================================================'
+                b'===================\n'
+                b'Index: new-empty-file-1\t(added)\n'
+                b'================================================'
+                b'===================\n'
+                b'Index: new-empty-file-2\t(added)\n'
+                b'================================================'
+                b'===================\n'
+            )
+
+        result = client.apply_patch(base_path=repository_info.base_path,
+                                    base_dir='',
+                                    patch_file='test.diff')
+
+        self.assertSpyCalled(run_process_exec)
+        self.assertFalse(os.path.exists('empty-file'))
+        self.assertTrue(os.path.exists('new-empty-file-1'))
+        self.assertTrue(os.path.exists('new-empty-file-2'))
+
+        with open('new-empty-file-1', 'rb') as fp:
+            self.assertEqual(fp.read(), b'')
+
+        with open('new-empty-file-2', 'rb') as fp:
+            self.assertEqual(fp.read(), b'')
+
+        self.assertTrue(result.applied)
+        self.assertFalse(result.has_conflicts)
+        self.assertEqual(result.conflicting_files, [])
+        self.assertEqual(result.patch_output, b'')
+
+    def test_apply_patch_with_empty_files_revert(self):
+        """Testing SVNClient.apply_patch with empty files and revert=True"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(
+            run_process_exec,
+            op=kgb.SpyOpMatchInOrder([
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'patch', '--strip=1',
+                        '--reverse-diff', 'test.diff',
+                    ],),
+                    'kwargs': {
+                        'redirect_stderr': True,
+                    },
+                },
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'add', '--force',
+                        'empty-file',
+                    ],),
+                },
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'delete', '--force',
+                        'new-empty-file-1', 'new-empty-file-2',
+                    ],),
+                },
+            ]))
+
+        with open('new-empty-file-1', 'wb'):
+            pass
+
+        with open('new-empty-file-2', 'wb'):
+            pass
+
+        with open('test.diff', 'wb') as fp:
+            fp.write(
+                b'Index: empty-file\t(deleted)\n'
+                b'================================================'
+                b'===================\n'
+                b'Index: new-empty-file-1\t(added)\n'
+                b'================================================'
+                b'===================\n'
+                b'Index: new-empty-file-2\t(added)\n'
+                b'================================================'
+                b'===================\n'
+            )
+
+        result = client.apply_patch(base_path=repository_info.base_path,
+                                    base_dir='',
+                                    patch_file='test.diff',
+                                    revert=True)
+
+        self.assertSpyCalled(run_process_exec)
+        self.assertTrue(os.path.exists('empty-file'))
+        self.assertFalse(os.path.exists('new-empty-file-1'))
+        self.assertFalse(os.path.exists('new-empty-file-2'))
+
+        self.assertTrue(result.applied)
+        self.assertFalse(result.has_conflicts)
+        self.assertEqual(result.conflicting_files, [])
+        self.assertEqual(result.patch_output, b'')
 
     def test_apply_patch_with_not_applied(self):
         """Testing SVNClient.apply_patch with not applied"""
