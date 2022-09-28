@@ -4,8 +4,7 @@ import shutil
 import sys
 import tempfile
 from contextlib import contextmanager
-from functools import lru_cache
-from typing import Generator, Iterable, List, Optional
+from typing import Dict, Generator, Iterable, List, Optional
 
 from rbtools.deprecation import (RemovedInRBTools50Warning,
                                  deprecate_non_keyword_only_args)
@@ -13,6 +12,7 @@ from rbtools.deprecation import (RemovedInRBTools50Warning,
 
 CONFIG_FILE = '.reviewboardrc'
 
+_iter_exes_in_path_cache: Dict[str, bool] = {}
 tempfiles: List[str] = []
 tempdirs = []
 builtin = {}
@@ -45,7 +45,6 @@ def is_exe_in_path(
     return any(iter_exes_in_path(name))
 
 
-@lru_cache
 def iter_exes_in_path(
     name: str,
 ) -> Iterable[str]:
@@ -69,10 +68,18 @@ def iter_exes_in_path(
     if sys.platform == 'win32' and not name.endswith('.exe'):
         name += '.exe'
 
+    cache = _iter_exes_in_path_cache
+
     for dirname in os.environ['PATH'].split(os.pathsep):
         path = os.path.join(dirname, name)
 
-        if os.path.exists(path):
+        try:
+            found = cache[path]
+        except KeyError:
+            found = os.path.exists(path)
+            cache[path] = found
+
+        if found:
             yield path
 
 

@@ -11,7 +11,8 @@ import kgb
 from rbtools.diffs.tools.base import DiffFileResult
 from rbtools.diffs.tools.backends.gnu import GNUDiffTool
 from rbtools.testing import TestCase
-from rbtools.utils.filesystem import iter_exes_in_path
+from rbtools.utils.filesystem import (_iter_exes_in_path_cache,
+                                      iter_exes_in_path)
 from rbtools.utils.process import RunProcessError, run_process_exec
 
 
@@ -21,7 +22,7 @@ class GNUDiffToolTests(kgb.SpyAgency, TestCase):
     def tearDown(self):
         super().tearDown()
 
-        iter_exes_in_path.cache_clear()
+        _iter_exes_in_path_cache.clear()
 
     def test_get_install_instructions_on_linux(self):
         """Testing GNUDiffTool.get_install_instructions on Linux"""
@@ -93,7 +94,7 @@ class GNUDiffToolTests(kgb.SpyAgency, TestCase):
             ]))
 
         self.spy_on(
-            iter_exes_in_path.__wrapped__,
+            iter_exes_in_path,
             op=kgb.SpyOpReturn([
                 '/path1/bin/diff',
                 '/path2/bin/diff',
@@ -132,7 +133,7 @@ class GNUDiffToolTests(kgb.SpyAgency, TestCase):
             ]))
 
         self.spy_on(
-            iter_exes_in_path.__wrapped__,
+            iter_exes_in_path,
             op=kgb.SpyOpReturn([
                 '/path1/bin/diff',
                 '/path2/bin/diff',
