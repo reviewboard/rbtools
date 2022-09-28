@@ -1,5 +1,7 @@
 """A client for Team Foundation Server."""
 
+from __future__ import annotations
+
 import argparse
 import logging
 import os
@@ -20,6 +22,7 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError)
 from rbtools.deprecation import (RemovedInRBTools50Warning,
                                  deprecate_non_keyword_only_args)
+from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.appdirs import user_data_dir
 from rbtools.utils.checks import check_install
 from rbtools.utils.diffs import filename_match_any_patterns
@@ -128,6 +131,7 @@ class BaseTFWrapper:
     def diff(
         self,
         *,
+        client: TFSClient,
         revisions: SCMClientRevisionSpec,
         include_files: List[str],
         exclude_patterns: List[str],
@@ -135,6 +139,9 @@ class BaseTFWrapper:
         """Return the generated diff.
 
         Args:
+            client (TFSClient):
+                The client performing the diff.
+
             revisions (dict):
                 A dictionary containing ``base`` and ``tip`` keys.
 
@@ -344,6 +351,7 @@ class TFExeWrapper(BaseTFWrapper):
     def diff(
         self,
         *,
+        client: TFSClient,
         revisions: SCMClientRevisionSpec,
         include_files: List[str],
         exclude_patterns: List[str],
@@ -351,6 +359,9 @@ class TFExeWrapper(BaseTFWrapper):
         """Return the generated diff.
 
         Args:
+            client (TFSClient):
+                The client performing the diff.
+
             revisions (dict):
                 A dictionary containing ``base`` and ``tip`` keys.
 
@@ -375,7 +386,8 @@ class TFExeWrapper(BaseTFWrapper):
 
         if tip == self.REVISION_WORKING_COPY:
             # TODO: support committed revisions
-            return self._diff_working_copy(base=base,
+            return self._diff_working_copy(client=client,
+                                           base=base,
                                            include_files=include_files,
                                            exclude_patterns=exclude_patterns)
 
@@ -385,6 +397,7 @@ class TFExeWrapper(BaseTFWrapper):
     def _diff_working_copy(
         self,
         *,
+        client: TFSClient,
         base: str,
         include_files: List[str],
         exclude_patterns: List[str],
@@ -392,6 +405,9 @@ class TFExeWrapper(BaseTFWrapper):
         """Return a diff of the working copy.
 
         Args:
+            client (TFSClient):
+                The client performing the diff.
+
             base (str):
                 The base revision to diff against.
 
@@ -410,6 +426,9 @@ class TFExeWrapper(BaseTFWrapper):
 
             ``parent_diff`` will always be ``None``.
         """
+        diff_tool = client.get_diff_tool()
+        assert diff_tool is not None
+
         status = (
             self._run_tf(['vc', 'status', '/format:xml'])
             .stdout_bytes
@@ -417,7 +436,7 @@ class TFExeWrapper(BaseTFWrapper):
         )
         root = ET.fromstring(status)
 
-        diff = []
+        diff_writer = UnifiedDiffWriter()
 
         for pending_change in root.findall(
                 './PendingSet/PendingChanges/PendingChange'):
@@ -485,52 +504,50 @@ class TFExeWrapper(BaseTFWrapper):
                     with open(local_filename, 'rb') as f:
                         new_data = f.read()
 
-            old_label = b'%s\t%s' % (old_filename, old_version)
-            new_label = b'%s\t%s' % (new_filename, new_version)
-
             if copied:
-                diff.append(b'Copied from: %s\n' % old_filename)
+                diff_writer.write_line(b'Copied from: %s' % old_filename)
 
             if binary:
+                diff_writer.write_file_headers(
+                    orig_path=old_filename,
+                    orig_extra=old_version,
+                    modified_path=new_filename,
+                    modified_extra=new_version)
+
                 if 'Add' in action:
                     old_filename = new_filename
 
-                diff.append(b'--- %s\n' % old_label)
-                diff.append(b'+++ %s\n' % new_label)
-                diff.append(b'Binary files %s and %s differ\n'
-                            % (old_filename, new_filename))
+                diff_writer.write_binary_files_differ(
+                    orig_path=old_filename,
+                    modified_path=new_filename)
             elif old_filename != new_filename and old_data == new_data:
                 # Renamed file with no changes.
-                diff.append(b'--- %s\n' % old_label)
-                diff.append(b'+++ %s\n' % new_label)
+                diff_writer.write_file_headers(
+                    orig_path=old_filename,
+                    orig_extra=old_version,
+                    modified_path=new_filename,
+                    modified_extra=new_version)
             else:
                 old_tmp = make_tempfile(content=old_data)
                 new_tmp = make_tempfile(content=new_data)
 
-                unified_diff = (
-                    run_process(
-                        [
-                            'diff',
-                            '-u',
-                            '--label', old_label.decode('utf-8'),
-                            '--label', new_label.decode('utf-8'),
-                            old_tmp,
-                            new_tmp,
-                        ],
-                        ignore_errors=(1,),
-                        log_debug_output_on_error=False
-                    )
-                    .stdout_bytes
-                    .read()
-                )
+                diff_result = diff_tool.run_diff_file(
+                    orig_path=old_tmp,
+                    modified_path=new_tmp)
 
-                diff.append(unified_diff)
+                if diff_result.has_text_differences:
+                    diff_writer.write_file_headers(
+                        orig_path=old_filename,
+                        orig_extra=old_version,
+                        modified_path=new_filename,
+                        modified_extra=new_version)
+                    diff_writer.write_diff_file_result_hunks(diff_result)
 
                 os.unlink(old_tmp)
                 os.unlink(new_tmp)
 
         return {
-            'diff': b''.join(diff),
+            'diff': diff_writer.getvalue(),
             'parent_diff': None,
             'base_commit_id': base,
         }
@@ -808,6 +825,7 @@ class TEEWrapper(BaseTFWrapper):
     def diff(
         self,
         *,
+        client: TFSClient,
         revisions: SCMClientRevisionSpec,
         include_files: List[str],
         exclude_patterns: List[str],
@@ -815,6 +833,9 @@ class TEEWrapper(BaseTFWrapper):
         """Return the generated diff.
 
         Args:
+            client (TFSClient):
+                The client performing the diff.
+
             revisions (dict):
                 A dictionary containing ``base`` and ``tip`` keys.
 
@@ -840,7 +861,8 @@ class TEEWrapper(BaseTFWrapper):
         assert isinstance(tip, str)
 
         if tip == self.REVISION_WORKING_COPY:
-            return self._diff_working_copy(base=base,
+            return self._diff_working_copy(client=client,
+                                           base=base,
                                            include_files=include_files,
                                            exclude_patterns=exclude_patterns)
 
@@ -851,6 +873,7 @@ class TEEWrapper(BaseTFWrapper):
     def _diff_working_copy(
         self,
         *,
+        client: TFSClient,
         base: str,
         include_files: List[str],
         exclude_patterns: List[str],
@@ -858,6 +881,9 @@ class TEEWrapper(BaseTFWrapper):
         """Return a diff of the working copy.
 
         Args:
+            client (TFSClient):
+                The client performing the diff.
+
             base (str):
                 The base revision to diff against.
 
@@ -876,6 +902,9 @@ class TEEWrapper(BaseTFWrapper):
 
             ``parent_diff`` will always be ``None``.
         """
+        diff_tool = client.get_diff_tool()
+        assert diff_tool is not None
+
         # We access stdout_bytes, even though the XML results we get should
         # always be UTF-8. They are well-formed with the encoding specified,
         # so we can let ElementTree determine how to decode it.
@@ -886,7 +915,7 @@ class TEEWrapper(BaseTFWrapper):
         )
         root = ET.fromstring(status)
 
-        diff = []
+        diff_writer = UnifiedDiffWriter()
 
         for pending_change in root.findall('./pending-changes/pending-change'):
             action = pending_change.attrib['change-type'].split(', ')
@@ -958,46 +987,44 @@ class TEEWrapper(BaseTFWrapper):
                     with open(local_filename, 'rb') as f:
                         new_data = f.read()
 
-            old_label = b'%s\t%s' % (old_filename, old_version)
-            new_label = b'%s\t%s' % (new_filename, new_version)
-
             if copied:
-                diff.append(b'Copied from: %s\n' % old_filename)
+                diff_writer.write_line(b'Copied from: %s' % old_filename)
 
             if file_type == 'binary':
+                diff_writer.write_file_headers(
+                    orig_path=old_filename,
+                    orig_extra=old_version,
+                    modified_path=new_filename,
+                    modified_extra=new_version)
+
                 if 'add' in action:
                     old_filename = new_filename
 
-                diff.append(b'--- %s\n' % old_label)
-                diff.append(b'+++ %s\n' % new_label)
-                diff.append(b'Binary files %s and %s differ\n'
-                            % (old_filename, new_filename))
+                diff_writer.write_binary_files_differ(
+                    orig_path=old_filename,
+                    modified_path=new_filename)
             elif old_filename != new_filename and old_data == new_data:
                 # Renamed file with no changes
-                diff.append(b'--- %s\n' % old_label)
-                diff.append(b'+++ %s\n' % new_label)
+                diff_writer.write_file_headers(
+                    orig_path=old_filename,
+                    orig_extra=old_version,
+                    modified_path=new_filename,
+                    modified_extra=new_version)
             else:
                 old_tmp = make_tempfile(content=old_data)
                 new_tmp = make_tempfile(content=new_data)
 
-                unified_diff = (
-                    run_process(
-                        [
-                            'diff',
-                            '-u',
-                            '--label', old_label.decode('utf-8'),
-                            '--label', new_label.decode('utf-8'),
-                            old_tmp,
-                            new_tmp,
-                        ],
-                        ignore_errors=(1,),
-                        log_debug_output_on_error=False
-                    )
-                    .stdout_bytes
-                    .read()
-                )
+                diff_result = diff_tool.run_diff_file(
+                    orig_path=old_tmp,
+                    modified_path=new_tmp)
 
-                diff.append(unified_diff)
+                if diff_result.has_text_differences:
+                    diff_writer.write_file_headers(
+                        orig_path=old_filename,
+                        orig_extra=old_version,
+                        modified_path=new_filename,
+                        modified_extra=new_version)
+                    diff_writer.write_diff_file_result_hunks(diff_result)
 
                 os.unlink(old_tmp)
                 os.unlink(new_tmp)
@@ -1008,7 +1035,7 @@ class TEEWrapper(BaseTFWrapper):
                             'in your review request.')
 
         return {
-            'diff': b''.join(diff),
+            'diff': diff_writer.getvalue(),
             'parent_diff': None,
             'base_commit_id': base,
         }
@@ -1188,6 +1215,7 @@ class TFHelperWrapper(BaseTFWrapper):
     def diff(
         self,
         *,
+        client: TFSClient,
         revisions: SCMClientRevisionSpec,
         include_files: List[str],
         exclude_patterns: List[str],
@@ -1195,6 +1223,9 @@ class TFHelperWrapper(BaseTFWrapper):
         """Return the generated diff.
 
         Args:
+            client (TFSClient):
+                The client performing the diff.
+
             revisions (dict):
                 A dictionary containing ``base`` and ``tip`` keys.
 
@@ -1478,6 +1509,7 @@ class TFSClient(BaseSCMClient):
             for the format of this dictionary.
         """
         return self.tf_wrapper.diff(
+            client=self,
             revisions=revisions,
             include_files=include_files,
             exclude_patterns=exclude_patterns)

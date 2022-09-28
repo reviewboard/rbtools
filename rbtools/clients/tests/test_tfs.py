@@ -26,6 +26,8 @@ from rbtools.utils.process import run_process_exec
 class TFExeWrapperTests(SCMClientTestCase):
     """Unit tests for TFExeWrapper."""
 
+    scmclient_cls = TFSClient
+
     def make_vc_status_rule(
         self,
         changes: List[Dict[str, str]],
@@ -104,19 +106,15 @@ class TFExeWrapperTests(SCMClientTestCase):
     def make_diff_rule(
         self,
         *,
-        orig_label: str,
-        modified_label: str,
+        client: TFSClient,
         orig_file: str,
         modified_file: str,
     ) -> Dict[str, Any]:
         """Return a rule for building a diff.
 
         Args:
-            orig_label (str):
-                The label to use for the original filename.
-
-            modified_label (str):
-                The label to use for the modified filename.
+            client (rbtools.clients.tfs.TFSClient):
+                The client generating the diff.
 
             orig_file (str):
                 The original file to diff against.
@@ -128,15 +126,15 @@ class TFExeWrapperTests(SCMClientTestCase):
             dict:
             The rule to use for kgb.
         """
+        diff_tool = client.get_diff_tool()
+        assert diff_tool is not None
+
         return {
-            'args': ([
-                'diff',
-                '-u',
-                '--label', orig_label,
-                '--label', modified_label,
-                orig_file,
-                modified_file,
-            ],),
+            'args': (
+                diff_tool.make_run_diff_file_cmdline(
+                    orig_path=orig_file,
+                    modified_path=modified_file),
+            ),
         }
 
     def test_check_dependencies_with_found(self):
@@ -376,6 +374,9 @@ class TFExeWrapperTests(SCMClientTestCase):
 
     def test_diff_with_add(self):
         """Testing TFExeWrapper.diff with chg=Add"""
+        client = self.build_client(needs_diff=True,
+                                   allow_dep_checks=False)
+
         tmpfiles = self.precreate_tempfiles(4)
 
         self._run_diff_test(
@@ -410,12 +411,10 @@ class TFExeWrapperTests(SCMClientTestCase):
                         'enc': '-1',
                     },
                 ]),
-                self.make_diff_rule(orig_label='/dev/null\t0',
-                                    modified_label='file1\t(pending)',
+                self.make_diff_rule(client=client,
                                     orig_file=tmpfiles[0],
                                     modified_file=tmpfiles[1]),
-                self.make_diff_rule(orig_label='/dev/null\t0',
-                                    modified_label='file2\t(pending)',
+                self.make_diff_rule(client=client,
                                     orig_file=tmpfiles[2],
                                     modified_file=tmpfiles[3]),
             ],
@@ -439,6 +438,9 @@ class TFExeWrapperTests(SCMClientTestCase):
 
     def test_diff_with_delete(self):
         """Testing TFExeWrapper.diff with chg=Delete"""
+        client = self.build_client(needs_diff=True,
+                                   allow_dep_checks=False)
+
         tmpfiles = self.precreate_tempfiles(4)
 
         self._run_diff_test(
@@ -485,16 +487,14 @@ class TFExeWrapperTests(SCMClientTestCase):
                     filename='file1',
                     revision='123',
                     content=b'old file 1.\n'),
-                self.make_diff_rule(orig_label='file1\t123',
-                                    modified_label='file1\t(deleted)',
+                self.make_diff_rule(client=client,
                                     orig_file=tmpfiles[0],
                                     modified_file=tmpfiles[1]),
                 self.make_vc_view_rule(
                     filename='file2',
                     revision='456',
                     content=b'old file 2.\n'),
-                self.make_diff_rule(orig_label='file2\t456',
-                                    modified_label='file2\t(deleted)',
+                self.make_diff_rule(client=client,
                                     orig_file=tmpfiles[2],
                                     modified_file=tmpfiles[3]),
             ],
@@ -518,6 +518,9 @@ class TFExeWrapperTests(SCMClientTestCase):
 
     def test_diff_with_edit(self):
         """Testing TFExeWrapper.diff with chg=Edit"""
+        client = self.build_client(needs_diff=True,
+                                   allow_dep_checks=False)
+
         tmpfiles = self.precreate_tempfiles(4)
 
         self._run_diff_test(
@@ -564,16 +567,14 @@ class TFExeWrapperTests(SCMClientTestCase):
                     filename='file1',
                     revision='123',
                     content=b'old file 1.\n'),
-                self.make_diff_rule(orig_label='file1\t123',
-                                    modified_label='file1\t(pending)',
+                self.make_diff_rule(client=client,
                                     orig_file=tmpfiles[0],
                                     modified_file=tmpfiles[1]),
                 self.make_vc_view_rule(
                     filename='file2',
                     revision='456',
                     content=b'old file 2.\n'),
-                self.make_diff_rule(orig_label='file2\t456',
-                                    modified_label='renamed-file\t(pending)',
+                self.make_diff_rule(client=client,
                                     orig_file=tmpfiles[2],
                                     modified_file=tmpfiles[3]),
             ],
@@ -599,6 +600,9 @@ class TFExeWrapperTests(SCMClientTestCase):
 
     def test_diff_with_edit_branch(self):
         """Testing TFExeWrapper.diff with chg='Edit Branch'"""
+        client = self.build_client(needs_diff=True,
+                                   allow_dep_checks=False)
+
         tmpfiles = self.precreate_tempfiles(4)
 
         self._run_diff_test(
@@ -636,16 +640,14 @@ class TFExeWrapperTests(SCMClientTestCase):
                     filename='file1',
                     revision='123',
                     content=b'old file.\n'),
-                self.make_diff_rule(orig_label='file1\t123',
-                                    modified_label='file2\t(pending)',
+                self.make_diff_rule(client=client,
                                     orig_file=tmpfiles[0],
                                     modified_file=tmpfiles[1]),
                 self.make_vc_view_rule(
                     filename='file2',
                     revision='456',
                     content=b'old file 2.\n'),
-                self.make_diff_rule(orig_label='file2\t456',
-                                    modified_label='renamed-file\t(pending)',
+                self.make_diff_rule(client=client,
                                     orig_file=tmpfiles[2],
                                     modified_file=tmpfiles[3]),
             ],
@@ -670,6 +672,7 @@ class TFExeWrapperTests(SCMClientTestCase):
 
     def test_diff_with_non_working_copy_tip(self):
         """Testing TFExeWrapper.diff with non-working copy tip"""
+        client = self.build_client(allow_dep_checks=False)
         wrapper = TFExeWrapper()
 
         message = (
@@ -679,6 +682,7 @@ class TFExeWrapperTests(SCMClientTestCase):
 
         with self.assertRaisesMessage(SCMError, message):
             wrapper.diff(
+                client=client,
                 revisions={
                     'base': '123',
                     'tip': '124',
@@ -710,6 +714,9 @@ class TFExeWrapperTests(SCMClientTestCase):
             AssertionError:
                 An expectation failed.
         """
+        client = self.build_client(needs_diff=True,
+                                   allow_dep_checks=False)
+
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder(rules))
 
         workdir = make_tempdir()
@@ -736,6 +743,7 @@ class TFExeWrapperTests(SCMClientTestCase):
 
         with chdir(workdir):
             diff_result = wrapper.diff(
+                client=client,
                 revisions={
                     'base': '123',
                     'tip': TFExeWrapper.REVISION_WORKING_COPY,
@@ -749,6 +757,8 @@ class TFExeWrapperTests(SCMClientTestCase):
 
 class TFHelperWrapperTests(SCMClientTestCase):
     """Unit tests for TFHelperWrapper."""
+
+    scmclient_cls = TFSClient
 
     def test_check_dependencies_with_found(self):
         """Testing TFHelperWrapper.check_dependencies with java and helper
@@ -999,6 +1009,9 @@ class TFHelperWrapperTests(SCMClientTestCase):
 
     def test_diff(self):
         """Testing TFHelperWrapper.diff"""
+        client = self.build_client(needs_diff=True,
+                                   allow_dep_checks=False)
+
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ([
@@ -1023,6 +1036,7 @@ class TFHelperWrapperTests(SCMClientTestCase):
         wrapper.helper_path = '/path/to/rb-tfs.jar'
 
         diff_result = wrapper.diff(
+            client=client,
             revisions={
                 'base': '123',
                 'tip': TEEWrapper.REVISION_WORKING_COPY,
@@ -1047,6 +1061,9 @@ class TFHelperWrapperTests(SCMClientTestCase):
 
     def test_diff_with_error_1(self):
         """Testing TFHelperWrapper.diff with exit code 1"""
+        client = self.build_client(needs_diff=True,
+                                   allow_dep_checks=False)
+
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ([
@@ -1068,6 +1085,7 @@ class TFHelperWrapperTests(SCMClientTestCase):
 
         with self.assertRaisesMessage(SCMError, 'Oh no.'):
             wrapper.diff(
+                client=client,
                 revisions={
                     'base': '123',
                     'tip': TEEWrapper.REVISION_WORKING_COPY,
@@ -1079,6 +1097,9 @@ class TFHelperWrapperTests(SCMClientTestCase):
 
     def test_diff_with_error_2(self):
         """Testing TFHelperWrapper.diff with exit code 2"""
+        client = self.build_client(needs_diff=True,
+                                   allow_dep_checks=False)
+
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ([
@@ -1104,6 +1125,7 @@ class TFHelperWrapperTests(SCMClientTestCase):
 
         with self.assertLogs(level='WARNING') as log_ctx:
             diff_result = wrapper.diff(
+                client=client,
                 revisions={
                     'base': '123',
                     'tip': TEEWrapper.REVISION_WORKING_COPY,
@@ -1137,6 +1159,8 @@ class TFHelperWrapperTests(SCMClientTestCase):
 
 class TEEWrapperTests(SCMClientTestCase):
     """Unit tests for TEEWrapper."""
+
+    scmclient_cls = TFSClient
 
     def make_status_rule(
         self,
@@ -1256,19 +1280,15 @@ class TEEWrapperTests(SCMClientTestCase):
     def make_diff_rule(
         self,
         *,
-        orig_label: str,
-        modified_label: str,
+        client: TFSClient,
         orig_file: str,
         modified_file: str,
     ) -> Dict[str, Any]:
         """Return a rule for building a diff.
 
         Args:
-            orig_label (str):
-                The label to use for the original filename.
-
-            modified_label (str):
-                The label to use for the modified filename.
+            client (rbtools.clients.tfs.TFSClient):
+                The client generating the diff.
 
             orig_file (str):
                 The original file to diff against.
@@ -1280,15 +1300,15 @@ class TEEWrapperTests(SCMClientTestCase):
             dict:
             The rule to use for kgb.
         """
+        diff_tool = client.get_diff_tool()
+        assert diff_tool is not None
+
         return {
-            'args': ([
-                'diff',
-                '-u',
-                '--label', orig_label,
-                '--label', modified_label,
-                orig_file,
-                modified_file,
-            ],),
+            'args': (
+                diff_tool.make_run_diff_file_cmdline(
+                    orig_path=orig_file,
+                    modified_path=modified_file),
+            ),
         }
 
 
@@ -1673,6 +1693,9 @@ class TEEWrapperTests(SCMClientTestCase):
 
     def test_diff_with_add(self):
         """Testing TEEWrapper.diff with change-type=add"""
+        client = self.build_client(needs_diff=True,
+                                   allow_dep_checks=False)
+
         tmpfiles = self.precreate_tempfiles(4)
 
         self._run_diff_test(
@@ -1707,12 +1730,10 @@ class TEEWrapperTests(SCMClientTestCase):
                         'version': '0',
                     },
                 ]),
-                self.make_diff_rule(orig_label='/dev/null\t0',
-                                    modified_label='file1\t(pending)',
+                self.make_diff_rule(client=client,
                                     orig_file=tmpfiles[0],
                                     modified_file=tmpfiles[1]),
-                self.make_diff_rule(orig_label='/dev/null\t0',
-                                    modified_label='file2\t(pending)',
+                self.make_diff_rule(client=client,
                                     orig_file=tmpfiles[2],
                                     modified_file=tmpfiles[3]),
             ],
@@ -1736,6 +1757,9 @@ class TEEWrapperTests(SCMClientTestCase):
 
     def test_diff_with_delete(self):
         """Testing TEEWrapper.diff with change-type=delete"""
+        client = self.build_client(needs_diff=True,
+                                   allow_dep_checks=False)
+
         tmpfiles = self.precreate_tempfiles(4)
 
         self._run_diff_test(
@@ -1778,16 +1802,14 @@ class TEEWrapperTests(SCMClientTestCase):
                     filename='file1',
                     revision='123',
                     content=b'old file 1.\n'),
-                self.make_diff_rule(orig_label='file1\t123',
-                                    modified_label='file1\t(deleted)',
+                self.make_diff_rule(client=client,
                                     orig_file=tmpfiles[0],
                                     modified_file=tmpfiles[1]),
                 self.make_vc_view_rule(
                     filename='file2',
                     revision='456',
                     content=b'old file 2.\n'),
-                self.make_diff_rule(orig_label='file2\t456',
-                                    modified_label='file2\t(deleted)',
+                self.make_diff_rule(client=client,
                                     orig_file=tmpfiles[2],
                                     modified_file=tmpfiles[3]),
             ],
@@ -1811,6 +1833,9 @@ class TEEWrapperTests(SCMClientTestCase):
 
     def test_diff_with_edit(self):
         """Testing TEEWrapper.diff with change-type=edit"""
+        client = self.build_client(needs_diff=True,
+                                   allow_dep_checks=False)
+
         tmpfiles = self.precreate_tempfiles(4)
 
         self._run_diff_test(
@@ -1853,16 +1878,14 @@ class TEEWrapperTests(SCMClientTestCase):
                     filename='file1',
                     revision='123',
                     content=b'old file 1.\n'),
-                self.make_diff_rule(orig_label='file1\t123',
-                                    modified_label='file1\t(pending)',
+                self.make_diff_rule(client=client,
                                     orig_file=tmpfiles[0],
                                     modified_file=tmpfiles[1]),
                 self.make_vc_view_rule(
                     filename='file2',
                     revision='456',
                     content=b'old file 2.\n'),
-                self.make_diff_rule(orig_label='file2\t456',
-                                    modified_label='renamed-file\t(pending)',
+                self.make_diff_rule(client=client,
                                     orig_file=tmpfiles[2],
                                     modified_file=tmpfiles[3]),
             ],
@@ -1888,6 +1911,9 @@ class TEEWrapperTests(SCMClientTestCase):
 
     def test_diff_with_edit_branch(self):
         """Testing TEEWrapper.diff with change-type='edit, branch'"""
+        client = self.build_client(needs_diff=True,
+                                   allow_dep_checks=False)
+
         tmpfiles = self.precreate_tempfiles(4)
 
         self._run_diff_test(
@@ -1925,8 +1951,7 @@ class TEEWrapperTests(SCMClientTestCase):
                     filename='file1',
                     revision='123',
                     content=b'old file.\n'),
-                self.make_diff_rule(orig_label='file1\t123',
-                                    modified_label='file2\t(pending)',
+                self.make_diff_rule(client=client,
                                     orig_file=tmpfiles[0],
                                     modified_file=tmpfiles[1]),
                 self.make_get_source_revision_rule(
@@ -1936,8 +1961,7 @@ class TEEWrapperTests(SCMClientTestCase):
                     filename='file2',
                     revision='456',
                     content=b'old file 2.\n'),
-                self.make_diff_rule(orig_label='file2\t456',
-                                    modified_label='renamed-file\t(pending)',
+                self.make_diff_rule(client=client,
                                     orig_file=tmpfiles[2],
                                     modified_file=tmpfiles[3]),
             ],
@@ -1962,6 +1986,8 @@ class TEEWrapperTests(SCMClientTestCase):
 
     def test_diff_with_non_working_copy_tip(self):
         """Testing TEEWrapper.diff with non-working copy tip"""
+        client = self.build_client(needs_diff=True,
+                                   allow_dep_checks=False)
         wrapper = TEEWrapper()
 
         message = (
@@ -1971,6 +1997,7 @@ class TEEWrapperTests(SCMClientTestCase):
 
         with self.assertRaisesMessage(SCMError, message):
             wrapper.diff(
+                client=client,
                 revisions={
                     'base': '123',
                     'tip': '124',
@@ -2002,6 +2029,9 @@ class TEEWrapperTests(SCMClientTestCase):
             AssertionError:
                 An expectation failed.
         """
+        client = self.build_client(needs_diff=True,
+                                   allow_dep_checks=False)
+
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder(rules))
 
         workdir = make_tempdir()
@@ -2029,6 +2059,7 @@ class TEEWrapperTests(SCMClientTestCase):
 
         with chdir(workdir):
             diff_result = wrapper.diff(
+                client=client,
                 revisions={
                     'base': '123',
                     'tip': TEEWrapper.REVISION_WORKING_COPY,
