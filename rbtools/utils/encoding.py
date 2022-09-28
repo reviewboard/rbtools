@@ -1,10 +1,10 @@
 """Utilities for managing string types and encoding."""
 
-from typing import AnyStr
+from typing import Union
 
 
 def force_bytes(
-    string: AnyStr,
+    string: Union[bytes, str],
     encoding: str = 'utf-8',
 ) -> bytes:
     """Force a given string to be a bytes type.
@@ -30,7 +30,7 @@ def force_bytes(
 
 
 def force_unicode(
-    string: AnyStr,
+    string: Union[bytes, str],
     encoding: str = 'utf-8',
 ) -> str:
     """Force a given string to be a Unicode string type.
