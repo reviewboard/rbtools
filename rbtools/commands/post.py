@@ -148,9 +148,10 @@ class Post(Command):
     author = 'The Review Board Project'
     description = 'Uploads diffs to create and update review requests.'
 
+    needs_diffs = True
     needs_api = True
-    needs_scm_client = True
     needs_repository = True
+    needs_scm_client = True
 
     #: Reserved built-in fields that can be set using the ``--field`` argument.
     reserved_fields = ('description', 'testing-done', 'summary')

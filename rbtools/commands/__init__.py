@@ -22,6 +22,7 @@ from rbtools.api.transport.sync import SyncTransport
 from rbtools.clients import scan_usable_client
 from rbtools.clients.errors import OptionsCheckError
 from rbtools.deprecation import RemovedInRBTools40Warning
+from rbtools.diffs.tools.errors import MissingDiffToolError
 from rbtools.utils.console import get_input, get_pass
 from rbtools.utils.filesystem import (cleanup_tempfiles, get_home_path,
                                       is_exe_in_path, load_config)
@@ -407,6 +408,21 @@ class Command(object):
     #: Type:
     #:     bool
     needs_api = False
+
+    #: Whether the command needs to generate diffs.
+    #:
+    #: If this is set, the initialization of the command will check for the
+    #: presence of a diff tool compatible with the chosen type of repository.
+    #:
+    #: This depends on :py:attr:`needs_repository` and
+    #: :py:attr:`needs_scm_client` both being set to ``True``.
+    #:
+    #: Version Added:
+    #:     4.0
+    #:
+    #: Type:
+    #:     bool
+    needs_diffs = False
 
     #: Whether the command needs the SCM client.
     #:
@@ -1172,7 +1188,13 @@ class Command(object):
         try:
             tool.check_options()
         except OptionsCheckError as e:
-            raise CommandError(six.text_type(e))
+            raise CommandError(str(e))
+
+        if self.needs_diffs:
+            try:
+                tool.get_diff_tool()
+            except MissingDiffToolError as e:
+                raise CommandError(str(e))
 
         return repository_info, tool
 

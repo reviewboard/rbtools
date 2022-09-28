@@ -19,6 +19,7 @@ class Diff(Command):
     # offline way, or we might just want to define a supported baseline version
     # of Review Board and get rid of some of the capability conditionals.
     needs_api = True
+    needs_diffs = True
     needs_repository = True
     needs_scm_client = True
 
