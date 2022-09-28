@@ -390,6 +390,7 @@ class BaseSOSTestCase(SCMClientTestCase):
 
     def make_rule_diff(
         self,
+        client: SOSClient,
         old_filename: str,
         new_filename: str,
     ) -> Dict[str, Any]:
@@ -399,6 +400,9 @@ class BaseSOSTestCase(SCMClientTestCase):
         must exist at the time the spy operation is called.
 
         Args:
+            client (rbtools.clients.sos.SOSClient):
+                The SOS client being used for the test.
+
             old_filename (unicode):
                 The old file to diff against, relative to the workarea.
 
@@ -409,11 +413,15 @@ class BaseSOSTestCase(SCMClientTestCase):
             dict:
             The match rule.
         """
+        diff_tool = client.get_diff_tool()
+        assert diff_tool is not None
+
+        cmdline = diff_tool.make_run_diff_file_cmdline(
+            orig_path=old_filename,
+            modified_path=os.path.join(self.workarea_dir, new_filename))
+
         return {
-            'args': ([
-                'diff', '-urNp', old_filename,
-                os.path.join(self.workarea_dir, new_filename),
-            ],),
+            'args': (cmdline,),
         }
 
     def make_rule_diff_tree(
@@ -780,6 +788,7 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_diff_with_changelist(self):
         """Testing SOSClient.diff with changelist"""
+        client = self.build_client(needs_diff=True)
         tmpfiles = self.precreate_tempfiles(4)
 
         self.write_workarea_file('README', b'new line\n')
@@ -848,16 +857,16 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_exportrev(sos_path='./README/#/1',
                                      out_filename=tmpfiles[1],
                                      content=b'old line\n'),
-            self.make_rule_diff(tmpfiles[1], 'README'),
-            self.make_rule_diff(tmpfiles[2], 'newfile'),
+            self.make_rule_diff(client, tmpfiles[1], 'README'),
+            self.make_rule_diff(client, tmpfiles[2], 'newfile'),
             self.make_rule_exportrev(sos_path='./src/main.c/#/3',
                                      out_filename=tmpfiles[3],
                                      content=b'old content\n'),
-            self.make_rule_diff(tmpfiles[3], os.path.join('src', 'main.c')),
+            self.make_rule_diff(client, tmpfiles[3],
+                                os.path.join('src', 'main.c')),
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -975,6 +984,7 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_diff_with_changelist_added_files(self):
         """Testing SOSClient.diff with changelist and added files"""
+        client = self.build_client(needs_diff=True)
         tmpfiles = self.precreate_tempfiles(3)
 
         self.write_workarea_file('newfile1', b'new file!\n')
@@ -1003,12 +1013,12 @@ class SOSClientTests(BaseSOSTestCase):
             self.rule_query_project,
             self.rule_query_server,
             self.rule_query_rso,
-            self.make_rule_diff(tmpfiles[1], 'newfile1'),
-            self.make_rule_diff(tmpfiles[2], os.path.join('src', 'newfile2')),
+            self.make_rule_diff(client, tmpfiles[1], 'newfile1'),
+            self.make_rule_diff(client, tmpfiles[2],
+                                os.path.join('src', 'newfile2')),
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -1092,6 +1102,7 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_diff_with_changelist_deleted_files(self):
         """Testing SOSClient.diff with changelist and deleted files"""
+        client = self.build_client(needs_diff=True)
         tmpfiles = self.precreate_tempfiles(3)
 
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
@@ -1148,15 +1159,15 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_exportrev(sos_path='./oldfile1/#/1',
                                      out_filename=tmpfiles[1],
                                      content=b'old line\n'),
-            self.make_rule_diff(tmpfiles[1], 'oldfile1'),
+            self.make_rule_diff(client, tmpfiles[1], 'oldfile1'),
             self.make_rule_exportrev(sos_path='./src/oldfile2/#/3',
                                      out_filename=tmpfiles[2],
                                      content=b'old line\n'),
-            self.make_rule_diff(tmpfiles[2], os.path.join('src', 'oldfile2')),
+            self.make_rule_diff(client, tmpfiles[2],
+                                os.path.join('src', 'oldfile2')),
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -1258,6 +1269,7 @@ class SOSClientTests(BaseSOSTestCase):
         """Testing SOSClient.diff with changelist and renamed files using
         `soscmd rename`
         """
+        client = self.build_client(needs_diff=True)
         tmpfiles = self.precreate_tempfiles(4)
 
         self.write_workarea_file('newfile1', b'new content 1\n')
@@ -1325,15 +1337,14 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_exportrev(sos_path='./newfile1/#/1',
                                      out_filename=tmpfiles[1],
                                      content=b'old content 1\n'),
-            self.make_rule_diff(tmpfiles[1], 'newfile1'),
+            self.make_rule_diff(client, tmpfiles[1], 'newfile1'),
             self.make_rule_exportrev(sos_path='./newfile2/#/3',
                                      out_filename=tmpfiles[2],
                                      content=b'unchanged content\n'),
-            self.make_rule_diff(tmpfiles[2], 'newfile2'),
+            self.make_rule_diff(client, tmpfiles[2], 'newfile2'),
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -1430,6 +1441,7 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_diff_with_changelist_and_binary_files(self):
         """Testing SOSClient.diff with changelist and binary files"""
+        client = self.build_client(needs_diff=True)
         tmpfiles = self.precreate_tempfiles(4)
 
         self.write_workarea_file('test.bin', b'\x00\x01\x02')
@@ -1479,18 +1491,17 @@ class SOSClientTests(BaseSOSTestCase):
             self.rule_query_project,
             self.rule_query_server,
             self.rule_query_rso,
-            self.make_rule_diff(tmpfiles[1], 'test.bin'),
+            self.make_rule_diff(client, tmpfiles[1], 'test.bin'),
             self.make_rule_exportrev(sos_path='./images/image.png/#/1',
                                      out_filename=tmpfiles[2],
                                      content=b'\x00\x01'),
-            self.make_rule_diff(tmpfiles[2],
+            self.make_rule_diff(client, tmpfiles[2],
                                 os.path.join('images', 'image.png')),
-            self.make_rule_diff(tmpfiles[3],
+            self.make_rule_diff(client, tmpfiles[3],
                                 os.path.join('trash', 'old.bin')),
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -1538,9 +1549,7 @@ class SOSClientTests(BaseSOSTestCase):
             b'    "op": "create",\n'
             b'    "path": "test.bin"\n'
             b'}\n'
-            b'#...diff: length=70, line_endings=unix, type=binary\n'
-            b'--- /dev/null\n'
-            b'+++ test.bin\n'
+            b'#...diff: length=43, line_endings=unix, type=binary\n'
             b'Binary files /dev/null and test.bin differ\n'
             b'#..file:\n'
             b'#...meta: format=json, length=170\n'
@@ -1556,9 +1565,7 @@ class SOSClientTests(BaseSOSTestCase):
             b'        }\n'
             b'    }\n'
             b'}\n'
-            b'#...diff: length=100, line_endings=unix, type=binary\n'
-            b'--- images/image.png\n'
-            b'+++ images/image.png\n'
+            b'#...diff: length=58, line_endings=unix, type=binary\n'
             b'Binary files images/image.png and images/image.png differ\n'
             b'#..file:\n'
             b'#...meta: format=json, length=52\n'
@@ -1578,6 +1585,7 @@ class SOSClientTests(BaseSOSTestCase):
         """Testing SOSClient.diff with changelist containing complex set
         of changes
         """
+        client = self.build_client(needs_diff=True)
         tmpfiles = self.precreate_tempfiles(6)
 
         self.write_workarea_file('README', b'new line\n')
@@ -1689,24 +1697,25 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_exportrev(sos_path='./README/#/1',
                                      out_filename=tmpfiles[1],
                                      content=b'old line\n'),
-            self.make_rule_diff(tmpfiles[1], 'README'),
+            self.make_rule_diff(client, tmpfiles[1], 'README'),
             self.make_rule_exportrev(sos_path='./new-name1/#/1',
                                      out_filename=tmpfiles[2],
                                      content=b'old content\n'),
-            self.make_rule_diff(tmpfiles[2], 'new-name1'),
-            self.make_rule_diff(tmpfiles[3], 'newfile'),
+            self.make_rule_diff(client, tmpfiles[2], 'new-name1'),
+            self.make_rule_diff(client, tmpfiles[3], 'newfile'),
             self.make_rule_exportrev(sos_path='./src/main.c/#/3',
                                      out_filename=tmpfiles[4],
                                      content=b'old content\n'),
-            self.make_rule_diff(tmpfiles[4], os.path.join('src', 'main.c')),
+            self.make_rule_diff(client, tmpfiles[4],
+                                os.path.join('src', 'main.c')),
             self.make_rule_exportrev(sos_path='./src/new-name2/#/3',
                                      out_filename=tmpfiles[5],
                                      content=b'unchanged content\n'),
-            self.make_rule_diff(tmpfiles[5], os.path.join('src', 'new-name2')),
+            self.make_rule_diff(client, tmpfiles[5],
+                                os.path.join('src', 'new-name2')),
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -1870,6 +1879,7 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_diff_with_changelist_and_include_files(self):
         """Testing SOSClient.diff with changelist and include_files"""
+        client = self.build_client(needs_diff=True)
         tmpfiles = self.precreate_tempfiles(4)
 
         self.write_workarea_file('README', b'new README content\n')
@@ -1960,16 +1970,16 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_exportrev(sos_path='./README/#/1',
                                      out_filename=tmpfiles[1],
                                      content=b'old README content\n'),
-            self.make_rule_diff(tmpfiles[1], 'README'),
+            self.make_rule_diff(client, tmpfiles[1], 'README'),
             self.make_rule_exportrev(sos_path='./README2/#/5',
                                      out_filename=tmpfiles[2],
                                      content=b'old README2 content\n'),
-            self.make_rule_diff(tmpfiles[2], 'README2'),
-            self.make_rule_diff(tmpfiles[3], os.path.join('src', 'newfile2')),
+            self.make_rule_diff(client, tmpfiles[2], 'README2'),
+            self.make_rule_diff(client, tmpfiles[3],
+                                os.path.join('src', 'newfile2')),
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client(needs_diff=True)
         result = client.diff(
             revisions={
                 'base': None,
@@ -2093,6 +2103,7 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_diff_with_changelist_and_exclude_patterns(self):
         """Testing SOSClient.diff with changelist and exclude_patterns"""
+        client = self.build_client(needs_diff=True)
         tmpfiles = self.precreate_tempfiles(5)
 
         self.write_workarea_file('README', b'new README content\n')
@@ -2183,16 +2194,16 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_exportrev(sos_path='./README/#/1',
                                      out_filename=tmpfiles[1],
                                      content=b'old README content\n'),
-            self.make_rule_diff(tmpfiles[1], 'README'),
+            self.make_rule_diff(client, tmpfiles[1], 'README'),
             self.make_rule_exportrev(sos_path='./README2/#/5',
                                      out_filename=tmpfiles[2],
                                      content=b'old README2 content\n'),
-            self.make_rule_diff(tmpfiles[2], 'README2'),
-            self.make_rule_diff(tmpfiles[3], os.path.join('src', 'newfile2')),
+            self.make_rule_diff(client, tmpfiles[2], 'README2'),
+            self.make_rule_diff(client, tmpfiles[3],
+                                os.path.join('src', 'newfile2')),
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client(needs_diff=True)
         result = client.diff(
             revisions={
                 'base': None,
@@ -2316,6 +2327,7 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_diff_with_selection(self):
         """Testing SOSClient.diff with selection"""
+        client = self.build_client(needs_diff=True)
         tmpfiles = self.precreate_tempfiles(3)
 
         self.write_workarea_file('README', b'new line\n')
@@ -2369,15 +2381,15 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_exportrev(sos_path='./README/#/1',
                                      out_filename=tmpfiles[1],
                                      content=b'old line\n'),
-            self.make_rule_diff(tmpfiles[1], 'README'),
+            self.make_rule_diff(client, tmpfiles[1], 'README'),
             self.make_rule_exportrev(sos_path='./doc/index.md/#/3',
                                      out_filename=tmpfiles[2],
                                      content=b'# old header line\n'),
-            self.make_rule_diff(tmpfiles[2], os.path.join('doc', 'index.md')),
+            self.make_rule_diff(client, tmpfiles[2],
+                                os.path.join('doc', 'index.md')),
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -2478,6 +2490,7 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_diff_with_selection_added_files(self):
         """Testing SOSClient.diff with selection and added files"""
+        client = self.build_client(needs_diff=True)
         tmpfiles = self.precreate_tempfiles(3)
 
         self.write_workarea_file('newfile1', b'new file!\n')
@@ -2504,12 +2517,12 @@ class SOSClientTests(BaseSOSTestCase):
             self.rule_query_project,
             self.rule_query_server,
             self.rule_query_rso,
-            self.make_rule_diff(tmpfiles[1], 'newfile1'),
-            self.make_rule_diff(tmpfiles[2], os.path.join('src', 'newfile2')),
+            self.make_rule_diff(client, tmpfiles[1], 'newfile1'),
+            self.make_rule_diff(client, tmpfiles[2],
+                                os.path.join('src', 'newfile2')),
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -2592,6 +2605,7 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_diff_with_selection_deleted_files(self):
         """Testing SOSClient.diff with selection and deleted files"""
+        client = self.build_client(needs_diff=True)
         tmpfiles = self.precreate_tempfiles(3)
 
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
@@ -2650,12 +2664,12 @@ class SOSClientTests(BaseSOSTestCase):
             self.rule_query_project,
             self.rule_query_server,
             self.rule_query_rso,
-            self.make_rule_diff(tmpfiles[1], 'oldfile1'),
-            self.make_rule_diff(tmpfiles[2], os.path.join('src', 'oldfile2')),
+            self.make_rule_diff(client, tmpfiles[1], 'oldfile1'),
+            self.make_rule_diff(client, tmpfiles[2],
+                                os.path.join('src', 'oldfile2')),
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -2754,6 +2768,7 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_diff_with_selection_renamed_files(self):
         """Testing SOSClient.diff with selection and renamed files"""
+        client = self.build_client(needs_diff=True)
         tmpfiles = self.precreate_tempfiles(3)
 
         self.write_workarea_file('newfile1', b'new content\n')
@@ -2816,15 +2831,15 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_exportrev(sos_path='./newfile1/#/1',
                                      out_filename=tmpfiles[1],
                                      content=b'old content\n'),
-            self.make_rule_diff(tmpfiles[1], 'newfile1'),
+            self.make_rule_diff(client, tmpfiles[1], 'newfile1'),
             self.make_rule_exportrev(sos_path='./src/newfile2/#/2',
                                      out_filename=tmpfiles[2],
                                      content=b'unchanged content\n'),
-            self.make_rule_diff(tmpfiles[2], os.path.join('src', 'newfile2')),
+            self.make_rule_diff(client, tmpfiles[2],
+                                os.path.join('src', 'newfile2')),
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -2920,6 +2935,7 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_diff_with_selection_renamed_dirs(self):
         """Testing SOSClient.diff with selection and renamed directories"""
+        client = self.build_client(needs_diff=True)
         tmpfiles = self.precreate_tempfiles(3)
 
         self.write_workarea_file(os.path.join('src2', 'testfile1'),
@@ -2977,17 +2993,16 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_exportrev(sos_path='./src2/testfile1/#/2',
                                      out_filename=tmpfiles[1],
                                      content=b'old content 1\n'),
-            self.make_rule_diff(tmpfiles[1],
+            self.make_rule_diff(client, tmpfiles[1],
                                 os.path.join('src2', 'testfile1')),
             self.make_rule_exportrev(sos_path='./src2/subdir/testfile2/#/1',
                                      out_filename=tmpfiles[2],
                                      content=b'content 2\n'),
-            self.make_rule_diff(tmpfiles[2],
+            self.make_rule_diff(client, tmpfiles[2],
                                 os.path.join('src2', 'subdir', 'testfile2')),
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -3083,6 +3098,7 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_diff_with_selection_and_binary_files(self):
         """Testing SOSClient.diff with selection and binary files"""
+        client = self.build_client(needs_diff=True)
         tmpfiles = self.precreate_tempfiles(3)
 
         self.write_workarea_file('test.bin', b'\x00\x01\x02')
@@ -3135,16 +3151,15 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_exportrev(sos_path='./test.bin/#/1',
                                      out_filename=tmpfiles[1],
                                      content=b'\x00\x01'),
-            self.make_rule_diff(tmpfiles[1], 'test.bin'),
+            self.make_rule_diff(client, tmpfiles[1], 'test.bin'),
             self.make_rule_exportrev(sos_path='./images/image.png/#/3',
                                      out_filename=tmpfiles[2],
                                      content=b'\x00\x03'),
-            self.make_rule_diff(tmpfiles[2], os.path.join('images',
-                                                          'image.png')),
+            self.make_rule_diff(client, tmpfiles[2],
+                                os.path.join('images', 'image.png')),
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -3200,9 +3215,7 @@ class SOSClientTests(BaseSOSTestCase):
             b'        }\n'
             b'    }\n'
             b'}\n'
-            b'#...diff: length=68, line_endings=unix, type=binary\n'
-            b'--- test.bin\n'
-            b'+++ test.bin\n'
+            b'#...diff: length=42, line_endings=unix, type=binary\n'
             b'Binary files test.bin and test.bin differ\n'
             b'#..file:\n'
             b'#...meta: format=json, length=171\n'
@@ -3218,9 +3231,7 @@ class SOSClientTests(BaseSOSTestCase):
             b'        }\n'
             b'    }\n'
             b'}\n'
-            b'#...diff: length=100, line_endings=unix, type=binary\n'
-            b'--- images/image.png\n'
-            b'+++ images/image.png\n'
+            b'#...diff: length=58, line_endings=unix, type=binary\n'
             b'Binary files images/image.png and images/image.png differ\n')
 
         self.assertEqual(result.get('review_request_extra_data'), {
@@ -3231,6 +3242,7 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_diff_with_selection_and_include_files(self):
         """Testing SOSClient.diff with selection and include_files"""
+        client = self.build_client(needs_diff=True)
         tmpfiles = self.precreate_tempfiles(4)
 
         self.write_workarea_file('README', b'new README content\n')
@@ -3317,16 +3329,16 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_exportrev(sos_path='./README/#/1',
                                      out_filename=tmpfiles[1],
                                      content=b'old README content\n'),
-            self.make_rule_diff(tmpfiles[1], 'README'),
+            self.make_rule_diff(client, tmpfiles[1], 'README'),
             self.make_rule_exportrev(sos_path='./README2/#/5',
                                      out_filename=tmpfiles[2],
                                      content=b'old README2 content\n'),
-            self.make_rule_diff(tmpfiles[2], 'README2'),
-            self.make_rule_diff(tmpfiles[3], os.path.join('src', 'newfile2')),
+            self.make_rule_diff(client, tmpfiles[2], 'README2'),
+            self.make_rule_diff(client, tmpfiles[3],
+                                os.path.join('src', 'newfile2')),
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client(needs_diff=True)
         result = client.diff(
             revisions={
                 'base': None,
@@ -3449,6 +3461,7 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_diff_with_selection_and_exclude_patterns(self):
         """Testing SOSClient.diff with selection and exclude_patterns"""
+        client = self.build_client(needs_diff=True)
         tmpfiles = self.precreate_tempfiles(5)
 
         self.write_workarea_file('README', b'new README content\n')
@@ -3527,16 +3540,16 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_exportrev(sos_path='./README/#/1',
                                      out_filename=tmpfiles[1],
                                      content=b'old README content\n'),
-            self.make_rule_diff(tmpfiles[1], 'README'),
+            self.make_rule_diff(client, tmpfiles[1], 'README'),
             self.make_rule_exportrev(sos_path='./README2/#/5',
                                      out_filename=tmpfiles[2],
                                      content=b'old README2 content\n'),
-            self.make_rule_diff(tmpfiles[2], 'README2'),
-            self.make_rule_diff(tmpfiles[3], os.path.join('src', 'newfile2')),
+            self.make_rule_diff(client, tmpfiles[2], 'README2'),
+            self.make_rule_diff(client, tmpfiles[3],
+                                os.path.join('src', 'newfile2')),
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client(needs_diff=True)
         result = client.diff(
             revisions={
                 'base': None,

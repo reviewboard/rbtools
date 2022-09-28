@@ -16,7 +16,7 @@ import re
 import sqlite3
 from collections import OrderedDict
 from contextlib import contextmanager
-from typing import List, Optional, cast
+from typing import List, Optional, Union, cast
 
 import six
 from pydiffx import DiffType, DiffX
@@ -35,6 +35,8 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError)
 from rbtools.deprecation import (RemovedInRBTools50Warning,
                                  deprecate_non_keyword_only_args)
+from rbtools.diffs.tools.base import DiffFileResult
+from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install
 from rbtools.utils.diffs import filename_match_any_patterns
 from rbtools.utils.filesystem import make_tempfile
@@ -508,6 +510,8 @@ class SOSClient(BaseSCMClient):
         wa_root = self._get_wa_root()
         changelist = None
 
+        assert wa_root
+
         # We'll be overriding the selection every time we export, so make sure
         # that we stash the old selection and restore it after.
         #
@@ -556,6 +560,8 @@ class SOSClient(BaseSCMClient):
             project = self._query_sos_info('project')
             server = self._query_sos_info('server')
             rso = self._query_sos_info('rso')
+
+            assert rso
 
             diffx = DiffX(meta={
                 'scm': 'sos',
@@ -656,51 +662,42 @@ class SOSClient(BaseSCMClient):
                     else:
                         diff_new_filename = new_filename
 
-                    if (change_status == SOSObjectChangeStatus.UNCHANGED and
-                        op != 'move'):
-                        # No file content has changed.
-                        chunks = None
-                        chunks_info = {}
-                    else:
+                    if (change_status != SOSObjectChangeStatus.UNCHANGED or
+                        op == 'move'):
                         # Generate a diff of the file contents.
-                        chunks, chunks_info = self._diff_file_hunks(
+                        diff_result = self._diff_file_hunks(
                             wa_root=wa_root,
                             filename=sos_new_filename or sos_old_filename,
                             orig_revision=revision,
                             orig_content=selected_file.get('orig_content'))
 
-                    if chunks_info and chunks_info.get('is_binary'):
-                        # Mark this as a binary file. We don't currently
-                        # provide any binary file contents.
-                        diffx_file.diff_type = DiffType.BINARY
-                        chunks = (
-                            'Binary files %s and %s differ\n'
-                            % (diff_old_filename, diff_new_filename)
-                        ).encode('utf-8')
+                        diff_writer = UnifiedDiffWriter()
 
-                    if chunks:
-                        # If we thought this was a moved file, it's time to
-                        # change it to indicate there are modifications.
-                        if op == 'move':
-                            op = 'move-modify'
+                        if diff_result.is_binary:
+                            # Mark this as a binary file. We don't currently
+                            # provide any binary file contents.
+                            diffx_file.diff_type = DiffType.BINARY
+                            diff_writer.write_binary_files_differ(
+                                orig_path=diff_old_filename,
+                                modified_path=diff_new_filename)
+                        elif diff_result.has_text_differences:
+                            # If we thought this was a moved file, it's time to
+                            # change it to indicate there are modifications.
+                            if op == 'move':
+                                op = 'move-modify'
 
-                        # Populate the diff content.
-                        file_diff = io.BytesIO()
-                        line_endings, newline = guess_line_endings(chunks)
+                            # Populate the diff content.
+                            hunks = diff_result.hunks
+                            line_endings, newline = guess_line_endings(hunks)
+                            diffx_file.diff_line_endings = line_endings
 
-                        file_diff.write(b'--- %s%s'
-                                        % (diff_old_filename.encode('utf-8'),
-                                           newline))
-                        file_diff.write(b'+++ %s%s'
-                                        % (diff_new_filename.encode('utf-8'),
-                                           newline))
+                            diff_writer.write_file_headers(
+                                orig_path=diff_old_filename,
+                                modified_path=diff_new_filename)
+                            diff_writer.write_diff_file_result_hunks(
+                                diff_result)
 
-                        file_diff.write(chunks)
-                        file_diffdata = file_diff.getvalue()
-                        file_diff.close()
-
-                        diffx_file.diff = file_diffdata
-                        diffx_file.diff_line_endings = line_endings
+                        diffx_file.diff = diff_writer.getvalue()
                 elif obj_type == SOSObjectType.SYMLINK:
                     # This is a symlink.
                     #
@@ -1670,19 +1667,23 @@ class SOSClient(BaseSCMClient):
                 # Ignore this.
                 pass
 
-    def _diff_file_hunks(self, wa_root, filename, orig_revision,
-                         orig_content=None):
+    def _diff_file_hunks(
+        self,
+        wa_root: str,
+        filename: str,
+        orig_revision: Union[int, str],
+        orig_content: Optional[bytes] = None,
+    ) -> DiffFileResult:
         """Return diff hunks for a given file.
 
         This will diff a file against a prior revision (or explicit content),
-        strip out any leading filename lines (``---`` or ``+++``), and check
-        for binary file indicators.
+        returning a diff result.
 
         Args:
-            wa_root (unicode):
+            wa_root (str):
                 The root of the workarea.
 
-            filename (unicode):
+            filename (str):
                 The path to the modified version of the file.
 
             revision (int or bytes):
@@ -1692,16 +1693,12 @@ class SOSClient(BaseSCMClient):
                 The original file contents.
 
         Returns:
-            tuple:
-            A 2-tuple of:
-
-            1. A byte string of the diff hunks.
-            2. Dictionary info about the file. This contains an
-               ``is_binary`` key mapping to a boolean.
-
-            Both will be ``None`` if this returns something that doesn't
-            look like a diff.
+            rbtools.diffs.tools.base.diff_file_result.DiffFileResult:
+            The result of the diff operation.
         """
+        diff_tool = self.get_diff_tool()
+        assert diff_tool is not None
+
         # Get the contents of the original file.
         tmp_orig_filename = make_tempfile()
         abs_filename = os.path.normpath(os.path.join(wa_root, filename))
@@ -1717,49 +1714,21 @@ class SOSClient(BaseSCMClient):
                 # For unmanaged (generally new) files, we want to diff against
                 # an empty temp file. We'll export if it's anything but new.
                 if orig_revision != SOSObjectRevision.UNMANAGED:
+                    assert isinstance(orig_revision, int)
+
                     os.unlink(tmp_orig_filename)
                     self.run_soscmd('exportrev',
                                     '%s/#/%d' % (filename, orig_revision),
                                     '-out%s' % tmp_orig_filename)
 
             # Diff the new file against that.
-            #
-            # Diff returns "1" if differences were found.
-            dl = execute(['diff', '-urNp', tmp_orig_filename, abs_filename],
-                         extra_ignore_errors=(1, 2),
-                         log_output_on_error=False,
-                         results_unicode=False,
-                         split_lines=True)
+            diff_result = diff_tool.run_diff_file(orig_path=tmp_orig_filename,
+                                                  modified_path=abs_filename)
         finally:
             if os.path.exists(tmp_orig_filename):
                 os.unlink(tmp_orig_filename)
 
-        # Check if this shows up as a binary file.
-        is_binary = False
-
-        if (len(dl) == 1 and
-            dl[0].startswith(b'Binary files %s and %s differ'
-                             % (tmp_orig_filename.encode('utf-8'),
-                                abs_filename.encode('utf-8')))):
-            # This is a binary file.
-            dl = []
-            is_binary = True
-        elif len(dl) > 0:
-            # This is a text file. We should have "---" and "+++" lines.
-            if (not dl[0].startswith(b'---') or
-                not dl[1].startswith(b'+++')):
-                # This isn't what we expected. Skip the file.
-                logger.warning('Received an invalid diff for %s/#/%s',
-                               filename, orig_revision)
-                logger.debug('Invalid diff = %r', dl)
-
-                return None, None
-
-            dl = dl[2:]
-
-        return b''.join(dl), {
-            'is_binary': is_binary,
-        }
+        return diff_result
 
     def _normalize_sos_path(self, sos_path):
         """Normalize an SOS path to a local path.
