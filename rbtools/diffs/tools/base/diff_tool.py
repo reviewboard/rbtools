@@ -190,5 +190,10 @@ class BaseDiffTool:
         Returns:
             rbtools.diffs.tools.base.diff_file_result.DiffFileResult:
             The result of the diff operation.
+
+        Raises:
+            rbtools.utils.process.RunProcessError:
+                There was an error invoking the diff tool. Details are in the
+                exception.
         """
         raise NotImplementedError

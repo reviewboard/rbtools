@@ -84,6 +84,8 @@ Diff Generation/Processing
    rbtools.diffs.tools.base
    rbtools.diffs.tools.base.diff_file_result
    rbtools.diffs.tools.base.diff_tool
+   rbtools.diffs.tools.errors
+   rbtools.diffs.tools.registry
 
 
 RBTools Commands
