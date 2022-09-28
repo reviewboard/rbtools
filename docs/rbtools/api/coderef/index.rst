@@ -79,6 +79,8 @@ Diff Generation/Processing
 
    rbtools.diffs
    rbtools.diffs.tools
+   rbtools.diffs.tools.backends
+   rbtools.diffs.tools.backends.gnu
    rbtools.diffs.tools.base
    rbtools.diffs.tools.base.diff_file_result
    rbtools.diffs.tools.base.diff_tool
