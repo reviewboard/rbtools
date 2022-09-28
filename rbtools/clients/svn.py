@@ -32,13 +32,15 @@ from rbtools.deprecation import (RemovedInRBTools40Warning,
                                  RemovedInRBTools50Warning,
                                  deprecate_non_keyword_only_args)
 from rbtools.diffs.writers import UnifiedDiffWriter
-from rbtools.utils.checks import check_install, is_valid_version
+from rbtools.utils.checks import check_install
 from rbtools.utils.console import get_pass
 from rbtools.utils.diffs import (filename_match_any_patterns, filter_diff,
                                  normalize_patterns)
 from rbtools.utils.filesystem import (make_empty_files, make_tempfile,
                                       walk_parents)
-from rbtools.utils.process import execute
+from rbtools.utils.process import (RunProcessError,
+                                   RunProcessResult,
+                                   run_process)
 from rbtools.utils.repository import get_repository_resource
 
 
@@ -186,8 +188,14 @@ class SVNClient(BaseSCMClient):
         local_path = info.get('Working Copy Root Path')
 
         # Grab version of SVN client and store as a tuple in the form:
+        #
         #   (major_version, minor_version, micro_version)
-        ver_string = self._run_svn(['--version', '-q'], ignore_errors=True)
+        ver_string = (
+            self._run_svn(['--version', '-q'], ignore_errors=True)
+            .stdout
+            .read()
+        )
+
         m = self.VERSION_NUMBER_RE.match(ver_string)
 
         if m:
@@ -314,10 +322,16 @@ class SVNClient(BaseSCMClient):
                 # It's not a revision--let's try a changelist. This only makes
                 # sense if we have a working copy.
                 if not self.options or not self.options.repository_url:
-                    status = self._run_svn(
-                        ['status', '--cl', revision_str,
-                         '--ignore-externals', '--xml'],
-                        results_unicode=False)
+                    status = (
+                        self._run_svn(
+                            [
+                                'status', '--cl', revision_str,
+                                '--ignore-externals', '--xml',
+                            ],
+                            redirect_stderr=True)
+                        .stdout_bytes
+                        .read()
+                    )
                     cl = ElementTree.fromstring(status).find('changelist')
 
                     if cl is not None:
@@ -411,9 +425,14 @@ class SVNClient(BaseSCMClient):
             The Review Board server URL, if available.
         """
         def get_url_prop(path):
-            url = self._run_svn(['propget', 'reviewboard:url', path],
-                                with_errors=False,
-                                extra_ignore_errors=(1,)).strip()
+            url = (
+                self._run_svn(['propget', 'reviewboard:url', path],
+                              ignore_errors=(1,))
+                .stdout
+                .read()
+                .strip()
+            )
+
             return url or None
 
         for path in walk_parents(os.getcwd()):
@@ -520,9 +539,10 @@ class SVNClient(BaseSCMClient):
         # current working directory. We use / for the base_dir because we do
         # not normalize the paths to be filesystem paths, but instead use SVN
         # paths.
-        exclude_patterns = normalize_patterns(exclude_patterns,
-                                              '/',
-                                              repository_info.base_path)
+        exclude_patterns = normalize_patterns(
+            patterns=exclude_patterns,
+            base_dir='/',
+            cwd=repository_info.base_path)
 
         # Keep track of information needed for handling empty files later.
         empty_files_revisions: SCMClientRevisionSpec = {
@@ -595,17 +615,21 @@ class SVNClient(BaseSCMClient):
         # --svn-show-copies-as-adds must be specified. Note: this only
         # pertains to local modifications in a working copy and not diffs
         # between specific numeric revisions.
-        if (((tip == self.REVISION_WORKING_COPY) or changelist) and
-            is_valid_version(self.subversion_client_version,
-                             self.SHOW_COPIES_AS_ADDS_MIN_VERSION)):
+        if ((tip == self.REVISION_WORKING_COPY or changelist) and
+            (self.subversion_client_version >=
+             self.SHOW_COPIES_AS_ADDS_MIN_VERSION)):
             svn_show_copies_as_adds = getattr(
                 self.options, 'svn_show_copies_as_adds', None)
 
             if svn_show_copies_as_adds is None:
-                if self.history_scheduled_with_commit(repository_info,
-                                                      changelist,
-                                                      include_files,
-                                                      exclude_patterns):
+                history_scheduled_with_commit = \
+                    self.history_scheduled_with_commit(
+                        repository_info=repository_info,
+                        changelist=changelist,
+                        include_files=include_files,
+                        exclude_patterns=exclude_patterns)
+
+                if history_scheduled_with_commit:
                     sys.stderr.write(
                         'One or more files in your changeset has history '
                         'scheduled with commit. Please try again with '
@@ -615,10 +639,11 @@ class SVNClient(BaseSCMClient):
                 if svn_show_copies_as_adds in 'Yy':
                     diff_cmd.append('--show-copies-as-adds')
 
-        diff_lines = self._run_svn(diff_cmd,
-                                   split_lines=True,
-                                   results_unicode=False,
-                                   log_output_on_error=False)
+        diff_lines = (
+            self._run_svn(diff_cmd, log_debug_output_on_error=False)
+            .stdout_bytes
+            .readlines()
+        )
         diff_lines = self.handle_renames(diff_lines)
 
         if self.supports_empty_files():
@@ -678,23 +703,20 @@ class SVNClient(BaseSCMClient):
         if include_files:
             status_cmd += include_files
 
-        for p in self._run_svn(status_cmd, split_lines=True,
-                               results_unicode=False):
+        for p in self._run_svn(status_cmd).stdout_bytes:
             try:
                 if p[3:4] == b'+':
-                    if exclude_patterns:
-                        # We found a file with history, but first we must make
-                        # sure that it is not being excluded.
-                        filename = p[8:].rstrip().decode(_fs_encoding)
+                    # We found a file with history, but first we must make
+                    # sure that it is not being excluded.
+                    should_exclude = (
+                        bool(exclude_patterns) and
+                        filename_match_any_patterns(
+                            filename=p[8:].rstrip().decode(_fs_encoding),
+                            patterns=exclude_patterns,
+                            base_dir=base_path)
+                    )
 
-                        should_exclude = filename_match_any_patterns(
-                            filename,
-                            exclude_patterns,
-                            self.get_repository_info().base_path)
-
-                        if not should_exclude:
-                            return True
-                    else:
+                    if not should_exclude:
                         return True
             except IndexError:
                 # This may be some other output, or just doesn't have the
@@ -871,11 +893,14 @@ class SVNClient(BaseSCMClient):
         """
         # Get a list of all deleted files in this diff so we can differentiate
         # between added empty files and deleted empty files.
-        diff_cmd.append('--no-diff-deleted')
-        diff_with_deleted = self._run_svn(diff_cmd,
-                                          ignore_errors=True,
-                                          none_on_ignored_error=True,
-                                          results_unicode=False)
+        try:
+            diff_with_deleted = (
+                self._run_svn(diff_cmd + ['--no-diff-deleted'])
+                .stdout_bytes
+                .read()
+            )
+        except RunProcessError:
+            diff_with_deleted = None
 
         if not diff_with_deleted:
             return diff_content
@@ -1042,16 +1067,13 @@ class SVNClient(BaseSCMClient):
             if path is not None:
                 cmdline.append(path)
 
-            result = self._run_svn(cmdline,
-                                   split_lines=True,
-                                   ignore_errors=ignore_errors,
-                                   none_on_ignored_error=True)
-            if result is None:
-                self._svn_info_cache[path] = None
-            else:
-                svninfo = {}
+            process_result = self._run_svn(cmdline,
+                                           ignore_errors=ignore_errors)
 
-                for info in result:
+            if process_result.exit_code == 0:
+                svninfo: Dict[str, str] = {}
+
+                for info in process_result.stdout:
                     parts = info.strip().split(': ', 1)
 
                     if len(parts) == 2:
@@ -1059,6 +1081,9 @@ class SVNClient(BaseSCMClient):
                         svninfo[key] = value
 
                 self._svn_info_cache[path] = svninfo
+
+            else:
+                self._svn_info_cache[path] = None
 
         return self._svn_info_cache[path]
 
@@ -1225,8 +1250,7 @@ class SVNClient(BaseSCMClient):
             rbtools.clients.base.patch.PatchResult:
             The result of the patch operation.
         """
-        if not is_valid_version(self.subversion_client_version,
-                                self.PATCH_MIN_VERSION):
+        if self.subversion_client_version < self.PATCH_MIN_VERSION:
             raise MinimumVersionError(
                 'Using "rbt patch" with the SVN backend requires at least '
                 'svn 1.7.0')
@@ -1260,10 +1284,13 @@ class SVNClient(BaseSCMClient):
 
         cmd.append(patch_file)
 
-        rc, patch_output = self._run_svn(cmd,
-                                         ignore_errors=True,
-                                         results_unicode=False,
-                                         return_error_code=True)
+        patch_output = (
+            self._run_svn(cmd,
+                          ignore_errors=True,
+                          redirect_stderr=True)
+            .stdout_bytes
+            .read()
+        )
 
         applied = False
 
@@ -1354,15 +1381,12 @@ class SVNClient(BaseSCMClient):
 
             # We require --force here because svn will complain if we run
             # `svn add` on a file that has already been added or deleted.
-            result = self._run_svn(['add', '--force'] + added_files,
-                                   ignore_errors=True,
-                                   none_on_ignored_error=True)
-
-            if result is None:
+            try:
+                self._run_svn(['add', '--force'] + added_files)
+                patched_empty_files = True
+            except RunProcessError:
                 logging.error('Unable to execute "svn add" on: %s',
                               ', '.join(added_files))
-            else:
-                patched_empty_files = True
 
         if deleted_files:
             deleted_files = self._strip_p_num_slashes(deleted_files,
@@ -1370,15 +1394,12 @@ class SVNClient(BaseSCMClient):
 
             # We require --force here because svn will complain if we run
             # `svn delete` on a file that has already been added or deleted.
-            result = self._run_svn(['delete', '--force'] + deleted_files,
-                                   ignore_errors=True,
-                                   none_on_ignored_error=True)
-
-            if result is None:
+            try:
+                self._run_svn(['delete', '--force'] + deleted_files)
+                patched_empty_files = True
+            except RunProcessError:
                 logging.error('Unable to execute "svn delete" on: %s',
                               ', '.join(deleted_files))
-            else:
-                patched_empty_files = True
 
         return patched_empty_files
 
@@ -1394,24 +1415,24 @@ class SVNClient(BaseSCMClient):
                 self.capabilities.has_capability('scmtools', 'svn',
                                                  'empty_files'))
 
-    def _run_svn(self, svn_args, *args, **kwargs):
+    def _run_svn(
+        self,
+        svn_args: List[str],
+        **kwargs,
+    ) -> RunProcessResult:
         """Run the ``svn`` command.
 
         Args:
             svn_args (list of str):
                 A list of additional arguments to add to the SVN command line.
 
-            *args (list):
-                Additional positional arguments to pass through to
-                :py:func:`rbtools.utils.process.execute`.
-
             **kwargs (dict):
                 Additional keyword arguments to pass through to
-                :py:func:`rbtools.utils.process.execute`.
+                :py:func:`rbtools.utils.process.run_process`.
 
         Returns:
-            tuple:
-            The value returned by :py:func:`rbtools.utils.process.execute`.
+            rbtools.utils.process.RunProcessResult:
+            The value returned by :py:func:`rbtools.utils.process.run_process`.
         """
         options = self.options or argparse.Namespace()
         svn_username = getattr(options, 'svn_username', None)
@@ -1433,7 +1454,7 @@ class SVNClient(BaseSCMClient):
         if svn_password:
             cmdline += ['--password', svn_password]
 
-        return execute(cmdline, *args, **kwargs)
+        return run_process(cmdline, **kwargs)
 
     def svn_log_xml(
         self,
@@ -1470,17 +1491,15 @@ class SVNClient(BaseSCMClient):
             rbtools.clients.errors.AuthenticationError:
                 Authentication to the remote repository failed.
         """
-        command = ['log', '--xml'] + svn_args
-        rc, result, errors = self._run_svn(command,
-                                           *args,
-                                           return_error_code=True,
-                                           with_errors=False,
-                                           return_errors=True,
-                                           ignore_errors=True,
-                                           results_unicode=False,
-                                           **kwargs)
+        try:
+            return (
+                self._run_svn(['log', '--xml'] + svn_args)
+                .stdout_bytes
+                .read()
+            )
+        except RunProcessError as e:
+            errors = e.result.stderr_bytes.read()
 
-        if rc:
             # SVN Error E215004: --non-interactive was passed but the remote
             # repository requires authentication.
             if errors.startswith(b'svn: E215004'):
@@ -1491,8 +1510,6 @@ class SVNClient(BaseSCMClient):
                     'options.')
 
             return None
-
-        return result
 
     def check_options(self) -> None:
         """Verify the command line options.
