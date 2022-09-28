@@ -215,7 +215,7 @@ class EditFileTests(kgb.SpyAgency, TestCase):
 
     def test_edit_file(self):
         """Testing edit_file"""
-        result = edit_file(make_tempfile(b'Test content'))
+        result = edit_file(make_tempfile(content=b'Test content'))
 
         self.assertEqual(result, 'TEST CONTENT')
 
@@ -240,14 +240,14 @@ class EditFileTests(kgb.SpyAgency, TestCase):
         os.environ[str('RBTOOLS_EDITOR')] = './bad-rbtools-editor'
 
         with self.assertRaisesMessage(EditorError, message):
-            edit_file(make_tempfile(b'Test content'))
+            edit_file(make_tempfile(content=b'Test content'))
 
     def test_edit_file_with_file_deleted(self):
         """Testing edit_file with file deleted during edit"""
         def _subprocess_call(*args, **kwargs):
             os.unlink(filename)
 
-        filename = make_tempfile(b'Test content')
+        filename = make_tempfile(content=b'Test content')
         message = 'The edited file "%s" was deleted during edit.' % filename
 
         self.spy_on(subprocess.call, call_fake=_subprocess_call)
@@ -265,7 +265,7 @@ class EditFileTests(kgb.SpyAgency, TestCase):
         old_visual = os.environ.get(str('VISUAL'))
         old_editor = os.environ.get(str('EDITOR'))
 
-        filename = make_tempfile(b'Test content')
+        filename = make_tempfile(content=b'Test content')
 
         try:
             os.environ[str('RBTOOLS_EDITOR')] = 'rbtools-editor'

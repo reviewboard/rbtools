@@ -2396,7 +2396,7 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
             tool (rbtools.clients.base.scmclient.BaseSCMClient):
                 The SCM client.
         """
-        super(ClearCaseRepositoryInfo, self).__init__(path)
+        super(ClearCaseRepositoryInfo, self).__init__(path=path)
         self.vobtag = vobtag
         self.tool = tool
         self.vob_tags = {vobtag}

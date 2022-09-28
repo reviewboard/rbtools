@@ -926,7 +926,7 @@ class MercurialClient(BaseSCMClient):
                 aborted by the user.
         """
         if run_editor:
-            filename = make_tempfile(message.encode('utf-8'),
+            filename = make_tempfile(content=message.encode('utf-8'),
                                      prefix='hg-editor-',
                                      suffix='.txt')
 

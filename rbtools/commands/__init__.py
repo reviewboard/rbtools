@@ -7,6 +7,7 @@ import json
 import logging
 import platform
 import os
+import subprocess
 import sys
 
 import colorama
@@ -26,7 +27,6 @@ from rbtools.diffs.tools.errors import MissingDiffToolError
 from rbtools.utils.console import get_input, get_pass
 from rbtools.utils.filesystem import (cleanup_tempfiles, get_home_path,
                                       is_exe_in_path, load_config)
-from rbtools.utils.process import log_command_line
 from rbtools.utils.repository import get_repository_resource
 
 
@@ -1112,7 +1112,7 @@ class Command(object):
 
         self._init_logging()
         self.initialize()
-        log_command_line('Command line: %s', argv)
+        logging.debug('Command line: %s', subprocess.list2cmdline(argv))
 
         try:
             exit_code = self.main(*args) or 0

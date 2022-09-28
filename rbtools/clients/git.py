@@ -764,9 +764,12 @@ class GitClient(BaseSCMClient):
         """
         git_find_renames_threshold = \
             getattr(self.options, 'git_find_renames_threshold', None)
+        git_toplevel = self._git_toplevel
 
-        exclude_patterns = normalize_patterns(exclude_patterns,
-                                              self._git_toplevel,
+        assert git_toplevel
+
+        exclude_patterns = normalize_patterns(patterns=exclude_patterns,
+                                              base_dir=git_toplevel,
                                               cwd=os.getcwd())
 
         try:
@@ -901,12 +904,19 @@ class GitClient(BaseSCMClient):
                 none_on_ignored_error=True,
                 log_output_on_error=False)
 
+            git_toplevel = self._git_toplevel
+            assert git_toplevel
+
             # The output of git diff-tree will be a list of entries that have
             # changed between the two revisions that we give it. The last part
             # of the line is the name of the file that has changed.
             changed_files = remove_filenames_matching_patterns(
-                (filename.split()[-1] for filename in changed_files),
-                exclude_patterns, base_dir=self._git_toplevel)
+                filenames=(
+                    filename.split()[-1]
+                    for filename in changed_files
+                ),
+                patterns=exclude_patterns,
+                base_dir=git_toplevel)
 
             diff_lines = []
 

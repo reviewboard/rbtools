@@ -320,7 +320,8 @@ def edit_text(content='', filename=None):
             The configured editor could not be run, or it failed with an
             error.
     """
-    tempfile = make_tempfile(content.encode('utf8'), filename=filename)
+    tempfile = make_tempfile(content=content.encode('utf8'),
+                             filename=filename)
     result = edit_file(tempfile)
     os.unlink(tempfile)
 
