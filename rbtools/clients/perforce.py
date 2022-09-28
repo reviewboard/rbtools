@@ -12,7 +12,7 @@ import string
 import subprocess
 import sys
 from fnmatch import fnmatch
-from typing import List, Optional
+from typing import List, Optional, Tuple, Union
 
 import six
 
@@ -893,8 +893,11 @@ class PerforceClient(BaseSCMClient):
                          'to %s',
                          base, tip)
             return self._compute_range_changes(
-                base, tip, depot_include_files, local_include_files,
-                exclude_patterns)
+                base=base,
+                tip=tip,
+                depot_include_files=depot_include_files,
+                local_include_files=local_include_files,
+                exclude_patterns=exclude_patterns)
 
         # Strip off the prefix
         tip = tip.split(':', 1)[1]
@@ -975,10 +978,15 @@ class PerforceClient(BaseSCMClient):
                                % (action, depot_file))
 
             if changetype_short == 'M':
+                assert tip is not None
+
                 try:
                     old_file, new_file = self._extract_edit_files(
-                        depot_file, local_file, base_revision, tip,
-                        cl_is_shelved, False)
+                        depot_file=depot_file,
+                        local_file=local_file,
+                        rev_a=base_revision,
+                        rev_b=tip,
+                        cl_is_shelved=cl_is_shelved)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
                         logging.warning('Skipping file %s: %s', depot_file, e)
@@ -999,8 +1007,11 @@ class PerforceClient(BaseSCMClient):
 
                 try:
                     old_file, new_file = self._extract_add_files(
-                        depot_file, local_file, tip, cl_is_shelved,
-                        cl_is_pending)
+                        depot_file=depot_file,
+                        local_file=local_file,
+                        revision=tip,
+                        cl_is_shelved=cl_is_shelved,
+                        cl_is_pending=cl_is_pending)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
                         logging.warning('Skipping file %s: %s', depot_file, e)
@@ -1015,7 +1026,8 @@ class PerforceClient(BaseSCMClient):
             elif changetype_short == 'D':
                 try:
                     old_file, new_file = self._extract_delete_files(
-                        depot_file, base_revision)
+                        depot_file=depot_file,
+                        revision=base_revision)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
                         logging.warning('Skipping file %s#%s: %s',
@@ -1031,7 +1043,10 @@ class PerforceClient(BaseSCMClient):
                 try:
                     old_file, new_file, new_depot_file = \
                         self._extract_move_files(
-                            depot_file, tip, base_revision, cl_is_shelved)
+                            old_depot_file=depot_file,
+                            tip=tip,
+                            base_revision=base_revision,
+                            cl_is_shelved=cl_is_shelved)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
                         logging.warning('Skipping file %s: %s', depot_file, e)
@@ -1238,9 +1253,13 @@ class PerforceClient(BaseSCMClient):
                 continue
 
             if action == 'add':
+                assert local_file is not None
+
                 try:
                     old_file, new_file = self._extract_add_files(
-                        depot_file, local_file, rev, False, False)
+                        depot_file=depot_file,
+                        local_file=local_file,
+                        revision=rev)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
                         logging.warning('Skipping file %s: %s', depot_file, e)
@@ -1253,7 +1272,8 @@ class PerforceClient(BaseSCMClient):
             elif action == 'delete':
                 try:
                     old_file, new_file = self._extract_delete_files(
-                        initial_depot_file, initial_rev)
+                        depot_file=initial_depot_file,
+                        revision=initial_rev)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
                         logging.warning('Skipping file %s: %s', depot_file, e)
@@ -1264,9 +1284,15 @@ class PerforceClient(BaseSCMClient):
                     old_file, new_file, initial_depot_file, initial_rev,
                     depot_file, 'D', ignore_unmodified=True)
             elif action == 'edit':
+                assert local_file is not None
+
                 try:
                     old_file, new_file = self._extract_edit_files(
-                        depot_file, local_file, initial_rev, rev, False, True)
+                        depot_file=depot_file,
+                        local_file=local_file,
+                        rev_a=initial_rev,
+                        rev_b=rev,
+                        cl_is_submitted=True)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
                         logging.warning('Skipping file %s: %s', depot_file, e)
@@ -1277,11 +1303,16 @@ class PerforceClient(BaseSCMClient):
                     old_file, new_file, initial_depot_file, initial_rev,
                     depot_file, 'M', ignore_unmodified=True)
             elif action == 'move':
+                assert local_file is not None
+
                 try:
                     old_file_a, new_file_a = self._extract_add_files(
-                        depot_file, local_file, rev, False, False)
+                        depot_file=depot_file,
+                        local_file=local_file,
+                        revision=rev)
                     old_file_b, new_file_b = self._extract_delete_files(
-                        initial_depot_file, initial_rev)
+                        depot_file=initial_depot_file,
+                        revision=initial_rev)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
                         logging.warning('Skipping file %s: %s', depot_file, e)
@@ -1368,33 +1399,47 @@ class PerforceClient(BaseSCMClient):
         file_entry['rev'] = change['rev']
         file_entry['action'] = new_action
 
-    def _extract_edit_files(self, depot_file, local_file, rev_a, rev_b,
-                            cl_is_shelved, cl_is_submitted):
+    def _extract_edit_files(
+        self,
+        *,
+        depot_file: str,
+        local_file: str,
+        rev_a: Union[int, str],
+        rev_b: Union[int, str],
+        cl_is_shelved: bool = False,
+        cl_is_submitted: bool = False,
+    ) -> Tuple[str, str]:
         """Extract the "old" and "new" files for an edit operation.
 
         Args:
-            depot_file (unicode):
+            depot_file (str):
                 The depot path of the file.
 
-            local_file (unicode):
+            local_file (str):
                 The local filesystem path of the file.
 
-            rev_a (unicode):
+            rev_a (int or str):
                 The original revision of the file.
 
-            rev_b (unicode):
+            rev_b (int or str):
                 The new revision of the file.
 
-            cl_is_shelved (bool):
+            cl_is_shelved (bool, optional):
                 Whether the containing changeset is shelved.
 
-            cl_is_submitted (bool):
+            cl_is_submitted (bool, optional):
                 Whether the containing changeset is submitted.
 
         Returns:
             tuple:
-            A 2-tuple containing the filenames of the old version and new
-            version.
+            A 2-tuple containing:
+
+            Tuple:
+                0 (str):
+                    The filename of the old version.
+
+                1 (str):
+                    The filename of the new version.
 
         Raises:
             ValueError:
@@ -1416,18 +1461,25 @@ class PerforceClient(BaseSCMClient):
 
         return old_filename, new_filename
 
-    def _extract_add_files(self, depot_file, local_file, revision,
-                           cl_is_shelved, cl_is_pending):
+    def _extract_add_files(
+        self,
+        *,
+        depot_file: str,
+        local_file: str,
+        revision: Union[int, str],
+        cl_is_shelved: bool = False,
+        cl_is_pending: bool = False,
+    ) -> Tuple[str, str]:
         """Extract the "old" and "new" files for an add operation.
 
         Args:
-            depot_file (unicode):
+            depot_file (str):
                 The depot path of the file.
 
-            local_file (unicode):
+            local_file (str):
                 The local filesystem path of the file.
 
-            revision (unicode):
+            revision (int or str):
                 The new revision of the file.
 
             cl_is_shelved (bool):
@@ -1438,9 +1490,17 @@ class PerforceClient(BaseSCMClient):
 
         Returns:
             tuple:
-            A 2-tuple containing the filenames of the old version and new
-            version. Because this is an add operation, the old filename will
-            contain an empty file.
+            A 2-tuple containing:
+
+            Tuple:
+                0 (str):
+                    The filename of the old version.
+
+                    Because this is an add operation, this will represent an
+                    empty file.
+
+                1 (str):
+                    The filename of the new version.
 
         Raises:
             ValueError:
@@ -1461,24 +1521,37 @@ class PerforceClient(BaseSCMClient):
 
         return old_filename, new_filename
 
-    def _extract_delete_files(self, depot_file, revision):
+    def _extract_delete_files(
+        self,
+        *,
+        depot_file: str,
+        revision: Union[int, str],
+    ) -> Tuple[str, str]:
         """Extract the "old" and "new" files for a delete operation.
 
         Returns a tuple of (old filename, new filename). This can raise a
         ValueError if extraction fails.
 
         Args:
-            depot_file (unicode):
+            depot_file (str):
                 The depot path of the file.
 
-            revision (unicode):
+            revision (int or str):
                 The old revision of the file.
 
         Returns:
             tuple:
-            A 2-tuple containing the filenames of the old version and new
-            version. Because this is a delete operation, the new filename will
-            contain an empty file.
+            A 2-tuple containing:
+
+            Tuple:
+                0 (str):
+                    The filename of the old version.
+
+                1 (str):
+                    The filename of the new version.
+
+                    Because this is a delete operation, this will represent an
+                    empty file.
 
         Raises:
             ValueError:
@@ -1493,30 +1566,48 @@ class PerforceClient(BaseSCMClient):
 
         return old_filename, new_filename
 
-    def _extract_move_files(self, old_depot_file, tip, base_revision,
-                            cl_is_shelved):
+    def _extract_move_files(
+        self,
+        *,
+        old_depot_file: str,
+        tip: Union[int, str],
+        base_revision: Union[int, str],
+        cl_is_shelved: bool = False,
+    ) -> Tuple[str, str, str]:
         """Extract the "old" and "new" files for a move operation.
 
         Returns a tuple of (old filename, new filename, new depot path). This
         can raise a ValueError if extraction fails.
 
         Args:
-            old_depot_file (unicode):
+            old_depot_file (str):
                 The depot path of the old version of the file.
 
-            tip (unicode):
+            tip (int or str):
                 The new revision of the file.
 
-            base_revision (unicode):
+            base_revision (int or str):
                 The old revision of the file.
 
-            cl_is_shelved (bool):
+            cl_is_shelved (bool, optional):
                 Whether the containing changeset is shelved.
 
         Returns:
             tuple:
-            A 2-tuple containing the filenames of the old version and new
-            version.
+            A 2-tuple containing:
+
+            Tuple:
+                0 (str):
+                    The filename of the old version.
+
+                    Because this is an add operation, this will represent an
+                    empty file.
+
+                1 (str):
+                    The filename of the new version.
+
+                2 (str):
+                    The depot path of the new version.
 
         Raises:
             ValueError:
