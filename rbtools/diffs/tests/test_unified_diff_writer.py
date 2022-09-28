@@ -176,6 +176,28 @@ class UnifiedDiffWriterTests(TestCase):
             b'--- path/to/orig-f\xc3\xadle\t(r\xc3\xa9vision 123)\n'
             b'+++ path/to/modified-f\xc3\xadle\t(r\xc3\xa9vision 456)\n')
 
+    def test_write_index_with_bytes(self):
+        """Testing UnifiedDiffWriter.write_index with byte string"""
+        writer = UnifiedDiffWriter()
+        writer.write_index(b'foo.txt\t(some-t\xc3\xa1g)')
+
+        self.assertEqual(
+            writer.getvalue(),
+            b'Index: foo.txt\t(some-t\xc3\xa1g)\n'
+            b'============================================================'
+            b'=======\n')
+
+    def test_write_index_with_str(self):
+        """Testing UnifiedDiffWriter.write_index with Unicode string"""
+        writer = UnifiedDiffWriter()
+        writer.write_index('foo.txt\t(some-tág)')
+
+        self.assertEqual(
+            writer.getvalue(),
+            b'Index: foo.txt\t(some-t\xc3\xa1g)\n'
+            b'============================================================'
+            b'=======\n')
+
     def test_write_hunks_with_bytes(self):
         """Testing UnifiedDiffWriter.write_hunks with byte string"""
         writer = UnifiedDiffWriter()

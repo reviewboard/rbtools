@@ -163,6 +163,25 @@ class UnifiedDiffWriter(io.BytesIO):
         self.write_modified_file_header(path=modified_path,
                                         extra=modified_extra)
 
+    def write_index(
+        self,
+        contents: _BytesOrStr,
+    ) -> None:
+        """Write a standard Index line.
+
+        This is used by some Unified Diff variants to separate sections for
+        different files, regardless of contents.
+
+        This is in the form of :samp:`Index {content}`, followed by a line
+        with 67 ``=`` characters.
+
+        Args:
+            contents (bytes or str):
+                The contents to write after ``Index: ``.
+        """
+        self.write_line(b'Index: %s' % force_bytes(contents, self.encoding))
+        self.write_line(b'=' * 67)
+
     def write_hunks(
         self,
         hunks: Union[bytes, Iterable[bytes]],
