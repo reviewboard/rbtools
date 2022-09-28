@@ -30,6 +30,7 @@ from rbtools.utils.checks import check_install, is_valid_version
 from rbtools.utils.console import edit_text
 from rbtools.utils.diffs import (normalize_patterns,
                                  remove_filenames_matching_patterns)
+from rbtools.utils.encoding import force_unicode
 from rbtools.utils.errors import EditorError
 from rbtools.utils.process import execute
 
@@ -1038,12 +1039,17 @@ class GitClient(BaseSCMClient):
             bytes:
             The reformatted diff contents.
         """
+        base_path = b''
         diff_data = b''
-        filename = b''
+        old_filename = b''
+        new_filename = b''
         p4rev = b''
+        is_full_rename = False
 
         # Find which depot changelist we're based on
-        log = self._execute([self.git, 'log', merge_base], ignore_errors=True)
+        log = self._execute([self.git, 'log', merge_base],
+                            ignore_errors=True,
+                            results_unicode=False)
 
         for line in log:
             m = re.search(br'[rd]epo.-paths = "(.+)": change = (\d+).*\]',
@@ -1059,33 +1065,135 @@ class GitClient(BaseSCMClient):
 
         for i, line in enumerate(diff_lines):
             if line.startswith(b'diff '):
-                # Grab the filename and then filter this out.
                 # This will be in the format of:
                 #    diff --git a/path/to/file b/path/to/file
-                filename = line.split(b' ')[2].strip()
+                #
+                # Filter this out. We can't extract any file names from this
+                # line as they may contain spaces and we can't therefore easily
+                # split the line.
+                old_filename = b''
+                new_filename = b''
+                is_full_rename = False
             elif (line.startswith(b'index ') or
                   line.startswith(b'new file mode ')):
-                # Filter this out
+                # Filter this out.
                 pass
-            elif (line.startswith(b'--- ') and i + 1 < len(diff_lines) and
-                  diff_lines[i + 1].startswith(b'+++ ')):
-                data = self._execute(
-                    ['p4', 'files', base_path + filename + '@' + p4rev],
-                    ignore_errors=True, results_unicode=False)
+            elif (line.startswith(b'similarity index 100%') and
+                  i + 2 < len(diff_lines) and
+                  diff_lines[i + 1].startswith(b'rename from') and
+                  diff_lines[i + 2].startswith(b'rename to')):
+                # The file was renamed without any file lines changing.
+                # We have to special-case this and generate a Perforce-specific
+                # line in the same way that perforce.py does.
+                #
+                # At this point, the current line and the next 2 lines look
+                # like this:
+                #
+                # similarity index 100%
+                # rename from <old filename>
+                # rename to <new filename>
+                #
+                # We parse out the old and new filenames and output the
+                # following:
+                #
+                # === <old depot path>#<revision> ==MV== <new depot path> ===
+                #
+                # Followed by an empty line. We then skip the following 2 lines
+                # which would otherwise print "Move from: ..." and
+                # "Move to: ...".
+                old_filename = diff_lines[i + 1].split(b' ', 2)[2].strip()
+                new_filename = diff_lines[i + 2].split(b' ', 2)[2].strip()
+
+                p4path = force_unicode(base_path + old_filename + b'@' + p4rev)
+                data = self._execute(['p4', 'files', p4path],
+                                     ignore_errors=True,
+                                     results_unicode=False)
                 m = re.search(br'^%s%s#(\d+).*$' % (re.escape(base_path),
-                                                    re.escape(filename)),
+                                                    re.escape(old_filename)),
                               data, re.M)
+
                 if m:
                     file_version = m.group(1).strip()
                 else:
-                    file_version = 1
+                    file_version = b'1'
 
-                diff_data += b'--- %s%s\t%s%s#%s\n' % (base_path, filename,
-                                                       base_path, filename,
+                diff_data += b'==== %s%s#%s ==MV== %s%s ====\n\n' % (
+                    base_path,
+                    old_filename,
+                    file_version,
+                    base_path,
+                    new_filename)
+
+                is_full_rename = True
+            elif line.startswith(b'similarity index'):
+                # Filter this out.
+                pass
+            elif line.startswith(b'rename from'):
+                # For perforce diffs where a file was renamed and modified, we
+                # specify "Moved from: <depotpath>" along with the usual diff
+                # markers.
+                from_filename = line.split(b' ', 2)[2].strip()
+
+                if not is_full_rename:
+                    diff_data += b'Moved from: %s%s\n' % (base_path,
+                                                          from_filename)
+            elif line.startswith(b'rename to'):
+                # For perforce diffs where a file was renamed and modified, we
+                # specify "Moved to: <depotpath>" along with the usual diff
+                # markers.
+                to_filename = line.split(b' ', 2)[2].strip()
+
+                if not is_full_rename:
+                    diff_data += b'Moved to: %s%s\n' % (base_path,
+                                                        to_filename)
+            elif (not old_filename and
+                  line.startswith(b'--- ') and i + 1 < len(diff_lines) and
+                  diff_lines[i + 1].startswith(b'+++ ')):
+                # At this point in parsing the current line and the next line
+                # look like this:
+                #
+                # --- <old filename><optional tab character>
+                # +++ <new filename><optional tab character>
+                #
+                # The tab character is present precisely when old or new
+                # filename (respectively) contain whitespace.
+                #
+                # So we take the section 4 characters from the start (i.e.
+                # after --- or +++) and split on tab, taking the first part.
+                old_filename = line[4:].split(b'\t', 1)[0].strip()
+                new_filename = diff_lines[i + 1][4:].split(b'\t', 1)[0].strip()
+
+                # Perforce diffs require that the "new file" and "old file"
+                # match the original filename in the case of adds and deletes.
+                if new_filename == b'/dev/null':
+                    # The file was deleted, use the old filename when writing
+                    # out the +++ line.
+                    new_filename = old_filename
+                elif old_filename == b'/dev/null':
+                    # The file is new, use the new filename in the --- line.
+                    old_filename = new_filename
+
+                p4path = force_unicode(base_path + old_filename + b'@' + p4rev)
+                data = self._execute(['p4', 'files', p4path],
+                                     ignore_errors=True,
+                                     results_unicode=False)
+                m = re.search(br'^%s%s#(\d+).*$' % (re.escape(base_path),
+                                                    re.escape(old_filename)),
+                              data, re.M)
+
+                if m:
+                    file_version = m.group(1).strip()
+                else:
+                    file_version = b'1'
+
+                diff_data += b'--- %s%s\t%s%s#%s\n' % (base_path,
+                                                       old_filename,
+                                                       base_path,
+                                                       old_filename,
                                                        file_version)
             elif line.startswith(b'+++ '):
                 # TODO: add a real timestamp
-                diff_data += b'+++ %s%s\t%s\n' % (base_path, filename,
+                diff_data += b'+++ %s%s\t%s\n' % (base_path, new_filename,
                                                   b'TIMESTAMP')
             else:
                 diff_data += line

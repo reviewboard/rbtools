@@ -2201,25 +2201,38 @@ class ClearCaseClient(BaseSCMClient):
 
             get_oid_cmd = ['cleartool', 'desc', '-fmt', '%On']
 
-            if current_mode == 'renamed to':
-                old_file = cpath.join(old_dir, _extract_filename(line))
-                old_oid = execute(get_oid_cmd + [old_file])
-                new_file = cpath.join(new_dir,
-                                      _extract_filename(diff_lines[i + 1]))
-                new_oid = execute(get_oid_cmd + [new_file])
+            try:
+                if current_mode == 'renamed to':
+                    old_file = cpath.join(old_dir, _extract_filename(line))
+                    old_oid = execute(get_oid_cmd + [old_file])
+                    new_file = cpath.join(new_dir,
+                                          _extract_filename(diff_lines[i + 1]))
+                    new_oid = execute(get_oid_cmd + [new_file])
 
-                results['renamed'].add((old_file, old_oid, new_file, new_oid))
-                i += 2
-            elif current_mode == 'added':
-                new_file = cpath.join(new_dir, _extract_filename(line))
-                oid = execute(get_oid_cmd + [new_file])
+                    results['renamed'].add(
+                        (old_file, old_oid, new_file, new_oid))
+                    i += 2
+                elif current_mode == 'added':
+                    new_file = cpath.join(new_dir, _extract_filename(line))
+                    oid = execute(get_oid_cmd + [new_file])
 
-                results['added'].add((new_file, oid))
-            elif current_mode == 'deleted':
-                old_file = cpath.join(old_dir, _extract_filename(line))
-                oid = execute(get_oid_cmd + [old_file])
+                    results['added'].add((new_file, oid))
+                elif current_mode == 'deleted':
+                    old_file = cpath.join(old_dir, _extract_filename(line))
+                    oid = execute(get_oid_cmd + [old_file])
 
-                results['deleted'].add((old_file, oid))
+                    results['deleted'].add((old_file, oid))
+            except Exception as e:
+                # It's possible that we'll get errors when trying to use
+                # get_oid_cmd in some cases, such as when a symbolic link is
+                # added or removed. In this cases, we'll just log a warning
+                # and skip them for this step. We'll still show it when the
+                # directory contents get diffed later.
+                logging.warning('Got error while processing directory changes '
+                                'from %s to %s: %s',
+                                old_dir,
+                                new_dir,
+                                e)
 
         return results
 
