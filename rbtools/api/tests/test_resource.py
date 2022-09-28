@@ -2,6 +2,8 @@
 
 from __future__ import unicode_literals
 
+import re
+
 from six.moves import range
 
 from rbtools.api.factory import create_resource
@@ -17,6 +19,7 @@ from rbtools.api.resource import (CountResource,
                                   RootResource,
                                   _EXTRA_DATA_DOCS_URL)
 from rbtools.api.tests.base import TestWithPayloads
+from rbtools.deprecation import RemovedInRBTools50Warning
 
 
 class ExpandedItemResource(ItemResource):
@@ -520,15 +523,31 @@ class ResourceFieldDictTests(TestWithPayloads):
         with self.assertRaisesMessage(KeyError, message):
             field['nestedX']
 
+    def test_fields(self):
+        """Testing ResourceDictField.fields"""
+        r = create_resource(transport=self.transport,
+                            payload=self.item_payload,
+                            url='')
+
+        self.assertEqual(
+            set(r.nested_field.fields()),
+            set(self.item_payload['resource_token']['nested_field']))
+
     def test_iterfields(self):
         """Testing ResourceDictField.iterfields"""
         r = create_resource(transport=self.transport,
                             payload=self.item_payload,
                             url='')
 
-        self.assertEqual(
-            set(r.nested_field.iterfields()),
-            set(self.item_payload['resource_token']['nested_field']))
+        message = re.escape(
+            'ResourceDictField.iterfields() is deprecated and will be removed '
+            'in RBTools 5.0. Please use fields() instead.'
+        )
+
+        with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+            self.assertEqual(
+                set(r.nested_field.iterfields()),
+                set(self.item_payload['resource_token']['nested_field']))
 
     def test_setitem(self):
         """Testing ResourceDictField.__setitem__"""

@@ -20,6 +20,7 @@ from rbtools.api.cache import MINIMUM_VERSION
 from rbtools.api.decorators import request_method_decorator
 from rbtools.api.request import HttpRequest
 from rbtools.api.utils import rem_mime_format
+from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.graphs import path_exists
 
 
@@ -594,31 +595,55 @@ class ResourceDictField(MutableMapping):
         as calling :py:meth:`keys` or simply ``for field in dict_field``.
 
         Yields:
-            unicode:
+            str:
             Each field in this dictionary.
         """
-        for field in self:
-            yield field
+        yield from self
 
     # Backwards-compatibility functions.
-    iterfields = fields
+    def iterfields(self):
+        """Iterate through all fields in the dictionary.
 
-    if six.PY3:
-        def iteritems(self):
-            """Iterate through all items in this dictionary.
+        This will yield each field name in the dictionary. This is the same
+        as calling :py:meth:`keys` or simply ``for field in dict_field``.
 
-            This is a legacy interface that provides compatibility with code
-            written in Python 3 and RBTools <= 3.0.
+        Deprecated:
+            4.0:
+            This will be removed in RBTools 5.0.
 
-            Yields:
-                tuple:
-                A 2-tuple of:
+        Yields:
+            str:
+            Each field in this dictionary.
+        """
+        RemovedInRBTools50Warning.warn(
+            '%s.iterfields() is deprecated and will be removed in RBTools '
+            '5.0. Please use fields() instead.'
+            % type(self).__name__)
 
-                1. The key
-                2. The value
-            """
-            for item in self.items():
-                yield item
+        yield from self.fields()
+
+    def iteritems(self):
+        """Iterate through all items in this dictionary.
+
+        This is a legacy interface that provides compatibility with code
+        written in Python 3 and RBTools <= 3.0.
+
+        Deprecated:
+            4.0:
+            This will be removed in RBTools 5.0.
+
+        Yields:
+            tuple:
+            A 2-tuple of:
+
+            1. The key
+            2. The value
+        """
+        RemovedInRBTools50Warning.warn(
+            '%s.iteritems() is deprecated and will be removed in RBTools '
+            '5.0. Please use .items() instead.')
+
+        yield from self.items()
 
     def _wrap_field(self, field_name):
         """Conditionally return a wrapped version of a field's value.
