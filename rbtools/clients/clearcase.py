@@ -1697,10 +1697,10 @@ class ClearCaseClient(SCMClient):
                          split_lines=True,
                          results_unicode=False)
 
-        contents = [
+        contents = sorted(
             os.path.basename(absolute_path.strip())
             for absolute_path in output
-        ]
+        )
 
         # Add one extra empty line so the data passed to diff ends in a
         # newline.
