@@ -8,8 +8,9 @@ import kgb
 from rbtools.clients import BaseSCMClient
 from rbtools.clients.errors import SCMClientDependencyError
 from rbtools.deprecation import RemovedInRBTools50Warning
-from rbtools.diffs.tools.errors import MissingDiffToolError
 from rbtools.diffs.tools.backends.gnu import GNUDiffTool
+from rbtools.diffs.tools.errors import MissingDiffToolError
+from rbtools.diffs.tools.registry import diff_tools_registry
 from rbtools.testing import TestCase
 
 
@@ -198,8 +199,11 @@ class BaseSCMClientTests(kgb.SpyAgency, TestCase):
                     owner=GNUDiffTool,
                     op=kgb.SpyOpReturn(True))
 
-        client = MySCMClient()
-        self.assertIsInstance(client.get_diff_tool(), GNUDiffTool)
+        try:
+            client = MySCMClient()
+            self.assertIsInstance(client.get_diff_tool(), GNUDiffTool)
+        finally:
+            diff_tools_registry.reset()
 
     def test_get_diff_tool_with_requires_false(self):
         """Testing BaseSCMClient.get_diff_tool with requires_diff_tool=False

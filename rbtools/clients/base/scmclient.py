@@ -7,7 +7,6 @@ Version Added:
 import argparse
 import logging
 import re
-from functools import lru_cache
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union, cast
 
 from typing_extensions import NotRequired, TypedDict, final
@@ -473,6 +472,7 @@ class BaseSCMClient(object):
         self.capabilities = None
         self.is_setup = False
 
+        self._diff_tool: Optional[BaseDiffTool] = None
         self._has_deps: Optional[bool] = None
 
     @property
@@ -666,7 +666,6 @@ class BaseSCMClient(object):
         """
         return None
 
-    @lru_cache(maxsize=None)
     def get_diff_tool(self) -> Optional[BaseDiffTool]:
         """Return a diff tool for use with this client.
 
@@ -692,17 +691,24 @@ class BaseSCMClient(object):
             rbtools.diffs.tools.errors.MissingDiffToolError:
                 No compatible diff tool could be found.
         """
-        if self.requires_diff_tool is True:
-            return diff_tools_registry.get_available()
-        elif self.requires_diff_tool is False:
-            return None
-        elif isinstance(self.requires_diff_tool, list):
-            return diff_tools_registry.get_available(
-                compatible_diff_tool_ids=self.requires_diff_tool)
-        else:
-            raise TypeError(
-                'Unexpected type %s for %s.requires_diff_tool.'
-                % (type(self.requires_diff_tool), type(self).__name__))
+        diff_tool = self._diff_tool
+
+        if diff_tool is None:
+            if self.requires_diff_tool is True:
+                diff_tool = diff_tools_registry.get_available()
+            elif self.requires_diff_tool is False:
+                diff_tool = None
+            elif isinstance(self.requires_diff_tool, list):
+                diff_tool = diff_tools_registry.get_available(
+                    compatible_diff_tool_ids=self.requires_diff_tool)
+            else:
+                raise TypeError(
+                    'Unexpected type %s for %s.requires_diff_tool.'
+                    % (type(self.requires_diff_tool), type(self).__name__))
+
+            self._diff_tool = diff_tool
+
+        return diff_tool
 
     def find_matching_server_repository(
         self,

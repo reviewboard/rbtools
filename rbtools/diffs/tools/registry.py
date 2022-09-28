@@ -161,6 +161,17 @@ class DiffToolsRegistry:
 
         self._register(diff_tool_cls)
 
+    def reset(self) -> None:
+        """Reset the registry to an empty state.
+
+        This is primarily intended for unit testing, to ensure that any
+        new attempts to fetch tools will result in fresh instances.
+        """
+        self._classes_populated = False
+        self._instances_populated = False
+        self._diff_tool_classes = {}
+        self._diff_tools = []
+
     def _populate_classes(self) -> None:
         """Populate all the default diff tool classes.
 
