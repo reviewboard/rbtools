@@ -29,6 +29,7 @@ from rbtools.clients.errors import (AuthenticationError,
 from rbtools.deprecation import (RemovedInRBTools40Warning,
                                  RemovedInRBTools50Warning,
                                  deprecate_non_keyword_only_args)
+from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install, is_valid_version
 from rbtools.utils.console import get_pass
 from rbtools.utils.diffs import (filename_match_any_patterns, filter_diff,
@@ -830,9 +831,9 @@ class SVNClient(BaseSCMClient):
         deleted_files = re.findall(br'^Index:\s+(\S+)\s+\(deleted\)$',
                                    diff_with_deleted, re.M)
 
-        result = []
-        i = 0
+        diff_writer = UnifiedDiffWriter()
         num_lines = len(diff_content)
+        i = 0
 
         while i < num_lines:
             line = diff_content[i]
@@ -841,13 +842,15 @@ class SVNClient(BaseSCMClient):
                 (i + 2 == num_lines or
                  (i + 2 < num_lines and
                   diff_content[i + 2].startswith(b'Index: ')))):
+                index_tag: bytes
+
                 # An empty file. Get and add the extra diff information.
                 index_line = line.strip()
                 filename = index_line.split(b' ', 1)[1].strip()
 
                 if filename in deleted_files:
                     # Deleted empty file.
-                    result.append(b'%s\t(deleted)\n' % index_line)
+                    index_tag = b'deleted'
 
                     if not revisions['base'] and not revisions['tip']:
                         tip = '(working copy)'
@@ -863,7 +866,7 @@ class SVNClient(BaseSCMClient):
                         tip = revisions['tip']
                 else:
                     # Added empty file.
-                    result.append(b'%s\t(added)\n' % index_line)
+                    index_tag = b'added'
 
                     if not revisions['base'] and not revisions['tip']:
                         base = tip = '(revision 0)'
@@ -871,20 +874,23 @@ class SVNClient(BaseSCMClient):
                         base = revisions['base']
                         tip = revisions['tip']
 
-                result.append(b'%s\n' % self.INDEX_SEP)
-                result.append(b'--- %s\t%s\n' % (filename,
-                                                 base.encode('utf-8')))
-                result.append(b'+++ %s\t%s\n' % (filename,
-                                                 tip.encode('utf-8')))
+                diff_writer.write_index(b'%s\t(%s)' % (filename, index_tag))
+                diff_writer.write_file_headers(
+                    orig_path=filename,
+                    orig_extra=base,
+                    modified_path=filename,
+                    modified_extra=tip)
 
                 # Skip the next line (the index separator) since we've already
                 # copied it.
                 i += 2
             else:
-                result.append(line)
+                diff_writer.write_line(line.rstrip(b'\r\n'))
                 i += 1
 
-        return result
+        diff_writer.seek(0)
+
+        return diff_writer.readlines()
 
     def convert_to_absolute_paths(self, diff_content, repository_info):
         """Convert relative paths in a diff output to absolute paths.
