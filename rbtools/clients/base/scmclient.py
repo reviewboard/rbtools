@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple, Union, cast
 
 from typing_extensions import NotRequired, TypedDict, final
 
+from rbtools.api.capabilities import Capabilities
 from rbtools.api.resource import (ItemResource,
                                   ListResource,
                                   ReviewRequestResource)
@@ -417,6 +418,14 @@ class BaseSCMClient(object):
     ######################
     # Instance variables #
     ######################
+
+    #: Capabilities returned by the server.
+    #:
+    #: This will be ``None`` if not set by the server.
+    #:
+    #: Type:
+    #:     rbtools.api.capabilities.Capabilities
+    capabilities: Optional[Capabilities]
 
     #: User configuration.
     #:

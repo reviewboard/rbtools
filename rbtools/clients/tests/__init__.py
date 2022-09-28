@@ -13,6 +13,7 @@ from unittest import SkipTest
 import kgb
 from typing_extensions import Final, TypeAlias
 
+from rbtools.api.capabilities import Capabilities
 from rbtools.clients import BaseSCMClient
 from rbtools.clients.errors import SCMClientDependencyError
 from rbtools.deprecation import RemovedInRBTools40Warning
@@ -87,6 +88,14 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
     #: Version Added:
     #:     4.0
     default_scmclient_options: _TestSCMClientOptions = {}
+
+    #: Custom default capabilities for SCMClients.
+    #:
+    #: These will be set by :py:meth:`build_client` unless overridden.
+    #:
+    #: Version Added:
+    #:     4.0
+    default_scmclient_caps: Dict[str, Any] = {}
 
     #: The main checkout directory used by tests.
     #:
@@ -186,6 +195,7 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
         self,
         *,
         options: _TestSCMClientOptions = {},
+        caps: Dict[str, Any] = {},
         client_kwargs: Dict[str, Any] = {},
         setup: bool = True,
         allow_dep_checks: bool = True,
@@ -212,6 +222,13 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
                 By default, :py:attr:`DEFAULT_SCMCLIENT_OPTIONS` and then
                 :py:attr:`default_scmclient_options` will be set. ``options``
                 may override anything in these.
+
+            caps (dict, optional):
+                Custom capabilities to simulate retrieving from the server.
+
+                By defaut, :py:attr:`default_scmclient_caps` will be set.
+                ``caps`` may override anything in these. Dictionaries will
+                *not* be merged recursively.
 
             client_kwargs (dict, optional):
                 Keyword arguments to pass to the client class.
@@ -250,6 +267,10 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
             setattr(cmd_options, key, value)
 
         client = self.scmclient_cls(options=cmd_options, **client_kwargs)
+
+        if caps or self.default_scmclient_caps:
+            client.capabilities = Capabilities(
+                dict(self.default_scmclient_caps, **caps))
 
         if not allow_dep_checks:
             self.spy_on(client.check_dependencies, call_original=False)

@@ -9,7 +9,6 @@ from typing import Type
 
 import kgb
 
-from rbtools.api.capabilities import Capabilities
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     TooManyRevisionsError)
@@ -648,8 +647,8 @@ class PerforceClientTests(SCMClientTestCase):
         ))
 
     def _test_diff_with_moved_files(self, expected_diff, caps={}):
-        client = self.build_client(needs_diff=True)
-        client.capabilities = Capabilities(caps)
+        client = self.build_client(needs_diff=True,
+                                   caps=caps)
         client.p4.repo_files = [
             {
                 'depotFile': '//mydepot/test/README',
