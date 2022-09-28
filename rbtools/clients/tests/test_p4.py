@@ -458,7 +458,7 @@ class PerforceClientTests(SCMClientTestCase):
 
     def test_diff_with_pending_changelist(self):
         """Testing PerforceClient.diff with a pending changelist"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         client.p4.repo_files = [
             {
                 'depotFile': '//mydepot/test/README',
@@ -547,7 +547,8 @@ class PerforceClientTests(SCMClientTestCase):
                     }
                 ]
 
-        client = self.build_client(wrapper_cls=TestWrapper)
+        client = self.build_client(wrapper_cls=TestWrapper,
+                                   needs_diff=True)
         client.p4.repo_files = [
             {
                 'depotFile': '//mydepot/test/README',
@@ -647,7 +648,7 @@ class PerforceClientTests(SCMClientTestCase):
         ))
 
     def _test_diff_with_moved_files(self, expected_diff, caps={}):
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         client.capabilities = Capabilities(caps)
         client.p4.repo_files = [
             {

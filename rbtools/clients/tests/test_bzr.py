@@ -496,7 +496,7 @@ class BazaarClientTests(SCMClientTestCase):
 
     def test_diff(self):
         """Testing BazaarClient.diff"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
@@ -525,7 +525,7 @@ class BazaarClientTests(SCMClientTestCase):
 
     def test_diff_with_exclude_patterns(self):
         """Testing BazaarClient.diff with exclude_patterns"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit('foo.txt', FOO1, 'commit 1')
@@ -558,7 +558,7 @@ class BazaarClientTests(SCMClientTestCase):
     def test_diff_with_exclude_patterns_in_subdir(self):
         """Testing BazaarClient.diff with exclude_patterns= in a subdirectory
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit('foo.txt', FOO1, 'commit 1')
@@ -594,7 +594,7 @@ class BazaarClientTests(SCMClientTestCase):
 
     def test_diff_with_exclude_patterns_in_repo_root(self):
         """Testing BazaarClient.diff with exclude_patterns= in the repo root"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit('exclude.txt', FOO2, 'commit 1')
@@ -635,7 +635,7 @@ class BazaarClientTests(SCMClientTestCase):
 
     def test_diff_with_include_files(self):
         """Testing BazaarClient.diff with include_files="""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
@@ -667,7 +667,7 @@ class BazaarClientTests(SCMClientTestCase):
 
     def test_diff_with_multiple_commits(self):
         """Testing BazaarClient.diff with multiple commits"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         os.chdir(self.child_branch)
 
         self._bzr_add_file_commit('foo.txt', FOO1, 'commit 1')
@@ -706,7 +706,7 @@ class BazaarClientTests(SCMClientTestCase):
 
     def test_diff_with_changes_in_parent_branch(self):
         """Testing BazaarClient.diff with changes only in the parent branch"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         self._bzr_add_file_commit('foo.txt', FOO1, 'delete and modify stuff',
                                   cwd=self.child_branch)
@@ -731,9 +731,11 @@ class BazaarClientTests(SCMClientTestCase):
         """
         # Requesting the diff between the grand child branch and its grand
         # parent:
-        client = self.build_client(options={
-            'parent_branch': self.original_branch,
-        })
+        client = self.build_client(
+            needs_diff=True,
+            options={
+                'parent_branch': self.original_branch,
+            })
 
         self._bzr_add_file_commit('foo.txt', FOO1, 'delete and modify stuff',
                                   cwd=self.child_branch)

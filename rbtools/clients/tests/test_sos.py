@@ -857,7 +857,7 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -1008,7 +1008,7 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -1156,7 +1156,7 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -1333,7 +1333,7 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -1490,7 +1490,7 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -1706,7 +1706,7 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -1969,7 +1969,7 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         result = client.diff(
             revisions={
                 'base': None,
@@ -2192,7 +2192,7 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         result = client.diff(
             revisions={
                 'base': None,
@@ -2377,7 +2377,7 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -2509,7 +2509,7 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -2655,7 +2655,7 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -2824,7 +2824,7 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -2987,7 +2987,7 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -3144,7 +3144,7 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         result = client.diff(revisions={
             'base': None,
             'extra': {
@@ -3326,7 +3326,7 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         result = client.diff(
             revisions={
                 'base': None,
@@ -3536,7 +3536,7 @@ class SOSClientTests(BaseSOSTestCase):
             self.make_rule_restore_selection(tmpfiles[0]),
         ]))
 
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         result = client.diff(
             revisions={
                 'base': None,

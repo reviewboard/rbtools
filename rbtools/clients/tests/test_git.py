@@ -393,7 +393,7 @@ class GitClientTests(SCMClientTestCase):
 
     def test_diff_simple(self):
         """Testing GitClient simple diff case"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         client.get_repository_info()
         base_commit_id = self._git_get_head()
 
@@ -435,7 +435,7 @@ class GitClientTests(SCMClientTestCase):
 
     def test_diff_simple_multiple(self):
         """Testing GitClient simple diff with multiple commits case"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         client.get_repository_info()
 
         base_commit_id = self._git_get_head()
@@ -480,7 +480,7 @@ class GitClientTests(SCMClientTestCase):
 
     def test_diff_exclude(self):
         """Testing GitClient simple diff with file exclusion"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         client.get_repository_info()
         base_commit_id = self._git_get_head()
 
@@ -516,7 +516,7 @@ class GitClientTests(SCMClientTestCase):
 
     def test_diff_exclude_in_subdir(self):
         """Testing GitClient simple diff with file exclusion in a subdir"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         base_commit_id = self._git_get_head()
 
         os.mkdir('subdir')
@@ -555,7 +555,7 @@ class GitClientTests(SCMClientTestCase):
 
     def test_diff_exclude_root_pattern_in_subdir(self):
         """Testing GitClient diff with file exclusion in the repo root"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         base_commit_id = self._git_get_head()
 
         os.mkdir('subdir')
@@ -595,7 +595,7 @@ class GitClientTests(SCMClientTestCase):
 
     def test_diff_branch_diverge(self):
         """Testing GitClient diff with divergent branches"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
         self._run_git(['checkout', '-b', 'mybranch', '--track',
@@ -671,7 +671,7 @@ class GitClientTests(SCMClientTestCase):
     def test_diff_tracking_no_origin(self):
         """Testing GitClient diff with a tracking branch, but no origin remote
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         self._run_git(['remote', 'add', 'quux', self.git_dir])
         self._run_git(['fetch', 'quux'])
@@ -711,7 +711,7 @@ class GitClientTests(SCMClientTestCase):
 
     def test_diff_local_tracking(self):
         """Testing GitClient diff with a local tracking branch"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         base_commit_id = self._git_get_head()
         self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
@@ -757,9 +757,11 @@ class GitClientTests(SCMClientTestCase):
 
     def test_diff_tracking_override(self):
         """Testing GitClient diff with option override for tracking branch"""
-        client = self.build_client(options={
-            'tracking': 'origin/master',
-        })
+        client = self.build_client(
+            needs_diff=True,
+            options={
+                'tracking': 'origin/master',
+            })
 
         self._run_git(['remote', 'add', 'bad', self.git_dir])
         self._run_git(['fetch', 'bad'])
@@ -801,7 +803,7 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient diff with tracking branch that has slash in its
         name
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         self._run_git(['fetch', 'origin'])
         self._run_git(['checkout', '-b', 'my/branch', '--track',
@@ -989,7 +991,7 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient.parse_revision_spec with target branch off a
         tracking branch not aligned with the remote
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         # In this case, the parent must be the non-aligned tracking branch
         # and the parent_base must be the remote tracking branch.
@@ -1035,9 +1037,11 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient.parse_revision_spec with target branch off a
         tracking branch aligned with the remote
         """
-        client = self.build_client(options={
-            'tracking': 'origin/not-master',
-        })
+        client = self.build_client(
+            needs_diff=True,
+            options={
+                'tracking': 'origin/not-master',
+            })
 
         # In this case, the parent_base should be the tracking branch aligned
         # with the remote.
@@ -1079,7 +1083,7 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient.parse_revision_spec with target branch off
         a tracking branch with changes since the remote
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         # In this case, the parent_base must be the remote tracking branch,
         # despite the fact that it is a few changes behind.
@@ -1122,7 +1126,7 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient.parse_revision_spec with target branch off a
         branch not properly tracking the remote
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         # In this case, the parent_base must be the remote tracking branch,
         # even though it is not properly being tracked.
@@ -1160,7 +1164,7 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient.parse_revision_spec with a target branch that
         merged a tracking branch off another tracking branch
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         # In this case, the parent_base must be the base of the merge, because
         # the user will expect that the diff would show the merged changes.
@@ -1203,9 +1207,11 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient.parse_revision_spec with a target branch posted
         off a tracking branch that merged another tracking branch
         """
-        client = self.build_client(options={
-            'tracking': 'origin/not-master',
-        })
+        client = self.build_client(
+            needs_diff=True,
+            options={
+                'tracking': 'origin/not-master',
+            })
 
         # In this case, the parent_base must be tracking branch that merged
         # the other tracking branch.
@@ -1248,7 +1254,7 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient.parse_revision_spec with a target branch posted
         off a remote branch without any tracking branches
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         # In this case, the parent_base must be remote tracking branch. The
         # existence of a tracking branch shouldn't matter much.
@@ -1287,7 +1293,7 @@ class GitClientTests(SCMClientTestCase):
         off a remote branch that is aligned to the same commit as another
         remote branch
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         # In this case, the parent_base must be common commit that the two
         # remote branches are aligned to.
@@ -1345,7 +1351,7 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient.parse_revision_spec with a target branch not
         up-to-date with a remote branch
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         # In this case, there is no good way of detecting the remote branch we
         # are not up-to-date with, so the parent_base must be the common commit
@@ -1404,7 +1410,7 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient.parse_revision_spec with a target branch that has
         branches from different remotes in its path
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         # In this case, the other remotes should be ignored and the parent_base
         # should be some origin/*.

@@ -779,7 +779,7 @@ class SVNClientTests(SCMClientTestCase):
 
     def test_diff_exclude(self):
         """Testing SVNClient diff with file exclude patterns"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         self._svn_add_file('bar.txt', FOO1)
         self._svn_add_file('exclude.txt', FOO2)
@@ -811,7 +811,7 @@ class SVNClientTests(SCMClientTestCase):
 
     def test_diff_exclude_in_subdir(self):
         """Testing SVNClient diff with exclude patterns in a subdir"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         self._svn_add_file('foo.txt', FOO1)
         self._svn_add_dir('subdir')
@@ -829,7 +829,7 @@ class SVNClientTests(SCMClientTestCase):
 
     def test_diff_exclude_root_pattern_in_subdir(self):
         """Testing SVNClient diff with repo exclude patterns in a subdir"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         self._svn_add_file('exclude.txt', FOO1)
         self._svn_add_dir('subdir')
@@ -852,7 +852,7 @@ class SVNClientTests(SCMClientTestCase):
         """Testing SVNClient identical diff generated from root, subdirectory,
         and via target
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         # Test diff generation for a single file, where 'svn diff' is invoked
         # from three different locations.  This should result in an identical
@@ -957,7 +957,7 @@ class SVNClientTests(SCMClientTestCase):
 
     def test_diff_non_unicode_characters(self):
         """Testing SVNClient diff with a non-utf8 file"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         self._svn_add_file('A.txt', '\xe2'.encode('iso-8859-1'))
         self._run_svn(['propset', 'svn:mime-type', 'text/plain', 'A.txt'])
@@ -992,9 +992,11 @@ class SVNClientTests(SCMClientTestCase):
         """Testing SVNClient diff with a non-utf8 filename via repository_url
         option
         """
-        client = self.build_client(options={
-            'repository_url': self.svn_repo_url,
-        })
+        client = self.build_client(
+            needs_diff=True,
+            options={
+                'repository_url': self.svn_repo_url,
+            })
 
         # Note: commit r4 adds one file with a non-utf8 character in both its
         # filename and content.
@@ -1078,9 +1080,11 @@ class SVNClientTests(SCMClientTestCase):
             AssertionError:
                 One of the checks failed.
         """
-        client = self.build_client(options={
-            'svn_show_copies_as_adds': state,
-        })
+        client = self.build_client(
+            needs_diff=True,
+            options={
+                'svn_show_copies_as_adds': state,
+            })
         client.get_repository_info()
 
         # Ensure valid SVN client version.
@@ -1118,7 +1122,7 @@ class SVNClientTests(SCMClientTestCase):
 
     def test_history_scheduled_with_commit_nominal(self):
         """Testing SVNClient.history_scheduled_with_commit nominal cases"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         client.get_repository_info()
 
         # Ensure valid SVN client version.
@@ -1175,7 +1179,7 @@ class SVNClientTests(SCMClientTestCase):
         """Testing SVNClient.history_scheduled_with_commit is bypassed when
         diff is not for local modifications in a working copy
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         client.get_repository_info()
 
         # Ensure valid SVN client version.
@@ -1219,9 +1223,11 @@ class SVNClientTests(SCMClientTestCase):
                 ),
             })
 
-        client = self.build_client(options={
-            'repository_url': self.svn_repo_url,
-        })
+        client = self.build_client(
+            needs_diff=True,
+            options={
+                'repository_url': self.svn_repo_url,
+            })
         client.get_repository_info()
 
         revisions = client.parse_revision_spec(['2'])
@@ -1255,7 +1261,7 @@ class SVNClientTests(SCMClientTestCase):
 
     def test_history_scheduled_with_commit_special_case_exclude(self):
         """Testing SVNClient.history_scheduled_with_commit with exclude file"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         client.get_repository_info()
 
         # Ensure valid SVN client version.
@@ -1296,7 +1302,7 @@ class SVNClientTests(SCMClientTestCase):
                     '-- test line2\n'
                     '-- test line (test2)\n')
 
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         revisions = client.parse_revision_spec()
 
         self.assertEqual(

@@ -1414,7 +1414,8 @@ class ClearCaseClientTests(SCMClientTestCase):
             ('test.py@@/main/1', 'test.py'),
         ]
 
-        client = self.build_client(allow_dep_checks=False)
+        client = self.build_client(allow_dep_checks=False,
+                                   needs_diff=True)
         client.root_path = os.getcwd()
         repository_info = ClearCaseRepositoryInfo('/view/test/vob', 'vob')
         metadata = client._get_diff_metadata({
@@ -1617,7 +1618,8 @@ class ClearCaseClientTests(SCMClientTestCase):
             ('test.pdf@@/main/0', 'test.pdf'),
         ]
 
-        client = self.build_client(allow_dep_checks=False)
+        client = self.build_client(allow_dep_checks=False,
+                                   needs_diff=True)
         client.root_path = os.getcwd()
         repository_info = ClearCaseRepositoryInfo('/view/test/vob', 'vob')
         repository_info.is_legacy = False
@@ -1829,7 +1831,8 @@ class ClearCaseClientTests(SCMClientTestCase):
             ('test-dir/empty-dir@@/main/0', 'test-dir/empty-dir'),
         ]
 
-        client = self.build_client(allow_dep_checks=False)
+        client = self.build_client(allow_dep_checks=False,
+                                   needs_diff=True)
         client.root_path = os.getcwd()
         repository_info = ClearCaseRepositoryInfo('/view/test/vob', 'vob')
         metadata = client._get_diff_metadata({
@@ -2121,7 +2124,8 @@ class ClearCaseClientTests(SCMClientTestCase):
             ('test-dir/empty-dir@@/main/0', 'test-dir/empty-dir'),
         ]
 
-        client = self.build_client(allow_dep_checks=False)
+        client = self.build_client(allow_dep_checks=False,
+                                   needs_diff=True)
         client.root_path = os.getcwd()
         repository_info = ClearCaseRepositoryInfo('/view/test/vob', 'vob')
         repository_info.is_legacy = False

@@ -4,7 +4,7 @@ Version Added:
     4.0
 """
 
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, cast
 
 
 class MissingDiffToolError(Exception):
@@ -16,6 +16,18 @@ class MissingDiffToolError(Exception):
     Version Added:
         4.0
     """
+
+    #: A list of compatible diff tool IDs that could not be found.
+    #:
+    #: Type:
+    #:     list of str
+    compatible_diff_tool_ids: List[str]
+
+    #: A list of compatible diff tool names that could not be found.
+    #:
+    #: Type:
+    #:     list of str
+    compatible_diff_tool_names: List[str]
 
     def __init__(
         self,
@@ -52,6 +64,10 @@ class MissingDiffToolError(Exception):
                     instructions.append(diff_tool_instructions)
             else:
                 compatible_diff_tool_names.append(diff_tool_id)
+
+        self.compatible_diff_tool_ids = \
+            cast(List[str], compatible_diff_tool_ids)
+        self.compatible_diff_tool_names = compatible_diff_tool_names
 
         message = [
             'A compatible command line diff tool (%s) was not found on the '

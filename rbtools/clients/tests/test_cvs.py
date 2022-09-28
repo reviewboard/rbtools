@@ -205,7 +205,7 @@ class CVSClientTests(SCMClientTestCase):
 
     def test_diff(self):
         """Testing CVSClient.diff"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         with open('file1', 'w') as fp:
             fp.write('new content!\n')
@@ -252,7 +252,7 @@ class CVSClientTests(SCMClientTestCase):
 
     def test_diff_with_include_files(self):
         """Testing CVSClient.diff with include_files="""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         with open('file1', 'w') as fp:
             fp.write('new content!\n')
@@ -289,7 +289,7 @@ class CVSClientTests(SCMClientTestCase):
 
     def test_diff_with_exclude_patterns(self):
         """Testing CVSClient.diff with exclude_patterns="""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         with open('file1', 'w') as fp:
             fp.write('new content!\n')

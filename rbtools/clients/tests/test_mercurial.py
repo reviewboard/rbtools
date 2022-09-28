@@ -370,7 +370,7 @@ class MercurialClientTests(MercurialTestCase):
 
     def test_diff(self):
         """Testing MercurialClient.diff"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
@@ -421,7 +421,7 @@ class MercurialClientTests(MercurialTestCase):
 
     def test_diff_with_multiple_commits(self):
         """Testing MercurialClient.diff with multiple commits"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
@@ -485,7 +485,7 @@ class MercurialClientTests(MercurialTestCase):
 
     def test_diff_with_exclude_patterns(self):
         """Testing MercurialClient.diff with exclude_patterns"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
@@ -540,7 +540,7 @@ class MercurialClientTests(MercurialTestCase):
         """Testing MercurialClient.diff with exclude_patterns matching empty
         file
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
@@ -593,7 +593,7 @@ class MercurialClientTests(MercurialTestCase):
 
     def test_diff_with_diverged_branch(self):
         """Testing MercurialClient.diff with diverged branch"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
@@ -722,7 +722,7 @@ class MercurialClientTests(MercurialTestCase):
 
     def test_diff_with_parent_diff(self):
         """Testing MercurialClient.diff with parent diffs"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
@@ -824,7 +824,7 @@ class MercurialClientTests(MercurialTestCase):
         """
         # This test is very similar to test_diff_with_parent_diff except we
         # throw a branch into the mix.
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
@@ -926,9 +926,11 @@ class MercurialClientTests(MercurialTestCase):
         """Testing MercurialClient.diff with parent diffs using --parent"""
         # This test is very similar to test_diff_with_parent_diff except we
         # use the --parent option to post without explicit revisions
-        client = self.build_client(options={
-            'parent_branch': '2',
-        })
+        client = self.build_client(
+            needs_diff=True,
+            options={
+                'parent_branch': '2',
+            })
 
         base_commit_id = self._hg_get_tip()
         self.hg_add_file_commit(filename='foo.txt',
@@ -1934,7 +1936,7 @@ class MercurialSubversionClientTests(MercurialTestCase):
 
     def test_diff(self):
         """Testing MercurialClient.diff with SVN"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         client.get_repository_info()
 
         self.hg_add_file_commit(filename='foo.txt',
@@ -1952,7 +1954,7 @@ class MercurialSubversionClientTests(MercurialTestCase):
 
     def test_diff_with_multiple_commits(self):
         """Testing MercurialClient.diff with SVN and multiple commits"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         client.get_repository_info()
 
         self.hg_add_file_commit(filename='foo.txt',
@@ -1976,7 +1978,7 @@ class MercurialSubversionClientTests(MercurialTestCase):
 
     def test_diff_with_revision(self):
         """Testing MercurialClient.diff with SVN and specific revision"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         client.get_repository_info()
 
         self.hg_add_file_commit(filename='foo.txt',

@@ -10,13 +10,13 @@ from datetime import datetime
 from typing import Any, Dict, Generic, Optional, Type, TypeVar
 from unittest import SkipTest
 
-from typing_extensions import Final, TypeAlias
-
 import kgb
+from typing_extensions import Final, TypeAlias
 
 from rbtools.clients import BaseSCMClient
 from rbtools.clients.errors import SCMClientDependencyError
 from rbtools.deprecation import RemovedInRBTools40Warning
+from rbtools.diffs.tools.errors import MissingDiffToolError
 from rbtools.testing import TestCase
 from rbtools.utils.filesystem import make_tempdir
 
@@ -190,8 +190,17 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
         setup: bool = True,
         allow_dep_checks: bool = True,
         skip_if_deps_missing: bool = True,
+        needs_diff: bool = False,
     ) -> _TestSCMClientType:
         """Build a client for testing.
+
+        This gives the test a lot of control over the setup of the client
+        and what checks can be performed.
+
+        If a test needs to use diff functionality, it must specify
+        ``needs_diff=True`` in order to pre-cache some state. The test will
+        then be skipped if a compatible tool is not installed. Failing to
+        set this and then creating a diff will result in an error.
 
         Version Added:
             4.0
@@ -219,6 +228,15 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
             skip_if_deps_missing (bool, optional):
                 Whether to skip the unit test if dependencies are missing.
 
+            needs_diff (bool, optional):
+                Whether the test needs to work with diffs.
+
+                If ``True``, and a compatible diff tool is not available, the
+                test will be skipped.
+
+                If ``False`` (the default), attempting to create a diff will
+                result in an error.
+
         Returns:
             rbtools.clients.base.scmclient.BaseSCMClient:
             The client instance.
@@ -244,6 +262,24 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
                     raise SkipTest(str(e))
                 else:
                     raise
+
+        if needs_diff:
+            # This will both cache the diff tool (so tests don't have to
+            # account for the checks), and skip if not present.
+            try:
+                client.get_diff_tool()
+            except MissingDiffToolError as e:
+                raise SkipTest(
+                    'A compatible diff tool (%s) is required for this test.'
+                    % (', '.join(e.compatible_diff_tool_names)))
+        else:
+            # Make sure the caller never calls diff(). That's a test error.
+            self.spy_on(
+                client.diff,
+                op=kgb.SpyOpRaise(Exception(
+                    'This unit test called %s.diff(), but did not pass '
+                    'needs_diff=True to build_client()!'
+                    % type(client).__name__)))
 
         return client
 
