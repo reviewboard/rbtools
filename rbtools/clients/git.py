@@ -1074,8 +1074,9 @@ class GitClient(BaseSCMClient):
                 old_filename = b''
                 new_filename = b''
                 is_full_rename = False
-            elif (line.startswith(b'index ') or
-                  line.startswith(b'new file mode ')):
+            elif (line.startswith((b'index ',
+                                   b'new file mode ',
+                                   b'deleted file mode '))):
                 # Filter this out.
                 pass
             elif (line.startswith(b'similarity index 100%') and
