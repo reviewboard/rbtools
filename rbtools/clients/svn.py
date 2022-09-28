@@ -8,7 +8,7 @@ import posixpath
 import re
 import sys
 from xml.etree import ElementTree
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import six
 from six.moves import map
@@ -1100,18 +1100,22 @@ class SVNClient(BaseSCMClient):
                     revert=False):
         """Apply the patch and return a PatchResult indicating its success.
 
+        Version Changed:
+            4.0:
+            This now supports returning information on files with conflicts.
+
         Args:
-            patch_file (unicode):
+            patch_file (str):
                 The name of the patch file to apply.
 
-            base_path (unicode):
+            base_path (str):
                 The base path that the diff was generated in.
 
-            base_dir (unicode):
+            base_dir (str):
                 The path of the current working directory relative to the root
                 of the repository.
 
-            p (unicode, optional):
+            p (str, optional):
                 The prefix level of the diff.
 
             revert (bool, optional):
@@ -1161,28 +1165,61 @@ class SVNClient(BaseSCMClient):
                                          results_unicode=False,
                                          return_error_code=True)
 
+        applied = False
+
         if self.supports_empty_files():
             try:
                 with open(patch_file, 'rb') as f:
                     patch = f.read()
             except IOError as e:
                 logging.error('Unable to read file %s: %s', patch_file, e)
-                return
+                return PatchResult(applied=False)
 
-            self.apply_patch_for_empty_files(patch, p_num, revert=revert)
+            applied = self.apply_patch_for_empty_files(
+                patch=patch,
+                p_num=p_num,
+                revert=revert)
 
-            # TODO: What is svn's equivalent of a garbage patch message?
+        patch_status_re = re.compile(
+            b'^(?P<status>[ACDGU]) {9}(?P<filename>.+)$'
+        )
 
-        return PatchResult(applied=(rc == 0), patch_output=patch_output)
+        conflicting_files: List[str] = []
 
-    def apply_patch_for_empty_files(self, patch, p_num, revert=False):
-        """Return whether any empty files in the patch are applied.
+        # We can't trust exit codes for svn patch, since we'll get 0 even if
+        # we fail to patch anything. Instead, look for the status output.
+        for line in patch_output.splitlines():
+            m = patch_status_re.match(line)
+
+            if m:
+                status = m.group('status')
+
+                if status == b'C':
+                    # There was a conflict.
+                    conflicting_files.append(
+                        m.group('filename').decode('utf-8'))
+                else:
+                    # Anything else is a successful result.
+                    applied = True
+
+        return PatchResult(applied=applied,
+                           has_conflicts=bool(conflicting_files),
+                           conflicting_files=conflicting_files,
+                           patch_output=patch_output)
+
+    def apply_patch_for_empty_files(
+        self,
+        patch: bytes,
+        p_num: Union[int, str],
+        revert: bool = False,
+    ) -> bool:
+        """Attempt to add or delete empty files in the patch.
 
         Args:
             patch (bytes):
                 The contents of the patch.
 
-            p_num (unicode):
+            p_num (int):
                 The prefix level of the diff.
 
             revert (bool, optional):
@@ -1196,11 +1233,20 @@ class SVNClient(BaseSCMClient):
         patched_empty_files = False
 
         if revert:
-            added_files = self.DELETED_FILES_RE.findall(patch)
-            deleted_files = self.ADDED_FILES_RE.findall(patch)
+            added_files_re = self.DELETED_FILES_RE
+            deleted_files_re = self.ADDED_FILES_RE
         else:
-            added_files = self.ADDED_FILES_RE.findall(patch)
-            deleted_files = self.DELETED_FILES_RE.findall(patch)
+            added_files_re = self.ADDED_FILES_RE
+            deleted_files_re = self.DELETED_FILES_RE
+
+        added_files = [
+            _filename.decode('utf-8')
+            for _filename in added_files_re.findall(patch)
+        ]
+        deleted_files = [
+            _filename.decode('utf-8')
+            for _filename in deleted_files_re.findall(patch)
+        ]
 
         if added_files:
             added_files = self._strip_p_num_slashes(added_files, int(p_num))

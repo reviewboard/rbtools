@@ -1327,8 +1327,33 @@ class SVNClientTests(SCMClientTestCase):
         client = self.build_client()
         repository_info = client.get_repository_info()
 
-        self.spy_on(run_process_exec,
-                    op=kgb.SpyOpReturn((0, b'test', b'')))
+        self.spy_on(run_process_exec)
+
+        with open('test.diff', 'wb') as fp:
+            fp.write(
+                b'Index: /\xc3\xa2.txt\n'
+                b'================================================'
+                b'===================\n'
+                b'--- /\xc3\xa2.txt\t(revision 5)\n'
+                b'+++ /\xc3\xa2.txt\t(working copy)\n'
+                b'@@ -1,2 +1,3 @@\n'
+                b' This file has a non-utf8 filename.\n'
+                b' It also contains a non-utf8 character: \xc3\xa9.\n'
+                b'+And this! \xf0\x9f\xa5\xb9\n'
+                b'Index: /foo.txt\n'
+                b'================================================'
+                b'===================\n'
+                b'--- /foo.txt\t(revision 5)\n'
+                b'+++ /foo.txt\t(working copy)\n'
+                b'@@ -6,6 +6,6 @@\n'
+                b' dum conderet urbem,\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b'-Albanique patres, atque altae moenia Romae.\n'
+                b'+Albanique patres, atque altae moenia Romae!\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'\n'
+            )
 
         result = client.apply_patch(base_path=repository_info.base_path,
                                     base_dir='',
@@ -1344,59 +1369,311 @@ class SVNClientTests(SCMClientTestCase):
         self.assertTrue(result.applied)
         self.assertFalse(result.has_conflicts)
         self.assertEqual(result.conflicting_files, [])
-        self.assertEqual(result.patch_output, b'test')
+        self.assertEqual(
+            result.patch_output,
+            b'U         \xc3\xa2.txt\n'
+            b'U         foo.txt\n')
 
     def test_apply_patch_with_p(self):
         """Testing SVNClient.apply_patch with p="""
         client = self.build_client()
         repository_info = client.get_repository_info()
 
-        self.spy_on(run_process_exec,
-                    op=kgb.SpyOpReturn((0, b'test', b'')))
+        self.spy_on(
+            run_process_exec,
+            op=kgb.SpyOpMatchInOrder([
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'patch', '--strip=3',
+                        'test.diff',
+                    ],),
+                    'kwargs': {
+                        'redirect_stderr': True,
+                    },
+                },
+            ]))
+
+        with open('test.diff', 'wb') as fp:
+            fp.write(
+                b'Index: /a/b/\xc3\xa2.txt\n'
+                b'================================================'
+                b'===================\n'
+                b'--- /a/b/\xc3\xa2.txt\t(revision 5)\n'
+                b'+++ /a/b/\xc3\xa2.txt\t(working copy)\n'
+                b'@@ -1,2 +1,3 @@\n'
+                b' This file has a non-utf8 filename.\n'
+                b' It also contains a non-utf8 character: \xc3\xa9.\n'
+                b'+And this! \xf0\x9f\xa5\xb9\n'
+                b'Index: /a/b/foo.txt\n'
+                b'================================================'
+                b'===================\n'
+                b'--- /a/b/foo.txt\t(revision 5)\n'
+                b'+++ /a/b/foo.txt\t(working copy)\n'
+                b'@@ -6,6 +6,6 @@\n'
+                b' dum conderet urbem,\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b'-Albanique patres, atque altae moenia Romae.\n'
+                b'+Albanique patres, atque altae moenia Romae!\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'\n'
+            )
 
         result = client.apply_patch(base_path=repository_info.base_path,
                                     base_dir='',
                                     patch_file='test.diff',
                                     p=3)
 
-        self.assertSpyCalledWith(
-            run_process_exec,
-            [
-                'svn', '--non-interactive', 'patch', '--strip=3', 'test.diff',
-            ],
-            redirect_stderr=True)
+        self.assertSpyCalled(run_process_exec)
 
         self.assertTrue(result.applied)
         self.assertFalse(result.has_conflicts)
         self.assertEqual(result.conflicting_files, [])
-        self.assertEqual(result.patch_output, b'test')
+        self.assertEqual(
+            result.patch_output,
+            b'U         \xc3\xa2.txt\n'
+            b'U         foo.txt\n')
 
-    def test_apply_patch_with_error(self):
-        """Testing SVNClient.apply_patch with error"""
+    def test_apply_patch_with_revert(self):
+        """Testing SVNClient.apply_patch with revert=True"""
         client = self.build_client()
         repository_info = client.get_repository_info()
 
         self.spy_on(
             run_process_exec,
-            op=kgb.SpyOpReturn((
-                1,
-                'bád'.encode('utf-8'),
-                b'',
-            )))
+            op=kgb.SpyOpMatchInOrder([
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'patch', '--strip=1',
+                        '--reverse-diff', 'test.diff',
+                    ],),
+                    'kwargs': {
+                        'redirect_stderr': True,
+                    },
+                },
+            ]))
+
+        with open('â.txt', 'ab') as fp:
+            fp.write(b'And this! \xf0\x9f\xa5\xb9\n')
+
+        with open('foo.txt', 'wb') as fp:
+            fp.write(
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'Italiam, fato profugus, Laviniaque venit\n'
+                b'litora, multum ille et terris iactatus et alto\n'
+                b'vi superum saevae memorem Iunonis ob iram;\n'
+                b'dum conderet urbem,\n'
+                b'inferretque deos Latio, genus unde Latinum,\n'
+                b'Albanique patres, atque altae moenia Romae.\n'
+                b'Albanique patres, atque altae moenia Romae!\n'
+                b'Musa, mihi causas memora, quo numine laeso,\n'
+                b'\n'
+            )
+
+        with open('test.diff', 'wb') as fp:
+            fp.write(
+                b'Index: /\xc3\xa2.txt\n'
+                b'================================================'
+                b'===================\n'
+                b'--- /\xc3\xa2.txt\t(revision 5)\n'
+                b'+++ /\xc3\xa2.txt\t(working copy)\n'
+                b'@@ -1,2 +1,3 @@\n'
+                b' This file has a non-utf8 filename.\n'
+                b' It also contains a non-utf8 character: \xc3\xa9.\n'
+                b'+And this! \xf0\x9f\xa5\xb9\n'
+                b'Index: /foo.txt\n'
+                b'================================================'
+                b'===================\n'
+                b'--- /foo.txt\t(revision 5)\n'
+                b'+++ /foo.txt\t(working copy)\n'
+                b'@@ -6,6 +6,6 @@\n'
+                b' dum conderet urbem,\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b'-Albanique patres, atque altae moenia Romae.\n'
+                b'+Albanique patres, atque altae moenia Romae!\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'\n'
+            )
 
         result = client.apply_patch(base_path=repository_info.base_path,
                                     base_dir='',
                                     patch_file='test.diff',
-                                    p=3)
+                                    revert=True)
 
-        self.assertSpyCalledWith(
+        self.assertSpyCalled(run_process_exec)
+
+        self.assertTrue(result.applied)
+        self.assertFalse(result.has_conflicts)
+        self.assertEqual(result.conflicting_files, [])
+        self.assertEqual(
+            result.patch_output,
+            b'U         \xc3\xa2.txt\n'
+            b'U         foo.txt\n')
+
+    def test_apply_patch_with_not_applied(self):
+        """Testing SVNClient.apply_patch with not applied"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(
             run_process_exec,
-            [
-                'svn', '--non-interactive', 'patch', '--strip=3', 'test.diff',
-            ],
-            redirect_stderr=True)
+            op=kgb.SpyOpMatchInOrder([
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'patch', '--strip=1',
+                        'test.diff',
+                    ],),
+                    'kwargs': {
+                        'redirect_stderr': True,
+                    },
+                },
+            ]))
+
+        with open('test.diff', 'wb') as fp:
+            fp.write(
+                b'Index: foorp.txt\n'
+                b'================================================'
+                b'===================\n'
+            )
+
+        result = client.apply_patch(base_path=repository_info.base_path,
+                                    base_dir='',
+                                    patch_file='test.diff')
+
+        self.assertSpyCalled(run_process_exec)
 
         self.assertFalse(result.applied)
         self.assertFalse(result.has_conflicts)
         self.assertEqual(result.conflicting_files, [])
-        self.assertEqual(result.patch_output, b'b\xc3\xa1d')
+        self.assertEqual(result.patch_output, b'')
+
+    def test_apply_patch_with_conflicts(self):
+        """Testing SVNClient.apply_patch with conflicts"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(
+            run_process_exec,
+            op=kgb.SpyOpMatchInOrder([
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'patch', '--strip=1',
+                        'test.diff',
+                    ],),
+                    'kwargs': {
+                        'redirect_stderr': True,
+                    },
+                },
+            ]))
+
+        with open('test.diff', 'wb') as fp:
+            fp.write(
+                b'Index: /\xc3\xa2.txt\n'
+                b'================================================'
+                b'===================\n'
+                b'--- /\xc3\xa2.txt\t(revision 5)\n'
+                b'+++ /\xc3\xa2.txt\t(working copy)\n'
+                b'@@ -1,1 +1,1 @@\n'
+                b'-This is a bad line\n'
+                b'+Oh hi! \xf0\x9f\xa5\xb9\n'
+                b'Index: /foo.txt\n'
+                b'================================================'
+                b'===================\n'
+                b'--- /foo.txt\t(revision 5)\n'
+                b'+++ /foo.txt\t(working copy)\n'
+                b'@@ -6,6 +6,6 @@\n'
+                b' dum conderet urbem,\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b'-foo\n'
+                b'+Albanique patres, atque altae moenia Romae!\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'\n'
+            )
+
+        result = client.apply_patch(base_path=repository_info.base_path,
+                                    base_dir='',
+                                    patch_file='test.diff')
+
+        self.assertSpyCalled(run_process_exec)
+
+        self.assertFalse(result.applied)
+        self.assertTrue(result.has_conflicts)
+        self.assertEqual(
+            result.conflicting_files,
+            [
+                'â.txt',
+                'foo.txt',
+            ])
+        self.assertEqual(
+            result.patch_output,
+            b'C         \xc3\xa2.txt\n'
+            b'>         rejected hunk @@ -1,1 +1,1 @@\n'
+            b'C         foo.txt\n'
+            b'>         rejected hunk @@ -6,6 +6,6 @@\n'
+            b'Summary of conflicts:\n'
+            b'  Text conflicts: 2\n')
+
+    def test_apply_patch_with_applied_and_conflicts(self):
+        """Testing SVNClient.apply_patch with applied and conflicts"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(
+            run_process_exec,
+            op=kgb.SpyOpMatchInOrder([
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'patch', '--strip=1',
+                        'test.diff',
+                    ],),
+                    'kwargs': {
+                        'redirect_stderr': True,
+                    },
+                },
+            ]))
+
+        with open('test.diff', 'wb') as fp:
+            fp.write(
+                b'Index: /\xc3\xa2.txt\n'
+                b'================================================'
+                b'===================\n'
+                b'--- /\xc3\xa2.txt\t(revision 5)\n'
+                b'+++ /\xc3\xa2.txt\t(working copy)\n'
+                b'@@ -1,2 +1,3 @@\n'
+                b' This file has a non-utf8 filename.\n'
+                b' It also contains a non-utf8 character: \xc3\xa9.\n'
+                b'+And this! \xf0\x9f\xa5\xb9\n'
+                b'Index: /foo.txt\n'
+                b'================================================'
+                b'===================\n'
+                b'--- /foo.txt\t(revision 5)\n'
+                b'+++ /foo.txt\t(working copy)\n'
+                b'@@ -6,6 +6,6 @@\n'
+                b' dum conderet urbem,\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b'-foo\n'
+                b'+Albanique patres, atque altae moenia Romae!\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'\n'
+            )
+
+        result = client.apply_patch(base_path=repository_info.base_path,
+                                    base_dir='',
+                                    patch_file='test.diff')
+
+        self.assertSpyCalled(run_process_exec)
+
+        self.assertTrue(result.applied)
+        self.assertTrue(result.has_conflicts)
+        self.assertEqual(result.conflicting_files, ['foo.txt'])
+        self.assertEqual(
+            result.patch_output,
+            b'U         \xc3\xa2.txt\n'
+            b'C         foo.txt\n'
+            b'>         rejected hunk @@ -6,6 +6,6 @@\n'
+            b'Summary of conflicts:\n'
+            b'  Text conflicts: 1\n')
