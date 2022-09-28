@@ -110,8 +110,9 @@ _WEBVIEW_VIEW_INFO = (
 )
 
 
-_LEGACY_DIFF = b"""--- vob/test2.py@@/main/1\t2022-05-23 20:10:38.578433000 +0000
-+++ vob/test2.py\t2022-05-23 20:11:11.050410000 +0000
+_LEGACY_DIFF = b"""\
+--- vob/test2.py@@/main/1\t2022-01-02 12:34:56.000000 +0000
++++ vob/test2.py\t2022-01-02 12:34:56.000000 +0000
 ==== test2.py-fake-oid test2.py-fake-oid ====
 @@ -0,0 +1,3 @@
 +#!/usr/bin/env python
@@ -119,8 +120,8 @@ _LEGACY_DIFF = b"""--- vob/test2.py@@/main/1\t2022-05-23 20:10:38.578433000 +000
 +print('Test')
 ==== test.pdf-fake-oid test.pdf-fake-oid ====
 Binary files test.pdf@@/main/0 and test.pdf differ
---- vob/test.py@@/main/1\t2022-05-23 20:10:38.578433000 +0000
-+++ vob/test.py\t2022-05-23 20:11:11.050410000 +0000
+--- vob/test.py@@/main/1\t2022-01-02 12:34:56.000000 +0000
++++ vob/test.py\t2022-01-02 12:34:56.000000 +0000
 ==== test.py-fake-oid test.py-fake-oid ====
 @@ -1,3 +1,4 @@
 #!/usr/bin/env python
@@ -204,8 +205,8 @@ _DIFFX_DIFF = b"""#diffx: encoding=utf-8, version=1.0
     }
 }
 #...diff: length=163, line_endings=unix, type=text
---- test2.py@@/main/1\t2022-05-23 20:10:38.578433000 +0000
-+++ test2.py\t2022-05-23 20:11:11.050410000 +0000
+--- test2.py@@/main/1\t2022-01-02 12:34:56.000000 +0000
++++ test2.py\t2022-01-02 12:34:56.000000 +0000
 @@ -0,0 +1,3 @@
 +#!/usr/bin/env python
 +
@@ -242,15 +243,17 @@ Binary files test.pdf@@/main/0 and test.pdf differ
 """
 
 
-_LEGACY_DIRECTORY_DIFF = b"""--- test-dir@@/main/0\t2022-09-05 23:49:05.000000000 -0600
-+++ test-dir\t2022-09-05 23:49:09.000000000 -0600
+_LEGACY_DIRECTORY_DIFF = b"""\
+--- test-dir@@/main/0\t2022-01-02 12:34:56.000000 +0000
++++ test-dir\t2022-01-02 12:34:56.000000 +0000
 ==== test-dir-old-oid test-dir-new-oid ====
 @@ -0,0 +1 @@
 +empty-dir
 """
 
 
-_DIFFX_DIRECTORY_DIFF = b"""#diffx: encoding=utf-8, version=1.0
+_DIFFX_DIRECTORY_DIFF = b"""\
+#diffx: encoding=utf-8, version=1.0
 #.meta: format=json, length=143
 {
     "stats": {
@@ -325,8 +328,8 @@ _DIFFX_DIRECTORY_DIFF = b"""#diffx: encoding=utf-8, version=1.0
     }
 }
 #...diff: length=132, line_endings=unix, type=text
---- test-dir@@/main/0	2022-09-05 23:49:05.000000000 -0600
-+++ test-dir	2022-09-05 23:49:09.000000000 -0600
+--- test-dir@@/main/0	2022-01-02 12:34:56.000000 +0000
++++ test-dir	2022-01-02 12:34:56.000000 +0000
 @@ -0,0 +1 @@
 +empty-dir
 #..file:
@@ -355,6 +358,48 @@ class ClearCaseClientTests(SCMClientTestCase):
     """Unit tests for ClearCaseClient."""
 
     scmclient_cls = ClearCaseClient
+
+    @classmethod
+    def setup_checkout(
+        cls,
+        checkout_dir: str,
+    ) -> str:
+        """Populate a ClearCase checkout.
+
+        This will create a few files and directories needed to test diffing.
+
+        Args:
+            checkout_dir (str):
+                The top-level directory in which the checkout will be placed.
+
+        Returns:
+            str:
+            The checkout directory.
+        """
+        # Write some files that will be diffed.
+        test2_py_path = os.path.join(checkout_dir, 'test2.py@@', 'main')
+        test_pdf_path = os.path.join(checkout_dir, 'test.pdf@@', 'main')
+
+        os.makedirs(test2_py_path)
+        os.makedirs(test_pdf_path)
+
+        with open(os.path.join(test2_py_path, '1'), 'w'):
+            pass
+
+        with open(os.path.join(checkout_dir, 'test2.py'), 'w') as fp:
+            fp.write(
+                "#!/usr/bin/env python\n"
+                "\n"
+                "print('Test')\n"
+            )
+
+        with open(os.path.join(test_pdf_path, '0'), 'wb') as fp:
+            fp.write(b'\0\1\2')
+
+        with open(os.path.join(checkout_dir, 'test.pdf'), 'wb') as fp:
+            fp.write(b'\1\2\3')
+
+        return checkout_dir
 
     def setUp(self):
         super(ClearCaseClientTests, self).setUp()
@@ -1266,6 +1311,10 @@ class ClearCaseClientTests(SCMClientTestCase):
 
     def test_diff_legacy(self):
         """Testing ClearCaseClient._do_diff in legacy mode"""
+        client = self.build_client(allow_dep_checks=False,
+                                   needs_diff=True)
+        diff_tool = client.get_diff_tool()
+
         self.spy_on(ClearCaseClient._get_host_info,
                     op=kgb.SpyOpReturn({}),
                     owner=ClearCaseClient)
@@ -1295,7 +1344,11 @@ class ClearCaseClientTests(SCMClientTestCase):
                 )),
             },
             {
-                'args': (['diff', '-uN', 'test2.py@@/main/1', 'test2.py'],),
+                'args': (
+                    diff_tool.make_run_diff_file_cmdline(
+                        orig_path='test2.py@@/main/1',
+                        modified_path='test2.py'),
+                ),
                 'op': kgb.SpyOpReturn((
                     1,
 
@@ -1330,7 +1383,11 @@ class ClearCaseClientTests(SCMClientTestCase):
                 )),
             },
             {
-                'args': (['diff', '-uN', 'test.pdf@@/main/0', 'test.pdf'],),
+                'args': (
+                    diff_tool.make_run_diff_file_cmdline(
+                        orig_path='test.pdf@@/main/0',
+                        modified_path='test.pdf'),
+                ),
                 'op': kgb.SpyOpReturn((
                     2,
                     b'Binary files test.pdf@@/main/0 and test.pdf differ\n',
@@ -1356,7 +1413,11 @@ class ClearCaseClientTests(SCMClientTestCase):
                 )),
             },
             {
-                'args': (['diff', '-uN', 'test.py@@/main/1', 'test.py'],),
+                'args': (
+                    diff_tool.make_run_diff_file_cmdline(
+                        orig_path='test.py@@/main/1',
+                        modified_path='test.py'),
+                ),
                 'op': kgb.SpyOpReturn((
                     1,
 
@@ -1414,8 +1475,6 @@ class ClearCaseClientTests(SCMClientTestCase):
             ('test.py@@/main/1', 'test.py'),
         ]
 
-        client = self.build_client(allow_dep_checks=False,
-                                   needs_diff=True)
         client.root_path = os.getcwd()
         repository_info = ClearCaseRepositoryInfo('/view/test/vob', 'vob')
         metadata = client._get_diff_metadata({
@@ -1425,10 +1484,19 @@ class ClearCaseClientTests(SCMClientTestCase):
 
         diff = client._do_diff(changeset, repository_info, metadata)
 
-        self.assertEqual(diff['diff'], _LEGACY_DIFF)
+        self.assertEqual(
+            self.normalize_diff_result(diff,
+                                       date_format='%Y-%m-%d %H:%M:%S.%f %z'),
+            {
+                'diff': _LEGACY_DIFF,
+            })
 
     def test_diff_diffx(self):
         """Testing ClearCaseClient._do_diff in diffx mode"""
+        client = self.build_client(allow_dep_checks=False,
+                                   needs_diff=True)
+        diff_tool = client.get_diff_tool()
+
         self.spy_on(ClearCaseClient._get_host_info,
                     op=kgb.SpyOpReturn({}),
                     owner=ClearCaseClient)
@@ -1450,21 +1518,11 @@ class ClearCaseClientTests(SCMClientTestCase):
                 )),
             },
             {
-                'args': (['diff', '-uN', 'test2.py@@/main/1', 'test2.py'],),
-                'op': kgb.SpyOpReturn((
-                    1,
-
-                    b'--- test2.py@@/main/1\t2022-05-23 '
-                    b'20:10:38.578433000 +0000\n'
-                    b'+++ test2.py\t2022-05-23 '
-                    b'20:11:11.050410000 +0000\n'
-                    b'@@ -0,0 +1,3 @@\n'
-                    b'+#!/usr/bin/env python\n'
-                    b'+\n'
-                    b'+print(\'Test\')\n',
-
-                    b'',
-                )),
+                'args': (
+                    diff_tool.make_run_diff_file_cmdline(
+                        orig_path='test2.py@@/main/1',
+                        modified_path='test2.py'),
+                ),
             },
             {
                 'args': (['cleartool', 'describe', '-fmt', '%On',
@@ -1530,7 +1588,11 @@ class ClearCaseClientTests(SCMClientTestCase):
                 )),
             },
             {
-                'args': (['diff', '-uN', 'test.pdf@@/main/0', 'test.pdf'],),
+                'args': (
+                    diff_tool.make_run_diff_file_cmdline(
+                        orig_path='test.pdf@@/main/0',
+                        modified_path='test.pdf'),
+                ),
                 'op': kgb.SpyOpReturn((
                     2,
                     b'Binary files test.pdf@@/main/0 and test.pdf differ\n',
@@ -1618,8 +1680,6 @@ class ClearCaseClientTests(SCMClientTestCase):
             ('test.pdf@@/main/0', 'test.pdf'),
         ]
 
-        client = self.build_client(allow_dep_checks=False,
-                                   needs_diff=True)
         client.root_path = os.getcwd()
         repository_info = ClearCaseRepositoryInfo('/view/test/vob', 'vob')
         repository_info.is_legacy = False
@@ -1630,12 +1690,22 @@ class ClearCaseClientTests(SCMClientTestCase):
 
         diff = client._do_diff(changeset, repository_info, metadata)
 
-        self.assertEqual(diff['diff'], _DIFFX_DIFF)
+        print(diff['diff'].decode('utf-8'))
+        self.assertEqual(
+            self.normalize_diff_result(diff,
+                                       date_format='%Y-%m-%d %H:%M:%S.%f %z'),
+            {
+                'diff': _DIFFX_DIFF,
+            })
 
     def test_diff_directory_legacy(self):
         """Testing ClearCaseClient._do_diff with a changed directory in legacy
         mode
         """
+        client = self.build_client(allow_dep_checks=False,
+                                   needs_diff=True)
+        diff_tool = client.get_diff_tool()
+
         tmpfiles = self.precreate_tempfiles(4)
         self.spy_on(ClearCaseClient._get_host_info,
                     op=kgb.SpyOpReturn({}),
@@ -1730,7 +1800,11 @@ class ClearCaseClientTests(SCMClientTestCase):
                 )),
             },
             {
-                'args': (['diff', '-uN', tmpfiles[0], tmpfiles[1]],),
+                'args': (
+                    diff_tool.make_run_diff_file_cmdline(
+                        orig_path=tmpfiles[0],
+                        modified_path=tmpfiles[1]),
+                ),
                 'op': kgb.SpyOpReturn((
                     1,
 
@@ -1772,7 +1846,11 @@ class ClearCaseClientTests(SCMClientTestCase):
                 )),
             },
             {
-                'args': (['diff', '-uN', tmpfiles[2], tmpfiles[3]],),
+                'args': (
+                    diff_tool.make_run_diff_file_cmdline(
+                        orig_path=tmpfiles[2],
+                        modified_path=tmpfiles[3]),
+                ),
                 'op': kgb.SpyOpReturn((
                     0,
                     b'',
@@ -1831,8 +1909,6 @@ class ClearCaseClientTests(SCMClientTestCase):
             ('test-dir/empty-dir@@/main/0', 'test-dir/empty-dir'),
         ]
 
-        client = self.build_client(allow_dep_checks=False,
-                                   needs_diff=True)
         client.root_path = os.getcwd()
         repository_info = ClearCaseRepositoryInfo('/view/test/vob', 'vob')
         metadata = client._get_diff_metadata({
@@ -1842,12 +1918,21 @@ class ClearCaseClientTests(SCMClientTestCase):
 
         diff = client._do_diff(changeset, repository_info, metadata)
 
-        self.assertEqual(diff['diff'], _LEGACY_DIRECTORY_DIFF)
+        self.assertEqual(
+            self.normalize_diff_result(diff,
+                                       date_format='%Y-%m-%d %H:%M:%S.%f %z'),
+            {
+                'diff': _LEGACY_DIRECTORY_DIFF,
+            })
 
     def test_diff_directory_diffx(self):
         """Testing ClearCaseClient._do_diff with a changed directory in diffx
         mode
         """
+        client = self.build_client(allow_dep_checks=False,
+                                   needs_diff=True)
+        diff_tool = client.get_diff_tool()
+
         tmpfiles = self.precreate_tempfiles(4)
         self.spy_on(ClearCaseClient._get_host_info,
                     op=kgb.SpyOpReturn({}),
@@ -1942,7 +2027,11 @@ class ClearCaseClientTests(SCMClientTestCase):
                 )),
             },
             {
-                'args': (['diff', '-uN', tmpfiles[0], tmpfiles[1]],),
+                'args': (
+                    diff_tool.make_run_diff_file_cmdline(
+                        orig_path=tmpfiles[0],
+                        modified_path=tmpfiles[1]),
+                ),
                 'op': kgb.SpyOpReturn((
                     1,
 
@@ -2029,7 +2118,11 @@ class ClearCaseClientTests(SCMClientTestCase):
                 )),
             },
             {
-                'args': (['diff', '-uN', tmpfiles[2], tmpfiles[3]],),
+                'args': (
+                    diff_tool.make_run_diff_file_cmdline(
+                        orig_path=tmpfiles[2],
+                        modified_path=tmpfiles[3]),
+                ),
                 'op': kgb.SpyOpReturn((
                     0,
                     b'',
@@ -2124,8 +2217,6 @@ class ClearCaseClientTests(SCMClientTestCase):
             ('test-dir/empty-dir@@/main/0', 'test-dir/empty-dir'),
         ]
 
-        client = self.build_client(allow_dep_checks=False,
-                                   needs_diff=True)
         client.root_path = os.getcwd()
         repository_info = ClearCaseRepositoryInfo('/view/test/vob', 'vob')
         repository_info.is_legacy = False
@@ -2136,4 +2227,9 @@ class ClearCaseClientTests(SCMClientTestCase):
 
         diff = client._do_diff(changeset, repository_info, metadata)
 
-        self.assertEqual(diff['diff'], _DIFFX_DIRECTORY_DIFF)
+        self.assertEqual(
+            self.normalize_diff_result(diff,
+                                       date_format='%Y-%m-%d %H:%M:%S.%f %z'),
+            {
+                'diff': _DIFFX_DIRECTORY_DIFF,
+            })

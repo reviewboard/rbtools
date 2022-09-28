@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import io
 import itertools
 import logging
 import os
@@ -14,6 +15,7 @@ from typing import Dict, List, Optional
 
 import six
 from pydiffx.dom import DiffX
+from pydiffx.dom.objects import DiffXChangeSection
 
 from rbtools.api.errors import APIError
 from rbtools.clients.base.repository import RepositoryInfo
@@ -26,6 +28,7 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
 from rbtools.deprecation import (RemovedInRBTools40Warning,
                                  RemovedInRBTools50Warning,
                                  deprecate_non_keyword_only_args)
+from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import execute
@@ -1635,10 +1638,12 @@ class ClearCaseClient(BaseSCMClient):
         # versions. The chances of this in reality are probably pretty small.
         return self._get_branch_changeset(branch, repository_info)
 
-    def _diff_directories(self,
-                          entry,
-                          repository_info,
-                          diffx_change):
+    def _diff_directories(
+        self,
+        entry: ChangesetEntry,
+        repository_info: ClearCaseRepositoryInfo,
+        diffx_change: DiffXChangeSection,
+    ) -> bytes:
         """Return a unified diff for a changed directory.
 
         Args:
@@ -1652,11 +1657,12 @@ class ClearCaseClient(BaseSCMClient):
                 The DiffX DOM object for writing VersionVault diffs.
 
         Returns:
-            list of bytes:
+            bytes:
             The diff between the two directory listings, for writing legacy
             ClearCase diffs.
         """
-        dl = []
+        diff_tool = self.get_diff_tool()
+        assert diff_tool is not None
 
         old_content = self._get_directory_contents(entry.old_path)
         old_tmp = make_tempfile(content=old_content)
@@ -1664,23 +1670,27 @@ class ClearCaseClient(BaseSCMClient):
         new_content = self._get_directory_contents(entry.new_path)
         new_tmp = make_tempfile(content=new_content)
 
-        dl = execute(['diff', '-uN', old_tmp, new_tmp],
-                     extra_ignore_errors=(1, 2),
-                     results_unicode=False,
-                     split_lines=True)
+        # Diff the two files.
+        diff_result = diff_tool.run_diff_file(orig_path=old_tmp,
+                                              modified_path=new_tmp)
 
-        if dl:
-            dl[0] = dl[0].replace(old_tmp.encode('utf-8'),
-                                  entry.old_path.encode('utf-8'))
-            dl[1] = dl[1].replace(new_tmp.encode('utf-8'),
-                                  entry.new_path.encode('utf-8'))
+        diff_writer = UnifiedDiffWriter()
+
+        if diff_result.has_text_differences:
+            diff_writer.write_diff_file_result_headers(
+                diff_result,
+                orig_path=entry.old_path,
+                modified_path=entry.new_path)
 
             if repository_info.is_legacy:
-                index_line = (
-                    b'==== %s %s ====\n'
+                diff_writer.write_line(
+                    b'==== %s %s ===='
                     % (entry.old_oid.encode('utf-8'),
                        entry.new_oid.encode('utf-8')))
-                dl.insert(2, index_line)
+
+            diff_writer.write_diff_file_result_hunks(diff_result)
+
+        diff_contents = diff_writer.getvalue()
 
         if not repository_info.is_legacy:
             # We need oids of files to translate them to paths on reviewboard
@@ -1694,6 +1704,8 @@ class ClearCaseClient(BaseSCMClient):
             }
 
             if entry.op == 'create':
+                assert entry.new_path
+
                 path = os.path.relpath(entry.new_path, self.root_path)
                 revision = {
                     'new': entry.new_version,
@@ -1704,6 +1716,8 @@ class ClearCaseClient(BaseSCMClient):
                     'path': path,
                 }
             elif entry.op == 'delete':
+                assert entry.old_path
+
                 path = os.path.relpath(entry.old_path, self.root_path)
                 revision = {
                     'old': entry.old_version,
@@ -1714,6 +1728,9 @@ class ClearCaseClient(BaseSCMClient):
                     'path': path,
                 }
             elif entry.op in ('modify', 'move'):
+                assert entry.old_path
+                assert entry.new_path
+
                 old_path_rel = os.path.relpath(entry.old_path, self.root_path)
                 new_path_rel = os.path.relpath(entry.new_path, self.root_path)
 
@@ -1739,7 +1756,7 @@ class ClearCaseClient(BaseSCMClient):
                 logging.warning(
                     'Unexpected operation "%s" for directory %s %s',
                     entry.op, entry.old_path, entry.new_path)
-                return []
+                return b''
 
             diffx_change.add_file(
                 meta={
@@ -1750,9 +1767,9 @@ class ClearCaseClient(BaseSCMClient):
                     'versionvault': vv_metadata,
                 },
                 diff_type='text',
-                diff=b''.join(dl))
+                diff=diff_contents)
 
-        return dl
+        return diff_contents
 
     def _get_directory_contents(self, extended_path):
         """Return an ls-style directory listing for a versioned directory.
@@ -1781,10 +1798,12 @@ class ClearCaseClient(BaseSCMClient):
 
         return b'\n'.join(contents)
 
-    def _diff_files(self,
-                    entry,
-                    repository_info,
-                    diffx_change):
+    def _diff_files(
+        self,
+        entry: ChangesetEntry,
+        repository_info: ClearCaseRepositoryInfo,
+        diffx_change: DiffXChangeSection,
+    ) -> bytes:
         """Return a unified diff for a changed file.
 
         Args:
@@ -1798,9 +1817,14 @@ class ClearCaseClient(BaseSCMClient):
                 The DiffX DOM object for writing VersionVault diffs.
 
         Returns:
-            list of bytes:
+            bytes:
             The diff between the two files, for writing legacy ClearCase diffs.
         """
+        diff_result_lines: List[bytes]
+
+        diff_tool = self.get_diff_tool()
+        assert diff_tool is not None
+
         if entry.old_path:
             old_file_rel = os.path.relpath(entry.old_path, self.root_path)
 
@@ -1835,42 +1859,29 @@ class ClearCaseClient(BaseSCMClient):
             diff_old_file = entry.old_path or make_tempfile()
             diff_new_file = entry.new_path or make_tempfile()
 
-        diff = execute(['diff', '-uN', diff_old_file, diff_new_file],
-                       extra_ignore_errors=(1, 2),
-                       results_unicode=False)
+        diff_result = diff_tool.run_diff_file(orig_path=diff_old_file,
+                                              modified_path=diff_new_file)
 
-        # If the input file has ^M characters at end of line, lets ignore them.
-        diff = diff.replace(b'\r\r\n', b'\r\n')
-        dl = diff.splitlines(True)
+        diff_writer = UnifiedDiffWriter()
 
-        # Replace temporary filenames in the diff with view-local relative
-        # paths.
-        if len(dl) >= 2:
-            dl[0] = dl[0].replace(diff_old_file.encode('utf-8'),
-                                  old_file_rel.encode('utf-8'))
-            dl[1] = dl[1].replace(diff_new_file.encode('utf-8'),
-                                  new_file_rel.encode('utf-8'))
+        if diff_result.has_text_differences:
+            # Replace temporary filenames in the diff with view-local relative
+            # paths.
+            diff_writer.write_diff_file_result_headers(
+                diff_result,
+                orig_path=old_file_rel,
+                modified_path=new_file_rel)
 
-        # Special handling for the output of the diff tool on binary files:
-        #     diff outputs "Files a and b differ"
-        # and the code below expects the output to start with
-        #     "Binary files "
-        if (len(dl) == 1 and
-            dl[0].startswith(b'Files ') and dl[0].endswith(b' differ')):
-            dl = [b'Binary f%s' % dl[0][1:]]
-
-        if dl and dl[0].startswith(b'Binary files '):
+        if diff_result.has_differences:
             if repository_info.is_legacy:
-                dl.insert(
-                    0,
-                    b'==== %s %s ====\n' % (entry.old_oid.encode('utf-8'),
-                                            entry.new_oid.encode('utf-8')))
-        elif dl:
-            if repository_info.is_legacy:
-                dl.insert(
-                    2,
-                    b'==== %s %s ====\n' % (entry.old_oid.encode('utf-8'),
-                                            entry.new_oid.encode('utf-8')))
+                diff_writer.write_line(
+                    b'==== %s %s ===='
+                    % (entry.old_oid.encode('utf-8'),
+                       entry.new_oid.encode('utf-8')))
+
+            diff_writer.write_diff_file_result_hunks(diff_result)
+
+        diff_contents = diff_writer.getvalue()
 
         if not repository_info.is_legacy:
             # We need oids of files to translate them to paths on reviewboard
@@ -1882,7 +1893,7 @@ class ClearCaseClient(BaseSCMClient):
                 'vob': vob_oid,
             }
 
-            if dl and dl[0].startswith(b'Binary files'):
+            if diff_result.is_binary:
                 diff_type = 'binary'
             else:
                 diff_type = 'text'
@@ -1931,12 +1942,12 @@ class ClearCaseClient(BaseSCMClient):
                     'oid': entry.new_oid,
                 }
 
-                if entry.op == 'move' and dl != []:
+                if entry.op == 'move' and diff_contents:
                     entry.op = 'move-modify'
             else:
                 logging.warning('Unexpected operation "%s" for file %s %s',
                                 entry.op, entry.old_path, entry.new_path)
-                return []
+                return b''
 
             diffx_change.add_file(
                 meta={
@@ -1947,9 +1958,9 @@ class ClearCaseClient(BaseSCMClient):
                     'type': 'file',
                 },
                 diff_type=diff_type,
-                diff=b''.join(dl))
+                diff=diff_contents)
 
-        return dl
+        return diff_contents
 
     def _get_content_snapshot(self, filename):
         """Return the content of a file in a snapshot view.
@@ -2003,30 +2014,32 @@ class ClearCaseClient(BaseSCMClient):
         diffx_change = diffx.add_change(meta={
             'versionvault': metadata,
         })
-        legacy_diff = []
+        legacy_diffs = io.BytesIO()
 
         logging.debug('Doing diff of changeset: %s', changeset)
 
         for entry in changeset:
-            legacy_dl = []
+            legacy_diff: bytes
 
             if entry.is_dir:
-                legacy_dl = self._diff_directories(entry, repository_info,
-                                                   diffx_change)
+                legacy_diff = self._diff_directories(entry,
+                                                     repository_info,
+                                                     diffx_change)
             else:
                 if self.viewtype == 'snapshot' or cpath.exists(entry.new_path):
-                    legacy_dl = self._diff_files(entry, repository_info,
-                                                 diffx_change)
+                    legacy_diff = self._diff_files(entry,
+                                                   repository_info,
+                                                   diffx_change)
                 else:
                     logging.error('File %s does not exist or access is denied.',
                                   entry.new_path)
                     continue
 
-            if repository_info.is_legacy and legacy_dl:
-                legacy_diff.append(b''.join(legacy_dl))
+            if repository_info.is_legacy and legacy_diff:
+                legacy_diffs.write(legacy_diff)
 
         if repository_info.is_legacy:
-            diff = b''.join(legacy_diff)
+            diff = legacy_diffs.getvalue()
         else:
             diffx.generate_stats()
             diff = diffx.to_bytes()

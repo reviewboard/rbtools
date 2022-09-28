@@ -6,7 +6,7 @@ import argparse
 import os
 import re
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Generic, Optional, Type, TypeVar
 from unittest import SkipTest
 
@@ -318,7 +318,9 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
             b'%Y': br'\d{4}',
             b'%b': br'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)',
             b'%d': br'\d{1,2}',
+            b'%f': br'\d{6,9}',
             b'%m': br'\d{2}',
+            b'%z': br'[-+]\d{4}(?:\d{2}(?:\.\d{6})?)?'
         }
 
         date_re = re.compile(
@@ -327,7 +329,7 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
                    date_format.encode('utf-8')))
 
         new_date = (
-            datetime(2022, 1, 2, 12, 34, 56)
+            datetime(2022, 1, 2, 12, 34, 56, tzinfo=timezone.utc)
             .strftime(date_format)
             .encode('utf-8')
         )
