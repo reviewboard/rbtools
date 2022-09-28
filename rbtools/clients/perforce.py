@@ -28,7 +28,7 @@ from rbtools.clients.errors import (AmendError,
                                     TooManyRevisionsError)
 from rbtools.deprecation import (RemovedInRBTools50Warning,
                                  deprecate_non_keyword_only_args)
-from rbtools.utils.checks import check_gnu_diff, check_install
+from rbtools.utils.checks import check_install
 from rbtools.utils.encoding import force_unicode
 from rbtools.utils.filesystem import make_empty_files, make_tempfile
 from rbtools.utils.process import execute
@@ -413,6 +413,9 @@ class PerforceClient(BaseSCMClient):
     scmclient_id = 'perforce'
     name = 'Perforce'
     server_tool_names = 'Perforce'
+
+    requires_diff_tool = ['gnu']
+
     can_amend_commit = True
     supports_changesets = True
     supports_diff_exclude_patterns = True
@@ -582,10 +585,6 @@ class PerforceClient(BaseSCMClient):
             # We couldn't resolve it. This might be a temporary error, or
             # a network disconnect, or it might just be a unit test.
             pass
-
-        # Now that we know it's Perforce, make sure we have GNU diff
-        # installed, and error out if we don't.
-        check_gnu_diff()
 
         # Build the final list of repository paths.
         repository_paths: List[str] = []

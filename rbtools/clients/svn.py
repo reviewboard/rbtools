@@ -29,9 +29,7 @@ from rbtools.clients.errors import (AuthenticationError,
 from rbtools.deprecation import (RemovedInRBTools40Warning,
                                  RemovedInRBTools50Warning,
                                  deprecate_non_keyword_only_args)
-from rbtools.utils.checks import (check_gnu_diff,
-                                  check_install,
-                                  is_valid_version)
+from rbtools.utils.checks import check_install, is_valid_version
 from rbtools.utils.console import get_pass
 from rbtools.utils.diffs import (filename_match_any_patterns, filter_diff,
                                  normalize_patterns)
@@ -54,6 +52,9 @@ class SVNClient(BaseSCMClient):
     scmclient_id = 'svn'
     name = 'Subversion'
     server_tool_names = 'Subversion'
+
+    requires_diff_tool = ['gnu']
+
     supports_diff_exclude_patterns = True
     supports_patch_revert = True
 
@@ -180,10 +181,6 @@ class SVNClient(BaseSCMClient):
             return None
 
         local_path = info.get('Working Copy Root Path')
-
-        # Now that we know it's SVN, make sure we have GNU diff installed,
-        # and error out if we don't.
-        check_gnu_diff()
 
         # Grab version of SVN client and store as a tuple in the form:
         #   (major_version, minor_version, micro_version)

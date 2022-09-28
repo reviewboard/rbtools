@@ -35,7 +35,7 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError)
 from rbtools.deprecation import (RemovedInRBTools50Warning,
                                  deprecate_non_keyword_only_args)
-from rbtools.utils.checks import check_gnu_diff, check_install
+from rbtools.utils.checks import check_install
 from rbtools.utils.diffs import filename_match_any_patterns
 from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import execute
@@ -240,6 +240,9 @@ class SOSClient(BaseSCMClient):
 
     scmclient_id = 'sos'
     name = 'Cliosoft SOS'
+
+    requires_diff_tool = ['gnu']
+
     supports_diff_exclude_patterns = True
 
     REVISION_WORKING_COPY = '--rbtools-working-copy'
@@ -313,10 +316,6 @@ class SOSClient(BaseSCMClient):
 
         project = self._query_sos_info('project')
         server = self._query_sos_info('server')
-
-        # Now that we know it's SOS, make sure we have GNU diff installed, and
-        # error out if we don't.
-        check_gnu_diff()
 
         # The path matches what's used in Power Pack. We don't have hostnames
         # to consider, so it's purely server/project.

@@ -21,7 +21,7 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
 from rbtools.deprecation import (RemovedInRBTools50Warning,
                                  deprecate_non_keyword_only_args)
 from rbtools.utils.appdirs import user_data_dir
-from rbtools.utils.checks import check_gnu_diff, check_install
+from rbtools.utils.checks import check_install
 from rbtools.utils.diffs import filename_match_any_patterns
 from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import (RunProcessError,
@@ -218,10 +218,6 @@ class TFExeWrapper(BaseTFWrapper):
         path = self.get_local_path()
 
         if path:
-            # Now that we know it's TFS, make sure we have GNU diff installed,
-            # and error out if we don't.
-            check_gnu_diff()
-
             return RepositoryInfo(path=path, local_path=path)
 
         return None
@@ -680,10 +676,6 @@ class TEEWrapper(BaseTFWrapper):
         path = self.get_local_path()
 
         if path:
-            # Now that we know it's TFS, make sure we have GNU diff installed,
-            # and error out if we don't.
-            check_gnu_diff()
-
             return RepositoryInfo(path=path, local_path=path)
 
         return None
@@ -1299,6 +1291,9 @@ class TFSClient(BaseSCMClient):
     scmclient_id = 'tfs'
     name = 'Team Foundation Server'
     server_tool_names = 'Team Foundation Server'
+
+    requires_diff_tool = ['gnu']
+
     supports_diff_exclude_patterns = True
     supports_patch_revert = True
 

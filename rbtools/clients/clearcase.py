@@ -26,7 +26,7 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
 from rbtools.deprecation import (RemovedInRBTools40Warning,
                                  RemovedInRBTools50Warning,
                                  deprecate_non_keyword_only_args)
-from rbtools.utils.checks import check_gnu_diff, check_install
+from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import execute
 from rbtools.utils.repository import get_repository_resource
@@ -303,6 +303,9 @@ class ClearCaseClient(BaseSCMClient):
     scmclient_id = 'clearcase'
     name = 'VersionVault / ClearCase'
     server_tool_names = 'ClearCase,VersionVault / ClearCase'
+
+    requires_diff_tool = ['gnu']
+
     supports_patch_revert = True
 
     REVISION_ACTIVITY_BASE = '--rbtools-activity-base'
@@ -432,10 +435,6 @@ class ClearCaseClient(BaseSCMClient):
 
         if not local_path:
             return None
-
-        # Now that we know it's ClearCase, make sure we have GNU diff
-        # installed, and error out if we don't.
-        check_gnu_diff()
 
         property_lines = execute(
             ['cleartool', 'lsview', '-full', '-properties', '-cview'],
