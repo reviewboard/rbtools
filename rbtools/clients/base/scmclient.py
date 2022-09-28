@@ -7,7 +7,8 @@ Version Added:
 import argparse
 import logging
 import re
-from typing import Any, Dict, List, Mapping, Optional, Tuple, cast
+from functools import lru_cache
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Union, cast
 
 from typing_extensions import NotRequired, TypedDict, final
 
@@ -19,6 +20,8 @@ from rbtools.clients.base.repository import RepositoryInfo
 from rbtools.clients.errors import SCMClientDependencyError, SCMError
 from rbtools.deprecation import (RemovedInRBTools50Warning,
                                  deprecate_non_keyword_only_args)
+from rbtools.diffs.tools.base import BaseDiffTool
+from rbtools.diffs.tools.registry import diff_tools_registry
 from rbtools.utils.process import execute
 
 
@@ -303,6 +306,25 @@ class BaseSCMClient(object):
     #:     str
     server_tool_names: Optional[str] = None
 
+    #: Whether this tool requires a command line diff tool.
+    #:
+    #: This may be a boolean or a list.
+    #:
+    #: If a boolean, then this must be ``False`` if no command line tool is
+    #: required, or ``True`` if any command line tool supported by RBTools is
+    #: available (in which case the SCMClient is responsible for ensuring
+    #: compatibility).
+    #:
+    #: If a list, then this must be a list of registered diff tool IDs that
+    #: are compatible.
+    #:
+    #: Version Added:
+    #:     4.0
+    #:
+    #: Type:
+    #:     bool or list
+    requires_diff_tool: Union[bool, List[str]] = False
+
     #: Whether the SCM uses server-side changesets
     #:
     #: Version Added:
@@ -488,6 +510,11 @@ class BaseSCMClient(object):
         If checks fail, an exception may be raised, and :py:attr:`is_setup`
         will be ``False``.
 
+        Note that this will not check :py:attr:`requires_diff_tool`, as that
+        is only required for certain operations. Checking for a compatible
+        diff tool is the responsibility of the caller whenever working with
+        diffs.
+
         Version Added:
             4.0
 
@@ -638,6 +665,44 @@ class BaseSCMClient(object):
             The repository info structure.
         """
         return None
+
+    @lru_cache(maxsize=None)
+    def get_diff_tool(self) -> Optional[BaseDiffTool]:
+        """Return a diff tool for use with this client.
+
+        This can be used by subclasses, and by callers that want to check if
+        a compatible diff tool is available before calling :py:meth:`diff`.
+
+        The value is cached for the client.
+
+        Version Added:
+            4.0
+
+        Returns:
+            rbtools.diffs.tools.base.BaseDiffTool:
+            The diff instance, if a compatible instance is found.
+
+            This will be ``None`` if :py:attr:`requires_diff_tool` is
+            ``False``.
+
+        Raises:
+            TypeError:
+                :py:attr:`requires_diff_tool` was an unsupported type.
+
+            rbtools.diffs.tools.errors.MissingDiffToolError:
+                No compatible diff tool could be found.
+        """
+        if self.requires_diff_tool is True:
+            return diff_tools_registry.get_available()
+        elif self.requires_diff_tool is False:
+            return None
+        elif isinstance(self.requires_diff_tool, list):
+            return diff_tools_registry.get_available(
+                compatible_diff_tool_ids=self.requires_diff_tool)
+        else:
+            raise TypeError(
+                'Unexpected type %s for %s.requires_diff_tool.'
+                % (type(self.requires_diff_tool), type(self).__name__))
 
     def find_matching_server_repository(
         self,
@@ -850,10 +915,27 @@ class BaseSCMClient(object):
     ) -> SCMClientDiffResult:
         """Perform a diff using the given revisions.
 
-        This is expected to be overridden by subclasses.
+        Callers should make sure that the appropriate diff tool is installed
+        by calling :py:func:`rbtools.diffs.tools.registry.get_diff_tool` and
+        passing :py:attr:`requires_diff_tool` if it's a list.
+
+        This is expected to be overridden by subclasses, which should:
+
+        1. Set :py:attr:`requires_diff_tool` based on the client's needs.
+        2. Optionally use :py:attr:`options` for any client-specific diff
+           functionality.
+        3. Call :py:meth:`get_diff_tool` early, if needed.
 
         Subclasses that need to support special arguments should use
         :py:attr:`options`.
+
+        Version Changed:
+            4.0:
+            * All arguments except ``revisions`` must be specified as keyword
+              arguments.
+            * Subclasses should now use :py:attr:`requires_diff_tool` and
+              :py:meth:`get_diff_tool` instead of manually invoking
+              :command:`diff` tools.
 
         Args:
             revisions (dict):
