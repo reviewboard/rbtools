@@ -1,7 +1,5 @@
 """A client for Perforce."""
 
-from __future__ import print_function, unicode_literals
-
 import logging
 import marshal
 import os
@@ -28,6 +26,8 @@ from rbtools.clients.errors import (AmendError,
                                     TooManyRevisionsError)
 from rbtools.deprecation import (RemovedInRBTools50Warning,
                                  deprecate_non_keyword_only_args)
+from rbtools.diffs.tools.base.diff_tool import BaseDiffTool
+from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install
 from rbtools.utils.encoding import force_unicode
 from rbtools.utils.filesystem import make_empty_files, make_tempfile
@@ -857,13 +857,18 @@ class PerforceClient(BaseSCMClient):
                 The number of the changeset being posted (if ``revisions``
                 represents a single changeset).
         """
+        diff_tool = self.get_diff_tool()
+        assert diff_tool is not None
+
         exclude_patterns = self.normalize_exclude_patterns(exclude_patterns)
 
         if not revisions:
             # The "path posting" is still interesting enough to keep around. If
             # the given arguments don't parse as valid changelists, fall back
             # on that behavior.
-            return self._path_diff(extra_args, exclude_patterns)
+            return self._path_diff(diff_tool=diff_tool,
+                                   args=extra_args,
+                                   exclude_patterns=exclude_patterns)
 
         # Support both //depot/... paths and local filenames. For the moment,
         # this does *not* support any of Perforce's traversal literals like ...
@@ -884,6 +889,8 @@ class PerforceClient(BaseSCMClient):
         assert isinstance(base, str)
         assert isinstance(tip, str)
 
+        diff_writer = UnifiedDiffWriter()
+
         cl_is_pending = tip.startswith(self.REVISION_PENDING_CLN_PREFIX)
         cl_is_shelved = False
 
@@ -893,6 +900,8 @@ class PerforceClient(BaseSCMClient):
                          'to %s',
                          base, tip)
             return self._compute_range_changes(
+                diff_tool=diff_tool,
+                diff_writer=diff_writer,
                 base=base,
                 tip=tip,
                 depot_include_files=depot_include_files,
@@ -916,8 +925,6 @@ class PerforceClient(BaseSCMClient):
             logging.info('Generating diff for shelved changeset %s', tip)
         else:
             logging.info('Generating diff for pending changeset %s', tip)
-
-        diff_lines = []
 
         action_mapping = {
             'edit': 'M',
@@ -1053,13 +1060,18 @@ class PerforceClient(BaseSCMClient):
 
                     continue
 
-            dl = self._do_diff(old_file, new_file, depot_file, base_revision,
-                               new_depot_file, changetype_short,
-                               ignore_unmodified=True)
-            diff_lines += dl
+            self._do_diff(diff_tool=diff_tool,
+                          diff_writer=diff_writer,
+                          old_file=old_file,
+                          new_file=new_file,
+                          depot_file=depot_file,
+                          base_revision=base_revision,
+                          new_depot_file=new_depot_file,
+                          changetype_short=changetype_short,
+                          ignore_unmodified=True)
 
         return {
-            'diff': b''.join(diff_lines),
+            'diff': diff_writer.getvalue(),
             'changenum': self.get_changenum(revisions),
         }
 
@@ -1093,8 +1105,16 @@ class PerforceClient(BaseSCMClient):
 
         return None
 
-    def _compute_range_changes(self, base, tip, depot_include_files,
-                               local_include_files, exclude_patterns):
+    def _compute_range_changes(
+        self,
+        diff_tool: BaseDiffTool,
+        diff_writer: UnifiedDiffWriter,
+        base: str,
+        tip: str,
+        depot_include_files: List[str],
+        local_include_files: List[str],
+        exclude_patterns: List[str],
+    ) -> SCMClientDiffResult:
         """Compute the changes across files given a revision range.
 
         This will look at the history of all changes within the given range and
@@ -1103,20 +1123,20 @@ class PerforceClient(BaseSCMClient):
         to include that information.
 
         Args:
-            base (unicode):
+            base (str):
                 The base of the revision range.
 
-            tip (unicode):
+            tip (str):
                 The tip of the revision range.
 
-            depot_include_files (list of unicode):
+            depot_include_files (list of str):
                 A list of depot paths to whitelist during diff generation.
 
-            local_include_files (list of unicode):
+            local_include_files (list of str):
                 A list of local filesystem paths to whitelist during diff
                 generation.
 
-            exclude_patterns (list of unicode):
+            exclude_patterns (list of str):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
 
@@ -1135,7 +1155,9 @@ class PerforceClient(BaseSCMClient):
         # [base, tip]. Increment the base to avoid this.
         real_base = str(int(base) + 1)
 
-        for file_entry in self.p4.filelog('//...@%s,%s' % (real_base, tip)):
+        file_log = self.p4.filelog('//...@%s,%s' % (real_base, tip)) or []
+
+        for file_entry in file_log:
             cid = 0
             while True:
                 change_key = 'change%d' % cid
@@ -1165,8 +1187,9 @@ class PerforceClient(BaseSCMClient):
                     raise Exception('Unsupported action type "%s" for %s' %
                                     (action, depot_file))
 
+                rev_key = 'rev%d' % cid
+
                 try:
-                    rev_key = 'rev%d' % cid
                     rev = int(file_entry[rev_key])
                 except ValueError:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
@@ -1225,7 +1248,6 @@ class PerforceClient(BaseSCMClient):
 
         # Now generate the diff
         supports_moves = self._supports_moves()
-        diff_lines = []
 
         for f in files:
             action = f['action']
@@ -1266,9 +1288,15 @@ class PerforceClient(BaseSCMClient):
 
                     continue
 
-                diff_lines += self._do_diff(
-                    old_file, new_file, depot_file, 0, '', 'A',
-                    ignore_unmodified=True)
+                self._do_diff(diff_tool=diff_tool,
+                              diff_writer=diff_writer,
+                              old_file=old_file,
+                              new_file=new_file,
+                              depot_file=depot_file,
+                              base_revision=0,
+                              new_depot_file='',
+                              changetype_short='A',
+                              ignore_unmodified=True)
             elif action == 'delete':
                 try:
                     old_file, new_file = self._extract_delete_files(
@@ -1280,9 +1308,15 @@ class PerforceClient(BaseSCMClient):
 
                     continue
 
-                diff_lines += self._do_diff(
-                    old_file, new_file, initial_depot_file, initial_rev,
-                    depot_file, 'D', ignore_unmodified=True)
+                self._do_diff(diff_tool=diff_tool,
+                              diff_writer=diff_writer,
+                              old_file=old_file,
+                              new_file=new_file,
+                              depot_file=initial_depot_file,
+                              base_revision=initial_rev,
+                              new_depot_file=depot_file,
+                              changetype_short='D',
+                              ignore_unmodified=True)
             elif action == 'edit':
                 assert local_file is not None
 
@@ -1299,9 +1333,15 @@ class PerforceClient(BaseSCMClient):
 
                     continue
 
-                diff_lines += self._do_diff(
-                    old_file, new_file, initial_depot_file, initial_rev,
-                    depot_file, 'M', ignore_unmodified=True)
+                self._do_diff(diff_tool=diff_tool,
+                              diff_writer=diff_writer,
+                              old_file=old_file,
+                              new_file=new_file,
+                              depot_file=initial_depot_file,
+                              base_revision=initial_rev,
+                              new_depot_file=depot_file,
+                              changetype_short='M',
+                              ignore_unmodified=True)
             elif action == 'move':
                 assert local_file is not None
 
@@ -1321,17 +1361,35 @@ class PerforceClient(BaseSCMClient):
 
                 if supports_moves:
                     # Show the change as a move
-                    diff_lines += self._do_diff(
-                        old_file_a, new_file_b, initial_depot_file,
-                        initial_rev, depot_file, 'MV', ignore_unmodified=True)
+                    self._do_diff(diff_tool=diff_tool,
+                                  diff_writer=diff_writer,
+                                  old_file=old_file_a,
+                                  new_file=new_file_b,
+                                  depot_file=initial_depot_file,
+                                  base_revision=initial_rev,
+                                  new_depot_file=depot_file,
+                                  changetype_short='MV',
+                                  ignore_unmodified=True)
                 else:
                     # Show the change as add and delete
-                    diff_lines += self._do_diff(
-                        old_file_a, new_file_a, depot_file, 0, '', 'A',
-                        ignore_unmodified=True)
-                    diff_lines += self._do_diff(
-                        old_file_b, new_file_b, initial_depot_file,
-                        initial_rev, depot_file, 'D', ignore_unmodified=True)
+                    self._do_diff(diff_tool=diff_tool,
+                                  diff_writer=diff_writer,
+                                  old_file=old_file_a,
+                                  new_file=new_file_a,
+                                  depot_file=depot_file,
+                                  base_revision=0,
+                                  new_depot_file='',
+                                  changetype_short='A',
+                                  ignore_unmodified=True)
+                    self._do_diff(diff_tool=diff_tool,
+                                  diff_writer=diff_writer,
+                                  old_file=old_file_b,
+                                  new_file=new_file_b,
+                                  depot_file=initial_depot_file,
+                                  base_revision=initial_rev,
+                                  new_depot_file=depot_file,
+                                  changetype_short='D',
+                                  ignore_unmodified=True)
             elif action == 'skip':
                 continue
             else:
@@ -1341,7 +1399,7 @@ class PerforceClient(BaseSCMClient):
                 assert False
 
         return {
-            'diff': b''.join(diff_lines)
+            'diff': diff_writer.getvalue(),
         }
 
     def _accumulate_range_change(self, file_entry, change):
@@ -1651,13 +1709,21 @@ class PerforceClient(BaseSCMClient):
 
         return old_filename, new_filename, new_depot_file
 
-    def _path_diff(self, args, exclude_patterns):
+    def _path_diff(
+        self,
+        diff_tool: BaseDiffTool,
+        args: List[str],
+        exclude_patterns: List[str],
+    ) -> SCMClientDiffResult:
         """Process a path-style diff.
 
         This allows people to post individual files in various ways.
 
         Args:
-            args (list of unicode):
+            diff_tool (rbtools.diffs.tools.base.diff_tool.BaseDiffTool):
+                The diff tool being used to generate diffs.
+
+            args (list of str):
                 A list of paths to add. The path styles supported are:
 
                 ``//path/to/file``:
@@ -1675,7 +1741,7 @@ class PerforceClient(BaseSCMClient):
                 ``//path/to/dir/...[@#]rev,[@#]rev``:
                     Upload a diff of all files between revs in that directory.
 
-            exclude_patterns (list of unicode):
+            exclude_patterns (list of str):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
 
@@ -1683,6 +1749,8 @@ class PerforceClient(BaseSCMClient):
             dict:
             A dictionary containing a ``diff`` key.
         """
+        diff_writer = UnifiedDiffWriter()
+
         r_revision_range = re.compile(r'^(?P<path>//[^@#]+)' +
                                       r'(?P<revision1>[#@][^,]+)?' +
                                       r'(?P<revision2>,[#@][^,]+)?$')
@@ -1690,8 +1758,6 @@ class PerforceClient(BaseSCMClient):
         empty_filename = make_tempfile()
         tmp_diff_from_filename = make_tempfile()
         tmp_diff_to_filename = make_tempfile()
-
-        diff_lines = []
 
         for path in args:
             m = r_revision_range.match(path)
@@ -1779,63 +1845,68 @@ class PerforceClient(BaseSCMClient):
                 # things work like they did before the moved file change was
                 # added (58ccae27). This section of code needs to be updated
                 # to properly work with moved files.
-                dl = self._do_diff(old_file, new_file, depot_path,
-                                   base_revision, '', changetype_short,
-                                   ignore_unmodified=True)
-                diff_lines += dl
+                self._do_diff(diff_tool=diff_tool,
+                              diff_writer=diff_writer,
+                              old_file=old_file,
+                              new_file=new_file,
+                              depot_file=depot_path,
+                              base_revision=base_revision,
+                              new_depot_file='',
+                              changetype_short=changetype_short,
+                              ignore_unmodified=True)
 
         os.unlink(empty_filename)
         os.unlink(tmp_diff_from_filename)
         os.unlink(tmp_diff_to_filename)
 
         return {
-            'diff': b''.join(diff_lines),
+            'diff': diff_writer.getvalue(),
         }
 
-    def _do_diff(self, old_file, new_file, depot_file, base_revision,
-                 new_depot_file, changetype_short, ignore_unmodified=False):
+    def _do_diff(
+        self,
+        diff_tool: BaseDiffTool,
+        diff_writer: UnifiedDiffWriter,
+        old_file: str,
+        new_file: str,
+        depot_file: str,
+        base_revision: int,
+        new_depot_file: str,
+        changetype_short: str,
+        ignore_unmodified: bool = False,
+    ) -> None:
         """Create a diff of a single file.
 
         Args:
-            old_file (unicode):
+            diff_tool (rbtools.diffs.tools.base.diff_tool.BaseDiffTool):
+                The diff tool being used to generate diffs.
+
+            old_file (str):
                 The absolute path of the "old" file.
 
-            new_file (unicode):
+            new_file (str):
                 The absolute path of the "new" file.
 
-            depot_file (unicode):
+            depot_file (str):
                 The depot path in Perforce for this file.
 
             base_revision (int):
                 The base Perforce revision number of the old file.
 
-            new_depot_file (unicode):
+            new_depot_file (str):
                 The depot path in Perforce for the new location of this ifle.
                 Only used if the file was moved.
 
-            changetype_short (unicode):
+            changetype_short (str):
                 The change type provided by Perforce.
 
             ignore_unmodified (bool, optional):
                 Whether to return an empty list if the file was not changed.
-
-        Returns:
-            list of bytes:
-            The diff, split into lines.
         """
-        if hasattr(os, 'uname') and os.uname()[0] == 'SunOS':
-            diff_cmd = ['gdiff', '-urNp', old_file, new_file]
-        else:
-            diff_cmd = ['diff', '-urNp', old_file, new_file]
-
-        # Diff returns "1" if differences were found.
-        dl = execute(diff_cmd, extra_ignore_errors=(1, 2),
-                     log_output_on_error=False,
-                     results_unicode=False)
-
-        # If the input file has ^M characters at end of line, lets ignore them.
-        dl = dl.replace(b'\r\r\n', b'\r\n')
-        dl = dl.splitlines(True)
+        # Perform the diff on the files.
+        diff_result = diff_tool.run_diff_file(orig_path=old_file,
+                                              modified_path=new_file,
+                                              show_hunk_context=True)
 
         cwd = os.getcwd()
 
@@ -1855,93 +1926,82 @@ class PerforceClient(BaseSCMClient):
             is_move = False
             new_local_path = local_path
 
-        # Special handling for the output of the diff tool on binary files:
-        #     diff outputs "Files a and b differ"
-        # and the code below expects the output to start with
-        #     "Binary files "
-        if (len(dl) == 1 and
-            dl[0].startswith(b'Files %s and %s differ' %
-                             (old_file.encode('utf-8'),
-                              new_file.encode('utf-8')))):
-            dl = [b'Binary files %s and %s differ\n'
-                  % (old_file.encode('utf-8'),
-                     new_file.encode('utf-8'))]
-
-        is_binary = dl != [] and dl[0].startswith(b'Binary files ')
-
-        if dl == [] or is_binary:
+        if not diff_result.has_text_differences or diff_result.is_binary:
             is_empty_and_changed = (self.supports_empty_files() and
                                     changetype_short in ('A', 'D'))
 
-            if (dl == [] and (is_move or is_empty_and_changed)) or is_binary:
-                line = (b'==== %s#%d ==%s== %s ====\n'
-                        % (depot_file.encode('utf-8'),
-                           base_revision,
-                           changetype_short.encode('utf-8'),
-                           new_local_path.encode('utf-8')))
-                dl.insert(0, line)
-                dl.append(b'\n')
+            if ((not diff_result.has_text_differences and
+                 (is_move or is_empty_and_changed)) or
+                diff_result.is_binary):
+                diff_writer.write_line(
+                    '==== %s#%d ==%s== %s ===='
+                    % (depot_file,
+                       base_revision,
+                       changetype_short,
+                       new_local_path))
+                diff_writer.write_diff_file_result_hunks(diff_result)
+                diff_writer.write_line(b'')
             else:
                 if ignore_unmodified:
-                    return []
+                    return
                 else:
                     print('Warning: %s in your changeset is unmodified' %
                           local_path)
-        elif len(dl) > 1:
-            m = re.search(br'(\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d)', dl[1])
-            if m:
-                timestamp = m.group(1).decode('utf-8')
-            else:
-                # Thu Sep  3 11:24:48 2007
-                m = self.DATE_RE.search(dl[1])
-                if not m:
-                    raise SCMError('Unable to parse diff header: %s' % dl[1])
+        else:
+            modified_header = diff_result.parsed_modified_file_header
+            modified_header_extra: bytes
+            timestamp: str = ''
 
-                month_map = {
-                    b'Jan': b'01',
-                    b'Feb': b'02',
-                    b'Mar': b'03',
-                    b'Apr': b'04',
-                    b'May': b'05',
-                    b'Jun': b'06',
-                    b'Jul': b'07',
-                    b'Aug': b'08',
-                    b'Sep': b'09',
-                    b'Oct': b'10',
-                    b'Nov': b'11',
-                    b'Dec': b'12',
-                }
-                month = month_map[m.group(2)]
-                day = m.group(3)
-                timestamp = m.group(4)
-                year = m.group(5)
+            if modified_header:
+                modified_header_extra = modified_header['extra']
 
-                timestamp = '%s-%s-%s %s' % (year, month, day, timestamp)
+                m = re.search(br'(\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d)',
+                              modified_header_extra)
 
-            dl[0] = (b'--- %s\t%s#%d\n'
-                     % (local_path.encode('utf-8'),
-                        depot_file.encode('utf-8'),
-                        base_revision))
-            dl[1] = (b'+++ %s\t%s\n'
-                     % (new_local_path.encode('utf-8'),
-                        timestamp.encode('utf-8')))
+                if m:
+                    timestamp = m.group(1).decode('utf-8')
+                else:
+                    # Thu Sep  3 11:24:48 2007
+                    m = self.DATE_RE.search(modified_header_extra)
+
+                    if m:
+                        month_map = {
+                            b'Jan': b'01',
+                            b'Feb': b'02',
+                            b'Mar': b'03',
+                            b'Apr': b'04',
+                            b'May': b'05',
+                            b'Jun': b'06',
+                            b'Jul': b'07',
+                            b'Aug': b'08',
+                            b'Sep': b'09',
+                            b'Oct': b'10',
+                            b'Nov': b'11',
+                            b'Dec': b'12',
+                        }
+                        month = month_map[m.group(2)]
+                        day = m.group(3)
+                        timestamp_raw = m.group(4)
+                        year = m.group(5)
+
+                        timestamp = (
+                            b'%s-%s-%s %s' % (year, month, day, timestamp_raw)
+                        ).decode('utf-8')
+
+            if not timestamp:
+                raise SCMError('Unable to parse diff header: %s'
+                               % diff_result.parsed_modified_file_header)
 
             if is_move:
-                dl.insert(0,
-                          (b'Moved to: %s\n' %
-                           new_depot_file.encode('utf-8')))
-                dl.insert(0,
-                          (b'Moved from: %s\n' %
-                           depot_file.encode('utf-8')))
+                diff_writer.write_line('Moved from: %s' % depot_file)
+                diff_writer.write_line('Moved to: %s' % new_depot_file)
 
-            # Not everybody has files that end in a newline (ugh). This ensures
-            # that the resulting diff file isn't broken.
-            if not dl[-1].endswith(b'\n'):
-                dl.append(b'\n')
-        else:
-            raise SCMError('No valid diffs: %s' % dl[0].decode('utf-8'))
-
-        return dl
+            diff_writer.write_file_headers(
+                orig_path=local_path,
+                orig_extra='%s#%d' % (depot_file, base_revision),
+                modified_path=new_local_path,
+                modified_extra=timestamp)
+            diff_writer.write_diff_file_result_hunks(diff_result)
 
     def _write_file(self, depot_path, tmpfile):
         """Grab a file from Perforce and writes it to a temp file.
