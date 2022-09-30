@@ -9,7 +9,7 @@ import posixpath
 import re
 import sys
 from xml.etree import ElementTree
-from typing import Dict, Iterable, List, Optional, Tuple, Union, cast
+from typing import Dict, Iterator, List, Optional, Tuple, Union, cast
 
 from six.moves.urllib.parse import unquote
 
@@ -42,6 +42,7 @@ from rbtools.utils.process import (RunProcessError,
                                    RunProcessResult,
                                    run_process)
 from rbtools.utils.repository import get_repository_resource
+from rbtools.utils.streams import BufferedIterator
 
 
 _fs_encoding = sys.getfilesystemencoding()
@@ -639,10 +640,9 @@ class SVNClient(BaseSCMClient):
                 if svn_show_copies_as_adds in 'Yy':
                     diff_cmd.append('--show-copies-as-adds')
 
-        diff_lines = (
+        diff_lines: Iterator[bytes] = (
             self._run_svn(diff_cmd, log_debug_output_on_error=False)
             .stdout_bytes
-            .readlines()
         )
         diff_lines = self.handle_renames(diff_lines)
 
@@ -654,17 +654,13 @@ class SVNClient(BaseSCMClient):
         diff_lines = self.convert_to_absolute_paths(diff_lines,
                                                     repository_info)
 
-        diff_iter: Iterable[bytes]
-
         if exclude_patterns:
-            diff_iter = filter_diff(diff=diff_lines,
-                                    file_index_re=self.INDEX_FILE_RE,
-                                    exclude_patterns=exclude_patterns)
-        else:
-            diff_iter = diff_lines
+            diff_lines = filter_diff(diff=diff_lines,
+                                     file_index_re=self.INDEX_FILE_RE,
+                                     exclude_patterns=exclude_patterns)
 
         return {
-            'diff': b''.join(diff_iter),
+            'diff': b''.join(diff_lines),
         }
 
     def history_scheduled_with_commit(
@@ -783,8 +779,8 @@ class SVNClient(BaseSCMClient):
 
     def handle_renames(
         self,
-        diff_content: List[bytes],
-    ) -> List[bytes]:
+        diff_content: Iterator[bytes],
+    ) -> Iterator[bytes]:
         """Fix up diff headers to properly show renames.
 
         The output of :command:`svn diff` is incorrect when the file in
@@ -794,31 +790,38 @@ class SVNClient(BaseSCMClient):
         portray this relationship.
 
         Args:
-            diff_content (list of bytes):
-                The content of the diffs.
+            diff_content (iterator of bytes):
+                The lines of the diff to process.
 
-        Returns:
-            list of bytes:
-            The processed diff.
+        Yields:
+            bytes:
+            Each processed line of the diff.
         """
         # svn diff against a repository URL on two revisions appears to
         # handle moved files properly, so only adjust the diff file names
         # if they were created using a working copy.
         if getattr(self.options, 'repository_url', None):
-            return diff_content
+            yield from diff_content
+            return
 
-        result: List[bytes] = []
-        num_lines = len(diff_content)
-        i = 0
+        DIFF_COMPLETE_REMOVAL_RE = self.DIFF_COMPLETE_REMOVAL_RE
+        DIFF_NEW_FILE_LINE_RE = self.DIFF_NEW_FILE_LINE_RE
+        DIFF_ORIG_FILE_LINE_RE = self.DIFF_ORIG_FILE_LINE_RE
+        INDEX_FILE_RE = self.INDEX_FILE_RE
+        INDEX_SEP = self.INDEX_SEP
 
-        while i < num_lines:
-            if (i + 4 < num_lines and
-                self.INDEX_FILE_RE.match(diff_content[i]) and
-                diff_content[i + 1][:-1] == self.INDEX_SEP and
-                self.DIFF_ORIG_FILE_LINE_RE.match(diff_content[i + 2]) and
-                self.DIFF_NEW_FILE_LINE_RE.match(diff_content[i + 3])):
-                from_line = diff_content[i + 2]
-                to_line = diff_content[i + 3]
+        iterator = BufferedIterator(diff_content)
+
+        while not iterator.is_empty:
+            lines = iterator.peek(4)
+
+            if (len(lines) == 4 and
+                INDEX_FILE_RE.match(lines[0]) and
+                lines[1][:-1] == INDEX_SEP and
+                DIFF_ORIG_FILE_LINE_RE.match(lines[2]) and
+                DIFF_NEW_FILE_LINE_RE.match(lines[3])):
+                # We found a diff header. Process it.
+                lines = iterator.consume(5)
 
                 # If the file is marked completely removed, bail out with the
                 # original diff. The reason for this is that
@@ -827,38 +830,33 @@ class SVNClient(BaseSCMClient):
                 # addition. If it was replaced with history, though, we need to
                 # preserve the file name in the "deletion" part, or the patch
                 # won't apply.
-                if self.DIFF_COMPLETE_REMOVAL_RE.match(diff_content[i + 4]):
-                    result.extend(diff_content[i:i + 5])
+                if DIFF_COMPLETE_REMOVAL_RE.match(lines[4]):
+                    yield from lines
                 else:
-                    to_file, _ = self.parse_filename_header(to_line[4:])
+                    from_line = lines[2]
+                    to_line = lines[3]
+                    to_file = self.parse_filename_header(to_line[4:])[0]
                     copied_from = self.find_copyfrom(to_file)
 
-                    result.append(diff_content[i])
-                    result.append(diff_content[i + 1])
-
                     if copied_from is not None:
-                        result.append(from_line.replace(
+                        from_line = from_line.replace(
                             to_file.encode(_fs_encoding),
-                            copied_from.encode(_fs_encoding)))
-                    else:
-                        result.append(from_line)
+                            copied_from.encode(_fs_encoding))
 
-                    result.append(to_line)
-                    result.append(diff_content[i + 4])
-
-                i += 5
+                    yield lines[0]
+                    yield lines[1]
+                    yield from_line
+                    yield to_line
+                    yield lines[4]
             else:
-                result.append(diff_content[i])
-                i += 1
-
-        return result
+                yield next(iterator)
 
     def _handle_empty_files(
         self,
-        diff_content: List[bytes],
+        diff_content: Iterator[bytes],
         diff_cmd: List[str],
         revisions: SCMClientRevisionSpec,
-    ) -> List[bytes]:
+    ) -> Iterator[bytes]:
         """Handle added and deleted 0-length files in the diff output.
 
         Since the diff output from :command:`svn diff` does not give enough
@@ -877,8 +875,8 @@ class SVNClient(BaseSCMClient):
             +++ foo\\t(<tip_revision>)\\n
 
         Args:
-            diff_content (list of bytes):
-                The content of the diff, split into lines.
+            diff_content (iterator of bytes):
+                The lines of the diff to process.
 
             diff_cmd (list of str):
                 A partial command line to run :command:`svn diff`.
@@ -887,9 +885,9 @@ class SVNClient(BaseSCMClient):
                 A dictionary of revisions, as returned by
                 :py:meth:`parse_revision_spec`.
 
-        Returns:
-            list of bytes:
-            The processed diff lines.
+        Yields:
+            bytes:
+            Each processed line of the diff.
         """
         # Get a list of all deleted files in this diff so we can differentiate
         # between added empty files and deleted empty files.
@@ -903,29 +901,30 @@ class SVNClient(BaseSCMClient):
             diff_with_deleted = None
 
         if not diff_with_deleted:
-            return diff_content
+            yield from diff_content
+            return
 
         deleted_files = re.findall(br'^Index:\s+(\S+)\s+\(deleted\)$',
                                    diff_with_deleted, re.M)
 
-        diff_writer = UnifiedDiffWriter()
-        num_lines = len(diff_content)
-        i = 0
+        iterator = BufferedIterator(diff_content)
 
         base: str
         tip: str
 
-        while i < num_lines:
-            line = diff_content[i]
+        while not iterator.is_empty:
+            # Grab one more than we need, to detect if we're at the end.
+            diff_writer = UnifiedDiffWriter()
+            lines = iterator.peek(4)
 
-            if (line.startswith(b'Index: ') and
-                (i + 2 == num_lines or
-                 (i + 2 < num_lines and
-                  diff_content[i + 2].startswith(b'Index: ')))):
+            if (lines[0].startswith(b'Index: ') and
+                (len(lines) < 4 or
+                 (len(lines) == 4 and
+                  lines[2].startswith(b'Index: ')))):
                 index_tag: bytes
 
                 # An empty file. Get and add the extra diff information.
-                index_line = line.strip()
+                index_line = lines[0].strip()
                 filename = index_line.split(b' ', 1)[1].strip()
 
                 if filename in deleted_files:
@@ -940,6 +939,7 @@ class SVNClient(BaseSCMClient):
                         if info and 'Revision' in info:
                             base = '(revision %s)' % info['Revision']
                         else:
+                            next(iterator)
                             continue
                     else:
                         base = str(revisions['base'])
@@ -963,37 +963,38 @@ class SVNClient(BaseSCMClient):
 
                 # Skip the next line (the index separator) since we've already
                 # copied it.
-                i += 2
+                iterator.consume(2)
             else:
+                line = next(iterator)
                 diff_writer.write_line(line.rstrip(b'\r\n'))
-                i += 1
 
-        diff_writer.seek(0)
-
-        return diff_writer.readlines()
+            # Yield the lines we just built.
+            diff_writer.seek(0)
+            yield from diff_writer
 
     def convert_to_absolute_paths(
         self,
-        diff_content: List[bytes],
+        diff_content: Iterator[bytes],
         repository_info: RepositoryInfo,
-    ) -> List[bytes]:
+    ) -> Iterator[bytes]:
         """Convert relative paths in a diff output to absolute paths.
 
         This handles paths that have been svn switched to other parts of the
         repository.
 
         Args:
-            diff_content (bytes):
-                The content of the diff.
+            diff_content (iterator of bytes):
+                The lines of the diff to process.
 
             repository_info (SVNRepositoryInfo):
                 The repository info.
 
-        Returns:
+        Yields:
             bytes:
-            The processed diff.
+            Each processed line of the diff.
         """
-        result: List[bytes] = []
+        DIFF_NEW_FILE_LINE_RE = self.DIFF_NEW_FILE_LINE_RE
+        DIFF_ORIG_FILE_LINE_RE = self.DIFF_ORIG_FILE_LINE_RE
 
         repository_url = getattr(self.options, 'repository_url', None)
         base_path = repository_info.base_path
@@ -1004,14 +1005,15 @@ class SVNClient(BaseSCMClient):
             front: Optional[bytes] = None
             orig_line: bytes = line
 
-            if (self.DIFF_NEW_FILE_LINE_RE.match(line) or
-                self.DIFF_ORIG_FILE_LINE_RE.match(line) or
+            if (DIFF_NEW_FILE_LINE_RE.match(line) or
+                DIFF_ORIG_FILE_LINE_RE.match(line) or
                 line.startswith(b'Index: ')):
                 front, line = line.split(b' ', 1)
 
             if front:
-                if line.startswith(b'/'):  # Already absolute
-                    line = front + b' ' + line
+                if line.startswith(b'/'):
+                    # This is already absolute.
+                    line = b'%s %s' % (front, line)
                 else:
                     # Filename and rest of line (usually the revision
                     # component)
@@ -1026,7 +1028,7 @@ class SVNClient(BaseSCMClient):
                         info = self.svn_info(file, ignore_errors=True)
 
                         if info is None:
-                            result.append(orig_line)
+                            yield orig_line
                             continue
 
                         url = info['URL']
@@ -1036,9 +1038,7 @@ class SVNClient(BaseSCMClient):
                     line = b'%s %s%s' % (front, path.encode(_fs_encoding),
                                          rest)
 
-            result.append(line)
-
-        return result
+            yield line
 
     def svn_info(self, path, ignore_errors=False):
         """Return a dict which is the result of 'svn info' at a given path.
@@ -1201,8 +1201,10 @@ class SVNClient(BaseSCMClient):
             with open(patch_file, 'rb') as original_patch:
                 include_file = True
 
+                INDEX_FILE_RE = self.INDEX_FILE_RE
+
                 for line in original_patch.readlines():
-                    m = self.INDEX_FILE_RE.match(line)
+                    m = INDEX_FILE_RE.match(line)
 
                     if m:
                         filename = m.group(1).decode('utf-8')
