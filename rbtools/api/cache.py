@@ -120,8 +120,9 @@ class CacheEntry(object):
 class LiveHTTPResponse(object):
     """An uncached HTTP response that can be read() more than once.
 
-    This is intended to be API-compatible with a urllib response object. This
-    allows a response to be read more than once.
+    This is intended to be API-compatible with an
+    :py:class:`http.client.HTTPResponse` object. This allows a response to be
+    read more than once.
     """
 
     def __init__(
@@ -138,15 +139,31 @@ class LiveHTTPResponse(object):
         """
         self.headers = response.info()
         self.content = response.read()
-        self.code = response.getcode()
+        self.status = response.status
+
+    @property
+    def code(self) -> int:
+        """The HTTP response code.
+
+        Type:
+            int
+        """
+        return self.status
 
     def info(self) -> Message:
         """Return the headers associated with the response.
+
+        Deprecated:
+            4.0:
+            Deprecated in favor of the :py:attr:`headers` attribute.
 
         Returns:
             email.message.Message:
             The response headers.
         """
+        RemovedInRBTools50Warning.warn(
+            'LiveHTTPResponse.info() is deprecated and will be removed in '
+            'RBTools 5.0. Use LiveHTTPResponse.headers instead.')
         return self.headers
 
     def read(self) -> bytes:
@@ -161,11 +178,18 @@ class LiveHTTPResponse(object):
     def getcode(self) -> int:
         """Return the associated HTTP response code.
 
+        Deprecated:
+            4.0:
+            Deprecated in favor of the :py:attr:`code` attribute.
+
         Returns:
             int:
             The HTTP response code.
         """
-        return self.code
+        RemovedInRBTools50Warning.warn(
+            'LiveHTTPResponseInfo.getcode() is deprecated and will be removed '
+            'in RBTools 5.0. Use LiveHTTPResponse.code instead.')
+        return self.status
 
 
 class CachedHTTPResponse(object):
@@ -190,14 +214,31 @@ class CachedHTTPResponse(object):
         }
 
         self.content = cache_entry.response_body
+        self.status = 200
+
+    @property
+    def code(self) -> int:
+        """The HTTP response code.
+
+        Type:
+            int
+        """
+        return self.status
 
     def info(self) -> dict:
         """Return the headers associated with the response.
+
+        Deprecated:
+            4.0:
+            Deprecated in favor of the :py:attr:`headers` attribute.
 
         Returns:
             dict:
             The cached response headers.
         """
+        RemovedInRBTools50Warning.warn(
+            'CachedHTTPResponse.info() is deprecated and will be removed in '
+            'RBTools 5.0. Use CachedHTTPResponse.headers instead.')
         return self.headers
 
     def read(self) -> bytes:
@@ -212,11 +253,18 @@ class CachedHTTPResponse(object):
     def getcode(self) -> int:
         """Return the associated HTTP response code, which is always 200.
 
+        Deprecated:
+            4.0:
+            Deprecated in favor of the :py:attr:`code` attribute.
+
         Returns:
             int:
             200, always. This pretends that the response is the successful
             result of an HTTP request.
         """
+        RemovedInRBTools50Warning.warn(
+            'CachedHTTPResponseInfo.getcode() is deprecated and will be '
+            'removed in RBTools 5.0. Use CachedHTTPResponse.code instead.')
         return 200
 
 
