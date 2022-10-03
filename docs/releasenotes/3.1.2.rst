@@ -5,7 +5,7 @@
 RBTools 3.1.2 Release Notes
 ===========================
 
-**Release date:** TBD
+**Release date:** October 3, 2022
 
 
 Windows Installer
