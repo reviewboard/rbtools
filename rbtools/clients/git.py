@@ -976,7 +976,7 @@ class GitClient(BaseSCMClient):
             bytes:
             The reformatted diff contents.
         """
-        rev = self._execute([self.git, 'svn', 'find-rev', merge_base]).strip()
+        rev = self._execute([self.git, 'svn', 'find-rev', merge_base], results_unicode=False).strip()
 
         if not rev:
             return None
