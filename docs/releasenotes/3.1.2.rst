@@ -1,0 +1,67 @@
+.. default-intersphinx:: rbt3.x rb-latest
+
+
+===========================
+RBTools 3.1.2 Release Notes
+===========================
+
+**Release date:** October 3, 2022
+
+
+Windows Installer
+=================
+
+* The RBToolls for Windows installer now ships Python 3.8.14, the latest in
+  the 3.8.x series.
+
+  RBTools 3.x will be the last to support Windows installers compatible with
+  Windows 7.
+
+
+Bug Fixes
+=========
+
+* Fixed compatibility with Python 3.11.
+
+  Some changes in Python 3.11's standard library caused RBTools commands to
+  fail.
+
+
+IBM ClearCase / HCL VersionVault
+--------------------------------
+
+* Restored old directory content entries in diffs.
+
+  The community-driven ClearCase implementation used to show changes to
+  directory elements by doing a diff of the ``ls`` output. This behavior was
+  removed in RBTools 3.0 but has been restored.
+
+* Fixed errors when posted changes included added or removed symbolic links.
+
+
+Perforce
+--------
+
+* Fixed Unicode errors when using git-p4 and Python 3.x.
+
+  Patch by Ben Jackson.
+
+* Fixed errors with renames/deletes and filenames containing whitespace with
+  git-p4.
+
+  Patch by Ben Jackson.
+
+
+Subversion
+----------
+
+* Fixed a string type crash when applying patches to Subversion repositories.
+
+
+Contributors
+============
+
+* Ben Jackson
+* Christian Hammond
+* David Trowbridge
+* Michelle Aubin

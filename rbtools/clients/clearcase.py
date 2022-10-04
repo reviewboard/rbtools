@@ -1787,10 +1787,10 @@ class ClearCaseClient(BaseSCMClient):
                          split_lines=True,
                          results_unicode=False)
 
-        contents = [
+        contents = sorted(
             os.path.basename(absolute_path.strip())
             for absolute_path in output
-        ]
+        )
 
         # Add one extra empty line so the data passed to diff ends in a
         # newline.
@@ -2240,11 +2240,11 @@ class ClearCaseClient(BaseSCMClient):
                 # added or removed. In this cases, we'll just log a warning
                 # and skip them for this step. We'll still show it when the
                 # directory contents get diffed later.
-                logging.warning('Got error while processing directory changes '
-                                'from %s to %s: %s',
-                                old_dir,
-                                new_dir,
-                                e)
+                logging.debug('Got error while processing directory changes '
+                              'from %s to %s: %s',
+                              old_dir,
+                              new_dir,
+                              e)
 
         return results
 
