@@ -5,9 +5,12 @@ from __future__ import unicode_literals
 import logging
 import os
 import re
-from typing import Optional
+from typing import List, Optional
 
-from rbtools.clients import BaseSCMClient, RepositoryInfo
+from rbtools.clients import RepositoryInfo
+from rbtools.clients.base.scmclient import (BaseSCMClient,
+                                            SCMClientDiffResult,
+                                            SCMClientRevisionSpec)
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError,
                                     SCMClientDependencyError,
@@ -89,7 +92,7 @@ class PlasticClient(BaseSCMClient):
 
         return m.group(1)
 
-    def get_repository_info(self):
+    def get_repository_info(self) -> Optional[RepositoryInfo]:
         """Return repository information for the current working tree.
 
         Returns:
@@ -104,16 +107,31 @@ class PlasticClient(BaseSCMClient):
 
         return None
 
-    def parse_revision_spec(self, revisions=[]):
+    def parse_revision_spec(
+        self,
+        revisions: List[str] = [],
+    ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
+        These will be used to generate the diffs to upload to Review Board
+        (or print). The Plastic implementation requires that one and only
+        one revision is passed in. The diff for review will include the
+        changes in the given changeset or branch.
+
         Args:
-            revisions (list of unicode, optional):
-                A list of revisions as specified by the user. Items in the list
-                do not necessarily represent a single revision, since the user
-                can use SCM-native syntaxes such as ``r1..r2`` or ``r1:r2``.
-                SCMTool-specific overrides of this method are expected to deal
-                with such syntaxes.
+            revisions (list of str, optional):
+                A list of revisions as specified by the user.
+
+        Returns:
+            dict:
+            The parsed revision spec.
+
+            See :py:class:`~rbtools.clients.base.scmclient.
+            SCMClientRevisionSpec` for the format of this dictionary.
+
+            This always populates ``tip``.
+
+            ``base`` will always be ``None``.
 
         Raises:
             rbtools.clients.errors.InvalidRevisionSpecError:
@@ -121,21 +139,6 @@ class PlasticClient(BaseSCMClient):
 
             rbtools.clients.errors.TooManyRevisionsError:
                 The specified revisions list contained too many revisions.
-
-        Returns:
-            dict:
-            A dictionary with the following keys:
-
-            ``base`` (:py:class:`NoneType`):
-                Always None.
-
-            ``tip`` (:py:class:`unicode`):
-                A revision to use as the tip of the resulting diff.
-
-            These will be used to generate the diffs to upload to Review Board
-            (or print). The Plastic implementation requires that one and only
-            one revision is passed in. The diff for review will include the
-            changes in the given changeset or branch.
         """
         n_revisions = len(revisions)
 
@@ -150,46 +153,36 @@ class PlasticClient(BaseSCMClient):
         else:
             raise TooManyRevisionsError
 
-    def diff(self, revisions, include_files=[], exclude_patterns=[],
-             extra_args=[], **kwargs):
+    def diff(
+        self,
+        revisions: SCMClientRevisionSpec,
+        **kwargs,
+    ) -> SCMClientDiffResult:
         """Perform a diff across all modified files in a Plastic workspace.
 
-        Parent diffs are not supported (the second value in the tuple).
+        Parent diffs are not supported.
 
         Args:
             revisions (dict):
                 A dictionary of revisions, as returned by
                 :py:meth:`parse_revision_spec`.
 
-            include_files (list of unicode, optional):
-                A list of files to whitelist during the diff generation.
-
-            exclude_patterns (list of unicode, optional):
-                A list of shell-style glob patterns to blacklist during diff
-                generation.
-
-            extra_args (list, unused):
-                Additional arguments to be passed to the diff generation.
-
             **kwargs (dict, unused):
                 Unused keyword arguments.
 
         Returns:
             dict:
-            A dictionary containing the following keys:
-
-            ``diff`` (:py:class:`bytes`):
-                The contents of the diff to upload.
-
-            ``changenum`` (:py:class:`unicode`):
-                The number of the changeset being posted (if ``revisions``
-                represents a single changeset).
+            A dictionary containing keys documented in
+            :py:class:`~rbtools.clients.base.scmclient.SCMClientDiffResult`.
         """
         # TODO: use 'files'
         changenum = None
         tip = revisions['tip']
+        assert tip
+
         if tip.startswith(self.REVISION_CHANGESET_PREFIX):
             logging.debug('Doing a diff against changeset %s', tip)
+
             try:
                 changenum = str(int(
                     tip[len(self.REVISION_CHANGESET_PREFIX):]))
@@ -197,7 +190,8 @@ class PlasticClient(BaseSCMClient):
                 pass
         else:
             logging.debug('Doing a diff against branch %s', tip)
-            if not getattr(self.options, 'branch', None):
+
+            if self.options and not getattr(self.options, 'branch', None):
                 self.options.branch = tip
 
         diff_entries = execute(

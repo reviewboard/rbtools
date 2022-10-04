@@ -1,24 +1,26 @@
-from __future__ import unicode_literals
-
 import logging
 import os
 import shutil
 import sys
 import tempfile
 from contextlib import contextmanager
-from typing import Generator
+from typing import Dict, Generator, Iterable, List, Optional
+
+from rbtools.deprecation import (RemovedInRBTools50Warning,
+                                 deprecate_non_keyword_only_args)
 
 
 CONFIG_FILE = '.reviewboardrc'
 
-tempfiles = []
+_iter_exes_in_path_cache: Dict[str, bool] = {}
+tempfiles: List[str] = []
 tempdirs = []
 builtin = {}
 
-_exe_in_path_cache = {}
 
-
-def is_exe_in_path(name):
+def is_exe_in_path(
+    name: str,
+) -> bool:
     """Return whether an executable is in the user's search path.
 
     This expects a name without any system-specific executable extension.
@@ -33,29 +35,52 @@ def is_exe_in_path(name):
         The result is now cached.
 
     Args:
-        name (unicode):
+        name (str):
             The name of the executable.
 
     Returns:
         bool:
         ``True`` if the executable is in the path. ``False`` if it is not.
     """
+    return any(iter_exes_in_path(name))
+
+
+def iter_exes_in_path(
+    name: str,
+) -> Iterable[str]:
+    """Iterate through all executables with a name in the user's search path.
+
+    This expects a name without any system-specific executable extension. It
+    will append the proper extension as necessary. For example, use "myapp"
+    and not "myapp.exe".
+
+    Version Added:
+        4.0
+
+    Args:
+        name (str):
+            The name of the executable.
+
+    Yields:
+        str:
+        The location of an executable in the path.
+    """
     if sys.platform == 'win32' and not name.endswith('.exe'):
         name += '.exe'
 
-    try:
-        found = _exe_in_path_cache[name]
-    except KeyError:
-        found = False
+    cache = _iter_exes_in_path_cache
 
-        for dir in os.environ['PATH'].split(os.pathsep):
-            if os.path.exists(os.path.join(dir, name)):
-                found = True
-                break
+    for dirname in os.environ['PATH'].split(os.pathsep):
+        path = os.path.join(dirname, name)
 
-        _exe_in_path_cache[name] = found
+        try:
+            found = cache[path]
+        except KeyError:
+            found = os.path.exists(path)
+            cache[path] = found
 
-    return found
+        if found:
+            yield path
 
 
 def cleanup_tempfiles():
@@ -75,7 +100,14 @@ def _load_python_file(filename, config):
         return config
 
 
-def make_tempfile(content=None, prefix='rbtools.', suffix=None, filename=None):
+@deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
+def make_tempfile(
+    *,
+    content: Optional[bytes] = None,
+    prefix: str = 'rbtools.',
+    suffix: Optional[str] = None,
+    filename: Optional[str] = None,
+) -> str:
     """Create a temporary file and return the path.
 
     If not manually removed, then the resulting temp file will be removed when
@@ -90,18 +122,18 @@ def make_tempfile(content=None, prefix='rbtools.', suffix=None, filename=None):
         content (bytes, optional):
             The content for the text file.
 
-        prefix (bool, optional):
+        prefix (str, optional):
             The prefix for the temp filename. This defaults to ``rbtools.``.
 
-        suffix (bool, optional):
+        suffix (str, optional):
             The suffix for the temp filename.
 
-        filename (unicode, optional):
+        filename (str, optional):
             An explicit name of the file. If provided, this will override
             ``suffix`` and ``prefix``.
 
     Returns:
-        unicode:
+        str:
         The temp file path.
     """
     if filename is not None:

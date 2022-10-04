@@ -19,6 +19,7 @@ class Diff(Command):
     # offline way, or we might just want to define a supported baseline version
     # of Review Board and get rid of some of the capability conditionals.
     needs_api = True
+    needs_diffs = True
     needs_repository = True
     needs_scm_client = True
 
@@ -81,10 +82,6 @@ class Diff(Command):
                                    'without renames.', tool.type)
 
             diff_kwargs['no_renames'] = True
-
-        if self.options.git_find_renames_threshold is not None:
-            diff_kwargs['git_find_renames_threshold'] = \
-                self.options.git_find_renames_threshold
 
         diff_info = tool.diff(
             revisions=revisions,

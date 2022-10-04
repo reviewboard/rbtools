@@ -448,7 +448,7 @@ def scan_scmclients_for_path(
             if repository_info is not None:
                 # This is a successful result.
                 logger.debug('[scan] Successfully found repository '
-                             'information: %s',
+                             'information: %r',
                              repository_info)
             else:
                 # We either didn't find repository information, or we failed

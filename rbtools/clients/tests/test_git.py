@@ -20,7 +20,9 @@ from rbtools.clients.tests import FOO1, FOO2, FOO3, FOO4, SCMClientTestCase
 from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import is_exe_in_path
-from rbtools.utils.process import execute
+from rbtools.utils.process import (RunProcessResult,
+                                   run_process,
+                                   run_process_exec)
 
 
 class GitClientTests(SCMClientTestCase):
@@ -79,7 +81,7 @@ class GitClientTests(SCMClientTestCase):
     def _run_git(
         cls,
         command: List[str],
-    ) -> Any:
+    ) -> RunProcessResult:
         """Run git with the provided arguments.
 
         Args:
@@ -87,14 +89,11 @@ class GitClientTests(SCMClientTestCase):
                 The arguments to pass to :command:`git`.
 
         Returns:
-            object:
-            The result of the :py:func:`~rbtools.utils.process.execute` call.
+            rbtools.utils.process.RunProcessResult:
+            The result of the :py:func:`~rbtools.utils.process.run_process`
+            call.
         """
-        return execute([cls._git] + command,
-                       env=None,
-                       split_lines=False,
-                       ignore_errors=False,
-                       extra_ignore_errors=())
+        return run_process([cls._git] + command)
 
     def setUp(self):
         super(GitClientTests, self).setUp()
@@ -121,7 +120,18 @@ class GitClientTests(SCMClientTestCase):
         self._run_git(['commit', '-m', msg])
 
     def _git_get_head(self):
-        return self._run_git(['rev-parse', 'HEAD']).strip()
+        """Return the HEAD commit SHA.
+
+        Returns:
+            str:
+            The HEAD commit SHA.
+        """
+        return (
+            self._run_git(['rev-parse', 'HEAD'])
+            .stdout
+            .read()
+            .strip()
+        )
 
     def test_check_dependencies_with_git_found(self):
         """Testing GitClient.check_dependencies with git found"""
@@ -383,7 +393,7 @@ class GitClientTests(SCMClientTestCase):
 
     def test_diff_simple(self):
         """Testing GitClient simple diff case"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         client.get_repository_info()
         base_commit_id = self._git_get_head()
 
@@ -425,7 +435,7 @@ class GitClientTests(SCMClientTestCase):
 
     def test_diff_simple_multiple(self):
         """Testing GitClient simple diff with multiple commits case"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         client.get_repository_info()
 
         base_commit_id = self._git_get_head()
@@ -470,7 +480,7 @@ class GitClientTests(SCMClientTestCase):
 
     def test_diff_exclude(self):
         """Testing GitClient simple diff with file exclusion"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         client.get_repository_info()
         base_commit_id = self._git_get_head()
 
@@ -506,7 +516,7 @@ class GitClientTests(SCMClientTestCase):
 
     def test_diff_exclude_in_subdir(self):
         """Testing GitClient simple diff with file exclusion in a subdir"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         base_commit_id = self._git_get_head()
 
         os.mkdir('subdir')
@@ -545,7 +555,7 @@ class GitClientTests(SCMClientTestCase):
 
     def test_diff_exclude_root_pattern_in_subdir(self):
         """Testing GitClient diff with file exclusion in the repo root"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         base_commit_id = self._git_get_head()
 
         os.mkdir('subdir')
@@ -585,7 +595,7 @@ class GitClientTests(SCMClientTestCase):
 
     def test_diff_branch_diverge(self):
         """Testing GitClient diff with divergent branches"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
         self._run_git(['checkout', '-b', 'mybranch', '--track',
@@ -661,7 +671,7 @@ class GitClientTests(SCMClientTestCase):
     def test_diff_tracking_no_origin(self):
         """Testing GitClient diff with a tracking branch, but no origin remote
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         self._run_git(['remote', 'add', 'quux', self.git_dir])
         self._run_git(['fetch', 'quux'])
@@ -701,7 +711,7 @@ class GitClientTests(SCMClientTestCase):
 
     def test_diff_local_tracking(self):
         """Testing GitClient diff with a local tracking branch"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         base_commit_id = self._git_get_head()
         self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
@@ -747,9 +757,11 @@ class GitClientTests(SCMClientTestCase):
 
     def test_diff_tracking_override(self):
         """Testing GitClient diff with option override for tracking branch"""
-        client = self.build_client(options={
-            'tracking': 'origin/master',
-        })
+        client = self.build_client(
+            needs_diff=True,
+            options={
+                'tracking': 'origin/master',
+            })
 
         self._run_git(['remote', 'add', 'bad', self.git_dir])
         self._run_git(['fetch', 'bad'])
@@ -791,7 +803,7 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient diff with tracking branch that has slash in its
         name
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         self._run_git(['fetch', 'origin'])
         self._run_git(['checkout', '-b', 'my/branch', '--track',
@@ -979,7 +991,7 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient.parse_revision_spec with target branch off a
         tracking branch not aligned with the remote
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         # In this case, the parent must be the non-aligned tracking branch
         # and the parent_base must be the remote tracking branch.
@@ -1025,9 +1037,11 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient.parse_revision_spec with target branch off a
         tracking branch aligned with the remote
         """
-        client = self.build_client(options={
-            'tracking': 'origin/not-master',
-        })
+        client = self.build_client(
+            needs_diff=True,
+            options={
+                'tracking': 'origin/not-master',
+            })
 
         # In this case, the parent_base should be the tracking branch aligned
         # with the remote.
@@ -1069,7 +1083,7 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient.parse_revision_spec with target branch off
         a tracking branch with changes since the remote
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         # In this case, the parent_base must be the remote tracking branch,
         # despite the fact that it is a few changes behind.
@@ -1112,7 +1126,7 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient.parse_revision_spec with target branch off a
         branch not properly tracking the remote
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         # In this case, the parent_base must be the remote tracking branch,
         # even though it is not properly being tracked.
@@ -1150,7 +1164,7 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient.parse_revision_spec with a target branch that
         merged a tracking branch off another tracking branch
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         # In this case, the parent_base must be the base of the merge, because
         # the user will expect that the diff would show the merged changes.
@@ -1193,9 +1207,11 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient.parse_revision_spec with a target branch posted
         off a tracking branch that merged another tracking branch
         """
-        client = self.build_client(options={
-            'tracking': 'origin/not-master',
-        })
+        client = self.build_client(
+            needs_diff=True,
+            options={
+                'tracking': 'origin/not-master',
+            })
 
         # In this case, the parent_base must be tracking branch that merged
         # the other tracking branch.
@@ -1238,7 +1254,7 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient.parse_revision_spec with a target branch posted
         off a remote branch without any tracking branches
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         # In this case, the parent_base must be remote tracking branch. The
         # existence of a tracking branch shouldn't matter much.
@@ -1277,7 +1293,7 @@ class GitClientTests(SCMClientTestCase):
         off a remote branch that is aligned to the same commit as another
         remote branch
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         # In this case, the parent_base must be common commit that the two
         # remote branches are aligned to.
@@ -1335,7 +1351,7 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient.parse_revision_spec with a target branch not
         up-to-date with a remote branch
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         # In this case, there is no good way of detecting the remote branch we
         # are not up-to-date with, so the parent_base must be the common commit
@@ -1394,7 +1410,7 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient.parse_revision_spec with a target branch that has
         branches from different remotes in its path
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         # In this case, the other remotes should be ignored and the parent_base
         # should be some origin/*.
@@ -1518,13 +1534,9 @@ class GitClientTests(SCMClientTestCase):
     def test_merge_with_squash(self):
         """Testing GitClient.merge with squash set to True"""
         client = self.build_client()
-
-        # We use a KGB function spy to check if execute is called with the
-        # right arguments i.e. with the '--squash' flag (and not with the
-        # '--no-ff' flag.
-        self.spy_on(execute)
-
         client.get_repository_info()
+
+        self.spy_on(run_process_exec)
 
         # Since pushing data upstream to the test repo corrupts its state,
         # we need to use the child clone.
@@ -1543,19 +1555,15 @@ class GitClientTests(SCMClientTestCase):
                      squash=True)
 
         self.assertSpyCalledWith(
-            execute.calls[-2],
+            run_process_exec.calls[-2],
             ['git', 'merge', 'new-branch', '--squash', '--no-commit'])
 
     def test_merge_without_squash(self):
         """Testing GitClient.merge with squash set to False"""
         client = self.build_client()
-
-        # We use a KGB function spy to check if execute is called with the
-        # right arguments i.e. with the '--no-ff' flag (and not with the
-        # '--squash' flag).
-        self.spy_on(execute)
-
         client.get_repository_info()
+
+        self.spy_on(run_process_exec)
 
         # Since pushing data upstream to the test repo corrupts its state,
         # we need to use the child clone.
@@ -1574,14 +1582,14 @@ class GitClientTests(SCMClientTestCase):
                      squash=False)
 
         self.assertSpyCalledWith(
-            execute.calls[-2],
+            run_process_exec.calls[-2],
             ['git', 'merge', 'new-branch', '--no-ff', '--no-commit'])
 
     def test_create_commit_with_run_editor_true(self):
         """Testing GitClient.create_commit with run_editor set to True"""
         client = self.build_client()
 
-        self.spy_on(execute)
+        self.spy_on(run_process_exec)
 
         with open('foo.txt', 'w') as fp:
             fp.write('change')
@@ -1592,7 +1600,7 @@ class GitClientTests(SCMClientTestCase):
                              files=['foo.txt'])
 
         self.assertSpyLastCalledWith(
-            execute,
+            run_process_exec,
             ['git', 'commit', '-m', 'TEST COMMIT MESSAGE.',
              '--author', 'name <email>'])
 
@@ -1600,7 +1608,7 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient.create_commit with run_editor set to False"""
         client = self.build_client()
 
-        self.spy_on(execute)
+        self.spy_on(run_process_exec)
 
         with open('foo.txt', 'w') as fp:
             fp.write('change')
@@ -1611,7 +1619,7 @@ class GitClientTests(SCMClientTestCase):
                              files=['foo.txt'])
 
         self.assertSpyLastCalledWith(
-            execute,
+            run_process_exec,
             ['git', 'commit', '-m', 'Test commit message.',
              '--author', 'name <email>'])
 
@@ -1619,7 +1627,7 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient.create_commit with all_files set to True"""
         client = self.build_client()
 
-        self.spy_on(execute)
+        self.spy_on(run_process_exec)
 
         with open('foo.txt', 'w') as fp:
             fp.write('change')
@@ -1631,17 +1639,17 @@ class GitClientTests(SCMClientTestCase):
                              all_files=True)
 
         self.assertSpyCalledWith(
-            execute.calls[0],
+            run_process_exec.calls[0],
             ['git', 'add', '--all', ':/'])
         self.assertSpyLastCalledWith(
-            execute,
+            run_process_exec,
             ['git', 'commit', '-m', 'message', '--author', 'name <email>'])
 
     def test_create_commit_with_all_files_false(self):
         """Testing GitClient.create_commit with all_files set to False"""
         client = self.build_client()
 
-        self.spy_on(execute)
+        self.spy_on(run_process_exec)
 
         with open('foo.txt', 'w') as fp:
             fp.write('change')
@@ -1653,10 +1661,10 @@ class GitClientTests(SCMClientTestCase):
                              all_files=False)
 
         self.assertSpyCalledWith(
-            execute.calls[0],
+            run_process_exec.calls[0],
             ['git', 'add', 'foo.txt'])
         self.assertSpyLastCalledWith(
-            execute,
+            run_process_exec,
             ['git', 'commit', '-m', 'message', '--author', 'name <email>'])
 
     def test_create_commit_with_empty_commit_message(self):
@@ -1682,7 +1690,7 @@ class GitClientTests(SCMClientTestCase):
         """Testing GitClient.create_commit without author information"""
         client = self.build_client()
 
-        self.spy_on(execute)
+        self.spy_on(run_process_exec)
 
         with open('foo.txt', 'w') as fp:
             fp.write('change')
@@ -1693,39 +1701,35 @@ class GitClientTests(SCMClientTestCase):
                              files=['foo.txt'])
 
         self.assertSpyLastCalledWith(
-            execute,
+            run_process_exec,
             ['git', 'commit', '-m', 'TEST COMMIT MESSAGE.'])
 
     def test_delete_branch_with_merged_only(self):
         """Testing GitClient.delete_branch with merged_only set to True"""
         client = self.build_client()
 
-        # We use a KGB function spy to check if execute is called with the
-        # right arguments i.e. with the -d flag (and not the -D flag).
-        self.spy_on(execute)
+        self.spy_on(run_process_exec)
 
         self._run_git(['branch', 'new-branch'])
 
         client.delete_branch('new-branch', merged_only=True)
 
         self.assertSpyLastCalledWith(
-            execute,
+            run_process_exec,
             ['git', 'branch', '-d', 'new-branch'])
 
     def test_delete_branch_without_merged_only(self):
         """Testing GitClient.delete_branch with merged_only set to False"""
         client = self.build_client()
 
-        # We use a KGB function spy to check if execute is called with the
-        # right arguments i.e. with the -D flag (and not the -d flag).
-        self.spy_on(execute)
+        self.spy_on(run_process_exec)
 
         self._run_git(['branch', 'new-branch'])
 
         client.delete_branch('new-branch', merged_only=False)
 
         self.assertSpyLastCalledWith(
-            execute,
+            run_process_exec,
             ['git', 'branch', '-D', 'new-branch'])
 
     def test_get_parent_branch_with_non_master_default(self):

@@ -1,20 +1,23 @@
 """A client for CVS."""
 
-from __future__ import unicode_literals
-
 import logging
 import os
 import re
 import socket
-from typing import Optional
+from typing import List, Optional
 
-from rbtools.clients import BaseSCMClient, RepositoryInfo
+from rbtools.clients.base.repository import RepositoryInfo
+from rbtools.clients.base.scmclient import (BaseSCMClient,
+                                            SCMClientDiffResult,
+                                            SCMClientRevisionSpec)
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     TooManyRevisionsError)
+from rbtools.deprecation import (RemovedInRBTools50Warning,
+                                 deprecate_non_keyword_only_args)
 from rbtools.utils.checks import check_install
 from rbtools.utils.diffs import filter_diff, normalize_patterns
-from rbtools.utils.process import execute
+from rbtools.utils.process import run_process
 
 
 class CVSClient(BaseSCMClient):
@@ -70,12 +73,15 @@ class CVSClient(BaseSCMClient):
             repository_path = fp.read().strip()
 
         i = repository_path.find('@')
+
         if i != -1:
             repository_path = repository_path[i + 1:]
 
         i = repository_path.rfind(':')
+
         if i != -1:
             host = repository_path[:i]
+
             try:
                 canon = socket.getfqdn(host)
                 repository_path = repository_path.replace('%s:' % host,
@@ -86,7 +92,7 @@ class CVSClient(BaseSCMClient):
 
         return repository_path
 
-    def get_repository_info(self):
+    def get_repository_info(self) -> Optional[RepositoryInfo]:
         """Return repository information for the current working tree.
 
         Returns:
@@ -101,16 +107,46 @@ class CVSClient(BaseSCMClient):
         return RepositoryInfo(path=repository_path,
                               local_path=repository_path)
 
-    def parse_revision_spec(self, revisions=[]):
+    def parse_revision_spec(
+        self,
+        revisions: List[str] = [],
+    ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
+        These will be used to generate the diffs to upload to Review Board
+        (or print). The diff for review will include the changes in (base,
+        tip].
+
+        If a single revision is passed in, this will raise an exception,
+        because CVS doesn't have a repository-wide concept of "revision",
+        so selecting an individual "revision" doesn't make sense.
+
+        With two revisions, this will treat those revisions as tags and do
+        a diff between those tags.
+
+        If zero revisions are passed in, this will return revisions
+        relevant for the current change.
+
+        The CVS SCMClient never fills in the ``parent_base`` key. Users who
+        are using other patch-stack tools who want to use parent diffs with
+        CVS will have to generate their diffs by hand.
+
+        Because :command:`cvs diff` uses multiple arguments to define
+        multiple tags, there's no single-argument/multiple-revision syntax
+        available.
+
         Args:
-            revisions (list of unicode, optional):
-                A list of revisions as specified by the user. Items in the list
-                do not necessarily represent a single revision, since the user
-                can use SCM-native syntaxes such as ``r1..r2`` or ``r1:r2``.
-                SCMTool-specific overrides of this method are expected to deal
-                with such syntaxes.
+            revisions (list of str, optional):
+                A list of revisions as specified by the user.
+
+        Returns:
+            dict:
+            The parsed revision spec.
+
+            See :py:class:`~rbtools.clients.base.scmclient.
+            SCMClientRevisionSpec` for the format of this dictionary.
+
+            This always populates ``base`` and ``tip``.
 
         Raises:
             rbtools.clients.errors.InvalidRevisionSpecError:
@@ -118,40 +154,6 @@ class CVSClient(BaseSCMClient):
 
             rbtools.clients.errors.TooManyRevisionsError:
                 The specified revisions list contained too many revisions.
-
-        Returns:
-            dict:
-            A dictionary with the following keys:
-
-            ``base`` (:py:class:`unicode`):
-                A revision to use as the base of the resulting diff.
-
-            ``tip`` (:py:class:`unicode`):
-                A revision to use as the tip of the resulting diff.
-
-            These will be used to generate the diffs to upload to Review Board
-            (or print). The diff for review will include the changes in (base,
-            tip].
-
-            If a single revision is passed in, this will raise an exception,
-            because CVS doesn't have a repository-wide concept of "revision",
-            so selecting an individual "revision" doesn't make sense.
-
-            With two revisions, this will treat those revisions as tags and do
-            a diff between those tags.
-
-            If zero revisions are passed in, this will return revisions
-            relevant for the "current change". The exact definition of what
-            "current" means is specific to each SCMTool backend, and documented
-            in the implementation classes.
-
-            The CVS SCMClient never fills in the 'parent_base' key. Users who
-            are using other patch-stack tools who want to use parent diffs with
-            CVS will have to generate their diffs by hand.
-
-            Because :command:`cvs diff` uses multiple arguments to define
-            multiple tags, there's no single-argument/multiple-revision syntax
-            available.
         """
         n_revs = len(revisions)
 
@@ -171,13 +173,15 @@ class CVSClient(BaseSCMClient):
         else:
             raise TooManyRevisionsError
 
-        return {
-            'base': None,
-            'tip': None,
-        }
-
-    def diff(self, revisions, include_files=[], exclude_patterns=[],
-             extra_args=[], **kwargs):
+    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
+    def diff(
+        self,
+        revisions: SCMClientRevisionSpec,
+        *,
+        include_files: List[str] = [],
+        exclude_patterns: List[str] = [],
+        **kwargs
+    ) -> SCMClientDiffResult:
         """Perform a diff using the given revisions.
 
         If no revisions are specified, this will return the diff for the
@@ -189,54 +193,64 @@ class CVSClient(BaseSCMClient):
                 A dictionary of revisions, as returned by
                 :py:meth:`parse_revision_spec`.
 
-            include_files (list of unicode, optional):
+            include_files (list of str, optional):
                 A list of files to whitelist during the diff generation.
 
-            exclude_patterns (list of unicode, optional):
+            exclude_patterns (list of str, optional):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
-
-            extra_args (list, unused):
-                Additional arguments to be passed to the diff generation.
-                Unused for CVS.
 
             **kwargs (dict, unused):
                 Unused keyword arguments.
 
         Returns:
             dict:
-            A dictionary containing the following keys:
+            A dictionary containing keys documented in
+            :py:class:`SCMClientDiffResult`.
 
-            ``diff`` (:py:class:`bytes`):
-                The contents of the diff to upload.
+            This will only populate the ``diff`` key.
         """
-        # CVS paths are always relative to the current working directory.
-        cwd = os.getcwd()
-        exclude_patterns = normalize_patterns(exclude_patterns, cwd, cwd)
-
-        include_files = include_files or []
-
-        # Diff returns "1" if differences were found.
-        diff_cmd = ['cvs', 'diff', '-uN']
-
         base = revisions['base']
         tip = revisions['tip']
+
+        assert isinstance(base, str)
+        assert isinstance(tip, str)
+
+        # CVS paths are always relative to the current working directory.
+        cwd = os.getcwd()
+        exclude_patterns = normalize_patterns(
+            patterns=exclude_patterns,
+            base_dir=cwd,
+            cwd=cwd)
+
+        # Bulid the command to diff the files.
+        diff_cmd = ['cvs', 'diff', '-uN']
+
         if not (base == 'BASE' and
                 tip == self.REVISION_WORKING_COPY):
-            diff_cmd.extend(['-r', base, '-r', tip])
+            diff_cmd += ['-r', base, '-r', tip]
 
-        diff = execute(diff_cmd + include_files,
-                       extra_ignore_errors=(1,),
-                       log_output_on_error=False,
-                       split_lines=True,
-                       results_unicode=False)
+        if include_files:
+            diff_cmd += include_files
+
+        # Generate the diff.
+        #
+        # Note that `cvs diff` returns "1" if differences were found, so we
+        # have to ignore that as an error.
+        diff = iter(
+            run_process(diff_cmd + include_files,
+                        ignore_errors=(1,),
+                        log_debug_output_on_error=False)
+            .stdout_bytes
+        )
 
         if exclude_patterns:
             # CVS diffs are relative to the current working directory, so the
             # base_dir parameter to filter_diff is unnecessary.
-            diff = filter_diff(diff, self.INDEX_FILE_RE, exclude_patterns,
+            diff = filter_diff(diff, self.INDEX_FILE_RE,
+                               exclude_patterns=exclude_patterns,
                                base_dir=cwd)
 
         return {
-            'diff': b''.join(diff)
+            'diff': b''.join(diff),
         }

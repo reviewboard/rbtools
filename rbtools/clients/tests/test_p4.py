@@ -9,7 +9,6 @@ from typing import Type
 
 import kgb
 
-from rbtools.api.capabilities import Capabilities
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     TooManyRevisionsError)
@@ -458,7 +457,7 @@ class PerforceClientTests(SCMClientTestCase):
 
     def test_diff_with_pending_changelist(self):
         """Testing PerforceClient.diff with a pending changelist"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         client.p4.repo_files = [
             {
                 'depotFile': '//mydepot/test/README',
@@ -505,7 +504,7 @@ class PerforceClientTests(SCMClientTestCase):
         revisions = client.parse_revision_spec(['12345'])
 
         self.assertEqual(
-            self._normalize_diff(client.diff(revisions)),
+            self.normalize_diff_result(client.diff(revisions)),
             {
                 'changenum': '12345',
                 'diff': (
@@ -547,7 +546,8 @@ class PerforceClientTests(SCMClientTestCase):
                     }
                 ]
 
-        client = self.build_client(wrapper_cls=TestWrapper)
+        client = self.build_client(wrapper_cls=TestWrapper,
+                                   needs_diff=True)
         client.p4.repo_files = [
             {
                 'depotFile': '//mydepot/test/README',
@@ -591,7 +591,7 @@ class PerforceClientTests(SCMClientTestCase):
         revisions = client.parse_revision_spec(['12345'])
 
         self.assertEqual(
-            self._normalize_diff(client.diff(revisions)),
+            self.normalize_diff_result(client.diff(revisions)),
             {
                 'diff': (
                     b'--- //mydepot/test/README\t//mydepot/test/README#2\n'
@@ -647,8 +647,8 @@ class PerforceClientTests(SCMClientTestCase):
         ))
 
     def _test_diff_with_moved_files(self, expected_diff, caps={}):
-        client = self.build_client()
-        client.capabilities = Capabilities(caps)
+        client = self.build_client(needs_diff=True,
+                                   caps=caps)
         client.p4.repo_files = [
             {
                 'depotFile': '//mydepot/test/README',
@@ -718,7 +718,7 @@ class PerforceClientTests(SCMClientTestCase):
         revisions = client.parse_revision_spec(['12345'])
 
         self.assertEqual(
-            self._normalize_diff(client.diff(revisions)),
+            self.normalize_diff_result(client.diff(revisions)),
             {
                 'changenum': '12345',
                 'diff': expected_diff,
@@ -903,31 +903,3 @@ class PerforceClientTests(SCMClientTestCase):
         result = client.normalize_exclude_patterns(patterns)
 
         self.assertEqual(result, normalized_patterns)
-
-    def _normalize_diff(self, diff_result):
-        """Normalize a diff result for comparison.
-
-        This will ensure that dates are all normalized to a fixed date
-        string, making it possible to compare for equality.
-
-        Version Added:
-            4.0
-
-        Args:
-            diff_result (dict):
-                The diff result.
-
-        Returns:
-            dict:
-            The normalized diff result.
-        """
-        self.assertIsInstance(diff_result, dict)
-
-        for key in ('diff', 'parent_diff'):
-            if diff_result.get(key):
-                diff_result[key] = re.sub(
-                    br'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}',
-                    br'2022-01-02 12:34:56',
-                    diff_result[key])
-
-        return diff_result

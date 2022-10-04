@@ -148,9 +148,10 @@ class Post(Command):
     author = 'The Review Board Project'
     description = 'Uploads diffs to create and update review requests.'
 
+    needs_diffs = True
     needs_api = True
-    needs_scm_client = True
     needs_repository = True
+    needs_scm_client = True
 
     #: Reserved built-in fields that can be set using the ``--field`` argument.
     reserved_fields = ('description', 'testing-done', 'summary')
@@ -854,9 +855,6 @@ class Post(Command):
                 '-X/--exclude command line options or the EXCLUDE_PATTERNS '
                 '.reviewboardrc option.' % self.tool.name)
 
-        self.repository_info = \
-            self.repository_info.find_server_repository_info(self.api_root)
-
         if self.repository is None:
             raise CommandError('Could not find the repository on the Review '
                                'Board server.')
@@ -1463,18 +1461,12 @@ class Post(Command):
         """
         options = self.options
 
-        diff_kwargs = {
+        return {
             'exclude_patterns': options.exclude_patterns or [],
             'extra_args': extra_args,
             'include_files': options.include_files or [],
             'repository_info': self.repository_info,
         }
-
-        if options.git_find_renames_threshold is not None:
-            diff_kwargs['git_find_renames_threshold'] = \
-                options.git_find_renames_threshold
-
-        return diff_kwargs
 
     def _post_diff_history(self, review_request, diff_history):
         """Post the diff history to the review request.

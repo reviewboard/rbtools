@@ -4,17 +4,20 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
+from datetime import datetime, timezone
 from typing import Any, Dict, Generic, Optional, Type, TypeVar
 from unittest import SkipTest
 
+import kgb
 from typing_extensions import Final, TypeAlias
 
-import kgb
-
+from rbtools.api.capabilities import Capabilities
 from rbtools.clients import BaseSCMClient
 from rbtools.clients.errors import SCMClientDependencyError
 from rbtools.deprecation import RemovedInRBTools40Warning
+from rbtools.diffs.tools.errors import MissingDiffToolError
 from rbtools.testing import TestCase
 from rbtools.utils.filesystem import make_tempdir
 
@@ -85,6 +88,14 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
     #: Version Added:
     #:     4.0
     default_scmclient_options: _TestSCMClientOptions = {}
+
+    #: Custom default capabilities for SCMClients.
+    #:
+    #: These will be set by :py:meth:`build_client` unless overridden.
+    #:
+    #: Version Added:
+    #:     4.0
+    default_scmclient_caps: Dict[str, Any] = {}
 
     #: The main checkout directory used by tests.
     #:
@@ -184,12 +195,22 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
         self,
         *,
         options: _TestSCMClientOptions = {},
+        caps: Dict[str, Any] = {},
         client_kwargs: Dict[str, Any] = {},
         setup: bool = True,
         allow_dep_checks: bool = True,
         skip_if_deps_missing: bool = True,
+        needs_diff: bool = False,
     ) -> _TestSCMClientType:
         """Build a client for testing.
+
+        This gives the test a lot of control over the setup of the client
+        and what checks can be performed.
+
+        If a test needs to use diff functionality, it must specify
+        ``needs_diff=True`` in order to pre-cache some state. The test will
+        then be skipped if a compatible tool is not installed. Failing to
+        set this and then creating a diff will result in an error.
 
         Version Added:
             4.0
@@ -201,6 +222,13 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
                 By default, :py:attr:`DEFAULT_SCMCLIENT_OPTIONS` and then
                 :py:attr:`default_scmclient_options` will be set. ``options``
                 may override anything in these.
+
+            caps (dict, optional):
+                Custom capabilities to simulate retrieving from the server.
+
+                By defaut, :py:attr:`default_scmclient_caps` will be set.
+                ``caps`` may override anything in these. Dictionaries will
+                *not* be merged recursively.
 
             client_kwargs (dict, optional):
                 Keyword arguments to pass to the client class.
@@ -217,6 +245,15 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
             skip_if_deps_missing (bool, optional):
                 Whether to skip the unit test if dependencies are missing.
 
+            needs_diff (bool, optional):
+                Whether the test needs to work with diffs.
+
+                If ``True``, and a compatible diff tool is not available, the
+                test will be skipped.
+
+                If ``False`` (the default), attempting to create a diff will
+                result in an error.
+
         Returns:
             rbtools.clients.base.scmclient.BaseSCMClient:
             The client instance.
@@ -231,6 +268,10 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
 
         client = self.scmclient_cls(options=cmd_options, **client_kwargs)
 
+        if caps or self.default_scmclient_caps:
+            client.capabilities = Capabilities(
+                dict(self.default_scmclient_caps, **caps))
+
         if not allow_dep_checks:
             self.spy_on(client.check_dependencies, call_original=False)
 
@@ -243,7 +284,84 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
                 else:
                     raise
 
+        if needs_diff:
+            # This will both cache the diff tool (so tests don't have to
+            # account for the checks), and skip if not present.
+            try:
+                client.get_diff_tool()
+            except MissingDiffToolError as e:
+                raise SkipTest(
+                    'A compatible diff tool (%s) is required for this test.'
+                    % (', '.join(e.compatible_diff_tool_names)))
+        else:
+            # Make sure the caller never calls diff(). That's a test error.
+            self.spy_on(
+                client.diff,
+                op=kgb.SpyOpRaise(Exception(
+                    'This unit test called %s.diff(), but did not pass '
+                    'needs_diff=True to build_client()!'
+                    % type(client).__name__)))
+
         return client
+
+    def normalize_diff_result(
+        self,
+        diff_result: Dict[str, Optional[bytes]],
+        *,
+        date_format: str = '%Y-%m-%d %H:%M:%S'
+    ) -> Dict[str, Optional[bytes]]:
+        """Normalize a diff result for comparison.
+
+        This will ensure that dates are all normalized to a fixed date
+        string, making it possible to compare for equality.
+
+        Version Added:
+            4.0
+
+        Args:
+            diff_result (dict):
+                The diff result.
+
+            date_format (str, optional):
+                The optional date string format used to match and generate
+                timestamps.
+
+        Returns:
+            dict:
+            The normalized diff result.
+        """
+        self.assertIsInstance(diff_result, dict)
+
+        format_patterns: Dict[bytes, bytes] = {
+            b'%H': br'\d{2}',
+            b'%M': br'\d{2}',
+            b'%S': br'\d{2}',
+            b'%Y': br'\d{4}',
+            b'%b': br'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)',
+            b'%d': br'\d{1,2}',
+            b'%f': br'\d{6,9}',
+            b'%m': br'\d{2}',
+            b'%z': br'[-+]\d{4}(?:\d{2}(?:\.\d{6})?)?'
+        }
+
+        date_re = re.compile(
+            re.sub(b'|'.join(format_patterns.keys()),
+                   lambda m: format_patterns[m.group(0)],
+                   date_format.encode('utf-8')))
+
+        new_date = (
+            datetime(2022, 1, 2, 12, 34, 56, tzinfo=timezone.utc)
+            .strftime(date_format)
+            .encode('utf-8')
+        )
+
+        for key in ('diff', 'parent_diff'):
+            diff = diff_result.get(key)
+
+            if diff:
+                diff_result[key] = date_re.sub(new_date, diff)
+
+        return diff_result
 
 
 class SCMClientTests(SCMClientTestCase):

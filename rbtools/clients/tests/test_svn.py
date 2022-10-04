@@ -1,18 +1,18 @@
 """Unit tests for SubversionClient."""
 
-from __future__ import unicode_literals
-
 import json
 import os
 import re
 import sys
 import unittest
+from typing import List
 
 import kgb
 from six.moves.urllib.request import urlopen
 
 from rbtools.api.client import RBClient
 from rbtools.api.tests.base import MockResponse
+from rbtools.clients.base.scmclient import SCMClientDiffResult
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     TooManyRevisionsError)
@@ -20,7 +20,9 @@ from rbtools.clients.svn import SVNRepositoryInfo, SVNClient
 from rbtools.clients.tests import FOO1, FOO2, FOO3, SCMClientTestCase
 from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.checks import check_install, is_valid_version
-from rbtools.utils.process import execute
+from rbtools.utils.process import (RunProcessResult,
+                                   run_process,
+                                   run_process_exec)
 from rbtools.utils.repository import get_repository_resource
 
 
@@ -347,6 +349,14 @@ class SVNClientTests(SCMClientTestCase):
         'svn_show_copies_as_adds': None,
     }
 
+    default_scmclient_caps = {
+        'scmtools': {
+            'svn': {
+                'empty_files': True,
+            },
+        },
+    }
+
     @classmethod
     def setup_checkout(cls, checkout_dir):
         """Populate a Subversion checkout.
@@ -375,7 +385,12 @@ class SVNClientTests(SCMClientTestCase):
         os.chdir(checkout_dir)
         cls._run_svn(['co', cls.svn_repo_url, cls.clone_dir])
 
-        svn_version = cls._run_svn(['--version', '-q'])
+        svn_version = (
+            cls._run_svn(['--version', '-q'])
+            .stdout
+            .read()
+        )
+
         cls.svn_version = tuple(
             int(_v)
             for _v in svn_version.split('.')
@@ -397,9 +412,22 @@ class SVNClientTests(SCMClientTestCase):
         return cls.clone_dir
 
     @classmethod
-    def _run_svn(cls, command):
-        return execute(['svn'] + command, env=None, split_lines=False,
-                       ignore_errors=False, extra_ignore_errors=())
+    def _run_svn(
+        cls,
+        command: List[str],
+    ) -> RunProcessResult:
+        """Run svn with the provided arguments.
+
+        Args:
+            command (list of str):
+                The arguments to pass to :command:`svn`.
+
+        Returns:
+            rbtools.utils.process.RunProcessResult:
+            The result of the :py:func:`~rbtools.utils.process.run_process`
+            call.
+        """
+        return run_process(['svn'] + command)
 
     def _svn_add_file(self, filename, data, changelist=None):
         """Add a file to the test repo."""
@@ -560,7 +588,7 @@ class SVNClientTests(SCMClientTestCase):
         with self.assertLogs(level='DEBUG') as ctx:
             remote_only = client.is_remote_only()
 
-        self.assertIsNone(remote_only)
+        self.assertFalse(remote_only)
 
         self.assertEqual(ctx.records[0].msg,
                          'Unable to execute "svn help": skipping SVN')
@@ -758,7 +786,7 @@ class SVNClientTests(SCMClientTestCase):
 
     def test_diff_exclude(self):
         """Testing SVNClient diff with file exclude patterns"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         self._svn_add_file('bar.txt', FOO1)
         self._svn_add_file('exclude.txt', FOO2)
@@ -790,7 +818,7 @@ class SVNClientTests(SCMClientTestCase):
 
     def test_diff_exclude_in_subdir(self):
         """Testing SVNClient diff with exclude patterns in a subdir"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         self._svn_add_file('foo.txt', FOO1)
         self._svn_add_dir('subdir')
@@ -808,7 +836,7 @@ class SVNClientTests(SCMClientTestCase):
 
     def test_diff_exclude_root_pattern_in_subdir(self):
         """Testing SVNClient diff with repo exclude patterns in a subdir"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         self._svn_add_file('exclude.txt', FOO1)
         self._svn_add_dir('subdir')
@@ -831,7 +859,7 @@ class SVNClientTests(SCMClientTestCase):
         """Testing SVNClient identical diff generated from root, subdirectory,
         and via target
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         # Test diff generation for a single file, where 'svn diff' is invoked
         # from three different locations.  This should result in an identical
@@ -936,7 +964,7 @@ class SVNClientTests(SCMClientTestCase):
 
     def test_diff_non_unicode_characters(self):
         """Testing SVNClient diff with a non-utf8 file"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
 
         self._svn_add_file('A.txt', '\xe2'.encode('iso-8859-1'))
         self._run_svn(['propset', 'svn:mime-type', 'text/plain', 'A.txt'])
@@ -971,9 +999,11 @@ class SVNClientTests(SCMClientTestCase):
         """Testing SVNClient diff with a non-utf8 filename via repository_url
         option
         """
-        client = self.build_client(options={
-            'repository_url': self.svn_repo_url,
-        })
+        client = self.build_client(
+            needs_diff=True,
+            options={
+                'repository_url': self.svn_repo_url,
+            })
 
         # Note: commit r4 adds one file with a non-utf8 character in both its
         # filename and content.
@@ -992,6 +1022,33 @@ class SVNClientTests(SCMClientTestCase):
                     b'+This file has a non-utf8 filename.\n'
                     b'+It also contains a non-utf8 character: \xc3\xa9.\n'
                 ) % self.new_file_diff_orig_version,
+            })
+
+    def test_diff_with_empty_files(self):
+        """Testing SVNClient.diff with empty files"""
+        client = self.build_client(needs_diff=True)
+
+        self._run_svn(['rm', 'empty-file'])
+        self._svn_add_file(filename='new-empty-file',
+                           data=b'')
+
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'diff': (
+                    b'Index: /empty-file\t(deleted)\n'
+                    b'======================================================='
+                    b'============\n'
+                    b'--- /empty-file\t(revision 6)\n'
+                    b'+++ /empty-file\t(working copy)\n'
+                    b'Index: /new-empty-file\t(added)\n'
+                    b'======================================================='
+                    b'============\n'
+                    b'--- /new-empty-file\t(revision 0)\n'
+                    b'+++ /new-empty-file\t(revision 0)\n'
+                ),
             })
 
     def test_show_copies_as_adds_enabled(self):
@@ -1029,9 +1086,11 @@ class SVNClientTests(SCMClientTestCase):
         if self.svn_version >= (1, 9):
             # Subversion >= 1.9
             diff = (
-                b'Index: /dir1/foo.txt\n'
+                b'Index: /dir1/foo.txt\t(added)\n'
                 b'==========================================='
                 b'========================\n'
+                b'--- /dir1/foo.txt\t(revision 0)\n'
+                b'+++ /dir1/foo.txt\t(revision 0)\n'
             )
         else:
             # Subversion < 1.9
@@ -1043,7 +1102,34 @@ class SVNClientTests(SCMClientTestCase):
                 'diff': diff,
             })
 
-    def check_show_copies_as_adds(self, state, expected_diff_result):
+    def test_show_copies_as_adds_disabled_and_no_empty_files_cap(self):
+        """Testing SVNClient with --show-copies-as-adds functionality
+        disabled and no empty files capability
+        """
+        if self.svn_version >= (1, 9):
+            # Subversion >= 1.9
+            diff = (
+                b'Index: /dir1/foo.txt\n'
+                b'==========================================='
+                b'========================\n'
+            )
+        else:
+            # Subversion < 1.9
+            diff = b''
+
+        self.check_show_copies_as_adds(
+            state='n',
+            empty_files_cap=False,
+            expected_diff_result={
+                'diff': diff,
+            })
+
+    def check_show_copies_as_adds(
+        self,
+        state: str,
+        expected_diff_result: SCMClientDiffResult,
+        empty_files_cap: bool = True,
+    ) -> None:
         """Helper function to evaluate --show-copies-as-adds.
 
         Args:
@@ -1053,13 +1139,26 @@ class SVNClientTests(SCMClientTestCase):
             expected_diff_result (dict):
                 The expected result of the diff call.
 
+            empty_files_cap (bool, optional):
+                The value to use for the Subversion ``empty_files``
+                capability.
+
         Raises:
             AssertionError:
                 One of the checks failed.
         """
-        client = self.build_client(options={
-            'svn_show_copies_as_adds': state,
-        })
+        client = self.build_client(
+            needs_diff=True,
+            caps={
+                'scmtools': {
+                    'svn': {
+                        'empty_files': empty_files_cap,
+                    },
+                },
+            },
+            options={
+                'svn_show_copies_as_adds': state,
+            })
         client.get_repository_info()
 
         # Ensure valid SVN client version.
@@ -1097,7 +1196,7 @@ class SVNClientTests(SCMClientTestCase):
 
     def test_history_scheduled_with_commit_nominal(self):
         """Testing SVNClient.history_scheduled_with_commit nominal cases"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         client.get_repository_info()
 
         # Ensure valid SVN client version.
@@ -1154,7 +1253,7 @@ class SVNClientTests(SCMClientTestCase):
         """Testing SVNClient.history_scheduled_with_commit is bypassed when
         diff is not for local modifications in a working copy
         """
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         client.get_repository_info()
 
         # Ensure valid SVN client version.
@@ -1198,9 +1297,11 @@ class SVNClientTests(SCMClientTestCase):
                 ),
             })
 
-        client = self.build_client(options={
-            'repository_url': self.svn_repo_url,
-        })
+        client = self.build_client(
+            needs_diff=True,
+            options={
+                'repository_url': self.svn_repo_url,
+            })
         client.get_repository_info()
 
         revisions = client.parse_revision_spec(['2'])
@@ -1234,7 +1335,7 @@ class SVNClientTests(SCMClientTestCase):
 
     def test_history_scheduled_with_commit_special_case_exclude(self):
         """Testing SVNClient.history_scheduled_with_commit with exclude file"""
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         client.get_repository_info()
 
         # Ensure valid SVN client version.
@@ -1275,7 +1376,7 @@ class SVNClientTests(SCMClientTestCase):
                     '-- test line2\n'
                     '-- test line (test2)\n')
 
-        client = self.build_client()
+        client = self.build_client(needs_diff=True)
         revisions = client.parse_revision_spec()
 
         self.assertEqual(
@@ -1285,7 +1386,7 @@ class SVNClientTests(SCMClientTestCase):
                     b'Index: /bug-4546.txt\n'
                     b'==========================================='
                     b'========================\n'
-                    b'--- /bug-4546.txt\t(revision 5)\n'
+                    b'--- /bug-4546.txt\t(revision 6)\n'
                     b'+++ /bug-4546.txt\t(working copy)\n'
                     b'@@ -1,4 +1,3 @@\n'
                     b' -- test line1\n'
@@ -1300,77 +1401,482 @@ class SVNClientTests(SCMClientTestCase):
         client = self.build_client()
         repository_info = client.get_repository_info()
 
-        self.spy_on(execute,
-                    op=kgb.SpyOpReturn((0, b'test')))
+        self.spy_on(run_process_exec)
+
+        with open('test.diff', 'wb') as fp:
+            fp.write(
+                b'Index: /\xc3\xa2.txt\n'
+                b'================================================'
+                b'===================\n'
+                b'--- /\xc3\xa2.txt\t(revision 5)\n'
+                b'+++ /\xc3\xa2.txt\t(working copy)\n'
+                b'@@ -1,2 +1,3 @@\n'
+                b' This file has a non-utf8 filename.\n'
+                b' It also contains a non-utf8 character: \xc3\xa9.\n'
+                b'+And this! \xf0\x9f\xa5\xb9\n'
+                b'Index: /foo.txt\n'
+                b'================================================'
+                b'===================\n'
+                b'--- /foo.txt\t(revision 5)\n'
+                b'+++ /foo.txt\t(working copy)\n'
+                b'@@ -6,6 +6,6 @@\n'
+                b' dum conderet urbem,\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b'-Albanique patres, atque altae moenia Romae.\n'
+                b'+Albanique patres, atque altae moenia Romae!\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'\n'
+            )
 
         result = client.apply_patch(base_path=repository_info.base_path,
                                     base_dir='',
                                     patch_file='test.diff')
 
         self.assertSpyCalledWith(
-            execute,
+            run_process_exec,
             [
                 'svn', '--non-interactive', 'patch', '--strip=1', 'test.diff',
             ],
-            with_errors=True,
-            return_error_code=True,
-            results_unicode=False)
+            redirect_stderr=True)
 
         self.assertTrue(result.applied)
         self.assertFalse(result.has_conflicts)
         self.assertEqual(result.conflicting_files, [])
-        self.assertEqual(result.patch_output, b'test')
+        self.assertEqual(
+            result.patch_output,
+            b'U         \xc3\xa2.txt\n'
+            b'U         foo.txt\n')
 
     def test_apply_patch_with_p(self):
         """Testing SVNClient.apply_patch with p="""
         client = self.build_client()
         repository_info = client.get_repository_info()
 
-        self.spy_on(execute,
-                    op=kgb.SpyOpReturn((0, b'test')))
+        self.spy_on(
+            run_process_exec,
+            op=kgb.SpyOpMatchInOrder([
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'patch', '--strip=3',
+                        'test.diff',
+                    ],),
+                    'kwargs': {
+                        'redirect_stderr': True,
+                    },
+                },
+            ]))
+
+        with open('test.diff', 'wb') as fp:
+            fp.write(
+                b'Index: /a/b/\xc3\xa2.txt\n'
+                b'================================================'
+                b'===================\n'
+                b'--- /a/b/\xc3\xa2.txt\t(revision 5)\n'
+                b'+++ /a/b/\xc3\xa2.txt\t(working copy)\n'
+                b'@@ -1,2 +1,3 @@\n'
+                b' This file has a non-utf8 filename.\n'
+                b' It also contains a non-utf8 character: \xc3\xa9.\n'
+                b'+And this! \xf0\x9f\xa5\xb9\n'
+                b'Index: /a/b/foo.txt\n'
+                b'================================================'
+                b'===================\n'
+                b'--- /a/b/foo.txt\t(revision 5)\n'
+                b'+++ /a/b/foo.txt\t(working copy)\n'
+                b'@@ -6,6 +6,6 @@\n'
+                b' dum conderet urbem,\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b'-Albanique patres, atque altae moenia Romae.\n'
+                b'+Albanique patres, atque altae moenia Romae!\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'\n'
+            )
 
         result = client.apply_patch(base_path=repository_info.base_path,
                                     base_dir='',
                                     patch_file='test.diff',
                                     p=3)
 
-        self.assertSpyCalledWith(
-            execute,
-            [
-                'svn', '--non-interactive', 'patch', '--strip=3', 'test.diff',
-            ],
-            with_errors=True,
-            return_error_code=True,
-            results_unicode=False)
+        self.assertSpyCalled(run_process_exec)
 
         self.assertTrue(result.applied)
         self.assertFalse(result.has_conflicts)
         self.assertEqual(result.conflicting_files, [])
-        self.assertEqual(result.patch_output, b'test')
+        self.assertEqual(
+            result.patch_output,
+            b'U         \xc3\xa2.txt\n'
+            b'U         foo.txt\n')
 
-    def test_apply_patch_with_error(self):
-        """Testing SVNClient.apply_patch with error"""
+    def test_apply_patch_with_revert(self):
+        """Testing SVNClient.apply_patch with revert=True"""
         client = self.build_client()
         repository_info = client.get_repository_info()
 
-        self.spy_on(execute,
-                    op=kgb.SpyOpReturn((1, 'bád'.encode('utf-8'))))
+        self.spy_on(
+            run_process_exec,
+            op=kgb.SpyOpMatchInOrder([
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'patch', '--strip=1',
+                        '--reverse-diff', 'test.diff',
+                    ],),
+                    'kwargs': {
+                        'redirect_stderr': True,
+                    },
+                },
+            ]))
+
+        with open('â.txt', 'ab') as fp:
+            fp.write(b'And this! \xf0\x9f\xa5\xb9\n')
+
+        with open('foo.txt', 'wb') as fp:
+            fp.write(
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'Italiam, fato profugus, Laviniaque venit\n'
+                b'litora, multum ille et terris iactatus et alto\n'
+                b'vi superum saevae memorem Iunonis ob iram;\n'
+                b'dum conderet urbem,\n'
+                b'inferretque deos Latio, genus unde Latinum,\n'
+                b'Albanique patres, atque altae moenia Romae.\n'
+                b'Albanique patres, atque altae moenia Romae!\n'
+                b'Musa, mihi causas memora, quo numine laeso,\n'
+                b'\n'
+            )
+
+        with open('test.diff', 'wb') as fp:
+            fp.write(
+                b'Index: /\xc3\xa2.txt\n'
+                b'================================================'
+                b'===================\n'
+                b'--- /\xc3\xa2.txt\t(revision 5)\n'
+                b'+++ /\xc3\xa2.txt\t(working copy)\n'
+                b'@@ -1,2 +1,3 @@\n'
+                b' This file has a non-utf8 filename.\n'
+                b' It also contains a non-utf8 character: \xc3\xa9.\n'
+                b'+And this! \xf0\x9f\xa5\xb9\n'
+                b'Index: /foo.txt\n'
+                b'================================================'
+                b'===================\n'
+                b'--- /foo.txt\t(revision 5)\n'
+                b'+++ /foo.txt\t(working copy)\n'
+                b'@@ -6,6 +6,6 @@\n'
+                b' dum conderet urbem,\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b'-Albanique patres, atque altae moenia Romae.\n'
+                b'+Albanique patres, atque altae moenia Romae!\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'\n'
+            )
 
         result = client.apply_patch(base_path=repository_info.base_path,
                                     base_dir='',
                                     patch_file='test.diff',
-                                    p=3)
+                                    revert=True)
 
-        self.assertSpyCalledWith(
-            execute,
-            [
-                'svn', '--non-interactive', 'patch', '--strip=3', 'test.diff',
-            ],
-            with_errors=True,
-            return_error_code=True,
-            results_unicode=False)
+        self.assertSpyCalled(run_process_exec)
+
+        self.assertTrue(result.applied)
+        self.assertFalse(result.has_conflicts)
+        self.assertEqual(result.conflicting_files, [])
+        self.assertEqual(
+            result.patch_output,
+            b'U         \xc3\xa2.txt\n'
+            b'U         foo.txt\n')
+
+    def test_apply_patch_with_empty_files(self):
+        """Testing SVNClient.apply_patch with empty files"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(
+            run_process_exec,
+            op=kgb.SpyOpMatchInOrder([
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'patch', '--strip=1',
+                        'test.diff',
+                    ],),
+                    'kwargs': {
+                        'redirect_stderr': True,
+                    },
+                },
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'add', '--force',
+                        'new-empty-file-1', 'new-empty-file-2',
+                    ],),
+                },
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'delete', '--force',
+                        'empty-file',
+                    ],),
+                },
+            ]))
+
+        with open('test.diff', 'wb') as fp:
+            fp.write(
+                b'Index: empty-file\t(deleted)\n'
+                b'================================================'
+                b'===================\n'
+                b'Index: new-empty-file-1\t(added)\n'
+                b'================================================'
+                b'===================\n'
+                b'Index: new-empty-file-2\t(added)\n'
+                b'================================================'
+                b'===================\n'
+            )
+
+        result = client.apply_patch(base_path=repository_info.base_path,
+                                    base_dir='',
+                                    patch_file='test.diff')
+
+        self.assertSpyCalled(run_process_exec)
+        self.assertFalse(os.path.exists('empty-file'))
+        self.assertTrue(os.path.exists('new-empty-file-1'))
+        self.assertTrue(os.path.exists('new-empty-file-2'))
+
+        with open('new-empty-file-1', 'rb') as fp:
+            self.assertEqual(fp.read(), b'')
+
+        with open('new-empty-file-2', 'rb') as fp:
+            self.assertEqual(fp.read(), b'')
+
+        self.assertTrue(result.applied)
+        self.assertFalse(result.has_conflicts)
+        self.assertEqual(result.conflicting_files, [])
+        self.assertEqual(result.patch_output, b'')
+
+    def test_apply_patch_with_empty_files_revert(self):
+        """Testing SVNClient.apply_patch with empty files and revert=True"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(
+            run_process_exec,
+            op=kgb.SpyOpMatchInOrder([
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'patch', '--strip=1',
+                        '--reverse-diff', 'test.diff',
+                    ],),
+                    'kwargs': {
+                        'redirect_stderr': True,
+                    },
+                },
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'add', '--force',
+                        'empty-file',
+                    ],),
+                },
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'delete', '--force',
+                        'new-empty-file-1', 'new-empty-file-2',
+                    ],),
+                },
+            ]))
+
+        with open('new-empty-file-1', 'wb'):
+            pass
+
+        with open('new-empty-file-2', 'wb'):
+            pass
+
+        with open('test.diff', 'wb') as fp:
+            fp.write(
+                b'Index: empty-file\t(deleted)\n'
+                b'================================================'
+                b'===================\n'
+                b'Index: new-empty-file-1\t(added)\n'
+                b'================================================'
+                b'===================\n'
+                b'Index: new-empty-file-2\t(added)\n'
+                b'================================================'
+                b'===================\n'
+            )
+
+        result = client.apply_patch(base_path=repository_info.base_path,
+                                    base_dir='',
+                                    patch_file='test.diff',
+                                    revert=True)
+
+        self.assertSpyCalled(run_process_exec)
+        self.assertTrue(os.path.exists('empty-file'))
+        self.assertFalse(os.path.exists('new-empty-file-1'))
+        self.assertFalse(os.path.exists('new-empty-file-2'))
+
+        self.assertTrue(result.applied)
+        self.assertFalse(result.has_conflicts)
+        self.assertEqual(result.conflicting_files, [])
+        self.assertEqual(result.patch_output, b'')
+
+    def test_apply_patch_with_not_applied(self):
+        """Testing SVNClient.apply_patch with not applied"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(
+            run_process_exec,
+            op=kgb.SpyOpMatchInOrder([
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'patch', '--strip=1',
+                        'test.diff',
+                    ],),
+                    'kwargs': {
+                        'redirect_stderr': True,
+                    },
+                },
+            ]))
+
+        with open('test.diff', 'wb') as fp:
+            fp.write(
+                b'Index: foorp.txt\n'
+                b'================================================'
+                b'===================\n'
+            )
+
+        result = client.apply_patch(base_path=repository_info.base_path,
+                                    base_dir='',
+                                    patch_file='test.diff')
+
+        self.assertSpyCalled(run_process_exec)
 
         self.assertFalse(result.applied)
         self.assertFalse(result.has_conflicts)
         self.assertEqual(result.conflicting_files, [])
-        self.assertEqual(result.patch_output, b'b\xc3\xa1d')
+        self.assertEqual(result.patch_output, b'')
+
+    def test_apply_patch_with_conflicts(self):
+        """Testing SVNClient.apply_patch with conflicts"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(
+            run_process_exec,
+            op=kgb.SpyOpMatchInOrder([
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'patch', '--strip=1',
+                        'test.diff',
+                    ],),
+                    'kwargs': {
+                        'redirect_stderr': True,
+                    },
+                },
+            ]))
+
+        with open('test.diff', 'wb') as fp:
+            fp.write(
+                b'Index: /\xc3\xa2.txt\n'
+                b'================================================'
+                b'===================\n'
+                b'--- /\xc3\xa2.txt\t(revision 5)\n'
+                b'+++ /\xc3\xa2.txt\t(working copy)\n'
+                b'@@ -1,1 +1,1 @@\n'
+                b'-This is a bad line\n'
+                b'+Oh hi! \xf0\x9f\xa5\xb9\n'
+                b'Index: /foo.txt\n'
+                b'================================================'
+                b'===================\n'
+                b'--- /foo.txt\t(revision 5)\n'
+                b'+++ /foo.txt\t(working copy)\n'
+                b'@@ -6,6 +6,6 @@\n'
+                b' dum conderet urbem,\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b'-foo\n'
+                b'+Albanique patres, atque altae moenia Romae!\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'\n'
+            )
+
+        result = client.apply_patch(base_path=repository_info.base_path,
+                                    base_dir='',
+                                    patch_file='test.diff')
+
+        self.assertSpyCalled(run_process_exec)
+
+        self.assertFalse(result.applied)
+        self.assertTrue(result.has_conflicts)
+        self.assertEqual(
+            result.conflicting_files,
+            [
+                'â.txt',
+                'foo.txt',
+            ])
+        self.assertEqual(
+            result.patch_output,
+            b'C         \xc3\xa2.txt\n'
+            b'>         rejected hunk @@ -1,1 +1,1 @@\n'
+            b'C         foo.txt\n'
+            b'>         rejected hunk @@ -6,6 +6,6 @@\n'
+            b'Summary of conflicts:\n'
+            b'  Text conflicts: 2\n')
+
+    def test_apply_patch_with_applied_and_conflicts(self):
+        """Testing SVNClient.apply_patch with applied and conflicts"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(
+            run_process_exec,
+            op=kgb.SpyOpMatchInOrder([
+                {
+                    'args': ([
+                        'svn', '--non-interactive', 'patch', '--strip=1',
+                        'test.diff',
+                    ],),
+                    'kwargs': {
+                        'redirect_stderr': True,
+                    },
+                },
+            ]))
+
+        with open('test.diff', 'wb') as fp:
+            fp.write(
+                b'Index: /\xc3\xa2.txt\n'
+                b'================================================'
+                b'===================\n'
+                b'--- /\xc3\xa2.txt\t(revision 5)\n'
+                b'+++ /\xc3\xa2.txt\t(working copy)\n'
+                b'@@ -1,2 +1,3 @@\n'
+                b' This file has a non-utf8 filename.\n'
+                b' It also contains a non-utf8 character: \xc3\xa9.\n'
+                b'+And this! \xf0\x9f\xa5\xb9\n'
+                b'Index: /foo.txt\n'
+                b'================================================'
+                b'===================\n'
+                b'--- /foo.txt\t(revision 5)\n'
+                b'+++ /foo.txt\t(working copy)\n'
+                b'@@ -6,6 +6,6 @@\n'
+                b' dum conderet urbem,\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b'-foo\n'
+                b'+Albanique patres, atque altae moenia Romae!\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'\n'
+            )
+
+        result = client.apply_patch(base_path=repository_info.base_path,
+                                    base_dir='',
+                                    patch_file='test.diff')
+
+        self.assertSpyCalled(run_process_exec)
+
+        self.assertTrue(result.applied)
+        self.assertTrue(result.has_conflicts)
+        self.assertEqual(result.conflicting_files, ['foo.txt'])
+        self.assertEqual(
+            result.patch_output,
+            b'U         \xc3\xa2.txt\n'
+            b'C         foo.txt\n'
+            b'>         rejected hunk @@ -6,6 +6,6 @@\n'
+            b'Summary of conflicts:\n'
+            b'  Text conflicts: 1\n')

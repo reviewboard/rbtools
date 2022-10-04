@@ -16,25 +16,72 @@ import re
 import sqlite3
 from collections import OrderedDict
 from contextlib import contextmanager
-from typing import Optional
+from typing import List, Optional, Union, cast
 
 import six
 from pydiffx import DiffType, DiffX
 from pydiffx.utils.text import guess_line_endings
 from six.moves import range
+from typing_extensions import NotRequired, TypedDict
 
-from rbtools.clients import BaseSCMClient, RepositoryInfo
+from rbtools.api.resource import ReviewRequestResource
+from rbtools.clients import RepositoryInfo
+from rbtools.clients.base.scmclient import (BaseSCMClient,
+                                            SCMClientDiffResult,
+                                            SCMClientRevisionSpec)
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
-from rbtools.utils.checks import check_gnu_diff, check_install
+from rbtools.deprecation import (RemovedInRBTools50Warning,
+                                 deprecate_non_keyword_only_args)
+from rbtools.diffs.tools.base import DiffFileResult
+from rbtools.diffs.writers import UnifiedDiffWriter
+from rbtools.utils.checks import check_install
 from rbtools.utils.diffs import filename_match_any_patterns
 from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import execute
 
 
 logger = logging.getLogger(__name__)
+
+
+class SOSRevisionSpecExtra(TypedDict):
+    """Extra revision information for a SOS revision specification.
+
+    This contains information on the SOS changelist or selection, computed
+    based on the revision information provided to SOS.
+
+    This goes into the ``extra`` key in
+    :py:class:`~rbtools.clients.base.scmclient.SCMClientRevisionSpec`.
+
+    Version Added:
+        4.0:
+        In prior versions, these keys lived directly in the base of the
+        revision spec.
+    """
+
+    #: Whether an explicit selection was provided.
+    #:
+    #: If ``False``, a default selection will be used instead.
+    #:
+    #: This is only present if :py:attr:`sos_selection` is present.
+    #:
+    #: Type:
+    #:     bool
+    has_explicit_selection: NotRequired[bool]
+
+    #: The changelist ID being posted for review.
+    #:
+    #: Type:
+    #:     str
+    sos_changelist: NotRequired[str]
+
+    #: A list of SOS selection flags representing files to post for review.
+    #:
+    #: Type:
+    #:     list of str
+    sos_selection: NotRequired[List[str]]
 
 
 class SOSObjectType(object):
@@ -195,6 +242,9 @@ class SOSClient(BaseSCMClient):
 
     scmclient_id = 'sos'
     name = 'Cliosoft SOS'
+
+    requires_diff_tool = ['gnu']
+
     supports_diff_exclude_patterns = True
 
     REVISION_WORKING_COPY = '--rbtools-working-copy'
@@ -253,7 +303,7 @@ class SOSClient(BaseSCMClient):
             # This is not a SOS workarea.
             return None
 
-    def get_repository_info(self):
+    def get_repository_info(self) -> Optional[RepositoryInfo]:
         """Return repository information for the current SOS workarea.
 
         Returns:
@@ -269,52 +319,43 @@ class SOSClient(BaseSCMClient):
         project = self._query_sos_info('project')
         server = self._query_sos_info('server')
 
-        # Now that we know it's SOS, make sure we have GNU diff installed, and
-        # error out if we don't.
-        check_gnu_diff()
-
         # The path matches what's used in Power Pack. We don't have hostnames
         # to consider, so it's purely server/project.
         return RepositoryInfo(path='SOS:%s:%s' % (server, project),
                               local_path=local_path)
 
-    def parse_revision_spec(self, revisions=[]):
+    def parse_revision_spec(
+        self,
+        revisions: List[str] = [],
+    ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
+        If a single revision is passed in, and it begins with ``select:``,
+        then anything after is expected to be SOS selection flags to
+        match files to post.
+
+        If a single revision is passed in, and it does not begin with
+        ``select:``, then it's assumed to be a changelist ID.
+
+        If zero revisions are passed in, a default selection of ``-scm``
+        will be used.
+
+        Anything else is unsupported.
+
         Args:
-            revisions (list of unicode, optional):
+            revisions (list of str, optional):
                 A list of SOS selection patterns or changelist IDs, as
                 specified by the user.
 
-                If this is empty, the default selection (``-scm``) will be
-                used.
-
-                If this has one value, and it begins with ``select:``, then
-                anything after is expected to be SOS selection flags to
-                match files to post.
-
-                If this has one value and does not start with ``select:``,
-                then it's a changelist ID.
-
-                Anything else is unsupported.
-
         Returns:
             dict:
-            A dictionary with one (and only one) of the following keys:
+            The parsed revision spec.
 
-            Keys:
-                sos_changelist (unicode):
-                    The changelist ID being posted for review.
+            See :py:class:`~rbtools.clients.base.scmclient.
+            SCMClientRevisionSpec` for the format of this dictionary.
 
-                sos_selection (list of unicode):
-                    A list of SOS selection flags representing files to
-                    post for review.
-
-                has_explicit_selection (bool):
-                    ``True`` if an explicit selection has been provided,
-                    or ``False`` if using the default.
-
-                    This is only present if ``sos_selection`` is present.
+            This only makes use of the ``extra`` field, which is documented
+            in :py:class:`SOSRevisionSpecExtra`.
 
         Raises:
             rbtools.clients.errors.InvalidRevisionSpecError:
@@ -325,20 +366,22 @@ class SOSClient(BaseSCMClient):
         """
         n_revs = len(revisions)
 
+        sos_revisions: SOSRevisionSpecExtra
+
         if n_revs == 0:
-            return {
+            sos_revisions = {
                 'sos_selection': self.DEFAULT_SELECTION,
                 'has_explicit_selection': False,
             }
         elif n_revs == 1:
             if revisions[0].startswith('select:'):
                 # The user is providing an SOS selection.
-                return {
+                sos_revisions = {
                     'sos_selection': revisions[0].split(':', 1)[1].split(' '),
                     'has_explicit_selection': True,
                 }
             elif self._has_changelist_support():
-                return {
+                sos_revisions = {
                     'sos_changelist': revisions[0],
                 }
             else:
@@ -349,8 +392,18 @@ class SOSClient(BaseSCMClient):
         else:
             raise TooManyRevisionsError
 
-    def get_tree_matches_review_request(self, review_request, revisions,
-                                        **kwargs):
+        return {
+            'base': None,
+            'tip': None,
+            'extra': sos_revisions,
+        }
+
+    def get_tree_matches_review_request(
+        self,
+        review_request: ReviewRequestResource,
+        revisions: SCMClientRevisionSpec,
+        **kwargs,
+    ) -> bool:
         """Return whether a tree matches metadata in a review request.
 
         This will compare the stored state in a review request (set when
@@ -376,7 +429,10 @@ class SOSClient(BaseSCMClient):
             ``True`` if the review request matches the tree. ``False`` if it
             does not.
         """
-        local_changelist_id = revisions.get('sos_changelist')
+        assert 'extra' in revisions
+        revisions_extra = cast(SOSRevisionSpecExtra, revisions['extra'])
+
+        local_changelist_id = revisions_extra.get('sos_changelist')
 
         if not local_changelist_id:
             return False
@@ -396,8 +452,16 @@ class SOSClient(BaseSCMClient):
                 project == self._query_sos_info('project') and
                 server == self._query_sos_info('server'))
 
-    def diff(self, revisions, include_files=[], exclude_patterns=[],
-             extra_args=[], **kwargs):
+    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
+    def diff(
+        self,
+        revisions: SCMClientRevisionSpec,
+        *,
+        include_files: List[str] = [],
+        exclude_patterns: List[str] = [],
+        with_parent_diff: bool = True,
+        **kwargs,
+    ) -> SCMClientDiffResult:
         """Perform a diff using the given revisions.
 
         This goes through the work of generating a diff for SOS, generating a
@@ -432,26 +496,21 @@ class SOSClient(BaseSCMClient):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
 
-            extra_args (list, unused):
-                Additional arguments to be passed to the diff generation.
-                Unused for git.
-
             **kwargs (dict, unused):
                 Unused keyword arguments.
 
         Returns:
             dict:
-            A dictionary containing the following keys:
-
-            Keys:
-                diff (bytes):
-                    The contents of the diff to upload.
-
-                review_request_extra_data (dict):
-                    Extra data to store on the posted review request.
+            A dictionary containing keys documented in
+            :py:class:`~rbtools.clients.base.scmclient.SCMClientDiffResult`.
         """
+        assert 'extra' in revisions
+        revisions_extra = cast(SOSRevisionSpecExtra, revisions['extra'])
+
         wa_root = self._get_wa_root()
         changelist = None
+
+        assert wa_root
 
         # We'll be overriding the selection every time we export, so make sure
         # that we stash the old selection and restore it after.
@@ -468,16 +527,16 @@ class SOSClient(BaseSCMClient):
             # files as part of the selection criteria.
             selection = None
 
-            if 'sos_changelist' in revisions:
-                changelist = revisions['sos_changelist']
-            elif 'sos_selection' in revisions:
+            if 'sos_changelist' in revisions_extra:
+                changelist = revisions_extra['sos_changelist']
+            elif 'sos_selection' in revisions_extra:
                 if (include_files and
-                    not revisions.get('has_explicit_selection')):
+                    not revisions_extra.get('has_explicit_selection')):
                     # Select all specified files (-sfo) or directories (-sdo),
                     # and allow for unmanaged files (-sunm).
                     selection = self.INCLUDE_FILES_SELECTION + include_files
                 else:
-                    selection = revisions['sos_selection']
+                    selection = revisions_extra['sos_selection']
             else:
                 raise KeyError(
                     'revisions is missing either a "sos_changelist" or '
@@ -501,6 +560,8 @@ class SOSClient(BaseSCMClient):
             project = self._query_sos_info('project')
             server = self._query_sos_info('server')
             rso = self._query_sos_info('rso')
+
+            assert rso
 
             diffx = DiffX(meta={
                 'scm': 'sos',
@@ -601,51 +662,42 @@ class SOSClient(BaseSCMClient):
                     else:
                         diff_new_filename = new_filename
 
-                    if (change_status == SOSObjectChangeStatus.UNCHANGED and
-                        op != 'move'):
-                        # No file content has changed.
-                        chunks = None
-                        chunks_info = {}
-                    else:
+                    if (change_status != SOSObjectChangeStatus.UNCHANGED or
+                        op == 'move'):
                         # Generate a diff of the file contents.
-                        chunks, chunks_info = self._diff_file_hunks(
+                        diff_result = self._diff_file_hunks(
                             wa_root=wa_root,
                             filename=sos_new_filename or sos_old_filename,
                             orig_revision=revision,
                             orig_content=selected_file.get('orig_content'))
 
-                    if chunks_info and chunks_info.get('is_binary'):
-                        # Mark this as a binary file. We don't currently
-                        # provide any binary file contents.
-                        diffx_file.diff_type = DiffType.BINARY
-                        chunks = (
-                            'Binary files %s and %s differ\n'
-                            % (diff_old_filename, diff_new_filename)
-                        ).encode('utf-8')
+                        diff_writer = UnifiedDiffWriter()
 
-                    if chunks:
-                        # If we thought this was a moved file, it's time to
-                        # change it to indicate there are modifications.
-                        if op == 'move':
-                            op = 'move-modify'
+                        if diff_result.is_binary:
+                            # Mark this as a binary file. We don't currently
+                            # provide any binary file contents.
+                            diffx_file.diff_type = DiffType.BINARY
+                            diff_writer.write_binary_files_differ(
+                                orig_path=diff_old_filename,
+                                modified_path=diff_new_filename)
+                        elif diff_result.has_text_differences:
+                            # If we thought this was a moved file, it's time to
+                            # change it to indicate there are modifications.
+                            if op == 'move':
+                                op = 'move-modify'
 
-                        # Populate the diff content.
-                        file_diff = io.BytesIO()
-                        line_endings, newline = guess_line_endings(chunks)
+                            # Populate the diff content.
+                            hunks = diff_result.hunks
+                            line_endings, newline = guess_line_endings(hunks)
+                            diffx_file.diff_line_endings = line_endings
 
-                        file_diff.write(b'--- %s%s'
-                                        % (diff_old_filename.encode('utf-8'),
-                                           newline))
-                        file_diff.write(b'+++ %s%s'
-                                        % (diff_new_filename.encode('utf-8'),
-                                           newline))
+                            diff_writer.write_file_headers(
+                                orig_path=diff_old_filename,
+                                modified_path=diff_new_filename)
+                            diff_writer.write_diff_file_result_hunks(
+                                diff_result)
 
-                        file_diff.write(chunks)
-                        file_diffdata = file_diff.getvalue()
-                        file_diff.close()
-
-                        diffx_file.diff = file_diffdata
-                        diffx_file.diff_line_endings = line_endings
+                        diffx_file.diff = diff_writer.getvalue()
                 elif obj_type == SOSObjectType.SYMLINK:
                     # This is a symlink.
                     #
@@ -1615,19 +1667,23 @@ class SOSClient(BaseSCMClient):
                 # Ignore this.
                 pass
 
-    def _diff_file_hunks(self, wa_root, filename, orig_revision,
-                         orig_content=None):
+    def _diff_file_hunks(
+        self,
+        wa_root: str,
+        filename: str,
+        orig_revision: Union[int, str],
+        orig_content: Optional[bytes] = None,
+    ) -> DiffFileResult:
         """Return diff hunks for a given file.
 
         This will diff a file against a prior revision (or explicit content),
-        strip out any leading filename lines (``---`` or ``+++``), and check
-        for binary file indicators.
+        returning a diff result.
 
         Args:
-            wa_root (unicode):
+            wa_root (str):
                 The root of the workarea.
 
-            filename (unicode):
+            filename (str):
                 The path to the modified version of the file.
 
             revision (int or bytes):
@@ -1637,16 +1693,12 @@ class SOSClient(BaseSCMClient):
                 The original file contents.
 
         Returns:
-            tuple:
-            A 2-tuple of:
-
-            1. A byte string of the diff hunks.
-            2. Dictionary info about the file. This contains an
-               ``is_binary`` key mapping to a boolean.
-
-            Both will be ``None`` if this returns something that doesn't
-            look like a diff.
+            rbtools.diffs.tools.base.diff_file_result.DiffFileResult:
+            The result of the diff operation.
         """
+        diff_tool = self.get_diff_tool()
+        assert diff_tool is not None
+
         # Get the contents of the original file.
         tmp_orig_filename = make_tempfile()
         abs_filename = os.path.normpath(os.path.join(wa_root, filename))
@@ -1662,49 +1714,21 @@ class SOSClient(BaseSCMClient):
                 # For unmanaged (generally new) files, we want to diff against
                 # an empty temp file. We'll export if it's anything but new.
                 if orig_revision != SOSObjectRevision.UNMANAGED:
+                    assert isinstance(orig_revision, int)
+
                     os.unlink(tmp_orig_filename)
                     self.run_soscmd('exportrev',
                                     '%s/#/%d' % (filename, orig_revision),
                                     '-out%s' % tmp_orig_filename)
 
             # Diff the new file against that.
-            #
-            # Diff returns "1" if differences were found.
-            dl = execute(['diff', '-urNp', tmp_orig_filename, abs_filename],
-                         extra_ignore_errors=(1, 2),
-                         log_output_on_error=False,
-                         results_unicode=False,
-                         split_lines=True)
+            diff_result = diff_tool.run_diff_file(orig_path=tmp_orig_filename,
+                                                  modified_path=abs_filename)
         finally:
             if os.path.exists(tmp_orig_filename):
                 os.unlink(tmp_orig_filename)
 
-        # Check if this shows up as a binary file.
-        is_binary = False
-
-        if (len(dl) == 1 and
-            dl[0].startswith(b'Binary files %s and %s differ'
-                             % (tmp_orig_filename.encode('utf-8'),
-                                abs_filename.encode('utf-8')))):
-            # This is a binary file.
-            dl = []
-            is_binary = True
-        elif len(dl) > 0:
-            # This is a text file. We should have "---" and "+++" lines.
-            if (not dl[0].startswith(b'---') or
-                not dl[1].startswith(b'+++')):
-                # This isn't what we expected. Skip the file.
-                logger.warning('Received an invalid diff for %s/#/%s',
-                               filename, orig_revision)
-                logger.debug('Invalid diff = %r', dl)
-
-                return None, None
-
-            dl = dl[2:]
-
-        return b''.join(dl), {
-            'is_binary': is_binary,
-        }
+        return diff_result
 
     def _normalize_sos_path(self, sos_path):
         """Normalize an SOS path to a local path.

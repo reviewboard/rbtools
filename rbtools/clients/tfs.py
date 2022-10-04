@@ -1,26 +1,35 @@
 """A client for Team Foundation Server."""
 
-from __future__ import unicode_literals
+from __future__ import annotations
 
+import argparse
 import logging
 import os
 import re
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
-from typing import Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional, cast
 
 from six.moves.urllib.parse import unquote
 
 from rbtools.clients import BaseSCMClient, RepositoryInfo
+from rbtools.clients.base.scmclient import (SCMClientDiffResult,
+                                            SCMClientRevisionSpec)
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
+from rbtools.deprecation import (RemovedInRBTools50Warning,
+                                 deprecate_non_keyword_only_args)
+from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.appdirs import user_data_dir
-from rbtools.utils.checks import check_gnu_diff, check_install
+from rbtools.utils.checks import check_install
 from rbtools.utils.diffs import filename_match_any_patterns
-from rbtools.utils.process import execute
+from rbtools.utils.filesystem import make_tempfile
+from rbtools.utils.process import (RunProcessError,
+                                   RunProcessResult,
+                                   run_process)
 
 
 class BaseTFWrapper:
@@ -30,7 +39,12 @@ class BaseTFWrapper:
         4.0
     """
 
-    def __init__(self, *, config=None, options=None):
+    def __init__(
+        self,
+        *,
+        config: Optional[Dict[str, Any]] = None,
+        options: Optional[argparse.Namespace] = None,
+    ) -> None:
         """Initialize the wrapper.
 
         Args:
@@ -71,17 +85,39 @@ class BaseTFWrapper:
     def parse_revision_spec(
         self,
         revisions: List[str],
-    ) -> Dict[str, str]:
+    ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
+
+        These will be used to generate the diffs to upload to Review Board
+        (or print). The diff for review will include the changes in (base,
+        tip], and the parent diff (if necessary) will include (parent,
+        base].
+
+        If a single revision is passed in, this will return the parent of
+        that revision for "base" and the passed-in revision for "tip".
+
+        If zero revisions are passed in, this will return revisions
+        relevant for the "current change" (changes in the work folder which
+        have not yet been checked in).
 
         Args:
             revisions (list of str):
-                A list of revisions as specified by the user. Items in the list
-                do not necessarily represent a single revision, since the user
-                can use the TFS-native syntax of ``r1~r2``. Versions passed in
-                can be any versionspec, such as a changeset number,
-                ``L``-prefixed label name, ``W`` (latest workspace version), or
-                ``T`` (latest upstream version).
+                A list of revisions as specified by the user.
+
+                Items in the list do not necessarily represent a single
+                revision, since the user can use the TFS-native syntax of
+                ``r1~r2``. Versions passed in can be any versionspec, such as a
+                changeset number, ``L``-prefixed label name, ``W`` (latest
+                workspace version), or ``T`` (latest upstream version).
+
+        Returns:
+            dict:
+            The parsed revision spec.
+
+            See :py:class:`~rbtools.clients.base.scmclient.
+            SCMClientRevisionSpec` for the format of this dictionary.
+
+            This always populates ``base`` and ``tip``.
 
         Raises:
             rbtools.clients.errors.TooManyRevisionsError:
@@ -89,39 +125,23 @@ class BaseTFWrapper:
 
             rbtools.clients.errors.InvalidRevisionSpecError:
                 The given revision spec could not be parsed.
-
-        Returns:
-            dict:
-            A dictionary with the following keys:
-
-            Keys:
-                base (str):
-                    A revision to use as the base of the resulting diff.
-
-                tip (str):
-                    A revision to use as the tip of the resulting diff.
-
-                parent_base (str, optional):
-                    The revision to use as the base of a parent diff.
-
-            These will be used to generate the diffs to upload to Review Board
-            (or print). The diff for review will include the changes in (base,
-            tip], and the parent diff (if necessary) will include (parent,
-            base].
-
-            If a single revision is passed in, this will return the parent of
-            that revision for "base" and the passed-in revision for "tip".
-
-            If zero revisions are passed in, this will return revisions
-            relevant for the "current change" (changes in the work folder which
-            have not yet been checked in).
         """
         raise NotImplementedError
 
-    def diff(self, revisions, include_files, exclude_patterns, **kwargs):
+    def diff(
+        self,
+        *,
+        client: TFSClient,
+        revisions: SCMClientRevisionSpec,
+        include_files: List[str],
+        exclude_patterns: List[str],
+    ) -> SCMClientDiffResult:
         """Return the generated diff.
 
         Args:
+            client (TFSClient):
+                The client performing the diff.
+
             revisions (dict):
                 A dictionary containing ``base`` and ``tip`` keys.
 
@@ -136,16 +156,10 @@ class BaseTFWrapper:
 
         Returns:
             dict:
-            A dictionary containing the following:
+            A dictionary of diff results.
 
-            Keys:
-                diff (bytes):
-                    The contents of the diff to upload.
-
-                base_commit_id (str, optional):
-                    The ID of the commit that the change is based on, if
-                    available. This is necessary for some hosting services
-                    that don't provide individual file access.
+            See :py:class:`~rbtools.clients.base.scmclient.SCMClientDiffResult`
+            for the format of this dictionary.
         """
         raise NotImplementedError
 
@@ -164,16 +178,20 @@ class TFExeWrapper(BaseTFWrapper):
             rbtools.clients.errors.SCMClientDependencyError:
                 A :command:`tf` tool could not be found.
         """
+        tf_vc_output: bytes
+
         try:
-            tf_vc_output = execute(['tf', 'vc', 'help'],
-                                   ignore_errors=True,
-                                   none_on_ignored_error=True)
-        except OSError:
-            tf_vc_output = None
+            tf_vc_output = (
+                run_process(['tf', 'vc', 'help'])
+                .stdout_bytes
+                .read()
+            )
+        except Exception:
+            tf_vc_output = b''
 
         # VS2015 has a tf.exe but it's not good enough.
         if (not tf_vc_output or
-            'Version Control Tool, Version 15' not in tf_vc_output):
+            b'Version Control Tool, Version 15' not in tf_vc_output):
             raise SCMClientDependencyError(missing_exes=['tf'])
 
     def get_local_path(self) -> Optional[str]:
@@ -183,7 +201,11 @@ class TFExeWrapper(BaseTFWrapper):
             str:
             The filesystem path of the repository on the client system.
         """
-        workfold = self._run_tf(['vc', 'workfold', os.getcwd()])
+        workfold = (
+            self._run_tf(['vc', 'workfold', os.getcwd()])
+            .stdout
+            .read()
+        )
 
         m = re.search('^Collection: (.*)$', workfold, re.MULTILINE)
 
@@ -203,25 +225,50 @@ class TFExeWrapper(BaseTFWrapper):
         path = self.get_local_path()
 
         if path:
-            # Now that we know it's TFS, make sure we have GNU diff installed,
-            # and error out if we don't.
-            check_gnu_diff()
-
             return RepositoryInfo(path=path, local_path=path)
 
         return None
 
-    def parse_revision_spec(self, revisions):
+    def parse_revision_spec(
+        self,
+        revisions: List[str],
+    ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
+        These will be used to generate the diffs to upload to Review Board
+        (or print). The diff for review will include the changes in (base,
+        tip], and the parent diff (if necessary) will include (parent,
+        base].
+
+        If a single revision is passed in, this will return the parent of
+        that revision for "base" and the passed-in revision for "tip".
+
+        If zero revisions are passed in, this will return revisions
+        relevant for the "current change" (changes in the work folder which
+        have not yet been checked in).
+
+        Versions passed in can be any versionspec, such as a changeset number,
+        ``L``-prefixed label name, ``W`` (latest workspace version), or ``T``
+        (latest upstream version).
+
         Args:
-            revisions (list of unicode):
-                A list of revisions as specified by the user. Items in the list
-                do not necessarily represent a single revision, since the user
-                can use the TFS-native syntax of ``r1~r2``. Versions passed in
-                can be any versionspec, such as a changeset number,
-                ``L``-prefixed label name, ``W`` (latest workspace version), or
-                ``T`` (latest upstream version).
+            revisions (list of str):
+                A list of revisions as specified by the user.
+
+                Items in the list do not necessarily represent a single
+                revision, since the user can use the TFS-native syntax of
+                ``r1~r2``. Versions passed in can be any versionspec, such as a
+                changeset number, ``L``-prefixed label name, ``W`` (latest
+                workspace version), or ``T`` (latest upstream version).
+
+        Returns:
+            dict:
+            The parsed revision spec.
+
+            See :py:class:`~rbtools.clients.base.scmclient.
+            SCMClientRevisionSpec` for the format of this dictionary.
+
+            This always populates ``base`` and ``tip``.
 
         Raises:
             rbtools.clients.errors.TooManyRevisionsError:
@@ -229,31 +276,6 @@ class TFExeWrapper(BaseTFWrapper):
 
             rbtools.clients.errors.InvalidRevisionSpecError:
                 The given revision spec could not be parsed.
-
-        Returns:
-            dict:
-            A dictionary with the following keys:
-
-            ``base`` (:py:class:`unicode`):
-                A revision to use as the base of the resulting diff.
-
-            ``tip`` (:py:class:`unicode`):
-                A revision to use as the tip of the resulting diff.
-
-            ``parent_base`` (:py:class:`unicode`, optional):
-                The revision to use as the base of a parent diff.
-
-            These will be used to generate the diffs to upload to Review Board
-            (or print). The diff for review will include the changes in (base,
-            tip], and the parent diff (if necessary) will include (parent,
-            base].
-
-            If a single revision is passed in, this will return the parent of
-            that revision for "base" and the passed-in revision for "tip".
-
-            If zero revisions are passed in, this will return revisions
-            relevant for the "current change" (changes in the work folder which
-            have not yet been checked in).
         """
         n_revisions = len(revisions)
 
@@ -264,7 +286,7 @@ class TFExeWrapper(BaseTFWrapper):
         if n_revisions == 0:
             # Most recent checked-out revision -- working copy
             return {
-                'base': self._convert_symbolic_revision('W'),
+                'base': str(self._convert_symbolic_revision('W')),
                 'tip': self.REVISION_WORKING_COPY,
             }
         elif n_revisions == 1:
@@ -272,46 +294,51 @@ class TFExeWrapper(BaseTFWrapper):
             revision = self._convert_symbolic_revision(revisions[0])
 
             return {
-                'base': revision - 1,
-                'tip': revision,
+                'base': str(revision - 1),
+                'tip': str(revision),
             }
         elif n_revisions == 2:
             # Diff between two numeric revisions
             return {
-                'base': self._convert_symbolic_revision(revisions[0]),
-                'tip': self._convert_symbolic_revision(revisions[1]),
+                'base': str(self._convert_symbolic_revision(revisions[0])),
+                'tip': str(self._convert_symbolic_revision(revisions[1])),
             }
         else:
             raise TooManyRevisionsError
 
-        return {
-            'base': None,
-            'tip': None,
-        }
-
-    def _convert_symbolic_revision(self, revision, path=None):
+    def _convert_symbolic_revision(
+        self,
+        revision: str,
+        path: Optional[str] = None,
+    ) -> int:
         """Convert a symbolic revision into a numeric changeset.
 
         Args:
-            revision (unicode):
+            revision (str):
                 The TFS versionspec to convert.
 
-            path (unicode, optional):
+            path (str, optional):
                 The itemspec that the revision applies to.
 
         Returns:
             int:
             The changeset number corresponding to the versionspec.
         """
-        # We pass results_unicode=False because that uses the filesystem
-        # encoding to decode the output, but the XML results we get should
-        # always be UTF-8, and are well-formed with the encoding specified. We
-        # can therefore let ElementTree determine how to decode it.
-        data = self._run_tf(['vc', 'history', '/stopafter:1', '/recursive',
-                             '/format:detailed', '/version:%s' % revision,
-                             path or os.getcwd()])
+        data = (
+            self._run_tf([
+                'vc',
+                'history',
+                '/stopafter:1',
+                '/recursive',
+                '/format:detailed',
+                '/version:%s' % revision,
+                path or os.getcwd(),
+            ])
+            .stdout_bytes
+            .read()
+        )
 
-        m = re.search(r'^Changeset: (\d+)$', data, re.MULTILINE)
+        m = re.search(br'^Changeset: (\d+)$', data, re.MULTILINE)
 
         if not m:
             logging.debug('Failed to parse output from "tf vc history":\n%s',
@@ -319,10 +346,22 @@ class TFExeWrapper(BaseTFWrapper):
             raise InvalidRevisionSpecError(
                 '"%s" does not appear to be a valid versionspec' % revision)
 
-    def diff(self, revisions, include_files, exclude_patterns, **kwargs):
+        return int(m.group(1))
+
+    def diff(
+        self,
+        *,
+        client: TFSClient,
+        revisions: SCMClientRevisionSpec,
+        include_files: List[str],
+        exclude_patterns: List[str],
+    ) -> SCMClientDiffResult:
         """Return the generated diff.
 
         Args:
+            client (TFSClient):
+                The client performing the diff.
+
             revisions (dict):
                 A dictionary containing ``base`` and ``tip`` keys.
 
@@ -332,60 +371,72 @@ class TFExeWrapper(BaseTFWrapper):
             exclude_patterns (list):
                 A list of file paths to exclude from the diff.
 
-            **kwargs (dict, unused):
-                Unused keyword arguments.
-
         Returns:
             dict:
-            A dictionary containing the following keys:
+            A dictionary of diff results.
 
-            ``diff`` (:py:class:`bytes`):
-                The contents of the diff to upload.
-
-            ``base_commit_id`` (:py:class:`unicode`, optional):
-                The ID of the commit that the change is based on, if available.
-                This is necessary for some hosting services that don't provide
-                individual file access.
+            See :py:class:`~rbtools.clients.base.scmclient.SCMClientDiffResult`
+            for the format of this dictionary.
         """
-        base = str(revisions['base'])
-        tip = str(revisions['tip'])
+        base = revisions['base']
+        tip = revisions['tip']
+
+        assert isinstance(base, str)
+        assert isinstance(tip, str)
 
         if tip == self.REVISION_WORKING_COPY:
             # TODO: support committed revisions
-            return self._diff_working_copy(base, include_files,
-                                           exclude_patterns)
-        else:
-            raise SCMError('Posting committed changes is not yet supported '
-                           'for TFS when using the tf.exe wrapper.')
+            return self._diff_working_copy(client=client,
+                                           base=base,
+                                           include_files=include_files,
+                                           exclude_patterns=exclude_patterns)
 
-    def _diff_working_copy(self, base, include_files, exclude_patterns):
+        raise SCMError('Posting committed changes is not yet supported '
+                       'for TFS when using the tf.exe wrapper.')
+
+    def _diff_working_copy(
+        self,
+        *,
+        client: TFSClient,
+        base: str,
+        include_files: List[str],
+        exclude_patterns: List[str],
+    ) -> SCMClientDiffResult:
         """Return a diff of the working copy.
 
         Args:
-            base (unicode):
+            client (TFSClient):
+                The client performing the diff.
+
+            base (str):
                 The base revision to diff against.
 
-            include_files (list):
+            include_files (list of str, unused):
                 A list of file paths to include in the diff.
 
-            exclude_patterns (list):
+            exclude_patterns (list of str):
                 A list of file paths to exclude from the diff.
 
         Returns:
             dict:
-            A dictionary containing ``diff``, ``parent_diff``, and
-            ``base_commit_id`` keys. In the case of TFS, the parent diff key
-            will always be ``None``.
+            A dictionary of diff results.
+
+            See :py:class:`~rbtools.clients.base.scmclient.SCMClientDiffResult`
+            for the format of this dictionary.
+
+            ``parent_diff`` will always be ``None``.
         """
-        # We pass results_unicode=False because that uses the filesystem
-        # encoding, but the XML results we get should always be UTF-8, and are
-        # well-formed with the encoding specified. We can therefore let
-        # ElementTree determine how to decode it.
-        status = self._run_tf(['vc', 'status', '/format:xml'],
-                              results_unicode=False)
+        diff_tool = client.get_diff_tool()
+        assert diff_tool is not None
+
+        status = (
+            self._run_tf(['vc', 'status', '/format:xml'])
+            .stdout_bytes
+            .read()
+        )
         root = ET.fromstring(status)
 
-        diff = []
+        diff_writer = UnifiedDiffWriter()
 
         for pending_change in root.findall(
                 './PendingSet/PendingChanges/PendingChange'):
@@ -411,8 +462,7 @@ class TFExeWrapper(BaseTFWrapper):
 
             if (exclude_patterns and
                 filename_match_any_patterns(local_filename,
-                                            exclude_patterns,
-                                            base_dir=None)):
+                                            exclude_patterns)):
                 continue
 
             if 'Add' in action:
@@ -424,89 +474,106 @@ class TFExeWrapper(BaseTFWrapper):
 
                     old_data = b''
             elif 'Delete' in action:
-                old_data = self._run_tf(
-                    ['vc', 'view', '/version:%s' % old_version.decode('utf-8'),
-                     old_filename.decode('utf-8')],
-                    results_unicode=False)
+                if not binary:
+                    old_data = (
+                        self._run_tf([
+                            'vc',
+                            'view',
+                            old_filename.decode('utf-8'),
+                            '/version:%s' % old_version.decode('utf-8'),
+                        ])
+                        .stdout_bytes
+                        .read()
+                    )
+
                 new_data = b''
                 new_version = b'(deleted)'
             elif 'Edit' in action:
                 if not binary:
-                    old_data = self._run_tf(
-                        ['vc', 'view', old_filename.decode('utf-8'),
-                         '/version:%s' % old_version.decode('utf-8')],
-                        results_unicode=False)
+                    old_data = (
+                        self._run_tf([
+                            'vc',
+                            'view',
+                            old_filename.decode('utf-8'),
+                            '/version:%s' % old_version.decode('utf-8'),
+                        ])
+                        .stdout_bytes
+                        .read()
+                    )
 
                     with open(local_filename, 'rb') as f:
                         new_data = f.read()
 
-            old_label = b'%s\t%s' % (old_filename, old_version)
-            new_label = b'%s\t%s' % (new_filename, new_version)
-
             if copied:
-                diff.append(b'Copied from: %s\n' % old_filename)
+                diff_writer.write_line(b'Copied from: %s' % old_filename)
 
             if binary:
+                diff_writer.write_file_headers(
+                    orig_path=old_filename,
+                    orig_extra=old_version,
+                    modified_path=new_filename,
+                    modified_extra=new_version)
+
                 if 'Add' in action:
                     old_filename = new_filename
 
-                diff.append(b'--- %s\n' % old_label)
-                diff.append(b'+++ %s\n' % new_label)
-                diff.append(b'Binary files %s and %s differ\n'
-                            % (old_filename, new_filename))
+                diff_writer.write_binary_files_differ(
+                    orig_path=old_filename,
+                    modified_path=new_filename)
             elif old_filename != new_filename and old_data == new_data:
                 # Renamed file with no changes.
-                diff.append(b'--- %s\n' % old_label)
-                diff.append(b'+++ %s\n' % new_label)
+                diff_writer.write_file_headers(
+                    orig_path=old_filename,
+                    orig_extra=old_version,
+                    modified_path=new_filename,
+                    modified_extra=new_version)
             else:
-                old_tmp = tempfile.NamedTemporaryFile(delete=False)
-                old_tmp.write(old_data)
-                old_tmp.close()
+                old_tmp = make_tempfile(content=old_data)
+                new_tmp = make_tempfile(content=new_data)
 
-                new_tmp = tempfile.NamedTemporaryFile(delete=False)
-                new_tmp.write(new_data)
-                new_tmp.close()
+                diff_result = diff_tool.run_diff_file(
+                    orig_path=old_tmp,
+                    modified_path=new_tmp)
 
-                unified_diff = execute(
-                    ['diff', '-u',
-                     '--label', old_label.decode('utf-8'),
-                     '--label', new_label.decode('utf-8'),
-                     old_tmp.name, new_tmp.name],
-                    extra_ignore_errors=(1,),
-                    log_output_on_error=False,
-                    results_unicode=False)
+                if diff_result.has_text_differences:
+                    diff_writer.write_file_headers(
+                        orig_path=old_filename,
+                        orig_extra=old_version,
+                        modified_path=new_filename,
+                        modified_extra=new_version)
+                    diff_writer.write_diff_file_result_hunks(diff_result)
 
-                diff.append(unified_diff)
-
-                os.unlink(old_tmp.name)
-                os.unlink(new_tmp.name)
+                os.unlink(old_tmp)
+                os.unlink(new_tmp)
 
         return {
-            'diff': b''.join(diff),
+            'diff': diff_writer.getvalue(),
             'parent_diff': None,
             'base_commit_id': base,
         }
 
-    def _run_tf(self, args, **kwargs):
+    def _run_tf(
+        self,
+        args: List[str],
+    ) -> RunProcessResult:
         """Run the "tf" command.
 
         Args:
-            args (list):
+            args (list of str):
                 A list of arguments to pass to rb-tfs.
 
-            **kwargs (dict):
-                Additional keyword arguments for the :py:meth:`execute` call.
-
         Returns:
-            unicode:
-            The output of the command.
+            rbtools.utils.process.RunProcessResult:
+            The result of the command.
         """
         command = ['tf'] + args + ['/noprompt']
 
-        if getattr(self.options, 'tfs_login', None):
-            command.append('/login:%s' % self.options.tfs_login)
+        tfs_login = getattr(self.options, 'tfs_login', None)
 
-        return execute(command, ignore_errors=True, **kwargs)
+        if tfs_login:
+            command.append('/login:%s' % tfs_login)
+
+        return run_process(command, ignore_errors=True)
 
 
 class TEEWrapper(BaseTFWrapper):
@@ -516,7 +583,7 @@ class TEEWrapper(BaseTFWrapper):
 
     @classmethod
     def get_default_tf_locations(
-        self,
+        cls,
         target_platform: str = sys.platform
     ) -> List[str]:
         """Return default locations for tf.cmd for the given platform.
@@ -532,7 +599,7 @@ class TEEWrapper(BaseTFWrapper):
             list of str:
             The list of possible platforms.
         """
-        tf_locations = []
+        tf_locations: List[str] = []
 
         if target_platform.startswith('win'):
             # First check in the system path. If that doesn't work, look in the
@@ -549,7 +616,7 @@ class TEEWrapper(BaseTFWrapper):
 
         return tf_locations
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         """Initialize the wrapper.
 
         Args:
@@ -558,7 +625,7 @@ class TEEWrapper(BaseTFWrapper):
         """
         super().__init__(**kwargs)
 
-        self.tf = None
+        self.tf: Optional[str] = None
 
     def check_dependencies(self) -> None:
         """Check whether all dependencies for the client are available.
@@ -593,16 +660,20 @@ class TEEWrapper(BaseTFWrapper):
         # To help with debugging, we'll include the full path on each.
         raise SCMClientDependencyError(missing_exes=[tuple(tf_locations)])
 
-    def get_local_path(self):
+    def get_local_path(self) -> Optional[str]:
         """Return the local path to the working tree.
 
         Returns:
-            unicode:
+            str:
             The filesystem path of the repository on the client system.
         """
         assert self.tf is not None
 
-        workfold = self._run_tf(['workfold', os.getcwd()])
+        workfold = (
+            self._run_tf(['workfold', os.getcwd()])
+            .stdout
+            .read()
+        )
 
         m = re.search('^Collection: (.*)$', workfold, re.MULTILINE)
 
@@ -612,7 +683,7 @@ class TEEWrapper(BaseTFWrapper):
         logging.debug('Could not find the collection from "tf workfold"')
         return None
 
-    def get_repository_info(self):
+    def get_repository_info(self) -> Optional[RepositoryInfo]:
         """Return repository information for the current working tree.
 
         Returns:
@@ -622,50 +693,46 @@ class TEEWrapper(BaseTFWrapper):
         path = self.get_local_path()
 
         if path:
-            # Now that we know it's TFS, make sure we have GNU diff installed,
-            # and error out if we don't.
-            check_gnu_diff()
-
             return RepositoryInfo(path=path, local_path=path)
 
         return None
 
-    def parse_revision_spec(self, revisions):
+    def parse_revision_spec(
+        self,
+        revisions: List[str],
+    ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
+        These will be used to generate the diffs to upload to Review Board
+        (or print). The diff for review will include the changes in (base,
+        tip], and the parent diff (if necessary) will include (parent,
+        base].
+
+        If a single revision is passed in, this will return the parent of
+        that revision for "base" and the passed-in revision for "tip".
+
+        If zero revisions are passed in, this will return revisions
+        relevant for the "current change" (changes in the work folder which
+        have not yet been checked in).
+
         Args:
-            revisions (list of unicode):
-                A list of revisions as specified by the user. Items in the list
-                do not necessarily represent a single revision, since the user
-                can use the TFS-native syntax of ``r1~r2``. Versions passed in
-                can be any versionspec, such as a changeset number,
-                ``L``-prefixed label name, ``W`` (latest workspace version), or
-                ``T`` (latest upstream version).
+            revisions (list of str):
+                A list of revisions as specified by the user.
+
+                Items in the list do not necessarily represent a single
+                revision, since the user can use the TFS-native syntax of
+                ``r1~r2``. Versions passed in can be any versionspec, such as a
+                changeset number, ``L``-prefixed label name, ``W`` (latest
+                workspace version), or ``T`` (latest upstream version).
 
         Returns:
             dict:
-            A dictionary with the following keys:
+            The parsed revision spec.
 
-            ``base`` (:py:class:`unicode`):
-                A revision to use as the base of the resulting diff.
+            See :py:class:`~rbtools.clients.base.scmclient.
+            SCMClientRevisionSpec` for the format of this dictionary.
 
-            ``tip`` (:py:class:`unicode`):
-                A revision to use as the tip of the resulting diff.
-
-            ``parent_base`` (:py:class:`unicode`, optional):
-                The revision to use as the base of a parent diff.
-
-            These will be used to generate the diffs to upload to Review Board
-            (or print). The diff for review will include the changes in (base,
-            tip], and the parent diff (if necessary) will include (parent,
-            base].
-
-            If a single revision is passed in, this will return the parent of
-            that revision for "base" and the passed-in revision for "tip".
-
-            If zero revisions are passed in, this will return revisions
-            relevant for the "current change" (changes in the work folder which
-            have not yet been checked in).
+            This always populates ``base`` and ``tip``.
 
         Raises:
             rbtools.clients.errors.TooManyRevisionsError:
@@ -683,7 +750,7 @@ class TEEWrapper(BaseTFWrapper):
         if n_revisions == 0:
             # Most recent checked-out revision -- working copy
             return {
-                'base': self._convert_symbolic_revision('W'),
+                'base': str(self._convert_symbolic_revision('W')),
                 'tip': self.REVISION_WORKING_COPY,
             }
         elif n_revisions == 1:
@@ -691,31 +758,30 @@ class TEEWrapper(BaseTFWrapper):
             revision = self._convert_symbolic_revision(revisions[0])
 
             return {
-                'base': revision - 1,
-                'tip': revision,
+                'base': str(revision - 1),
+                'tip': str(revision),
             }
         elif n_revisions == 2:
             # Diff between two numeric revisions
             return {
-                'base': self._convert_symbolic_revision(revisions[0]),
-                'tip': self._convert_symbolic_revision(revisions[1]),
+                'base': str(self._convert_symbolic_revision(revisions[0])),
+                'tip': str(self._convert_symbolic_revision(revisions[1])),
             }
         else:
             raise TooManyRevisionsError
 
-        return {
-            'base': None,
-            'tip': None,
-        }
-
-    def _convert_symbolic_revision(self, revision, path=None):
+    def _convert_symbolic_revision(
+        self,
+        revision: str,
+        path: Optional[str] = None,
+    ) -> int:
         """Convert a symbolic revision into a numeric changeset.
 
         Args:
-            revision (unicode):
+            revision (str):
                 The TFS versionspec to convert.
 
-            path (unicode, optional):
+            path (str, optional):
                 The itemspec that the revision applies to.
 
         Returns:
@@ -732,11 +798,14 @@ class TEEWrapper(BaseTFWrapper):
 
         args.append(path or os.getcwd())
 
-        # We pass results_unicode=False because that uses the filesystem
-        # encoding to decode the output, but the XML results we get should
-        # always be UTF-8, and are well-formed with the encoding specified. We
-        # can therefore let ElementTree determine how to decode it.
-        data = self._run_tf(args, results_unicode=False)
+        # We access stdout_bytes, even though the XML results we get should
+        # always be UTF-8. They are well-formed with the encoding specified,
+        # so we can let ElementTree determine how to decode it.
+        data = (
+            self._run_tf(args)
+            .stdout_bytes
+            .read()
+        )
 
         try:
             root = ET.fromstring(data)
@@ -753,10 +822,20 @@ class TEEWrapper(BaseTFWrapper):
             raise InvalidRevisionSpecError(
                 '"%s" does not appear to be a valid versionspec' % revision)
 
-    def diff(self, revisions, include_files, exclude_patterns):
+    def diff(
+        self,
+        *,
+        client: TFSClient,
+        revisions: SCMClientRevisionSpec,
+        include_files: List[str],
+        exclude_patterns: List[str],
+    ) -> SCMClientDiffResult:
         """Return the generated diff.
 
         Args:
+            client (TFSClient):
+                The client performing the diff.
+
             revisions (dict):
                 A dictionary containing ``base`` and ``tip`` keys.
 
@@ -768,32 +847,44 @@ class TEEWrapper(BaseTFWrapper):
 
         Returns:
             dict:
-            A dictionary containing the following keys:
+            A dictionary of diff results.
 
-            ``diff`` (:py:class:`bytes`):
-                The contents of the diff to upload.
+            See :py:class:`~rbtools.clients.base.scmclient.SCMClientDiffResult`
+            for the format of this dictionary.
 
-            ``base_commit_id`` (:py:class:`unicode`, optional):
-                The ID of the commit that the change is based on, if available.
-                This is necessary for some hosting services that don't provide
-                individual file access.
+            ``parent_diff`` will always be ``None``.
         """
-        base = str(revisions['base'])
-        tip = str(revisions['tip'])
+        base = revisions['base']
+        tip = revisions['tip']
+
+        assert isinstance(base, str)
+        assert isinstance(tip, str)
 
         if tip == self.REVISION_WORKING_COPY:
-            return self._diff_working_copy(base, include_files,
-                                           exclude_patterns)
-        else:
-            raise SCMError('Posting committed changes is not yet supported '
-                           'for TFS when using the Team Explorer Everywhere '
-                           'wrapper.')
+            return self._diff_working_copy(client=client,
+                                           base=base,
+                                           include_files=include_files,
+                                           exclude_patterns=exclude_patterns)
 
-    def _diff_working_copy(self, base, include_files, exclude_patterns):
+        raise SCMError('Posting committed changes is not yet supported '
+                       'for TFS when using the Team Explorer Everywhere '
+                       'wrapper.')
+
+    def _diff_working_copy(
+        self,
+        *,
+        client: TFSClient,
+        base: str,
+        include_files: List[str],
+        exclude_patterns: List[str],
+    ) -> SCMClientDiffResult:
         """Return a diff of the working copy.
 
         Args:
-            base (unicode):
+            client (TFSClient):
+                The client performing the diff.
+
+            base (str):
                 The base revision to diff against.
 
             include_files (list):
@@ -804,18 +895,27 @@ class TEEWrapper(BaseTFWrapper):
 
         Returns:
             dict:
-            A dictionary containing ``diff``, ``parent_diff``, and
-            ``base_commit_id`` keys. In the case of TFS, the parent diff key
-            will always be ``None``.
+            A dictionary of diff results.
+
+            See :py:class:`~rbtools.clients.base.scmclient.SCMClientDiffResult`
+            for the format of this dictionary.
+
+            ``parent_diff`` will always be ``None``.
         """
-        # We pass results_unicode=False because that uses the filesystem
-        # encoding, but the XML results we get should always be UTF-8, and are
-        # well-formed with the encoding specified. We can therefore let
-        # ElementTree determine how to decode it.
-        status = self._run_tf(['status', '-format:xml'], results_unicode=False)
+        diff_tool = client.get_diff_tool()
+        assert diff_tool is not None
+
+        # We access stdout_bytes, even though the XML results we get should
+        # always be UTF-8. They are well-formed with the encoding specified,
+        # so we can let ElementTree determine how to decode it.
+        status = (
+            self._run_tf(['status', '-format:xml'])
+            .stdout_bytes
+            .read()
+        )
         root = ET.fromstring(status)
 
-        diff = []
+        diff_writer = UnifiedDiffWriter()
 
         for pending_change in root.findall('./pending-changes/pending-change'):
             action = pending_change.attrib['change-type'].split(', ')
@@ -834,8 +934,7 @@ class TEEWrapper(BaseTFWrapper):
 
             if (exclude_patterns and
                 filename_match_any_patterns(local_filename,
-                                            exclude_patterns,
-                                            base_dir=None)):
+                                            exclude_patterns)):
                 continue
 
             if 'rename' in action:
@@ -855,65 +954,80 @@ class TEEWrapper(BaseTFWrapper):
                 old_filename = b'/dev/null'
 
                 if file_type != 'binary':
-                    with open(local_filename) as f:
+                    with open(local_filename, 'rb') as f:
                         new_data = f.read()
+
                 old_data = b''
             elif 'delete' in action:
-                old_data = self._run_tf(
-                    ['print', '-version:%s' % old_version.decode('utf-8'),
-                     old_filename.decode('utf-8')],
-                    results_unicode=False)
+                if file_type != 'binary':
+                    old_data = (
+                        self._run_tf([
+                            'print',
+                            '-version:%s' % old_version.decode('utf-8'),
+                            old_filename.decode('utf-8'),
+                        ])
+                        .stdout_bytes
+                        .read()
+                    )
+
                 new_data = b''
                 new_version = b'(deleted)'
             elif 'edit' in action:
-                old_data = self._run_tf(
-                    ['print', '-version:%s' % old_version.decode('utf-8'),
-                     old_filename.decode('utf-8')],
-                    results_unicode=False)
+                if file_type != 'binary':
+                    old_data = (
+                        self._run_tf([
+                            'print',
+                            '-version:%s' % old_version.decode('utf-8'),
+                            old_filename.decode('utf-8'),
+                        ])
+                        .stdout_bytes
+                        .read()
+                    )
 
-                with open(local_filename) as f:
-                    new_data = f.read()
-
-            old_label = b'%s\t%s' % (old_filename, old_version)
-            new_label = b'%s\t%s' % (new_filename, new_version)
+                    with open(local_filename, 'rb') as f:
+                        new_data = f.read()
 
             if copied:
-                diff.append(b'Copied from: %s\n' % old_filename)
+                diff_writer.write_line(b'Copied from: %s' % old_filename)
 
             if file_type == 'binary':
+                diff_writer.write_file_headers(
+                    orig_path=old_filename,
+                    orig_extra=old_version,
+                    modified_path=new_filename,
+                    modified_extra=new_version)
+
                 if 'add' in action:
                     old_filename = new_filename
 
-                diff.append(b'--- %s\n' % old_label)
-                diff.append(b'+++ %s\n' % new_label)
-                diff.append(b'Binary files %s and %s differ\n'
-                            % (old_filename, new_filename))
+                diff_writer.write_binary_files_differ(
+                    orig_path=old_filename,
+                    modified_path=new_filename)
             elif old_filename != new_filename and old_data == new_data:
                 # Renamed file with no changes
-                diff.append(b'--- %s\n' % old_label)
-                diff.append(b'+++ %s\n' % new_label)
+                diff_writer.write_file_headers(
+                    orig_path=old_filename,
+                    orig_extra=old_version,
+                    modified_path=new_filename,
+                    modified_extra=new_version)
             else:
-                old_tmp = tempfile.NamedTemporaryFile(delete=False)
-                old_tmp.write(old_data)
-                old_tmp.close()
+                old_tmp = make_tempfile(content=old_data)
+                new_tmp = make_tempfile(content=new_data)
 
-                new_tmp = tempfile.NamedTemporaryFile(delete=False)
-                new_tmp.write(new_data)
-                new_tmp.close()
+                diff_result = diff_tool.run_diff_file(
+                    orig_path=old_tmp,
+                    modified_path=new_tmp)
 
-                unified_diff = execute(
-                    ['diff', '-u',
-                     '--label', old_label.decode('utf-8'),
-                     '--label', new_label.decode('utf-8'),
-                     old_tmp.name, new_tmp.name],
-                    extra_ignore_errors=(1,),
-                    log_output_on_error=False,
-                    results_unicode=False)
+                if diff_result.has_text_differences:
+                    diff_writer.write_file_headers(
+                        orig_path=old_filename,
+                        orig_extra=old_version,
+                        modified_path=new_filename,
+                        modified_extra=new_version)
+                    diff_writer.write_diff_file_result_hunks(diff_result)
 
-                diff.append(unified_diff)
-
-                os.unlink(old_tmp.name)
-                os.unlink(new_tmp.name)
+                os.unlink(old_tmp)
+                os.unlink(new_tmp)
 
         if len(root.findall('./candidate-pending-changes/pending-change')) > 0:
             logging.warning('There are added or deleted files which have not '
@@ -921,30 +1035,30 @@ class TEEWrapper(BaseTFWrapper):
                             'in your review request.')
 
         return {
-            'diff': b''.join(diff),
+            'diff': diff_writer.getvalue(),
             'parent_diff': None,
             'base_commit_id': base,
         }
 
-    def _run_tf(self, args, **kwargs):
+    def _run_tf(
+        self,
+        args: List[str],
+    ) -> RunProcessResult:
         """Run the "tf" command.
 
         Args:
-            args (list):
+            args (list of str):
                 A list of arguments to pass to rb-tfs.
 
-            **kwargs (dict):
-                Additional keyword arguments for the :py:meth:`execute` call.
-
         Returns:
-            unicode:
-            The output of the command.
+            rbtools.utils.process.RunProcessResult
+            The result of the command.
         """
         assert self.tf is not None
 
-        cmdline = [self.tf, '-noprompt']
+        cmdline: List[str] = [self.tf, '-noprompt']
 
-        tfs_login = getattr(self.options, 'tfs_login')
+        tfs_login = getattr(self.options, 'tfs_login', None)
 
         if tfs_login:
             cmdline.append('-login:%s' % tfs_login)
@@ -957,7 +1071,7 @@ class TEEWrapper(BaseTFWrapper):
                 if arg.startswith('-'):
                     cmdline[i] = '/' + arg[1:]
 
-        return execute(cmdline, ignore_errors=True, **kwargs)
+        return run_process(cmdline, ignore_errors=True)
 
 
 class TFHelperWrapper(BaseTFWrapper):
@@ -999,22 +1113,24 @@ class TFHelperWrapper(BaseTFWrapper):
         if missing_exes:
             raise SCMClientDependencyError(missing_exes=missing_exes)
 
-    def get_local_path(self):
+    def get_local_path(self) -> Optional[str]:
         """Return the local path to the working tree.
 
         Returns:
-            unicode:
+            str:
             The filesystem path of the repository on the client system.
         """
-        rc, path, errors = self._run_helper(['get-collection'],
-                                            ignore_errors=True)
+        try:
+            return (
+                self._run_helper(['get-collection'])
+                .stdout
+                .read()
+                .strip()
+            )
+        except Exception:
+            return None
 
-        if rc == 0:
-            return path.strip()
-
-        return None
-
-    def get_repository_info(self):
+    def get_repository_info(self) -> Optional[RepositoryInfo]:
         """Return repository information for the current working tree.
 
         Returns:
@@ -1028,42 +1144,42 @@ class TFHelperWrapper(BaseTFWrapper):
 
         return None
 
-    def parse_revision_spec(self, revisions):
+    def parse_revision_spec(
+        self,
+        revisions: List[str],
+    ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
+        These will be used to generate the diffs to upload to Review Board
+        (or print). The diff for review will include the changes in (base,
+        tip], and the parent diff (if necessary) will include (parent,
+        base].
+
+        If a single revision is passed in, this will return the parent of
+        that revision for "base" and the passed-in revision for "tip".
+
+        If zero revisions are passed in, this will return revisions
+        relevant for the "current change" (changes in the work folder which
+        have not yet been checked in).
+
         Args:
-            revisions (list of unicode):
-                A list of revisions as specified by the user. Items in the list
-                do not necessarily represent a single revision, since the user
-                can use the TFS-native syntax of ``r1~r2``. Versions passed in
-                can be any versionspec, such as a changeset number,
-                ``L``-prefixed label name, ``W`` (latest workspace version), or
-                ``T`` (latest upstream version).
+            revisions (list of str):
+                A list of revisions as specified by the user.
+
+                Items in the list do not necessarily represent a single
+                revision, since the user can use the TFS-native syntax of
+                ``r1~r2``. Versions passed in can be any versionspec, such as a
+                changeset number, ``L``-prefixed label name, ``W`` (latest
+                workspace version), or ``T`` (latest upstream version).
 
         Returns:
             dict:
-            A dictionary with the following keys:
+            The parsed revision spec.
 
-            ``base`` (:py:class:`unicode`):
-                A revision to use as the base of the resulting diff.
+            See :py:class:`~rbtools.clients.base.scmclient.
+            SCMClientRevisionSpec` for the format of this dictionary.
 
-            ``tip`` (:py:class:`unicode`):
-                A revision to use as the tip of the resulting diff.
-
-            ``parent_base`` (:py:class:`unicode`, optional):
-                The revision to use as the base of a parent diff.
-
-            These will be used to generate the diffs to upload to Review Board
-            (or print). The diff for review will include the changes in (base,
-            tip], and the parent diff (if necessary) will include (parent,
-            base].
-
-            If a single revision is passed in, this will return the parent of
-            that revision for "base" and the passed-in revision for "tip".
-
-            If zero revisions are passed in, this will return revisions
-            relevant for the "current change" (changes in the work folder which
-            have not yet been checked in).
+            This always populates ``base`` and ``tip``.
 
         Raises:
             rbtools.clients.errors.TooManyRevisionsError:
@@ -1075,21 +1191,41 @@ class TFHelperWrapper(BaseTFWrapper):
         if len(revisions) > 2:
             raise TooManyRevisionsError
 
-        rc, revisions, errors = self._run_helper(
-            ['parse-revision'] + revisions, split_lines=True)
+        try:
+            result = self._run_helper(['parse-revision'] + revisions)
+        except Exception as e:
+            if isinstance(e, RunProcessError):
+                errors = e.result.stderr.read().strip()
+            else:
+                errors = ''
 
-        if rc == 0:
-            return {
-                'base': revisions[0].strip(),
-                'tip': revisions[1].strip()
-            }
-        else:
-            raise InvalidRevisionSpecError('\n'.join(errors))
+            if not errors:
+                errors = ('Unexpected error while parsing revision spec %r'
+                          % (revisions,))
 
-    def diff(self, revisions, include_files, exclude_patterns):
+            raise InvalidRevisionSpecError(errors)
+
+        parsed_revisions = result.stdout.readlines()
+
+        return {
+            'base': parsed_revisions[0].strip(),
+            'tip': parsed_revisions[1].strip(),
+        }
+
+    def diff(
+        self,
+        *,
+        client: TFSClient,
+        revisions: SCMClientRevisionSpec,
+        include_files: List[str],
+        exclude_patterns: List[str],
+    ) -> SCMClientDiffResult:
         """Return the generated diff.
 
         Args:
+            client (TFSClient):
+                The client performing the diff.
+
             revisions (dict):
                 A dictionary containing ``base`` and ``tip`` keys.
 
@@ -1101,15 +1237,10 @@ class TFHelperWrapper(BaseTFWrapper):
 
         Returns:
             dict:
-            A dictionary containing the following keys:
+            A dictionary of diff results.
 
-            ``diff`` (:py:class:`bytes`):
-                The contents of the diff to upload.
-
-            ``base_commit_id`` (:py:class:`unicode`, optional):
-                The ID of the commit that the change is based on, if available.
-                This is necessary for some hosting services that don't provide
-                individual file access.
+            See :py:class:`~rbtools.clients.base.scmclient.SCMClientDiffResult`
+            for the format of this dictionary.
 
         Raises:
             rbtools.clients.errors.SCMError:
@@ -1118,13 +1249,15 @@ class TFHelperWrapper(BaseTFWrapper):
         base = revisions['base']
         tip = revisions['tip']
 
-        rc, diff, errors = self._run_helper(['diff', '--', base, tip],
-                                            ignore_errors=True,
-                                            results_unicode=False,
-                                            log_output_on_error=False)
+        assert isinstance(base, str)
+        assert isinstance(tip, str)
 
-        if rc in (0, 2):
-            if rc == 2:
+        result = self._run_helper(['diff', '--', base, tip],
+                                  ignore_errors=True,
+                                  log_debug_output_on_error=False)
+
+        if result.exit_code in (0, 2):
+            if result.exit_code == 2:
                 # Magic return code that means success, but there were
                 # un-tracked files in the working directory.
                 logging.warning('There are added or deleted files which have '
@@ -1132,14 +1265,18 @@ class TFHelperWrapper(BaseTFWrapper):
                                 'included in your review request.')
 
             return {
-                'diff': diff,
+                'diff': result.stdout_bytes.read(),
                 'parent_diff': None,
                 'base_commit_id': None,
             }
         else:
-            raise SCMError(errors.strip())
+            raise SCMError(result.stderr.read().strip())
 
-    def _run_helper(self, args, **kwargs):
+    def _run_helper(
+        self,
+        args: List[str],
+        **kwargs,
+    ) -> RunProcessResult:
         """Run the rb-tfs binary.
 
         Args:
@@ -1147,12 +1284,12 @@ class TFHelperWrapper(BaseTFWrapper):
                 A list of arguments to pass to rb-tfs.
 
             **kwargs (dict):
-                Additional keyword arguments for the :py:meth:`execute` call.
+                Additional keyword arguments for the
+                :py:func:`~rbtools.utils.process.run_process` call.
 
         Returns:
-            tuple:
-            A 3-tuple of return code, output, and error output. The output and
-            error output may be lists depending on the contents of ``kwargs``.
+            rbtools.utils.process.RunProcessResult:
+            The result of the command.
         """
         if len(args) == 0:
             raise ValueError('_run_helper called without any arguments')
@@ -1176,12 +1313,7 @@ class TFHelperWrapper(BaseTFWrapper):
 
         cmdline += args[1:]
 
-        return execute(cmdline,
-                       with_errors=False,
-                       results_unicode=False,
-                       return_error_code=True,
-                       return_errors=True,
-                       **kwargs)
+        return run_process(cmdline, **kwargs)
 
 
 class TFSClient(BaseSCMClient):
@@ -1190,10 +1322,13 @@ class TFSClient(BaseSCMClient):
     scmclient_id = 'tfs'
     name = 'Team Foundation Server'
     server_tool_names = 'Team Foundation Server'
+
+    requires_diff_tool = ['gnu']
+
     supports_diff_exclude_patterns = True
     supports_patch_revert = True
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         """Initialize the client.
 
         Args:
@@ -1221,7 +1356,7 @@ class TFSClient(BaseSCMClient):
 
         return cast(BaseTFWrapper, self._tf_wrapper)
 
-    def check_dependencies(self):
+    def check_dependencies(self) -> None:
         """Check whether all dependencies for the client are available.
 
         There are three different backends that can be used to access the
@@ -1288,7 +1423,7 @@ class TFSClient(BaseSCMClient):
         """
         return self.tf_wrapper.get_local_path()
 
-    def get_repository_info(self):
+    def get_repository_info(self) -> Optional[RepositoryInfo]:
         """Return repository information for the current working tree.
 
         Returns:
@@ -1297,11 +1432,26 @@ class TFSClient(BaseSCMClient):
         """
         return self.tf_wrapper.get_repository_info()
 
-    def parse_revision_spec(self, revisions):
+    def parse_revision_spec(
+        self,
+        revisions: List[str] = [],
+    ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
+        These will be used to generate the diffs to upload to Review Board
+        (or print). The diff for review will include the changes in (base,
+        tip], and the parent diff (if necessary) will include (parent,
+        base].
+
+        If a single revision is passed in, this will return the parent of
+        that revision for "base" and the passed-in revision for "tip".
+
+        If zero revisions are passed in, this will return revisions
+        relevant for the "current change" (changes in the work folder which
+        have not yet been checked in).
+
         Args:
-            revisions (list of unicode):
+            revisions (list of str, optional):
                 A list of revisions as specified by the user. Items in the list
                 do not necessarily represent a single revision, since the user
                 can use the TFS-native syntax of ``r1~r2``. Versions passed in
@@ -1311,28 +1461,12 @@ class TFSClient(BaseSCMClient):
 
         Returns:
             dict:
-            A dictionary with the following keys:
+            The parsed revision spec.
 
-            ``base`` (:py:class:`unicode`):
-                A revision to use as the base of the resulting diff.
+            See :py:class:`~rbtools.clients.base.scmclient.
+            SCMClientRevisionSpec` for the format of this dictionary.
 
-            ``tip`` (:py:class:`unicode`):
-                A revision to use as the tip of the resulting diff.
-
-            ``parent_base`` (:py:class:`unicode`, optional):
-                The revision to use as the base of a parent diff.
-
-            These will be used to generate the diffs to upload to Review Board
-            (or print). The diff for review will include the changes in (base,
-            tip], and the parent diff (if necessary) will include (parent,
-            base].
-
-            If a single revision is passed in, this will return the parent of
-            that revision for "base" and the passed-in revision for "tip".
-
-            If zero revisions are passed in, this will return revisions
-            relevant for the "current change" (changes in the work folder which
-            have not yet been checked in).
+            This always populates ``base`` and ``tip``.
 
         Raises:
             rbtools.clients.errors.TooManyRevisionsError:
@@ -1343,8 +1477,15 @@ class TFSClient(BaseSCMClient):
         """
         return self.tf_wrapper.parse_revision_spec(revisions)
 
-    def diff(self, revisions, include_files=[], exclude_patterns=[],
-             no_renames=False, extra_args=[], **kwargs):
+    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
+    def diff(
+        self,
+        revisions: SCMClientRevisionSpec,
+        *,
+        include_files: List[str] = [],
+        exclude_patterns: List[str] = [],
+        **kwargs,
+    ) -> SCMClientDiffResult:
         """Return the generated diff.
 
         Args:
@@ -1357,22 +1498,18 @@ class TFSClient(BaseSCMClient):
             exclude_patterns (list, optional):
                 A list of file paths to exclude from the diff.
 
-            extra_args (list, optional):
-                Unused.
-
             **kwargs (dict, unused):
                 Unused keyword arguments.
 
         Returns:
             dict:
-            A dictionary containing the following keys:
+            A dictionary of diff results.
 
-            ``diff`` (:py:class:`bytes`):
-                The contents of the diff to upload.
-
-            ``base_commit_id`` (:py:class:`unicode`, optional):
-                The ID of the commit that the change is based on, if available.
-                This is necessary for some hosting services that don't provide
-                individual file access.
+            See :py:class:`~rbtools.clients.base.scmclient.SCMClientDiffResult`
+            for the format of this dictionary.
         """
-        return self.tf_wrapper.diff(revisions, include_files, exclude_patterns)
+        return self.tf_wrapper.diff(
+            client=self,
+            revisions=revisions,
+            include_files=include_files,
+            exclude_patterns=exclude_patterns)

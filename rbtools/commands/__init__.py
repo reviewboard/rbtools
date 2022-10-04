@@ -7,6 +7,7 @@ import json
 import logging
 import platform
 import os
+import subprocess
 import sys
 
 import colorama
@@ -22,10 +23,10 @@ from rbtools.api.transport.sync import SyncTransport
 from rbtools.clients import scan_usable_client
 from rbtools.clients.errors import OptionsCheckError
 from rbtools.deprecation import RemovedInRBTools40Warning
+from rbtools.diffs.tools.errors import MissingDiffToolError
 from rbtools.utils.console import get_input, get_pass
 from rbtools.utils.filesystem import (cleanup_tempfiles, get_home_path,
                                       is_exe_in_path, load_config)
-from rbtools.utils.process import log_command_line
 from rbtools.utils.repository import get_repository_resource
 
 
@@ -407,6 +408,21 @@ class Command(object):
     #: Type:
     #:     bool
     needs_api = False
+
+    #: Whether the command needs to generate diffs.
+    #:
+    #: If this is set, the initialization of the command will check for the
+    #: presence of a diff tool compatible with the chosen type of repository.
+    #:
+    #: This depends on :py:attr:`needs_repository` and
+    #: :py:attr:`needs_scm_client` both being set to ``True``.
+    #:
+    #: Version Added:
+    #:     4.0
+    #:
+    #: Type:
+    #:     bool
+    needs_diffs = False
 
     #: Whether the command needs the SCM client.
     #:
@@ -1096,7 +1112,7 @@ class Command(object):
 
         self._init_logging()
         self.initialize()
-        log_command_line('Command line: %s', argv)
+        logging.debug('Command line: %s', subprocess.list2cmdline(argv))
 
         try:
             exit_code = self.main(*args) or 0
@@ -1172,7 +1188,13 @@ class Command(object):
         try:
             tool.check_options()
         except OptionsCheckError as e:
-            raise CommandError(six.text_type(e))
+            raise CommandError(str(e))
+
+        if self.needs_diffs:
+            try:
+                tool.get_diff_tool()
+            except MissingDiffToolError as e:
+                raise CommandError(str(e))
 
         return repository_info, tool
 

@@ -7,10 +7,11 @@ Version Added:
 import argparse
 import logging
 import re
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Union, cast
 
 from typing_extensions import NotRequired, TypedDict, final
 
+from rbtools.api.capabilities import Capabilities
 from rbtools.api.resource import (ItemResource,
                                   ListResource,
                                   ReviewRequestResource)
@@ -19,6 +20,8 @@ from rbtools.clients.base.repository import RepositoryInfo
 from rbtools.clients.errors import SCMClientDependencyError, SCMError
 from rbtools.deprecation import (RemovedInRBTools50Warning,
                                  deprecate_non_keyword_only_args)
+from rbtools.diffs.tools.base import BaseDiffTool
+from rbtools.diffs.tools.registry import diff_tools_registry
 from rbtools.utils.process import execute
 
 
@@ -36,35 +39,52 @@ class SCMClientRevisionSpec(TypedDict):
 
     #: A revision to use as the base of the resulting diff.
     #:
+    #: The value is considered an opaque value, dependent on the SCMClient.
+    #:
     #: This is required.
     #:
     #: Type:
-    #:     str
-    base: Optional[str]
+    #:     object
+    base: Optional[object]
 
     #: A revision to use as the tip of the resulting diff.
     #:
+    #: The value is considered an opaque value, dependent on the SCMClient.
+    #:
     #: This is required.
     #:
     #: Type:
-    #:     str
-    tip: Optional[str]
+    #:     object
+    tip: Optional[object]
 
     #: The revision to use as the base of a parent diff.
+    #:
+    #: The value is considered an opaque value, dependent on the SCMClient.
     #:
     #: This is optional.
     #:
     #: Type:
-    #:     str
-    parent_base: NotRequired[Optional[str]]
+    #:     object
+    parent_base: NotRequired[Optional[object]]
 
-    # The commit ID of the single commit being posted, if not using a range.
+    #: The commit ID of the single commit being posted, if not using a range.
     #:
     #: This is optional.
     #:
     #: Type:
     #:     str
     commit_id: NotRequired[Optional[str]]
+
+    #: Any extra revision state not used above.
+    #:
+    #: If a SCMClient needs to provide information in addition or instead of
+    #: the above, they should populate this field, rather than placing the
+    #: information in the main revision dictionary. This helps ensure a stable,
+    #: typed interface for all revision data.
+    #:
+    #: Version Added:
+    #:     4.0
+    extra: NotRequired[Optional[Mapping[str, Any]]]
 
 
 class SCMClientDiffResult(TypedDict):
@@ -90,6 +110,12 @@ class SCMClientDiffResult(TypedDict):
     #: Type:
     #:     bytes
     parent_diff: NotRequired[Optional[bytes]]
+
+    #: The change number to include when posting, if available.
+    #:
+    #: Type:
+    #:     str
+    changenum: NotRequired[Optional[str]]
 
     #: The commit ID to include when posting, if available.
     #:
@@ -280,6 +306,25 @@ class BaseSCMClient(object):
     #:     str
     server_tool_names: Optional[str] = None
 
+    #: Whether this tool requires a command line diff tool.
+    #:
+    #: This may be a boolean or a list.
+    #:
+    #: If a boolean, then this must be ``False`` if no command line tool is
+    #: required, or ``True`` if any command line tool supported by RBTools is
+    #: available (in which case the SCMClient is responsible for ensuring
+    #: compatibility).
+    #:
+    #: If a list, then this must be a list of registered diff tool IDs that
+    #: are compatible.
+    #:
+    #: Version Added:
+    #:     4.0
+    #:
+    #: Type:
+    #:     bool or list
+    requires_diff_tool: Union[bool, List[str]] = False
+
     #: Whether the SCM uses server-side changesets
     #:
     #: Version Added:
@@ -374,6 +419,14 @@ class BaseSCMClient(object):
     # Instance variables #
     ######################
 
+    #: Capabilities returned by the server.
+    #:
+    #: This will be ``None`` if not set by the server.
+    #:
+    #: Type:
+    #:     rbtools.api.capabilities.Capabilities
+    capabilities: Optional[Capabilities]
+
     #: User configuration.
     #:
     #: Any user configuration loaded via :file:`.reviewboardrc` files.
@@ -428,6 +481,7 @@ class BaseSCMClient(object):
         self.capabilities = None
         self.is_setup = False
 
+        self._diff_tool: Optional[BaseDiffTool] = None
         self._has_deps: Optional[bool] = None
 
     @property
@@ -464,6 +518,11 @@ class BaseSCMClient(object):
 
         If checks fail, an exception may be raised, and :py:attr:`is_setup`
         will be ``False``.
+
+        Note that this will not check :py:attr:`requires_diff_tool`, as that
+        is only required for certain operations. Checking for a compatible
+        diff tool is the responsibility of the caller whenever working with
+        diffs.
 
         Version Added:
             4.0
@@ -615,6 +674,50 @@ class BaseSCMClient(object):
             The repository info structure.
         """
         return None
+
+    def get_diff_tool(self) -> Optional[BaseDiffTool]:
+        """Return a diff tool for use with this client.
+
+        This can be used by subclasses, and by callers that want to check if
+        a compatible diff tool is available before calling :py:meth:`diff`.
+
+        The value is cached for the client.
+
+        Version Added:
+            4.0
+
+        Returns:
+            rbtools.diffs.tools.base.BaseDiffTool:
+            The diff instance, if a compatible instance is found.
+
+            This will be ``None`` if :py:attr:`requires_diff_tool` is
+            ``False``.
+
+        Raises:
+            TypeError:
+                :py:attr:`requires_diff_tool` was an unsupported type.
+
+            rbtools.diffs.tools.errors.MissingDiffToolError:
+                No compatible diff tool could be found.
+        """
+        diff_tool = self._diff_tool
+
+        if diff_tool is None:
+            if self.requires_diff_tool is True:
+                diff_tool = diff_tools_registry.get_available()
+            elif self.requires_diff_tool is False:
+                diff_tool = None
+            elif isinstance(self.requires_diff_tool, list):
+                diff_tool = diff_tools_registry.get_available(
+                    compatible_diff_tool_ids=self.requires_diff_tool)
+            else:
+                raise TypeError(
+                    'Unexpected type %s for %s.requires_diff_tool.'
+                    % (type(self.requires_diff_tool), type(self).__name__))
+
+            self._diff_tool = diff_tool
+
+        return diff_tool
 
     def find_matching_server_repository(
         self,
@@ -823,10 +926,31 @@ class BaseSCMClient(object):
         no_renames: bool = False,
         repository_info: Optional[RepositoryInfo] = None,
         extra_args: List[str] = [],
+        with_parent_diff: bool = True,
     ) -> SCMClientDiffResult:
         """Perform a diff using the given revisions.
 
-        This is expected to be overridden by subclasses.
+        Callers should make sure that the appropriate diff tool is installed
+        by calling :py:func:`rbtools.diffs.tools.registry.get_diff_tool` and
+        passing :py:attr:`requires_diff_tool` if it's a list.
+
+        This is expected to be overridden by subclasses, which should:
+
+        1. Set :py:attr:`requires_diff_tool` based on the client's needs.
+        2. Optionally use :py:attr:`options` for any client-specific diff
+           functionality.
+        3. Call :py:meth:`get_diff_tool` early, if needed.
+
+        Subclasses that need to support special arguments should use
+        :py:attr:`options`.
+
+        Version Changed:
+            4.0:
+            * All arguments except ``revisions`` must be specified as keyword
+              arguments.
+            * Subclasses should now use :py:attr:`requires_diff_tool` and
+              :py:meth:`get_diff_tool` instead of manually invoking
+              :command:`diff` tools.
 
         Args:
             revisions (dict):
@@ -840,6 +964,9 @@ class BaseSCMClient(object):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
 
+            no_renames (bool, optional):
+                Whether to avoid rename detection.
+
             repository_info (rbtools.clients.base.repository.RepositoryInfo,
                              optional):
                 The repository info structure.
@@ -847,8 +974,8 @@ class BaseSCMClient(object):
             extra_args (list, unused):
                 Additional arguments to be passed to the diff generation.
 
-            **kwargs (dict, unused):
-                Unused keyword arguments.
+            with_parent_diff (bool, optional):
+                Whether or not to compute a parent diff.
 
         Returns:
             dict:

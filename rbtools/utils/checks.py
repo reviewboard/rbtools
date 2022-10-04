@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 import os
 import subprocess
 
+from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.process import execute
 
 
@@ -43,7 +44,23 @@ def check_install(command):
 
 
 def check_gnu_diff():
-    """Checks if GNU diff is installed, and informs the user if it's not."""
+    """Check if GNU diff is installed, and informs the user if it's not.
+
+    Deprecated:
+        4.0:
+        Clients should use Diff Tools (see :py:mod:`rbtools.diffs.tools`)
+        instead.
+
+        This will be removed in 5.0.
+
+    Raises:
+        Exception:
+            GNU diff is not installed.
+    """
+    RemovedInRBTools50Warning.warn(
+        'check_gnu_diff() is deprecated and will be removed in RBTools 5.0. '
+        'Use Diff Tools (rbtools.diffs.tools) instead.')
+
     has_gnu_diff = False
 
     try:

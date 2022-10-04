@@ -1,7 +1,5 @@
 """A client for Perforce."""
 
-from __future__ import print_function, unicode_literals
-
 import logging
 import marshal
 import os
@@ -12,18 +10,25 @@ import string
 import subprocess
 import sys
 from fnmatch import fnmatch
-from typing import Optional
+from typing import List, Optional, Tuple, Union
 
 import six
 
-from rbtools.clients import BaseSCMClient, RepositoryInfo
+from rbtools.clients import RepositoryInfo
+from rbtools.clients.base.scmclient import (BaseSCMClient,
+                                            SCMClientDiffResult,
+                                            SCMClientRevisionSpec)
 from rbtools.clients.errors import (AmendError,
                                     EmptyChangeError,
                                     InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
-from rbtools.utils.checks import check_gnu_diff, check_install
+from rbtools.deprecation import (RemovedInRBTools50Warning,
+                                 deprecate_non_keyword_only_args)
+from rbtools.diffs.tools.base.diff_tool import BaseDiffTool
+from rbtools.diffs.writers import UnifiedDiffWriter
+from rbtools.utils.checks import check_install
 from rbtools.utils.encoding import force_unicode
 from rbtools.utils.filesystem import make_empty_files, make_tempfile
 from rbtools.utils.process import execute
@@ -408,6 +413,9 @@ class PerforceClient(BaseSCMClient):
     scmclient_id = 'perforce'
     name = 'Perforce'
     server_tool_names = 'Perforce'
+
+    requires_diff_tool = ['gnu']
+
     can_amend_commit = True
     supports_changesets = True
     supports_diff_exclude_patterns = True
@@ -492,7 +500,7 @@ class PerforceClient(BaseSCMClient):
 
         return None
 
-    def get_repository_info(self):
+    def get_repository_info(self) -> Optional[RepositoryInfo]:
         """Return repository information for the current working tree.
 
         Returns:
@@ -505,6 +513,7 @@ class PerforceClient(BaseSCMClient):
             return None
 
         p4_info = self._p4_info
+        assert p4_info is not None
 
         # Check the server address. If we don't get something we expect here,
         # we'll want to bail early.
@@ -542,7 +551,8 @@ class PerforceClient(BaseSCMClient):
         # Validate the repository path we got above to see if it's something
         # that makes sense.
         parts = server_address.split(':')
-        hostname = None
+        hostname: Optional[str] = None
+        port: Optional[str] = None
 
         if len(parts) == 3 and parts[0] == 'ssl':
             hostname = parts[1]
@@ -554,7 +564,7 @@ class PerforceClient(BaseSCMClient):
         elif len(parts) == 2:
             hostname, port = parts
 
-        if not hostname:
+        if not hostname or not port:
             raise SCMError('Path %s is not a valid Perforce P4PORT'
                            % server_address)
 
@@ -577,7 +587,7 @@ class PerforceClient(BaseSCMClient):
             pass
 
         # Build the final list of repository paths.
-        repository_paths = []
+        repository_paths: List[str] = []
 
         for server in servers:
             repository_path = '%s:%s' % (server, port)
@@ -592,14 +602,11 @@ class PerforceClient(BaseSCMClient):
         # a string. This doesn't have any impact on performance these days,
         # but the result is more consistent with other SCMs.
         if len(repository_paths) == 1:
-            repository_paths = repository_paths[0]
-
-        # Now that we know it's Perforce, make sure we have GNU diff
-        # installed, and error out if we don't.
-        check_gnu_diff()
-
-        return RepositoryInfo(path=repository_paths,
-                              local_path=local_path)
+            return RepositoryInfo(path=repository_paths[0],
+                                  local_path=local_path)
+        else:
+            return RepositoryInfo(path=repository_paths,
+                                  local_path=local_path)
 
     def get_repository_name(self):
         """Return any repository name configured in the repository.
@@ -616,16 +623,43 @@ class PerforceClient(BaseSCMClient):
         counters = self.p4.counters()
         return counters.get('reviewboard.repository_name', None)
 
-    def parse_revision_spec(self, revisions=[]):
+    def parse_revision_spec(
+        self,
+        revisions: List[str] = [],
+    ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
+        These will be used to generate the diffs to upload to Review Board
+        (or print). The diff for review will include the changes in (base,
+        tip].
+
+        If zero revisions are passed in, this will return the current sync
+        changelist as "tip", and the upstream branch as "base". The result
+        may have special internal revisions or prefixes based on whether
+        the changeset is submitted, pending, or shelved.
+
+        If a single revision is passed in, this will return the parent of
+        that revision for "base" and the passed-in revision for "tip".
+
+        If two revisions are passed in, they need to both be submitted
+        changesets.
+
         Args:
-            revisions (list of unicode, optional):
+            revisions (list of str, optional):
                 A list of revisions as specified by the user. Items in the list
                 do not necessarily represent a single revision, since the user
                 can use SCM-native syntaxes such as ``r1..r2`` or ``r1:r2``.
                 SCMTool-specific overrides of this method are expected to deal
                 with such syntaxes.
+
+        Returns:
+            dict:
+            The parsed revision spec.
+
+            See :py:class:`~rbtools.clients.base.scmclient.
+            SCMClientRevisionSpec` for the format of this dictionary.
+
+            This always populates the ``base`` and ``tip`` keys.
 
         Raises:
             rbtools.clients.errors.InvalidRevisionSpecError:
@@ -633,31 +667,6 @@ class PerforceClient(BaseSCMClient):
 
             rbtools.clients.errors.TooManyRevisionsError:
                 The specified revisions list contained too many revisions.
-
-        Returns:
-            dict:
-            A dictionary with the following keys:
-
-            ``base`` (:py:class:`unicode`):
-                A revision to use as the base of the resulting diff.
-
-            ``tip`` (:py:class:`unicode`):
-                A revision to use as the tip of the resulting diff.
-
-            These will be used to generate the diffs to upload to Review Board
-            (or print). The diff for review will include the changes in (base,
-            tip].
-
-            If zero revisions are passed in, this will return the current sync
-            changelist as "tip", and the upstream branch as "base". The result
-            may have special internal revisions or prefixes based on whether
-            the changeset is submitted, pending, or shelved.
-
-            If a single revision is passed in, this will return the parent of
-            that revision for "base" and the passed-in revision for "tip".
-
-            If two revisions are passed in, they need to both be submitted
-            changesets.
         """
         n_revs = len(revisions)
 
@@ -710,35 +719,34 @@ class PerforceClient(BaseSCMClient):
                     '%s does not appear to be a valid changelist' %
                     revisions[0])
         elif n_revs == 2:
-            result = {}
-
-            # The base revision must be a submitted CLN
+            # The base revision must be a submitted CLN.
             status = self._get_changelist_status(revisions[0])
-            if status == 'submitted':
-                result['base'] = revisions[0]
-            elif status in ('pending', 'shelved'):
+
+            if status in ('pending', 'shelved'):
                 raise InvalidRevisionSpecError(
                     '%s cannot be used as the base CLN for a diff because '
                     'it is %s.' % (revisions[0], status))
-            else:
+            elif status != 'submitted':
                 raise InvalidRevisionSpecError(
                     '%s does not appear to be a valid changelist' %
                     revisions[0])
 
-            # Tip revision can be any of submitted, pending, or shelved CLNs
+            # Tip revision can be any of submitted, pending, or shelved CLNs.
             status = self._get_changelist_status(revisions[1])
-            if status == 'submitted':
-                result['tip'] = revisions[1]
-            elif status in ('pending', 'shelved'):
+
+            if status in ('pending', 'shelved'):
                 raise InvalidRevisionSpecError(
                     '%s cannot be used for a revision range diff because it '
                     'is %s' % (revisions[1], status))
-            else:
+            elif status != 'submitted':
                 raise InvalidRevisionSpecError(
                     '%s does not appear to be a valid changelist' %
                     revisions[1])
 
-            return result
+            return {
+                'base': revisions[0],
+                'tip': revisions[1],
+            }
         else:
             raise TooManyRevisionsError
 
@@ -803,8 +811,16 @@ class PerforceClient(BaseSCMClient):
 
         return None
 
-    def diff(self, revisions, include_files=[], exclude_patterns=[],
-             extra_args=[], **kwargs):
+    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
+    def diff(
+        self,
+        revisions: SCMClientRevisionSpec,
+        *,
+        include_files: List[str] = [],
+        exclude_patterns: List[str] = [],
+        extra_args: List[str] = [],
+        **kwargs,
+    ) -> SCMClientDiffResult:
         """Perform a diff using the given revisions.
 
         This goes through the hard work of generating a diff on Perforce in
@@ -841,13 +857,18 @@ class PerforceClient(BaseSCMClient):
                 The number of the changeset being posted (if ``revisions``
                 represents a single changeset).
         """
+        diff_tool = self.get_diff_tool()
+        assert diff_tool is not None
+
         exclude_patterns = self.normalize_exclude_patterns(exclude_patterns)
 
         if not revisions:
             # The "path posting" is still interesting enough to keep around. If
             # the given arguments don't parse as valid changelists, fall back
             # on that behavior.
-            return self._path_diff(extra_args, exclude_patterns)
+            return self._path_diff(diff_tool=diff_tool,
+                                   args=extra_args,
+                                   exclude_patterns=exclude_patterns)
 
         # Support both //depot/... paths and local filenames. For the moment,
         # this does *not* support any of Perforce's traversal literals like ...
@@ -865,6 +886,11 @@ class PerforceClient(BaseSCMClient):
         base = revisions['base']
         tip = revisions['tip']
 
+        assert isinstance(base, str)
+        assert isinstance(tip, str)
+
+        diff_writer = UnifiedDiffWriter()
+
         cl_is_pending = tip.startswith(self.REVISION_PENDING_CLN_PREFIX)
         cl_is_shelved = False
 
@@ -874,8 +900,13 @@ class PerforceClient(BaseSCMClient):
                          'to %s',
                          base, tip)
             return self._compute_range_changes(
-                base, tip, depot_include_files, local_include_files,
-                exclude_patterns)
+                diff_tool=diff_tool,
+                diff_writer=diff_writer,
+                base=base,
+                tip=tip,
+                depot_include_files=depot_include_files,
+                local_include_files=local_include_files,
+                exclude_patterns=exclude_patterns)
 
         # Strip off the prefix
         tip = tip.split(':', 1)[1]
@@ -894,8 +925,6 @@ class PerforceClient(BaseSCMClient):
             logging.info('Generating diff for shelved changeset %s', tip)
         else:
             logging.info('Generating diff for pending changeset %s', tip)
-
-        diff_lines = []
 
         action_mapping = {
             'edit': 'M',
@@ -956,10 +985,15 @@ class PerforceClient(BaseSCMClient):
                                % (action, depot_file))
 
             if changetype_short == 'M':
+                assert tip is not None
+
                 try:
                     old_file, new_file = self._extract_edit_files(
-                        depot_file, local_file, base_revision, tip,
-                        cl_is_shelved, False)
+                        depot_file=depot_file,
+                        local_file=local_file,
+                        rev_a=base_revision,
+                        rev_b=tip,
+                        cl_is_shelved=cl_is_shelved)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
                         logging.warning('Skipping file %s: %s', depot_file, e)
@@ -980,8 +1014,11 @@ class PerforceClient(BaseSCMClient):
 
                 try:
                     old_file, new_file = self._extract_add_files(
-                        depot_file, local_file, tip, cl_is_shelved,
-                        cl_is_pending)
+                        depot_file=depot_file,
+                        local_file=local_file,
+                        revision=tip,
+                        cl_is_shelved=cl_is_shelved,
+                        cl_is_pending=cl_is_pending)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
                         logging.warning('Skipping file %s: %s', depot_file, e)
@@ -996,7 +1033,8 @@ class PerforceClient(BaseSCMClient):
             elif changetype_short == 'D':
                 try:
                     old_file, new_file = self._extract_delete_files(
-                        depot_file, base_revision)
+                        depot_file=depot_file,
+                        revision=base_revision)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
                         logging.warning('Skipping file %s#%s: %s',
@@ -1012,20 +1050,28 @@ class PerforceClient(BaseSCMClient):
                 try:
                     old_file, new_file, new_depot_file = \
                         self._extract_move_files(
-                            depot_file, tip, base_revision, cl_is_shelved)
+                            old_depot_file=depot_file,
+                            tip=tip,
+                            base_revision=base_revision,
+                            cl_is_shelved=cl_is_shelved)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
                         logging.warning('Skipping file %s: %s', depot_file, e)
 
                     continue
 
-            dl = self._do_diff(old_file, new_file, depot_file, base_revision,
-                               new_depot_file, changetype_short,
-                               ignore_unmodified=True)
-            diff_lines += dl
+            self._do_diff(diff_tool=diff_tool,
+                          diff_writer=diff_writer,
+                          old_file=old_file,
+                          new_file=new_file,
+                          depot_file=depot_file,
+                          base_revision=base_revision,
+                          new_depot_file=new_depot_file,
+                          changetype_short=changetype_short,
+                          ignore_unmodified=True)
 
         return {
-            'diff': b''.join(diff_lines),
+            'diff': diff_writer.getvalue(),
             'changenum': self.get_changenum(revisions),
         }
 
@@ -1059,8 +1105,16 @@ class PerforceClient(BaseSCMClient):
 
         return None
 
-    def _compute_range_changes(self, base, tip, depot_include_files,
-                               local_include_files, exclude_patterns):
+    def _compute_range_changes(
+        self,
+        diff_tool: BaseDiffTool,
+        diff_writer: UnifiedDiffWriter,
+        base: str,
+        tip: str,
+        depot_include_files: List[str],
+        local_include_files: List[str],
+        exclude_patterns: List[str],
+    ) -> SCMClientDiffResult:
         """Compute the changes across files given a revision range.
 
         This will look at the history of all changes within the given range and
@@ -1069,20 +1123,20 @@ class PerforceClient(BaseSCMClient):
         to include that information.
 
         Args:
-            base (unicode):
+            base (str):
                 The base of the revision range.
 
-            tip (unicode):
+            tip (str):
                 The tip of the revision range.
 
-            depot_include_files (list of unicode):
+            depot_include_files (list of str):
                 A list of depot paths to whitelist during diff generation.
 
-            local_include_files (list of unicode):
+            local_include_files (list of str):
                 A list of local filesystem paths to whitelist during diff
                 generation.
 
-            exclude_patterns (list of unicode):
+            exclude_patterns (list of str):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
 
@@ -1101,7 +1155,9 @@ class PerforceClient(BaseSCMClient):
         # [base, tip]. Increment the base to avoid this.
         real_base = str(int(base) + 1)
 
-        for file_entry in self.p4.filelog('//...@%s,%s' % (real_base, tip)):
+        file_log = self.p4.filelog('//...@%s,%s' % (real_base, tip)) or []
+
+        for file_entry in file_log:
             cid = 0
             while True:
                 change_key = 'change%d' % cid
@@ -1131,8 +1187,9 @@ class PerforceClient(BaseSCMClient):
                     raise Exception('Unsupported action type "%s" for %s' %
                                     (action, depot_file))
 
+                rev_key = 'rev%d' % cid
+
                 try:
-                    rev_key = 'rev%d' % cid
                     rev = int(file_entry[rev_key])
                 except ValueError:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
@@ -1191,7 +1248,6 @@ class PerforceClient(BaseSCMClient):
 
         # Now generate the diff
         supports_moves = self._supports_moves()
-        diff_lines = []
 
         for f in files:
             action = f['action']
@@ -1219,50 +1275,84 @@ class PerforceClient(BaseSCMClient):
                 continue
 
             if action == 'add':
+                assert local_file is not None
+
                 try:
                     old_file, new_file = self._extract_add_files(
-                        depot_file, local_file, rev, False, False)
+                        depot_file=depot_file,
+                        local_file=local_file,
+                        revision=rev)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
                         logging.warning('Skipping file %s: %s', depot_file, e)
 
                     continue
 
-                diff_lines += self._do_diff(
-                    old_file, new_file, depot_file, 0, '', 'A',
-                    ignore_unmodified=True)
+                self._do_diff(diff_tool=diff_tool,
+                              diff_writer=diff_writer,
+                              old_file=old_file,
+                              new_file=new_file,
+                              depot_file=depot_file,
+                              base_revision=0,
+                              new_depot_file='',
+                              changetype_short='A',
+                              ignore_unmodified=True)
             elif action == 'delete':
                 try:
                     old_file, new_file = self._extract_delete_files(
-                        initial_depot_file, initial_rev)
+                        depot_file=initial_depot_file,
+                        revision=initial_rev)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
                         logging.warning('Skipping file %s: %s', depot_file, e)
 
                     continue
 
-                diff_lines += self._do_diff(
-                    old_file, new_file, initial_depot_file, initial_rev,
-                    depot_file, 'D', ignore_unmodified=True)
+                self._do_diff(diff_tool=diff_tool,
+                              diff_writer=diff_writer,
+                              old_file=old_file,
+                              new_file=new_file,
+                              depot_file=initial_depot_file,
+                              base_revision=initial_rev,
+                              new_depot_file=depot_file,
+                              changetype_short='D',
+                              ignore_unmodified=True)
             elif action == 'edit':
+                assert local_file is not None
+
                 try:
                     old_file, new_file = self._extract_edit_files(
-                        depot_file, local_file, initial_rev, rev, False, True)
+                        depot_file=depot_file,
+                        local_file=local_file,
+                        rev_a=initial_rev,
+                        rev_b=rev,
+                        cl_is_submitted=True)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
                         logging.warning('Skipping file %s: %s', depot_file, e)
 
                     continue
 
-                diff_lines += self._do_diff(
-                    old_file, new_file, initial_depot_file, initial_rev,
-                    depot_file, 'M', ignore_unmodified=True)
+                self._do_diff(diff_tool=diff_tool,
+                              diff_writer=diff_writer,
+                              old_file=old_file,
+                              new_file=new_file,
+                              depot_file=initial_depot_file,
+                              base_revision=initial_rev,
+                              new_depot_file=depot_file,
+                              changetype_short='M',
+                              ignore_unmodified=True)
             elif action == 'move':
+                assert local_file is not None
+
                 try:
                     old_file_a, new_file_a = self._extract_add_files(
-                        depot_file, local_file, rev, False, False)
+                        depot_file=depot_file,
+                        local_file=local_file,
+                        revision=rev)
                     old_file_b, new_file_b = self._extract_delete_files(
-                        initial_depot_file, initial_rev)
+                        depot_file=initial_depot_file,
+                        revision=initial_rev)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
                         logging.warning('Skipping file %s: %s', depot_file, e)
@@ -1271,17 +1361,35 @@ class PerforceClient(BaseSCMClient):
 
                 if supports_moves:
                     # Show the change as a move
-                    diff_lines += self._do_diff(
-                        old_file_a, new_file_b, initial_depot_file,
-                        initial_rev, depot_file, 'MV', ignore_unmodified=True)
+                    self._do_diff(diff_tool=diff_tool,
+                                  diff_writer=diff_writer,
+                                  old_file=old_file_a,
+                                  new_file=new_file_b,
+                                  depot_file=initial_depot_file,
+                                  base_revision=initial_rev,
+                                  new_depot_file=depot_file,
+                                  changetype_short='MV',
+                                  ignore_unmodified=True)
                 else:
                     # Show the change as add and delete
-                    diff_lines += self._do_diff(
-                        old_file_a, new_file_a, depot_file, 0, '', 'A',
-                        ignore_unmodified=True)
-                    diff_lines += self._do_diff(
-                        old_file_b, new_file_b, initial_depot_file,
-                        initial_rev, depot_file, 'D', ignore_unmodified=True)
+                    self._do_diff(diff_tool=diff_tool,
+                                  diff_writer=diff_writer,
+                                  old_file=old_file_a,
+                                  new_file=new_file_a,
+                                  depot_file=depot_file,
+                                  base_revision=0,
+                                  new_depot_file='',
+                                  changetype_short='A',
+                                  ignore_unmodified=True)
+                    self._do_diff(diff_tool=diff_tool,
+                                  diff_writer=diff_writer,
+                                  old_file=old_file_b,
+                                  new_file=new_file_b,
+                                  depot_file=initial_depot_file,
+                                  base_revision=initial_rev,
+                                  new_depot_file=depot_file,
+                                  changetype_short='D',
+                                  ignore_unmodified=True)
             elif action == 'skip':
                 continue
             else:
@@ -1291,7 +1399,7 @@ class PerforceClient(BaseSCMClient):
                 assert False
 
         return {
-            'diff': b''.join(diff_lines)
+            'diff': diff_writer.getvalue(),
         }
 
     def _accumulate_range_change(self, file_entry, change):
@@ -1349,33 +1457,47 @@ class PerforceClient(BaseSCMClient):
         file_entry['rev'] = change['rev']
         file_entry['action'] = new_action
 
-    def _extract_edit_files(self, depot_file, local_file, rev_a, rev_b,
-                            cl_is_shelved, cl_is_submitted):
+    def _extract_edit_files(
+        self,
+        *,
+        depot_file: str,
+        local_file: str,
+        rev_a: Union[int, str],
+        rev_b: Union[int, str],
+        cl_is_shelved: bool = False,
+        cl_is_submitted: bool = False,
+    ) -> Tuple[str, str]:
         """Extract the "old" and "new" files for an edit operation.
 
         Args:
-            depot_file (unicode):
+            depot_file (str):
                 The depot path of the file.
 
-            local_file (unicode):
+            local_file (str):
                 The local filesystem path of the file.
 
-            rev_a (unicode):
+            rev_a (int or str):
                 The original revision of the file.
 
-            rev_b (unicode):
+            rev_b (int or str):
                 The new revision of the file.
 
-            cl_is_shelved (bool):
+            cl_is_shelved (bool, optional):
                 Whether the containing changeset is shelved.
 
-            cl_is_submitted (bool):
+            cl_is_submitted (bool, optional):
                 Whether the containing changeset is submitted.
 
         Returns:
             tuple:
-            A 2-tuple containing the filenames of the old version and new
-            version.
+            A 2-tuple containing:
+
+            Tuple:
+                0 (str):
+                    The filename of the old version.
+
+                1 (str):
+                    The filename of the new version.
 
         Raises:
             ValueError:
@@ -1397,18 +1519,25 @@ class PerforceClient(BaseSCMClient):
 
         return old_filename, new_filename
 
-    def _extract_add_files(self, depot_file, local_file, revision,
-                           cl_is_shelved, cl_is_pending):
+    def _extract_add_files(
+        self,
+        *,
+        depot_file: str,
+        local_file: str,
+        revision: Union[int, str],
+        cl_is_shelved: bool = False,
+        cl_is_pending: bool = False,
+    ) -> Tuple[str, str]:
         """Extract the "old" and "new" files for an add operation.
 
         Args:
-            depot_file (unicode):
+            depot_file (str):
                 The depot path of the file.
 
-            local_file (unicode):
+            local_file (str):
                 The local filesystem path of the file.
 
-            revision (unicode):
+            revision (int or str):
                 The new revision of the file.
 
             cl_is_shelved (bool):
@@ -1419,9 +1548,17 @@ class PerforceClient(BaseSCMClient):
 
         Returns:
             tuple:
-            A 2-tuple containing the filenames of the old version and new
-            version. Because this is an add operation, the old filename will
-            contain an empty file.
+            A 2-tuple containing:
+
+            Tuple:
+                0 (str):
+                    The filename of the old version.
+
+                    Because this is an add operation, this will represent an
+                    empty file.
+
+                1 (str):
+                    The filename of the new version.
 
         Raises:
             ValueError:
@@ -1442,24 +1579,37 @@ class PerforceClient(BaseSCMClient):
 
         return old_filename, new_filename
 
-    def _extract_delete_files(self, depot_file, revision):
+    def _extract_delete_files(
+        self,
+        *,
+        depot_file: str,
+        revision: Union[int, str],
+    ) -> Tuple[str, str]:
         """Extract the "old" and "new" files for a delete operation.
 
         Returns a tuple of (old filename, new filename). This can raise a
         ValueError if extraction fails.
 
         Args:
-            depot_file (unicode):
+            depot_file (str):
                 The depot path of the file.
 
-            revision (unicode):
+            revision (int or str):
                 The old revision of the file.
 
         Returns:
             tuple:
-            A 2-tuple containing the filenames of the old version and new
-            version. Because this is a delete operation, the new filename will
-            contain an empty file.
+            A 2-tuple containing:
+
+            Tuple:
+                0 (str):
+                    The filename of the old version.
+
+                1 (str):
+                    The filename of the new version.
+
+                    Because this is a delete operation, this will represent an
+                    empty file.
 
         Raises:
             ValueError:
@@ -1474,30 +1624,48 @@ class PerforceClient(BaseSCMClient):
 
         return old_filename, new_filename
 
-    def _extract_move_files(self, old_depot_file, tip, base_revision,
-                            cl_is_shelved):
+    def _extract_move_files(
+        self,
+        *,
+        old_depot_file: str,
+        tip: Union[int, str],
+        base_revision: Union[int, str],
+        cl_is_shelved: bool = False,
+    ) -> Tuple[str, str, str]:
         """Extract the "old" and "new" files for a move operation.
 
         Returns a tuple of (old filename, new filename, new depot path). This
         can raise a ValueError if extraction fails.
 
         Args:
-            old_depot_file (unicode):
+            old_depot_file (str):
                 The depot path of the old version of the file.
 
-            tip (unicode):
+            tip (int or str):
                 The new revision of the file.
 
-            base_revision (unicode):
+            base_revision (int or str):
                 The old revision of the file.
 
-            cl_is_shelved (bool):
+            cl_is_shelved (bool, optional):
                 Whether the containing changeset is shelved.
 
         Returns:
             tuple:
-            A 2-tuple containing the filenames of the old version and new
-            version.
+            A 2-tuple containing:
+
+            Tuple:
+                0 (str):
+                    The filename of the old version.
+
+                    Because this is an add operation, this will represent an
+                    empty file.
+
+                1 (str):
+                    The filename of the new version.
+
+                2 (str):
+                    The depot path of the new version.
 
         Raises:
             ValueError:
@@ -1541,13 +1709,21 @@ class PerforceClient(BaseSCMClient):
 
         return old_filename, new_filename, new_depot_file
 
-    def _path_diff(self, args, exclude_patterns):
+    def _path_diff(
+        self,
+        diff_tool: BaseDiffTool,
+        args: List[str],
+        exclude_patterns: List[str],
+    ) -> SCMClientDiffResult:
         """Process a path-style diff.
 
         This allows people to post individual files in various ways.
 
         Args:
-            args (list of unicode):
+            diff_tool (rbtools.diffs.tools.base.diff_tool.BaseDiffTool):
+                The diff tool being used to generate diffs.
+
+            args (list of str):
                 A list of paths to add. The path styles supported are:
 
                 ``//path/to/file``:
@@ -1565,7 +1741,7 @@ class PerforceClient(BaseSCMClient):
                 ``//path/to/dir/...[@#]rev,[@#]rev``:
                     Upload a diff of all files between revs in that directory.
 
-            exclude_patterns (list of unicode):
+            exclude_patterns (list of str):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
 
@@ -1573,6 +1749,8 @@ class PerforceClient(BaseSCMClient):
             dict:
             A dictionary containing a ``diff`` key.
         """
+        diff_writer = UnifiedDiffWriter()
+
         r_revision_range = re.compile(r'^(?P<path>//[^@#]+)' +
                                       r'(?P<revision1>[#@][^,]+)?' +
                                       r'(?P<revision2>,[#@][^,]+)?$')
@@ -1580,8 +1758,6 @@ class PerforceClient(BaseSCMClient):
         empty_filename = make_tempfile()
         tmp_diff_from_filename = make_tempfile()
         tmp_diff_to_filename = make_tempfile()
-
-        diff_lines = []
 
         for path in args:
             m = r_revision_range.match(path)
@@ -1669,63 +1845,68 @@ class PerforceClient(BaseSCMClient):
                 # things work like they did before the moved file change was
                 # added (58ccae27). This section of code needs to be updated
                 # to properly work with moved files.
-                dl = self._do_diff(old_file, new_file, depot_path,
-                                   base_revision, '', changetype_short,
-                                   ignore_unmodified=True)
-                diff_lines += dl
+                self._do_diff(diff_tool=diff_tool,
+                              diff_writer=diff_writer,
+                              old_file=old_file,
+                              new_file=new_file,
+                              depot_file=depot_path,
+                              base_revision=base_revision,
+                              new_depot_file='',
+                              changetype_short=changetype_short,
+                              ignore_unmodified=True)
 
         os.unlink(empty_filename)
         os.unlink(tmp_diff_from_filename)
         os.unlink(tmp_diff_to_filename)
 
         return {
-            'diff': b''.join(diff_lines),
+            'diff': diff_writer.getvalue(),
         }
 
-    def _do_diff(self, old_file, new_file, depot_file, base_revision,
-                 new_depot_file, changetype_short, ignore_unmodified=False):
+    def _do_diff(
+        self,
+        diff_tool: BaseDiffTool,
+        diff_writer: UnifiedDiffWriter,
+        old_file: str,
+        new_file: str,
+        depot_file: str,
+        base_revision: int,
+        new_depot_file: str,
+        changetype_short: str,
+        ignore_unmodified: bool = False,
+    ) -> None:
         """Create a diff of a single file.
 
         Args:
-            old_file (unicode):
+            diff_tool (rbtools.diffs.tools.base.diff_tool.BaseDiffTool):
+                The diff tool being used to generate diffs.
+
+            old_file (str):
                 The absolute path of the "old" file.
 
-            new_file (unicode):
+            new_file (str):
                 The absolute path of the "new" file.
 
-            depot_file (unicode):
+            depot_file (str):
                 The depot path in Perforce for this file.
 
             base_revision (int):
                 The base Perforce revision number of the old file.
 
-            new_depot_file (unicode):
+            new_depot_file (str):
                 The depot path in Perforce for the new location of this ifle.
                 Only used if the file was moved.
 
-            changetype_short (unicode):
+            changetype_short (str):
                 The change type provided by Perforce.
 
             ignore_unmodified (bool, optional):
                 Whether to return an empty list if the file was not changed.
-
-        Returns:
-            list of bytes:
-            The diff, split into lines.
         """
-        if hasattr(os, 'uname') and os.uname()[0] == 'SunOS':
-            diff_cmd = ['gdiff', '-urNp', old_file, new_file]
-        else:
-            diff_cmd = ['diff', '-urNp', old_file, new_file]
-
-        # Diff returns "1" if differences were found.
-        dl = execute(diff_cmd, extra_ignore_errors=(1, 2),
-                     log_output_on_error=False,
-                     results_unicode=False)
-
-        # If the input file has ^M characters at end of line, lets ignore them.
-        dl = dl.replace(b'\r\r\n', b'\r\n')
-        dl = dl.splitlines(True)
+        # Perform the diff on the files.
+        diff_result = diff_tool.run_diff_file(orig_path=old_file,
+                                              modified_path=new_file,
+                                              show_hunk_context=True)
 
         cwd = os.getcwd()
 
@@ -1745,93 +1926,82 @@ class PerforceClient(BaseSCMClient):
             is_move = False
             new_local_path = local_path
 
-        # Special handling for the output of the diff tool on binary files:
-        #     diff outputs "Files a and b differ"
-        # and the code below expects the output to start with
-        #     "Binary files "
-        if (len(dl) == 1 and
-            dl[0].startswith(b'Files %s and %s differ' %
-                             (old_file.encode('utf-8'),
-                              new_file.encode('utf-8')))):
-            dl = [b'Binary files %s and %s differ\n'
-                  % (old_file.encode('utf-8'),
-                     new_file.encode('utf-8'))]
-
-        is_binary = dl != [] and dl[0].startswith(b'Binary files ')
-
-        if dl == [] or is_binary:
+        if not diff_result.has_text_differences or diff_result.is_binary:
             is_empty_and_changed = (self.supports_empty_files() and
                                     changetype_short in ('A', 'D'))
 
-            if (dl == [] and (is_move or is_empty_and_changed)) or is_binary:
-                line = (b'==== %s#%d ==%s== %s ====\n'
-                        % (depot_file.encode('utf-8'),
-                           base_revision,
-                           changetype_short.encode('utf-8'),
-                           new_local_path.encode('utf-8')))
-                dl.insert(0, line)
-                dl.append(b'\n')
+            if ((not diff_result.has_text_differences and
+                 (is_move or is_empty_and_changed)) or
+                diff_result.is_binary):
+                diff_writer.write_line(
+                    '==== %s#%d ==%s== %s ===='
+                    % (depot_file,
+                       base_revision,
+                       changetype_short,
+                       new_local_path))
+                diff_writer.write_diff_file_result_hunks(diff_result)
+                diff_writer.write_line(b'')
             else:
                 if ignore_unmodified:
-                    return []
+                    return
                 else:
                     print('Warning: %s in your changeset is unmodified' %
                           local_path)
-        elif len(dl) > 1:
-            m = re.search(br'(\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d)', dl[1])
-            if m:
-                timestamp = m.group(1).decode('utf-8')
-            else:
-                # Thu Sep  3 11:24:48 2007
-                m = self.DATE_RE.search(dl[1])
-                if not m:
-                    raise SCMError('Unable to parse diff header: %s' % dl[1])
+        else:
+            modified_header = diff_result.parsed_modified_file_header
+            modified_header_extra: bytes
+            timestamp: str = ''
 
-                month_map = {
-                    b'Jan': b'01',
-                    b'Feb': b'02',
-                    b'Mar': b'03',
-                    b'Apr': b'04',
-                    b'May': b'05',
-                    b'Jun': b'06',
-                    b'Jul': b'07',
-                    b'Aug': b'08',
-                    b'Sep': b'09',
-                    b'Oct': b'10',
-                    b'Nov': b'11',
-                    b'Dec': b'12',
-                }
-                month = month_map[m.group(2)]
-                day = m.group(3)
-                timestamp = m.group(4)
-                year = m.group(5)
+            if modified_header:
+                modified_header_extra = modified_header['extra']
 
-                timestamp = '%s-%s-%s %s' % (year, month, day, timestamp)
+                m = re.search(br'(\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d)',
+                              modified_header_extra)
 
-            dl[0] = (b'--- %s\t%s#%d\n'
-                     % (local_path.encode('utf-8'),
-                        depot_file.encode('utf-8'),
-                        base_revision))
-            dl[1] = (b'+++ %s\t%s\n'
-                     % (new_local_path.encode('utf-8'),
-                        timestamp.encode('utf-8')))
+                if m:
+                    timestamp = m.group(1).decode('utf-8')
+                else:
+                    # Thu Sep  3 11:24:48 2007
+                    m = self.DATE_RE.search(modified_header_extra)
+
+                    if m:
+                        month_map = {
+                            b'Jan': b'01',
+                            b'Feb': b'02',
+                            b'Mar': b'03',
+                            b'Apr': b'04',
+                            b'May': b'05',
+                            b'Jun': b'06',
+                            b'Jul': b'07',
+                            b'Aug': b'08',
+                            b'Sep': b'09',
+                            b'Oct': b'10',
+                            b'Nov': b'11',
+                            b'Dec': b'12',
+                        }
+                        month = month_map[m.group(2)]
+                        day = m.group(3)
+                        timestamp_raw = m.group(4)
+                        year = m.group(5)
+
+                        timestamp = (
+                            b'%s-%s-%s %s' % (year, month, day, timestamp_raw)
+                        ).decode('utf-8')
+
+            if not timestamp:
+                raise SCMError('Unable to parse diff header: %s'
+                               % diff_result.parsed_modified_file_header)
 
             if is_move:
-                dl.insert(0,
-                          (b'Moved to: %s\n' %
-                           new_depot_file.encode('utf-8')))
-                dl.insert(0,
-                          (b'Moved from: %s\n' %
-                           depot_file.encode('utf-8')))
+                diff_writer.write_line('Moved from: %s' % depot_file)
+                diff_writer.write_line('Moved to: %s' % new_depot_file)
 
-            # Not everybody has files that end in a newline (ugh). This ensures
-            # that the resulting diff file isn't broken.
-            if not dl[-1].endswith(b'\n'):
-                dl.append(b'\n')
-        else:
-            raise SCMError('No valid diffs: %s' % dl[0].decode('utf-8'))
-
-        return dl
+            diff_writer.write_file_headers(
+                orig_path=local_path,
+                orig_extra='%s#%d' % (depot_file, base_revision),
+                modified_path=new_local_path,
+                modified_extra=timestamp)
+            diff_writer.write_diff_file_result_hunks(diff_result)
 
     def _write_file(self, depot_path, tmpfile):
         """Grab a file from Perforce and writes it to a temp file.

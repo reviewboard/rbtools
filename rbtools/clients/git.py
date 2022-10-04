@@ -10,7 +10,10 @@ from typing import List, Optional, cast
 
 import six
 
-from rbtools.clients import BaseSCMClient, PatchResult, RepositoryInfo
+from rbtools.clients import PatchResult, RepositoryInfo
+from rbtools.clients.base.scmclient import (BaseSCMClient,
+                                            SCMClientDiffResult,
+                                            SCMClientRevisionSpec)
 from rbtools.clients.errors import (AmendError,
                                     CreateCommitError,
                                     MergeError,
@@ -21,10 +24,13 @@ from rbtools.clients.errors import (AmendError,
                                     SCMError)
 from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.svn import SVNClient, SVNRepositoryInfo
+from rbtools.deprecation import (RemovedInRBTools50Warning,
+                                 deprecate_non_keyword_only_args)
 from rbtools.utils.checks import check_install, is_valid_version
 from rbtools.utils.console import edit_text
 from rbtools.utils.diffs import (normalize_patterns,
                                  remove_filenames_matching_patterns)
+from rbtools.utils.encoding import force_unicode
 from rbtools.utils.errors import EditorError
 from rbtools.utils.process import execute
 
@@ -185,16 +191,38 @@ class GitClient(BaseSCMClient):
 
         return self._git_version_at_least_180
 
-    def parse_revision_spec(self, revisions=[]):
+    def parse_revision_spec(
+        self,
+        revisions: List[str] = [],
+    ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
+        These will be used to generate the diffs to upload to Review Board
+        (or print). The diff for review will include the changes in (base,
+        tip], and the parent diff (if necessary) will include (parent_base,
+        base].
+
+        If a single revision is passed in, this will return the parent of
+        that revision for "base" and the passed-in revision for "tip".
+
+        If zero revisions are passed in, this will return the current HEAD
+        as "tip", and the upstream branch as "base", taking into account
+        parent branches explicitly specified via :option:`--parent`.
+
         Args:
-            revisions (list of unicode, optional):
-                A list of revisions as specified by the user. Items in the list
-                do not necessarily represent a single revision, since the user
-                can use SCM-native syntaxes such as ``r1..r2`` or ``r1:r2``.
-                SCMTool-specific overrides of this method are expected to deal
-                with such syntaxes.
+            revisions (list of str, optional):
+                A list of revisions as specified by the user.
+
+        Returns:
+            dict:
+            The parsed revision spec.
+
+            See :py:class:`~rbtools.clients.base.scmclient.
+            SCMClientRevisionSpec` for the format of this dictionary.
+
+            This always populates ``base``, ``commit_id``, and ``tip``.
+
+            ``parent_base`` may also be populated.
 
         Raises:
             rbtools.clients.errors.InvalidRevisionSpecError:
@@ -202,37 +230,9 @@ class GitClient(BaseSCMClient):
 
             rbtools.clients.errors.TooManyRevisionsError:
                 The specified revisions list contained too many revisions.
-
-        Returns:
-            dict:
-            A dictionary with the following keys:
-
-            ``base`` (:py:class:`unicode`):
-                A revision to use as the base of the resulting diff.
-
-            ``tip`` (:py:class:`unicode`):
-                A revision to use as the tip of the resulting diff.
-
-            ``parent_base`` (:py:class:`unicode`, optional):
-                The revision to use as the base of a parent diff.
-
-            ``commit_id`` (:py:class:`unicode`, optional):
-                The ID of the single commit being posted, if not using a range.
-
-            These will be used to generate the diffs to upload to Review Board
-            (or print). The diff for review will include the changes in (base,
-            tip], and the parent diff (if necessary) will include (parent_base,
-            base].
-
-            If a single revision is passed in, this will return the parent of
-            that revision for "base" and the passed-in revision for "tip".
-
-            If zero revisions are passed in, this will return the current HEAD
-            as "tip", and the upstream branch as "base", taking into account
-            parent branches explicitly specified via --parent.
         """
         n_revs = len(revisions)
-        result = {}
+        result: SCMClientRevisionSpec
 
         if n_revs == 0:
             # No revisions were passed in. Start with HEAD, and find the
@@ -247,8 +247,8 @@ class GitClient(BaseSCMClient):
 
             result = {
                 'base': parent_ref,
-                'tip': head_ref,
                 'commit_id': head_ref,
+                'tip': head_ref,
             }
 
             if parent_ref != merge_base:
@@ -366,7 +366,7 @@ class GitClient(BaseSCMClient):
 
         return self._git_toplevel
 
-    def get_repository_info(self):
+    def get_repository_info(self) -> Optional[RepositoryInfo]:
         """Return repository information for the current working tree.
 
         Returns:
@@ -377,6 +377,8 @@ class GitClient(BaseSCMClient):
 
         if not local_path:
             return None
+
+        assert self._git_dir
 
         self._head_ref = self._execute(
             [self.git, 'symbolic-ref', '-q', 'HEAD'],
@@ -467,8 +469,10 @@ class GitClient(BaseSCMClient):
         self._type = self.TYPE_GIT
         url = None
 
-        if getattr(self.options, 'repository_url', None):
-            url = self.options.repository_url
+        repository_url = getattr(self.options, 'repository_url', None)
+
+        if repository_url:
+            url = repository_url
         else:
             upstream_branch = self._get_parent_branch()
             url = self._get_origin(upstream_branch).rstrip('/')
@@ -708,9 +712,18 @@ class GitClient(BaseSCMClient):
                       youngest_remote_commit)
         return youngest_remote_commit
 
-    def diff(self, revisions, include_files=[], exclude_patterns=[],
-             no_renames=False, extra_args=[], with_parent_diff=True,
-             git_find_renames_threshold=None, **kwargs):
+    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
+    def diff(
+        self,
+        revisions: SCMClientRevisionSpec,
+        *,
+        include_files: List[str] = [],
+        exclude_patterns: List[str] = [],
+        no_renames: bool = False,
+        repository_info: Optional[RepositoryInfo] = None,
+        with_parent_diff: bool = True,
+        **kwargs,
+    ) -> SCMClientDiffResult:
         """Perform a diff using the given revisions.
 
         If no revisions are specified, this will do a diff of the contents of
@@ -738,39 +751,25 @@ class GitClient(BaseSCMClient):
             no_renames (bool, optional):
                 Whether to avoid rename detection.
 
-            extra_args (list, unused):
-                Additional arguments to be passed to the diff generation.
-                Unused for git.
-
             with_parent_diff (bool, optional):
                 Whether or not to compute a parent diff.
-
-            git_find_renames_threshold (unicode, optional):
-                The threshold to pass to ``--find-renames``, if any.
 
             **kwargs (dict, unused):
                 Unused keyword arguments.
 
         Returns:
             dict:
-            A dictionary containing the following keys:
-
-            ``diff`` (:py:class:`bytes`):
-                The contents of the diff to upload.
-
-            ``parent_diff`` (:py:class:`bytes`, optional):
-                The contents of the parent diff, if available.
-
-            ``commit_id`` (:py:class:`unicode`, optional):
-                The commit ID to include when posting, if available.
-
-            ``base_commit_id`` (:py:class:`unicode`, optional):
-                The ID of the commit that the change is based on, if available.
-                This is necessary for some hosting services that don't provide
-                individual file access.
+            A dictionary containing keys documented in
+            :py:class:`~rbtools.clients.base.scmclient.SCMClientDiffResult`.
         """
-        exclude_patterns = normalize_patterns(exclude_patterns,
-                                              self._git_toplevel,
+        git_find_renames_threshold = \
+            getattr(self.options, 'git_find_renames_threshold', None)
+        git_toplevel = self._git_toplevel
+
+        assert git_toplevel
+
+        exclude_patterns = normalize_patterns(patterns=exclude_patterns,
+                                              base_dir=git_toplevel,
                                               cwd=os.getcwd())
 
         try:
@@ -905,12 +904,19 @@ class GitClient(BaseSCMClient):
                 none_on_ignored_error=True,
                 log_output_on_error=False)
 
+            git_toplevel = self._git_toplevel
+            assert git_toplevel
+
             # The output of git diff-tree will be a list of entries that have
             # changed between the two revisions that we give it. The last part
             # of the line is the name of the file that has changed.
             changed_files = remove_filenames_matching_patterns(
-                (filename.split()[-1] for filename in changed_files),
-                exclude_patterns, base_dir=self._git_toplevel)
+                filenames=(
+                    filename.split()[-1]
+                    for filename in changed_files
+                ),
+                patterns=exclude_patterns,
+                base_dir=git_toplevel)
 
             diff_lines = []
 
@@ -1043,12 +1049,17 @@ class GitClient(BaseSCMClient):
             bytes:
             The reformatted diff contents.
         """
+        base_path = b''
         diff_data = b''
-        filename = b''
+        old_filename = b''
+        new_filename = b''
         p4rev = b''
+        is_full_rename = False
 
         # Find which depot changelist we're based on
-        log = self._execute([self.git, 'log', merge_base], ignore_errors=True)
+        log = self._execute([self.git, 'log', merge_base],
+                            ignore_errors=True,
+                            results_unicode=False)
 
         for line in log:
             m = re.search(br'[rd]epo.-paths = "(.+)": change = (\d+).*\]',
@@ -1064,33 +1075,136 @@ class GitClient(BaseSCMClient):
 
         for i, line in enumerate(diff_lines):
             if line.startswith(b'diff '):
-                # Grab the filename and then filter this out.
                 # This will be in the format of:
                 #    diff --git a/path/to/file b/path/to/file
-                filename = line.split(b' ')[2].strip()
-            elif (line.startswith(b'index ') or
-                  line.startswith(b'new file mode ')):
-                # Filter this out
+                #
+                # Filter this out. We can't extract any file names from this
+                # line as they may contain spaces and we can't therefore easily
+                # split the line.
+                old_filename = b''
+                new_filename = b''
+                is_full_rename = False
+            elif (line.startswith((b'index ',
+                                   b'new file mode ',
+                                   b'deleted file mode '))):
+                # Filter this out.
                 pass
-            elif (line.startswith(b'--- ') and i + 1 < len(diff_lines) and
-                  diff_lines[i + 1].startswith(b'+++ ')):
-                data = self._execute(
-                    ['p4', 'files', base_path + filename + '@' + p4rev],
-                    ignore_errors=True, results_unicode=False)
+            elif (line.startswith(b'similarity index 100%') and
+                  i + 2 < len(diff_lines) and
+                  diff_lines[i + 1].startswith(b'rename from') and
+                  diff_lines[i + 2].startswith(b'rename to')):
+                # The file was renamed without any file lines changing.
+                # We have to special-case this and generate a Perforce-specific
+                # line in the same way that perforce.py does.
+                #
+                # At this point, the current line and the next 2 lines look
+                # like this:
+                #
+                # similarity index 100%
+                # rename from <old filename>
+                # rename to <new filename>
+                #
+                # We parse out the old and new filenames and output the
+                # following:
+                #
+                # === <old depot path>#<revision> ==MV== <new depot path> ===
+                #
+                # Followed by an empty line. We then skip the following 2 lines
+                # which would otherwise print "Move from: ..." and
+                # "Move to: ...".
+                old_filename = diff_lines[i + 1].split(b' ', 2)[2].strip()
+                new_filename = diff_lines[i + 2].split(b' ', 2)[2].strip()
+
+                p4path = force_unicode(base_path + old_filename + b'@' + p4rev)
+                data = self._execute(['p4', 'files', p4path],
+                                     ignore_errors=True,
+                                     results_unicode=False)
                 m = re.search(br'^%s%s#(\d+).*$' % (re.escape(base_path),
-                                                    re.escape(filename)),
+                                                    re.escape(old_filename)),
                               data, re.M)
+
                 if m:
                     file_version = m.group(1).strip()
                 else:
-                    file_version = 1
+                    file_version = b'1'
 
-                diff_data += b'--- %s%s\t%s%s#%s\n' % (base_path, filename,
-                                                       base_path, filename,
+                diff_data += b'==== %s%s#%s ==MV== %s%s ====\n\n' % (
+                    base_path,
+                    old_filename,
+                    file_version,
+                    base_path,
+                    new_filename)
+
+                is_full_rename = True
+            elif line.startswith(b'similarity index'):
+                # Filter this out.
+                pass
+            elif line.startswith(b'rename from'):
+                # For perforce diffs where a file was renamed and modified, we
+                # specify "Moved from: <depotpath>" along with the usual diff
+                # markers.
+                from_filename = line.split(b' ', 2)[2].strip()
+
+                if not is_full_rename:
+                    diff_data += b'Moved from: %s%s\n' % (base_path,
+                                                          from_filename)
+            elif line.startswith(b'rename to'):
+                # For perforce diffs where a file was renamed and modified, we
+                # specify "Moved to: <depotpath>" along with the usual diff
+                # markers.
+                to_filename = line.split(b' ', 2)[2].strip()
+
+                if not is_full_rename:
+                    diff_data += b'Moved to: %s%s\n' % (base_path,
+                                                        to_filename)
+            elif (not old_filename and
+                  line.startswith(b'--- ') and i + 1 < len(diff_lines) and
+                  diff_lines[i + 1].startswith(b'+++ ')):
+                # At this point in parsing the current line and the next line
+                # look like this:
+                #
+                # --- <old filename><optional tab character>
+                # +++ <new filename><optional tab character>
+                #
+                # The tab character is present precisely when old or new
+                # filename (respectively) contain whitespace.
+                #
+                # So we take the section 4 characters from the start (i.e.
+                # after --- or +++) and split on tab, taking the first part.
+                old_filename = line[4:].split(b'\t', 1)[0].strip()
+                new_filename = diff_lines[i + 1][4:].split(b'\t', 1)[0].strip()
+
+                # Perforce diffs require that the "new file" and "old file"
+                # match the original filename in the case of adds and deletes.
+                if new_filename == b'/dev/null':
+                    # The file was deleted, use the old filename when writing
+                    # out the +++ line.
+                    new_filename = old_filename
+                elif old_filename == b'/dev/null':
+                    # The file is new, use the new filename in the --- line.
+                    old_filename = new_filename
+
+                p4path = force_unicode(base_path + old_filename + b'@' + p4rev)
+                data = self._execute(['p4', 'files', p4path],
+                                     ignore_errors=True,
+                                     results_unicode=False)
+                m = re.search(br'^%s%s#(\d+).*$' % (re.escape(base_path),
+                                                    re.escape(old_filename)),
+                              data, re.M)
+
+                if m:
+                    file_version = m.group(1).strip()
+                else:
+                    file_version = b'1'
+
+                diff_data += b'--- %s%s\t%s%s#%s\n' % (base_path,
+                                                       old_filename,
+                                                       base_path,
+                                                       old_filename,
                                                        file_version)
             elif line.startswith(b'+++ '):
                 # TODO: add a real timestamp
-                diff_data += b'+++ %s%s\t%s\n' % (base_path, filename,
+                diff_data += b'+++ %s%s\t%s\n' % (base_path, new_filename,
                                                   b'TIMESTAMP')
             else:
                 diff_data += line
