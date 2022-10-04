@@ -31,19 +31,19 @@ set DEPS_DIR=%BUILD_BASE%\deps
 ::-------------------------------------------------------------------------
 :: Dependencies
 ::-------------------------------------------------------------------------
-set PYTHON_VERSION=3.8.13
+set PYTHON_VERSION=3.8.14
 
 set PYTHON_URL_BASE=https://s3.amazonaws.com/downloads.beanbaginc.com/python
 :: set PYTHON_URL_BASE=https://www.python.org/ftp/python
 
 set PYTHON_X86_FILENAME=python-%PYTHON_VERSION%.exe
 set PYTHON_X86_URL=%PYTHON_URL_BASE%/%PYTHON_VERSION%/%PYTHON_X86_FILENAME%
-set PYTHON_X86_MD5=5e8edbf3fe95034850768b4e6680bc9f
+set PYTHON_X86_MD5=f3daaad6998195d1286258145d557b0e
 set PYTHON_X86_DEP=%DEPS_DIR%\python-%PYTHON_VERSION%-x86
 
 set PYTHON_X64_FILENAME=python-%PYTHON_VERSION%-amd64.exe
 set PYTHON_X64_URL=%PYTHON_URL_BASE%/%PYTHON_VERSION%/%PYTHON_X64_FILENAME%
-set PYTHON_X64_MD5=8cd844e55135bd5f9e1d8d2d70a2b6ae
+set PYTHON_X64_MD5=9e0e02f01395129f08626c54c247d29b
 set PYTHON_X64_DEP=%DEPS_DIR%\python-%PYTHON_VERSION%-x64
 
 

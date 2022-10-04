@@ -8,6 +8,16 @@ RBTools 3.1.2 Release Notes
 **Release date:** TBD
 
 
+Windows Installer
+=================
+
+* The RBToolls for Windows installer now ships Python 3.8.14, the latest in
+  the 3.8.x series.
+
+  RBTools 3.x will be the last to support Windows installers compatible with
+  Windows 7.
+
+
 Bug Fixes
 =========
 
