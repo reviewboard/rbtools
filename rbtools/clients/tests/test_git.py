@@ -2226,3 +2226,301 @@ class GitPerforceClientTests(BaseGitClientTests):
                 ),
                 'parent_diff': None,
             })
+
+
+class GitSubversionClientTests(BaseGitClientTests):
+    """Unit tests for GitClient wrapping Subversion.
+
+    Version Added:
+        4.0
+    """
+
+    @classmethod
+    def setup_checkout(
+        cls,
+        checkout_dir: str,
+    ) -> Optional[str]:
+        """Populate a Git-SVN checkout.
+
+        This will create a checkout of the sample Git repository stored
+        in the :file:`testdata` directory, along with a child clone and a
+        grandchild clone.
+
+        Args:
+            checkout_dir (str):
+                The top-level directory in which the clones will be placed.
+
+        Returns:
+            The main checkout directory, or ``None`` if :command:`git` isn't
+            in the path.
+        """
+        clone_dir = super().setup_checkout(checkout_dir)
+
+        if clone_dir is None:
+            return None
+
+        svn_clone_dir = os.path.join(clone_dir, 'svn-clone')
+
+        cls.svn_repo_path = 'file://%s' % os.path.join(cls.testdata_dir,
+                                                       'svn-repo')
+
+        cls._run_git(['svn', 'clone', cls.svn_repo_path, svn_clone_dir])
+        os.chdir(svn_clone_dir)
+
+        return os.path.realpath(svn_clone_dir)
+
+    def test_get_repository_info(self):
+        """Testing GitClient.get_repository_info with git-svn"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.assertIsNotNone(repository_info)
+        self.assertEqual(repository_info.path, self.svn_repo_path)
+        self.assertEqual(repository_info.base_path, '/')
+        self.assertEqual(repository_info.local_path, self.checkout_dir)
+        self.assertEqual(client._type, client.TYPE_GIT_SVN)
+
+    def test_parse_revision_spec_no_args(self):
+        """Testing GitClient.parse_revision_spec with git-svn and no
+        specified revisions
+        """
+        client = self.build_client(needs_diff=True)
+
+        base_commit_id = self._git_get_head()
+        self._git_add_file_commit('foo.txt', FOO2, 'Commit 2')
+        tip_commit_id = self._git_get_head()
+
+        client.get_repository_info()
+
+        self.assertEqual(
+            client.parse_revision_spec([]),
+            {
+                'base': base_commit_id,
+                'commit_id': tip_commit_id,
+                'tip': tip_commit_id,
+            })
+
+    def test_diff(self):
+        """Testing GitClient.diff with git-svn"""
+        client = self.build_client(needs_diff=True)
+        client.get_repository_info()
+
+        base_commit_id = self._git_get_head()
+
+        with open('new-file.txt', 'wb') as f:
+            f.write(FOO1)
+
+        with open('foo.txt', 'ab') as f:
+            f.write(b'Here is a new line.\n')
+
+        self._run_git(['add', 'new-file.txt', 'foo.txt'])
+        self._run_git([
+            'commit', '-m',
+            'Set up files for the diff.\n',
+        ])
+
+        commit_id = self._git_get_head()
+        revisions = client.parse_revision_spec(['HEAD'])
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'Index: foo.txt\n'
+                    b'===================================================='
+                    b'===============\n'
+                    b'--- foo.txt\t(revision 6)\n'
+                    b'+++ foo.txt\t(working copy)\n'
+                    b'@@ -9,3 +9,4 @@ Albanique patres, atque altae moenia '
+                    b'Romae.\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b' \n'
+                    b'+Here is a new line.\n'
+                    b'Index: new-file.txt\n'
+                    b'===================================================='
+                    b'===============\n'
+                    b'--- new-file.txt\t(nonexistent)\n'
+                    b'+++ new-file.txt\t(working copy)\n'
+                    b'@@ -0,0 +1,9 @@\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+Italiam, fato profugus, Laviniaque venit\n'
+                    b'+litora, multum ille et terris iactatus et alto\n'
+                    b'+vi superum saevae memorem Iunonis ob iram;\n'
+                    b'+multa quoque et bello passus, dum conderet urbem,\n'
+                    b'+inferretque deos Latio, genus unde Latinum,\n'
+                    b'+Albanique patres, atque altae moenia Romae.\n'
+                    b'+Musa, mihi causas memora, quo numine laeso,\n'
+                    b'+\n'
+                ),
+                'parent_diff': None,
+            })
+
+    def test_diff_with_spaces_in_filename(self):
+        """Testing GitClient.diff with git-svn with spaces in filename"""
+        client = self.build_client(needs_diff=True)
+
+        base_commit_id = self._git_get_head()
+
+        self._git_add_file_commit(
+            filename='new  file.txt',
+            data=FOO2,
+            msg='Add a file to the base clone.')
+
+        commit_id = self._git_get_head()
+
+        client.get_repository_info()
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'Index: new  file.txt\n'
+                    b'===================================================='
+                    b'===============\n'
+                    b'--- new  file.txt\t(nonexistent)\n'
+                    b'+++ new  file.txt\t(working copy)\n'
+                    b'@@ -0,0 +1,11 @@\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+Italiam, fato profugus, Laviniaque venit\n'
+                    b'+litora, multum ille et terris iactatus et alto\n'
+                    b'+vi superum saevae memorem Iunonis ob iram;\n'
+                    b'+multa quoque et bello passus, dum conderet urbem,\n'
+                    b'+inferretque deos Latio, genus unde Latinum,\n'
+                    b'+Albanique patres, atque altae moenia Romae.\n'
+                    b'+Musa, mihi causas memora, quo numine laeso,\n'
+                    b'+\n'
+                ),
+                'parent_diff': None,
+            })
+
+    def test_diff_with_deletes(self):
+        """Testing GitClient.diff with git-svn and deleted files"""
+        client = self.build_client(needs_diff=True)
+
+        base_commit_id = self._git_get_head()
+
+        self._run_git(['rm', 'foo.txt'])
+        self._run_git(['commit', '-m', 'Delete test.'])
+
+        commit_id = self._git_get_head()
+
+        client.get_repository_info()
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'Index: foo.txt\n'
+                    b'===================================================='
+                    b'===============\n'
+                    b'--- foo.txt\t(revision 6)\n'
+                    b'+++ foo.txt\t(nonexistent)\n'
+                    b'@@ -1,11 +0,0 @@\n'
+                    b'-ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'-ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'-Italiam, fato profugus, Laviniaque venit\n'
+                    b'-litora, multum ille et terris iactatus et alto\n'
+                    b'-vi superum saevae memorem Iunonis ob iram;\n'
+                    b'-dum conderet urbem,\n'
+                    b'-inferretque deos Latio, genus unde Latinum,\n'
+                    b'-Albanique patres, atque altae moenia Romae.\n'
+                    b'-Albanique patres, atque altae moenia Romae.\n'
+                    b'-Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-\n'
+                ),
+                'parent_diff': None,
+            })
+
+    def test_diff_with_multiple_commits(self):
+        """Testing GitClient.diff with git-svn and multiple commits"""
+        client = self.build_client(needs_diff=True)
+
+        base_commit_id = self._git_get_head()
+
+        self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._git_add_file_commit('foo.txt', FOO2, 'commit 2')
+
+        commit_id = self._git_get_head()
+
+        client.get_repository_info()
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'base_commit_id': base_commit_id,
+                'commit_id': commit_id,
+                'diff': (
+                    b'Index: foo.txt\n'
+                    b'===================================================='
+                    b'===============\n'
+                    b'--- foo.txt\t(revision 6)\n'
+                    b'+++ foo.txt\t(working copy)\n'
+                    b'@@ -1,11 +1,11 @@\n'
+                    b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b' Italiam, fato profugus, Laviniaque venit\n'
+                    b' litora, multum ille et terris iactatus et alto\n'
+                    b' vi superum saevae memorem Iunonis ob iram;\n'
+                    b'-dum conderet urbem,\n'
+                    b'+multa quoque et bello passus, dum conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b'-Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b' \n'
+                ),
+                'parent_diff': None,
+            })
+
+    def test_diff_with_exclude_patterns(self):
+        """Testing GitClient.diff with git-svn and file exclusion"""
+        client = self.build_client(needs_diff=True)
+        base_commit_id = self._git_get_head()
+
+        self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._git_add_file_commit('exclude.txt', FOO2, 'commit 2')
+        commit_id = self._git_get_head()
+
+        client.get_repository_info()
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions, exclude_patterns=['exclude.txt']),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'Index: foo.txt\n'
+                    b'===================================================='
+                    b'===============\n'
+                    b'--- foo.txt\t(revision 6)\n'
+                    b'+++ foo.txt\t(working copy)\n'
+                    b'@@ -1,11 +1,9 @@\n'
+                    b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'-ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b' Italiam, fato profugus, Laviniaque venit\n'
+                    b' litora, multum ille et terris iactatus et alto\n'
+                    b' vi superum saevae memorem Iunonis ob iram;\n'
+                    b'-dum conderet urbem,\n'
+                    b'+multa quoque et bello passus, dum conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b'-Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b' \n'
+                ),
+                'parent_diff': None,
+            })
