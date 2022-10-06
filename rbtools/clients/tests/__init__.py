@@ -106,8 +106,8 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
     #:     3.0
     #:
     #: Type:
-    #:     unicode
-    checkout_dir = None
+    #:     str
+    checkout_dir: Optional[str] = None
 
     @classmethod
     def setUpClass(cls):
@@ -139,7 +139,10 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
         shutil.rmtree(cls._checkout_base_dir)
 
     @classmethod
-    def setup_checkout(cls, checkout_dir):
+    def setup_checkout(
+        cls,
+        checkout_dir: str,
+    ) -> Optional[str]:
         """Populate any clones/checkouts needed by the test suite.
 
         Subclasses can override this to populate as many or as few checkouts
@@ -158,11 +161,11 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
             3.0
 
         Args:
-            checkout_dir (unicode):
+            checkout_dir (str):
                 The top-level directory in which checkouts should be placed.
 
         Returns:
-            unicode:
+            str:
             The main checkout directory. If multiple checkouts are created,
             return only the primary one that unit tests will be working with.
 

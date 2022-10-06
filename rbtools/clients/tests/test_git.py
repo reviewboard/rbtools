@@ -5,7 +5,7 @@ from __future__ import unicode_literals
 import os
 import re
 import unittest
-from typing import Any, List
+from typing import List, Optional
 
 import kgb
 
@@ -25,19 +25,22 @@ from rbtools.utils.process import (RunProcessResult,
                                    run_process_exec)
 
 
-class GitClientTests(SCMClientTestCase):
-    """Unit tests for GitClient."""
+class BaseGitClientTests(SCMClientTestCase):
+    """Base class for unit tests for GitClient.
+
+    Version Added:
+        4.0
+    """
 
     scmclient_cls = GitClient
-
-    TESTSERVER = 'http://127.0.0.1:8080'
-    AUTHOR = PatchAuthor(full_name='name',
-                         email='email')
 
     _git: str = ''
 
     @classmethod
-    def setup_checkout(cls, checkout_dir):
+    def setup_checkout(
+        cls,
+        checkout_dir: str,
+    ) -> Optional[str]:
         """Populate a Git checkout.
 
         This will create a checkout of the sample Git repository stored
@@ -49,33 +52,23 @@ class GitClientTests(SCMClientTestCase):
                 The top-level directory in which the clones will be placed.
 
         Returns:
+            str:
             The main checkout directory, or ``None`` if :command:`git` isn't
             in the path.
         """
         scmclient = GitClient()
 
         if not scmclient.has_dependencies():
-            return
+            return None
 
         cls._git = scmclient.git
 
         cls.git_dir = os.path.join(cls.testdata_dir, 'git-repo')
         cls.clone_dir = checkout_dir
 
-        orig_clone_dir = os.path.join(checkout_dir, 'orig')
-        child_clone_dir = os.path.join(checkout_dir, 'child')
-        grandchild_clone_dir = os.path.join(checkout_dir, 'grandchild')
-
         os.mkdir(checkout_dir, 0o700)
-        cls._run_git(['clone', cls.git_dir, orig_clone_dir])
-        cls._run_git(['clone', orig_clone_dir, child_clone_dir])
-        cls._run_git(['clone', child_clone_dir, grandchild_clone_dir])
 
-        cls.orig_clone_dir = orig_clone_dir
-        cls.child_clone_dir = child_clone_dir
-        cls.grandchild_clone_dir = grandchild_clone_dir
-
-        return orig_clone_dir
+        return checkout_dir
 
     @classmethod
     def _run_git(
@@ -95,31 +88,37 @@ class GitClientTests(SCMClientTestCase):
         """
         return run_process([cls._git] + command)
 
-    def setUp(self):
-        super(GitClientTests, self).setUp()
-
-        self.set_user_home(os.path.join(self.testdata_dir, 'homedir'))
-
-    def _git_add_file_commit(self, filename, data, msg):
+    @classmethod
+    def _git_add_file_commit(
+        cls,
+        filename: str,
+        data: bytes,
+        msg: str,
+    ) -> None:
         """Add a file to a git repository.
 
         Args:
-            filename (unicode):
+            filename (str):
                 The filename to write to.
 
             data (bytes):
                 The content of the file to write.
 
-            msg (unicode):
+            msg (str):
                 The commit message to use.
         """
         with open(filename, 'wb') as f:
             f.write(data)
 
-        self._run_git(['add', filename])
-        self._run_git(['commit', '-m', msg])
+        cls._run_git(['add', filename])
+        cls._run_git(['commit', '-m', msg])
 
-    def _git_get_head(self):
+    def setUp(self):
+        super().setUp()
+
+        self.set_user_home(os.path.join(self.testdata_dir, 'homedir'))
+
+    def _git_get_head(self) -> str:
         """Return the HEAD commit SHA.
 
         Returns:
@@ -132,6 +131,53 @@ class GitClientTests(SCMClientTestCase):
             .read()
             .strip()
         )
+
+
+class GitClientTests(BaseGitClientTests):
+    """Unit tests for GitClient."""
+
+    TESTSERVER = 'http://127.0.0.1:8080'
+    AUTHOR = PatchAuthor(full_name='name',
+                         email='email')
+
+    @classmethod
+    def setup_checkout(
+        cls,
+        checkout_dir: str,
+    ) -> Optional[str]:
+        """Populate a Git checkout.
+
+        This will create a checkout of the sample Git repository stored
+        in the :file:`testdata` directory, along with a child clone and a
+        grandchild clone.
+
+        Args:
+            checkout_dir (unicode):
+                The top-level directory in which the clones will be placed.
+
+        Returns:
+            str:
+            The main checkout directory, or ``None`` if :command:`git` isn't
+            in the path.
+        """
+        clone_dir = super().setup_checkout(checkout_dir)
+
+        if clone_dir is None:
+            return None
+
+        orig_clone_dir = os.path.join(checkout_dir, 'orig')
+        child_clone_dir = os.path.join(checkout_dir, 'child')
+        grandchild_clone_dir = os.path.join(checkout_dir, 'grandchild')
+
+        cls._run_git(['clone', cls.git_dir, orig_clone_dir])
+        cls._run_git(['clone', orig_clone_dir, child_clone_dir])
+        cls._run_git(['clone', child_clone_dir, grandchild_clone_dir])
+
+        cls.orig_clone_dir = os.path.realpath(orig_clone_dir)
+        cls.child_clone_dir = os.path.realpath(child_clone_dir)
+        cls.grandchild_clone_dir = os.path.realpath(grandchild_clone_dir)
+
+        return orig_clone_dir
 
     def test_check_dependencies_with_git_found(self):
         """Testing GitClient.check_dependencies with git found"""
@@ -391,8 +437,8 @@ class GitClientTests(SCMClientTestCase):
 
         self.assertEqual(client.scan_for_server(ri), self.TESTSERVER)
 
-    def test_diff_simple(self):
-        """Testing GitClient simple diff case"""
+    def test_diff(self):
+        """Testing GitClient.diff"""
         client = self.build_client(needs_diff=True)
         client.get_repository_info()
         base_commit_id = self._git_get_head()
@@ -426,15 +472,8 @@ class GitClientTests(SCMClientTestCase):
                 'parent_diff': None,
             })
 
-    def test_too_many_revisions(self):
-        """Testing GitClient parse_revision_spec with too many revisions"""
-        client = self.build_client()
-
-        with self.assertRaises(TooManyRevisionsError):
-            client.parse_revision_spec([1, 2, 3])
-
-    def test_diff_simple_multiple(self):
-        """Testing GitClient simple diff with multiple commits case"""
+    def test_diff_with_multiple_commits(self):
+        """Testing GitClient.diff with multiple commits"""
         client = self.build_client(needs_diff=True)
         client.get_repository_info()
 
@@ -478,8 +517,8 @@ class GitClientTests(SCMClientTestCase):
                 'parent_diff': None,
             })
 
-    def test_diff_exclude(self):
-        """Testing GitClient simple diff with file exclusion"""
+    def test_diff_with_exclude_patterns(self):
+        """Testing GitClient.diff with file exclusion"""
         client = self.build_client(needs_diff=True)
         client.get_repository_info()
         base_commit_id = self._git_get_head()
@@ -515,7 +554,7 @@ class GitClientTests(SCMClientTestCase):
             })
 
     def test_diff_exclude_in_subdir(self):
-        """Testing GitClient simple diff with file exclusion in a subdir"""
+        """Testing GitClient.diff with file exclusion in a subdir"""
         client = self.build_client(needs_diff=True)
         base_commit_id = self._git_get_head()
 
@@ -553,8 +592,8 @@ class GitClientTests(SCMClientTestCase):
                 'parent_diff': None,
             })
 
-    def test_diff_exclude_root_pattern_in_subdir(self):
-        """Testing GitClient diff with file exclusion in the repo root"""
+    def test_diff_with_exclude_patterns_root_pattern_in_subdir(self):
+        """Testing GitClient.diff with file exclusion in the repo root"""
         client = self.build_client(needs_diff=True)
         base_commit_id = self._git_get_head()
 
@@ -593,8 +632,8 @@ class GitClientTests(SCMClientTestCase):
                 'parent_diff': None,
             })
 
-    def test_diff_branch_diverge(self):
-        """Testing GitClient diff with divergent branches"""
+    def test_diff_with_branch_diverge(self):
+        """Testing GitClient.diff with divergent branches"""
         client = self.build_client(needs_diff=True)
 
         self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
@@ -668,8 +707,8 @@ class GitClientTests(SCMClientTestCase):
                 'parent_diff': None,
             })
 
-    def test_diff_tracking_no_origin(self):
-        """Testing GitClient diff with a tracking branch, but no origin remote
+    def test_diff_with_tracking_branch_no_origin(self):
+        """Testing GitClient.diff with a tracking branch, but no origin remote
         """
         client = self.build_client(needs_diff=True)
 
@@ -709,8 +748,8 @@ class GitClientTests(SCMClientTestCase):
                 'parent_diff': None,
             })
 
-    def test_diff_local_tracking(self):
-        """Testing GitClient diff with a local tracking branch"""
+    def test_diff_with_tracking_branch_local(self):
+        """Testing GitClient.diff with a local tracking branch"""
         client = self.build_client(needs_diff=True)
 
         base_commit_id = self._git_get_head()
@@ -755,8 +794,8 @@ class GitClientTests(SCMClientTestCase):
                 'parent_diff': None,
             })
 
-    def test_diff_tracking_override(self):
-        """Testing GitClient diff with option override for tracking branch"""
+    def test_diff_with_tracking_branch_option(self):
+        """Testing GitClient.diff with option override for tracking branch"""
         client = self.build_client(
             needs_diff=True,
             options={
@@ -799,8 +838,8 @@ class GitClientTests(SCMClientTestCase):
                 'parent_diff': None,
             })
 
-    def test_diff_slash_tracking(self):
-        """Testing GitClient diff with tracking branch that has slash in its
+    def test_diff_with_tracking_branch_slash(self):
+        """Testing GitClient.diff with tracking branch that has slash in its
         name
         """
         client = self.build_client(needs_diff=True)
@@ -987,7 +1026,14 @@ class GitClientTests(SCMClientTestCase):
                 'tip': tip_commit_id,
             })
 
-    def test_diff_finding_parent(self):
+    def test_parse_revision_spec_with_too_many_revisions(self):
+        """Testing GitClient.parse_revision_spec with too many revisions"""
+        client = self.build_client()
+
+        with self.assertRaises(TooManyRevisionsError):
+            client.parse_revision_spec([1, 2, 3])
+
+    def test_parse_revision_spec_with_diff_finding_parent(self):
         """Testing GitClient.parse_revision_spec with target branch off a
         tracking branch not aligned with the remote
         """
@@ -1033,7 +1079,7 @@ class GitClientTests(SCMClientTestCase):
                 'tip': tip_commit_id,
             })
 
-    def test_diff_finding_parent_case_one(self):
+    def test_parse_revision_spec_with_diff_finding_parent_case_one(self):
         """Testing GitClient.parse_revision_spec with target branch off a
         tracking branch aligned with the remote
         """
@@ -1079,7 +1125,7 @@ class GitClientTests(SCMClientTestCase):
                 'tip': tip_commit_id,
             })
 
-    def test_diff_finding_parent_case_two(self):
+    def test_parse_revision_spec_with_diff_finding_parent_case_two(self):
         """Testing GitClient.parse_revision_spec with target branch off
         a tracking branch with changes since the remote
         """
@@ -1122,7 +1168,7 @@ class GitClientTests(SCMClientTestCase):
                 'tip': tip_commit_id,
             })
 
-    def test_diff_finding_parent_case_three(self):
+    def test_parse_revision_spec_with_diff_finding_parent_case_three(self):
         """Testing GitClient.parse_revision_spec with target branch off a
         branch not properly tracking the remote
         """
@@ -1160,7 +1206,7 @@ class GitClientTests(SCMClientTestCase):
                 'tip': tip_commit_id,
             })
 
-    def test_diff_finding_parent_case_four(self):
+    def testparse_revision_spec_with__diff_finding_parent_case_four(self):
         """Testing GitClient.parse_revision_spec with a target branch that
         merged a tracking branch off another tracking branch
         """
@@ -1203,7 +1249,7 @@ class GitClientTests(SCMClientTestCase):
                 'tip': tip_commit_id,
             })
 
-    def test_diff_finding_parent_case_five(self):
+    def test_parse_revision_spec_with_diff_finding_parent_case_five(self):
         """Testing GitClient.parse_revision_spec with a target branch posted
         off a tracking branch that merged another tracking branch
         """
@@ -1250,7 +1296,7 @@ class GitClientTests(SCMClientTestCase):
                 'tip': tip_commit_id,
             })
 
-    def test_diff_finding_parent_case_six(self):
+    def test_parse_revision_spec_with_diff_finding_parent_case_six(self):
         """Testing GitClient.parse_revision_spec with a target branch posted
         off a remote branch without any tracking branches
         """
@@ -1288,7 +1334,7 @@ class GitClientTests(SCMClientTestCase):
                 'tip': tip_commit_id,
             })
 
-    def test_diff_finding_parent_case_seven(self):
+    def test_parse_revision_spec_with_diff_finding_parent_case_seven(self):
         """Testing GitClient.parse_revision_spec with a target branch posted
         off a remote branch that is aligned to the same commit as another
         remote branch
@@ -1347,7 +1393,7 @@ class GitClientTests(SCMClientTestCase):
                 'tip': tip_commit_id,
             })
 
-    def test_diff_finding_parent_case_eight(self):
+    def test_parse_revision_spec_with_diff_finding_parent_case_eight(self):
         """Testing GitClient.parse_revision_spec with a target branch not
         up-to-date with a remote branch
         """
@@ -1406,7 +1452,7 @@ class GitClientTests(SCMClientTestCase):
                 'tip': tip_commit_id,
             })
 
-    def test_diff_finding_parent_case_nine(self):
+    def test_parse_revision_spec_with_diff_finding_parent_case_nine(self):
         """Testing GitClient.parse_revision_spec with a target branch that has
         branches from different remotes in its path
         """
@@ -1748,3 +1794,435 @@ class GitClientTests(SCMClientTestCase):
         client.get_repository_info()
 
         self.assertEqual(client._get_parent_branch(), 'origin/main')
+
+
+class GitPerforceClientTests(BaseGitClientTests):
+    """Unit tests for GitClient wrapping Perforce.
+
+    Version Added:
+        4.0
+    """
+
+    @classmethod
+    def setup_checkout(
+        cls,
+        checkout_dir: str,
+    ) -> Optional[str]:
+        """Populate a Git-P4 checkout.
+
+        This will create a fake Perforce upstream with commits containing
+        git-p4 change information and depot paths, along with a clone for
+        tests.
+
+        Args:
+            checkout_dir (str):
+                The top-level directory in which the clones will be placed.
+
+        Returns:
+            The main clone directory, or ``None`` if :command:`git` isn't in
+            the path.
+        """
+        clone_dir = super().setup_checkout(checkout_dir)
+
+        if clone_dir is None:
+            return None
+
+        p4_origin_clone_dir = os.path.join(clone_dir, 'p4-origin')
+        p4_clone_dir = os.path.join(clone_dir, 'p4-clone')
+
+        # Create the p4 "remote".
+        cls._run_git(['clone', cls.git_dir, p4_origin_clone_dir])
+        os.chdir(p4_origin_clone_dir)
+
+        cls._git_add_file_commit(
+            filename='existing-file.txt',
+            data=FOO2,
+            msg=(
+                'Add a file to the base clone.\n'
+                '\n'
+                '[git-p4: depot-paths = "//depot/": change = 5]\n'
+            ))
+
+        # Create the clone for the tests.
+        cls._run_git(['clone', '-o', 'p4', p4_origin_clone_dir, p4_clone_dir])
+        os.chdir(p4_clone_dir)
+        cls._run_git(['fetch', 'p4'])
+        cls._run_git(['config', '--local', '--add', 'git-p4.port',
+                      'example.com:1666'])
+
+        return os.path.realpath(p4_clone_dir)
+
+    def test_get_repository_info(self):
+        """Testing GitClient.get_repository_info with git-p4"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.assertIsNotNone(repository_info)
+        self.assertEqual(repository_info.path, 'example.com:1666')
+        self.assertEqual(repository_info.base_path, '')
+        self.assertEqual(repository_info.local_path, self.checkout_dir)
+        self.assertEqual(client._type, client.TYPE_GIT_P4)
+
+    def test_diff(self):
+        """Testing GitClient.diff with git-p4"""
+        client = self.build_client(needs_diff=True)
+        client.get_repository_info()
+
+        # Pre-cache this.
+        client._supports_git_config_flag()
+
+        base_commit_id = self._git_get_head()
+
+        with open('new-file.txt', 'wb') as f:
+            f.write(FOO1)
+
+        with open('existing-file.txt', 'ab') as f:
+            f.write(b'Here is a new line.\n')
+
+        self._run_git(['add', 'new-file.txt', 'existing-file.txt'])
+        self._run_git([
+            'commit', '-m',
+            ('Set up files for the diff.\n'
+             '\n'
+             '[git-p4: depot-paths = "//depot/": change = 6]\n'),
+        ])
+
+        commit_id = self._git_get_head()
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'--- //depot/existing-file.txt\t'
+                    b'//depot/existing-file.txt#1\n'
+                    b'+++ //depot/existing-file.txt\tTIMESTAMP\n'
+                    b'@@ -9,3 +9,4 @@ inferretque deos Latio, genus unde '
+                    b'Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b' \n'
+                    b'+Here is a new line.\n'
+                    b'--- //depot/new-file.txt\t//depot/new-file.txt#1\n'
+                    b'+++ //depot/new-file.txt\tTIMESTAMP\n'
+                    b'@@ -0,0 +1,9 @@\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+Italiam, fato profugus, Laviniaque venit\n'
+                    b'+litora, multum ille et terris iactatus et alto\n'
+                    b'+vi superum saevae memorem Iunonis ob iram;\n'
+                    b'+multa quoque et bello passus, dum conderet urbem,\n'
+                    b'+inferretque deos Latio, genus unde Latinum,\n'
+                    b'+Albanique patres, atque altae moenia Romae.\n'
+                    b'+Musa, mihi causas memora, quo numine laeso,\n'
+                    b'+\n'
+                ),
+                'parent_diff': None,
+            })
+
+    def test_diff_with_spaces_in_filename(self):
+        """Testing GitClient.diff with git-p4 with spaces in filename"""
+        client = self.build_client(needs_diff=True)
+        client.get_repository_info()
+
+        # Pre-cache this.
+        client._supports_git_config_flag()
+
+        base_commit_id = self._git_get_head()
+
+        self._git_add_file_commit(
+            filename='new  file.txt',
+            data=FOO2,
+            msg=(
+                'Add a file to the base clone.\n'
+                '\n'
+                '[git-p4: depot-paths = "//depot/": change = 6]\n'
+            ))
+
+        commit_id = self._git_get_head()
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'--- //depot/new  file.txt\t//depot/new  file.txt#1\n'
+                    b'+++ //depot/new  file.txt\tTIMESTAMP\n'
+                    b'@@ -0,0 +1,11 @@\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+Italiam, fato profugus, Laviniaque venit\n'
+                    b'+litora, multum ille et terris iactatus et alto\n'
+                    b'+vi superum saevae memorem Iunonis ob iram;\n'
+                    b'+multa quoque et bello passus, dum conderet urbem,\n'
+                    b'+inferretque deos Latio, genus unde Latinum,\n'
+                    b'+Albanique patres, atque altae moenia Romae.\n'
+                    b'+Musa, mihi causas memora, quo numine laeso,\n'
+                    b'+\n'
+                ),
+                'parent_diff': None,
+            })
+
+    def test_diff_with_rename(self):
+        """Testing GitClient.diff with renamed file"""
+        client = self.build_client(needs_diff=True)
+        client.get_repository_info()
+
+        # Pre-cache this.
+        client._supports_git_config_flag()
+
+        base_commit_id = self._git_get_head()
+
+        self._run_git(['mv', 'existing-file.txt', 'renamed-file.txt'])
+        self._run_git(['commit', '-m', 'Rename test.'])
+
+        commit_id = self._git_get_head()
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'==== //depot/existing-file.txt#1 ==MV== '
+                    b'//depot/renamed-file.txt ====\n'
+                    b'\n'
+                ),
+                'parent_diff': None,
+            })
+
+    def test_diff_with_rename_and_changes(self):
+        """Testing GitClient.diff with renamed file and changes"""
+        client = self.build_client(needs_diff=True)
+        client.get_repository_info()
+
+        # Pre-cache this.
+        client._supports_git_config_flag()
+
+        base_commit_id = self._git_get_head()
+
+        self._run_git(['mv', 'existing-file.txt', 'renamed-file.txt'])
+
+        with open('renamed-file.txt', 'ab') as fp:
+            fp.write(b'Here is a new line!\n')
+
+        self._run_git(['add', 'renamed-file.txt'])
+        self._run_git(['commit', '-m', 'Rename test.'])
+
+        commit_id = self._git_get_head()
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'Moved from: //depot/existing-file.txt\n'
+                    b'Moved to: //depot/renamed-file.txt\n'
+                    b'--- //depot/existing-file.txt\t'
+                    b'//depot/existing-file.txt#1\n'
+                    b'+++ //depot/renamed-file.txt\tTIMESTAMP\n'
+                    b'@@ -9,3 +9,4 @@ inferretque deos Latio, genus unde '
+                    b'Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b' \n'
+                    b'+Here is a new line!\n'
+                ),
+                'parent_diff': None,
+            })
+
+    def test_diff_with_deletes(self):
+        """Testing GitClient.diff with deleted files"""
+        client = self.build_client(needs_diff=True)
+        client.get_repository_info()
+
+        # Pre-cache this.
+        client._supports_git_config_flag()
+
+        base_commit_id = self._git_get_head()
+
+        self._run_git(['rm', 'existing-file.txt'])
+        self._run_git(['commit', '-m', 'Delete test.'])
+
+        commit_id = self._git_get_head()
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'--- //depot/existing-file.txt\t'
+                    b'//depot/existing-file.txt#1\n'
+                    b'+++ //depot/existing-file.txt\tTIMESTAMP\n'
+                    b'@@ -1,11 +0,0 @@\n'
+                    b'-ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'-ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'-ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'-Italiam, fato profugus, Laviniaque venit\n'
+                    b'-litora, multum ille et terris iactatus et alto\n'
+                    b'-vi superum saevae memorem Iunonis ob iram;\n'
+                    b'-multa quoque et bello passus, dum conderet urbem,\n'
+                    b'-inferretque deos Latio, genus unde Latinum,\n'
+                    b'-Albanique patres, atque altae moenia Romae.\n'
+                    b'-Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-\n'
+                ),
+                'parent_diff': None,
+            })
+
+    def test_diff_with_multiple_commits(self):
+        """Testing GitClient.diff with git-p4 and multiple commits"""
+        client = self.build_client(needs_diff=True)
+        client.get_repository_info()
+
+        base_commit_id = self._git_get_head()
+
+        self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._git_add_file_commit('foo.txt', FOO2, 'commit 1')
+        self._git_add_file_commit('foo.txt', FOO3, 'commit 1')
+        commit_id = self._git_get_head()
+
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'base_commit_id': base_commit_id,
+                'commit_id': commit_id,
+                'diff': (
+                    b'--- //depot/foo.txt\t//depot/foo.txt#1\n'
+                    b'+++ //depot/foo.txt\tTIMESTAMP\n'
+                    b'@@ -1,12 +1,11 @@\n ARMA virumque cano, Troiae '
+                    b'qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b' Italiam, fato profugus, Laviniaque venit\n'
+                    b' litora, multum ille et terris iactatus et alto\n'
+                    b' vi superum saevae memorem Iunonis ob iram;\n'
+                    b'-multa quoque et bello passus, dum conderet urbem,\n'
+                    b'+dum conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b'+Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                ),
+                'parent_diff': None,
+            })
+
+    def test_diff_with_exclude_patterns(self):
+        """Testing GitClient.diff with git-p4 and file exclusion"""
+        client = self.build_client(needs_diff=True)
+        client.get_repository_info()
+        base_commit_id = self._git_get_head()
+
+        self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._git_add_file_commit('exclude.txt', FOO2, 'commit 2')
+        commit_id = self._git_get_head()
+
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions, exclude_patterns=['exclude.txt']),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'--- //depot/foo.txt\t//depot/foo.txt#1\n'
+                    b'+++ //depot/foo.txt\tTIMESTAMP\n'
+                    b'@@ -6,7 +6,4 @@ multa quoque et bello passus, dum '
+                    b'conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                ),
+                'parent_diff': None,
+            })
+
+    def test_diff_exclude_in_subdir(self):
+        """Testing GitClient simple diff with file exclusion in a subdir"""
+        client = self.build_client(needs_diff=True)
+        base_commit_id = self._git_get_head()
+
+        os.mkdir('subdir')
+        self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._git_add_file_commit('subdir/exclude.txt', FOO2, 'commit 2')
+
+        os.chdir('subdir')
+        client.get_repository_info()
+
+        commit_id = self._git_get_head()
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions, exclude_patterns=['exclude.txt']),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'--- //depot/foo.txt\t//depot/foo.txt#1\n'
+                    b'+++ //depot/foo.txt\tTIMESTAMP\n'
+                    b'@@ -6,7 +6,4 @@ multa quoque et bello passus, dum '
+                    b'conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                ),
+                'parent_diff': None,
+            })
+
+    def test_diff_with_exclude_patterns_root_pattern_in_subdir(self):
+        """Testing GitClient diff with file exclusion in the repo root"""
+        client = self.build_client(needs_diff=True)
+        base_commit_id = self._git_get_head()
+
+        os.mkdir('subdir')
+        self._git_add_file_commit('foo.txt', FOO1, 'commit 1')
+        self._git_add_file_commit('exclude.txt', FOO2, 'commit 2')
+        os.chdir('subdir')
+
+        client.get_repository_info()
+
+        commit_id = self._git_get_head()
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions,
+                        exclude_patterns=[os.path.sep + 'exclude.txt']),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'--- //depot/foo.txt\t//depot/foo.txt#1\n'
+                    b'+++ //depot/foo.txt\tTIMESTAMP\n'
+                    b'@@ -6,7 +6,4 @@ multa quoque et bello passus, dum '
+                    b'conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                ),
+                'parent_diff': None,
+            })
