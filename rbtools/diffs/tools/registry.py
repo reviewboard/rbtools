@@ -7,6 +7,7 @@ Version Added:
 import logging
 from typing import Dict, Iterable, Iterator, List, Optional, Type
 
+from rbtools.diffs.tools.backends.apple import AppleDiffTool
 from rbtools.diffs.tools.backends.gnu import GNUDiffTool
 from rbtools.diffs.tools.base import BaseDiffTool
 from rbtools.diffs.tools.errors import MissingDiffToolError
@@ -240,8 +241,11 @@ class DiffToolsRegistry:
             list of type:
             The list of diff tool classes.
         """
+        # These are in the order most likely to be encountered across supported
+        # systems.
         return [
             GNUDiffTool,
+            AppleDiffTool,
         ]
 
     def _register(

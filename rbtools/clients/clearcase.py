@@ -307,7 +307,7 @@ class ClearCaseClient(BaseSCMClient):
     name = 'VersionVault / ClearCase'
     server_tool_names = 'ClearCase,VersionVault / ClearCase'
 
-    requires_diff_tool = ['gnu']
+    requires_diff_tool = True
 
     supports_patch_revert = True
 

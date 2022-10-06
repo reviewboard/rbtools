@@ -60,7 +60,7 @@ class SVNClient(BaseSCMClient):
     name = 'Subversion'
     server_tool_names = 'Subversion'
 
-    requires_diff_tool = ['gnu']
+    requires_diff_tool = True
 
     supports_diff_exclude_patterns = True
     supports_patch_revert = True

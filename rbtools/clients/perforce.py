@@ -415,7 +415,7 @@ class PerforceClient(BaseSCMClient):
     name = 'Perforce'
     server_tool_names = 'Perforce'
 
-    requires_diff_tool = ['gnu']
+    requires_diff_tool = True
 
     can_amend_commit = True
     supports_changesets = True

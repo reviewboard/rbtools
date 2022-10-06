@@ -243,7 +243,7 @@ class SOSClient(BaseSCMClient):
     scmclient_id = 'sos'
     name = 'Cliosoft SOS'
 
-    requires_diff_tool = ['gnu']
+    requires_diff_tool = True
 
     supports_diff_exclude_patterns = True
 

@@ -1326,7 +1326,7 @@ class TFSClient(BaseSCMClient):
     name = 'Team Foundation Server'
     server_tool_names = 'Team Foundation Server'
 
-    requires_diff_tool = ['gnu']
+    requires_diff_tool = True
 
     supports_diff_exclude_patterns = True
     supports_patch_revert = True

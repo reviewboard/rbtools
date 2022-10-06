@@ -8,6 +8,7 @@ import inspect
 
 import kgb
 
+from rbtools.diffs.tools.backends.apple import AppleDiffTool
 from rbtools.diffs.tools.backends.gnu import GNUDiffTool
 from rbtools.diffs.tools.base import BaseDiffTool
 from rbtools.diffs.tools.errors import MissingDiffToolError
@@ -33,7 +34,7 @@ class DiffToolsRegistryTests(kgb.SpyAgency, TestCase):
 
         self.assertTrue(inspect.isgenerator(classes))
         self.assertEqual(set(classes),
-                         {GNUDiffTool})
+                         {AppleDiffTool, GNUDiffTool})
 
     def test_get_diff_tool_class_with_found(self):
         """Testing DiffToolsRegistry.get_diff_tool_class with ID found"""
@@ -71,9 +72,10 @@ class DiffToolsRegistryTests(kgb.SpyAgency, TestCase):
                     call_original=False)
 
         message = (
-            "A compatible command line diff tool (GNU Diff) was not found on "
-            "the system. This is required in order to generate diffs, and "
-            "will need to be installed and placed in your system path.\n"
+            "A compatible command line diff tool (Apple Diff, GNU Diff) was "
+            "not found on the system. This is required in order to generate "
+            "diffs, and will need to be installed and placed in your system "
+            "path.\n"
             "\n"
             "Install by doing a thing.\n"
             "\n"
@@ -106,14 +108,18 @@ class DiffToolsRegistryTests(kgb.SpyAgency, TestCase):
 
     def test_get_available_with_setup_error(self):
         """Testing DiffToolsRegistry.get_available with setup error"""
+        self.spy_on(AppleDiffTool.check_available,
+                    owner=AppleDiffTool,
+                    op=kgb.SpyOpRaise(TypeError('oh no')))
         self.spy_on(GNUDiffTool.check_available,
                     owner=GNUDiffTool,
                     op=kgb.SpyOpRaise(TypeError('oh no')))
 
         message = (
-            "A compatible command line diff tool (GNU Diff) was not found on "
-            "the system. This is required in order to generate diffs, and "
-            "will need to be installed and placed in your system path.\n"
+            "A compatible command line diff tool (Apple Diff, GNU Diff) was "
+            "not found on the system. This is required in order to generate "
+            "diffs, and will need to be installed and placed in your system "
+            "path.\n"
             "\n"
             "Install by doing a thing.\n"
             "\n"
