@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import logging
 import os
 import re
@@ -436,7 +437,8 @@ class TFExeWrapper(BaseTFWrapper):
         )
         root = ET.fromstring(status)
 
-        diff_writer = UnifiedDiffWriter()
+        stream = io.BytesIO()
+        diff_writer = UnifiedDiffWriter(stream)
 
         for pending_change in root.findall(
                 './PendingSet/PendingChanges/PendingChange'):
@@ -547,7 +549,7 @@ class TFExeWrapper(BaseTFWrapper):
                 os.unlink(new_tmp)
 
         return {
-            'diff': diff_writer.getvalue(),
+            'diff': stream.getvalue(),
             'parent_diff': None,
             'base_commit_id': base,
         }
@@ -915,7 +917,8 @@ class TEEWrapper(BaseTFWrapper):
         )
         root = ET.fromstring(status)
 
-        diff_writer = UnifiedDiffWriter()
+        stream = io.BytesIO()
+        diff_writer = UnifiedDiffWriter(stream)
 
         for pending_change in root.findall('./pending-changes/pending-change'):
             action = pending_change.attrib['change-type'].split(', ')
@@ -1035,7 +1038,7 @@ class TEEWrapper(BaseTFWrapper):
                             'in your review request.')
 
         return {
-            'diff': diff_writer.getvalue(),
+            'diff': stream.getvalue(),
             'parent_diff': None,
             'base_commit_id': base,
         }

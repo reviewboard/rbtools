@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import logging
 import os
 import posixpath
@@ -914,7 +915,8 @@ class SVNClient(BaseSCMClient):
 
         while not iterator.is_empty:
             # Grab one more than we need, to detect if we're at the end.
-            diff_writer = UnifiedDiffWriter()
+            stream = io.BytesIO()
+            diff_writer = UnifiedDiffWriter(stream)
             lines = iterator.peek(4)
 
             if (lines[0].startswith(b'Index: ') and
@@ -969,8 +971,8 @@ class SVNClient(BaseSCMClient):
                 diff_writer.write_line(line.rstrip(b'\r\n'))
 
             # Yield the lines we just built.
-            diff_writer.seek(0)
-            yield from diff_writer
+            stream.seek(0)
+            yield from stream
 
     def convert_to_absolute_paths(
         self,

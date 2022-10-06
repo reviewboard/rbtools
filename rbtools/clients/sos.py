@@ -671,7 +671,8 @@ class SOSClient(BaseSCMClient):
                             orig_revision=revision,
                             orig_content=selected_file.get('orig_content'))
 
-                        diff_writer = UnifiedDiffWriter()
+                        stream = io.BytesIO()
+                        diff_writer = UnifiedDiffWriter(stream)
 
                         if diff_result.is_binary:
                             # Mark this as a binary file. We don't currently
@@ -697,7 +698,7 @@ class SOSClient(BaseSCMClient):
                             diff_writer.write_diff_file_result_hunks(
                                 diff_result)
 
-                        diffx_file.diff = diff_writer.getvalue()
+                        diffx_file.diff = stream.getvalue()
                 elif obj_type == SOSObjectType.SYMLINK:
                     # This is a symlink.
                     #
