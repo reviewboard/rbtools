@@ -19,7 +19,7 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
 from rbtools.clients.svn import SVNRepositoryInfo, SVNClient
 from rbtools.clients.tests import FOO1, FOO2, FOO3, SCMClientTestCase
 from rbtools.deprecation import RemovedInRBTools50Warning
-from rbtools.utils.checks import check_install, is_valid_version
+from rbtools.utils.checks import check_install
 from rbtools.utils.process import (RunProcessResult,
                                    run_process,
                                    run_process_exec)
@@ -1162,8 +1162,8 @@ class SVNClientTests(SCMClientTestCase):
         client.get_repository_info()
 
         # Ensure valid SVN client version.
-        if not is_valid_version(client.subversion_client_version,
-                                client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
+        if (client.subversion_client_version <
+            client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
             raise unittest.SkipTest('Subversion client is too old to test '
                                     '--show-copies-as-adds.')
 
@@ -1200,8 +1200,8 @@ class SVNClientTests(SCMClientTestCase):
         client.get_repository_info()
 
         # Ensure valid SVN client version.
-        if not is_valid_version(client.subversion_client_version,
-                                client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
+        if (client.subversion_client_version <
+            client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
             raise unittest.SkipTest('Subversion client is too old to test '
                                     'history_scheduled_with_commit().')
 
@@ -1257,8 +1257,8 @@ class SVNClientTests(SCMClientTestCase):
         client.get_repository_info()
 
         # Ensure valid SVN client version.
-        if not is_valid_version(client.subversion_client_version,
-                                client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
+        if (client.subversion_client_version <
+            client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
             raise unittest.SkipTest('Subversion client is too old to test '
                                     'history_scheduled_with_commit().')
 
@@ -1339,8 +1339,8 @@ class SVNClientTests(SCMClientTestCase):
         client.get_repository_info()
 
         # Ensure valid SVN client version.
-        if not is_valid_version(client.subversion_client_version,
-                                client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
+        if (client.subversion_client_version <
+            client.SHOW_COPIES_AS_ADDS_MIN_VERSION):
             raise unittest.SkipTest('Subversion client is too old to test '
                                     'history_scheduled_with_commit().')
 

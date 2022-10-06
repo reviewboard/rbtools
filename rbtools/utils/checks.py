@@ -86,14 +86,35 @@ def check_gnu_diff():
 
 
 def is_valid_version(actual, expected):
-    """
-    Takes two tuples, both in the form::
+    """Return whether one tuple is greater than or equal to another.
+
+    Tuples should be in the form of::
 
         (major_version, minor_version, micro_version)
 
-    Returns true if the actual version is greater than or equal to
-    the expected version, and false otherwise.
+    With each version an integer.
+
+    Deprecated:
+        4.0:
+        Consumers should just compare tuples directly. This will be removed
+        in RBTools 5.0.
+
+    Args:
+        actual (tuple of int):
+            The actual version to compare.
+
+        expected (tuple of int):
+            The expected version to compare against.
+
+    Returns:
+        bool:
+        ``True`` if ``actual`` is greater than or equal to the expected
+        version. ``False`` otherwise.
     """
+    RemovedInRBTools50Warning.warn(
+        'is_valid_version() is deprecated and will be removed in RBTools 5.0. '
+        'Please compare tuples directly.')
+
     return ((actual[0] > expected[0]) or
             (actual[0] == expected[0] and actual[1] > expected[1]) or
             (actual[0] == expected[0] and actual[1] == expected[1] and

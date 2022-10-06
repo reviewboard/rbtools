@@ -26,7 +26,7 @@ from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.svn import SVNClient, SVNRepositoryInfo
 from rbtools.deprecation import (RemovedInRBTools50Warning,
                                  deprecate_non_keyword_only_args)
-from rbtools.utils.checks import check_install, is_valid_version
+from rbtools.utils.checks import check_install
 from rbtools.utils.console import edit_text
 from rbtools.utils.diffs import (normalize_patterns,
                                  remove_filenames_matching_patterns)
@@ -435,13 +435,16 @@ class GitClient(BaseSCMClient):
                     [self.git, 'config', '--get', 'svn-remote.svn.url'],
                     ignore_errors=True)
 
-                if (version_parts and svn_remote and
-                    not is_valid_version((int(version_parts.group(1)),
-                                          int(version_parts.group(2)),
-                                          int(version_parts.group(3))),
-                                         (1, 5, 4))):
-                    raise SCMError('Your installation of git-svn must be '
-                                   'upgraded to version 1.5.4 or later.')
+                if version_parts and svn_remote:
+                    version = (
+                        int(version_parts.group(1)),
+                        int(version_parts.group(2)),
+                        int(version_parts.group(3)),
+                    )
+
+                    if version < (1, 5, 4):
+                        raise SCMError('Your installation of git-svn must be '
+                                       'upgraded to version 1.5.4 or later.')
 
         # Okay, maybe Perforce (git-p4).
         git_p4_ref = self._execute(
