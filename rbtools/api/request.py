@@ -722,7 +722,7 @@ class ReviewBoardServer(object):
         else:
             context = ssl.create_default_context(cafile=ca_certs)
 
-        if client_cert or client_key:
+        if client_cert and client_key:
             context.load_cert_chain(client_cert, client_key)
 
         handlers.append(HTTPSHandler(context=context))
