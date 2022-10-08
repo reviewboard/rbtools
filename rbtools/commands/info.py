@@ -3,7 +3,13 @@
 from __future__ import unicode_literals
 
 from texttable import Texttable
-from backports.shutil_get_terminal_size import get_terminal_size
+
+try:
+    # Python >= 3.0
+    from shutil import get_terminal_size
+except ImportError:
+    # Python 2.7
+    from backports.shutil_get_terminal_size import get_terminal_size
 
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError
