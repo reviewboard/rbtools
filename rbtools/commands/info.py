@@ -1,9 +1,8 @@
 """The rbt info command."""
 
-from __future__ import unicode_literals
+from shutil import get_terminal_size
 
 from texttable import Texttable
-from backports.shutil_get_terminal_size import get_terminal_size
 
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError
