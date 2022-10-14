@@ -161,7 +161,7 @@ setup(
     install_requires=[
         'importlib-metadata~=4.12; python_version < "3.10"',
         'colorama',
-        'pydiffx~=1.0.1',
+        'pydiffx~=1.1.0',
         'setuptools',
         'six>=1.8.0',
         'texttable',
