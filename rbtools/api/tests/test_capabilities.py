@@ -1,7 +1,5 @@
 """Unit tests for rbtools.api.capabilities."""
 
-from __future__ import unicode_literals
-
 from rbtools.api.capabilities import Capabilities
 from rbtools.testing import TestCase
 

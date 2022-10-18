@@ -1,8 +1,5 @@
-from __future__ import unicode_literals
-
-
 def request_method_decorator(f):
-    """Wraps methods returned from a resource to capture HttpRequests.
+    """Wrap a method returned from a resource to capture HttpRequests.
 
     When a method which returns HttpRequests is called, it will
     pass the method and arguments off to the transport to be executed.

@@ -6,7 +6,7 @@ import logging
 import os
 import re
 import sys
-from typing import List, Optional, cast
+from typing import Dict, List, Optional, cast
 
 import six
 
@@ -26,13 +26,13 @@ from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.svn import SVNClient, SVNRepositoryInfo
 from rbtools.deprecation import (RemovedInRBTools50Warning,
                                  deprecate_non_keyword_only_args)
-from rbtools.utils.checks import check_install, is_valid_version
+from rbtools.utils.checks import check_install
 from rbtools.utils.console import edit_text
 from rbtools.utils.diffs import (normalize_patterns,
                                  remove_filenames_matching_patterns)
 from rbtools.utils.encoding import force_unicode
 from rbtools.utils.errors import EditorError
-from rbtools.utils.process import execute
+from rbtools.utils.process import RunProcessError, execute
 
 
 def get_git_candidates(
@@ -113,6 +113,7 @@ class GitClient(BaseSCMClient):
         # default.
         self._git = ''
         self._git_toplevel = None
+        self._git_svn_remote_info: Optional[Dict[str, str]] = None
         self._type = None
 
     @property
@@ -435,13 +436,16 @@ class GitClient(BaseSCMClient):
                     [self.git, 'config', '--get', 'svn-remote.svn.url'],
                     ignore_errors=True)
 
-                if (version_parts and svn_remote and
-                    not is_valid_version((int(version_parts.group(1)),
-                                          int(version_parts.group(2)),
-                                          int(version_parts.group(3))),
-                                         (1, 5, 4))):
-                    raise SCMError('Your installation of git-svn must be '
-                                   'upgraded to version 1.5.4 or later.')
+                if version_parts and svn_remote:
+                    version = (
+                        int(version_parts.group(1)),
+                        int(version_parts.group(2)),
+                        int(version_parts.group(3)),
+                    )
+
+                    if version < (1, 5, 4):
+                        raise SCMError('Your installation of git-svn must be '
+                                       'upgraded to version 1.5.4 or later.')
 
         # Okay, maybe Perforce (git-p4).
         git_p4_ref = self._execute(
@@ -605,13 +609,10 @@ class GitClient(BaseSCMClient):
             return parent_branch
 
         if self._type == self.TYPE_GIT_SVN:
-            data = self._execute(
-                [self.git, 'svn', 'rebase', '-n'],
-                ignore_errors=True)
-            m = re.search(r'^Remote Branch:\s*(.+)$', data, re.M)
+            svn_remote_info = self._get_svn_remote()
 
-            if m:
-                return m.group(1)
+            if svn_remote_info:
+                return svn_remote_info['ref']
             else:
                 logging.warning('Failed to determine SVN tracking branch. '
                                 'Defaulting to "master"\n')
@@ -675,10 +676,18 @@ class GitClient(BaseSCMClient):
         if not isinstance(revisions, list):
             revisions = [revisions]
 
-        revisions = self._execute([self.git, 'rev-parse'] + revisions)
+        try:
+            revisions = self._execute([self.git, 'rev-parse'] + revisions)
+        except RunProcessError:
+            return []
+
         return revisions.strip().split('\n')
 
-    def _rev_list_youngest_remote_ancestor(self, local_branch, remote):
+    def _rev_list_youngest_remote_ancestor(
+        self,
+        local_branch: str,
+        remote: str,
+    ) -> str:
         """Return the youngest ancestor of ``local_branch`` on ``remote``.
 
         Args:
@@ -697,19 +706,37 @@ class GitClient(BaseSCMClient):
             be reached from local_branch by following the least number of
             parent links).
         """
-        local_commits = self._execute(
-            [self.git, 'rev-list', local_branch, '--not',
-             '--remotes=%s' % remote])
-        local_commits = local_commits.split()
+        exclude_option = '--remotes=%s' % remote
+
+        if self._type == self.TYPE_GIT_SVN:
+            svn_remote_info = self._get_svn_remote()
+
+            if svn_remote_info and remote == svn_remote_info['remote']:
+                # The git-svn "remote" is not really a remote, so we can't pass
+                # it to --remotes. However, it is a valid reference we can pass
+                # directly.
+                exclude_option = remote
+
+        cmdline: List[str] = [self.git, 'rev-list', local_branch, '--not',
+                              exclude_option]
+
+        local_commits = self._execute(cmdline).split()
 
         if local_commits == []:
             # We are currently at a commit also available to the remote.
             return local_branch
 
         local_commit = local_commits[-1]
-        youngest_remote_commit = self._rev_parse('%s^' % local_commit)[0]
+
+        try:
+            youngest_remote_commit = self._rev_parse('%s^' % local_commit)[0]
+        except IndexError:
+            # This was the last commit in the repository.
+            youngest_remote_commit = local_commit
+
         logging.debug('Found youngest remote git commit %s',
                       youngest_remote_commit)
+
         return youngest_remote_commit
 
     @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
@@ -963,6 +990,9 @@ class GitClient(BaseSCMClient):
         :command:`svn diff`. This is needed so that the SVNTool in Review Board
         can properly parse the diff.
 
+        This currently does not support renames/moves/copies (though SVN diffs
+        have problems natively with these anyway).
+
         Args:
             merge_base (unicode):
                 The ID of the merge base commit. This is only used when
@@ -976,15 +1006,18 @@ class GitClient(BaseSCMClient):
             bytes:
             The reformatted diff contents.
         """
-        rev = self._execute([self.git, 'svn', 'find-rev', merge_base]).strip()
+        rev = self._execute(
+            [self.git, 'svn', 'find-rev', merge_base],
+            results_unicode=False).strip()
 
         if not rev:
             return None
 
         diff_data = b''
-        original_file = b''
-        filename = b''
-        newfile = False
+        old_filename = b''
+        new_filename = b''
+        old_header_info = b''
+        new_header_info = b''
 
         for i, line in enumerate(diff_lines):
             if line.startswith(b'diff '):
@@ -992,33 +1025,59 @@ class GitClient(BaseSCMClient):
                 # This will be in the format of:
                 #
                 # diff --git a/path/to/file b/path/to/file
-                info = line.split(b' ')
-                diff_data += b'Index: %s\n' % info[2]
-                diff_data += b'=' * 67
-                diff_data += b'\n'
-            elif line.startswith(b'index '):
-                # Filter this out.
+                #
+                # Filter this out. We can't extract any file names from this
+                # line as they may contain spaces and we can't therefore easily
+                # split the line.
+                old_filename = b''
+                new_filename = b''
+                old_header_info = b''
+                new_header_info = b''
+            elif line.startswith((b'index ',
+                                  b'new file mode ',
+                                  b'deleted file mode ',
+                                  b'similarity index ',
+                                  b'rename from ',
+                                  b'rename to ')):
+                # Filter these out.
                 pass
-            elif line.strip() == b'--- /dev/null':
-                # New file
-                newfile = True
             elif (line.startswith(b'--- ') and i + 1 < len(diff_lines) and
                   diff_lines[i + 1].startswith(b'+++ ')):
-                newfile = False
-                original_file = line[4:].strip()
-                diff_data += b'--- %s\t(revision %s)\n' % (original_file, rev)
+                # At this point in parsing the current line and the next line
+                # look like this:
+                #
+                # --- <old filename><optional tab character>
+                # +++ <new filename><optional tab character>
+                #
+                # The tab character is present precisely when old or new
+                # filename (respectively) contain whitespace.
+                #
+                # So we take the section 4 characters from the start (i.e.
+                # after --- or +++) and split on tab, taking the first part.
+                old_filename = line[4:].split(b'\t', 1)[0].strip()
+                new_filename = diff_lines[i + 1][4:].split(b'\t', 1)[0].strip()
+
+                old_header_info = b'(revision %s)' % rev
+                new_header_info = b'(working copy)'
+
+                # Subversion diffs require that the "new file" and "old file"
+                # match the original filename in the case of adds and deletes.
+                if new_filename == b'/dev/null':
+                    # The file was deleted, use the old filename when writing
+                    # out the +++ line.
+                    new_filename = old_filename
+                    new_header_info = b'(nonexistent)'
+                elif old_filename == b'/dev/null':
+                    # The file is new, use the new filename in the --- line.
+                    old_filename = new_filename
+                    old_header_info = b'(nonexistent)'
+
+                diff_data += b'Index: %s\n' % old_filename
+                diff_data += b'=' * 67
+                diff_data += b'\n'
+                diff_data += b'--- %s\t%s\n' % (old_filename, old_header_info)
             elif line.startswith(b'+++ '):
-                filename = line[4:].strip()
-                if newfile:
-                    diff_data += b'--- %s\t(revision 0)\n' % filename
-                    diff_data += b'+++ %s\t(revision 0)\n' % filename
-                else:
-                    # We already printed the "--- " line.
-                    diff_data += b'+++ %s\t(working copy)\n' % original_file
-            elif (line.startswith(b'new file mode') or
-                  line.startswith(b'deleted file mode')):
-                # Filter this out.
-                pass
+                diff_data += b'+++ %s\t%s\n' % (new_filename, new_header_info)
             elif line.startswith(b'Binary files '):
                 # Add the following so that we know binary files were
                 # added/changed.
@@ -1657,6 +1716,53 @@ class GitClient(BaseSCMClient):
         else:
             return None
 
+    def _get_svn_remote(self) -> Dict[str, str]:
+        """Return information on the SVN remote.
+
+        This will include the remote branch name corresponding to the SVN clone
+        and the full reference.
+
+        Version Added:
+            4.0
+
+        Returns:
+            dict:
+            A dictionary containing the following:
+
+            Keys:
+                ref (str):
+                    The full reference name, in the form of
+                    ``refs/remotes/<remote>``.
+
+                remote (str):
+                    The remote name.
+        """
+        assert self._type == self.TYPE_GIT_SVN
+
+        svn_remote_info = self._git_svn_remote_info
+
+        if svn_remote_info is None:
+            data = self._execute(
+                [self.git, 'svn', 'rebase', '-n'],
+                ignore_errors=True)
+
+            m = re.search(
+                r'^Remote Branch:\s*'
+                r'(?P<ref>(refs\/remotes\/)?(?P<remote>.+))$',
+                data, re.M)
+
+            if m:
+                svn_remote_info = {
+                    'ref': m.group('ref'),
+                    'remote': m.group('remote'),
+                }
+            else:
+                svn_remote_info = {}
+
+            self._git_svn_remote_info = svn_remote_info
+
+        return svn_remote_info
+
     def _find_remote(self, local_or_remote_branch):
         """Find the remote given a branch name.
 
@@ -1676,11 +1782,11 @@ class GitClient(BaseSCMClient):
             rbtools.clients.errors.SCMError:
                 The current repository did not have any remotes configured.
         """
-        all_remote_branches = [
+        all_remote_branches = {
             branch.strip()
             for branch in self._execute(['git', 'branch', '--remotes'],
                                         split_lines=True)
-        ]
+        }
 
         if local_or_remote_branch in all_remote_branches:
             return local_or_remote_branch.split('/', 1)[0]
@@ -1690,6 +1796,14 @@ class GitClient(BaseSCMClient):
         if remote:
             return remote
 
+        if self._type == self.TYPE_GIT_SVN:
+            # Assume the user wants the git-svn remote.
+            svn_remote_info = self._get_svn_remote()
+
+            if svn_remote_info:
+                return svn_remote_info['remote']
+
+        # Try to find a reasonable remote to use.
         all_remotes = [
             _remote.strip()
             for _remote in self._execute(['git', 'remote'],

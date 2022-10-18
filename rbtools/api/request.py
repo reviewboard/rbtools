@@ -1,55 +1,53 @@
-from __future__ import unicode_literals
-
 import base64
 import logging
 import mimetypes
 import os
 import random
 import shutil
+import ssl
 import sys
 from collections import OrderedDict
+from http.client import HTTPMessage, HTTPResponse, NOT_MODIFIED
+from http.cookiejar import Cookie, CookieJar, MozillaCookieJar
 from io import BytesIO
 from json import loads as json_loads
-
-import six
-from six.moves.http_client import UNAUTHORIZED, NOT_MODIFIED
-from six.moves.http_cookiejar import Cookie, CookieJar, MozillaCookieJar
-from six.moves.urllib.error import HTTPError, URLError
-from six.moves.urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
-from six.moves.urllib.request import (
+from typing import Callable, Dict, List, Optional, Tuple, Union
+from urllib.error import HTTPError, URLError
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+from urllib.request import (
     BaseHandler,
     HTTPBasicAuthHandler,
     HTTPCookieProcessor,
     HTTPDigestAuthHandler,
     HTTPErrorProcessor,
     HTTPPasswordMgr,
+    HTTPSHandler,
     ProxyHandler,
     Request as URLRequest,
     build_opener,
     install_opener,
     urlopen)
 
+from typing_extensions import TypeAlias
+
 from rbtools import get_package_version
-from rbtools.api.cache import APICache
+from rbtools.api.cache import APICache, CachedHTTPResponse, LiveHTTPResponse
 from rbtools.api.errors import APIError, create_api_error, ServerInterfaceError
+from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.encoding import force_bytes, force_unicode
 from rbtools.utils.filesystem import get_home_path
-
-# Python 2.7.9+ added strict HTTPS certificate validation (finally). These APIs
-# don't exist everywhere so soft-import them.
-try:
-    import ssl
-    from six.moves.urllib.request import HTTPSHandler
-except ImportError:
-    ssl = None
-    HTTPSHandler = None
 
 
 RBTOOLS_COOKIE_FILE = '.rbtools-cookies'
 RB_COOKIE_NAME = 'rbsessionid'
 
 
-class HttpRequest(object):
+AuthCallback: TypeAlias = Callable[..., Tuple[str, str]]
+OTPCallback: TypeAlias = Callable[[str, str], str]
+QueryArgs: TypeAlias = Union[bool, int, float, bytes, str]
+
+
+class HttpRequest:
     """A high-level HTTP request.
 
     This is used to construct an HTTP request to a Review Board server.
@@ -60,63 +58,58 @@ class HttpRequest(object):
     Instances are intentionally generic and not tied to :py:mod:`urllib2`,
     providing API stability and a path toward eventually interfacing with
     other HTTP backends.
-
-    Attributes:
-        headers (dict):
-            Any HTTP headers to provide in the request.
-
-        url (unicode):
-            The URL to request.
     """
 
-    def __init__(self, url, method='GET', query_args={}, headers={}):
+    #: HTTP headers to provide when making the request
+    #:
+    #: Type: dict
+    headers: Dict[str, str]
+
+    #: The URL te request
+    #:
+    #: Type: str
+    url: str
+
+    def __init__(
+        self,
+        url: str,
+        method: str = 'GET',
+        query_args: Dict[str, QueryArgs] = {},
+        headers: Dict[str, str] = {},
+    ) -> None:
         """Initialize the HTTP request.
 
         Args:
-            url (bytes or unicode):
+            url (bytes or str):
                 The URL to request.
 
-            method (bytes or unicode, optional):
+            method (bytes or str, optional):
                 The HTTP method to send to the server.
 
             query_args (dict, optional):
                 Any query arguments to add to the URL.
 
-                All keys and values are expected to be strings (either
-                byte strings or unicode strings).
-
             headers (dict, optional):
                 Any HTTP headers to provide in the request.
-
-                All keys and values are expected to be strings (either
-                byte strings or unicode strings).
         """
-        self.method = method
+        self._method = method
+        self.headers = headers
         self._fields = OrderedDict()
         self._files = OrderedDict()
 
-        # Replace all underscores in each query argument
-        # key with dashes.
-        query_args = {
-            self.encode_url_key(key): self.encode_url_value(key, value)
-            for key, value in six.iteritems(query_args)
-        }
-
-        # Make sure headers are always in the native string type.
-        self.headers = {
-            str(key): str(value)
-            for key, value in six.iteritems(headers)
-        }
-
         # Add the query arguments to the url
-        url_parts = list(urlparse(str(url)))
-        query = dict(parse_qsl(url_parts[4]))
-        query.update(query_args)
+        url_parts = list(urlparse(url))
+        query: Dict[str, str] = dict(parse_qsl(url_parts[4]))
+        query.update({
+            # Replace all underscores in each query argument key with dashes.
+            self.encode_url_key(key): self.encode_url_value(key, value)
+            for key, value in query_args.items()
+        })
 
         url_parts[4] = urlencode(
             OrderedDict(
                 pair
-                for pair in sorted(six.iteritems(query),
+                for pair in sorted(query.items(),
                                    key=lambda pair: pair[0])
             ),
             doseq=True
@@ -124,11 +117,14 @@ class HttpRequest(object):
 
         self.url = urlunparse(url_parts)
 
-    def encode_url_key(self, key):
+    def encode_url_key(
+        self,
+        key: str,
+    ) -> str:
         """Encode the given key for inclusion in a URL.
 
         Args:
-            key (unicode):
+            key (str):
                 The key that is being encoded.
 
         Raises:
@@ -136,18 +132,23 @@ class HttpRequest(object):
                 The given key was neither a unicode string or byte string.
 
         Returns:
-            unicode:
+            str:
             The key encoded as a unicode string.
         """
         return force_unicode(key).replace('_', '-')
 
-    def encode_url_value(self, key, value):
+    def encode_url_value(
+        self,
+        key: Union[bytes, str],
+        value: QueryArgs,
+    ) -> str:
         """Encode the given value for inclusion in a URL.
 
         Args:
-            key (unicode):
+            key (str):
                 The field name for which the value is being encoded.
                 This argument is only used to generate an error message.
+
             value (object):
                 The value to be encoded.
 
@@ -156,7 +157,7 @@ class HttpRequest(object):
                 The given value could not be encoded.
 
         Returns:
-            unicode:
+            str:
             The value encoded as a unicode string.
         """
         if isinstance(value, bool):
@@ -164,9 +165,9 @@ class HttpRequest(object):
                 value = '1'
             else:
                 value = '0'
-        elif isinstance(value, six.integer_types + (float,)):
-            value = six.text_type(value)
-        elif isinstance(value, (bytes, six.text_type)):
+        elif isinstance(value, (int, float)):
+            value = str(value)
+        elif isinstance(value, (bytes, str)):
             value = force_unicode(value)
         else:
             raise ValueError(
@@ -175,78 +176,102 @@ class HttpRequest(object):
                 % (key, value, type(value).__name__)
             )
 
+        assert isinstance(value, str)
         return value
 
     @property
-    def method(self):
+    def method(self) -> str:
         """The HTTP method to send to the server."""
         return self._method
 
     @method.setter
-    def method(self, method):
+    def method(
+        self,
+        method: str,
+    ) -> None:
         """The HTTP method to send to the server.
 
         Args:
-            method (bytes or unicode):
+            method (str):
                 The HTTP method to send to the server.
         """
         self._method = str(method)
 
-    def add_field(self, name, value):
+    def add_field(
+        self,
+        name: Union[bytes, str],
+        value: Union[bytes, str],
+    ) -> None:
         """Add a form-data field for the request.
 
+        Version Changed:
+            4.0:
+            Values of types other than bytes or str are now deprecated, and
+            will be removed in 5.0.
+
         Args:
-            name (bytes or unicode):
+            name (bytes or str):
                 The name of the field.
 
-            value (bytes or unicode):
+            value (bytes or str):
                 The value to send for the field.
 
-                For backwards-compatibility, other values will be
-                converted to strings. This may turn into a warning in
-                future releases. Callers are encouraged to only send
-                strings.
+                For backwards-compatibility, other values will be converted to
+                strings. This will be removed in 5.0.
         """
-        if not isinstance(value, (bytes, six.text_type)):
+        if not isinstance(value, (bytes, str)):
+            RemovedInRBTools50Warning.warn(
+                'A value of type %s was passed to HttpRequest.add_field. In '
+                'RBTools 5.0, only values of bytes or str types will be '
+                'accepted.')
             value = str(value)
 
         self._fields[force_bytes(name)] = force_bytes(value)
 
-    def add_file(self, name, filename, content, mimetype=None):
+    def add_file(
+        self,
+        name: Union[bytes, str],
+        filename: Union[bytes, str],
+        content: Union[bytes, str],
+        mimetype: Optional[Union[bytes, str]] = None,
+    ) -> None:
         """Add an uploaded file for the request.
 
         Args:
-            name (bytes or unicode):
+            name (bytes or str):
                 The name of the field representing the file.
 
-            filename (bytes or unicode):
+            filename (bytes or str):
                 The filename.
 
-            content (bytes or unicode):
+            content (bytes or str):
                 The contents of the file.
 
-            mimetype (bytes or unicode, optional):
+            mimetype (bytes or str, optional):
                 The optional mimetype of the content. If not provided, it
                 will be guessed.
         """
-        mimetype = force_bytes(
-            mimetypes.guess_type(force_unicode(filename))[0] or
-            b'application/octet-stream')
+        if not mimetype:
+            mimetype = (
+                mimetypes.guess_type(force_unicode(filename))[0] or
+                b'application/octet-stream')
 
         self._files[force_bytes(name)] = {
             'filename': force_bytes(filename),
             'content': force_bytes(content),
-            'mimetype': mimetype,
+            'mimetype': force_bytes(mimetype),
         }
 
-    def encode_multipart_formdata(self):
-        """Encode the request into a multi-aprt form-data payload.
+    def encode_multipart_formdata(
+        self,
+    ) -> Tuple[Optional[str], Optional[bytes]]:
+        """Encode the request into a multi-part form-data payload.
 
         Returns:
             tuple:
             A tuple containing:
 
-            * The content type (:py:class:`unicode`)
+            * The content type (:py:class:`str`)
             * The form-data payload (:py:class:`bytes`)
 
             If there are no fields or files in the request, both values will
@@ -259,7 +284,7 @@ class HttpRequest(object):
         BOUNDARY = self._make_mime_boundary()
         content = BytesIO()
 
-        for key, value in six.iteritems(self._fields):
+        for key, value in self._fields.items():
             content.write(b'--%s%s' % (BOUNDARY, NEWLINE))
             content.write(b'Content-Disposition: form-data; name="%s"%s'
                           % (key, NEWLINE))
@@ -267,7 +292,7 @@ class HttpRequest(object):
             content.write(value)
             content.write(NEWLINE)
 
-        for key, file_info in six.iteritems(self._files):
+        for key, file_info in self._files.items():
             content.write(b'--%s%s' % (BOUNDARY, NEWLINE))
             content.write(b'Content-Disposition: form-data; name="%s"; ' % key)
             content.write(b'filename="%s"%s' % (file_info['filename'],
@@ -284,7 +309,7 @@ class HttpRequest(object):
 
         return content_type, content.getvalue()
 
-    def _make_mime_boundary(self):
+    def _make_mime_boundary(self) -> bytes:
         """Create a mime boundary.
 
         This exists because :py:func:`mimetools.choose_boundary` is gone in
@@ -302,36 +327,233 @@ class HttpRequest(object):
 
 class Request(URLRequest):
     """A request which contains a method attribute."""
-    def __init__(self, url, body=b'', headers={}, method='PUT'):
-        normalized_headers = {
-            str(key): str(value)
-            for key, value in six.iteritems(headers)
-        }
 
-        URLRequest.__init__(self, str(url), body, normalized_headers)
-        self.method = str(method)
+    #: The HTTP method to use.
+    #:
+    #: Type: str
+    method: str
 
-    def get_method(self):
+    def __init__(
+        self,
+        url: str,
+        body: Optional[bytes] = b'',
+        headers: Dict[str, str] = {},
+        method: str = 'PUT',
+    ) -> None:
+        """Initialize the request.
+
+        Args:
+            url (str):
+                The URL to make the request at.
+
+            body (bytes, optional):
+                The body to send with the request.
+
+            headers (dict, optional):
+                The headers to send with the request.
+
+            method (str, optional):
+                The HTTP method to use.
+        """
+        super().__init__(url, body, headers)
+        self.method = method
+
+    def get_method(self) -> str:
+        """Return the HTTP method.
+
+        Returns:
+            str:
+            The HTTP method.
+        """
         return self.method
+
+
+class ReviewBoardHTTPErrorProcessor(HTTPErrorProcessor):
+    """Processes HTTP error codes.
+
+    Python's built-in error processing understands 2XX responses as successful,
+    but processes 3XX as an error. This handler ensures that all valid
+    responses from the API are processed as such.
+    """
+
+    def http_response(self, request, response):
+        if not (200 <= response.status < 300 or
+                response.status == NOT_MODIFIED):
+            response = self.parent.error('http', request, response,
+                                         response.status, response.msg,
+                                         response.headers)
+
+        return response
+
+    https_response = http_response
+
+
+class ReviewBoardHTTPPasswordMgr(HTTPPasswordMgr):
+    """Adds HTTP authentication support for URLs."""
+
+    def __init__(
+        self,
+        reviewboard_url: str,
+        rb_user: Optional[str] = None,
+        rb_pass: Optional[str] = None,
+        api_token: Optional[str] = None,
+        auth_callback: Optional[AuthCallback] = None,
+        otp_token_callback: Optional[OTPCallback] = None,
+    ) -> None:
+        """Initialize the password manager.
+
+        Args:
+            reviewboard_url (str):
+                The URL of the Review Board server.
+
+            rb_user (str, optional):
+                The username to authenticate with.
+
+            rb_pass (str, optional):
+                The password to authenticate with.
+
+            api_token (str, optional):
+                The API token to authenticate with. If present, this takes
+                priority over the username and password.
+
+            auth_callback (callable, optional):
+                A callback to prompt the user for their username and password.
+
+            otp_token_callback (callable, optional):
+                A callback to prompt the user for their two-factor
+                authentication code.
+        """
+        super().__init__()
+        self.rb_url = reviewboard_url
+        self.rb_user = rb_user
+        self.rb_pass = rb_pass
+        self.api_token = api_token
+        self.auth_callback = auth_callback
+        self.otp_token_callback = otp_token_callback
+
+    def find_user_password(
+        self,
+        realm: str,
+        uri: str,
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Return the username and password for the given realm.
+
+        Args:
+            realm (str):
+                The HTTP Basic authentication realm.
+
+            uri (str):
+                The URI being accessed.
+
+        Returns:
+            tuple:
+            A 2-tuple containing:
+
+            Tuple:
+                0 (str):
+                    The username to use.
+
+                1 (str):
+                    The password to use.
+        """
+        if realm == 'Web API':
+            if self.auth_callback:
+                username, password = self.auth_callback(realm, uri,
+                                                        username=self.rb_user,
+                                                        password=self.rb_pass)
+                self.rb_user = username
+                self.rb_pass = password
+
+            return self.rb_user, self.rb_pass
+        else:
+            # If this is an auth request for some other domain (since HTTP
+            # handlers are globaltake), fall back to standard password
+            # management.
+            return HTTPPasswordMgr.find_user_password(self, realm, uri)
+
+    def get_otp_token(
+        self,
+        uri: str,
+        method: str,
+    ) -> Optional[str]:
+        """Return the two-factor authentication code.
+
+        Args:
+            uri (str):
+                The URI being accessed.
+
+            method (str):
+                The HTTP method being used.
+
+        Returns:
+            str:
+            The user's two-factor authentication code, if available.
+        """
+        if self.otp_token_callback:
+            return self.otp_token_callback(uri, method)
+
+        return None
 
 
 class PresetHTTPAuthHandler(BaseHandler):
     """Handler that presets the use of HTTP Basic Auth."""
+
     handler_order = 480  # After Basic auth
 
     AUTH_HEADER = 'Authorization'
 
-    def __init__(self, url, password_mgr):
+    def __init__(
+        self,
+        url: str,
+        password_mgr: ReviewBoardHTTPPasswordMgr,
+    ) -> None:
+        """Initialize the handler.
+
+        Args:
+            url (str):
+                The URL fo the Review Board server.
+
+            password_mgr (ReviewBoardHTTPPasswordMgr):
+                The password manager to use for requests.
+        """
         self.url = url
         self.password_mgr = password_mgr
         self.used = False
 
-    def reset(self, username, password):
+    def reset(
+        self,
+        username: Optional[str],
+        password: Optional[str],
+    ) -> None:
+        """Reset the stored authentication credentials.
+
+        Args:
+            username (str):
+                The username to use for authentication. If ``None``, this will
+                effectively log out the user.
+
+            passsword (str):
+                The password to use for authentication. If ``None``, this will
+                effectively log out the user.
+        """
         self.password_mgr.rb_user = username
         self.password_mgr.rb_pass = password
         self.used = False
 
-    def http_request(self, request):
+    def http_request(
+        self,
+        request: Request,
+    ) -> Request:
+        """Modify an HTTP request with authentication information.
+
+        Args:
+            request (rbtools.api.request.Request):
+                The HTTP request to make.
+
+        Returns:
+            rbtools.api.request.Request:
+            The HTTP request, with authentication headers added.
+        """
         if not self.used:
             if self.password_mgr.api_token:
                 request.add_header(self.AUTH_HEADER,
@@ -354,26 +576,6 @@ class PresetHTTPAuthHandler(BaseHandler):
     https_request = http_request
 
 
-class ReviewBoardHTTPErrorProcessor(HTTPErrorProcessor):
-    """Processes HTTP error codes.
-
-    Python's built-in error processing understands 2XX responses as successful,
-    but processes 3XX as an error. This handler ensures that all valid
-    responses from the API are processed as such.
-    """
-
-    def http_response(self, request, response):
-        if not (200 <= response.code < 300 or
-                response.code == NOT_MODIFIED):
-            response = self.parent.error('http', request, response,
-                                         response.code, response.msg,
-                                         response.info())
-
-        return response
-
-    https_response = http_response
-
-
 class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
     """Custom Basic Auth handler that doesn't retry excessively.
 
@@ -392,7 +594,9 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
     OTP_TOKEN_HEADER = 'X-ReviewBoard-OTP'
     MAX_OTP_TOKEN_ATTEMPTS = 2
 
-    def __init__(self, *args, **kwargs):
+    passwd: ReviewBoardHTTPPasswordMgr
+
+    def __init__(self, *args, **kwargs) -> None:
         """Initialize the Basic Auth handler.
 
         Args:
@@ -404,12 +608,18 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
         """
         HTTPBasicAuthHandler.__init__(self, *args, **kwargs)
 
-        self._tried_login = False
-        self._otp_token_method = None
-        self._otp_token_attempts = 0
-        self._last_otp_token = None
+        self._tried_login: bool = False
+        self._otp_token_method: Optional[str] = None
+        self._otp_token_attempts: int = 0
+        self._last_otp_token: Optional[str] = None
 
-    def http_error_auth_reqed(self, authreq, host, req, headers):
+    def http_error_auth_reqed(
+        self,
+        authreq: str,
+        host: str,
+        req: URLRequest,
+        headers: HTTPMessage,
+    ) -> None:
         """Handle an HTTP 401 Unauthorized from an API request.
 
         This will start by checking whether a two-factor authentication
@@ -419,20 +629,20 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
         :py:meth:`retry_http_basic_auth`.
 
         Args:
-            authreq (unicode):
+            authreq (str):
                 The authentication request type.
 
-            host (unicode):
+            host (str):
                 The URL being accessed.
 
             req (rbtools.api.request.Request):
                 The API request being made.
 
-            headers (dict):
+            headers (http.client.HTTPMessage):
                 The headers sent in the Unauthorized error response.
 
         Returns:
-            httplib.HTTPResponse:
+            http.client.HTTPResponse:
             If attempting another request, this will be the HTTP response
             from that request. This will be ``None`` if not making another
             request.
@@ -457,7 +667,12 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
         return HTTPBasicAuthHandler.http_error_auth_reqed(
             self, authreq, host, req, headers)
 
-    def retry_http_basic_auth(self, host, request, realm):
+    def retry_http_basic_auth(
+        self,
+        host: str,
+        request: URLRequest,
+        realm: str,
+    ) -> Optional[HTTPResponse]:
         """Attempt another HTTP Basic Auth request.
 
         This will determine if another request should be made (based on
@@ -465,18 +680,18 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
         another attempt.
 
         Args:
-            host (unicode):
+            host (str):
                 The URL being accessed.
 
             request (rbtools.api.request.Request):
                 The API request being made.
 
-            realm (unicode):
+            realm (str):
                 The Basic Auth realm, which will be used to look up any
                 stored passwords.
 
         Returns:
-            httplib.HTTPResponse:
+            http.client.HTTPResponse:
             If attempting another request, this will be the HTTP response
             from that request. This will be ``None`` if not making another
             request.
@@ -511,11 +726,8 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
         # If the response had sent a X-ReviewBoard-OTP header stating that
         # a 2FA token is required, request it from the user.
         if self._otp_token_method:
-            otp_token = (
-                self.passwd.get_otp_token(request.get_full_url(),
-                                          self._otp_token_method)
-                .encode('utf-8')
-            )
+            otp_token = self.passwd.get_otp_token(
+                request.get_full_url(), self._otp_token_method)
         else:
             otp_token = None
 
@@ -546,41 +758,9 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
         return self.parent.open(request, timeout=request.timeout)
 
 
-class ReviewBoardHTTPPasswordMgr(HTTPPasswordMgr):
-    """Adds HTTP authentication support for URLs."""
-
-    def __init__(self, reviewboard_url, rb_user=None, rb_pass=None,
-                 api_token=None, auth_callback=None, otp_token_callback=None):
-        HTTPPasswordMgr.__init__(self)
-        self.passwd = {}
-        self.rb_url = reviewboard_url
-        self.rb_user = rb_user
-        self.rb_pass = rb_pass
-        self.api_token = api_token
-        self.auth_callback = auth_callback
-        self.otp_token_callback = otp_token_callback
-
-    def find_user_password(self, realm, uri):
-        if realm == 'Web API':
-            if self.auth_callback:
-                username, password = self.auth_callback(realm, uri,
-                                                        username=self.rb_user,
-                                                        password=self.rb_pass)
-                self.rb_user = username
-                self.rb_pass = password
-
-            return self.rb_user, self.rb_pass
-        else:
-            # If this is an auth request for some other domain (since HTTP
-            # handlers are global), fall back to standard password management.
-            return HTTPPasswordMgr.find_user_password(self, realm, uri)
-
-    def get_otp_token(self, uri, method):
-        if self.otp_token_callback:
-            return self.otp_token_callback(uri, method)
-
-
-def create_cookie_jar(cookie_file=None):
+def create_cookie_jar(
+    cookie_file: Optional[str] = None,
+) -> Tuple[MozillaCookieJar, str]:
     """Return a cookie jar backed by cookie_file
 
     If cooie_file is not provided, we will default it. If the
@@ -589,10 +769,25 @@ def create_cookie_jar(cookie_file=None):
 
     In the case where we default cookie_file, and it does not exist,
     we will attempt to copy the .post-review-cookies.txt file.
-    """
-    home_path = get_home_path()
 
+    Args:
+        cookie_file (str, optional):
+            The filename to use for cookies.
+
+    Returns:
+        tuple:
+        A two-tuple containing:
+
+
+        Tuple:
+            0 (http.cookiejar.MozillaCookieJar):
+                The cookie jar object.
+
+            1 (str):
+                The name of the cookie file.
+    """
     if not cookie_file:
+        home_path = get_home_path()
         cookie_file = os.path.join(home_path, RBTOOLS_COOKIE_FILE)
         post_review_cookies = os.path.join(home_path,
                                            '.post-review-cookies.txt')
@@ -617,7 +812,7 @@ def create_cookie_jar(cookie_file=None):
     return MozillaCookieJar(cookie_file), cookie_file
 
 
-class ReviewBoardServer(object):
+class ReviewBoardServer:
     """Represents a Review Board server we are communicating with.
 
     Provides methods for executing HTTP requests on a Review Board
@@ -629,12 +824,104 @@ class ReviewBoardServer(object):
     return a 2-tuple of username, password. The user can be prompted
     for their credentials using this mechanism.
     """
-    def __init__(self, url, cookie_file=None, username=None, password=None,
-                 api_token=None, agent=None, session=None, disable_proxy=False,
-                 auth_callback=None, otp_token_callback=None,
-                 verify_ssl=True, save_cookies=True, ext_auth_cookies=None,
-                 ca_certs=None, client_key=None, client_cert=None,
-                 proxy_authorization=None):
+
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The path to the file for storing authentication cookies.
+    #:
+    #: Type:
+    #:     str
+    cookie_file: Optional[str]
+
+    #: The cookie jar object for managing authentication cookies.
+    #:
+    #: Type:
+    #:     http.cookiejar.CookieJar
+    cookie_jar: CookieJar
+
+    _cache: Optional[APICache] = None
+
+    def __init__(
+        self,
+        url: str,
+        cookie_file: Optional[str] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        api_token: Optional[str] = None,
+        agent: Optional[str] = None,
+        session: Optional[str] = None,
+        disable_proxy: bool = False,
+        auth_callback: Optional[AuthCallback] = None,
+        otp_token_callback: Optional[OTPCallback] = None,
+        verify_ssl: bool = True,
+        save_cookies: bool = True,
+        ext_auth_cookies: Optional[str] = None,
+        ca_certs: Optional[str] = None,
+        client_key: Optional[str] = None,
+        client_cert: Optional[str] = None,
+        proxy_authorization: Optional[str] = None,
+    ) -> None:
+        """Initialize the server object.
+
+        Args:
+            url (str):
+                The URL of the Review Board server.
+
+            cookie_file (str, optional):
+                The name of the file to store authentication cookies in.
+
+            username (str, optional):
+                The username to use for authentication.
+
+            password (str, optional):
+                The password to use for authentication.
+
+            api_token (str, optional):
+                An API token to use for authentication. If present, this is
+                preferred over the username and password.
+
+            agent (str, optional):
+                A User-Agent string to use for the client. If not specified,
+                the default RBTools User-Agent will be used.
+
+            session (str, optional):
+                An ``rbsessionid`` string to use for authentication.
+
+            disable_proxy (bool, optional):
+                Whether to disable HTTP proxies.
+
+            auth_callback (callable, optional):
+                A callback method to prompt the user for a username and
+                password.
+
+            otp_callback (callable, optional):
+                A callback method to prompt the user for their two-factor
+                authentication code.
+
+            verify_ssl (bool, optional):
+                Whether to verify SSL certificates.
+
+            save_cookies (bool, optional):
+                Whether to save authentication cookies.
+
+            ext_auth_cookies (str, optional):
+                The name of a file to load additional cookies from. These will
+                be layered on top of any cookies loaded from ``cookie_file``.
+
+            ca_certs (str, optional):
+                The name of a file to load certificates from.
+
+            client_key (str, optional):
+                The key for a client certificate to load into the chain.
+
+            client_cert (str, optional):
+                A client certificate to load into the chain.
+
+            proxy_authorization (str, optional):
+                A string to use for the ``Proxy-Authorization`` header.
+        """
         if not url.endswith('/'):
             url += '/'
 
@@ -657,6 +944,7 @@ class ReviewBoardServer(object):
 
         if self.ext_auth_cookies:
             try:
+                assert isinstance(self.cookie_jar, MozillaCookieJar)
                 self.cookie_jar.load(ext_auth_cookies, ignore_expires=True)
             except IOError as e:
                 logging.critical('There was an error while loading a '
@@ -689,10 +977,11 @@ class ReviewBoardServer(object):
                 discard=False,
                 comment=None,
                 comment_url=None,
-                rest={'HttpOnly': None})
+                rest={'HttpOnly': ''})
             self.cookie_jar.set_cookie(cookie)
 
             if self.save_cookies:
+                assert isinstance(self.cookie_jar, MozillaCookieJar)
                 self.cookie_jar.save()
 
         if username:
@@ -715,14 +1004,14 @@ class ReviewBoardServer(object):
         self.preset_auth_handler = PresetHTTPAuthHandler(self.url,
                                                          password_mgr)
 
-        handlers = []
+        handlers: List[BaseHandler] = []
 
         if not verify_ssl:
             context = ssl._create_unverified_context()
         else:
             context = ssl.create_default_context(cafile=ca_certs)
 
-        if client_cert or client_key:
+        if client_cert and client_key:
             context.load_cert_chain(client_cert, client_key)
 
         handlers.append(HTTPSHandler(context=context))
@@ -756,13 +1045,25 @@ class ReviewBoardServer(object):
         self._cache = None
         self._urlopen = urlopen
 
-    def enable_cache(self, cache_location=None, in_memory=False):
+    def enable_cache(
+        self,
+        cache_location: Optional[str] = None,
+        in_memory: bool = False,
+    ) -> None:
         """Enable caching for all future HTTP requests.
 
         The cache will be created at the default location if none is provided.
 
         If the in_memory parameter is True, the cache will be created in memory
         instead of on disk. This overrides the cache_location parameter.
+
+        Args:
+            cache_location (str, optional):
+                The name of the file to use for the cache database.
+
+            in_memory (bool, optional):
+                Whether to only use in-memory caching. If ``True``, the
+                ``cache_location`` argument is ignored.
         """
         if not self._cache:
             self._cache = APICache(create_db_in_memory=in_memory,
@@ -770,28 +1071,55 @@ class ReviewBoardServer(object):
 
             self._urlopen = self._cache.make_request
 
-    def login(self, username, password):
-        """Reset the user information"""
+    def login(
+        self,
+        username: str,
+        password: str,
+    ) -> None:
+        """Log in to the Review Board server.
+
+        Args:
+            username (str):
+                The username to use to log in.
+
+            password (str):
+                The password to use to log in.
+        """
         self.preset_auth_handler.reset(username, password)
 
-    def logout(self):
-        """Logs the user out of the session."""
+    def logout(self) -> None:
+        """Log the user out of the session."""
         self.preset_auth_handler.reset(None, None)
         self.make_request(HttpRequest('%ssession/' % self.url,
                                       method='DELETE'))
         self.cookie_jar.clear(self.domain)
 
         if self.save_cookies:
+            assert isinstance(self.cookie_jar, MozillaCookieJar)
             self.cookie_jar.save()
 
-    def process_error(self, http_status, data):
-        """Processes an error, raising an APIError with the information."""
-        # In Python 3, the data can be bytes, not str, and json.loads
-        # explicitly requires decoded strings.
-        data = force_unicode(data)
+    def process_error(
+        self,
+        http_status: int,
+        data: Union[str, bytes],
+    ) -> None:
+        """Process an error, raising an APIError with the information.
+
+        Args:
+            http_status (int):
+                The HTTP status code.
+
+            data (bytes or str):
+                The data returned by the server.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The API error object.
+        """
+        data_str = force_unicode(data)
 
         try:
-            rsp = json_loads(data)
+            rsp = json_loads(data_str)
 
             assert rsp['stat'] == 'fail'
 
@@ -802,20 +1130,30 @@ class ReviewBoardServer(object):
             raise create_api_error(http_status, rsp['err']['code'], rsp,
                                    rsp['err']['msg'])
         except ValueError:
-            logging.debug('Got HTTP error: %s: %s', http_status, data)
-            raise APIError(http_status, None, None, data)
+            logging.debug('Got HTTP error: %s: %s', http_status, data_str)
+            raise APIError(http_status, None, None, data_str)
 
-    def make_request(self, request):
+    def make_request(
+        self,
+        request: HttpRequest,
+    ) -> Optional[Union[HTTPResponse, CachedHTTPResponse, LiveHTTPResponse]]:
         """Perform an http request.
 
-        The request argument should be an instance of
-        'rbtools.api.request.HttpRequest'.
+        Args:
+            request (rbtools.api.request.HttpRequest):
+                The request object.
+
+        Returns:
+            http.client.HTTPResponse:
+            The HTTP response.
         """
+        rsp = None
+
         try:
             content_type, body = request.encode_multipart_formdata()
             headers = request.headers
 
-            if body:
+            if content_type and body:
                 headers.update({
                     'Content-Type': content_type,
                     'Content-Length': str(len(body)),
@@ -832,6 +1170,7 @@ class ReviewBoardServer(object):
 
         if self.save_cookies:
             try:
+                assert isinstance(self.cookie_jar, MozillaCookieJar)
                 self.cookie_jar.save()
             except IOError:
                 pass

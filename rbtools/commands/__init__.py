@@ -19,6 +19,7 @@ from rbtools import get_version_string
 from rbtools.api.capabilities import Capabilities
 from rbtools.api.client import RBClient
 from rbtools.api.errors import APIError, ServerInterfaceError
+from rbtools.api.resource import RootResource
 from rbtools.api.transport.sync import SyncTransport
 from rbtools.clients import scan_usable_client
 from rbtools.clients.errors import OptionsCheckError
@@ -1398,8 +1399,20 @@ class Command(object):
 
         return api_client, api_root
 
-    def get_capabilities(self, api_root):
-        """Retrieve Capabilities from the server and return them."""
+    def get_capabilities(
+        self,
+        api_root: RootResource,
+    ) -> Capabilities:
+        """Retrieve capabilities from the server and return them.
+
+        Args:
+            api_root (rbtools.api.resource.RootResource):
+                The root resource
+
+        Returns:
+            rbtools.api.capabilities.Capabilities:
+            The server capabilities.
+        """
         if 'capabilities' in api_root:
             # Review Board 2.0+ provides capabilities in the root resource.
             return Capabilities(api_root.capabilities)

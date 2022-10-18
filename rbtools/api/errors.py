@@ -1,11 +1,9 @@
-from __future__ import unicode_literals
-
-import six
+from typing import Dict, Optional, Type
 
 from rbtools.utils.encoding import force_unicode
 
 
-HTTP_STATUS_CODES = {
+HTTP_STATUS_CODES: Dict[int, str] = {
     100: 'Continue',
     101: 'Switching Protocols',
     102: 'Processing',
@@ -79,7 +77,7 @@ HTTP_STATUS_CODES = {
 }
 
 
-API_ERROR_CODES = {
+API_ERROR_CODES: Dict[int, str] = {
     0: 'No Error',
     1: 'Service Not Configured',
     100: 'Does Not Exist',
@@ -144,7 +142,7 @@ class APIError(Exception):
         http_status (int):
             The HTTP status code.
 
-        message (unicode):
+        message (str):
             The error message from the API response. This may be ``None``.
 
             Version Added:
@@ -160,11 +158,19 @@ class APIError(Exception):
     #:     3.1
     #:
     #: Type:
-    #:     unicode
-    default_message = 'An error occurred when communicating with Review Board.'
+    #:     str
+    default_message: str = \
+        'An error occurred when communicating with Review Board.'
 
-    def __init__(self, http_status=None, error_code=None, rsp=None,
-                 message=None, *args, **kwargs):
+    def __init__(
+        self,
+        http_status: Optional[int] = None,
+        error_code: Optional[int] = None,
+        rsp: Optional[Dict] = None,
+        message: Optional[str] = None,
+        *args,
+        **kwargs,
+    ) -> None:
         """Initialize the error.
 
         Args:
@@ -186,7 +192,7 @@ class APIError(Exception):
                 The API response payload. This may be ``None`` for non-API
                 Error payloads.
 
-            message (unicode, optional):
+            message (str, optional):
                 A specific error message to use. This will take precedence
                 over any errors in ``rsp``.
 
@@ -212,7 +218,7 @@ class APIError(Exception):
 
         self.message = message or self.default_message
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Return a string representation of the error.
 
         The explicit :py:attr:`message` passed to the constructor will be
@@ -225,7 +231,7 @@ class APIError(Exception):
         be included instead.
 
         Returns:
-            unicode:
+            str:
             The error message.
         """
         http_status = self.http_status
@@ -233,7 +239,7 @@ class APIError(Exception):
 
         details = None
 
-        if self.error_code is not None:
+        if error_code is not None:
             error_name = API_ERROR_CODES.get(error_code)
             details = 'API Error %s' % error_code
 
@@ -257,22 +263,22 @@ class APIError(Exception):
 class AuthorizationError(APIError):
     """Authorization error when communicating with the API."""
 
-    default_message = 'Error authenticating to Review Board.'
+    default_message: str = 'Error authenticating to Review Board.'
 
 
 class BadRequestError(APIError):
     """Bad request data made to an API."""
 
-    default_message = 'Missing or invalid data was sent to Review Board.'
+    default_message: str = 'Missing or invalid data was sent to Review Board.'
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Return a string representation of the error.
 
         If the payload contains a list of fields, the error associated with
         each field will be included.
 
         Returns:
-            unicode:
+            str:
             The error message.
         """
         lines = [super(BadRequestError, self).__str__()]
@@ -280,7 +286,7 @@ class BadRequestError(APIError):
         if self.rsp and 'fields' in self.rsp:
             lines.append('')
 
-            for field, error in sorted(six.iteritems(self.rsp['fields']),
+            for field, error in sorted(self.rsp['fields'].items(),
                                        key=lambda pair: pair[0]):
                 lines.append('    %s: %s' % (field, '; '.join(error)))
 
@@ -292,26 +298,65 @@ class CacheError(Exception):
 
 
 class ServerInterfaceError(Exception):
-    def __init__(self, msg, *args, **kwargs):
+    """A non-API error when communicating with a server."""
+
+    def __init__(
+        self,
+        msg: str,
+        *args,
+        **kwargs,
+    ) -> None:
+        """Initialize the error.
+
+        Args:
+            msg (str):
+                The error's message.
+
+            *args (tuple):
+                Positional arguments to pass through to the base class.
+
+            **kwargs (dict):
+                Keyword arguments to pass through to the base class.
+        """
         Exception.__init__(self, *args, **kwargs)
         self.msg = msg
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Return the error message as a unicode string.
 
         Returns:
-            unicode:
+            str:
             The error message as a unicode string.
         """
         return force_unicode(self.msg)
 
 
-API_ERROR_TYPE = {
+API_ERROR_TYPE: Dict[int, Type[APIError]] = {
     400: BadRequestError,
     401: AuthorizationError,
 }
 
 
-def create_api_error(http_status, *args, **kwargs):
+def create_api_error(
+    http_status: int,
+    *args,
+    **kwargs,
+) -> APIError:
+    """Create an error instance.
+
+    Args:
+        http_status (int):
+            The HTTP status code.
+
+        *args (tuple):
+            Positional arguments to pass through to the error class.
+
+        **kwargs (dict):
+            Keyword arguments to pass through to the error class.
+
+    Returns:
+        APIError:
+        The error instance.
+    """
     error_type = API_ERROR_TYPE.get(http_status, APIError)
     return error_type(http_status, *args, **kwargs)

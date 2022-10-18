@@ -1,6 +1,6 @@
 from __future__ import unicode_literals
 
-from rbtools.api.cache import clear_cache
+from rbtools.api.cache import APICache, clear_cache
 from rbtools.commands import Command, Option
 
 
@@ -23,7 +23,8 @@ class ClearCache(Command):
 
     def main(self):
         """Unlink the API cache's path."""
-        if self.options.cache_location:
-            clear_cache(self.options.cache_location)
-        else:
-            clear_cache()
+        cache_location = (self.options.cache_location or
+                          APICache.DEFAULT_CACHE_PATH)
+
+        if clear_cache(cache_location):
+            self.stdout.write('Cleared cache in "%s"' % cache_location)

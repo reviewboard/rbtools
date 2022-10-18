@@ -1,5 +1,6 @@
 """A client for Perforce."""
 
+import io
 import logging
 import marshal
 import os
@@ -414,7 +415,7 @@ class PerforceClient(BaseSCMClient):
     name = 'Perforce'
     server_tool_names = 'Perforce'
 
-    requires_diff_tool = ['gnu']
+    requires_diff_tool = True
 
     can_amend_commit = True
     supports_changesets = True
@@ -889,7 +890,8 @@ class PerforceClient(BaseSCMClient):
         assert isinstance(base, str)
         assert isinstance(tip, str)
 
-        diff_writer = UnifiedDiffWriter()
+        stream = io.BytesIO()
+        diff_writer = UnifiedDiffWriter(stream)
 
         cl_is_pending = tip.startswith(self.REVISION_PENDING_CLN_PREFIX)
         cl_is_shelved = False
@@ -899,7 +901,7 @@ class PerforceClient(BaseSCMClient):
             logging.info('Generating diff for range of submitted changes: %s '
                          'to %s',
                          base, tip)
-            return self._compute_range_changes(
+            self._compute_range_changes(
                 diff_tool=diff_tool,
                 diff_writer=diff_writer,
                 base=base,
@@ -907,6 +909,10 @@ class PerforceClient(BaseSCMClient):
                 depot_include_files=depot_include_files,
                 local_include_files=local_include_files,
                 exclude_patterns=exclude_patterns)
+
+            return {
+                'diff': stream.getvalue(),
+            }
 
         # Strip off the prefix
         tip = tip.split(':', 1)[1]
@@ -1071,7 +1077,7 @@ class PerforceClient(BaseSCMClient):
                           ignore_unmodified=True)
 
         return {
-            'diff': diff_writer.getvalue(),
+            'diff': stream.getvalue(),
             'changenum': self.get_changenum(revisions),
         }
 
@@ -1114,7 +1120,7 @@ class PerforceClient(BaseSCMClient):
         depot_include_files: List[str],
         local_include_files: List[str],
         exclude_patterns: List[str],
-    ) -> SCMClientDiffResult:
+    ) -> None:
         """Compute the changes across files given a revision range.
 
         This will look at the history of all changes within the given range and
@@ -1123,6 +1129,12 @@ class PerforceClient(BaseSCMClient):
         to include that information.
 
         Args:
+            diff_tool (rbtools.diffs.tools.base.diff_tool.BaseDiffTool):
+                The diff tool used to generate diffs.
+
+            diff_writer (rbtools.diffs.writers.UnifiedDiffWriter):
+                The writer used to write diff content.
+
             base (str):
                 The base of the revision range.
 
@@ -1139,10 +1151,6 @@ class PerforceClient(BaseSCMClient):
             exclude_patterns (list of str):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
-
-        Returns:
-            dict:
-            A dictionary with a single ``diff`` key.
         """
         # Start by looking at the filelog to get a history of all the changes
         # within the changeset range. This processing step is done because in
@@ -1397,10 +1405,6 @@ class PerforceClient(BaseSCMClient):
                 # self._accumulate_range_change should never be anything other
                 # than add, delete, move, or edit.
                 assert False
-
-        return {
-            'diff': diff_writer.getvalue(),
-        }
 
     def _accumulate_range_change(self, file_entry, change):
         """Compute the effects of a given change on a given file.
@@ -1749,7 +1753,8 @@ class PerforceClient(BaseSCMClient):
             dict:
             A dictionary containing a ``diff`` key.
         """
-        diff_writer = UnifiedDiffWriter()
+        stream = io.BytesIO()
+        diff_writer = UnifiedDiffWriter(stream)
 
         r_revision_range = re.compile(r'^(?P<path>//[^@#]+)' +
                                       r'(?P<revision1>[#@][^,]+)?' +
@@ -1860,7 +1865,7 @@ class PerforceClient(BaseSCMClient):
         os.unlink(tmp_diff_to_filename)
 
         return {
-            'diff': diff_writer.getvalue(),
+            'diff': stream.getvalue(),
         }
 
     def _do_diff(

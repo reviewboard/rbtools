@@ -307,7 +307,7 @@ class ClearCaseClient(BaseSCMClient):
     name = 'VersionVault / ClearCase'
     server_tool_names = 'ClearCase,VersionVault / ClearCase'
 
-    requires_diff_tool = ['gnu']
+    requires_diff_tool = True
 
     supports_patch_revert = True
 
@@ -1674,7 +1674,8 @@ class ClearCaseClient(BaseSCMClient):
         diff_result = diff_tool.run_diff_file(orig_path=old_tmp,
                                               modified_path=new_tmp)
 
-        diff_writer = UnifiedDiffWriter()
+        stream = io.BytesIO()
+        diff_writer = UnifiedDiffWriter(stream)
 
         if diff_result.has_text_differences:
             diff_writer.write_diff_file_result_headers(
@@ -1690,7 +1691,7 @@ class ClearCaseClient(BaseSCMClient):
 
             diff_writer.write_diff_file_result_hunks(diff_result)
 
-        diff_contents = diff_writer.getvalue()
+        diff_contents = stream.getvalue()
 
         if not repository_info.is_legacy:
             # We need oids of files to translate them to paths on reviewboard
@@ -1862,7 +1863,8 @@ class ClearCaseClient(BaseSCMClient):
         diff_result = diff_tool.run_diff_file(orig_path=diff_old_file,
                                               modified_path=diff_new_file)
 
-        diff_writer = UnifiedDiffWriter()
+        stream = io.BytesIO()
+        diff_writer = UnifiedDiffWriter(stream)
 
         if diff_result.has_text_differences:
             # Replace temporary filenames in the diff with view-local relative
@@ -1881,7 +1883,7 @@ class ClearCaseClient(BaseSCMClient):
 
             diff_writer.write_diff_file_result_hunks(diff_result)
 
-        diff_contents = diff_writer.getvalue()
+        diff_contents = stream.getvalue()
 
         if not repository_info.is_legacy:
             # We need oids of files to translate them to paths on reviewboard

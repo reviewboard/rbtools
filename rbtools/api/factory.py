@@ -1,28 +1,61 @@
-from __future__ import unicode_literals
+from typing import Optional, Type
 
-from rbtools.api.resource import (CountResource, ItemResource,
-                                  ListResource, RESOURCE_MAP)
+from rbtools.api.resource import (CountResource,
+                                  ItemResource,
+                                  ListResource,
+                                  Resource,
+                                  RESOURCE_MAP)
+from rbtools.api.transport import Transport
 from rbtools.api.utils import rem_mime_format
 
 
-SPECIAL_KEYS = set(('links', 'total_results', 'stat', 'count'))
+SPECIAL_KEYS = {
+    'links',
+    'total_results',
+    'stat',
+    'count',
+}
 
 
-def create_resource(transport, payload, url, mime_type=None,
-                    item_mime_type=None, guess_token=True):
+def create_resource(
+    transport: Transport,
+    payload: dict,
+    url: str,
+    mime_type: Optional[str] = None,
+    item_mime_type: Optional[str] = None,
+    guess_token: bool = True,
+) -> Resource:
     """Construct and return a resource object.
 
-    The mime type will be used to find a resource specific base class.
-    Alternatively, if no resource specific base class exists, one of
-    the generic base classes, Resource or ResourceList, will be used.
+    Args:
+        transport (rbtools.api.transport.Transport):
+            The API transport.
 
-    If an item mime type is provided, it will be used by list
-    resources to construct item resources from the list.
+        payload (dict):
+            The payload returned from the API endpoint.
 
-    If 'guess_token' is True, we will try and guess what key the
-    resources body lives under. If False, we assume that the resource
-    body is the body of the payload itself. This is important for
-    constructing Item resources from a resource list.
+        url (str):
+            The URL of the API endpoint.
+
+        mime_type (str, optional):
+            The MIME type of the API response. This is used to find a resource
+            specific class. If no resource specific class exists, one of the
+            generic base classes (:py:class:`~rbtools.api.resource.Resource`
+            or :py:class:`~rbtools.api.resource.ResourceList`) will be used.
+
+        item_mime_type (str, optional):
+            The MIME type to use when constructing individual items within a
+            list resource.
+
+        guess_token (bool, optional):
+            Whether to guess the key for the API response body. If ``False``,
+            we assume that the resource body is the body of the payload itself.
+            This is important for constructing item resources from a resource
+            list.
+
+    Returns:
+        rbtools.api.resource.Resource:
+        The resource instance.
     """
 
     # Determine the key for the resources data.
@@ -30,8 +63,11 @@ def create_resource(transport, payload, url, mime_type=None,
 
     if guess_token:
         other_keys = set(payload.keys()).difference(SPECIAL_KEYS)
+
         if len(other_keys) == 1:
             token = other_keys.pop()
+
+    resource_class: Type[Resource]
 
     # Select the base class for the resource.
     if 'count' in payload:

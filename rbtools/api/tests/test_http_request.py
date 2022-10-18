@@ -29,8 +29,8 @@ class HttpRequestTests(SpyAgency, TestCase):
         request = HttpRequest(
             url='/',
             query_args={
-                b'a_b': 'c',
-                'd-e': b'f',
+                'a_b': 'c',
+                'd-e': 'f',
             })
 
         self.assertEqual(request.url, '/?a-b=c&d-e=f')
@@ -40,11 +40,11 @@ class HttpRequestTests(SpyAgency, TestCase):
         request = HttpRequest(
             url='/',
             headers={
-                b'a': 'b',
-                'c': b'd',
+                'a': 'b',
+                'c': 'd',
             })
 
-        keys = list(six.iterkeys(request.headers))
+        keys = list(request.headers.keys())
         self.assertIs(type(keys[0]), str)
         self.assertIs(type(keys[1]), str)
         self.assertIs(type(request.headers[keys[0]]), str)
@@ -166,7 +166,7 @@ class HttpRequestTests(SpyAgency, TestCase):
                 'false': '0',
             })
 
-        for key, value in six.iteritems(query_args):
+        for key, value in query_args.items():
             self.assertIsInstance(key, str)
             self.assertIsInstance(value, str)
 

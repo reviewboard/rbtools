@@ -20,11 +20,11 @@ from rbtools.utils.encoding import force_bytes
 _BytesOrStr: TypeAlias = Union[bytes, str]
 
 
-class UnifiedDiffWriter(io.BytesIO):
+class UnifiedDiffWriter:
     """Writer for generating Unified Diff files.
 
-    This can be used to incrementally build up one or more Unified Diff
-    files from any provided input or from results from a diff tool.
+    This can be used to incrementally build up one or more Unified Diff files
+    from any provided input or from results from a diff tool.
 
     It takes care of ensuring proper newlines at the end of the file.
 
@@ -49,12 +49,16 @@ class UnifiedDiffWriter(io.BytesIO):
 
     def __init__(
         self,
+        stream: io.BufferedIOBase,
         encoding: str = 'utf-8',
         newline: bytes = b'\n',
     ) -> None:
         """Initialize the writer.
 
         Args:
+            stream (io.BufferedIOBase):
+                The stream to write to.
+
             encoding (str, optional):
                 The encoding to use to encode Unicode strings.
 
@@ -68,6 +72,7 @@ class UnifiedDiffWriter(io.BytesIO):
         """
         self.encoding = encoding
         self.newline = newline
+        self.stream = stream
 
     def write_orig_file_header(
         self,
@@ -205,10 +210,10 @@ class UnifiedDiffWriter(io.BytesIO):
             # The hunks will be written as-is. It's assumed the caller was
             # careful about newlines.
             if hunks:
-                self.write(hunks)
+                self.stream.write(hunks)
 
                 if not hunks.endswith(self.newline):
-                    self.write(self.newline)
+                    self.stream.write(self.newline)
         else:
             for line in hunks:
                 self.write_line(line)
@@ -364,5 +369,5 @@ class UnifiedDiffWriter(io.BytesIO):
         # The provided line should never end with a \r\n or \n.
         assert not norm_line.endswith(b'\n')
 
-        self.write(norm_line)
-        self.write(self.newline)
+        self.stream.write(norm_line)
+        self.stream.write(self.newline)

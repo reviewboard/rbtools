@@ -527,8 +527,12 @@ class BaseSOSTestCase(SCMClientTestCase):
 class SOSClientTests(BaseSOSTestCase):
     """Unit tests for rbtools.clients.sos.SOSClient."""
 
-    def test_check_dependencies_with_found(self):
-        """Testing SOSClient.check_dependencies with soscmd found"""
+    def setUp(self):
+        super().setUp()
+
+        # Our unit tests simulate results for soscmd, so we don't actually
+        # need it installed. Instead, fake that it's installed so tests
+        # aren't skipped.
         self.spy_on(check_install, op=kgb.SpyOpMatchAny([
             {
                 'args': (['soscmd', 'version'],),
@@ -536,6 +540,8 @@ class SOSClientTests(BaseSOSTestCase):
             },
         ]))
 
+    def test_check_dependencies_with_found(self):
+        """Testing SOSClient.check_dependencies with soscmd found"""
         client = self.build_client(setup=False)
         client.check_dependencies()
 
@@ -546,6 +552,7 @@ class SOSClientTests(BaseSOSTestCase):
         """Testing SOSClient.check_dependencies with dependencies
         missing
         """
+        check_install.unspy()
         self.spy_on(check_install, op=kgb.SpyOpReturn(False))
 
         client = self.build_client(setup=False)
@@ -571,6 +578,7 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_get_local_path_with_deps_missing(self):
         """Testing SOSClient.get_local_path with dependencies missing"""
+        check_install.unspy()
         self.spy_on(check_install, op=kgb.SpyOpReturn(False))
         self.spy_on(RemovedInRBTools50Warning.warn)
 
@@ -598,6 +606,7 @@ class SOSClientTests(BaseSOSTestCase):
         """
         # A False value is used just to ensure get_local_path() bails early,
         # and to minimize side-effects.
+        check_install.unspy()
         self.spy_on(check_install, op=kgb.SpyOpReturn(False))
 
         client = self.build_client(setup=False)
