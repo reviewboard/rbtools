@@ -1,0 +1,262 @@
+.. default-intersphinx:: rbt4.x rb-latest
+
+
+=========================
+RBTools 4.0 Release Notes
+=========================
+
+**Release date:** TBD
+
+
+Compatibility
+=============
+
+* RBTools 4.0 supports Python 3.7 through 3.11.
+
+  Support for Python 2.7 and 3.6 have been dropped. For continued support,
+  please use RBTools 3.x.
+
+* The RBTools for Windows installer now bundles Python 3.10.
+
+  This unfortunately means we have to drop support for Windows 7 and older,
+  as Python has dropped support in their installers.
+
+
+New Features
+============
+
+* Added support for Apple Diff on macOS Ventura.
+
+  Ventura is the first version of macOS to drop support for GNU Diff. It
+  instead introduces Apple Diff, which is similar to GNU Diff in most (but
+  not all) respects.
+
+  RBTools 4 has been updated to detect whether GNU Diff or Apple Diff is
+  installed and to interface with it properly.
+
+* Added conflict information when trying to apply Subversion patches using
+  :rbtcommand:`rbt patch` or :rbtcommand:`rbt land`.
+
+* Improved error messages when posting review requests if failing to find
+  a repository match.
+
+  Sometimes local tools (such as :command:`git`, :command:`svn`, or
+  :command:`diff`) are missing when posting a change for review, or the local
+  tree doesn't quite match up with what's configured on Review Board. Or
+  there may be too many repositories that match the local tree.
+
+  RBTools will now report on what types of repositories were tried, what
+  tools may be missing, and what conflicts may have been found, helping you
+  to resolve the problem more quickly.
+
+
+Performance Improvements
+========================
+
+* Improved the performance of diff generation for most SCMs.
+
+  Subversion, Perforce, and Team Foundation Server will see the most gains
+  here, especially for larger changes.
+
+* Improved startup time and reliability.
+
+  We've optimized how we load in repository support, reducing the work
+  required when starting up.
+
+
+RBTools Python API
+==================
+
+If you're developing custom scripts that use the RBTools Python API, you may
+need to update your scripts for RBTools 4.
+
+These changes should all be backwards-compatible, but deprecated code will be
+removed in RBTools 5.
+
+
+New SCMClient Support
+---------------------
+
+We've completely reworked how SCMClients (which interface with services like
+Git or Perforce) are registered and set up:
+
+* SCMClients can be registered or looked up using
+  :py:data:`rbtools.clients.base.registry.scmclient_registry`.
+
+  This will still include SCMClients provided by Python packages that use
+  Python Entry Points.
+
+* Custom SCMClients must now inherit from
+  :py:class:`rbtools.clients.base.scmclient.BaseSCMClient`, instead of the
+  legacy :py:class:`rbtools.clients.SCMClient`.
+
+  This allows base class allows clients to specify dependencies, compatible
+  diff tools (GNU Diff, Apple Diff, or custom diff tools), and go through
+  a formal setup process.
+
+* If manually instantiating a SCMClient,
+  :py:meth:`~rbtools.clients.base.scmclient.BaseSCMClient.setup` must be
+  called.
+
+  This checks for missing dependencies and performs some internal client
+  setup.
+
+  If not called, certain operations may fail, or emit deprecation warnings.
+
+
+New Diff Functionality
+----------------------
+
+It's now easier than ever to create or process diffs using RBTools.
+
+* :py:mod:`rbtools.diffs.tools` provides wrappers and a registry for looking
+  up and calling the correct diff tool for your system.
+
+* :py:class:`rbtools.diffs.writers.UnifiedDiffWriter` makes it easy to
+  programmatically generate Unified Diff files with the right syntax and
+  encodings.
+
+
+New Repository Scanning
+-----------------------
+
+Tools can now use
+:py:func:`rbtools.utils.source_tree.scan_scmclients_for_path` to determine
+which SCMClient and which repository on Review Board is correct for a given
+path.
+
+This will check client dependencies as well, and return detailed error
+messages if a match could not be found.
+
+
+Python 3 Type Annotations
+-------------------------
+
+Much of our codebase has been updated to provide Type Annotations, which IDEs
+can use to ensure the code you write is using the right types.
+
+Much of the API, SCMClients, new diff functionality, and utility functions
+have been updated with Type Annotations, with more coming in the future.
+
+
+Deprecations
+------------
+
+The following functionality in the RBTools Python API have been deprecated
+and will be removed in RBTools 5:
+
+
+rbtools.api
+~~~~~~~~~~~
+
+* :py:class:`rbtools.api.cache.CachedHTTPResponse`:
+
+  * :py:meth:`~rbtools.api.cache.CachedHTTPResponse.info` (use
+    :py:attr:`~rbtools.api.cache.CachedHTTPResponse.headers` instead).
+  * :py:meth:`~rbtools.api.cache.CachedHTTPResponse.getcode` (use
+    :py:attr:`~rbtools.api.cache.CachedHTTPResponse.code` instead).
+
+* :py:class:`rbtools.api.cache.LiveHTTPResponse`:
+
+  * :py:meth:`~rbtools.api.cache.LiveHTTPResponse.info` (use
+    :py:attr:`~rbtools.api.cache.LiveHTTPResponse.headers` instead).
+  * :py:meth:`~rbtools.api.cache.LiveHTTPResponse.getcode` (use
+    :py:attr:`~rbtools.api.cache.LiveHTTPResponse.code` instead).
+
+* :py:class:`rbtools.api.request.HttpRequest`:
+
+  * :py:meth:`~rbtools.api.request.HttpRequest.add_field` now requires
+    byte string or Unicode string arguments.
+
+* :py:class:`rbtools.api.resource.ResourceDictField`:
+
+  * :py:meth:`~rbtools.api.resource.ResourceDictField.iteritems` (use
+    :py:meth:`~rbtools.api.resource.ResourceDictField.items` instead).
+  * :py:meth:`~rbtools.api.resource.ResourceDictField.iterfields` (use
+    :py:meth:`~rbtools.api.resource.ResourceDictField.fields` instead).
+
+
+rbtools.clients
+~~~~~~~~~~~~~~~
+
+* :py:class:`rbtools.clients.SCMClient` (subclass
+  :py:class:`rbtools.clients.base.scmclient.BaseSCMClient` instead).
+* :py:class:`rbtools.clients.base.repository.RepositoryInfo` now expects
+  keyword arguments instead of positional arguments.
+* :py:meth:`BaseSCMClient.diff()
+  <rbtools.clients.base.scmclient.BaseSCMClient.diff>` now expects keyword
+  arguments, and should not take SCM-specific arguments.
+
+
+rbtools.utils
+~~~~~~~~~~~~~
+
+* :py:mod:`rbtools.utils.checks`
+
+  * :py:func:`~rbtools.utils.checks.is_valid_version` (compare tuples
+    directly instead).
+
+* :py:mod:`rbtools.utils.diffs`
+
+  * :py:func:`~rbtools.utils.diffs.filename_match_any_patterns` now expects
+    ``base_dir`` as a keyword argument.
+  * :py:func:`~rbtools.utils.diffs.filter_diff` now expects
+    ``exclude_patterns`` and ``base_dir`` as keyword arguments.
+  * :py:func:`~rbtools.utils.diffs.normalize_patterns` now expects
+    ``base_dir`` and ``cwd`` as keyword arguments.
+  * :py:func:`~rbtools.utils.diffs.remove_filenames_matching_patterns` now
+    expects ``base_dir`` and ``patterns`` as keyword arguments.
+
+* :py:mod:`rbtools.utils.process`
+
+  * :py:func:`~rbtools.utils.process.execute` (use
+    :py:func:`~rbtools.utils.process.run_process` instead).
+
+
+Bug Fixes
+=========
+
+API Communication
+-----------------
+
+* Fixed a bug where RBTools tried and failed to load custom SSL certificates
+  when only finding a certificate or a key (but not both).
+
+
+Bazaar/Breezy
+-------------
+
+* Fixed rare crashes that could occur with mismatched data types.
+
+
+Mercurial
+---------
+
+* Fixed problems that could occur when applying Mercurial patches using
+  :rbtcommand:`rbt patch` or :rbtcommand:`rbt land`.
+
+
+Subversion
+----------
+
+* Fixed problems that could occur when applying Subversion patches using
+  :rbtcommand:`rbt patch` or :rbtcommand:`rbt land`.
+
+* Fixed an infinite loop that could theoretically occur when building diffs
+  of empty files.
+
+
+Team Foundation Server
+----------------------
+
+* Fixed a crash that could occur when parsing revisions to post for review.
+
+* Fixed string type issues on Python 3.
+
+
+Contributors
+============
+
+* Christian Hammond
+* David Trowbridge
+* Michelle Aubin

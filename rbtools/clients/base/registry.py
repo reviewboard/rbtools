@@ -261,4 +261,8 @@ class SCMClientRegistry:
                                  ep, e)
 
 
+#: The main SCMClients registry used by RBTools.
+#:
+#: Version Added:
+#:     4.0
 scmclient_registry = SCMClientRegistry()
