@@ -182,7 +182,7 @@ class UnifiedDiffWriter:
 
         Args:
             contents (bytes or str):
-                The contents to write after ``Index: ``.
+                The contents to write after ``Index:``.
         """
         self.write_line(b'Index: %s' % force_bytes(contents, self.encoding))
         self.write_line(b'=' * 67)

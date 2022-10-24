@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<Project ToolsVersion="4.0"
+         xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+ <!-- Output paths -->
+ <PropertyGroup>
+  <OutputPath>bin\$(Platform)\$(Configuration)\</OutputPath>
+  <IntermediateOutputPath>obj\$(Platform)\$(Configuration)\</IntermediateOutputPath>
+ </PropertyGroup>
+
+ <!-- Code Signing Parameters -->
+ <PropertyGroup>
+  <SignOutput Condition="'$(CertificateThumbprint)' != ''">true</SignOutput>
+  <TimestampUrl Condition="'$(TimestampUrl)' == ''">http://timestamp.verisign.com/scripts/timstamp.dll</TimestampUrl>
+ </PropertyGroup>
+
+ <!-- Code Signing Paths -->
+ <PropertyGroup>
+  <Win10SDKInstallationFolder>$(registry:HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Microsoft SDKs\Windows\v10.0@InstallationFolder)</Win10SDKInstallationFolder>
+  <Win10SDKProductVersion>$(registry:HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Microsoft SDKs\Windows\v10.0@ProductVersion)</Win10SDKProductVersion>
+
+  <SignToolPath>$(Win10SDKInstallationFolder)bin\$(Win10SDKProductVersion).0\$(Platform)\signtool.exe</SignToolPath>
+ </PropertyGroup>
+
+ <Target Name="EnsureSignToolInstalled"
+         Condition=" '$(SignToolPath)' == '' OR !Exists('$(SignToolPath)') ">
+  <Error Text="signtool.exe must be installed. It was expected at '$(SignToolPath)'. This may require an update to the list of supported SDK paths in the WiX installer." />
+ </Target>
+</Project>

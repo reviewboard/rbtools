@@ -258,27 +258,6 @@ class BaseSCMClient(object):
 
         * A call to :py:meth:`setup` or :py:meth:`has_dependencies` will be
           required starting in RBTools 5.0.
-
-    Attributes:
-        config (dict):
-            Any user configuration loaded via :file:`.reviewboardrc` files.
-            This may be empty.
-
-        is_setup (bool):
-            Whether the client is set up and ready for operations. Operations
-            may fail if this is ``False``.
-
-            Callers must call :py:meth:`setup` or :py:meth:`has_dependencies`
-            before performing operations using this client.
-
-            Version Added:
-                4.0
-
-        options (argparse.Namespace):
-            Any command line arguments passed to a tool running this client.
-            This may be empty, and makes assumptions about which command line
-            arguments are registered with a command. It's intended for use
-            within RBTools.
     """
 
     #: The unique ID of the client.

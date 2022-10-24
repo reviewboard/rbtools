@@ -1,6 +1,6 @@
 """Utilities used by the API interfaces."""
 
-from typing import TypedDict
+from typing_extensions import TypedDict
 
 
 class ParsedMIMEType(TypedDict):

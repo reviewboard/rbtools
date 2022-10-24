@@ -48,6 +48,7 @@ Base Support
    rbtools.clients
    rbtools.clients.base
    rbtools.clients.base.patch
+   rbtools.clients.base.registry
    rbtools.clients.base.repository
    rbtools.clients.base.scmclient
    rbtools.clients.errors
@@ -86,6 +87,7 @@ Diff Generation/Processing
    rbtools.diffs.tools.base.diff_tool
    rbtools.diffs.tools.errors
    rbtools.diffs.tools.registry
+   rbtools.diffs.writers
 
 
 RBTools Commands
@@ -187,5 +189,6 @@ Utilities
    rbtools.utils.process
    rbtools.utils.repository
    rbtools.utils.review_request
+   rbtools.utils.source_tree
    rbtools.utils.testbase
    rbtools.utils.users

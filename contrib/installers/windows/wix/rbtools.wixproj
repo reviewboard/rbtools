@@ -3,12 +3,11 @@
 <Project ToolsVersion="4.0"
          DefaultTargets="Build"
          xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-
  <!-- Common properties for building the installer. -->
  <PropertyGroup>
   <Configuration Condition=" '$(Configuration)' == '' ">Release</Configuration>
   <Platform Condition=" '$(Platform)' == '' ">x64</Platform>
-  <ProductVersion>3.9</ProductVersion>
+  <ProductVersion>3.11</ProductVersion>
   <ProjectGuid>45BB4178-86BF-44FC-BE19-A54763BCA4CC</ProjectGuid>
   <SchemaVersion>2.0</SchemaVersion>
 
@@ -21,13 +20,6 @@
   <Pedantic>True</Pedantic>
   <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
   <SuppressPdbOutput>True</SuppressPdbOutput>
-  <WixTargetsPath Condition=" '$(WixTargetsPath)' == '' AND '$(MSBuildExtensionsPath32)' != '' ">$(MSBuildExtensionsPath32)\Microsoft\WiX\v3.x\Wix.targets</WixTargetsPath>
-  <WixTargetsPath Condition=" '$(WixTargetsPath)' == '' ">$(MSBuildExtensionsPath)\Microsoft\WiX\v3.x\Wix.targets</WixTargetsPath>
-  <SignOutput Condition="'$(CertificateThumbprint)' != '' ">true</SignOutput>
-  <TimestampUrl Condition="'$(TimestampUrl)' == ''">http://timestamp.verisign.com/scripts/timstamp.dll</TimestampUrl>
-
-  <OutputPath>bin\$(Platform)\$(Configuration)\</OutputPath>
-  <IntermediateOutputPath>obj\$(Platform)\$(Configuration)\</IntermediateOutputPath>
  </PropertyGroup>
 
  <!--
@@ -50,7 +42,17 @@
   <EmbeddedResource Include="Product_en-us.wxl"/>
  </ItemGroup>
 
- <Import Project="$(WixTargetsPath)" />
+ <Import Project="common.props"/>
+
+ <!-- Import Wix.targets -->
+ <Import Project="$(WixTargetsPath)"
+         Condition=" '$(WixTargetsPath)' != '' " />
+ <Import Project="$(MSBuildExtensionsPath32)\Microsoft\WiX\v3.x\Wix.targets"
+         Condition=" '$(WixTargetsPath)' == '' AND Exists('$(MSBuildExtensionsPath32)\Microsoft\WiX\v3.x\Wix.targets') " />
+ <Target Name="EnsureWixToolsetInstalled"
+         Condition=" '$(WixTargetsImported)' != 'true' ">
+  <Error Text="The WiX Toolset v3.11 (or newer) build tools must be installed to build this project. To download the WiX Toolset, see http://wixtoolset.org/releases/" />
+ </Target>
 
  <!-- Sign the bundled cabinet files -->
  <Target Name="SignCabs">
@@ -61,6 +63,6 @@
 
  <!-- Sign the installer -->
  <Target Name="SignMsi">
-  <Exec Command='"$(WindowsSDK80Path)\bin\x64\signtool.exe" sign /sha1 $(CertificateThumbprint) /t $(TimestampUrl) "%(SignMsi.FullPath)"' />
+  <Exec Command='"$(SignToolPath)" sign /fd SHA256 /sha1 $(CertificateThumbprint) /t $(TimestampUrl) "%(SignMsi.FullPath)"' />
  </Target>
 </Project>
