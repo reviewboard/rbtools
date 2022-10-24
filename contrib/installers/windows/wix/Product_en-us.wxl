@@ -12,5 +12,5 @@
  <String Id="NewerVersionAlreadyInstalled">Command line utilities and Python API for working with Review Board.</String>
 
  <String Id="x64VersionRequired">You need to install the 64-bit version of this product on 64-bit Windows.</String>
- <String Id="x86VersionRequired">You need to install the 32-bit version of this product on 32-bit Windows.</String>
+ <String Id="x86VersionRequired">RBTools requires a 64-bit version of Windows. To install on 32-bit, please download RBTools 3.x, or install on your own copy of Python 3.</String>
 </WixLocalization>

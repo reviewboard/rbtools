@@ -22,7 +22,6 @@ popd
 set BUILD_DEST=%TREE_ROOT%\dist
 set BUILD_BASE=%TREE_ROOT%\build\windows-pkg
 set BUILD_ROOT=%BUILD_BASE%\build
-set BUILD_ROOT_X86=%BUILD_BASE%\build\x86
 set BUILD_ROOT_X64=%BUILD_BASE%\build\x64
 set BUILD_STAGE=%BUILD_BASE%\stage
 set DEPS_DIR=%BUILD_BASE%\deps
@@ -36,11 +35,6 @@ set PYTHON_VERSION=3.8.14
 set PYTHON_URL_BASE=https://s3.amazonaws.com/downloads.beanbaginc.com/python
 :: set PYTHON_URL_BASE=https://www.python.org/ftp/python
 
-set PYTHON_X86_FILENAME=python-%PYTHON_VERSION%.exe
-set PYTHON_X86_URL=%PYTHON_URL_BASE%/%PYTHON_VERSION%/%PYTHON_X86_FILENAME%
-set PYTHON_X86_MD5=f3daaad6998195d1286258145d557b0e
-set PYTHON_X86_DEP=%DEPS_DIR%\python-%PYTHON_VERSION%-x86
-
 set PYTHON_X64_FILENAME=python-%PYTHON_VERSION%-amd64.exe
 set PYTHON_X64_URL=%PYTHON_URL_BASE%/%PYTHON_VERSION%/%PYTHON_X64_FILENAME%
 set PYTHON_X64_MD5=9e0e02f01395129f08626c54c247d29b
@@ -50,9 +44,6 @@ set PYTHON_X64_DEP=%DEPS_DIR%\python-%PYTHON_VERSION%-x64
 ::-------------------------------------------------------------------------
 :: Binaries
 ::-------------------------------------------------------------------------
-set BUNDLED_PYTHON_X86_DIR=%BUILD_ROOT_X86%\Python
-set BUNDLED_PYTHON_X86=%BUNDLED_PYTHON_X86_DIR%\python.exe
-
 set BUNDLED_PYTHON_X64_DIR=%BUILD_ROOT_X64%\Python
 set BUNDLED_PYTHON_X64=%BUNDLED_PYTHON_X64_DIR%\python.exe
 
@@ -70,11 +61,6 @@ set CERT_THUMBPRINT=deee311acc700a6f797018a6cf4075131b6f7198
 ::-------------------------------------------------------------------------
 if not exist "%DEPS_DIR%" mkdir "%DEPS_DIR%"
 if not exist "%BUILD_STAGE%" mkdir "%BUILD_STAGE%"
-
-call :InstallPython ^
-    x86 %PYTHON_X86_DEP% %PYTHON_X86_FILENAME% ^
-    %PYTHON_X86_URL% %PYTHON_X86_MD5% ^
-    || goto :Abort
 
 call :InstallPython ^
     x64 %PYTHON_X64_DEP% %PYTHON_X64_FILENAME% ^
@@ -153,7 +139,6 @@ echo.
 echo == Creating build directory ==
 
 call :DeleteIfExists "%BUILD_ROOT%"
-xcopy /EYI "%PYTHON_X86_DEP%" "%BUNDLED_PYTHON_X86_DIR%" >NUL
 xcopy /EYI "%PYTHON_X64_DEP%" "%BUNDLED_PYTHON_X64_DIR%" >NUL
 
 goto :EOF
@@ -171,21 +156,6 @@ echo.
 echo --------------------------- [Install log] ---------------------------
 
 pushd %TREE_ROOT%
-
-:: Install packages for 32-bit packages.
-"%BUNDLED_PYTHON_X86%" -m ensurepip --upgrade
-
-if ERRORLEVEL 1 (
-    popd
-    exit /B 1
-)
-
-"%BUNDLED_PYTHON_X86%" -m pip install -U pip setuptools
-
-if ERRORLEVEL 1 (
-    popd
-    exit /B 1
-)
 
 :: Install packages for 64-bit packages.
 "%BUNDLED_PYTHON_X64%" -m ensurepip --upgrade
@@ -222,14 +192,6 @@ echo --------------------------- [Install log] ---------------------------
 
 pushd %TREE_ROOT%
 
-:: Build for 32-bit Python.
-"%BUNDLED_PYTHON_X86%" setup.py release install >NUL
-
-if ERRORLEVEL 1 (
-    popd
-    exit /B 1
-)
-
 :: Build for 64-bit Python.
 "%BUNDLED_PYTHON_X64%" setup.py release install >NUL
 
@@ -254,14 +216,9 @@ setlocal
 echo.
 echo == Removing unwanted files ==
 
-call :DeleteIfExists "%BUNDLED_PYTHON_X86_DIR%\Doc"
-call :DeleteIfExists "%BUNDLED_PYTHON_X86_DIR%\tcl"
-call :DeleteIfExists "%BUNDLED_PYTHON_X86_DIR%\Tools"
-call :DeleteIfExists "%BUNDLED_PYTHON_X86_DIR%\%PYTHON_X86_FILENAME%"
-
 call :DeleteIfExists "%BUNDLED_PYTHON_X64_DIR%\Doc"
 call :DeleteIfExists "%BUNDLED_PYTHON_X64_DIR%\tcl"
-call :DeleteIfExists "%BUNDLED_PYTHON_X86_DIR%\Tools"
+call :DeleteIfExists "%BUNDLED_PYTHON_X64_DIR%\Tools"
 call :DeleteIfExists "%BUNDLED_PYTHON_X64_DIR%\%PYTHON_X64_FILENAME%"
 
 echo == Files removed ==
@@ -281,22 +238,6 @@ set _rbtools_version=%_return1%
 set _wix_path=%CD%\wix
 set _sln_file=%_wix_path%\rbtools.sln
 set _timestamp_url=http://timestamp.comodoca.com/authenticode
-
-echo.
-echo == Building the RBTools installer [x86] ==
-
-%MSBUILD% ^
-    /p:Version="%_rbtools_version%" ^
-    /p:Platform=x86 ^
-    /p:ExeSuffix=-32bit ^
-    /p:Root="%BUILD_ROOT_X86%" ^
-    /p:OutputPath="%BUILD_STAGE%\\" ^
-    /p:SourcePath="%_wix_path%" ^
-    /p:CertificateThumbprint=%CERT_THUMBPRINT% ^
-    /p:TimestampUrl=%_timestamp_url% ^
-    "%_sln_file%"
-
-if ERRORLEVEL 1 exit /B 1
 
 echo.
 echo == Building the RBTools installer [x64] ==
@@ -345,35 +286,38 @@ goto :EOF
 :: Determines the path to MSBuild.exe
 ::-------------------------------------------------------------------------
 :SetMSBuildPath
-setlocal
+setlocal enabledelayedexpansion
 
-set _reg_key=HKLM\SOFTWARE\Microsoft\MSBuild\ToolsVersions\4.0
-set _reg_query_cmd=reg.exe query "%_reg_key%" /V MSBuildToolsPath
+set _vswhere="C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
 
-%_reg_query_cmd% >NUL 2>&1
+echo %_vswhere%
 
-if ERRORLEVEL 1 (
-    echo Cannot obtain the MSBuild tools path from the registry.
+echo Searching
+for /f "usebackq tokens=*" %%i in (`%_vswhere% -latest -products * -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe`) do (
+    echo found
+    set MSBUILDPATH="%%i"
+)
+
+echo checking 1
+echo %MSBUILDPATH%
+
+if %MSBUILDPATH%X == X (
+    echo vswhere.exe could not find MSBuild.exe.
+    echo.
+    echo Make sure you have downloaded the Visual Studio Build Tools.
     exit /B 1
 )
 
-for /f "skip=2 tokens=2,*" %%A in ('%_reg_query_cmd%') do (
-    SET MSBUILDDIR=%%B
-)
+echo checking 2
 
-if not exist %MSBUILDDIR%nul (
-    echo The MSBuild tools path from the registry does not exist.
-    echo
-    echo The missing path is: %MSBUILDDIR%
+if not exist %MSBUILDPATH% (
+    echo The MSBuild tools path could not be determined from vswhere.exe.
+    echo.
+    echo The missing path is: %MSBUILDPATH%
     exit /B 1
 )
 
-if not exist %MSBUILDDIR%msbuild.exe (
-    echo MSBuild.exe is missing from %MSBUILDDIR%.
-    exit /B 1
-)
-
-endlocal & set MSBUILD=%MSBUILDDIR%msbuild.exe
+endlocal & set MSBUILD=%MSBUILDPATH%
 goto :EOF
 
 
