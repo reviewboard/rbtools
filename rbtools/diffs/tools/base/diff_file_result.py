@@ -6,7 +6,9 @@ Version Added:
 
 import io
 import re
-from typing import Iterator, List, Optional, Tuple, TypedDict
+from typing import Iterator, List, Optional, Tuple
+
+from typing_extensions import TypedDict
 
 
 _DEFAULT_FILE_HEADER_RE = re.compile(
