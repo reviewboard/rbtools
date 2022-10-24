@@ -5,7 +5,7 @@
 RBTools 4.0 Release Notes
 =========================
 
-**Release date:** TBD
+**Release date:** October 24, 2022
 
 
 Compatibility
