@@ -2,12 +2,9 @@ from __future__ import unicode_literals
 
 import logging
 import re
+from shutil import get_terminal_size
 
 import texttable as tt
-try:
-    from backports.shutil_get_terminal_size import get_terminal_size
-except ImportError:
-    from shutil import get_terminal_size
 
 from rbtools.commands import Command, Option
 from rbtools.utils.users import get_username
