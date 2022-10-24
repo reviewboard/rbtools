@@ -107,7 +107,7 @@ def deprecate_non_keyword_only_args(
     Args:
         warning_cls (type):
             The specific RBTools deprecation warning class to use. This must
-            be a subclass of :py:clas:`BaseRemovedInRBToolsVersionWarning`.
+            be a subclass of :py:class:`BaseRemovedInRBToolsVersionWarning`.
 
         message (str, optional):
             An optional message to use instead of the default.

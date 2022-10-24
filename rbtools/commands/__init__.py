@@ -181,7 +181,7 @@ class OutputWrapper(object):
                 String to write to output stream.
 
             end (unicode, optional):
-                String to append to end of msg. This defaults to ``\n```.
+                String to append to end of msg. This defaults to ``\\n```.
         """
         if self.output_stream:
             if end:
