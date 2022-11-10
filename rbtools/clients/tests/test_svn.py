@@ -1,3 +1,4 @@
+# coding: utf-8
 """Unit tests for SubversionClient."""
 
 from __future__ import unicode_literals
