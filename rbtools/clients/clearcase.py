@@ -10,7 +10,7 @@ import os
 import re
 import sys
 import threading
-from collections import defaultdict, deque
+from collections import OrderedDict, defaultdict, deque
 from typing import Dict, List, Optional
 
 import six
@@ -1055,7 +1055,7 @@ class ClearCaseClient(BaseSCMClient):
             list:
             The list of file versions.
         """
-        changelist = {}
+        changelist = OrderedDict()
         ignored_changes = []
         changeset = list(changeset)
 
