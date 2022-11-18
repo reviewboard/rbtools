@@ -9,7 +9,7 @@ import os
 import re
 import sys
 import threading
-from collections import defaultdict, deque
+from collections import OrderedDict, defaultdict, deque
 
 import six
 from pydiffx.dom import DiffX
@@ -979,7 +979,7 @@ class ClearCaseClient(SCMClient):
             list:
             The list of file versions.
         """
-        changelist = {}
+        changelist = OrderedDict()
         ignored_changes = []
         changeset = list(changeset)
 
