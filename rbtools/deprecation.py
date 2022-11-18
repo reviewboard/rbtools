@@ -167,14 +167,18 @@ def deprecate_non_keyword_only_args(
             sig = inspect.signature(func)
             first_kwonly_arg_index = -1
             param_names = []
+            i = 0
 
             # This is guaranteed to be in the correct order.
-            for i, param in enumerate(sig.parameters.values()):
-                param_names.append(param.name)
+            for param in sig.parameters.values():
+                if param.kind not in (param.VAR_POSITIONAL, param.VAR_KEYWORD):
+                    param_names.append(param.name)
 
-                if (param.kind == param.KEYWORD_ONLY and
-                    first_kwonly_arg_index == -1):
-                    first_kwonly_arg_index = i
+                    if (param.kind == param.KEYWORD_ONLY and
+                        first_kwonly_arg_index == -1):
+                        first_kwonly_arg_index = i
+
+                    i += 1
 
             assert first_kwonly_arg_index != -1, (
                 '@deprecate_non_keyword_only_args cannot be used on '
@@ -231,18 +235,23 @@ def deprecate_non_keyword_only_args(
         new_args: List = []
         new_kwargs: Dict[str, Any] = kwargs.copy()
         moved_args: List[str] = []
+        i = 0
 
-        for i, param_name in enumerate(param_names):
-            if i < first_kwonly_arg_index:
-                # This is a valid positional argument.
-                new_args.append(args[i])
-            elif i < num_args:
-                # This must be converted to a keyword argument.
-                new_kwargs[param_name] = args[i]
-                moved_args.append(param_name)
-            else:
-                # We've handled all positional arguments. We're done.
-                break
+        for param_name in param_names:
+            if param_name not in kwargs:
+                if i < first_kwonly_arg_index:
+                    new_args.append(args[i])
+                elif i < num_args:
+                    # This must be converted to a keyword argument.
+                    new_kwargs[param_name] = args[i]
+                    moved_args.append(param_name)
+                else:
+                    # We've handled all positional arguments. We're done.
+                    break
+
+                i += 1
+
+        new_args += args[i:]
 
         warning_cls.warn(
             message or (
