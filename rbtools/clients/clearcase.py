@@ -2140,20 +2140,20 @@ class ClearCaseClient(BaseSCMClient):
                 # directory diff will break in odd ways depending on
                 # the view type. Explicitly appending the element
                 # version seems to work.
-                old_version = execute(
-                    ['cleartool', 'describe', '-fmt', '%Vn', file.old_path])
-                old_path = '%s@@%s' % (old_file, old_version)
 
                 for file in files:
                     if (file.old_oid == old_oid or
                         file.new_oid == new_oid):
-                        file.old_path = old_path
+                        old_version = execute(['cleartool', 'describe',
+                                               '-fmt', '%Vn', file.old_path])
+                        file.old_path = '%s@@%s' % (old_file, old_version)
                         file.op = 'move'
+
                         break
                 else:
                     if not self._is_dir(new_file):
                         files.append(ChangesetEntry(self.root_path,
-                                                    old_path=old_path,
+                                                    old_path=old_file,
                                                     new_path=new_file,
                                                     old_oid=old_oid,
                                                     new_oid=new_oid,
