@@ -193,8 +193,24 @@ class ChangesetEntry(object):
         self._new_oid = new_oid
         self._new_version = None
 
+        self._vob_oid = None
+
         self.op = op
         self.is_dir = is_dir
+
+    @property
+    def vob_oid(self):
+        """The OID of the VOB that the element is in.
+
+        Type:
+            unicode
+        """
+        if self._vob_oid is None:
+            self._vob_oid = execute(
+                ['cleartool', 'describe', '-fmt', '%On',
+                 'vob:%s' % (self.new_path or self.old_path)])
+
+        return self._vob_oid
 
     @property
     def old_oid(self):
@@ -235,8 +251,9 @@ class ChangesetEntry(object):
             unicode
         """
         if self._old_version is None and self.old_path:
-            self._old_version = execute(['cleartool', 'describe', '-fmt',
-                                         '%Vn', 'oid:%s' % self.old_oid])
+            self._old_version = execute(
+                ['cleartool', 'describe', '-fmt', '%Vn',
+                 'oid:%s@vobuuid:%s' % (self.old_oid, self.vob_oid)])
 
         return self._old_version
 
@@ -274,10 +291,11 @@ class ChangesetEntry(object):
     @property
     def new_version(self):
         if self._new_version is None and self.new_path:
-            self._new_version = execute(['cleartool', 'describe', '-fmt',
-                                         '%Vn', 'oid:%s' % self.new_oid],
-                                        ignore_errors=True,
-                                        with_errors=True)
+            self._new_version = execute(
+                ['cleartool', 'describe', '-fmt', '%Vn',
+                 'oid:%s@vobuuid:%s' % (self.new_oid, self.vob_oid)],
+                ignore_errors=True,
+                with_errors=True)
 
             if 'Not a vob object' in self._new_version:
                 self._new_version = 'CHECKEDOUT'
@@ -1694,14 +1712,9 @@ class ClearCaseClient(BaseSCMClient):
         diff_contents = stream.getvalue()
 
         if not repository_info.is_legacy:
-            # We need oids of files to translate them to paths on reviewboard
-            # repository.
-            vob_oid = execute(['cleartool', 'describe', '-fmt', '%On',
-                               'vob:%s' % (entry.new_path or entry.old_path)])
-
             vv_metadata = {
                 'directory-diff': 'legacy-filenames',
-                'vob': vob_oid,
+                'vob': entry.vob_oid,
             }
 
             if entry.op == 'create':

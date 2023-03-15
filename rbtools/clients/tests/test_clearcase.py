@@ -1543,8 +1543,17 @@ class ClearCaseClientTests(SCMClientTestCase):
                 )),
             },
             {
+                'args': (['cleartool', 'describe', '-fmt', '%On',
+                          'vob:test2.py'],),
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'test2.py-fake-vob-oid',
+                    b'',
+                )),
+            },
+            {
                 'args': (['cleartool', 'describe', '-fmt', '%Vn',
-                          'oid:test2.py-fake-old-oid'],),
+                          'oid:test2.py-fake-old-oid@vobuuid:test2.py-fake-vob-oid'],),
                 'op': kgb.SpyOpReturn((
                     0,
                     b'test2.py-fake-version-old',
@@ -1562,7 +1571,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             },
             {
                 'args': (['cleartool', 'describe', '-fmt', '%Vn',
-                          'oid:test2.py-fake-oid'],),
+                          'oid:test2.py-fake-oid@vobuuid:test2.py-fake-vob-oid'],),
                 'op': kgb.SpyOpReturn((
                     0,
                     b'test2.py-fake-version',
@@ -1618,8 +1627,17 @@ class ClearCaseClientTests(SCMClientTestCase):
                 )),
             },
             {
+                'args': (['cleartool', 'describe', '-fmt', '%On',
+                          'vob:test.pdf'],),
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'test.pdf-vob-oid',
+                    b'',
+                )),
+            },
+            {
                 'args': (['cleartool', 'describe', '-fmt', '%Vn',
-                          'oid:test.pdf-fake-old-oid'],),
+                          'oid:test.pdf-fake-old-oid@vobuuid:test.pdf-vob-oid'],),
                 'op': kgb.SpyOpReturn((
                     0,
                     b'test.pdf-fake-version-old',
@@ -1637,7 +1655,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             },
             {
                 'args': (['cleartool', 'describe', '-fmt', '%Vn',
-                          'oid:test.pdf-fake-oid'],),
+                          'oid:test.pdf-fake-oid@vobuuid:test.pdf-vob-oid'],),
                 'op': kgb.SpyOpReturn((
                     0,
                     b'test.pdf-fake-version',
@@ -2065,7 +2083,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             },
             {
                 'args': (['cleartool', 'describe', '-fmt', '%Vn',
-                          'oid:test-dir-old-oid'],),
+                          'oid:test-dir-old-oid@vobuuid:test-dir-vob-oid'],),
                 'op': kgb.SpyOpReturn((
                     0,
                     b'test-dir-old-version',
@@ -2074,7 +2092,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             },
             {
                 'args': (['cleartool', 'describe', '-fmt', '%Vn',
-                          'oid:test-dir-new-oid'],),
+                          'oid:test-dir-new-oid@vobuuid:test-dir-vob-oid'],),
                 'op': kgb.SpyOpReturn((
                     0,
                     b'test-dir-new-version',
@@ -2140,7 +2158,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             },
             {
                 'args': (['cleartool', 'describe', '-fmt', '%Vn',
-                          'oid:empty-dir-new-oid'],),
+                          'oid:empty-dir-new-oid@vobuuid:empty-dir-vob-oid'],),
                 'op': kgb.SpyOpReturn((
                     0,
                     b'empty-dir-new-version',
@@ -2167,7 +2185,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             },
             {
                 'args': (['cleartool', 'describe', '-fmt', '%Vn',
-                          'oid:empty-dir-old-oid'],),
+                          'oid:empty-dir-old-oid@vobuuid:empty-dir-vob-oid'],),
                 'op': kgb.SpyOpReturn((
                     0,
                     b'empty-dir-old-version',
