@@ -12,14 +12,18 @@ A typical workflow looks like this:
 
 1. :ref:`Create a SOS changelist for your changes (optional)
    <rbtools-workflow-sos-step1>`
+
 2. :ref:`Post your changes for review (via changelist or selection)
    <rbtools-workflow-sos-step2>`
+
 3. :ref:`Make changes based on feedback and re-post for review
    <rbtools-workflow-sos-step3>`
+
 4. :ref:`Commit your change to SOS <rbtools-workflow-sos-step4>`
+
 5. :ref:`Close your review request <rbtools-workflow-sos-step5>`
 
-We'll follow go over these concepts and then
+We'll go over these concepts and then
 :ref:`show you an example session <rbtools-workflow-sos-example>`.
 
 
@@ -250,20 +254,25 @@ Step 5: Close your review request
 
 Now that your change is in, it's time to close your review request.
 
-1. Navigate to the review request and click :guilabel:`Close -> Submitted`.
+1. Navigate to the review request and close it.
+
+   In Review Board 6 and newer, click :guilabel:`Close -> Completed`.
+
+   In Review Board 5 and older, click :guilabel:`Close -> Submitted`.
+
 2. Run :command:`rbt close <review request ID>` (see the
    :ref:`documentation <rbt-close>`).
 
 
 .. _rbtools-workflow-sos-example:
 
-Putting It All Together
+Putting it all together
 =======================
 
 Let's walk through an example using changelists in a writeable workarea.
 
 
-Posting Your Change
+Posting your change
 -------------------
 
 First, assume we've created a file (``newfile``), deleted a file
@@ -292,7 +301,7 @@ URL now to fill out those fields, and then click :guilabel:`Publish`.
 Wait and grab some coffee...
 
 
-Update From Review Feedback
+Update From review feedback
 ---------------------------
 
 Hey, we got some review feedback. Let's make some changes to those files in
@@ -320,7 +329,7 @@ reviewers, and publish the new draft.
       $ rbt post -u -m "Fixed a broken link." -p my-changelist
 
 
-Commit The Change
+Commit the change
 -----------------
 
 Once you've gotten an approval (reviews with a "Ship It!" that match your
