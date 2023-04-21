@@ -8,7 +8,7 @@ import io
 import os
 import platform
 import re
-from typing import List
+from typing import Iterator, List, Set
 
 from rbtools.diffs.tools.base import BaseDiffTool, DiffFileResult
 from rbtools.utils.filesystem import iter_exes_in_path
@@ -25,8 +25,10 @@ class GNUDiffTool(BaseDiffTool):
     diff_tool_id = 'gnu'
     name = 'GNU Diff'
 
-    _GNU_DIFF_WIN32_URL = \
-        'http://gnuwin32.sourceforge.net/packages/diffutils.htm'
+    _BEANBAG_DIFFUTILS_URL = \
+        'http://downloads.reviewboard.org/ports/gnu-diffutils/'
+
+    _GIT_WINDOWS_URL = 'https://git-scm.com/download/win'
 
     _BINARY_FILES_DIFFER_RE = re.compile(
         br'^(Binary files|Files) .*? and .*? differ$')
@@ -53,8 +55,16 @@ class GNUDiffTool(BaseDiffTool):
         # or Apple Diff (macOS 13 and newer) automatically.
         if system == 'Windows':
             return (
-                'On Windows, you can install GNU Diff from: %s'
-                % cls._GNU_DIFF_WIN32_URL
+                "On Windows, if you're not using our RBTools for Windows "
+                "installer, you can manually download our version of diff.exe "
+                "(%(beanbag_diffutils_url)s) and place the bin/ directory in "
+                "your system path. Alternatively, install Git for Windows "
+                "(%(git_windows_url)s) and place it in your system path, as "
+                "this version will also be compatible."
+                % {
+                    'beanbag_diffutils_url': cls._BEANBAG_DIFFUTILS_URL,
+                    'git_windows_url': cls._GIT_WINDOWS_URL,
+                }
             )
         elif system == 'Linux':
             return (
@@ -76,14 +86,14 @@ class GNUDiffTool(BaseDiffTool):
             bool:
             ``True`` if GNU Diff is available. ``False`` if it's not.
         """
-        diff_cmd: str
+        tried: Set[str] = set()
 
-        if hasattr(os, 'uname') and os.uname()[0] == 'SunOS':
-            diff_cmd = 'gdiff'
-        else:
-            diff_cmd = 'diff'
+        for diff_path in self._iter_diff_paths():
+            if diff_path in tried:
+                continue
 
-        for diff_path in iter_exes_in_path(diff_cmd):
+            tried.add(diff_path)
+
             try:
                 result = (
                     run_process([diff_path, '--version'],
@@ -238,3 +248,56 @@ class GNUDiffTool(BaseDiffTool):
 
         # Something else went wrong. Raise this.
         raise RunProcessError(process_result)
+
+    def _iter_diff_paths(self) -> Iterator[str]:
+        """Iterate through possible paths for GNU diff.
+
+        The results are not necessarily locations where GNU diff (or even
+        a diff tool) reside, but rather are locations that should be checked.
+
+        Version Added:
+            4.0.1
+
+        Yields:
+            str:
+            Each possible path for GNU diff.
+        """
+        if platform.system() == 'Windows':
+            # On Windows, we want to prioritize some known locations first,
+            # in order to avoid issues with other tools named diff.exe.
+            #
+            # First, try the version that comes with RBTools's Windows
+            # installer.
+            yield from (
+                os.path.abspath(os.path.join(_rbt_path, '..', 'diff.exe'))
+                for _rbt_path in iter_exes_in_path('rbt')
+            )
+
+            # Git supplies a copy of GNU Diff, but it's not in the PATH. If
+            # Git is installed, attempt to include these paths.
+            yield from (
+                os.path.abspath(os.path.join(
+                    git_path, '..', '..', 'usr', 'bin', 'diff.exe'))
+                for git_path in iter_exes_in_path('git')
+            )
+
+            # Unity ships GNU diff (or it does at the time of this writing).
+            # Try it.
+            #
+            # We'll hard-code the most likely path. This won't consider other
+            # drives. If it's elsewhere, and a legacy install, people should
+            # have it in their system path.
+            yield r'C:\Program Files\Unity\Editor\Data\Tools\diff.exe'
+
+            # Try the old GnuWin32 locations. These are old versions of GNU
+            # diff, but may exist.
+            #
+            # We'll hard-code the most likely path. This won't consider other
+            # drives. If it's elsewhere, and a legacy install, people should
+            # have it in their system path.
+            yield r'C:\Program Files (x86)\GnuWin32\bin\diff.exe'
+
+        # Try everything named "gdiff", followed by "diff". On some systems,
+        # GNU Diff (which is preferred) will be named "gdiff".
+        yield from iter_exes_in_path('gdiff')
+        yield from iter_exes_in_path('diff')

@@ -48,8 +48,13 @@ class GNUDiffToolTests(kgb.SpyAgency, TestCase):
 
         self.assertEqual(
             GNUDiffTool.get_install_instructions(),
-            'On Windows, you can install GNU Diff from: '
-            'http://gnuwin32.sourceforge.net/packages/diffutils.htm')
+            "On Windows, if you're not using our RBTools for Windows "
+            "installer, you can manually download our version of diff.exe "
+            "(http://downloads.reviewboard.org/ports/gnu-diffutils/) and "
+            "place the bin/ directory in your system path. Alternatively, "
+            "install Git for Windows (https://git-scm.com/download/win) and "
+            "place it in your system path, as this version will also be "
+            "compatible.")
 
     def test_check_available_with_found(self):
         """Testing GNUDiffTool.check_available with diff found"""
@@ -137,6 +142,121 @@ class GNUDiffToolTests(kgb.SpyAgency, TestCase):
             op=kgb.SpyOpReturn([
                 '/path1/bin/diff',
                 '/path2/bin/diff',
+            ]))
+
+        diff_tool = GNUDiffTool()
+        available = diff_tool.check_available()
+
+        self.assertFalse(available)
+        self.assertIsNone(diff_tool.exe_path)
+        self.assertIsNone(diff_tool.version_info)
+
+    def test_check_available_with_not_found_on_windows(self):
+        """Testing GNUDiffTool.check_available with diff not found on
+        Windows
+        """
+        self.spy_on(platform.system,
+                    op=kgb.SpyOpReturn('Windows'))
+
+        self.spy_on(
+            run_process_exec,
+            op=kgb.SpyOpMatchInOrder([
+                {
+                    'args': ([
+                        r'C:\Program Files\RBTools\bin\diff.exe',
+                        '--version',
+                    ],),
+                    'op': kgb.SpyOpReturn((
+                        0,
+                        b'Some Other Diff v1.2.3\n',
+                        b'',
+                    )),
+                },
+                {
+                    'args': ([
+                        r'C:\Program Files\Git\bin\git.exe',
+                        '--version',
+                    ],),
+                    'op': kgb.SpyOpReturn((
+                        1,
+                        b'',
+                        b'Some error.',
+                    )),
+                },
+                {
+                    'args': ([
+                        r'C:\Program Files\Unity\Editor\Data\Tools\diff.exe',
+                        '--version',
+                    ],),
+                    'op': kgb.SpyOpReturn((
+                        1,
+                        b'',
+                        b'Some error.',
+                    )),
+                },
+                {
+                    'args': ([
+                        r'C:\Program Files\FooApp\gdiff.exe',
+                        '--version',
+                    ],),
+                    'op': kgb.SpyOpReturn((
+                        1,
+                        b'',
+                        b'Some error.',
+                    )),
+                },
+                {
+                    'args': ([
+                        r'C:\Program Files\BarApp\gdiff.exe',
+                        '--version',
+                    ],),
+                    'op': kgb.SpyOpReturn((
+                        1,
+                        b'',
+                        b'Some error.',
+                    )),
+                },
+                {
+                    'args': ([
+                        r'C:\Program Files\OtherApp\diff.exe',
+                        '--version',
+                    ],),
+                    'op': kgb.SpyOpReturn((
+                        1,
+                        b'',
+                        b'Some error.',
+                    )),
+                },
+            ]))
+
+        self.spy_on(
+            iter_exes_in_path,
+            op=kgb.SpyOpMatchInOrder([
+                {
+                    'args': ('rbt',),
+                    'op': kgb.SpyOpReturn([
+                        r'C:\Program Files\RBTools\bin\rbt.cmd',
+                    ]),
+                },
+                {
+                    'args': ('git',),
+                    'op': kgb.SpyOpReturn([
+                        r'C:\Program Files\Git\bin\git.exe',
+                    ]),
+                },
+                {
+                    'args': ('gdiff',),
+                    'op': kgb.SpyOpReturn([
+                        r'C:\Program Files\FooApp\gdiff.exe',
+                        r'C:\Program Files\BarApp\gdiff.exe',
+                    ]),
+                },
+                {
+                    'args': ('diff',),
+                    'op': kgb.SpyOpReturn([
+                        r'C:\Program Files\OtherApp\diff.exe',
+                    ]),
+                },
             ]))
 
         diff_tool = GNUDiffTool()

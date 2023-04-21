@@ -8,13 +8,39 @@ This guide covers the various ways to use RBTools with `HCL VersionVault`_ or
 `IBM ClearCase`_. You can post changes using both Base ClearCase or UCM
 workflows.
 
-.. _`HCL VersionVault`: https://www.hcltechsw.com/versionvault
-.. _`IBM ClearCase`: https://www.ibm.com/products/rational-clearcase
+A typical workflow looks like this:
+
+1. :ref:`Create your change for the review request
+   <rbtools-workflow-versionvault-step1>`
+
+2. :ref:`Post your change for review <rbtools-workflow-versionvault-step2>`
+
+3. :ref:`Make changes based on feedback and re-port for review
+   <rbtools-workflow-versionvault-step3>`
+
+4. :ref:`Finish your code by checking in or delivering your activity
+   <rbtools-workflow-versionvault-step4>`
+
+5. :ref:`Close your review request <rbtools-workflow-versionvault-step5>`
 
 
-Step 1: Posting changes for review
+.. _HCL VersionVault: https://www.hcltechsw.com/versionvault
+.. _IBM ClearCase: https://www.ibm.com/products/rational-clearcase
+
+
+.. _rbtools-workflow-versionvault-step1:
+
+Step 1: Create your change
+==========================
+
+You'll be able to post a branch, label, activity, baseline, or stream
+representing the change you want to review.
+
+
+.. _rbtools-workflow-versionvault-step2:
+
+Step 2: Posting changes for review
 ==================================
-
 
 Posting checked-out files
 -------------------------
@@ -119,7 +145,9 @@ Once you're done filling out fields on the review request, click
 :guilabel:`Publish` to send it out for review.
 
 
-Step 2: Update from reviewer feedback and re-post
+.. _rbtools-workflow-versionvault-step3:
+
+Step 3: Update from reviewer feedback and re-post
 =================================================
 
 Got some reviewer feedback to incorporate into your change? Easy.
@@ -153,7 +181,9 @@ Got some reviewer feedback to incorporate into your change? Easy.
    accepted.
 
 
-Step 3: Finish your code
+.. _rbtools-workflow-versionvault-step4:
+
+Step 4: Finish your code
 ========================
 
 Depending on what workflow you're doing, you can now proceed to finish the code
@@ -161,16 +191,25 @@ change. This could involve checking in any checked-out files, or delivering
 your current UCM activity.
 
 
-Step 4: Close your review request
+.. _rbtools-workflow-versionvault-step5:
+
+Step 5: Close your review request
 =================================
 
 Now that your change is in, it's time to close your review request. You can do
 this in one of two ways:
 
-1. Navigate to the review request and click :guilabel:`Close -> Submitted`.
+1. Navigate to the review request and close it.
+
+   In Review Board 6 and newer, click :guilabel:`Close -> Completed`.
+
+   In Review Board 5 and older, click :guilabel:`Close -> Submitted`.
+
 2. Run :command:`rbt close <review request ID>` (see the
    :ref:`documentation <rbt-close>`).
 
+
+.. _rbtools-workflow-versionvault-example:
 
 Putting it all together
 =======================
