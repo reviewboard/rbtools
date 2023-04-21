@@ -6,14 +6,27 @@ Using RBTools with Git
 ======================
 
 There are many ways you can use RBTools with Git. This guide covers the way
-that we use RBTools ourselves. It boils down to the following:
+that we use RBTools ourselves.
 
-1. Create a branch for each review request (containing one or more commits)
-2. Post your change for review
-3. Commit/amend based on feedback and re-post for review
-4. Land your change
-5. Close your review request
+A typical workflow looks like this:
 
+1. :ref:`Create a branch for each review request <rbtools-workflow-git-step1>`
+   (containing one or more commits)
+
+2. :ref:`Post your change for review <rbtools-workflow-git-step2>`
+
+3. :ref:`Commit/amend based on feedback and re-post for review
+   <rbtools-workflow-git-step3>`
+
+4. :ref:`Land your change <rbtools-workflow-git-step4>`
+
+5. :ref:`Close your review request <rbtools-workflow-git-step5>`
+
+We'll go over these concepts and then
+:ref:`show you an example session <rbtools-workflow-git-example>`.
+
+
+.. _rbtools-workflow-git-step1:
 
 Step 1: Create a branch for your review request
 ===============================================
@@ -25,6 +38,8 @@ of each other as a series of dependent branches.
 Create your branch, and create as many commits on it as you want. These
 commits will later be posted as a single review request.
 
+
+.. _rbtools-workflow-git-step2:
 
 Step 2: Post your change for review
 ===================================
@@ -67,17 +82,16 @@ There's a few useful tips to keep in mind when posting commits for review:
    worth of changes), and may time out or just fail to validate diffs.
 
    You can specify one using :option:`rbt post --tracking-branch` or, better,
-   configuring :ref:`rbtools-reviewboardrc-tracking-branch` in
+   configuring :rbtconfig:`TRACKING_BRANCH` in
    :ref:`rbtools-reviewboardrc`.
 
    .. tip::
 
       We recommend you commit a :ref:`rbtools-reviewboardrc` file to your
-      repository, and set the :ref:`rbtools-reviewboardrc-tracking-branch`,
-      :ref:`rbtools-reviewboardrc-branch` and
-      :ref:`LAND_DEST_BRANCH <rbt-land>` settings in each main
-      upstream branch. That way, this will always be set correctly for all
-      users.
+      repository, and set the :rbtconfig:`TRACKING_BRANCH`,
+      :rbtconfig:`BRANCH` and :rbtconfig:`LAND_DEST_BRANCH` settings in each
+      main upstream branch. That way, this will always be set correctly for
+      all users.
 
 3. **Make sure the branch you're posting (or its parents) are on top of the
    latest upstream changes.**
@@ -123,6 +137,8 @@ Once you're done filling out fields on the review request, click
 :guilabel:`Publish` to send it out for review.
 
 
+.. _rbtools-workflow-git-step3:
+
 Step 3: Update from reviewer feedback and re-post
 =================================================
 
@@ -144,6 +160,8 @@ Got some reviewer feedback to incorporate into your change? Easy.
 
 4. Publish the new changes for review.
 
+
+.. _rbtools-workflow-git-step4:
 
 Step 4: Land your change
 ========================
@@ -174,6 +192,8 @@ You can edit the commit message before creating the commit using
 :option:`--edit`.
 
 
+.. _rbtools-workflow-git-step5:
+
 Step 5: Close your review request
 =================================
 
@@ -194,8 +214,13 @@ guides to set up automatic closing of review requests:
 
 If you're not set up this way, no problem. You have two options:
 
-1. Navigate to the review request and click :guilabel:`Close -> Submitted`.
-2. Run ``rbt close <review request ID>`` (see the
+1. Navigate to the review request and close it.
+
+   In Review Board 6 and newer, click :guilabel:`Close -> Completed`.
+
+   In Review Board 5 and older, click :guilabel:`Close -> Submitted`.
+
+2. Run :command:`rbt close <review request ID>` (see the
    :ref:`documentation <rbt-close>`).
 
 
@@ -203,7 +228,9 @@ If you're not set up this way, no problem. You have two options:
    https://github.com/reviewboard/rbtools/blob/master/contrib/tools/git-hook-set-submitted
 
 
-Putting It All Together
+.. _rbtools-workflow-git-example:
+
+Putting it all together
 =======================
 
 Let's walk through an example using 3 commits across two branches.

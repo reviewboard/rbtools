@@ -52,7 +52,12 @@ def iter_exes_in_path(
 
     This expects a name without any system-specific executable extension. It
     will append the proper extension as necessary. For example, use "myapp"
-    and not "myapp.exe".
+    and not "myapp.exe" or "myapp.cmd". This will look for both variations.
+
+    Version Changed:
+        4.0.1:
+        On Windows, if not searching for a deliberate ``.exe`` or ``.cmd``
+        extension, this will now look for variations with both extensions.
 
     Version Added:
         4.0
@@ -65,22 +70,30 @@ def iter_exes_in_path(
         str:
         The location of an executable in the path.
     """
-    if sys.platform == 'win32' and not name.endswith('.exe'):
-        name += '.exe'
+    names: List[str] = []
+
+    if (sys.platform == 'win32' and not name.endswith(('.exe', '.cmd'))):
+        names += [
+            '%s.exe' % name,
+            '%s.cmd' % name,
+        ]
+    else:
+        names.append(name)
 
     cache = _iter_exes_in_path_cache
 
     for dirname in os.environ['PATH'].split(os.pathsep):
-        path = os.path.join(dirname, name)
+        for name in names:
+            path = os.path.join(dirname, name)
 
-        try:
-            found = cache[path]
-        except KeyError:
-            found = os.path.exists(path)
-            cache[path] = found
+            try:
+                found = cache[path]
+            except KeyError:
+                found = os.path.exists(path)
+                cache[path] = found
 
-        if found:
-            yield path
+            if found:
+                yield path
 
 
 def cleanup_tempfiles():
