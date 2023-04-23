@@ -276,8 +276,6 @@ else:
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
-    'rb2.0': ('%s/docs/manual/2.0/' % rbwebsite_url, None),
-    'rb2.5': ('%s/docs/manual/2.5/' % rbwebsite_url, None),
     'rb': ('%s/docs/manual/latest/' % rbwebsite_url, None),
 }
 

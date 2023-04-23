@@ -275,6 +275,6 @@ review request.
 .. code-block:: console
 
     $ cleartool deliver -activities my-activity
-    $ rbt close -r 1001
+    $ rbt close 1001
 
 (You can also close it in the review request page.)
