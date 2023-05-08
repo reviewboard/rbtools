@@ -135,10 +135,10 @@ is a short example::
    info = root.get_info()
 
    # Print the product version ("1.7 beta 1").
-   print info.product.version
+   print(info.product.version)
 
    # Print the only administrator's name ("Example Admin")
-   print info.site.administrators[0].name
+   print(info.site.administrators[0].name)
 
 .. note::
    While using attributes is the preferred way of accessing fields
@@ -172,7 +172,7 @@ review requests::
    requests = root.get_review_requests(counts_only=True, status="pending")
 
    # Print the number of pending review requests
-   print requests.count
+   print(requests.count)
 
 
 Resource Specific Details

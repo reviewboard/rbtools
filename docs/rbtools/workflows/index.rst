@@ -1,3 +1,5 @@
+.. _rbtools-workflows:
+
 =================
 RBTools Workflows
 =================
@@ -15,5 +17,8 @@ RBTools Workflows
 
 
 ..
-   NOTE: When adding to this page, make sure you also add a reference
-         in reviewboard/docs/manual/users/getting-started/workflow.rst.
+   NOTE: When adding to this page, make sure you also add references in:
+
+         reviewboard/docs/manual/users/getting-started/workflow.rst.
+
+         rbtools/docs/rbtools/index.rst

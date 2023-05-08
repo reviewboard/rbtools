@@ -1,6 +1,6 @@
-===
-rbt
-===
+===========
+rbt Command
+===========
 
 .. toctree::
    :maxdepth: 1

@@ -46,6 +46,7 @@ extensions = [
     'sphinx.ext.autosummary',
     'sphinx.ext.doctest',
     'sphinx.ext.linkcode',
+    'sphinx_tabs.tabs',
     'beanbag_docutils.sphinx.ext.autodoc_utils',
     'beanbag_docutils.sphinx.ext.extlinks',
     'beanbag_docutils.sphinx.ext.http_role',
@@ -285,6 +286,9 @@ extlinks = {
 
 
 autosummary_generate = True
+
+sphinx_tabs_valid_builders = ['html', 'json', 'pickle']
+sphinx_tabs_disable_tab_closing = True
 
 
 def linkcode_resolve(domain, info):
