@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+
+import logging
+import os
+import sys
+
+# Configure the Python Path, if needed:
+#
+# sys.path.insert('...')
+
+from rbtools.api.client import RBClient
+from rbtools.api.errors import APIError, ServerInterfaceError
+from rbtools.clients.perforce import PerforceClient
+from rbtools.utils.repository import get_repository_resource
+from rbtools.hooks.common import initialize_logging
+
+
+# The Review Board server URL.
+REVIEWBOARD_URL = 'https://reviewboard.example.com'
+
+# The username and password to be supplied to the Review Board server. This
+# user must have the "can_change_status" permission granted.
+USERNAME = 'special_user'
+PASSWORD = 'password'
+
+# Configure the Perforce credentials and port.
+P4_USER = 'my-p4-user'
+P4_PASSWORD = 'my-p4-password'
+P4_PORT = 'perforce:1666'
+
+# Whether to close review requests after being submitted successfully.
+CLOSE_REVIEW_REQUESTS = True
+
+# Whether to require the changeset to have a review request.
+REQUIRE_REVIEW_REQUESTS = True
+
+# Whether to decline changes that aren't approved.
+REQUIRE_APPROVAL = True
+
+# Configure the executable search path, if necessary.
+#
+# os.environ['PATH'] = '...' + os.environ['PATH']
+
+
+# The primary field requested for the change description. This is shown in
+# error messages.
+PRIMARY_FIELD = 'Reviewed at'
+
+
+def main():
+    initialize_logging()
+
+    os.environ.update({
+        'P4USER': P4_USER,
+        'P4PASSWD': P4_PASSWORD,
+        'P4PORT': P4_PORT,
+    })
+
+    # Get the changeset from Perforce.
+    try:
+        changenum = int(sys.argv[1])
+    except IndexError:
+        sys.stderr.write('No changeset number was passed to the hook.\n')
+        sys.exit(1)
+    except ValueError:
+        sys.stderr.write('The value passed to the hook was not a changeset '
+                         'number.\n')
+        sys.exit(1)
+
+    client = PerforceClient()
+    changes = client.p4.change(changenum)
+
+    # Connect to Review Board.
+    api_client = RBClient(url=REVIEWBOARD_URL)
+
+    try:
+        api_root = api_client.get_root()
+    except ServerInterfaceError as e:
+        sys.stderr.write('Could not reach the Review Board server at %s: %s\n'
+                         % (REVIEWBOARD_URL, e))
+        sys.exit(1)
+    except APIError as e:
+        sys.stderr.write('Unexpected API error when talking to Review Board '
+                         'at %s: %s'
+                         % (REVIEWBOARD_URL, e))
+        sys.exit(1)
+
+    # Find the review request for this changenum.
+    review_request = None
+
+    if changes and len(changes) == 1:
+        # Look up the repository for this server.
+        try:
+            repository = get_repository_resource(
+                api_root=api_root,
+                repository_paths=[P4_PORT])[0]
+        except APIError as e:
+            # 100 = Does Not Exist.
+            if e.error_code == 100:
+                repository = None
+            else:
+                sys.stderr.write(
+                    'Error looking up a repository in Review Board for '
+                    '%s: %s\n'
+                    % (P4_PORT, e))
+
+            sys.exit(1)
+
+        if repository is None:
+            sys.stderr.write(
+                'Could not find a repository in Review Board for %s.\n'
+                % P4_PORT)
+            sys.exit(1)
+
+        # Look up a review request for this changenum.
+        try:
+            review_requests = api_root.get_review_requests(
+                commit_id=changenum,
+                repository=repository.id,
+                only_fields='approved,approval_failure,id')
+        except APIError as e:
+            sys.stderr.write(
+                'Unexpected error looking up a matching review request: %s\n'
+                % e)
+            sys.exit(1)
+
+        if len(review_requests) == 1:
+            review_request = review_requests[0]
+        elif len(review_requests) >= 1:
+            sys.stderr.write(
+                'More than one review request was found for changenum %s and '
+                'P4PORT %s. This may be an internal error. Please contact '
+                'your Perforce administrator.\n'
+                % (changenum, P4_PORT))
+            sys.exit(1)
+
+    if review_request:
+        # A review request ID was found.
+        if not review_request.approved:
+            # The review request was not approved in Review Board. Display
+            # an error.
+            if REQUIRE_APPROVAL:
+                sys.stderr.write('%s\n' % review_request.approval_failure)
+                sys.exit(1)
+            else:
+                logging.warning(
+                    'Change #%s was not approved, but is allowed to be '
+                    'submitted (%s)',
+                    changenum, review_request.approval_failure)
+
+        # If we're here, the change is allowed to go into Review Board.
+        if CLOSE_REVIEW_REQUESTS:
+            # Close the review request, and point to this change.
+            review_request.update(
+                status='submitted',
+                description='Submitted as change #%s' % changenum)
+    else:
+        # A review request ID was not found.
+        if REQUIRE_REVIEW_REQUESTS:
+            sys.stderr.write(
+                'A review request for this change must be posted for review '
+                'and approved before it can be submitted.\n')
+            sys.exit(1)
+        else:
+            logging.warning(
+                "Change #%s hasn't been posted for review, but is allowed to "
+                "be submitted.",
+                changenum)
+
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--perforce-xml-version=1.0-->
+<CustomToolDefList varName="customtooldeflist">
+ <CustomToolDef>
+  <Definition>
+   <Name>Review Board - Post for Review</Name>
+   <Command>cmd.exe</Command>
+   <Arguments>/C "rbt post -o %c"</Arguments>
+   <Shortcut></Shortcut>
+  </Definition>
+  <Console>
+   <CloseOnExit>false</CloseOnExit>
+  </Console>
+  <AddToContext>true</AddToContext>
+ </CustomToolDef>
+</CustomToolDefList>
