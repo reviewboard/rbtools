@@ -1251,6 +1251,10 @@ class BaseSCMClient(object):
             merged_only (bool, optional):
                 Whether to limit branch deletion to only those branches which
                 have been merged into the current HEAD.
+
+        Raises:
+            rbtools.clients.errors.SCMError:
+                An error occurred while deleting the branch.
         """
         raise NotImplementedError
 
