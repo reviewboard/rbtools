@@ -20,6 +20,27 @@ from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempfile
 
 
+SAMPLE_CHANGEDESC_TEMPLATE_BASIC = (
+    'Change:\t123\n'
+    '\n'
+    'Date:\t2023/05/06 01:02:03\n'
+    '\n'
+    'Client:\tTestClient\n'
+    '\n'
+    'User:\ttest-user\n'
+    '\n'
+    'Status:\tpending\n'
+    '\n'
+    'Type:\tpublic\n'
+    '\n'
+    '%s'
+    '\n'
+    'Files:\n'
+    '\t//depot/main/test1\t# edit\n'
+    '\t//depot/main/test2\t# edit\n'
+)
+
+
 class P4WrapperTests(TestCase):
     """Unit tests for P4Wrapper."""
 
@@ -912,3 +933,167 @@ class PerforceClientTests(SCMClientTestCase):
         result = client.normalize_exclude_patterns(patterns)
 
         self.assertEqual(result, normalized_patterns)
+
+    def test_replace_changeset_description(self) -> None:
+        """Testing PerforceClient._replace_changeset_description"""
+        client = self.build_client()
+
+        old_changedesc = SAMPLE_CHANGEDESC_TEMPLATE_BASIC % (
+            'Description:\n'
+            '\tHere is the original description.\n'
+            '\t\n'
+            '\tWith multiple...\n'
+            '\t...lines.\n'
+        )
+
+        new_changedesc = client._replace_changeset_description(
+            old_changedesc,
+            'Here is the original description.\n'
+            '\n'
+            'With multiple...\n'
+            '...lines.\n'
+            '\n'
+            'Reviewed at https://reviews.example.com/r/123/\n'
+        )
+
+        self.assertEqual(new_changedesc, SAMPLE_CHANGEDESC_TEMPLATE_BASIC % (
+            'Description:\n'
+            '\tHere is the original description.\n'
+            '\t\n'
+            '\tWith multiple...\n'
+            '\t...lines.\n'
+            '\t\n'
+            '\tReviewed at https://reviews.example.com/r/123/\n'
+        ))
+
+    def test_replace_changeset_description_with_summary(self) -> None:
+        """Testing PerforceClient._replace_changeset_description with existing
+        summary only
+        """
+        client = self.build_client()
+
+        old_changedesc = SAMPLE_CHANGEDESC_TEMPLATE_BASIC % (
+            'Description:\n'
+            '\tHere is the original description.\n'
+        )
+
+        new_changedesc = client._replace_changeset_description(
+            old_changedesc,
+            'Here is the original description.\n'
+            '\n'
+            'Reviewed at https://reviews.example.com/r/123/\n'
+        )
+
+        self.assertEqual(new_changedesc, SAMPLE_CHANGEDESC_TEMPLATE_BASIC % (
+            'Description:\n'
+            '\tHere is the original description.\n'
+            '\t\n'
+            '\tReviewed at https://reviews.example.com/r/123/\n'
+        ))
+
+    def test_replace_changeset_description_with_single(self) -> None:
+        """Testing PerforceClient._replace_changeset_description with single
+        line
+        """
+        client = self.build_client()
+
+        old_changedesc = SAMPLE_CHANGEDESC_TEMPLATE_BASIC % (
+            'Description:\tHere is the original description.\n'
+        )
+
+        new_changedesc = client._replace_changeset_description(
+            old_changedesc,
+            'Here is the original description.\n'
+            '\n'
+            'Reviewed at https://reviews.example.com/r/123/\n'
+        )
+
+        self.assertEqual(new_changedesc, SAMPLE_CHANGEDESC_TEMPLATE_BASIC % (
+            'Description:\n'
+            '\tHere is the original description.\n'
+            '\t\n'
+            '\tReviewed at https://reviews.example.com/r/123/\n'
+        ))
+
+    def test_replace_changeset_description_with_spaces(self) -> None:
+        """Testing PerforceClient._replace_changeset_description with spaces
+        """
+        client = self.build_client()
+
+        old_changedesc = SAMPLE_CHANGEDESC_TEMPLATE_BASIC % (
+            'Description:\n'
+            '    Here is the original description.\n'
+        )
+
+        new_changedesc = client._replace_changeset_description(
+            old_changedesc,
+            'Here is the original description.\n'
+            '\n'
+            'Reviewed at https://reviews.example.com/r/123/\n'
+        )
+
+        self.assertEqual(new_changedesc, SAMPLE_CHANGEDESC_TEMPLATE_BASIC % (
+            'Description:\n'
+            '\tHere is the original description.\n'
+            '\t\n'
+            '\tReviewed at https://reviews.example.com/r/123/\n'
+        ))
+
+    def test_replace_changeset_description_with_indents(self) -> None:
+        """Testing PerforceClient._replace_changeset_description with indents
+        within body
+        """
+        client = self.build_client()
+
+        old_changedesc = SAMPLE_CHANGEDESC_TEMPLATE_BASIC % (
+            'Description:\n'
+            '\tHere is the original description.\n'
+            '\n'
+            '\t    And we indent here.\n'
+            '\n'
+            '\tAnd back to normal.\n'
+        )
+
+        new_changedesc = client._replace_changeset_description(
+            old_changedesc,
+            'Here is the original description.\n'
+            '\n'
+            '    And we indent here.\n'
+            '\n'
+            'And back to normal.\n'
+            '\n'
+            'Reviewed at https://reviews.example.com/r/123/\n'
+        )
+
+        self.assertEqual(new_changedesc, SAMPLE_CHANGEDESC_TEMPLATE_BASIC % (
+            'Description:\n'
+            '\tHere is the original description.\n'
+            '\t\n'
+            '\t    And we indent here.\n'
+            '\t\n'
+            '\tAnd back to normal.\n'
+            '\t\n'
+            '\tReviewed at https://reviews.example.com/r/123/\n'
+        ))
+
+    def test_replace_changeset_description_with_empty(self) -> None:
+        """Testing PerforceClient._replace_changeset_description with empty
+        description
+        """
+        client = self.build_client()
+
+        old_changedesc = SAMPLE_CHANGEDESC_TEMPLATE_BASIC % (
+            'Description:\n'
+        )
+
+        new_changedesc = client._replace_changeset_description(
+            old_changedesc,
+            '\n'
+            'Reviewed at https://reviews.example.com/r/123/\n'
+        )
+
+        self.assertEqual(new_changedesc, SAMPLE_CHANGEDESC_TEMPLATE_BASIC % (
+            'Description:\n'
+            '\t\n'
+            '\tReviewed at https://reviews.example.com/r/123/\n'
+        ))

@@ -109,7 +109,12 @@ class P4Wrapper(object):
                            none_on_ignored_error=True,
                            marshalled=marshalled)
 
-    def modify_change(self, new_change_spec):
+    def modify_change(
+        self,
+        new_change_spec: str,
+        *,
+        changenum: Optional[str] = None,
+    ) -> None:
         """Modify a change description.
 
         Args:
@@ -117,7 +122,12 @@ class P4Wrapper(object):
                 The new changeset description. This must contain the changelist
                 number.
         """
-        self.run_p4(['change', '-i'], input_string=new_change_spec)
+        args: List[str] = ['change', '-i']
+
+        if changenum is not None:
+            args.append(changenum)
+
+        self.run_p4(args, input_string=new_change_spec)
 
     def files(self, path):
         """Return the opened files within the given path.
@@ -365,11 +375,20 @@ class P4Wrapper(object):
             if not isinstance(input_string, bytes):
                 input_string = input_string.encode('utf8')
 
-            p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-            p.communicate(input_string)  # Send input, wait, set returncode
+            p = subprocess.Popen(cmd, stdin=subprocess.PIPE,
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE)
 
-            if not ignore_errors and p.returncode:
-                raise SCMError('Failed to execute command: %s' % cmd)
+            try:
+                stdout, stderr = p.communicate(input_string, timeout=30)
+            except subprocess.TimeoutExpired:
+                p.kill()
+                stdout, stderr = p.communicate()
+
+            if not ignore_errors and p.returncode != 0:
+                raise SCMError('Failed to execute command: %s; stdout=%r; '
+                               'stderr=%r'
+                               % (cmd, stdout, stderr))
 
             return None
         else:
@@ -2249,52 +2268,54 @@ class PerforceClient(BaseSCMClient):
 
         return [normalize(pattern) for pattern in patterns]
 
-    def _replace_description_in_changelist_spec(self, old_spec,
-                                                new_description):
+    def _replace_changeset_description(
+        self,
+        old_spec: str,
+        new_description: str,
+    ) -> str:
         """Replace the description in the given changelist spec.
 
         Args:
-            old_spec (unicode):
+            old_spec (str):
                 The p4 changelist spec string (the raw output from p4 change).
 
-            new_description (unicode):
+            new_description (str):
                 The new description text to use.
 
         Returns:
-            unicode:
+            str:
             The new changelist spec.
         """
-        new_spec = ''
-        whitespace = tuple(string.whitespace)
-        description_key = 'Description:'
-        skipping_old_description = False
+        new_lines: List[str] = []
+        key = 'Description:'
+        skipping_to_next_field: bool = False
 
         for line in old_spec.splitlines(True):
-            if not skipping_old_description:
-                if not line.startswith(description_key):
-                    new_spec += line
-
-                else:
-                    # Insert the new description. Don't include the first line
-                    # of the old one if it happens to be on the same line as
-                    # the key.
-                    skipping_old_description = True
-                    new_spec += description_key
-
-                    for desc_line in new_description.splitlines():
-                        new_spec += '\t%s\n' % desc_line
-
+            if skipping_to_next_field:
+                # Ignore the content in the current field until we find another
+                # key. We'll skip anything that starts with whitespace, which
+                # would indicate content within the current field.
+                if not line[0].isspace():
+                    # There's content here, so we're in a field again.
+                    # Mark it, and make sure to add a leading newline to
+                    # separate this field from the previously-injected
+                    # content.
+                    skipping_to_next_field = False
+                    new_lines.append(f'\n{line}')
+            elif line.startswith(key):
+                # Insert the new description. Don't include the first line
+                # of the old one if it happens to be on the same line as
+                # the key.
+                new_lines.append(f'{key}\n')
+                new_lines += [
+                    f'\t{_line}\n'
+                    for _line in new_description.splitlines()
+                ]
+                skipping_to_next_field = True
             else:
-                # Ignore the description from the original file (all lines
-                # that start with whitespace until the next key is
-                # encountered).
-                if line.startswith(whitespace):
-                    continue
-                else:
-                    skipping_old_description = False
-                    new_spec += '\n%s' % line
+                new_lines.append(line)
 
-        return new_spec
+        return ''.join(new_lines)
 
     def amend_commit_description(self, message, revisions):
         """Update a commit message to the given string.
@@ -2334,6 +2355,6 @@ class PerforceClient(BaseSCMClient):
         # Since p4 change -i doesn't take in marshalled objects, we get the
         # description as raw text and manually edit it.
         change = self.p4.change(changelist_num, marshalled=False)
-        new_change = self._replace_description_in_changelist_spec(
-            change, message)
+        new_change = self._replace_changeset_description(change, message)
+
         self.p4.modify_change(new_change)
