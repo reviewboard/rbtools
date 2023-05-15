@@ -1,7 +1,5 @@
 """Unit tests for BazaarClient."""
 
-from __future__ import unicode_literals
-
 import os
 import re
 from typing import List

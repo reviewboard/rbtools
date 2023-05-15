@@ -1,4 +1,4 @@
-from __future__ import unicode_literals
+"""Utilities for working with command aliases."""
 
 import logging
 import re

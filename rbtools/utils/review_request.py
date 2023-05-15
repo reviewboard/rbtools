@@ -1,4 +1,4 @@
-from __future__ import unicode_literals
+"""Utilities for matching review requests."""
 
 import logging
 import re

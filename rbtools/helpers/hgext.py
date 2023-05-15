@@ -1,6 +1,3 @@
-from __future__ import unicode_literals
-
-
 # This file provides a Mercurial extension that resets certain
 # config options to provide consistent output.
 

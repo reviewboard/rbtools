@@ -3,8 +3,6 @@
 # Fake editor script used for unit tests. This will convert all content to
 # uppercase.
 
-from __future__ import unicode_literals
-
 import sys
 
 

@@ -1,7 +1,5 @@
 """Unit tests for rbtools.utils.console."""
 
-from __future__ import unicode_literals
-
 import io
 import os
 import subprocess

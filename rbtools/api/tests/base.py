@@ -1,7 +1,5 @@
 """Base support for API unit tests."""
 
-from __future__ import unicode_literals
-
 from rbtools.api.transport import Transport
 from rbtools.testing import TestCase
 

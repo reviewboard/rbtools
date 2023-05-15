@@ -1,7 +1,5 @@
 """A client for Git."""
 
-from __future__ import unicode_literals
-
 import logging
 import os
 import re

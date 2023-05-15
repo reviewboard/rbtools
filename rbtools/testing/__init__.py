@@ -1,4 +1,4 @@
-from __future__ import unicode_literals
+"""Common support for writing unit tests for RBTools."""
 
 from rbtools.testing.api.transport import URLMapTransport
 from rbtools.testing.commands import CommandTestsMixin

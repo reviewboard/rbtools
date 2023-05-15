@@ -1,4 +1,4 @@
-from __future__ import unicode_literals
+"""Git repository hook utilities."""
 
 from collections import defaultdict
 from copy import deepcopy

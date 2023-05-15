@@ -1,4 +1,4 @@
-from __future__ import unicode_literals
+"""Implementation of rbt alias."""
 
 from collections import defaultdict
 from subprocess import list2cmdline

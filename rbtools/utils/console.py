@@ -1,4 +1,4 @@
-from __future__ import print_function, unicode_literals
+"""Utilities for working with console interactions."""
 
 import getpass
 import logging

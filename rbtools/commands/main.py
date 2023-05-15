@@ -1,4 +1,4 @@
-from __future__ import print_function, unicode_literals
+"""Main handler for the rbt command."""
 
 import argparse
 import glob

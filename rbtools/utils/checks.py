@@ -1,4 +1,4 @@
-from __future__ import unicode_literals
+"""Utilities for checking for dependencies."""
 
 import os
 import subprocess

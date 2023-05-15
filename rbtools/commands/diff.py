@@ -1,4 +1,4 @@
-from __future__ import unicode_literals
+"""Implementation of rbt diff."""
 
 from rbtools.clients.errors import InvalidRevisionSpecError
 from rbtools.commands import Command, CommandError

@@ -1,4 +1,4 @@
-from __future__ import unicode_literals
+"""Implementation of rbt post."""
 
 import logging
 import os

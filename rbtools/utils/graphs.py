@@ -1,4 +1,4 @@
-from __future__ import unicode_literals
+"""Topological graphing and sorting utilities."""
 
 from collections import defaultdict, deque
 

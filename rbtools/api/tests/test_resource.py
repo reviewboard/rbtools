@@ -1,7 +1,5 @@
 """Unit tests for rbtools.api.resource."""
 
-from __future__ import unicode_literals
-
 import re
 
 from rbtools.api.factory import create_resource

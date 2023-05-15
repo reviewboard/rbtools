@@ -1,7 +1,5 @@
 """Utility functions for working with repositories."""
 
-from __future__ import unicode_literals
-
 from rbtools.api.errors import APIError
 
 

@@ -1,6 +1,4 @@
-"""The rbt patch command."""
-
-from __future__ import unicode_literals
+"""Implementation of rbt patch."""
 
 import logging
 import os

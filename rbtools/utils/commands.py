@@ -1,5 +1,4 @@
-from __future__ import unicode_literals
-
+"""Utilities for commands."""
 
 DEFAULT_OPTIONS_MAP = {
     'debug': '--debug',

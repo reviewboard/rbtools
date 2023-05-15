@@ -1,7 +1,5 @@
 """Unit tests for rbtools.api.errors."""
 
-from __future__ import unicode_literals
-
 from rbtools.api.errors import APIError, AuthorizationError, BadRequestError
 from rbtools.testing import TestCase
 

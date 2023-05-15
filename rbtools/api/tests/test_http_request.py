@@ -1,7 +1,5 @@
 """Unit tests for rbtools.api.request.HttpRequest."""
 
-from __future__ import unicode_literals
-
 from urllib.parse import parse_qsl, urlparse
 
 from kgb import SpyAgency

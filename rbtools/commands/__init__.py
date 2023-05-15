@@ -1,4 +1,4 @@
-from __future__ import unicode_literals
+"""Base support for creating commands."""
 
 import argparse
 import inspect
