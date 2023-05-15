@@ -5,16 +5,10 @@ import json
 import logging
 import re
 from collections import defaultdict, deque
+from collections.abc import MutableMapping
+from urllib.parse import urljoin
 
-try:
-    from collections.abc import MutableMapping
-except ImportError:
-    from collections import MutableMapping
-
-import six
 from pkg_resources import parse_version
-from six.moves import range
-from six.moves.urllib.parse import urljoin
 
 from rbtools.api.cache import MINIMUM_VERSION
 from rbtools.api.decorators import request_method_decorator
@@ -72,7 +66,7 @@ def _preprocess_fields(fields):
         1. The normalized field name to send in the request.
         2. The normalized value to send.
     """
-    field_names = set(six.iterkeys(fields))
+    field_names = set(fields.keys())
 
     # Serialize the JSON Merge Patch or JSON Patch payloads first.
     for norm_field_name, field_name in (('extra_data:json',
@@ -319,7 +313,7 @@ class Resource(object):
 
         # Add a method for each supported REST operation, and
         # for retrieving 'self'.
-        for link, method in six.iteritems(SPECIAL_LINKS):
+        for link, method in SPECIAL_LINKS.items():
             if link in self._links and method[1]:
                 setattr(self,
                         method[0],
@@ -328,7 +322,7 @@ class Resource(object):
 
         # Generate request methods for any additional links
         # the resource has.
-        for link, body in six.iteritems(self._links):
+        for link, body in self._links.items():
             if link not in SPECIAL_LINKS:
                 setattr(self,
                         'get_%s' % link,
@@ -574,7 +568,7 @@ class ResourceDictField(MutableMapping):
             object:
             Each item in the dictionary.
         """
-        return six.iterkeys(self._fields)
+        yield from self._fields.keys()
 
     def __repr__(self):
         """Return a string representation of the dictionary field.
@@ -825,7 +819,7 @@ class ItemResource(Resource):
         else:
             data = self._payload
 
-        for name, value in six.iteritems(data):
+        for name, value in data.items():
             if name not in self._excluded_attrs:
                 self._fields[name] = value
 
@@ -1071,7 +1065,7 @@ class RootResource(ItemResource):
         super(RootResource, self).__init__(transport, payload, url, token=None)
         # Generate methods for accessing resources directly using
         # the uri-templates.
-        for name, url in six.iteritems(payload['uri_templates']):
+        for name, url in payload['uri_templates'].items():
             attr_name = 'get_%s' % name
 
             if not hasattr(self, attr_name):
@@ -1481,7 +1475,7 @@ class ReviewRequestResource(ItemResource):
         request = self.get_draft(internal=True)
         request.method = 'POST'
 
-        for name, value in six.iteritems(kwargs):
+        for name, value in kwargs.items():
             request.add_field(name, value)
 
         return request

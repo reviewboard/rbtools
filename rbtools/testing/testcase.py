@@ -10,7 +10,6 @@ from contextlib import contextmanager
 from typing import List
 
 import kgb
-import six
 
 from rbtools.api.client import RBClient
 from rbtools.testing.api.transport import URLMapTransport
@@ -374,7 +373,7 @@ class TestCase(unittest.TestCase):
             os.chdir(temp_dir)
 
         with open('.reviewboardrc', 'w') as fp:
-            for key, value in six.iteritems(config):
+            for key, value in config.items():
                 fp.write('%s = %r\n' % (key, value))
 
         try:

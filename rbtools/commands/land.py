@@ -2,8 +2,6 @@ from __future__ import unicode_literals
 
 import logging
 
-import six
-
 from rbtools.api.errors import APIError
 from rbtools.clients.errors import MergeError, PushError
 from rbtools.commands import Command, CommandError, Option, RB_MAIN
@@ -150,7 +148,7 @@ class Land(Command):
         if squash:
             patch_command.append('--squash')
 
-        patch_command.append(six.text_type(review_request_id))
+        patch_command.append(str(review_request_id))
 
         rc, output = execute(patch_command, ignore_errors=True,
                              return_error_code=True)
@@ -257,7 +255,7 @@ class Land(Command):
                                     run_editor=edit,
                                     close_branch=delete_branch)
                 except MergeError as e:
-                    raise CommandError(six.text_type(e))
+                    raise CommandError(str(e))
         else:
             self.stdout.write('Applying patch from review request %s.'
                               % review_request.id)
@@ -345,7 +343,7 @@ class Land(Command):
                     is_fuzzy_match_func=self._ask_review_request_match,
                     repository_id=self.repository.id)
             except MatchReviewRequestsError as e:
-                raise CommandError(six.text_type(e))
+                raise CommandError(str(e))
 
             if not review_request or not review_request.id:
                 raise CommandError('Could not determine the existing review '
@@ -446,7 +444,7 @@ class Land(Command):
                 try:
                     self.tool.push_upstream(self.options.destination_branch)
                 except PushError as e:
-                    raise CommandError(six.text_type(e))
+                    raise CommandError(str(e))
 
     def _ask_review_request_match(self, review_request):
         return confirm(

@@ -18,10 +18,8 @@ from collections import OrderedDict
 from contextlib import contextmanager
 from typing import List, Optional, Union, cast
 
-import six
 from pydiffx import DiffType, DiffX
 from pydiffx.utils.text import guess_line_endings
-from six.moves import range
 from typing_extensions import NotRequired, TypedDict
 
 from rbtools.api.resource import ReviewRequestResource
@@ -726,7 +724,7 @@ class SOSClient(BaseSCMClient):
                 # This might change in the future.
                 if revision != SOSObjectRevision.UNMANAGED:
                     diffx_file.meta['revision'] = {
-                        'old': six.text_type(revision),
+                        'old': str(revision),
                     }
 
                 if rev_id not in (None, SOSObjectRevision.UNMANAGED):
@@ -1100,7 +1098,7 @@ class SOSClient(BaseSCMClient):
         # Generally, if any directories were renamed, we'll want to include
         # each file in that directory or any subdirectories in the diff as a
         # moved file.
-        for new_dirname, old_dirname in six.iteritems(renamed_dirs):
+        for new_dirname, old_dirname in renamed_dirs.items():
             full_walk_path = os.path.normpath(
                 os.path.join(wa_root, new_dirname))
 
@@ -1122,7 +1120,7 @@ class SOSClient(BaseSCMClient):
         # If we're working with a changelist, then the changelist must include
         # both the add and the delete in order to treat it as a rename.
         # Otherwise, we'll process this in the adds or deletes blocks below.
-        for new_filename, old_filename in six.iteritems(renamed_files):
+        for new_filename, old_filename in renamed_files.items():
             if changelist:
                 is_deleted = old_filename in changelist.deletes
                 is_added = new_filename in changelist.adds
@@ -1224,7 +1222,7 @@ class SOSClient(BaseSCMClient):
         # We'll fetch 25 at a time so we won't have any real risk of
         # hitting max command line lengths, even with very long path names.
         revisions_iter = self._iter_obj_revisions(
-            list(six.iterkeys(pending_revision_payloads)))
+            list(pending_revision_payloads.keys()))
 
         for info in revisions_iter:
             pending_revision_payloads[info['path']].update({
@@ -1235,7 +1233,7 @@ class SOSClient(BaseSCMClient):
         logger.debug('File information for diff: %r', files)
 
         return sorted(
-            six.itervalues(files),
+            files.values(),
             key=lambda info: os.path.split(info['new_filename'] or
                                            info['old_filename']))
 
@@ -1422,7 +1420,7 @@ class SOSClient(BaseSCMClient):
         renamed_dirs = {}
         renamed_files = {}
 
-        for file_change in six.itervalues(file_changes):
+        for file_change in file_changes.values():
             obj_type = FILE_CHANGE_TYPE_MAP.get(file_change['type'])
             old_filename = file_change.get('old_filename')
             new_filename = file_change.get('new_filename')
@@ -1491,7 +1489,7 @@ class SOSClient(BaseSCMClient):
             return renamed_files[path]
 
         if renamed_dirs:
-            for new_dir_name, old_dir_name in six.iteritems(renamed_dirs):
+            for new_dir_name, old_dir_name in renamed_dirs.items():
                 if path.startswith(new_dir_name):
                     return os.path.join(old_dir_name,
                                         path[len(new_dir_name):])

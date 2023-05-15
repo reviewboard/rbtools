@@ -2,8 +2,6 @@ from __future__ import unicode_literals
 
 import textwrap
 
-import six
-
 from rbtools.clients import load_scmclients
 from rbtools.commands import Command
 
@@ -36,7 +34,7 @@ class ListRepoTypes(Command):
 
         self.json.add('repository_types', [])
 
-        for name, tool in six.iteritems(SCMCLIENTS):
+        for name, tool in SCMCLIENTS.items():
             has_repository_info = tool.get_repository_info() is not None
 
             self.json.append('repository_types', {

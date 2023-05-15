@@ -8,8 +8,6 @@ import re
 import sys
 from typing import Dict, List, Optional, cast
 
-import six
-
 from rbtools.clients import PatchResult, RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
                                             SCMClientDiffResult,
@@ -1412,14 +1410,14 @@ class GitClient(BaseSCMClient):
             elif files:
                 self._execute(['git', 'add'] + files)
         except Exception as e:
-            raise CreateCommitError(six.text_type(e))
+            raise CreateCommitError(str(e))
 
         if run_editor:
             try:
                 modified_message = edit_text(message,
                                              filename='COMMIT_EDITMSG')
             except EditorError as e:
-                raise CreateCommitError(six.text_type(e))
+                raise CreateCommitError(str(e))
         else:
             modified_message = message
 
@@ -1444,7 +1442,7 @@ class GitClient(BaseSCMClient):
         try:
             self._execute(cmd)
         except Exception as e:
-            raise CreateCommitError(six.text_type(e))
+            raise CreateCommitError(str(e))
 
     def delete_branch(self, branch_name, merged_only=True):
         """Delete the specified branch.
@@ -1652,7 +1650,7 @@ class GitClient(BaseSCMClient):
 
         # 0x1f is the ASCII field separator. It is a non-printable character
         # that should not appear in any field in `git log`.
-        log_format = b'%x1f'.join(six.itervalues(log_fields))
+        log_format = b'%x1f'.join(log_fields.values())
 
         log_entries = execute(
             [
@@ -1673,7 +1671,7 @@ class GitClient(BaseSCMClient):
             return None
 
         history = []
-        field_names = six.viewkeys(log_fields)
+        field_names = log_fields.keys()
 
         for log_entry in log_entries.split(self._NUL):
             fields = log_entry.split(self._FIELD_SEP)

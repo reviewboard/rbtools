@@ -7,9 +7,7 @@ import os
 import re
 import uuid
 from typing import List, Optional
-
-import six
-from six.moves.urllib.parse import urlsplit, urlunparse
+from urllib.parse import urlsplit, urlunparse
 
 from rbtools.clients import PatchResult, RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
@@ -239,7 +237,7 @@ class MercurialClient(BaseSCMClient):
             'parent2': '{p2node}',
             'commit_message': '{desc}',
         }
-        log_format = self._FIELD_SEP_ESC.join(six.itervalues(log_fields))
+        log_format = self._FIELD_SEP_ESC.join(log_fields.values())
 
         log_entries = self._execute(
             [
@@ -258,7 +256,7 @@ class MercurialClient(BaseSCMClient):
             return None
 
         history = []
-        field_names = six.viewkeys(log_fields)
+        field_names = log_fields.keys()
 
         # The ASCII record separator will be appended to every record, so if we
         # attempt to split the entire output by the record separator, we will
@@ -933,7 +931,7 @@ class MercurialClient(BaseSCMClient):
             try:
                 modified_message = edit_file(filename)
             except EditorError as e:
-                raise CreateCommitError(six.text_type(e))
+                raise CreateCommitError(str(e))
             finally:
                 try:
                     os.unlink(filename)
@@ -967,7 +965,7 @@ class MercurialClient(BaseSCMClient):
         try:
             self._execute(hg_command)
         except Exception as e:
-            raise CreateCommitError(six.text_type(e))
+            raise CreateCommitError(str(e))
 
     def merge(self, target, destination, message, author, squash=False,
               run_editor=False, close_branch=False, **kwargs):

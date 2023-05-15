@@ -3,8 +3,6 @@ from __future__ import unicode_literals
 from collections import defaultdict
 from copy import deepcopy
 
-import six
-
 from rbtools.hooks.common import execute, get_review_request_id
 
 
@@ -95,8 +93,7 @@ def get_review_id_to_commits_map(lines, regex):
     if new_branches:
         review_id_to_commits_map_copy = deepcopy(review_id_to_commits_map)
 
-        for review_id, commit_list in six.iteritems(
-                review_id_to_commits_map_copy):
+        for review_id, commit_list in review_id_to_commits_map_copy.items():
             for commit in commit_list:
                 commit_branch = commit[:commit.find('(') - 1]
 

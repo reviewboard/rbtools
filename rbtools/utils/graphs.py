@@ -2,8 +2,6 @@ from __future__ import unicode_literals
 
 from collections import defaultdict, deque
 
-import six
-
 
 def visit_depth_first(graph, start):
     """Yield vertices in the graph starting at the start vertex.
@@ -49,16 +47,16 @@ def toposort(graph):
 
     indegrees = defaultdict(int)  # The in-degree of each vertex in the graph.
 
-    for head in six.iterkeys(graph):
+    for head in graph.keys():
         indegrees[head] = 0
 
-    for tails in six.itervalues(graph):
+    for tails in graph.values():
         for tail in tails:
             indegrees[tail] += 1
 
     heads = set(
         vertex
-        for vertex, indegree in six.iteritems(indegrees)
+        for vertex, indegree in indegrees.items()
         if indegree == 0
     )
 
@@ -73,7 +71,7 @@ def toposort(graph):
                 if indegrees[tail] == 0:
                     heads.add(tail)
 
-    if any(six.itervalues(indegrees)):
+    if any(indegrees.values()):
         raise ValueError('Graph contains cycles.')
 
     return result

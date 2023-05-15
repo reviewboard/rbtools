@@ -4,8 +4,6 @@ from __future__ import unicode_literals
 
 import re
 
-from six.moves import range
-
 from rbtools.api.factory import create_resource
 from rbtools.api.request import HttpRequest
 from rbtools.api.resource import (CountResource,

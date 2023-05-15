@@ -13,8 +13,6 @@ import sys
 from fnmatch import fnmatch
 from typing import List, Optional, Tuple, Union
 
-import six
-
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
                                             SCMClientDiffResult,
@@ -346,7 +344,7 @@ class P4Wrapper(object):
                     # We need to convert these over to Unicode.
                     data = {}
 
-                    for key, value in six.iteritems(decoded_data):
+                    for key, value in decoded_data.items():
                         key = force_unicode(key)
 
                         # Values are typically strings, but error payloads
@@ -823,7 +821,7 @@ class PerforceClient(BaseSCMClient):
 
         # Next try for a counter of the form:
         # reviewboard_url.http:||reviewboard.example.com
-        for key, value in six.iteritems(counters):
+        for key, value in counters.items():
             m = self.ENCODED_COUNTER_URL_RE.match(key)
 
             if m:
@@ -1243,9 +1241,11 @@ class PerforceClient(BaseSCMClient):
         # Now run through the changesets in order and compute a change journal
         # for each file.
         files = []
+
         for cln in sorted(changesets.keys()):
             changeset = changesets[cln]
-            for depot_file, change in six.iteritems(changeset):
+
+            for depot_file, change in changeset.items():
                 action = change['action']
 
                 # Moves will be handled in the 'move/delete' entry
@@ -1830,8 +1830,7 @@ class PerforceClient(BaseSCMClient):
             old_file = new_file = empty_filename
             changetype_short = None
 
-            for depot_path, (first_record, second_record) in \
-                    six.iteritems(files):
+            for depot_path, (first_record, second_record) in files.items():
                 old_file = new_file = empty_filename
                 if first_record is None:
                     new_path = '%s#%s' % (depot_path, second_record['rev'])

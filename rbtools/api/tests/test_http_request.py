@@ -2,8 +2,7 @@
 
 from __future__ import unicode_literals
 
-import six
-from six.moves.urllib.parse import parse_qsl, urlparse
+from urllib.parse import parse_qsl, urlparse
 
 from kgb import SpyAgency
 

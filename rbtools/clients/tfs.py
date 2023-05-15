@@ -11,8 +11,7 @@ import sys
 import tempfile
 import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Optional, cast
-
-from six.moves.urllib.parse import unquote
+from urllib.parse import unquote
 
 from rbtools.clients import BaseSCMClient, RepositoryInfo
 from rbtools.clients.base.scmclient import (SCMClientDiffResult,

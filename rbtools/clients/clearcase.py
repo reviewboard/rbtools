@@ -13,7 +13,6 @@ import threading
 from collections import OrderedDict, defaultdict, deque
 from typing import Dict, List, Optional
 
-import six
 from pydiffx.dom import DiffX
 from pydiffx.dom.objects import DiffXChangeSection
 
@@ -1134,7 +1133,7 @@ class ClearCaseClient(BaseSCMClient):
         # Convert to list
         changeranges = []
 
-        for path, version in six.iteritems(changelist):
+        for path, version in changelist.items():
             current_version = version['current']
             branch_path, current_version_number = cpath.split(current_version)
 
@@ -1191,15 +1190,11 @@ class ClearCaseClient(BaseSCMClient):
                 changelist[path]['highest'] = version_number
                 changelist[path]['current'] = current
 
-        # Convert to list
-        changeranges = []
-        for path, version in six.iteritems(changelist):
-            changeranges.append(
-                (self._construct_extended_path(path, version['previous']),
-                 self._construct_extended_path(path, version['current']))
-            )
-
-        return changeranges
+        return [
+            (self._construct_extended_path(path, version['previous']),
+             self._construct_extended_path(path, version['current']))
+            for path, version in changelist.items()
+        ]
 
     def _sanitize_checkedout_changeset(self, changeset):
         """Return extended paths for all modifications in a changeset.
@@ -2459,7 +2454,7 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
         self.vob_tags = set()
         self.uuid_to_tags = {}
 
-        for uuid, tags in six.iteritems(tags):
+        for uuid, tags in tags.items():
             self.vob_tags.update(tags)
             self.uuid_to_tags[uuid] = list(tags)
 

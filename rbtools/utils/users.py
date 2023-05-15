@@ -3,8 +3,6 @@ from __future__ import unicode_literals
 import logging
 import sys
 
-from six.moves import range
-
 from rbtools.api.errors import AuthorizationError
 from rbtools.utils.console import get_input, get_pass
 

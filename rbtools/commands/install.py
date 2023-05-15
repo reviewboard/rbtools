@@ -6,10 +6,10 @@ import os
 import shutil
 import tempfile
 import zipfile
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
 
 import tqdm
-from six.moves.urllib.error import HTTPError, URLError
-from six.moves.urllib.request import urlopen
 
 from rbtools.commands import Command, CommandError
 from rbtools.utils.appdirs import user_data_dir

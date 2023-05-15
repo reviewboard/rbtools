@@ -6,7 +6,6 @@ import sys
 from docutils import nodes
 from docutils.parsers.rst import Directive
 from docutils.statemachine import ViewList
-from six.moves import range
 
 from rbtools import commands
 from rbtools.commands import BaseMultiCommand, OptionGroup, Option

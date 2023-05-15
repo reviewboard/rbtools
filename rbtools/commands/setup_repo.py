@@ -4,9 +4,6 @@ import difflib
 import os
 import textwrap
 
-import six
-from six.moves import input
-
 from rbtools.commands import Command, CommandError
 from rbtools.utils.console import confirm, confirm_select
 from rbtools.utils.filesystem import CONFIG_FILE
@@ -79,8 +76,9 @@ class SetupRepo(Command):
                 repo_paths[repository['mirror_path']] = repository
 
         closest_paths = difflib.get_close_matches(repository_paths,
-                                                  six.iterkeys(repo_paths),
-                                                  n=4, cutoff=0.4)
+                                                  repo_paths.keys(),
+                                                  n=4,
+                                                  cutoff=0.4)
 
         if closest_paths:
             self.stdout.new_line()

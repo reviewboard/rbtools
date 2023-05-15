@@ -2,8 +2,6 @@ from __future__ import unicode_literals
 
 import logging
 
-import six
-
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option, OptionGroup
 from rbtools.utils.commands import stamp_commit_with_review_url
@@ -115,7 +113,7 @@ class Stamp(Command):
                 no_commit_error=self.no_commit_error,
                 repository_id=self.repository.id)
         except MatchReviewRequestsError as e:
-            raise CommandError(six.text_type(e))
+            raise CommandError(str(e))
 
         if review_request:
             logging.debug('Found review request ID %d', review_request.id)

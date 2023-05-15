@@ -7,7 +7,6 @@ import os
 import re
 from gettext import gettext as _, ngettext
 
-import six
 from rbtools.api.errors import APIError
 from rbtools.clients import PatchAuthor
 from rbtools.clients.errors import CreateCommitError
@@ -356,13 +355,8 @@ class Patch(Command):
             self.stdout.new_line()
 
             patch_output = result.patch_output.strip()
-
-            if six.PY2:
-                self.stdout.write(patch_output)
-            else:
-                self.stdout_bytes.write(patch_output)
-                self.stdout.new_line()
-
+            self.stdout_bytes.write(patch_output)
+            self.stdout.new_line()
             self.stdout.new_line()
 
         if not result.applied:
@@ -695,7 +689,7 @@ class Patch(Command):
                         author=author,
                         run_editor=not commit_no_edit)
                 except CreateCommitError as e:
-                    raise CommandError(six.text_type(e))
+                    raise CommandError(str(e))
                 except NotImplementedError:
                     raise CommandError('--commit is not supported with %s'
                                        % self.tool.name)

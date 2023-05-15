@@ -6,9 +6,6 @@ import os
 import subprocess
 import sys
 
-import six
-from six.moves import input
-
 from rbtools.utils.encoding import force_unicode
 from rbtools.utils.errors import EditorError
 from rbtools.utils.filesystem import make_tempfile
@@ -67,7 +64,7 @@ def get_input(prompt, require=False, stderr=sys.stderr, stdin=sys.stdin):
 
         return result
 
-    prompt = six.text_type(prompt)
+    prompt = str(prompt)
 
     if require:
         value = None
@@ -124,7 +121,7 @@ def get_pass(prompt, require=False, stderr=sys.stderr, stdin=sys.stdin):
 
         return result.strip()
 
-    prompt = six.text_type(prompt)
+    prompt = str(prompt)
 
     if require:
         password = None
