@@ -533,10 +533,10 @@ class GitClient(BaseSCMClient):
             if url:
                 url = url.rstrip('/')
 
-                # Central bare repositories don't have origin URLs.
-                # We return git_dir instead and hope for the best.
-                if not url:
-                    url = os.path.abspath(self._git_dir)
+            # Central bare repositories don't have origin URLs.
+            # We return git_dir instead and hope for the best.
+            if not url:
+                url = os.path.abspath(self._git_dir)
 
         if url:
             return RepositoryInfo(path=url,
