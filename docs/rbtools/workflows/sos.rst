@@ -339,7 +339,7 @@ review request.
 .. code-block:: console
 
    $ soscmd commit -c my-changelist
-   $ rbt close -r 1001
+   $ rbt close 1001
 
 (You can also close it in the review request page).
 

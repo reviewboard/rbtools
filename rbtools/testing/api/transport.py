@@ -4,13 +4,10 @@ Version Added:
     3.1
 """
 
-from __future__ import unicode_literals
-
 import json
 import logging
 from collections import defaultdict
-
-from six.moves.urllib.parse import parse_qs, urljoin, urlparse
+from urllib.parse import parse_qs, urljoin, urlparse
 
 from rbtools.api.errors import create_api_error
 from rbtools.api.factory import create_resource

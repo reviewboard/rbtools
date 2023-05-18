@@ -1,10 +1,6 @@
 """Unit tests for rbtools.api.resource."""
 
-from __future__ import unicode_literals
-
 import re
-
-from six.moves import range
 
 from rbtools.api.factory import create_resource
 from rbtools.api.request import HttpRequest

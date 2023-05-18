@@ -1,11 +1,9 @@
 """Unit tests for rbtools.utils.repository."""
 
-from __future__ import unicode_literals
-
 import json
+from urllib.request import urlopen
 
 import kgb
-from six.moves.urllib.request import urlopen
 
 from rbtools.api.client import RBClient
 from rbtools.api.tests.base import MockResponse

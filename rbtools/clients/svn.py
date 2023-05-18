@@ -11,8 +11,7 @@ import re
 import sys
 from xml.etree import ElementTree
 from typing import Dict, Iterator, List, Optional, Tuple, Union, cast
-
-from six.moves.urllib.parse import unquote
+from urllib.parse import unquote
 
 from rbtools.api.errors import APIError
 from rbtools.api.resource import (ItemResource,

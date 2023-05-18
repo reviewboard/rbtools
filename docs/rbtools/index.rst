@@ -15,12 +15,21 @@ Along with a variety of helpful commands, RBTools also provides a powerful
 Python client API for Review Board, giving you the flexibility to develop your
 own integrations.
 
-.. _`Review Board`: https://www.reviewboard.org/
+Let's explore RBTools:
+
+* :ref:`What's in RBTools? <whats-in-rbtools>`
+* :ref:`Getting started <rbtools-getting-started>`
+* :ref:`Common RBTools workflows <rbtools-workflows-summary>`
+
+
+.. _Review Board: https://www.reviewboard.org/
 .. _RBCommons: https://rbcommons.com/
 
 
-What's in RBTools
-=================
+.. _whats-in-rbtools:
+
+What's in RBTools?
+==================
 
 .. _rbt:
 
@@ -70,86 +79,82 @@ There's a whole suite of additional commands that might also be useful:
 * :ref:`rbt-status-update` - Register or update a "status update" on a review
   request, for automatic code review
 
-
-Python API
-----------
-
-RBTools provides a Python module makes it easy to communicate with any Review
-Board server using its powerful REST API. You can write custom scripts or even
-new RBTools command that can attach metadata to review requests, perform
-reviews, analyze diffs, extract analytics data, or almost anything else.
-
-There's a lot you can do with the API. See the :ref:`rbtools-api`
-documentation for more information.
+:ref:`Learn more about RBTools commands <rbt>`.
 
 
-Installation
-============
+The RBTools Python API
+----------------------
 
-To install RBTools, simply visit the `RBTools Downloads`_ page and follow the
-instructions for your operating system.
+RBTools isn't just a set of commands. It's also a platform for writing your
+own code, including:
 
-.. _`RBTools Downloads`: https://www.reviewboard.org/downloads/rbtools/
+* Custom :command:`rbt` commands
+* Automation scripts for Review Board
+* Analytics tools
+* New automated code review integrations
+* Repository hooks and triggers
 
-.. admonition:: Using Microsoft Team Foundation Server?
+And more.
 
-   You will need to install and configure some additional tools as well. See
-   the our guide on :ref:`configuring TFS <rbtools-tfs>`.
+Using the :ref:`RBTools Python API <rbtools-api>`, you can write programs that
+talk to the :ref:`Review Board API <rb:webapiguide>` or to your local source
+code management system, all from Python.
 
-
-Authentication
-==============
-
-Most actions with RBTools require that you are authenticated to a Review Board
-server.
-
-* :ref:`Authenticating to Review Board <rbtools-authentication>`
+:ref:`Learn more about the RBTools Python API <rbtools-api>`.
 
 
-Configuration
-=============
+.. _rbtools-getting-started:
 
-Repositories
-------------
+Getting Started
+===============
 
-Once you've installed RBTools, you'll want to configure it to work with each
-of your repositories. This is done with a :file:`.reviewboardrc` file. This is
-the first step to allow any of your developers to easily post changes using
-RBTools.
+We'll walk you through getting RBTools ready to use with Review Board.
 
-* :ref:`Configure your repositories <rbtools-repo-config>`
+1. :ref:`Install RBTools <rbtools-installation>`.
+
+   Steps are provided all major operating systems and Linux distributions.
+
+2. :ref:`Authenticate with Review Board <rbtools-authentication>`.
+
+3. :ref:`Configure RBTools for your repositories <rbtools-repo-config>`.
+
+   RBTools configuration lives in a :file:`.reviewboardrc` file, which is
+   usually stored in your source code repository, so everyone can share the
+   same configuration.
+
+   This is the first step to allow any of your developers to easily post
+   changes using RBTools.
+
+4. Optionally, customize your RBTools experience:
+
+   * :ref:`Configure options and environment variables <rbtools-user-config>`
+   * :ref:`Creating custom command aliases <rbtools-aliases>`
+   * :ref:`Enable shell integration and auto-completion
+     <rbt-setup-completion>`
+
+   These can also live in a separate :file:`.reviewboardrc` in your home
+   directory, letting you make your RBTools experience your own.
 
 
-User Environments
------------------
+.. _rbtools-workflows-summary:
 
-There's a number of options available to RBTools users, from command line
-argument defaults to custom aliases and shell integration. We've broken this
-into multiple guides:
+Common RBTools Workflows
+========================
 
-* :ref:`Configurable options and environment variables <rbtools-user-config>`
-* :ref:`Creating custom aliases <rbtools-aliases>`
-* :ref:`Shell integration/auto-completion <rbt-setup-completion>`
+Every source code management system is different. We have guides on the most
+common workflows to help you get started:
 
-
-RBTools Workflows
-=================
-
-* :ref:`rbtools-workflow-git`
 * :ref:`rbtools-workflow-sos`
+* :ref:`rbtools-workflow-git`
 * :ref:`rbtools-workflow-versionvault`
-
-
-Indices, Glossary and Tables
-============================
-
-* :ref:`glossary`
+* :ref:`rbtools-workflow-perforce`
 
 
 .. toctree::
    :hidden:
 
+   installation
    rbt/index
-   api/index
    workflows/index
+   api/index
    glossary

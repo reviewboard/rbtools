@@ -30,13 +30,13 @@ set DEPS_DIR=%BUILD_BASE%\deps
 ::-------------------------------------------------------------------------
 :: Dependencies
 ::-------------------------------------------------------------------------
-set PYTHON_VERSION=3.10.8
+set PYTHON_VERSION=3.10.11
 
 set PYTHON_URL_BASE=https://www.python.org/ftp/python
 
 set PYTHON_X64_FILENAME=python-%PYTHON_VERSION%-amd64.exe
 set PYTHON_X64_URL=%PYTHON_URL_BASE%/%PYTHON_VERSION%/%PYTHON_X64_FILENAME%
-set PYTHON_X64_MD5=308a3d095311fbc82e5c696ab4036251
+set PYTHON_X64_MD5=a55e9c1e6421c84a4bd8b4be41492f51
 set PYTHON_X64_DEP=%DEPS_DIR%\python-%PYTHON_VERSION%-x64
 
 
@@ -52,7 +52,7 @@ call :SetMSBuildPath || goto :Abort
 ::-------------------------------------------------------------------------
 :: Signing certificate
 ::-------------------------------------------------------------------------
-set CERT_THUMBPRINT=deee311acc700a6f797018a6cf4075131b6f7198
+set CERT_THUMBPRINT_SHA1=88b278d63d192543884faa8cd97cc77ef74ef897
 
 
 ::-------------------------------------------------------------------------
@@ -248,7 +248,7 @@ echo == Building the RBTools installer [x64] ==
     /p:Root="%BUILD_ROOT_X64%" ^
     /p:OutputPath="%BUILD_STAGE%\\" ^
     /p:SourcePath="%_wix_path%" ^
-    /p:CertificateThumbprint=%CERT_THUMBPRINT% ^
+    /p:CertificateThumbprint=%CERT_THUMBPRINT_SHA1% ^
     /p:TimestampUrl=%_timestamp_url% ^
     "%_sln_file%"
 

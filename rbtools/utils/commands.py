@@ -1,7 +1,4 @@
-from __future__ import unicode_literals
-
-import six
-
+"""Utilities for commands."""
 
 DEFAULT_OPTIONS_MAP = {
     'debug': '--debug',
@@ -68,7 +65,7 @@ def build_rbtools_cmd_argv(options, options_map=DEFAULT_OPTIONS_MAP):
     """
     argv = []
 
-    for option_key, arg_name in six.iteritems(options_map):
+    for option_key, arg_name in options_map.items():
         option_value = getattr(options, option_key, None)
 
         if option_value is True and option_key != 'enable_proxy':

@@ -16,8 +16,6 @@
 # All configuration values have a default; values that are commented
 # out serve to show the default.
 
-from __future__ import unicode_literals
-
 import os
 import sys
 from datetime import datetime
@@ -46,6 +44,7 @@ extensions = [
     'sphinx.ext.autosummary',
     'sphinx.ext.doctest',
     'sphinx.ext.linkcode',
+    'sphinx_tabs.tabs',
     'beanbag_docutils.sphinx.ext.autodoc_utils',
     'beanbag_docutils.sphinx.ext.extlinks',
     'beanbag_docutils.sphinx.ext.http_role',
@@ -276,8 +275,6 @@ else:
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
-    'rb2.0': ('%s/docs/manual/2.0/' % rbwebsite_url, None),
-    'rb2.5': ('%s/docs/manual/2.5/' % rbwebsite_url, None),
     'rb': ('%s/docs/manual/latest/' % rbwebsite_url, None),
 }
 
@@ -287,6 +284,9 @@ extlinks = {
 
 
 autosummary_generate = True
+
+sphinx_tabs_valid_builders = ['html', 'json', 'pickle']
+sphinx_tabs_disable_tab_closing = True
 
 
 def linkcode_resolve(domain, info):

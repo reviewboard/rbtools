@@ -1,12 +1,10 @@
-from __future__ import unicode_literals
+"""Utilities for working with command aliases."""
 
 import logging
 import re
 import shlex
 import sys
 import subprocess
-
-import six
 
 from rbtools.commands import RB_MAIN
 
@@ -61,7 +59,7 @@ def replace_arguments(cmd, args, posix):
     did_replacement = False
 
     shlex_convert_text_type = (not _SHLEX_SUPPORTS_UNICODE and
-                               isinstance(cmd, six.text_type))
+                               isinstance(cmd, str))
 
     if shlex_convert_text_type:
         # This version of Python does not have a shlex module that supports
