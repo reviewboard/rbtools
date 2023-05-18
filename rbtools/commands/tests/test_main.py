@@ -1,7 +1,5 @@
 """Tests for RBTools help command and rbt command help options."""
 
-from __future__ import unicode_literals
-
 import sys
 
 import kgb

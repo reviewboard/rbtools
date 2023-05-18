@@ -6,8 +6,6 @@ Deprecated::
     :py:class:`rbtools.testing.api.transport.URLMapTransport.`
 """
 
-from __future__ import unicode_literals
-
 from rbtools.api.factory import create_resource
 from rbtools.api.request import HttpRequest
 from rbtools.api.tests.base import TestWithPayloads

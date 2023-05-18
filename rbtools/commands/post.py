@@ -1,4 +1,4 @@
-from __future__ import unicode_literals
+"""Implementation of rbt post."""
 
 import logging
 import os
@@ -7,8 +7,6 @@ import re
 import sys
 from collections import namedtuple
 
-import six
-from six.moves import zip
 from tqdm import tqdm
 
 from rbtools.api.errors import APIError
@@ -1078,7 +1076,7 @@ class Post(Command):
                     additional_fields=additional_fields,
                     repository_id=self.repository.id)
             except MatchReviewRequestsError as e:
-                raise CommandError(six.text_type(e))
+                raise CommandError(str(e))
 
             if not review_request or not review_request.id:
                 raise CommandError('Could not determine existing review '
@@ -1350,7 +1348,7 @@ class Post(Command):
             if extra_data_patch:
                 request_data.update({
                     'extra_data__%s' % _key: _value
-                    for _key, _value in six.iteritems(extra_data_patch)
+                    for _key, _value in extra_data_patch.items()
                 })
 
     def _get_diff_history(self, extra_args):

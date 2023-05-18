@@ -1,13 +1,10 @@
-from __future__ import print_function, unicode_literals
+"""Utilities for working with console interactions."""
 
 import getpass
 import logging
 import os
 import subprocess
 import sys
-
-import six
-from six.moves import input
 
 from rbtools.utils.encoding import force_unicode
 from rbtools.utils.errors import EditorError
@@ -67,7 +64,7 @@ def get_input(prompt, require=False, stderr=sys.stderr, stdin=sys.stdin):
 
         return result
 
-    prompt = six.text_type(prompt)
+    prompt = str(prompt)
 
     if require:
         value = None
@@ -124,7 +121,7 @@ def get_pass(prompt, require=False, stderr=sys.stderr, stdin=sys.stdin):
 
         return result.strip()
 
-    prompt = six.text_type(prompt)
+    prompt = str(prompt)
 
     if require:
         password = None

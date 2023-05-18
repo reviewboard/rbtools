@@ -1,4 +1,4 @@
-from __future__ import unicode_literals
+"""Implementation of rbt clear-cache."""
 
 from rbtools.api.cache import APICache, clear_cache
 from rbtools.commands import Command, Option

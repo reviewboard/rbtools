@@ -163,7 +163,6 @@ setup(
         'colorama',
         'pydiffx~=1.1.0',
         'setuptools',
-        'six>=1.8.0',
         'texttable',
         'typing_extensions>=4.3.0',
         'tqdm',

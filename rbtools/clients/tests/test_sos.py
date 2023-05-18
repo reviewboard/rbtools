@@ -4,8 +4,6 @@ Version Added:
     3.1
 """
 
-from __future__ import unicode_literals
-
 import os
 import re
 from typing import Any, Dict, List

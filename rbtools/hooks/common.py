@@ -1,4 +1,4 @@
-from __future__ import print_function, unicode_literals
+"""Common functionality for working with repository hooks."""
 
 import logging
 import subprocess

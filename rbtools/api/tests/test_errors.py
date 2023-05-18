@@ -1,9 +1,5 @@
 """Unit tests for rbtools.api.errors."""
 
-from __future__ import unicode_literals
-
-import six
-
 from rbtools.api.errors import APIError, AuthorizationError, BadRequestError
 from rbtools.testing import TestCase
 
@@ -14,35 +10,35 @@ class APIErrorTests(TestCase):
     def test_str_with_http_status(self):
         """Testing APIError.__str__ with http_status"""
         self.assertEqual(
-            six.text_type(APIError(http_status=500)),
+            str(APIError(http_status=500)),
             'An error occurred when communicating with Review Board. '
             '(HTTP 500: Internal Server Error)')
 
     def test_str_with_http_status_unknown(self):
         """Testing APIError.__str__ with unknown http_status"""
         self.assertEqual(
-            six.text_type(APIError(http_status=900)),
+            str(APIError(http_status=900)),
             'An error occurred when communicating with Review Board. '
             '(HTTP 900)')
 
     def test_str_with_error_code(self):
         """Testing APIError.__str__ with error_code"""
         self.assertEqual(
-            six.text_type(APIError(error_code=105)),
+            str(APIError(error_code=105)),
             'An error occurred when communicating with Review Board. '
             '(API Error 105: Invalid Form Data)')
 
     def test_str_with_error_code_unknown(self):
         """Testing APIError.__str__ with unknown error_code"""
         self.assertEqual(
-            six.text_type(APIError(error_code=12345)),
+            str(APIError(error_code=12345)),
             'An error occurred when communicating with Review Board. '
             '(API Error 12345)')
 
     def test_str_with_http_status_and_error_code(self):
         """Testing APIError.__str__ with http_status and error_code"""
         self.assertEqual(
-            six.text_type(APIError(http_status=400,
+            str(APIError(http_status=400,
                                    error_code=106)),
             'An error occurred when communicating with Review Board. '
             '(API Error 106: Missing Attribute)')
@@ -50,7 +46,7 @@ class APIErrorTests(TestCase):
     def test_str_with_rsp(self):
         """Testing APIError.__str__ with rsp error message"""
         self.assertEqual(
-            six.text_type(APIError(rsp={
+            str(APIError(rsp={
                 'err': {
                     'msg': 'Bad things happened.',
                 },
@@ -60,7 +56,7 @@ class APIErrorTests(TestCase):
     def test_str_with_rsp_and_error_code(self):
         """Testing APIError.__str__ with rsp error message and error_code"""
         self.assertEqual(
-            six.text_type(APIError(
+            str(APIError(
                 http_status=400,
                 error_code=106,
                 rsp={
@@ -73,7 +69,7 @@ class APIErrorTests(TestCase):
     def test_str_with_rsp_and_http_status(self):
         """Testing APIError.__str__ with rsp error message and http_status"""
         self.assertEqual(
-            six.text_type(APIError(
+            str(APIError(
                 http_status=400,
                 rsp={
                     'err': {
@@ -85,7 +81,7 @@ class APIErrorTests(TestCase):
     def test_str_with_no_details(self):
         """Testing APIError.__str__ without any details"""
         self.assertEqual(
-            six.text_type(APIError()),
+            str(APIError()),
             'An error occurred when communicating with Review Board.')
 
 
@@ -95,7 +91,7 @@ class AuthorizationErrorTests(TestCase):
     def test_str_with_message(self):
         """Testing AuthorizationError.__str__ with explicit error message"""
         self.assertEqual(
-            six.text_type(AuthorizationError(message='Oh no.')),
+            str(AuthorizationError(message='Oh no.')),
             'Oh no.')
 
     def test_str_with_details(self):
@@ -103,8 +99,8 @@ class AuthorizationErrorTests(TestCase):
         with HTTP details
         """
         self.assertEqual(
-            six.text_type(AuthorizationError(http_status=401,
-                                             error_code=104)),
+            str(AuthorizationError(http_status=401,
+                                   error_code=104)),
             'Error authenticating to Review Board. (API Error 104: '
             'Login Failed)')
 
@@ -113,7 +109,7 @@ class AuthorizationErrorTests(TestCase):
         or HTTP details
         """
         self.assertEqual(
-            six.text_type(AuthorizationError()),
+            str(AuthorizationError()),
             'Error authenticating to Review Board.')
 
 
@@ -123,20 +119,20 @@ class BadRequestErrorTests(TestCase):
     def test_str(self):
         """Testing BadRequestError.__str__"""
         self.assertEqual(
-            six.text_type(BadRequestError()),
+            str(BadRequestError()),
             'Missing or invalid data was sent to Review Board.')
 
     def test_str_with_error_code(self):
         """Testing BadRequestError.__str__"""
         self.assertEqual(
-            six.text_type(BadRequestError(error_code=200)),
+            str(BadRequestError(error_code=200)),
             'Missing or invalid data was sent to Review Board. '
             '(API Error 200: Unspecified Diff Revision)')
 
     def test_str_with_rsp_error_message(self):
         """Testing BadRequestError.__str__ with rsp error message"""
         self.assertEqual(
-            six.text_type(BadRequestError(
+            str(BadRequestError(
                 error_code=200,
                 rsp={
                     'err': {
@@ -149,7 +145,7 @@ class BadRequestErrorTests(TestCase):
     def test_str_with_message(self):
         """Testing BadRequestError.__str__ with message"""
         self.assertEqual(
-            six.text_type(BadRequestError(
+            str(BadRequestError(
                 error_code=200,
                 message='Diff revision not specified.')),
             'Diff revision not specified. (API Error 200: Unspecified Diff '
@@ -158,7 +154,7 @@ class BadRequestErrorTests(TestCase):
     def test_str_with_message_with_fields(self):
         """Testing BadRequestError.__str__ with fields"""
         self.assertEqual(
-            six.text_type(BadRequestError(
+            str(BadRequestError(
                 error_code=105,
                 rsp={
                     'err': {

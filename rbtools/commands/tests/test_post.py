@@ -1,7 +1,5 @@
 """Test for RBTools post command."""
 
-from __future__ import unicode_literals
-
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.git import GitClient
 from rbtools.commands import CommandError

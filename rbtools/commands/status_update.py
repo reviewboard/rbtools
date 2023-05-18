@@ -1,10 +1,4 @@
-"""Interact with review request status-updates on Review Board.
-
-For getting or setting status-updates on review requests. Also for including a
-review when creating a status-update.
-"""
-
-from __future__ import print_function, unicode_literals
+"""Implementation of rbt status-update."""
 
 import json
 import logging

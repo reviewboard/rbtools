@@ -1,8 +1,7 @@
-from __future__ import unicode_literals
+"""Implementation of rbt attach."""
 
 import os
-
-from six.moves.urllib.parse import urljoin
+from urllib.parse import urljoin
 
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option

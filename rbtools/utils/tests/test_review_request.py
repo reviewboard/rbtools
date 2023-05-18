@@ -1,7 +1,5 @@
 """Unit tests for rbtools.utils.review_request."""
 
-from __future__ import unicode_literals
-
 import kgb
 
 from rbtools.api.errors import APIError

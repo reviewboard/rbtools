@@ -1,7 +1,5 @@
 """Unit tests for client scanning."""
 
-from __future__ import unicode_literals
-
 import os
 
 from rbtools.clients import scan_usable_client

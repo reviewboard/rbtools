@@ -1,4 +1,4 @@
-from __future__ import unicode_literals
+"""Implementation of rbt close."""
 
 from rbtools.api.errors import APIError
 from rbtools.commands import Command, CommandError, Option

@@ -1,4 +1,4 @@
-from __future__ import unicode_literals
+"""Base support for creating commands."""
 
 import argparse
 import inspect
@@ -9,11 +9,10 @@ import platform
 import os
 import subprocess
 import sys
+from urllib.parse import urlparse
 
 import colorama
 import pkg_resources
-import six
-from six.moves.urllib.parse import urlparse
 
 from rbtools import get_version_string
 from rbtools.api.capabilities import Capabilities
@@ -186,7 +185,7 @@ class OutputWrapper(object):
         if self.output_stream:
             if end:
                 if (isinstance(msg, bytes) and
-                    isinstance(end, six.string_types)):
+                    isinstance(end, str)):
                     msg += end.encode('utf-8')
                 else:
                     msg += end
@@ -194,8 +193,7 @@ class OutputWrapper(object):
             self.output_stream.write(msg)
 
     def new_line(self):
-        """Pass a new line character to output stream object.
-        """
+        """Pass a new line character to output stream object."""
         if self.output_stream:
             self.output_stream.write('\n')
 

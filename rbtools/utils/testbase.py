@@ -5,8 +5,6 @@ Deprecated:
     This will be removed in RBTools 4.0.
 """
 
-from __future__ import unicode_literals
-
 from rbtools.deprecation import RemovedInRBTools40Warning
 from rbtools.testing import TestCase
 

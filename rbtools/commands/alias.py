@@ -1,9 +1,7 @@
-from __future__ import unicode_literals
+"""Implementation of rbt alias."""
 
 from collections import defaultdict
 from subprocess import list2cmdline
-
-import six
 
 from rbtools.commands import command_exists, Command, CommandError, Option
 from rbtools.utils.aliases import expand_alias
@@ -50,7 +48,7 @@ class Alias(Command):
             config = parse_config_file(config_path)
 
             if 'ALIASES' in config:
-                for alias_name, alias_cmd in six.iteritems(config['ALIASES']):
+                for alias_name, alias_cmd in config['ALIASES'].items():
                     predefined = alias_name in predefined_aliases
 
                     aliases[config_path][alias_name] = {
@@ -66,7 +64,7 @@ class Alias(Command):
             if aliases[config_path]:
                 self.stdout.write('[%s]' % config_path)
 
-                for alias_name, entry in six.iteritems(aliases[config_path]):
+                for alias_name, entry in aliases[config_path].items():
                     self.stdout.write('    %s = %s'
                                       % (alias_name, entry['command']))
 

@@ -1,7 +1,5 @@
 """Tests for RBTools alias command."""
 
-from __future__ import unicode_literals
-
 from rbtools.commands.alias import Alias
 from rbtools.testing import CommandTestsMixin, TestCase
 

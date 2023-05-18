@@ -1,9 +1,7 @@
-from __future__ import unicode_literals
+"""Implementation of rbt diff."""
 
 from rbtools.clients.errors import InvalidRevisionSpecError
 from rbtools.commands import Command, CommandError
-
-import six
 
 
 class Diff(Command):
@@ -94,9 +92,6 @@ class Diff(Command):
         diff = diff_info['diff']
 
         if diff:
-            if six.PY2:
-                self.stdout.write(diff)
-            else:
-                # Write the non-decoded binary diff to standard out
-                self.stdout_bytes.write(diff)
-                self.stdout.new_line()
+            # Write the non-decoded binary diff to standard out.
+            self.stdout_bytes.write(diff)
+            self.stdout.new_line()

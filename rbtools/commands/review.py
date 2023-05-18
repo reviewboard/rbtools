@@ -1,9 +1,8 @@
-"""RBTools command to create and publish reviews.
+"""Implementation of rbt review.
 
-Version Added: 3.0
+Version Added:
+    3.0
 """
-
-from __future__ import unicode_literals
 
 import logging
 

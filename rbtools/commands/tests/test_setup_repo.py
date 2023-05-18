@@ -1,7 +1,5 @@
 """Tests for RBTools setup-repo command."""
 
-from __future__ import unicode_literals
-
 import os
 
 from kgb import SpyAgency

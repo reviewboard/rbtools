@@ -27,8 +27,6 @@ Version Changed:
       added a forwarding import.
 """
 
-from __future__ import unicode_literals
-
 import logging
 import os
 import sys

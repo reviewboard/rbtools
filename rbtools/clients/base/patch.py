@@ -4,8 +4,6 @@ Version Added:
     4.0
 """
 
-from __future__ import unicode_literals
-
 
 class PatchAuthor(object):
     """The author of a patch or commit.
