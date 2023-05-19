@@ -11,8 +11,8 @@ import sys
 from rbtools import get_version_string
 from rbtools.commands import RB_MAIN, find_entry_point_for_command
 from rbtools.commands.base import BaseMultiCommand, Option
+from rbtools.config import load_config
 from rbtools.utils.aliases import run_alias
-from rbtools.utils.filesystem import load_config
 
 
 GLOBAL_OPTIONS = [
@@ -112,7 +112,7 @@ def help(args, parser):
                 # exists with the name before printing an error message.
                 pass
 
-            aliases = load_config().get('ALIASES', {})
+            aliases = load_config().ALIASES
 
             if args[0] in aliases:
                 if aliases[args[0]].startswith('!'):
@@ -140,7 +140,7 @@ def help(args, parser):
         for cmd in glob.glob(path_prefix + '*'):
             commands.add(cmd.replace(path_prefix, ''))
 
-    aliases = load_config().get('ALIASES', {})
+    aliases = load_config().ALIASES
     commands |= set(aliases.keys())
     common_commands = ['post', 'patch', 'close', 'diff']
     other_commands = commands - set(common_commands)
@@ -221,7 +221,7 @@ def main():
             # with the name before printing an error message.
             pass
 
-        aliases = load_config().get('ALIASES', {})
+        aliases = load_config().ALIASES
 
         if command_name in aliases:
             sys.exit(run_alias(command_name, aliases[command_name], args))

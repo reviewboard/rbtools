@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Tuple
 
+from rbtools.config import RBToolsConfig
+
 if TYPE_CHECKING:
     import argparse
 
@@ -68,7 +70,7 @@ class Option:
     def add_to(
         self,
         parent: argparse._ActionsContainer,
-        config: Dict = {},
+        config: Optional[RBToolsConfig] = None,
         argv: List[str] = [],
     ) -> None:
         """Adds the option to the parent parser or group.
@@ -91,7 +93,7 @@ class Option:
         """
         attrs = self.attrs.copy()
 
-        if 'config_key' in attrs:
+        if config is not None and 'config_key' in attrs:
             config_key = attrs.pop('config_key')
 
             if config_key in config:
@@ -180,7 +182,7 @@ class OptionGroup:
     def add_to(
         self,
         parser: argparse.ArgumentParser,
-        config: Dict = {},
+        config: RBToolsConfig,
         argv: List[str] = [],
     ) -> None:
         """Add the group and all its contained options to the parser.
@@ -189,7 +191,7 @@ class OptionGroup:
             parser (argparse.ArgumentParser):
                 The command-line parser.
 
-            config (dict):
+            config (rbtools.config.RBToolsConfig):
                 The loaded RBTools configuration.
 
             argv (list, deprecated):

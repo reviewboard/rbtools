@@ -4,10 +4,13 @@ Version Added:
     4.0
 """
 
+from __future__ import annotations
+
 import argparse
 import logging
 import re
-from typing import Any, Dict, List, Mapping, Optional, Tuple, Union, cast
+from typing import (Any, Dict, List, Mapping, Optional, Tuple, Union, cast,
+                    TYPE_CHECKING)
 
 from housekeeping import deprecate_non_keyword_only_args
 from typing_extensions import NotRequired, TypedDict, final
@@ -23,6 +26,9 @@ from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.diffs.tools.base import BaseDiffTool
 from rbtools.diffs.tools.registry import diff_tools_registry
 from rbtools.utils.process import execute
+
+if TYPE_CHECKING:
+    from rbtools.config import RBToolsConfig
 
 
 class SCMClientRevisionSpec(TypedDict):
@@ -412,8 +418,8 @@ class BaseSCMClient(object):
     #: This may be empty.
     #:
     #: Type:
-    #:     dict
-    config: Dict[str, Any]
+    #:     rbtools.config.config.RBToolsConfig
+    config: RBToolsConfig
 
     #: Command line arguments passed to this client.
     #:

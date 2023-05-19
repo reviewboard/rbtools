@@ -14,8 +14,7 @@ import os
 import platform
 import subprocess
 import sys
-from typing import (Any, Dict, List, Optional, TYPE_CHECKING, TextIO, Type,
-                    Union)
+from typing import Dict, List, Optional, TYPE_CHECKING, TextIO, Type, Union
 
 import colorama
 from six.moves.urllib.parse import urlparse
@@ -33,12 +32,11 @@ from rbtools.commands.base.errors import (CommandError,
                                           ParseError)
 from rbtools.commands.base.options import Option, OptionGroup
 from rbtools.commands.base.output import JSONOutput, OutputWrapper
+from rbtools.config import RBToolsConfig, load_config
 from rbtools.deprecation import RemovedInRBTools40Warning
 from rbtools.diffs.tools.errors import MissingDiffToolError
 from rbtools.utils.console import get_input, get_pass
-from rbtools.utils.filesystem import (cleanup_tempfiles,
-                                      get_home_path,
-                                      load_config)
+from rbtools.utils.filesystem import cleanup_tempfiles, get_home_path
 from rbtools.utils.repository import get_repository_resource
 
 if TYPE_CHECKING:
@@ -217,7 +215,12 @@ class BaseCommand:
     capabilities: Optional[Capabilities]
 
     #: The loaded configuration for RBTools.
-    config: Dict[str, Any]
+    #:
+    #: Version Changed:
+    #:     5.0:
+    #:     This is now a :py:class:`~rbtools.config.config.RBToolsConfig`
+    #:     instance, instead of a plain dictionary.
+    config: RBToolsConfig
 
     #: An output buffer for JSON results.
     #:
@@ -773,6 +776,7 @@ class BaseCommand:
         self.repository_info = None
         self.server_url = None
         self.tool = None
+        self.config = RBToolsConfig()
 
         self.stdout = OutputWrapper(stdout)
         self.stderr = OutputWrapper(stderr)
@@ -1463,7 +1467,7 @@ class BaseSubCommand(BaseCommand):
         """
         super(BaseSubCommand, self).__init__(*args, **kwargs)
         self.options = options
-        self.config = config
+        self.config = RBToolsConfig()
 
 
 class BaseMultiCommand(BaseCommand):
