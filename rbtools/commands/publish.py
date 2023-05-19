@@ -3,10 +3,10 @@
 import logging
 
 from rbtools.api.errors import APIError
-from rbtools.commands import Command, CommandError, Option
+from rbtools.commands.base import BaseCommand, CommandError, Option
 
 
-class Publish(Command):
+class Publish(BaseCommand):
     """Publish a specific review request from a draft."""
 
     name = 'publish'
@@ -16,8 +16,8 @@ class Publish(Command):
 
     args = '<review-request-id>'
     option_list = [
-        Command.server_options,
-        Command.repository_options,
+        BaseCommand.server_options,
+        BaseCommand.repository_options,
         Option('-t', '--trivial',
                dest='trivial_publish',
                action='store_true',

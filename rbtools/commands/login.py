@@ -3,11 +3,11 @@
 import logging
 
 from rbtools.api.errors import AuthorizationError
-from rbtools.commands import Command, CommandError
+from rbtools.commands.base import BaseCommand, CommandError
 from rbtools.utils.users import get_authenticated_session
 
 
-class Login(Command):
+class Login(BaseCommand):
     """Logs into a Review Board server.
 
     The user will be prompted for a username and password, unless otherwise
@@ -24,7 +24,7 @@ class Login(Command):
     needs_api = True
 
     option_list = [
-        Command.server_options,
+        BaseCommand.server_options,
     ]
 
     def main(self):

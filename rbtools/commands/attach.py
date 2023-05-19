@@ -4,10 +4,10 @@ import os
 from urllib.parse import urljoin
 
 from rbtools.api.errors import APIError
-from rbtools.commands import Command, CommandError, Option
+from rbtools.commands.base import BaseCommand, CommandError, Option
 
 
-class Attach(Command):
+class Attach(BaseCommand):
     """Attach a file to a review request."""
 
     name = 'attach'
@@ -31,8 +31,8 @@ class Attach(Command):
                     'existing attachment, and enable diffing for files '
                     'that support it.',
                added_in='3.0'),
-        Command.server_options,
-        Command.repository_options,
+        BaseCommand.server_options,
+        BaseCommand.repository_options,
     ]
 
     def main(self, review_request_id, path_to_file):

@@ -5,7 +5,8 @@ import sys
 import kgb
 
 from rbtools import get_version_string
-from rbtools.commands import JSONOutput, main as rbt_main
+from rbtools.commands import main as rbt_main
+from rbtools.commands.base.output import JSONOutput
 from rbtools.testing import TestCase
 from rbtools.utils.process import execute
 

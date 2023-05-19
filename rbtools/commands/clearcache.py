@@ -1,10 +1,10 @@
 """Implementation of rbt clear-cache."""
 
 from rbtools.api.cache import APICache, clear_cache
-from rbtools.commands import Command, Option
+from rbtools.commands.base import BaseCommand, Option
 
 
-class ClearCache(Command):
+class ClearCache(BaseCommand):
     """Delete the HTTP cache used for the API."""
 
     name = 'clear-cache'

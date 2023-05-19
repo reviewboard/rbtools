@@ -1,10 +1,10 @@
 """Implementation of rbt diff."""
 
 from rbtools.clients.errors import InvalidRevisionSpecError
-from rbtools.commands import Command, CommandError
+from rbtools.commands.base import BaseCommand, CommandError
 
 
-class Diff(Command):
+class Diff(BaseCommand):
     """Prints a diff to the terminal."""
 
     name = 'diff'
@@ -23,14 +23,14 @@ class Diff(Command):
 
     args = '[revisions]'
     option_list = [
-        Command.server_options,
-        Command.diff_options,
-        Command.branch_options,
-        Command.repository_options,
-        Command.git_options,
-        Command.perforce_options,
-        Command.subversion_options,
-        Command.tfs_options,
+        BaseCommand.server_options,
+        BaseCommand.diff_options,
+        BaseCommand.branch_options,
+        BaseCommand.repository_options,
+        BaseCommand.git_options,
+        BaseCommand.perforce_options,
+        BaseCommand.subversion_options,
+        BaseCommand.tfs_options,
     ]
 
     def main(self, *args):

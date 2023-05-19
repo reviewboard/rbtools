@@ -4,13 +4,13 @@ import json
 import logging
 
 from rbtools.api.errors import APIError
-from rbtools.commands import (BaseMultiCommand,
-                              BaseSubCommand,
-                              Command,
-                              CommandError,
-                              CommandExit,
-                              Option,
-                              OptionGroup)
+from rbtools.commands.base import (BaseCommand,
+                                   BaseMultiCommand,
+                                   BaseSubCommand,
+                                   CommandError,
+                                   CommandExit,
+                                   Option,
+                                   OptionGroup)
 
 
 class BaseStatusUpdateSubCommand(BaseSubCommand):
@@ -484,7 +484,7 @@ class StatusUpdate(BaseMultiCommand):
                        help='Specifies which review request.'),
             ]
         ),
-        Command.server_options,
+        BaseCommand.server_options,
     ]
 
     def run_from_argv(self, argv):

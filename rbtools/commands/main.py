@@ -9,10 +9,8 @@ import subprocess
 import sys
 
 from rbtools import get_version_string
-from rbtools.commands import (BaseMultiCommand,
-                              Option,
-                              RB_MAIN,
-                              find_entry_point_for_command)
+from rbtools.commands import RB_MAIN, find_entry_point_for_command
+from rbtools.commands.base import BaseMultiCommand, Option
 from rbtools.utils.aliases import run_alias
 from rbtools.utils.filesystem import load_config
 

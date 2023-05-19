@@ -2,10 +2,10 @@
 
 import logging
 
-from rbtools.commands import Command
+from rbtools.commands.base import BaseCommand
 
 
-class Logout(Command):
+class Logout(BaseCommand):
     """Logs out of a Review Board server.
 
     The session cookie will be removed into from the .rbtools-cookies
@@ -18,7 +18,7 @@ class Logout(Command):
     needs_api = True
 
     option_list = [
-        Command.server_options,
+        BaseCommand.server_options,
     ]
 
     def main(self):

@@ -3,10 +3,10 @@
 import textwrap
 
 from rbtools.clients import load_scmclients
-from rbtools.commands import Command
+from rbtools.commands.base import BaseCommand
 
 
-class ListRepoTypes(Command):
+class ListRepoTypes(BaseCommand):
     """List available repository types."""
 
     name = 'list-repo-types'
