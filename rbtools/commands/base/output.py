@@ -7,11 +7,12 @@ Version Added:
 from __future__ import annotations
 
 import json
+from typing import Any, Dict, TextIO
 
 import six
 
 
-class JSONOutput(object):
+class JSONOutput:
     """Output wrapper for JSON output.
 
     JSON outputter class that stores Command outputs in python dictionary
@@ -28,21 +29,38 @@ class JSONOutput(object):
         3.0
     """
 
-    def __init__(self, output_stream):
+    ######################
+    # Instance variables #
+    ######################
+
+    #: Storage for JSON data to output.
+    _output: Dict[str, Any]
+
+    #: The stream where JSON output will be written to.
+    _output_stream: TextIO
+
+    def __init__(
+        self,
+        output_stream: TextIO,
+    ) -> None:
         """Initialize JSONOutput class.
 
         Args:
-            output_stream (Object):
+            output_stream (io.IOBase):
                 Object to output JSON object to.
         """
         self._output = {}
         self._output_stream = output_stream
 
-    def add(self, key, value):
+    def add(
+        self,
+        key: str,
+        value: Any,
+    ) -> None:
         """Add a new key value pair.
 
         Args:
-            key (unicode):
+            key (str):
                 The key associated with the value to be added to dictionary.
 
             value (object):
@@ -50,11 +68,20 @@ class JSONOutput(object):
         """
         self._output[key] = value
 
-    def append(self, key, value):
+    def append(
+        self,
+        key: str,
+        value: Any,
+    ) -> None:
         """Add new value to an existing list associated with key.
 
+        Version Changed:
+            5.0:
+            When appending to a non-list, a :py:exc:`TypeError` is now raised
+            instead of a :py:exc:`AttributeError`.
+
         Args:
-            key (unicode):
+            key (str):
                 The key associated with the list to append to.
 
             value (object):
@@ -64,24 +91,36 @@ class JSONOutput(object):
             KeyError:
                 The key was not found in the state.
 
-            AttributeError:
+            TypeError:
                 The existing value was not a list.
         """
-        self._output[key].append(value)
+        items = self._output[key]
 
-    def add_error(self, error):
-        """Add new error to 'errors' key.
+        if not isinstance(items, list):
+            raise TypeError('Expected "%s" to be a list, but it is a %s.'
+                            % (key, type(items)))
+
+        items.append(value)
+
+    def add_error(
+        self,
+        error: str,
+    ) -> None:
+        """Add a new error to the "errors" key.
 
         Append a new error to the ``errors`` key, creating one if needed.
 
         Args:
-            error (unicode):
+            error (str):
                 The error that will be added to ``errors``.
         """
         self._output.setdefault('errors', []).append(error)
 
-    def add_warning(self, warning):
-        """Add new warning to 'warnings' key.
+    def add_warning(
+        self,
+        warning: str,
+    ) -> None:
+        """Add a new warning to the "warnings" key.
 
         Append a new warning to the ``warnings`` key, creating one if needed.
 
@@ -91,7 +130,7 @@ class JSONOutput(object):
         """
         self._output.setdefault('warnings', []).append(warning)
 
-    def print_to_stream(self):
+    def print_to_stream(self) -> None:
         """Output JSON string representation to output stream."""
         self._output_stream.write(json.dumps(self._output,
                                              indent=4,
