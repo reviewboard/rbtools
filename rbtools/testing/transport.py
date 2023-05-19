@@ -6,6 +6,10 @@ Deprecated::
     :py:class:`rbtools.testing.api.transport.URLMapTransport.`
 """
 
+from __future__ import unicode_literals
+
+from typing import Optional
+
 from rbtools.api.factory import create_resource
 from rbtools.api.request import HttpRequest
 from rbtools.api.tests.base import TestWithPayloads
@@ -26,6 +30,13 @@ class TestTransport(Transport):
         Replaced with
         :py:class:`rbtools.testing.api.transport.URLMapTransport.`
     """
+
+    ######################
+    # Instance variables #
+    ######################
+
+    #: Whether caching is enabled on the test transport.
+    cache_enabled: bool
 
     def __init__(self, url, list_payload=TestWithPayloads.list_payload,
                  root_payload=TestWithPayloads.root_payload):
@@ -50,6 +61,7 @@ class TestTransport(Transport):
         self.url = url
         self.list_payload = list_payload
         self.root_payload = root_payload
+        self.cache_enabled = False
 
     def execute_request_method(self, method, *args, **kwargs):
         """Return an instance of ItemResource.
@@ -108,3 +120,34 @@ class TestTransport(Transport):
             payload=self.root_payload,
             url='http://localhost:8080/api/',
             mime_type='application/vnd.reviewboard.org.root+json')
+
+    def enable_cache(
+        self,
+        cache_location: Optional[str] = None,
+        in_memory: bool = False,
+    ) -> None:
+        """Enable caching for all future HTTP requests.
+
+        The cache will be created at the default location if none is provided.
+
+        If the in_memory parameter is True, the cache will be created in memory
+        instead of on disk. This overrides the cache_location parameter.
+
+        Args:
+            cache_location (str, optional):
+                The filename to store the cache in, if using a persistent
+                cache.
+
+            in_memory (bool, optional):
+                Whether to keep the cache data in memory rather than persisting
+                to a file.
+        """
+        self.cache_enabled = True
+
+    def disable_cache(self) -> None:
+        """Disable the HTTP cache.
+
+        Version Added:
+            5.0
+        """
+        self.cache_enabled = False

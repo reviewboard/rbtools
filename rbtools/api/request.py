@@ -1071,6 +1071,16 @@ class ReviewBoardServer:
 
             self._urlopen = self._cache.make_request
 
+    def disable_cache(self) -> None:
+        """Disable caching for all future HTTP requests.
+
+        Version Added:
+            5.0
+        """
+        if self._cache:
+            self._cache = None
+            self._urlopen = urlopen
+
     def login(
         self,
         username: str,
