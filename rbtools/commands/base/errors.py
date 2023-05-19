@@ -8,14 +8,32 @@ from __future__ import annotations
 
 
 class CommandExit(Exception):
-    def __init__(self, exit_code=0):
-        super(CommandExit, self).__init__('Exit with code %s' % exit_code)
+    """An errror indicating a command is ready to exit."""
+
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The exit code.
+    exit_code: int
+
+    def __init__(
+        self,
+        exit_code: int = 0,
+    ) -> None:
+        """Initialize the error.
+
+        Args:
+            exit_code (int):
+                The exit code.
+        """
+        super().__init__('Exit with code %s' % exit_code)
         self.exit_code = exit_code
 
 
 class CommandError(Exception):
-    pass
+    """A general error for a command."""
 
 
 class ParseError(CommandError):
-    pass
+    """An error indicating a command failed to parse some information."""
