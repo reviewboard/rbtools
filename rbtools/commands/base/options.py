@@ -6,8 +6,13 @@ Version Added:
 
 from __future__ import annotations
 
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, Tuple
 
-class Option(object):
+if TYPE_CHECKING:
+    import argparse
+
+
+class Option:
     """Represents an option for a command.
 
     The arguments to the constructor should be treated like those
@@ -23,14 +28,49 @@ class Option(object):
 
     Version Added:
         5.0:
-        This replaces the old :py:class:`rbtools.commands.Option` class.
+        This is the new location for the old
+        :py:class:`rbtools.commands.Option` class.
     """
 
-    def __init__(self, *opts, **attrs):
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The long and short form option names.
+    #:
+    #: Type:
+    #:     tuple
+    opts: Tuple[str, ...]
+
+    #: The attributes for the option.
+    #:
+    #: Type:
+    #:     dict
+    attrs: Dict[str, Any]
+
+    def __init__(
+        self,
+        *opts: str,
+        **attrs,
+    ) -> None:
+        """Initialize the option.
+
+        Args:
+            *opts (tuple of str):
+                The long and short form option names.
+
+            **attrs (dict):
+                The attributes for the option.
+        """
         self.opts = opts
         self.attrs = attrs
 
-    def add_to(self, parent, config={}, argv=[]):
+    def add_to(
+        self,
+        parent: argparse._ActionsContainer,
+        config: Dict = {},
+        argv: List[str] = [],
+    ) -> None:
         """Adds the option to the parent parser or group.
 
         If the option maps to a configuration key, this will handle figuring
@@ -38,6 +78,16 @@ class Option(object):
 
         Once we've determined the right set of flags, the option will be
         added to the parser.
+
+        Args:
+            parent (argparse._ActionsContainer):
+                The parent argument parser or group.
+
+            config (dict):
+                The loaded RBTools configuration.
+
+            argv (list, deprecated):
+                Unused list of deprecated command line arguments.
         """
         attrs = self.attrs.copy()
 
@@ -48,18 +98,22 @@ class Option(object):
                 attrs['default'] = config[config_key]
 
         if 'deprecated_in' in attrs:
-            attrs['help'] += '\n[Deprecated since %s]' % attrs['deprecated_in']
+            attrs['help'] = (
+                '%(help)s\n[Deprecated since %(deprecated_in)s]'
+                % attrs)
 
         # These are used for other purposes, and are not supported by
         # argparse.
-        for attr in ('added_in', 'deprecated_in', 'extended_help',
+        for attr in ('added_in',
+                     'deprecated_in',
+                     'extended_help',
                      'versions_changed'):
             attrs.pop(attr, None)
 
         parent.add_argument(*self.opts, **attrs)
 
 
-class OptionGroup(object):
+class OptionGroup:
     """Represents a named group of options.
 
     Each group has a name, an optional description, and a list of options.
@@ -75,12 +129,60 @@ class OptionGroup(object):
         :py:class:`rbtools.commands.OptionGroup` class.
     """
 
-    def __init__(self, name=None, description=None, option_list=[]):
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The description of this option group.
+    #:
+    #: This may be ``None``.
+    #:
+    #: Type:
+    #:     str
+    description: Optional[str]
+
+    #: The name of this option group.
+    #:
+    #: This may be ``None``.
+    #:
+    #: Type:
+    #:     str
+    name: Optional[str]
+
+    #: The list of options this group was initialized with.
+    #:
+    #: Type:
+    #:     list of Option
+    option_list: List[Option]
+
+    def __init__(
+        self,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        option_list: List[Option] = [],
+    ) -> None:
+        """Initialize the option group.
+
+        Args:
+            name (str, optional):
+                The name of the option group.
+
+            description (str, optional):
+                The description of this option group.
+
+            option_list (list of Option, optional):
+                The list of options in this group.
+        """
         self.name = name
         self.description = description
         self.option_list = option_list
 
-    def add_to(self, parser, config={}, argv=[]):
+    def add_to(
+        self,
+        parser: argparse.ArgumentParser,
+        config: Dict = {},
+        argv: List[str] = [],
+    ) -> None:
         """Add the group and all its contained options to the parser.
 
         Args:
