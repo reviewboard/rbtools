@@ -72,6 +72,17 @@ Client Implementations
    rbtools.clients.tfs
 
 
+RBTools Configuration
+---------------------
+
+.. autosummary::
+   :toctree: python
+
+   rbtools.config
+   rbtools.config.config
+   rbtools.config.loader
+
+
 Diff Generation/Processing
 --------------------------
 

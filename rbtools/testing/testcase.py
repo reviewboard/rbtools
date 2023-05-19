@@ -7,7 +7,7 @@ import sys
 import tempfile
 import unittest
 from contextlib import contextmanager
-from typing import List
+from typing import Dict, List, Optional, Union
 
 import kgb
 
@@ -50,7 +50,7 @@ class TestCase(unittest.TestCase):
     #:
     #: Version Added:
     #:     3.0
-    needs_temp_home = False
+    needs_temp_home: bool = False
 
     @classmethod
     def setUpClass(cls):
@@ -338,6 +338,57 @@ class TestCase(unittest.TestCase):
         """
         return client._transport
 
+    def write_reviewboardrc(
+        self,
+        config: Union[str, Dict[str, object]] = {},
+        *,
+        parent_dir: Optional[str] = None,
+        filename: str = '.reviewboardrc',
+    ) -> str:
+        """Write a .reviewboardrc file to a directory.
+
+        This allows for control over where the file is written, what it's
+        named, and the serialization of the contents of the file.
+
+        Version Added:
+            5.0
+
+        Args:
+            config (dict or str):
+                A dictionary of settings to write, or a string payload for
+                the entire file.
+
+            parent_dir (str, optional):
+                The directory where the configuration file should go.
+
+                This will default to the current directory.
+
+            filename (str, optional):
+                The name of the configuration file.
+
+                This defaults to :file:`.reviewboardrc`.
+
+        Returns:
+            str:
+            The resulting path to the configuration file.
+        """
+        if not parent_dir:
+            parent_dir = os.getcwd()
+
+        if not os.path.exists(parent_dir):
+            os.makedirs(parent_dir, 0o700)
+
+        full_path = os.path.realpath(os.path.join(parent_dir, filename))
+
+        with open(full_path, 'w') as fp:
+            if isinstance(config, str):
+                fp.write(config)
+            else:
+                for key, value in config.items():
+                    fp.write('%s = %r\n' % (key, value))
+
+        return full_path
+
     @contextmanager
     def reviewboardrc(self, config, use_temp_dir=False):
         """Populate a temporary .reviewboardrc file.
@@ -371,10 +422,12 @@ class TestCase(unittest.TestCase):
             temp_dir = tempfile.mkdtemp()
             cwd = os.getcwd()
             os.chdir(temp_dir)
+        else:
+            # Avoid unbound errors. We won't be using these below.
+            temp_dir = ''
+            cwd = ''
 
-        with open('.reviewboardrc', 'w') as fp:
-            for key, value in config.items():
-                fp.write('%s = %r\n' % (key, value))
+        self.write_reviewboardrc(config)
 
         try:
             yield

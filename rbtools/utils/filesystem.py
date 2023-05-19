@@ -6,17 +6,24 @@ import tempfile
 from contextlib import contextmanager
 from typing import Dict, Generator, Iterable, List, Optional
 
-from housekeeping import deprecate_non_keyword_only_args
+from housekeeping import deprecate_non_keyword_only_args, func_moved
 
-from rbtools.deprecation import RemovedInRBTools50Warning
+from rbtools.deprecation import (RemovedInRBTools50Warning,
+                                 RemovedInRBTools60Warning)
 
 
+#: The name fo the default configuration file.
+#:
+#: Deprecated:
+#:     5.0:
+#:     This has been replaced with
+#:     :py:func:`rbtools.config.loader.CONFIG_FILENAME`, and will be removed
+#:     in RBTools 6.
 CONFIG_FILE = '.reviewboardrc'
 
 _iter_exes_in_path_cache: Dict[str, bool] = {}
 tempfiles: List[str] = []
 tempdirs = []
-builtin = {}
 
 
 def is_exe_in_path(
@@ -240,6 +247,8 @@ def get_home_path():
         return ''
 
 
+@func_moved(RemovedInRBTools60Warning,
+            'rbtools.config.loader.get_config_paths')
 def get_config_paths():
     """Return the paths to each :file:`.reviewboardrc` influencing the cwd.
 
@@ -250,93 +259,69 @@ def get_config_paths():
     Configuration in the paths set in :envvar:`$RBTOOLS_CONFIG_PATH` will take
     precedence over files found in the current working directory or its
     parents.
+
+    Deprecated:
+        5.0:
+        This has been replaced with
+        :py:func:`rbtools.config.loader.get_config_paths`, and will be removed
+        in RBTools 6.
     """
-    config_paths = []
+    from rbtools.config.loader import get_config_paths as _get_config_paths
 
-    # Apply config files from $RBTOOLS_CONFIG_PATH first, ...
-    for path in os.environ.get('RBTOOLS_CONFIG_PATH', '').split(os.pathsep):
-        # Filter out empty paths, this also takes care of if
-        # $RBTOOLS_CONFIG_PATH is unset or empty.
-        if not path:
-            continue
-
-        filename = os.path.realpath(os.path.join(path, CONFIG_FILE))
-
-        if os.path.exists(filename) and filename not in config_paths:
-            config_paths.append(filename)
-
-    # ... then config files from the current or parent directories.
-    for path in walk_parents(os.getcwd()):
-        filename = os.path.realpath(os.path.join(path, CONFIG_FILE))
-
-        if os.path.exists(filename) and filename not in config_paths:
-            config_paths.append(filename)
-
-    # Finally, the user's own config file.
-    home_config_path = os.path.realpath(os.path.join(get_home_path(),
-                                                     CONFIG_FILE))
-
-    if (os.path.exists(home_config_path) and
-        home_config_path not in config_paths):
-        config_paths.append(home_config_path)
-
-    return config_paths
+    return _get_config_paths()
 
 
+@func_moved(RemovedInRBTools60Warning,
+            'rbtools.config.loader.parse_config_file')
 def parse_config_file(filename):
     """Parse a .reviewboardrc file.
 
     Returns a dictionary containing the configuration from the file.
 
-    The ``filename`` argument should contain a full path to a
-    .reviewboardrc file.
+    Deprecated:
+        5.0:
+        This has been replaced with
+        :py:func:`rbtools.config.loader.parse_config_file`, and will be removed
+        in RBTools 6.
+
+    Args:
+        filename (str):
+            The full path to a :file:`.reviewboardrc` file.
+
+    Returns:
+        dict:
+        The loaded configuration data.
+
+    Raises:
+        SyntaxError:
+            There was a syntax error in the configuration file.
     """
-    config = {
-        'TREES': {},
-        'ALIASES': {},
-    }
+    from rbtools.config.loader import parse_config_file as _parse_config_file
 
-    try:
-        config = _load_python_file(filename, config)
-    except SyntaxError as e:
-        raise Exception('Syntax error in config file: %s\n'
-                        'Line %i offset %i\n'
-                        % (filename, e.lineno, e.offset))
-
-    return dict((k, config[k])
-                for k in set(config.keys()) - set(builtin.keys()))
+    return _parse_config_file(filename)
 
 
+@func_moved(RemovedInRBTools60Warning,
+            'rbtools.config.loader.load_config')
 def load_config():
     """Load configuration from .reviewboardrc files.
 
-    This will read all of the .reviewboardrc files influencing the
+    This will read all of the :file:`.reviewboardrc` files influencing the
     cwd and return a dictionary containing the configuration.
+
+    Deprecated:
+        5.0:
+        This has been replaced with
+        :py:func:`rbtools.config.loader.load_config`, and will be removed in
+        RBTools 6.
+
+    Returns:
+        dict:
+        The loaded configuration data.
     """
-    nested_config = {
-        'ALIASES': {},
-        'COLOR': {
-            'INFO': None,
-            'DEBUG': None,
-            'WARNING': 'yellow',
-            'ERROR': 'red',
-            'CRITICAL': 'red'
-        },
-        'TREES': {},
-    }
-    config = {}
+    from rbtools.config.loader import load_config as _load_config
 
-    for filename in reversed(get_config_paths()):
-        parsed_config = parse_config_file(filename)
-
-        for key in nested_config:
-            nested_config[key].update(parsed_config.pop(key, {}))
-
-        config.update(parsed_config)
-
-    config.update(nested_config)
-
-    return config
+    return _load_config()
 
 
 @contextmanager
@@ -366,9 +351,3 @@ def chdir(
         yield
     finally:
         os.chdir(old_cwd)
-
-
-# This extracts a dictionary of the built-in globals in order to have a clean
-# dictionary of settings, consisting of only what has been specified in the
-# config file.
-exec('True', builtin)
