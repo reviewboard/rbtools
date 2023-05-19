@@ -106,6 +106,10 @@ class CacheEntry(object):
     def up_to_date(self) -> bool:
         """Determine if the cache entry is up to date.
 
+        Version Changed:
+            4.1:
+            This now returns ``False`` if ``max_age`` is not available.
+
         Returns:
             bool:
             ``True`` if the cache entry is still valid. ``False``, otherwise.
@@ -114,7 +118,7 @@ class CacheEntry(object):
             max_age = datetime.timedelta(seconds=self.max_age)
             return self.local_date + max_age > datetime.datetime.now()
 
-        return True
+        return False
 
 
 class LiveHTTPResponse(object):
