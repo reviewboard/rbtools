@@ -9,6 +9,7 @@ import logging
 import re
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union, cast
 
+from housekeeping import deprecate_non_keyword_only_args
 from typing_extensions import NotRequired, TypedDict, final
 
 from rbtools.api.capabilities import Capabilities
@@ -18,8 +19,7 @@ from rbtools.api.resource import (ItemResource,
 from rbtools.clients.base.patch import PatchAuthor, PatchResult
 from rbtools.clients.base.repository import RepositoryInfo
 from rbtools.clients.errors import SCMClientDependencyError, SCMError
-from rbtools.deprecation import (RemovedInRBTools50Warning,
-                                 deprecate_non_keyword_only_args)
+from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.diffs.tools.base import BaseDiffTool
 from rbtools.diffs.tools.registry import diff_tools_registry
 from rbtools.utils.process import execute

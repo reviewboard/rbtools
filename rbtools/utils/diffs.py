@@ -5,8 +5,9 @@ import os
 import sys
 from typing import Iterable, Iterator, List, Optional, Pattern
 
-from rbtools.deprecation import (RemovedInRBTools50Warning,
-                                 deprecate_non_keyword_only_args)
+from housekeeping import deprecate_non_keyword_only_args
+
+from rbtools.deprecation import RemovedInRBTools50Warning
 
 
 @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)

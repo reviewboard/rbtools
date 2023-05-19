@@ -13,6 +13,7 @@ import threading
 from collections import OrderedDict, defaultdict, deque
 from typing import Dict, List, Optional
 
+from housekeeping import deprecate_non_keyword_only_args
 from pydiffx.dom import DiffX
 from pydiffx.dom.objects import DiffXChangeSection
 
@@ -25,8 +26,7 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     SCMError)
 from rbtools.deprecation import (RemovedInRBTools40Warning,
-                                 RemovedInRBTools50Warning,
-                                 deprecate_non_keyword_only_args)
+                                 RemovedInRBTools50Warning)
 from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempfile

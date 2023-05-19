@@ -13,6 +13,8 @@ import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Optional, cast
 from urllib.parse import unquote
 
+from housekeeping import deprecate_non_keyword_only_args
+
 from rbtools.clients import BaseSCMClient, RepositoryInfo
 from rbtools.clients.base.scmclient import (SCMClientDiffResult,
                                             SCMClientRevisionSpec)
@@ -20,8 +22,7 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
-from rbtools.deprecation import (RemovedInRBTools50Warning,
-                                 deprecate_non_keyword_only_args)
+from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.appdirs import user_data_dir
 from rbtools.utils.checks import check_install

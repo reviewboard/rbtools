@@ -6,9 +6,10 @@ Version Added:
 
 from typing import List, Optional, Union
 
+from housekeeping import deprecate_non_keyword_only_args
+
 from rbtools.api.resource import ItemResource
-from rbtools.deprecation import (RemovedInRBTools50Warning,
-                                 deprecate_non_keyword_only_args)
+from rbtools.deprecation import RemovedInRBTools50Warning
 
 
 class RepositoryInfo:
