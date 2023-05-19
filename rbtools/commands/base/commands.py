@@ -14,6 +14,8 @@ import os
 import platform
 import subprocess
 import sys
+from typing import (Any, Dict, List, Optional, TYPE_CHECKING, TextIO, Type,
+                    Union)
 
 import colorama
 from six.moves.urllib.parse import urlparse
@@ -38,6 +40,12 @@ from rbtools.utils.filesystem import (cleanup_tempfiles,
                                       get_home_path,
                                       load_config)
 from rbtools.utils.repository import get_repository_resource
+
+if TYPE_CHECKING:
+    from rbtools.api.resource import Resource
+    from rbtools.api.transport import Transport
+    from rbtools.clients.base.repository import RepositoryInfo
+    from rbtools.clients.base.scmclient import BaseSCMClient
 
 
 RB_MAIN = 'rbt'
@@ -97,89 +105,25 @@ class BaseCommand:
         5.0:
         This moved from :py:mod:`rbtools.commands` to
         :py:mod:`rbtools.commands.base.commands`.
-
-    Attributes:
-        api_client (rbtools.api.client.RBClient):
-            The API client. This will be ``None`` if :py:attr:`needs_api` is
-            ``False``.
-
-        api_root (rbtools.api.resource.RootResource):
-            The API root resource. This will be ``None`` if
-            :py:attr:`needs_api` is ``False``.
-
-        capabilities (rbtools.api.capabilities.Capabilities):
-            The API capabilities object. This will be ``None`` if
-            :py:attr:`needs_api` is ``False``.
-
-        repository (rbtools.api.resource.ItemResource):
-            The API resource corresponding to the repository.
-
-        repository_info (rbtools.clients.base.repository.RepositoryInfo):
-            The repository info object. This will be ``None`` if
-            :py:attr:`needs_scm_client` is ``False``.
-
-        server_url (unicode):
-            The URL to the Review Board server.
-
-        stdout (OutputWrapper):
-            Standard unicode output wrapper that subclasses must write to.
-
-        stdout_is_atty (bool):
-            Whether :py:attr:`stdout` is connected to a TTY or similar device.
-
-            Version Added:
-                3.1
-
-        stderr (OutputWrapper):
-            Standard unicode error output wrapper that subclasses must write
-            to.
-
-        stderr_is_atty (bool):
-            Whether :py:attr:`stderr` is connected to a TTY or similar device.
-
-            Version Added:
-                3.1
-
-        stdin (io.TextIOWrapper):
-            Standard input.
-
-            Version Added:
-                3.1
-
-        stdin_is_atty (bool):
-            Whether :py:attr:`stdin` is connected to a TTY or similar device.
-
-            Version Added:
-                3.1
-
-        stdout_bytes (OutputWrapper):
-            Standard byte output wrapper that subclasses must write to.
-
-        stderr_bytes (OutputWrapper):
-            Standard byte error output wrapper that subclasses must write to.
-
-        tool (rbtools.clients.base.BaseSCMClient):
-            The SCM client. This will be ``None`` if
-            :py:attr:`needs_scm_client` is ``False``.
     """
 
     #: The name of the command.
     #:
     #: Type:
-    #:     unicode
-    name = ''
+    #:     str
+    name: str = ''
 
     #: The author of the command.
     #:
     #: Type:
-    #:     unicode
-    author = ''
+    #:     str
+    author: str = ''
 
     #: A short description of the command, suitable for display in usage text.
     #:
     #: Type:
-    #:     unicode
-    description = ''
+    #:     str
+    description: str = ''
 
     #: Whether the command needs the API client.
     #:
@@ -191,7 +135,7 @@ class BaseCommand:
     #:
     #: Type:
     #:     bool
-    needs_api = False
+    needs_api: bool = False
 
     #: Whether the command needs to generate diffs.
     #:
@@ -206,7 +150,7 @@ class BaseCommand:
     #:
     #: Type:
     #:     bool
-    needs_diffs = False
+    needs_diffs: bool = False
 
     #: Whether the command needs the SCM client.
     #:
@@ -218,19 +162,22 @@ class BaseCommand:
     #:
     #: Type:
     #:     bool
-    needs_scm_client = False
+    needs_scm_client: bool = False
 
     #: Whether the command needs the remote repository object.
     #:
     #: If this is set, the initialization of the command will set
     #: :py:attr:`repository`.
     #:
+    #: Setting this will imply setting both :py:attr:`needs_api` and
+    #: :py:attr:`needs_scm_client` to ``True``.
+    #:
     #: Version Added:
     #:     3.0
     #:
     #: Type:
     #:     bool
-    needs_repository = False
+    needs_repository: bool = False
 
     #: Usage text for what arguments the command takes.
     #:
@@ -238,16 +185,137 @@ class BaseCommand:
     #: options (for example, revisions passed to :command:`rbt post`).
     #:
     #: Type:
-    #:     unicode
-    args = ''
+    #:     str
+    args: str = ''
 
     #: Command-line options for this command.
     #:
     #: Type:
     #:     list of Option or OptionGroup
-    option_list = []
+    option_list: List[Union[Option, OptionGroup]] = []
 
-    _global_options = [
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The client used to connect to the API.
+    #:
+    #: This will be set when the command is run if :py:attr:`needs_api` is
+    #: ``True``. Otherwise it will be ``None``.
+    api_client: Optional[RBClient]
+
+    #: The root of the API tree.
+    #:
+    #: This will be set when the command is run if :py:attr:`needs_api` is
+    #: ``True``. Otherwise it will be ``None``.
+    api_root: Optional[RootResource]
+
+    #: Capabilities set by the API.
+    #:
+    #: This will be set when the command is run if :py:attr:`needs_api` is
+    #: ``True``. Otherwise it will be ``None``.
+    capabilities: Optional[Capabilities]
+
+    #: The loaded configuration for RBTools.
+    config: Dict[str, Any]
+
+    #: An output buffer for JSON results.
+    #:
+    #: Commands can set this to return data used when a command is passed
+    #: :option:`--json`.
+    json: JSONOutput
+
+    #: A logger for the command.
+    log: logging.Logger
+
+    #: Options parsed for the command.
+    options: argparse.Namespace
+
+    #: The resource for the matching repository.
+    #:
+    #: This will be set when the command is run if both :py:attr:`needs_api`
+    #: and :py:attr:`needs_repository` are ``True``.
+    repository: Optional[Resource]
+
+    #: Information on the local repository.
+    #:
+    #: This will be set when the command is run if :py:attr:`needs_scm_client`
+    #: is run. Otherwise it will be ``None``.
+    repository_info: Optional[RepositoryInfo]
+
+    #: The URL to the Review Board server.
+    #:
+    #: This will be set when the command is run if :py:attr:`needs_api` is
+    #: ``True``.
+    server_url: Optional[str]
+
+    #: The stream for writing error output as Unicode strings.
+    #:
+    #: Commands should write error text using this instead of :py:func:`print`
+    #: or :py:func:`sys.stderr`.
+    stderr: OutputWrapper
+
+    #: The stream for writing error output as byte strings.
+    #:
+    #: Commands should write error text using this instead of :py:func:`print`
+    #: or :py:func:`sys.stderr`.
+    stderr_bytes: OutputWrapper
+
+    #: Whether the stderr stream is from an interactive session.
+    #:
+    #: This applies to :py:attr:`stderr`.
+    #:
+    #: Version Added:
+    #:     3.1
+    stderr_is_atty: bool
+
+    #: The stream for reading standard input.
+    #:
+    #: Commands should read input from here instead of using
+    #: :py:func:`sys.stdin`.
+    #:
+    #: Version Added:
+    #:     3.1
+    stdin: TextIO
+
+    #: Whether the stdin stream is from an interactive session.
+    #:
+    #: This applies to :py:attr:`stdin`.
+    #:
+    #: Version Added:
+    #:     3.1
+    stdin_is_atty: bool
+
+    #: The stream for writing standard output as Unicode strings.
+    #:
+    #: Commands should write text using this instead of :py:func:`print` or
+    #: :py:func:`sys.stdout`.
+    stdout: OutputWrapper
+
+    #: The stream for writing standard output as byte strings.
+    #:
+    #: Commands should write text using this instead of :py:func:`print` or
+    #: :py:func:`sys.stdout`.
+    stdout_bytes: OutputWrapper
+
+    #: Whether the stdout stream is from an interactive session.
+    #:
+    #: This applies to :py:attr:`stdout`.
+    #:
+    #: Version Added:
+    #:     3.1
+    stdout_is_atty: bool
+
+    #: The client/tool used to communicate with the repository.
+    #:
+    #: This will be set when the command is run if :py:attr:`needs_scm_client`
+    #: is run. Otherwise it will be ``None``.
+    tool: Optional[BaseSCMClient]
+
+    #: The transport class used for talking to the API.
+    transport_cls: Type[Transport]
+
+    _global_options: List[Option] = [
         Option('-d', '--debug',
                action='store_true',
                dest='debug',
@@ -1374,8 +1442,8 @@ class BaseSubCommand(BaseCommand):
     #: The subcommand's help text.
     #:
     #: Type:
-    #:     unicode
-    help_text = ''
+    #:     str
+    help_text: str = ''
 
     def __init__(self, options, config, *args, **kwargs):
         """Initialize the subcommand.
@@ -1410,17 +1478,27 @@ class BaseMultiCommand(BaseCommand):
 
     #: The available subcommands.
     #:
-    #: This is a list of BaseSubCommand sub classes.
+    #: This is a list of BaseSubCommand subclasses.
     #:
     #: Type:
     #:     list
-    subcommands = {}
+    subcommands: List[Type[BaseSubCommand]] = []
 
     #: Options common to all subcommands.
     #:
     #: Type:
     #:     list
-    common_subcommand_option_list = []
+    common_subcommand_option_list: List[Union[Option, OptionGroup]] = []
+
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The currently-running subcommand.
+    subcommand: BaseSubCommand
+
+    #: A mapping of subcommand names to argument parsers.
+    subcommand_parsers: Dict[str, argparse.ArgumentParser]
 
     def usage(self, command_cls=None):
         """Return a usage string for the command.
