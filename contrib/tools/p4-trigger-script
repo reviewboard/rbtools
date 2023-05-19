@@ -6,13 +6,19 @@ import sys
 
 # Configure the Python Path, if needed:
 #
-# sys.path.insert('...')
+# sys.path.insert(0, '...')
+
+# Configure the executable search path, if necessary.
+#
+# os.environ['PATH'] = '...' + os.environ['PATH']
+
 
 from rbtools.api.client import RBClient
 from rbtools.api.errors import APIError, ServerInterfaceError
+from rbtools.clients.errors import AmendError
 from rbtools.clients.perforce import PerforceClient
-from rbtools.utils.repository import get_repository_resource
 from rbtools.hooks.common import initialize_logging
+from rbtools.utils.repository import get_repository_resource
 
 
 # The Review Board server URL.
@@ -20,8 +26,8 @@ REVIEWBOARD_URL = 'https://reviewboard.example.com'
 
 # The username and password to be supplied to the Review Board server. This
 # user must have the "can_change_status" permission granted.
-USERNAME = 'special_user'
-PASSWORD = 'password'
+REVIEWBOARD_USERNAME = 'special_user'
+REVIEWBOARD_PASSWORD = 'read_write_api_token'
 
 # Configure the Perforce credentials and port.
 P4_USER = 'my-p4-user'
@@ -37,14 +43,11 @@ REQUIRE_REVIEW_REQUESTS = True
 # Whether to decline changes that aren't approved.
 REQUIRE_APPROVAL = True
 
-# Configure the executable search path, if necessary.
-#
-# os.environ['PATH'] = '...' + os.environ['PATH']
+# Whether to stamp the change with the review request URL.
+STAMP_CHANGES = True
 
-
-# The primary field requested for the change description. This is shown in
-# error messages.
-PRIMARY_FIELD = 'Reviewed at'
+# The prefix for the review request field being added to the description.
+REVIEW_REQUEST_URL_FIELD = 'Reviewed at:'
 
 
 def main():
@@ -71,7 +74,9 @@ def main():
     changes = client.p4.change(changenum)
 
     # Connect to Review Board.
-    api_client = RBClient(url=REVIEWBOARD_URL)
+    api_client = RBClient(url=REVIEWBOARD_URL,
+                          username=REVIEWBOARD_USERNAME,
+                          password=REVIEWBOARD_PASSWORD)
 
     try:
         api_root = api_client.get_root()
@@ -136,6 +141,30 @@ def main():
 
     if review_request:
         # A review request ID was found.
+        #
+        # We'll now stamp changes if the script is configured to enable this,
+        # whether or not the change is approved.
+        if STAMP_CHANGES:
+            # Update the changeset if needed in order to include the review
+            # request URL.
+            assert changes is not None
+            change_description = changes[0]['Description']
+
+            stamp_str = '%s %s' % (REVIEW_REQUEST_URL_FIELD,
+                                   review_request.absolute_url)
+
+            if stamp_str not in change_description:
+                try:
+                    client.amend_commit_description(
+                        '%s\n\n%s' % (change_description.rstrip(), stamp_str),
+                        revisions=client.parse_revision_spec([str(changenum)]))
+                except AmendError as e:
+                    sys.stderr.write(
+                        'Unable to amend change %s with the review request '
+                        'URL: %s\n'
+                        % (changenum, e))
+                    sys.exit(1)
+
         if not review_request.approved:
             # The review request was not approved in Review Board. Display
             # an error.
