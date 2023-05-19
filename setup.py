@@ -160,6 +160,7 @@ setup(
     },
     install_requires=[
         'importlib-metadata~=4.12; python_version < "3.10"',
+        'certifi>=2023.5.7',
         'colorama',
         'pydiffx~=1.1.0',
         'setuptools',

@@ -1,4 +1,11 @@
-from typing import Dict, Optional, Type
+"""Error classes and codes for API communication."""
+
+from __future__ import annotations
+
+import os
+import ssl
+import sys
+from typing import Dict, List, Optional, Set, Type
 
 from rbtools.utils.encoding import force_unicode
 
@@ -329,6 +336,218 @@ class ServerInterfaceError(Exception):
             The error message as a unicode string.
         """
         return force_unicode(self.msg)
+
+
+class ServerInterfaceSSLError(ServerInterfaceError):
+    """An error communicating over SSL or verifying an SSL certificate.
+
+    This class wraps a :py:mod:`ssl.SSLError` or subclass, and attempts to
+    generate a helpful error message with instructions for resolving most
+    common SSL-related issues.
+
+    Version Added:
+        4.1
+    """
+
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The hostname RBTools attempted to connect to.
+    host: str
+
+    #: The port RBTools attempted to connect to.
+    port: int
+
+    # The original SSL context.
+    ssl_context: ssl.SSLContext
+
+    #: The original SSL error.
+    ssl_error: ssl.SSLError
+
+    def __init__(
+        self,
+        *,
+        host: str,
+        port: int,
+        ssl_error: ssl.SSLError,
+        ssl_context: ssl.SSLContext,
+    ) -> None:
+        """Initialize the error.
+
+        Args:
+            host (str):
+                The hostname RBTools attempted to connect to.
+
+            port (int):
+                The port RBTools attempted to connect to.
+
+            ssl_error (ssl.SSLError):
+                The original SSL error.
+
+            ssl_context (ssl.SSLContext):
+                The original SSL context.
+        """
+        messages: List[str] = []
+        needs_cert_file: bool = False
+        needs_root_certs_command: bool = False
+
+        if isinstance(ssl_error, ssl.SSLCertVerificationError):
+            error_code = ssl_error.verify_code
+
+            if error_code == 10:
+                # Expired or revoked certificate
+                messages.append(
+                    'The SSL certificate used for "%(host)s" has expired or '
+                    'has been revoked. Contact your Review Board '
+                    'administrator for further assistance.'
+                    % {
+                        'host': host,
+                    }
+                )
+            elif error_code == 18:
+                # Self-signed certificate
+                needs_cert_file = True
+                needs_root_certs_command = True
+                messages.append(
+                    'The SSL certificate used for "%(host)s" is self-signed '
+                    'and cannot currently be verified by RBTools.'
+                    % {
+                        'host': host,
+                    }
+                )
+            elif error_code == 19:
+                # Untrusted root certificate
+                needs_cert_file = True
+                needs_root_certs_command = True
+                messages.append(
+                    'The SSL certificate used for "%(host)s" has an '
+                    'untrusted or self-signed root certificate that cannot '
+                    'currently be verified by RBTools.'
+                    % {
+                        'host': host,
+                    }
+                )
+            elif error_code == 20:
+                # Unable to get local issuer certificate
+                needs_cert_file = True
+                needs_root_certs_command = True
+                messages.append(
+                    'The SSL certificate used for "%(host)s" has an '
+                    'untrusted or self-signed certificate in the chain that '
+                    'cannot currently be verified by RBTools.'
+                    % {
+                        'host': host,
+                    }
+                )
+            elif error_code == 62:
+                # Hostname mismatch, certificate is not valid for '<domain>'
+                messages.append(
+                    'The SSL certificate is not valid for "%(host)s". '
+                    'Make sure you are connecting to the correct host. '
+                    'Contact your Review Board administrator for further '
+                    'assistance.'
+                    % {
+                        'host': host,
+                    }
+                )
+        else:
+            reason = getattr(ssl_error, 'reason', None)
+
+            if reason == 'SSLV3_ALERT_HANDSHAKE_FAILURE':
+                messages.append(
+                    'The server on "%(host)s" is using a TLS protocol or '
+                    'cipher suite that your version of Python does not '
+                    'support. You may need to upgrade Python, or contact '
+                    'your Review Board administrator for further assistance.'
+                    % {
+                        'host': host,
+                    }
+                )
+
+        if not messages:
+            # SSL errors are a bit of a mess. Try a few things.
+            messages.append(
+                'An expected SSL error occurred when communicating with '
+                '"%(host)s": %(details)s'
+                % {
+                    'details': (
+                        ssl_error.strerror or
+                        '; '.join(
+                            str(_arg)
+                            for _arg in ssl_error.args
+                        ) or
+                        str(ssl_error)
+                    ),
+                    'host': host,
+                })
+
+        if needs_cert_file:
+            messages += [
+                'Make sure any necessary certificates in the chain are '
+                'placed in one of the following locations:',
+
+                '\n'.join(
+                    f'    * {_path}'
+                    for _path in self._get_ssl_cert_paths()
+                ),
+            ]
+
+        if needs_root_certs_command:
+            messages += [
+                'You may need to update your root SSL certificates for '
+                'RBTools by running:',
+
+                '    %(python)s -m pip install -U certifi'
+                % {
+                    'python': sys.executable,
+                }
+            ]
+
+        super().__init__('\n\n'.join(messages))
+
+        self.host = host
+        self.port = port
+        self.ssl_error = ssl_error
+        self.ssl_context = ssl_context
+
+    def _get_ssl_cert_paths(self) -> List[str]:
+        """Return a list of paths where SSL certificates could be placed.
+
+        This will check all the default verify paths known to Python, as well
+        as any that are referenced by OpenSSL environment variables.
+
+        Returns:
+            list of str:
+            The list of SSL certificate paths.
+        """
+        default_paths = ssl.get_default_verify_paths()
+        paths: Set[str] = set()
+
+        if default_paths.cafile:
+            paths.add(default_paths.cafile)
+
+        if default_paths.capath:
+            paths.add(default_paths.capath)
+
+        if default_paths.openssl_cafile:
+            paths.add(default_paths.openssl_cafile)
+
+        if default_paths.openssl_capath:
+            paths.add(default_paths.openssl_capath)
+
+        for env_name in (default_paths.openssl_cafile_env,
+                         default_paths.openssl_capath_env):
+            if env_name:
+                env_path = os.environ.get(env_name)
+
+                if env_path:
+                    paths.add(env_path)
+
+        if default_paths.openssl_capath:
+            paths.add(default_paths.openssl_capath)
+
+        return sorted(paths)
 
 
 API_ERROR_TYPE: Dict[int, Type[APIError]] = {
