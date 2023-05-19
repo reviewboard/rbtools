@@ -74,4 +74,4 @@ class RemovedInRBTools70Warning(BaseRemovedInRBToolsVersionWarning):
     version = '7.0'
 
 
-RemovedInNextRBToolsVersionWarning = RemovedInRBTools50Warning
+RemovedInNextRBToolsVersionWarning = RemovedInRBTools60Warning

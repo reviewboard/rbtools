@@ -103,6 +103,21 @@ Base Support
    rbtools.commands.main
 
 
+
+Base Command Support
+--------------------
+
+.. autosummary::
+   :toctree: python
+
+   rbtools.commands
+   rbtools.commands.base.
+   rbtools.commands.base.commands
+   rbtools.commands.base.errors
+   rbtools.commands.base.options
+   rbtools.commands.base.output
+
+
 Command Implementations
 -----------------------
 
