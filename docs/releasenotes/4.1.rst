@@ -12,7 +12,7 @@ New Features
 ============
 
 Ready for Review Board 6
-========================
+------------------------
 
 This release contains fixes and enhancements for the upcoming release of
 Review Board 6.
