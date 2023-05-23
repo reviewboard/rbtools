@@ -7,10 +7,10 @@ import sys
 
 from pkg_resources import resource_string
 
-from rbtools.commands import Command
+from rbtools.commands.base import BaseCommand
 
 
-class SetupCompletion(Command):
+class SetupCompletion(BaseCommand):
     """Setup auto-completion for rbt.
 
     By default, the command installs an auto-completion file for the user's

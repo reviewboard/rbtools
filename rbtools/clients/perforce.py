@@ -13,6 +13,8 @@ import sys
 from fnmatch import fnmatch
 from typing import List, Optional, Tuple, Union
 
+from housekeeping import deprecate_non_keyword_only_args
+
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
                                             SCMClientDiffResult,
@@ -23,8 +25,7 @@ from rbtools.clients.errors import (AmendError,
                                     SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
-from rbtools.deprecation import (RemovedInRBTools50Warning,
-                                 deprecate_non_keyword_only_args)
+from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.diffs.tools.base.diff_tool import BaseDiffTool
 from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install
@@ -103,7 +104,6 @@ class P4Wrapper(object):
             object or a list depending on the value of ``marshalled``.
         """
         return self.run_p4(['change', '-o', str(changenum)],
-                           ignore_errors=True,
                            none_on_ignored_error=True,
                            marshalled=marshalled)
 
@@ -318,7 +318,10 @@ class P4Wrapper(object):
         cmd += p4_args
 
         if marshalled:
-            p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+            logging.debug('Running: %s', subprocess.list2cmdline(cmd))
+            p = subprocess.Popen(cmd,
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE)
             result = []
             has_error = False
 
@@ -361,12 +364,22 @@ class P4Wrapper(object):
 
             rc = p.wait()
 
+            try:
+                stderr = p.stderr.read()
+            except Exception as e:
+                stderr = '<stderr exception: %r>' % e
+
+            logging.debug('Command results = %r; stderr=%r',
+                          result, stderr)
+
             if not ignore_errors and (rc or has_error):
                 for record in result:
                     if 'data' in record:
                         print(record['data'])
 
-                raise SCMError('Failed to execute command: %s' % cmd)
+                raise SCMError(
+                    'Failed to execute command `%s`; payload=%r, stderr=%r'
+                    % (subprocess.list2cmdline(cmd), result, stderr))
 
             return result
         elif input_string is not None:

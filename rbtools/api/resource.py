@@ -1074,9 +1074,11 @@ class RootResource(ItemResource):
 
         server_version = payload.get('product', {}).get('package_version')
 
-        if (server_version is not None and
-            parse_version(server_version) >= parse_version(MINIMUM_VERSION)):
-            transport.enable_cache()
+        if (server_version is None or
+            parse_version(server_version) < parse_version(MINIMUM_VERSION)):
+            # This version is too old to safely support caching (there were
+            # bugs before this version). Disable caching.
+            transport.disable_cache()
 
     @request_method_decorator
     def _get_template_request(self, url_template, values={}, **kwargs):

@@ -72,6 +72,17 @@ Client Implementations
    rbtools.clients.tfs
 
 
+RBTools Configuration
+---------------------
+
+.. autosummary::
+   :toctree: python
+
+   rbtools.config
+   rbtools.config.config
+   rbtools.config.loader
+
+
 Diff Generation/Processing
 --------------------------
 
@@ -101,6 +112,21 @@ Base Support
 
    rbtools.commands
    rbtools.commands.main
+
+
+
+Base Command Support
+--------------------
+
+.. autosummary::
+   :toctree: python
+
+   rbtools.commands
+   rbtools.commands.base.
+   rbtools.commands.base.commands
+   rbtools.commands.base.errors
+   rbtools.commands.base.options
+   rbtools.commands.base.output
 
 
 Command Implementations

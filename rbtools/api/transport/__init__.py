@@ -190,3 +190,11 @@ class Transport:
                 to a file.
         """
         raise NotImplementedError
+
+    def disable_cache(self) -> None:
+        """Disable caching for all future HTTP requests.
+
+        Version Added:
+            5.0
+        """
+        raise NotImplementedError

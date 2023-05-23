@@ -4,14 +4,14 @@ import json
 import re
 
 from rbtools.api.errors import APIError
-from rbtools.commands import (Command,
-                              CommandError,
-                              CommandExit,
-                              Option,
-                              ParseError)
+from rbtools.commands.base import (BaseCommand,
+                                   CommandError,
+                                   CommandExit,
+                                   Option,
+                                   ParseError)
 
 
-class APIGet(Command):
+class APIGet(BaseCommand):
     name = 'api-get'
     author = 'The Review Board Project'
     description = 'Retrieve raw API resource payloads.'
@@ -26,7 +26,7 @@ class APIGet(Command):
                config_key='API_GET_PRETTY_PRINT',
                default=False,
                help='Pretty prints the resulting API payload.'),
-        Command.server_options,
+        BaseCommand.server_options,
     ]
 
     def _dumps(self, payload):

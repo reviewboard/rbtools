@@ -16,7 +16,11 @@ from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.appdirs import user_cache_dir
 
 
-MINIMUM_VERSION = '2.0.14'  # Minimum server version to enable the API cache.
+#: The minimum version of Review Board to allow HTTP caching.
+#:
+#: Versions prior to this had broken caching. If this version or older is
+#: encountered, caching will be disabled.
+MINIMUM_VERSION = '2.0.14'
 
 _locale_lock = threading.Lock()  # Lock for getting / setting locale.
 
@@ -106,6 +110,10 @@ class CacheEntry(object):
     def up_to_date(self) -> bool:
         """Determine if the cache entry is up to date.
 
+        Version Changed:
+            4.1:
+            This now returns ``False`` if ``max_age`` is not available.
+
         Returns:
             bool:
             ``True`` if the cache entry is still valid. ``False``, otherwise.
@@ -114,7 +122,7 @@ class CacheEntry(object):
             max_age = datetime.timedelta(seconds=self.max_age)
             return self.local_date + max_age > datetime.datetime.now()
 
-        return True
+        return False
 
 
 class LiveHTTPResponse(object):

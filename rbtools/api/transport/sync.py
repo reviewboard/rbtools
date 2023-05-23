@@ -151,6 +151,11 @@ class SyncTransport(Transport):
             client_cert=client_cert,
             proxy_authorization=proxy_authorization)
 
+        # Default to enabling the cache. This is safe for all versions of
+        # Review Board >= 2.0.14. Caching will be automatically disabled if
+        # using an older version.
+        self.enable_cache()
+
     def get_root(
         self,
         *args,
@@ -348,6 +353,15 @@ class SyncTransport(Transport):
 
             self.server.enable_cache(cache_location=cache_location,
                                      in_memory=in_memory)
+
+    def disable_cache(self) -> None:
+        """Disable caching for all future HTTP requests.
+
+        Version Added:
+            5.0
+        """
+        if self.allow_caching:
+            self.server.disable_cache()
 
     def __repr__(self) -> str:
         """Return a string representation of the object.

@@ -721,6 +721,13 @@ class URLMapTransport(Transport):
         self.cache_location = cache_location
         self.cache_in_memory = in_memory
 
+    def disable_cache(self) -> None:
+        """Disable the HTTP cache.
+
+        Version Added:
+            5.0
+        """
+
     def handle_api_path(self, path, method):
         """Handle a request to an API path.
 

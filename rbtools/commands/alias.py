@@ -3,12 +3,13 @@
 from collections import defaultdict
 from subprocess import list2cmdline
 
-from rbtools.commands import command_exists, Command, CommandError, Option
+from rbtools.commands import command_exists
+from rbtools.commands.base import BaseCommand, CommandError, Option
+from rbtools.config import get_config_paths, parse_config_file
 from rbtools.utils.aliases import expand_alias
-from rbtools.utils.filesystem import get_config_paths, parse_config_file
 
 
-class Alias(Command):
+class Alias(BaseCommand):
     """A command for managing aliases defined in .reviewboardrc files."""
 
     name = 'alias'

@@ -16,6 +16,7 @@ from collections import OrderedDict
 from contextlib import contextmanager
 from typing import List, Optional, Union, cast
 
+from housekeeping import deprecate_non_keyword_only_args
 from pydiffx import DiffType, DiffX
 from pydiffx.utils.text import guess_line_endings
 from typing_extensions import NotRequired, TypedDict
@@ -29,8 +30,7 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
-from rbtools.deprecation import (RemovedInRBTools50Warning,
-                                 deprecate_non_keyword_only_args)
+from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.diffs.tools.base import DiffFileResult
 from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install

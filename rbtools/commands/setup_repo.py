@@ -4,13 +4,13 @@ import difflib
 import os
 import textwrap
 
-from rbtools.commands import Command, CommandError
+from rbtools.commands.base import BaseCommand, CommandError
 from rbtools.utils.console import confirm, confirm_select
 from rbtools.utils.filesystem import CONFIG_FILE
 from rbtools.utils.repository import get_repository_resource
 
 
-class SetupRepo(Command):
+class SetupRepo(BaseCommand):
     """Configure a repository to point to a Review Board server.
 
     Interactively creates the configuration file .reviewboardrc in the current
@@ -33,9 +33,9 @@ class SetupRepo(Command):
                    % CONFIG_FILE)
     args = ''
     option_list = [
-        Command.server_options,
-        Command.perforce_options,
-        Command.tfs_options,
+        BaseCommand.server_options,
+        BaseCommand.perforce_options,
+        BaseCommand.tfs_options,
     ]
 
     def prompt_rb_repository(self, local_tool_name, server_tool_names,

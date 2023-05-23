@@ -8,7 +8,7 @@ from gettext import gettext as _, ngettext
 from rbtools.api.errors import APIError
 from rbtools.clients import PatchAuthor
 from rbtools.clients.errors import CreateCommitError
-from rbtools.commands import Command, CommandError, Option
+from rbtools.commands.base import BaseCommand, CommandError, Option
 from rbtools.utils.commands import extract_commit_message
 from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.review_request import parse_review_request_url
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 COMMIT_ID_SPLIT_RE = re.compile(r'\s*,\s*')
 
 
-class Patch(Command):
+class Patch(BaseCommand):
     """Applies a specific patch from a RB server.
 
     The patch file indicated by the request id is downloaded from the
@@ -95,8 +95,8 @@ class Patch(Command):
                help='Squash all patches into one commit. This is only used if '
                     'also using -c/--commit or -C/--commit-no-edit.',
                added_in='2.0'),
-        Command.server_options,
-        Command.repository_options,
+        BaseCommand.server_options,
+        BaseCommand.repository_options,
     ]
 
     def get_patches(self, diff_revision=None, commit_ids=None, squashed=False,
@@ -409,9 +409,11 @@ class Patch(Command):
     def initialize(self):
         """Initialize the command.
 
-        This overrides Command.initialize in order to handle full review
-        request URLs on the command line. In this case, we want to parse that
-        URL in order to pull the server name and diff revision out of it.
+        This overrides :py:meth:`BaseCommand.initialize
+        <rbtools.commands.base.commands.BaseCommand.initialize>` in order to
+        handle full review request URLs on the command line. In this case, we
+        want to parse that URL in order to pull the server name and diff
+        revision out of it.
 
         Raises:
             rbtools.commands.CommandError:

@@ -5,10 +5,10 @@ from shutil import get_terminal_size
 from texttable import Texttable
 
 from rbtools.api.errors import APIError
-from rbtools.commands import Command, CommandError
+from rbtools.commands.base import BaseCommand, CommandError
 
 
-class Info(Command):
+class Info(BaseCommand):
     """Display information about a review request."""
 
     name = 'info'
@@ -19,8 +19,8 @@ class Info(Command):
 
     args = '<review-request> [revision]'
     option_list = [
-        Command.server_options,
-        Command.repository_options,
+        BaseCommand.server_options,
+        BaseCommand.repository_options,
     ]
 
     def main(self, review_request_id, diff_revision=None):

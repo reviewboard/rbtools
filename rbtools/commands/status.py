@@ -6,11 +6,11 @@ from shutil import get_terminal_size
 
 import texttable as tt
 
-from rbtools.commands import Command, Option
+from rbtools.commands.base import BaseCommand, Option
 from rbtools.utils.users import get_username
 
 
-class Status(Command):
+class Status(BaseCommand):
     """Display review requests for the current repository."""
 
     name = 'status'
@@ -45,10 +45,10 @@ class Status(Command):
                default=False,
                help='Shows review requests for all repositories instead '
                     'of just the detected repository.'),
-        Command.server_options,
-        Command.repository_options,
-        Command.perforce_options,
-        Command.tfs_options,
+        BaseCommand.server_options,
+        BaseCommand.repository_options,
+        BaseCommand.perforce_options,
+        BaseCommand.tfs_options,
     ]
 
     # The number of spaces between the request's status and the request's id

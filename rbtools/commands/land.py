@@ -4,7 +4,8 @@ import logging
 
 from rbtools.api.errors import APIError
 from rbtools.clients.errors import MergeError, PushError
-from rbtools.commands import Command, CommandError, Option, RB_MAIN
+from rbtools.commands import RB_MAIN
+from rbtools.commands.base import BaseCommand, CommandError, Option
 from rbtools.utils.commands import (build_rbtools_cmd_argv,
                                     extract_commit_message)
 from rbtools.utils.console import confirm
@@ -17,7 +18,7 @@ from rbtools.utils.review_request import (get_draft_or_current_value,
                                           parse_review_request_url)
 
 
-class Land(Command):
+class Land(BaseCommand):
     """Land changes from a review request onto the remote repository.
 
     This command takes a review request, applies it to a feature branch,
@@ -118,9 +119,9 @@ class Land(Command):
                     'to calling "rbt patch" for each of those review '
                     'requests.',
                added_in='1.0'),
-        Command.server_options,
-        Command.repository_options,
-        Command.branch_options,
+        BaseCommand.server_options,
+        BaseCommand.repository_options,
+        BaseCommand.branch_options,
     ]
 
     def patch(self, review_request_id, squash=False):
@@ -274,9 +275,11 @@ class Land(Command):
     def initialize(self):
         """Initialize the command.
 
-        This overrides Command.initialize in order to handle full review
-        request URLs on the command line. In this case, we want to parse that
-        URL in order to pull the server name and review request ID out of it.
+        This overrides :py:meth:`BaseCommand.initialize
+        <rbtools.commands.base.commands.BaseCommand.initialize>` in order to
+        handle full review request URLs on the command line. In this case, we
+        want to parse that URL in order to pull the server name and review
+        request ID out of it.
 
         Raises:
             rbtools.commands.CommandError:

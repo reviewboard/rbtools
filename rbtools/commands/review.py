@@ -7,12 +7,12 @@ Version Added:
 import logging
 
 from rbtools.api.errors import APIError
-from rbtools.commands import (BaseSubCommand,
-                              BaseMultiCommand,
-                              Command,
-                              CommandError,
-                              Option,
-                              OptionGroup)
+from rbtools.commands.base import (BaseCommand,
+                                   BaseSubCommand,
+                                   BaseMultiCommand,
+                                   CommandError,
+                                   Option,
+                                   OptionGroup)
 
 
 logger = logging.getLogger(__file__)
@@ -428,5 +428,5 @@ class Review(BaseMultiCommand):
                        help='Specifies the ID of the review request to '
                             'review.'),
             ]),
-        Command.server_options,
+        BaseCommand.server_options,
     ]

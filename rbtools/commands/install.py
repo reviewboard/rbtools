@@ -11,13 +11,13 @@ from urllib.request import urlopen
 
 import tqdm
 
-from rbtools.commands import Command, CommandError
+from rbtools.commands.base import BaseCommand, CommandError
 from rbtools.utils.appdirs import user_data_dir
 from rbtools.utils.checks import check_install
 from rbtools.utils.process import execute
 
 
-class Install(Command):
+class Install(BaseCommand):
     """Install a dependency.
 
     This allows RBTools to install external dependencies that may be needed for

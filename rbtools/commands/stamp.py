@@ -3,7 +3,10 @@
 import logging
 
 from rbtools.api.errors import APIError
-from rbtools.commands import Command, CommandError, Option, OptionGroup
+from rbtools.commands.base import (BaseCommand,
+                                   CommandError,
+                                   Option,
+                                   OptionGroup)
 from rbtools.utils.commands import stamp_commit_with_review_url
 from rbtools.utils.console import confirm
 from rbtools.utils.errors import MatchReviewRequestsError
@@ -13,7 +16,7 @@ from rbtools.utils.review_request import (find_review_request_by_change_id,
                                           guess_existing_review_request)
 
 
-class Stamp(Command):
+class Stamp(BaseCommand):
     """Add the review request URL to the commit message.
 
     Stamps the review request URL onto the commit message of the revision
@@ -50,11 +53,11 @@ class Stamp(Command):
                             'be stamped.'),
             ]
         ),
-        Command.server_options,
-        Command.repository_options,
-        Command.diff_options,
-        Command.branch_options,
-        Command.perforce_options,
+        BaseCommand.server_options,
+        BaseCommand.repository_options,
+        BaseCommand.diff_options,
+        BaseCommand.branch_options,
+        BaseCommand.perforce_options,
     ]
 
     def no_commit_error(self):

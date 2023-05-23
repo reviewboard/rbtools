@@ -1,14 +1,14 @@
 """Implementation of rbt close."""
 
 from rbtools.api.errors import APIError
-from rbtools.commands import Command, CommandError, Option
+from rbtools.commands.base import BaseCommand, CommandError, Option
 
 
 SUBMITTED = 'submitted'
 DISCARDED = 'discarded'
 
 
-class Close(Command):
+class Close(BaseCommand):
     """Close a specific review request as discarded or submitted.
 
     By default, the command will change the status to submitted. The
@@ -30,8 +30,8 @@ class Close(Command):
                dest='description',
                default=None,
                help='An optional description accompanying the change.'),
-        Command.server_options,
-        Command.repository_options,
+        BaseCommand.server_options,
+        BaseCommand.repository_options,
     ]
 
     def check_valid_type(self, close_type):
