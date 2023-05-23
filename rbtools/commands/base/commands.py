@@ -966,11 +966,12 @@ class BaseCommand:
             parser.error('Invalid number of arguments provided')
             sys.exit(1)
 
-        self._init_logging()
-        self.initialize()
-        logging.debug('Command line: %s', subprocess.list2cmdline(argv))
-
         try:
+            self._init_logging()
+            logging.debug('Command line: %s', subprocess.list2cmdline(argv))
+
+            self.initialize()
+
             exit_code = self.main(*args) or 0
         except CommandError as e:
             if isinstance(e, ParseError):

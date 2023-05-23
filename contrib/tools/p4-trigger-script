@@ -1,32 +1,123 @@
 #!/usr/bin/env python3
+#
+# Trigger script for connecting Perforce servers to Review Board.
+#
+# This can check changes for approval in Review Board, auto-close review
+# requests, and stamp changesets with the review request URL.
+#
+# Usage:
+#
+#     $ p4-trigger-script [options] %change%
+#
+#     Connection information and options must either be provided by editing
+#     this script or specifying as command line options.
+#
+#
+# To install, run:
+#     $ p4 triggers
+#     Triggers:
+#         reviewboard change-submit //depot/... "/path/to/python /path/to/p4-trigger-script [options] %change%"
+#
+#     If you're using this with the RBTools for Windows installer, specify
+#     the path to the bundled Python.exe:
 
+#         reviewboard change-submit //depot/... "C:\Program Files\RBTools\Python\python.exe C:\Path/To/p4-trigger-script [options] %change%"
+#
+#
+# Required Options:
+#
+#     --server or REVIEWBOARD_URL
+#     --username or REVIEWBOARD_USERNAME
+#     --api-token, --password, REVIEWBOARD_API_TOKEN, or REVIEWBOARD_PASSWORD
+#     --p4-port or P4_PORT
+#     --p4-user or P4_USER
+#
+#     Additional options may also be needed for your environment.
+#
+#
+# Choosing the Perforce user:
+#
+#     This script may either need to operate as the submitting user, or as an
+#     administrative user.
+#
+#     The correct option depends on your environment. If the Perforce client
+#     spec specifies "Host:", the Perforce server may not be able to stamp
+#     changes.
+#
+#     To stamp as the user submitting the change, specify %user%,
+#     %client%, and %clienthost% as arguments:
+#
+#         p4-trigger-script --p4-user %user%
+#                           --p4-client %client%
+#                           --p4-host %clienthost%
+#
+#     You can also specify --p4-host to set an explicit $P4HOST value.
+#     Perforce does not provide the user's Host as a value.
+#
+#     For variables available to trigger scripts, see:
+#
+#     https://www.perforce.com/manuals/p4sag/Content/P4SAG/scripting.triggers.variables.html
+
+
+import argparse
 import logging
 import os
 import sys
 
 # Configure the Python Path, if needed:
 #
-# sys.path.insert('...')
+# sys.path.insert(0, '...')
+
+# Configure the executable search path, if necessary.
+#
+# os.environ['PATH'] = '...' + os.environ['PATH']
+
 
 from rbtools.api.client import RBClient
 from rbtools.api.errors import APIError, ServerInterfaceError
+from rbtools.clients.errors import AmendError
 from rbtools.clients.perforce import PerforceClient
-from rbtools.utils.repository import get_repository_resource
 from rbtools.hooks.common import initialize_logging
+from rbtools.utils.repository import get_repository_resource
 
+# Whether to enable enhanced debug output.
+#
+# Output will be shown when submitting changes. It will be output to stderr.
+DEBUG = False
 
 # The Review Board server URL.
-REVIEWBOARD_URL = 'https://reviewboard.example.com'
+REVIEWBOARD_URL = ''
 
 # The username and password to be supplied to the Review Board server. This
 # user must have the "can_change_status" permission granted.
-USERNAME = 'special_user'
-PASSWORD = 'password'
+REVIEWBOARD_USERNAME = ''
+REVIEWBOARD_PASSWORD = ''
+REVIEWBOARD_API_TOKEN = ''
 
 # Configure the Perforce credentials and port.
-P4_USER = 'my-p4-user'
-P4_PASSWORD = 'my-p4-password'
-P4_PORT = 'perforce:1666'
+#
+# You will to configure a standard user, not an operator or service user.
+#
+# These can also be set as command line options (--p4-user, --p4-passwd,
+# --p4-port).
+#
+# The $P4USER and $P4PORT environment variables are used by default.
+P4_USER = ''
+P4_PASSWORD = ''
+P4_PORT = ''
+
+# An explicit P4 client and matching host to use for any operations.
+#
+# If a client is not specified, the default one for the user and system will
+# be used, as determined by Perforce.
+#
+# If a client has a "Host:" setting, then P4_HOST should be set to match.
+P4_CLIENT = None
+P4_HOST = None
+
+# If using SSL, configure a path to a pre-populated p4trust file. This can
+# be generated on any system.
+P4_TRUST_FILE = None
 
 # Whether to close review requests after being submitted successfully.
 CLOSE_REVIEW_REQUESTS = True
@@ -37,52 +128,265 @@ REQUIRE_REVIEW_REQUESTS = True
 # Whether to decline changes that aren't approved.
 REQUIRE_APPROVAL = True
 
-# Configure the executable search path, if necessary.
-#
-# os.environ['PATH'] = '...' + os.environ['PATH']
+# Whether to stamp the change with the review request URL.
+STAMP_CHANGES = True
 
-
-# The primary field requested for the change description. This is shown in
-# error messages.
-PRIMARY_FIELD = 'Reviewed at'
+# The prefix for the review request field being added to the description.
+REVIEW_REQUEST_URL_FIELD = 'Reviewed at:'
 
 
 def main():
-    initialize_logging()
+    arg_parser = argparse.ArgumentParser()
 
+    # Debugging options.
+    group = arg_parser.add_argument_group('Debugging Options')
+    group.add_argument(
+        '--debug',
+        action='store_true',
+        default=DEBUG,
+        help='Enable debug output.')
+    group.add_argument(
+        '--no-debug',
+        action='store_false',
+        dest='debug',
+        default=DEBUG,
+        help='Disable debug output.')
+
+    # Review Board connection options.
+    group = arg_parser.add_argument_group('Review Board Options')
+    group.add_argument(
+        '--server',
+        dest='rb_server',
+        default=REVIEWBOARD_URL,
+        help='The URL to the Review Board server.')
+    group.add_argument(
+        '--username',
+        dest='rb_username',
+        default=REVIEWBOARD_USERNAME,
+        help=(
+            'The Review Board user used to verify and close review requests. '
+            'This user must have the can_change_status permission granted.'
+        ))
+    group.add_argument(
+        '--api-token',
+        dest='rb_api_token',
+        default=REVIEWBOARD_API_TOKEN,
+        help='The API token for the Review Board user.')
+    group.add_argument(
+        '--password',
+        dest='rb_password',
+        default=REVIEWBOARD_PASSWORD,
+        help=(
+            'The password for the Review Board user, if not using API tokens.'
+        ))
+    group.add_argument(
+        '--disable-ssl-verification',
+        dest='disable_ssl_verification',
+        action='store_true',
+        default=False,
+        help='Disable SSL certificate verification.')
+
+    # Perforce connection options.
+    group = arg_parser.add_argument_group('Perforce Options')
+    group.add_argument(
+        '--p4-user',
+        dest='p4_user',
+        default=P4_USER,
+        help=(
+            "The Perforce user used to stamp changes. Pass `%%user%%` to use "
+            "the submitting user's username."
+        ))
+    group.add_argument(
+        '--p4-passwd',
+        dest='p4_passwd',
+        default=P4_PASSWORD,
+        help='The password used for the user.')
+    group.add_argument(
+        '--p4-client',
+        dest='p4_client',
+        default=P4_CLIENT,
+        help=(
+            "The Perforce client used to stamp changes. Pass `%%client%%` to "
+            "use the submitting user's client."
+        ))
+    group.add_argument(
+        '--p4-host',
+        dest='p4_host',
+        default=P4_HOST,
+        help=(
+            "The Perforce host matching the client. Pass `%%clienthost%%` to "
+            "use the submitting user's host."
+        ))
+    group.add_argument(
+        '--p4-port',
+        dest='p4_port',
+        default=P4_PORT or os.environ.get('P4PORT'),
+        help='The Perforce server to connect to.')
+    group.add_argument(
+        '--p4-trust-file',
+        dest='p4_trust_file',
+        default=P4_TRUST_FILE,
+        help='A Perforce trust file used for verifying server connections.')
+
+    # Trigger action options.
+    group = arg_parser.add_argument_group('Trigger Actions')
+    group.add_argument(
+        '--close-review-requests',
+        action='store_true',
+        dest='close_review_requests',
+        default=CLOSE_REVIEW_REQUESTS,
+        help=(
+            'Close review requests once submitted. Overrides the default '
+            'in the trigger script.'
+        ))
+    group.add_argument(
+        '--no-close-review-requests',
+        action='store_false',
+        dest='close_review_requests',
+        help=(
+            "Leave review requests open once submitted. Overrides the "
+            "default in the trigger script."
+        ))
+    group.add_argument(
+        '--require-review-requests',
+        action='store_true',
+        dest='require_review_requests',
+        default=REQUIRE_REVIEW_REQUESTS,
+        help=(
+            'Require a matching review request. Overrides the default in '
+            'the trigger script.'
+        ))
+    group.add_argument(
+        '--no-require-review-requests',
+        action='store_false',
+        dest='require_review_requests',
+        help=(
+            "Don't requiring a matching review request. Overrides the "
+            "default in the trigger script."
+        ))
+    group.add_argument(
+        '--require-approval',
+        action='store_true',
+        dest='require_approval',
+        default=REQUIRE_APPROVAL,
+        help=(
+            'Require approval on the review request. Overrides the default '
+            'in the trigger script.'
+        ))
+    group.add_argument(
+        '--no-require-approval',
+        action='store_false',
+        dest='require_approval',
+        help=(
+            "Don't require approval on the review request. Overrides the "
+            "default in the trigger script."
+        ))
+    group.add_argument(
+        '--stamp',
+        action='store_true',
+        dest='stamp',
+        default=STAMP_CHANGES,
+        help=(
+            'Stamp the review request URL onto a change description. '
+            'Overrides the default in the trigger script.'
+        ))
+    group.add_argument(
+        '--no-stamp',
+        action='store_false',
+        dest='stamp',
+        help=(
+            "Don't stamp the review request URL onto a change description. "
+            "Overrides the default in the trigger script."
+        ))
+
+    # Positional arguments.
+    arg_parser.add_argument(
+        'changenum',
+        type=int,
+        nargs=1,
+        help='The submitted change number.')
+
+    # Parse the options and validate them.
+    options = arg_parser.parse_args()
+    print(options)
+
+    p4_client = options.p4_client
+    p4_host = options.p4_host
+    p4_passwd = options.p4_passwd
+    p4_port = options.p4_port
+    p4_trust_file = options.p4_trust_file
+    p4_user = options.p4_user
+    rb_api_token = options.rb_api_token
+    rb_password = options.rb_password
+    rb_url = options.rb_server
+    rb_username = options.rb_username
+
+    if not rb_url:
+        sys.stderr.write('--server is required.\n')
+        sys.exit(1)
+
+    if not rb_username:
+        sys.stderr.write('--username is required.\n')
+        sys.exit(1)
+
+    if not rb_api_token and not rb_password:
+        sys.stderr.write('--api-token or --password is required.\n')
+        sys.exit(1)
+
+    if not p4_port:
+        sys.stderr.write('--p4-port or $P4PORT is required.\n')
+        sys.exit(1)
+
+    if not p4_user:
+        sys.stderr.write('--p4-user or $P4USER is required.\n')
+        sys.exit(1)
+
+    # Set up logging.
+    initialize_logging(debug=options.debug)
+
+    # Set up the Perforce environment.
     os.environ.update({
-        'P4USER': P4_USER,
-        'P4PASSWD': P4_PASSWORD,
-        'P4PORT': P4_PORT,
+        'P4USER': p4_user,
+        'P4PORT': p4_port,
     })
 
+    if p4_client:
+        os.environ['P4CLIENT'] = p4_client
+
+    if p4_passwd:
+        os.environ['P4PASSWD'] = p4_passwd
+
+    if p4_host:
+        os.environ['P4HOST'] = p4_host
+
+    if p4_trust_file:
+        os.environ['P4TRUST'] = p4_trust_file
+
     # Get the changeset from Perforce.
-    try:
-        changenum = int(sys.argv[1])
-    except IndexError:
-        sys.stderr.write('No changeset number was passed to the hook.\n')
-        sys.exit(1)
-    except ValueError:
-        sys.stderr.write('The value passed to the hook was not a changeset '
-                         'number.\n')
-        sys.exit(1)
+    changenum = options.changenum[0]
+    assert isinstance(changenum, int)
 
     client = PerforceClient()
     changes = client.p4.change(changenum)
 
     # Connect to Review Board.
-    api_client = RBClient(url=REVIEWBOARD_URL)
+    api_client = RBClient(url=rb_url,
+                          username=rb_username,
+                          password=rb_password,
+                          api_token=rb_api_token,
+                          in_memory_cache=True,
+                          verify_ssl=not options.disable_ssl_verification)
 
     try:
         api_root = api_client.get_root()
     except ServerInterfaceError as e:
         sys.stderr.write('Could not reach the Review Board server at %s: %s\n'
-                         % (REVIEWBOARD_URL, e))
+                         % (rb_url, e))
         sys.exit(1)
     except APIError as e:
         sys.stderr.write('Unexpected API error when talking to Review Board '
                          'at %s: %s'
-                         % (REVIEWBOARD_URL, e))
+                         % (rb_url, e))
         sys.exit(1)
 
     # Find the review request for this changenum.
@@ -93,7 +397,7 @@ def main():
         try:
             repository = get_repository_resource(
                 api_root=api_root,
-                repository_paths=[P4_PORT])[0]
+                repository_paths=[p4_port])[0]
         except APIError as e:
             # 100 = Does Not Exist.
             if e.error_code == 100:
@@ -102,14 +406,14 @@ def main():
                 sys.stderr.write(
                     'Error looking up a repository in Review Board for '
                     '%s: %s\n'
-                    % (P4_PORT, e))
+                    % (p4_port, e))
 
             sys.exit(1)
 
         if repository is None:
             sys.stderr.write(
                 'Could not find a repository in Review Board for %s.\n'
-                % P4_PORT)
+                % p4_port)
             sys.exit(1)
 
         # Look up a review request for this changenum.
@@ -131,15 +435,39 @@ def main():
                 'More than one review request was found for changenum %s and '
                 'P4PORT %s. This may be an internal error. Please contact '
                 'your Perforce administrator.\n'
-                % (changenum, P4_PORT))
+                % (changenum, p4_port))
             sys.exit(1)
 
     if review_request:
         # A review request ID was found.
+        #
+        # We'll now stamp changes if the script is configured to enable this,
+        # whether or not the change is approved.
+        if options.stamp:
+            # Update the changeset if needed in order to include the review
+            # request URL.
+            assert changes is not None
+            change_description = changes[0]['Description']
+
+            stamp_str = '%s %s' % (REVIEW_REQUEST_URL_FIELD,
+                                   review_request.absolute_url)
+
+            if stamp_str not in change_description:
+                try:
+                    client.amend_commit_description(
+                        '%s\n\n%s' % (change_description.rstrip(), stamp_str),
+                        revisions=client.parse_revision_spec([str(changenum)]))
+                except AmendError as e:
+                    sys.stderr.write(
+                        'Unable to amend change %s with the review request '
+                        'URL: %s\n'
+                        % (changenum, e))
+                    sys.exit(1)
+
         if not review_request.approved:
             # The review request was not approved in Review Board. Display
             # an error.
-            if REQUIRE_APPROVAL:
+            if options.require_approval:
                 sys.stderr.write('%s\n' % review_request.approval_failure)
                 sys.exit(1)
             else:
@@ -149,14 +477,14 @@ def main():
                     changenum, review_request.approval_failure)
 
         # If we're here, the change is allowed to go into Review Board.
-        if CLOSE_REVIEW_REQUESTS:
+        if options.close_review_requests:
             # Close the review request, and point to this change.
             review_request.update(
                 status='submitted',
                 description='Submitted as change #%s' % changenum)
     else:
         # A review request ID was not found.
-        if REQUIRE_REVIEW_REQUESTS:
+        if options.require_review_requests:
             sys.stderr.write(
                 'A review request for this change must be posted for review '
                 'and approved before it can be submitted.\n')

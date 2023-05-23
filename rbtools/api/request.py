@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import base64
 import logging
 import mimetypes
@@ -7,11 +9,12 @@ import shutil
 import ssl
 import sys
 from collections import OrderedDict
-from http.client import HTTPMessage, HTTPResponse, NOT_MODIFIED
+from http.client import (HTTPMessage, HTTPResponse, HTTPSConnection,
+                         NOT_MODIFIED)
 from http.cookiejar import Cookie, CookieJar, MozillaCookieJar
 from io import BytesIO
 from json import loads as json_loads
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import (
@@ -28,11 +31,15 @@ from urllib.request import (
     install_opener,
     urlopen)
 
+import certifi
 from typing_extensions import TypeAlias
 
 from rbtools import get_package_version
 from rbtools.api.cache import APICache, CachedHTTPResponse, LiveHTTPResponse
-from rbtools.api.errors import APIError, create_api_error, ServerInterfaceError
+from rbtools.api.errors import (APIError,
+                                ServerInterfaceError,
+                                ServerInterfaceSSLError,
+                                create_api_error)
 from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.encoding import force_bytes, force_unicode
 from rbtools.utils.filesystem import get_home_path
@@ -323,6 +330,98 @@ class HttpRequest:
         fmt = '%%0%dd' % len(repr(sys.maxsize - 1))
         token = random.randrange(sys.maxsize)
         return (b'=' * 15) + (fmt % token).encode('utf-8') + b'=='
+
+
+class RBToolsHTTPSConnection(HTTPSConnection):
+    """Connection class for HTTPS connections.
+
+    This is a specialization of the default HTTPS connection class that
+    provides custom error handling for SSL errors.
+
+    Version Added:
+        4.1
+    """
+
+    def connect(self, *args, **kwargs) -> Any:
+        """Connect to the server.
+
+        This will catch SSL errors and wrap them with our own error classes.
+
+        Args:
+            *args (tuple):
+                Positional arguments to pass to the parent method.
+
+            **kwargs (dict):
+                Keyword arguments to pass to the parent method.
+
+        Returns:
+            object:
+            The result from the parent method.
+
+        Raises:
+            rbtools.api.errors.ServerInterfaceSSLError:
+                An SSL error occurred during communication. Details will be
+                in the error message.
+        """
+        try:
+            return super().connect(*args, **kwargs)
+        except ssl.SSLError as e:
+            # This seems to be the only way to get access to the context
+            # here. Assert that it's reachable.
+            context = getattr(self, '_context', None)
+            assert context is not None
+
+            raise ServerInterfaceSSLError(
+                host=self.host,
+                port=self.port,
+                ssl_error=e,
+                ssl_context=context)
+
+
+class RBToolsHTTPSHandler(HTTPSHandler):
+    """Request/response handler for HTTPS connections.
+
+    This wraps the default HTTPS handler, passing in a specialized HTTPS
+    connection class used to generate more useful SSL-related errors.
+
+    Version Added:
+        4.1
+    """
+
+    def do_open(
+        self,
+        http_class,
+        *args,
+        **kwargs,
+    ) -> HTTPResponse:
+        """Open a connection to the server.
+
+        Args:
+            http_class (type, unused):
+                The original HTTPS connection class. This will be replaced
+                with our own.
+
+            *args (tuple):
+                Positional arguments to pass to the parent method.
+
+            **kwargs (dict):
+                Keyword arguments to pass to the parent method.
+
+        Returns:
+            http.client.HTTPResponse:
+            The resulting HTTP response.
+
+        Raises:
+            rbtools.api.errors.ServerInterfaceSSLError:
+                An SSL error occurred during communication. Details will be
+                in the error message.
+        """
+        # Note that we're ignoring the typing below, as the type hints for
+        # do_open() mistakenly lack the 'self' parameter and think that
+        # RBToolsHTTPSConnection is therefore a mismatch on a different
+        # parameter.
+        return super().do_open(RBToolsHTTPSConnection,  # type: ignore
+                               *args, **kwargs)
 
 
 class Request(URLRequest):
@@ -1006,15 +1105,16 @@ class ReviewBoardServer:
 
         handlers: List[BaseHandler] = []
 
-        if not verify_ssl:
-            context = ssl._create_unverified_context()
+        if verify_ssl:
+            context = ssl.create_default_context(
+                cafile=ca_certs or certifi.where())
         else:
-            context = ssl.create_default_context(cafile=ca_certs)
+            context = ssl._create_unverified_context()
 
         if client_cert and client_key:
             context.load_cert_chain(client_cert, client_key)
 
-        handlers.append(HTTPSHandler(context=context))
+        handlers.append(RBToolsHTTPSHandler(context=context))
 
         if disable_proxy:
             handlers.append(ProxyHandler({}))

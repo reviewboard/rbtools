@@ -1,0 +1,122 @@
+.. default-intersphinx:: rbt4.x rb-latest
+
+
+=========================
+RBTools 4.1 Release Notes
+=========================
+
+**Release date:** May 23, 2023
+
+
+New Features
+============
+
+Ready for Review Board 6
+========================
+
+This release contains fixes and enhancements for the upcoming release of
+Review Board 6.
+
+We recommend upgrading to RBTools 4.1 ahead of time in order to have the best
+experience when upgrading to Review Board 6.
+
+
+SSL Improvements
+----------------
+
+* Made it easier to work with SSL certificates and diagnose issues.
+
+  RBTools now ships up-to-date root SSL certificates, which makes it easier
+  to work with newer SSL certificates on older Python installs.
+
+  When SSL issues occur, a complete description of what went wrong and how
+  to address the issue is displayed. This includes information on how to
+  register self-signed certificates with Python, and how to update root
+  certificates.
+
+
+Perforce
+--------
+
+* Added a Perforce trigger script to check review requests on submit, stamp
+  them, and close them.
+
+  This can be installed by Perforce administrators to:
+
+  1. Check that a review request has been reviewed and approved before
+     accepting it.
+
+     This defaults to a "Ship It!" with no open issues, but this can be
+     :ref:`customized by extensions <review-request-approval-hook>`.
+
+  2. Update the changeset with the URL to the review request.
+
+  3. Close the review request once submitted.
+
+  See the `trigger script`_ and :ref:`rbtools-workflow-perforce` for more
+  information.
+
+
+.. _trigger script:
+   https://github.com/reviewboard/rbtools/blob/release-4.x/contrib/tools/p4-trigger-script
+
+
+Windows
+-------
+
+* The Windows installer now includes GNU Diff.
+
+  GNU Diff is an important component needed to generate diffs for many types
+  of repositories. It previously had to be installed separately, but is now
+  available as part of RBTools for Windows.
+
+* The Windows installer has been updated from Python 3.10.8 to 3.10.11.
+
+
+Bug Fixes
+=========
+
+API
+---
+
+* Fixed issues with over-aggressive caching with the Review Board API
+  depending on the caching headers used.
+
+  This will be important for Review Board 6.
+
+
+IBM ClearCase / HCL VersionVault
+--------------------------------
+
+* Fixed generating diffs containing moved files.
+
+* Fixed generating diffs for UCM activities containing changes present in
+  other VOBs.
+
+* Fixed consistency issues when generating information on changesets.
+
+  This is mostly an internal fix, but helps ensure that there's no differences
+  between two attempts at generating the same changeset.
+
+
+Perforce
+--------
+
+* Fixed stamping of Perforce changesets.
+
+  When using the `trigger script`_, :rbtcommand:`rbt land`, or
+  :rbtcommand:`rbt stamp`, the description could previously end up malformed.
+
+
+Packaging
+=========
+
+* Added a dependency on :pypi:`certifi` >= 2023.5.7.
+
+
+Contributors
+============
+
+* Christian Hammond
+* David Trowbridge
+* Michelle Aubin

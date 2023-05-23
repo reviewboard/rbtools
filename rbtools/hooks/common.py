@@ -61,18 +61,37 @@ def execute(command):
     return output
 
 
-def initialize_logging():
+def initialize_logging(
+    debug: bool = False,
+) -> None:
     """Sets up a log handler to format log messages.
 
     Warning, error, and critical messages will show the level name as a prefix,
-    followed by the message.
+    followed by the message. Debug logs can optionally be enabled as well.
+
+    Version Changed:
+        4.1:
+        Added the ``debug`` argument.
+
+    Args:
+        debug (bool, optional):
+            Whether to enable debug logging.
+
+            Version Added:
+                4.1
     """
     root = logging.getLogger()
 
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
-    handler.setLevel(logging.WARNING)
     root.addHandler(handler)
+
+    if debug:
+        handler.setLevel(logging.DEBUG)
+        root.setLevel(logging.DEBUG)
+    else:
+        handler.setLevel(logging.WARNING)
+        root.setLevel(logging.WARNING)
 
 
 def get_review_request_id(regex, commit_message):
