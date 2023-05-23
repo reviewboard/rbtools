@@ -6,7 +6,7 @@ from docutils.parsers.rst import Directive
 from docutils.statemachine import ViewList
 
 from rbtools import commands
-from rbtools.commands import BaseMultiCommand, OptionGroup, Option
+from rbtools.commands.base import BaseMultiCommand, OptionGroup, Option
 
 
 class CommandClassNotFound(Exception):
