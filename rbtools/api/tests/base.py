@@ -43,6 +43,7 @@ class MockResponse(object):
         """Return the HTTP response code."""
         return self.code
 
+    @property
     def status(self) -> int:
         """Return the HTTP response code."""
         return self.code
