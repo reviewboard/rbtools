@@ -33,8 +33,11 @@ class JSONOutput:
     # Instance variables #
     ######################
 
-    #: Storage for JSON data to output.
-    _output: Dict[str, Any]
+    #: Raw storage for JSON data scheduled to be output.
+    #:
+    #: Version Added:
+    #:     5.0
+    raw: Dict[str, Any]
 
     #: The stream where JSON output will be written to.
     _output_stream: TextIO
@@ -49,7 +52,7 @@ class JSONOutput:
             output_stream (io.IOBase):
                 Object to output JSON object to.
         """
-        self._output = {}
+        self.raw = {}
         self._output_stream = output_stream
 
     def add(
@@ -66,7 +69,7 @@ class JSONOutput:
             value (object):
                 The value to attach to the key in the dictionary.
         """
-        self._output[key] = value
+        self.raw[key] = value
 
     def append(
         self,
@@ -94,7 +97,7 @@ class JSONOutput:
             TypeError:
                 The existing value was not a list.
         """
-        items = self._output[key]
+        items = self.raw[key]
 
         if not isinstance(items, list):
             raise TypeError('Expected "%s" to be a list, but it is a %s.'
@@ -114,7 +117,7 @@ class JSONOutput:
             error (str):
                 The error that will be added to ``errors``.
         """
-        self._output.setdefault('errors', []).append(error)
+        self.raw.setdefault('errors', []).append(error)
 
     def add_warning(
         self,
@@ -128,11 +131,11 @@ class JSONOutput:
             warning (unicode):
                 The warning that will be added to ``warnings``.
         """
-        self._output.setdefault('warnings', []).append(warning)
+        self.raw.setdefault('warnings', []).append(warning)
 
     def print_to_stream(self) -> None:
         """Output JSON string representation to output stream."""
-        self._output_stream.write(json.dumps(self._output,
+        self._output_stream.write(json.dumps(self.raw,
                                              indent=4,
                                              sort_keys=True))
         self._output_stream.write('\n')

@@ -28,7 +28,7 @@ class JSONOutputTests(TestCase):
             'subkey': 'value!',
         })
 
-        self.assertEqual(output._output, {
+        self.assertEqual(output.raw, {
             'key1': 'value',
             'key2': 123,
             'key3': {
@@ -44,7 +44,7 @@ class JSONOutputTests(TestCase):
         output.append('key1', True)
         output.append('key1', 'XYZ')
 
-        self.assertEqual(output._output, {
+        self.assertEqual(output.raw, {
             'key1': [1, True, 'XYZ'],
         })
 
@@ -55,7 +55,7 @@ class JSONOutputTests(TestCase):
         with self.assertRaisesMessage(KeyError, 'key1'):
             output.append('key1', 1)
 
-        self.assertEqual(output._output, {})
+        self.assertEqual(output.raw, {})
 
     def test_append_with_non_list(self) -> None:
         """Testing JSONOutput.append with non-list"""
@@ -69,7 +69,7 @@ class JSONOutputTests(TestCase):
         with self.assertRaisesMessage(TypeError, message):
             output.append('key1', 1)
 
-        self.assertEqual(output._output, {
+        self.assertEqual(output.raw, {
             'key1': 'str',
         })
 
@@ -79,7 +79,7 @@ class JSONOutputTests(TestCase):
         output.add_error('Error 1')
         output.add_error('Error 2')
 
-        self.assertEqual(output._output, {
+        self.assertEqual(output.raw, {
             'errors': ['Error 1', 'Error 2'],
         })
 
@@ -89,7 +89,7 @@ class JSONOutputTests(TestCase):
         output.add_warning('Warning 1')
         output.add_warning('Warning 2')
 
-        self.assertEqual(output._output, {
+        self.assertEqual(output.raw, {
             'warnings': ['Warning 1', 'Warning 2'],
         })
 

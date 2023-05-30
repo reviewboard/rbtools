@@ -1000,7 +1000,7 @@ class BaseCommand:
         cleanup_tempfiles()
 
         if self.options.json_output:
-            if 'errors' in self.json._output:
+            if 'errors' in self.json.raw:
                 self.json.add('status', 'failed')
             else:
                 self.json.add('status', 'success')
