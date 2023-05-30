@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import io
 
-from rbtools.commands.base.output import JSONOutput
+from rbtools.commands.base.output import JSONOutput, OutputWrapper
 from rbtools.testing import TestCase
 
 
@@ -135,3 +135,111 @@ class JSONOutputTests(TestCase):
             '        "Warning!"\n'
             '    ]\n'
             '}\n')
+
+
+class OutputWrapperTests(TestCase):
+    """Unit tests for OutputWrapper."""
+
+    def test_bytes_write(self) -> None:
+        """Testing OutputWrapper[bytes].write"""
+        buf = io.BytesIO()
+        output = OutputWrapper[bytes](buf)
+
+        output.write(b'ABC')
+        output.write(b'123')
+
+        result = buf.getvalue()
+        buf.close()
+
+        self.assertEqual(result, b'ABC\n123\n')
+
+    def test_bytes_write_with_end(self) -> None:
+        """Testing OutputWrapper[bytes].write with end="""
+        buf = io.BytesIO()
+        output = OutputWrapper[bytes](buf)
+
+        output.write(b'ABC', end=b'!')
+        output.write(b'123', end=b'!')
+
+        result = buf.getvalue()
+        buf.close()
+
+        self.assertEqual(result, b'ABC!123!')
+
+    def test_bytes_write_with_end_empty(self) -> None:
+        """Testing OutputWrapper[bytes].write with end=b''"""
+        buf = io.BytesIO()
+        output = OutputWrapper[bytes](buf)
+
+        output.write(b'ABC', end=b'')
+        output.write(b'123', end=b'')
+
+        result = buf.getvalue()
+        buf.close()
+
+        self.assertEqual(result, b'ABC123')
+
+    def test_bytes_new_line(self) -> None:
+        """Testing OutputWrapper[bytes].new_line"""
+        buf = io.BytesIO()
+        output = OutputWrapper[bytes](buf)
+
+        output.new_line()
+        output.new_line()
+
+        result = buf.getvalue()
+        buf.close()
+
+        self.assertEqual(result, b'\n\n')
+
+    def test_str_write(self) -> None:
+        """Testing OutputWrapper[str].write"""
+        buf = io.StringIO()
+        output = OutputWrapper[str](buf)
+
+        output.write('ABC')
+        output.write('123')
+
+        result = buf.getvalue()
+        buf.close()
+
+        self.assertEqual(result, 'ABC\n123\n')
+
+    def test_str_write_with_end(self) -> None:
+        """Testing OutputWrapper[str].write with end="""
+        buf = io.StringIO()
+        output = OutputWrapper[str](buf)
+
+        output.write('ABC', end='!')
+        output.write('123', end='!')
+
+        result = buf.getvalue()
+        buf.close()
+
+        self.assertEqual(result, 'ABC!123!')
+
+    def test_str_write_with_end_empty(self) -> None:
+        """Testing OutputWrapper[str].write with end=''"""
+        buf = io.StringIO()
+        output = OutputWrapper[str](buf)
+
+        output.write('ABC', end='')
+        output.write('123', end='')
+
+        result = buf.getvalue()
+        buf.close()
+
+        self.assertEqual(result, 'ABC123')
+
+    def test_str_new_line(self) -> None:
+        """Testing OutputWrapper[str].new_line"""
+        buf = io.StringIO()
+        output = OutputWrapper[str](buf)
+
+        output.new_line()
+        output.new_line()
+
+        result = buf.getvalue()
+        buf.close()
+
+        self.assertEqual(result, '\n\n')

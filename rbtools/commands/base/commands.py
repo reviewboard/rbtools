@@ -256,13 +256,13 @@ class BaseCommand:
     #:
     #: Commands should write error text using this instead of :py:func:`print`
     #: or :py:func:`sys.stderr`.
-    stderr: OutputWrapper
+    stderr: OutputWrapper[str]
 
     #: The stream for writing error output as byte strings.
     #:
     #: Commands should write error text using this instead of :py:func:`print`
     #: or :py:func:`sys.stderr`.
-    stderr_bytes: OutputWrapper
+    stderr_bytes: OutputWrapper[bytes]
 
     #: Whether the stderr stream is from an interactive session.
     #:
@@ -293,13 +293,13 @@ class BaseCommand:
     #:
     #: Commands should write text using this instead of :py:func:`print` or
     #: :py:func:`sys.stdout`.
-    stdout: OutputWrapper
+    stdout: OutputWrapper[str]
 
     #: The stream for writing standard output as byte strings.
     #:
     #: Commands should write text using this instead of :py:func:`print` or
     #: :py:func:`sys.stdout`.
-    stdout_bytes: OutputWrapper
+    stdout_bytes: OutputWrapper[bytes]
 
     #: Whether the stdout stream is from an interactive session.
     #:
@@ -778,22 +778,16 @@ class BaseCommand:
         self.tool = None
         self.config = RBToolsConfig()
 
-        self.stdout = OutputWrapper(stdout)
-        self.stderr = OutputWrapper(stderr)
+        self.stdout = OutputWrapper[str](stdout)
+        self.stderr = OutputWrapper[str](stderr)
         self.stdin = stdin
+
+        self.stdout_bytes = OutputWrapper[bytes](stdout.buffer)
+        self.stderr_bytes = OutputWrapper[bytes](stderr.buffer)
 
         self.stdout_is_atty = hasattr(stdout, 'isatty') and stdout.isatty()
         self.stderr_is_atty = hasattr(stderr, 'isatty') and stderr.isatty()
         self.stdin_is_atty = hasattr(stdin, 'isatty') and stdin.isatty()
-
-        if isinstance(stdout, io.TextIOWrapper):
-            self.stderr_bytes = OutputWrapper(stderr.buffer)
-            self.stdout_bytes = OutputWrapper(stdout.buffer)
-        else:
-            # Python 2.x, or while we're running unit tests (where stdout and
-            # stderr are actually io.StringIO)
-            self.stderr_bytes = OutputWrapper(stderr)
-            self.stdout_bytes = OutputWrapper(stdout)
 
         self.json = JSONOutput(stdout)
 

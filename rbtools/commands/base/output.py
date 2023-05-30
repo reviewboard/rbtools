@@ -6,10 +6,57 @@ Version Added:
 
 from __future__ import annotations
 
+import io
 import json
-from typing import Any, Dict, TextIO
+from typing import (Any, AnyStr, Callable, Dict, Generic, IO, Optional,
+                    TextIO, Union, cast)
 
-import six
+from typing_extensions import TypeAlias
+
+from rbtools.utils.encoding import force_bytes, force_unicode
+
+
+#: Type alias for a force_bytes() or force_unicode() function.
+#:
+#: Version Added:
+#:     5.0
+_ForceStringFunc: TypeAlias = Callable[..., AnyStr]
+
+
+class _Newline:
+    """A wrapper for newline characters.
+
+    This is used as a default parameter for indicating a newline when
+    writing to an output stream.
+
+    Version Added:
+        5.0
+    """
+
+    def __bytes__(self) -> bytes:
+        """Return the newline as a byte string.
+
+        Returns:
+            bytes:
+            The newline character.
+        """
+        return b'\n'
+
+    def __str__(self) -> str:
+        """Return the newline as a Unicode string.
+
+        Returns:
+            bytes:
+            The newline character.
+        """
+        return '\n'
+
+
+#: Newline wrapper instance.
+#:
+#: Version Added:
+#:     5.0
+_newline = _Newline()
 
 
 class JSONOutput:
@@ -141,7 +188,7 @@ class JSONOutput:
         self._output_stream.write('\n')
 
 
-class OutputWrapper(object):
+class OutputWrapper(Generic[AnyStr]):
     """Wrapper for output of a command.
 
     Wrapper around some output object that handles outputting messages.
@@ -157,41 +204,83 @@ class OutputWrapper(object):
         3.0
     """
 
-    def __init__(self, output_stream):
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The wrapped output stream.
+    output_stream: Optional[IO[AnyStr]]
+
+    #: A function to force a string type for writing.
+    _force_str: _ForceStringFunc
+
+    def __init__(
+        self,
+        output_stream: IO[AnyStr],
+    ) -> None:
         """Initialize with an output object to stream to.
 
         Args:
-            output_stream (object):
+            output_stream (io.IOBase):
                 The output stream to send command output to.
         """
         self.output_stream = output_stream
 
-    def write(self, msg, end='\n'):
+        if isinstance(output_stream, io.TextIOBase):
+            self._force_str = cast(_ForceStringFunc, force_unicode)
+        else:
+            self._force_str = cast(_ForceStringFunc, force_bytes)
+
+    def write(
+        self,
+        msg: Optional[AnyStr] = None,
+        end: Union[AnyStr, _Newline] = _newline,
+    ) -> None:
         """Write a message to the output stream.
 
-        Write a string to output stream object if defined, otherwise
-        do nothing. end specifies a string that should be appended to
-        the end of msg before being given to the output stream.
+        Version Changed:
+            5.0:
+            This now handles incoming strings of either bytes or Unicode
+            under the hood, but callers should take care to always use the
+            intended string type. This behavior may change in future versions.
 
         Args:
-            msg (unicode):
+            msg (bytes or str, optional):
                 String to write to output stream.
 
-            end (unicode, optional):
-                String to append to end of msg. This defaults to ``\\n```.
-        """
-        if self.output_stream:
-            if end:
-                if (isinstance(msg, bytes) and
-                    isinstance(end, six.string_types)):
-                    msg += end.encode('utf-8')
-                else:
-                    msg += end
+                Version Changed:
+                    5.0:
+                    This is now optional, allowing just the ending marker to
+                    be written if provided.
 
-            self.output_stream.write(msg)
+            end (bytes or str, optional):
+                String to append to end.
 
-    def new_line(self):
-        """Pass a new line character to output stream object.
+                This defaults to a newline.
         """
-        if self.output_stream:
-            self.output_stream.write('\n')
+        if msg:
+            self._write(msg)
+
+        if end:
+            self._write(end)
+
+    def new_line(self) -> None:
+        """Write a newline to the output stream."""
+        self.write()
+
+    def _write(
+        self,
+        s: Union[AnyStr, _Newline],
+    ) -> None:
+        """Write a string to the output stream.
+
+        This will take care to convert the string (or newline wrapper) as
+        necessary.
+
+        Args:
+            s (bytes or str or _Newline):
+                The string or newline wrapper to write.
+        """
+        # Make sure the stream hasn't been closed (for JSON writing).
+        if self.output_stream is not None:
+            self.output_stream.write(self._force_str(s, strings_only=False))
