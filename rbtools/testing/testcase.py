@@ -7,7 +7,7 @@ import sys
 import tempfile
 import unittest
 from contextlib import contextmanager
-from typing import Dict, List, Optional, Union
+from typing import Dict, Iterator, List, Optional, Union
 
 import kgb
 
@@ -152,6 +152,48 @@ class TestCase(unittest.TestCase):
         os.chdir(dirname)
 
         return dirname
+
+    @contextmanager
+    def env(
+        self,
+        env: Dict[str, Optional[str]],
+    ) -> Iterator[None]:
+        """Run code with custom environment variables temporarily set.
+
+        This will set environment variables to the provided values (or
+        erase them from the environment if set to ``None``) before executing
+        the code in the context.
+
+        Once executed, the old environment will be restored.
+
+        Version Added:
+            5.0
+
+        Args:
+            env (dict):
+                The environment variables to set/remove.
+
+        Context:
+            Code will execute with the new environment set.
+        """
+        old_env: Dict[str, Optional[str]] = {}
+
+        for key, value in env.items():
+            old_env[key] = os.environ[key]
+
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+        try:
+            yield
+        finally:
+            for key, value in old_env.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
 
     def precreate_tempfiles(self, count):
         """Pre-create a specific number of temporary files.
