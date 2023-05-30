@@ -1,12 +1,16 @@
 """Main handler for the rbt command."""
 
+from __future__ import annotations
+
 import argparse
 import glob
 import os
-import pkg_resources
 import signal
 import subprocess
 import sys
+import traceback
+
+import importlib_metadata
 
 from rbtools import get_version_string
 from rbtools.commands import RB_MAIN, find_entry_point_for_command
@@ -131,14 +135,20 @@ def help(args, parser):
     # We cast to a set to de-dupe the list, since third-parties may
     # try to override commands by using the same name, and then cast
     # back to a list for easy sorting.
-    entrypoints = pkg_resources.iter_entry_points('rbtools_commands')
-    commands = {entrypoint.name for entrypoint in entrypoints}
+    entrypoints = importlib_metadata.entry_points(group='rbtools_commands')
+    commands = {
+        _entrypoint.name
+        for _entrypoint in entrypoints
+    }
 
-    for path_dir in os.environ.get('PATH').split(':'):
-        path_prefix = '%s/%s-' % (path_dir, RB_MAIN)
+    for path_dir in os.environ.get('PATH', '').split(':'):
+        path_prefix = os.path.join(path_dir, f'{RB_MAIN}-')
+        path_prefix_len = len(path_prefix)
 
-        for cmd in glob.glob(path_prefix + '*'):
-            commands.add(cmd.replace(path_prefix, ''))
+        commands.update(
+            cmd[path_prefix_len:]
+            for cmd in glob.glob(f'{path_prefix}*')
+        )
 
     aliases = load_config().ALIASES
     commands |= set(aliases.keys())
@@ -190,16 +200,15 @@ def main():
     if ep:
         try:
             command = ep.load()()
-        except ImportError:
-            # TODO: It might be useful to actual have the stack
-            # trace here, due to an import somewhere down the import
-            # chain failing.
-            sys.stderr.write('Could not load command entry point %s\n' %
-                             ep.name)
+        except ImportError as e:
+            sys.stderr.write('Could not load command entry point %s: %s\n'
+                             % (ep.name, e))
+            sys.stderr.write(''.join(traceback.format_exception(e)))
             sys.exit(1)
         except Exception as e:
-            sys.stderr.write('Unexpected error loading command %s: %s\n' %
-                             (ep.name, e))
+            sys.stderr.write('Unexpected error loading command %s: %s\n'
+                             % (ep.name, e))
+            sys.stderr.write(''.join(traceback.format_exception(e)))
             sys.exit(1)
 
         command.run_from_argv([RB_MAIN, command_name] + args)

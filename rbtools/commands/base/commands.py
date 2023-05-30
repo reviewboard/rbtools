@@ -8,22 +8,21 @@ from __future__ import annotations
 
 import argparse
 import inspect
-import io
 import logging
 import os
 import platform
 import subprocess
 import sys
-from typing import Dict, List, Optional, TYPE_CHECKING, TextIO, Type, Union
+from typing import (Dict, List, Optional, TextIO, Tuple, Type, Union,
+                    TYPE_CHECKING)
+from urllib.parse import urlparse
 
 import colorama
-from six.moves.urllib.parse import urlparse
 
 from rbtools import get_version_string
 from rbtools.api.capabilities import Capabilities
 from rbtools.api.client import RBClient
 from rbtools.api.errors import APIError, ServerInterfaceError
-from rbtools.api.resource import RootResource
 from rbtools.api.transport.sync import SyncTransport
 from rbtools.clients import scan_usable_client
 from rbtools.clients.errors import OptionsCheckError
@@ -40,7 +39,7 @@ from rbtools.utils.filesystem import cleanup_tempfiles, get_home_path
 from rbtools.utils.repository import get_repository_resource
 
 if TYPE_CHECKING:
-    from rbtools.api.resource import Resource
+    from rbtools.api.resource import Resource, RootResource
     from rbtools.api.transport import Transport
     from rbtools.clients.base.repository import RepositoryInfo
     from rbtools.clients.base.scmclient import BaseSCMClient
@@ -256,13 +255,13 @@ class BaseCommand:
     #:
     #: Commands should write error text using this instead of :py:func:`print`
     #: or :py:func:`sys.stderr`.
-    stderr: OutputWrapper
+    stderr: OutputWrapper[str]
 
     #: The stream for writing error output as byte strings.
     #:
     #: Commands should write error text using this instead of :py:func:`print`
     #: or :py:func:`sys.stderr`.
-    stderr_bytes: OutputWrapper
+    stderr_bytes: OutputWrapper[bytes]
 
     #: Whether the stderr stream is from an interactive session.
     #:
@@ -293,13 +292,13 @@ class BaseCommand:
     #:
     #: Commands should write text using this instead of :py:func:`print` or
     #: :py:func:`sys.stdout`.
-    stdout: OutputWrapper
+    stdout: OutputWrapper[str]
 
     #: The stream for writing standard output as byte strings.
     #:
     #: Commands should write text using this instead of :py:func:`print` or
     #: :py:func:`sys.stdout`.
-    stdout_bytes: OutputWrapper
+    stdout_bytes: OutputWrapper[bytes]
 
     #: Whether the stdout stream is from an interactive session.
     #:
@@ -733,11 +732,13 @@ class BaseCommand:
 
     default_transport_cls = SyncTransport
 
-    def __init__(self,
-                 transport_cls=SyncTransport,
-                 stdout=sys.stdout,
-                 stderr=sys.stderr,
-                 stdin=sys.stdin):
+    def __init__(
+        self,
+        transport_cls: Type[Transport] = SyncTransport,
+        stdout: TextIO = sys.stdout,
+        stderr: TextIO = sys.stderr,
+        stdin: TextIO = sys.stdin,
+    ) -> None:
         """Initialize the base functionality for the command.
 
         Args:
@@ -778,27 +779,37 @@ class BaseCommand:
         self.tool = None
         self.config = RBToolsConfig()
 
-        self.stdout = OutputWrapper(stdout)
-        self.stderr = OutputWrapper(stderr)
+        self.stdout = OutputWrapper[str](stdout)
+        self.stderr = OutputWrapper[str](stderr)
         self.stdin = stdin
+
+        self.stdout_bytes = OutputWrapper[bytes](stdout.buffer)
+        self.stderr_bytes = OutputWrapper[bytes](stderr.buffer)
 
         self.stdout_is_atty = hasattr(stdout, 'isatty') and stdout.isatty()
         self.stderr_is_atty = hasattr(stderr, 'isatty') and stderr.isatty()
         self.stdin_is_atty = hasattr(stdin, 'isatty') and stdin.isatty()
 
-        if isinstance(stdout, io.TextIOWrapper):
-            self.stderr_bytes = OutputWrapper(stderr.buffer)
-            self.stdout_bytes = OutputWrapper(stdout.buffer)
-        else:
-            # Python 2.x, or while we're running unit tests (where stdout and
-            # stderr are actually io.StringIO)
-            self.stderr_bytes = OutputWrapper(stderr)
-            self.stdout_bytes = OutputWrapper(stdout)
-
         self.json = JSONOutput(stdout)
 
-    def create_parser(self, config, argv=[]):
-        """Create and return the argument parser for this command."""
+    def create_parser(
+        self,
+        config: RBToolsConfig,
+        argv: List[str] = [],
+    ) -> argparse.ArgumentParser:
+        """Return a new argument parser for this command.
+
+        Args:
+            config (dict):
+                The loaded RBTools configuration.
+
+            argv (list of str):
+                The list of command line arguments.
+
+        Returns:
+            argparse.ArgumentParser:
+            The new argument parser for the command.
+        """
         parser = argparse.ArgumentParser(
             prog=RB_MAIN,
             usage=self.usage(),
@@ -812,7 +823,15 @@ class BaseCommand:
 
         return parser
 
-    def post_process_options(self):
+    def post_process_options(self) -> None:
+        """Post-process options for the command.
+
+        This can validate and update options before the command is invoked.
+
+        Raises:
+            rbtools.commands.base.errors.CommandError:
+                There was an error found with an option.
+        """
         if self.options.disable_ssl_verification:
             try:
                 import ssl
@@ -821,16 +840,25 @@ class BaseCommand:
                 raise CommandError('The --disable-ssl-verification flag is '
                                    'only available with Python 2.7.9+')
 
-    def usage(self):
-        """Return a usage string for the command."""
-        usage = '%%(prog)s %s [options] %s' % (self.name, self.args)
+    def usage(self) -> str:
+        """Return a usage string for the command.
+
+        Returns:
+            str:
+            Usage text for the command.
+        """
+        usage = f'%(prog)s {self.name} [options] {self.args}'
 
         if self.description:
-            return '%s\n\n%s' % (usage, self.description)
+            return f'{usage}\n\n{self.description}'
         else:
             return usage
 
-    def _create_formatter(self, level, fmt):
+    def _create_formatter(
+        self,
+        level: str,
+        fmt: str,
+    ) -> logging.Formatter:
         """Create a logging formatter for the appropriate logging level.
 
         When writing to a TTY, the format will be colorized by the colors
@@ -838,18 +866,18 @@ class BaseCommand:
         Otherwise, the format will not be altered.
 
         Args:
-            level (unicode):
+            level (str):
                 The logging level name.
 
-            fmt (unicode):
+            fmt (str):
                 The logging format.
 
         Returns:
             logging.Formatter:
             The created formatter.
         """
-        color = ''
-        reset = ''
+        color: str = ''
+        reset: str = ''
 
         if self.stdout_is_atty:
             color_name = self.config['COLOR'].get(level.upper())
@@ -862,13 +890,17 @@ class BaseCommand:
 
         return logging.Formatter(fmt.format(color=color, reset=reset))
 
-    def initialize(self):
+    def initialize(self) -> None:
         """Initialize the command.
 
         This will set up various prerequisites for commands. Individual command
         subclasses can control what gets done by setting the various
         ``needs_*`` attributes (as documented in this class).
         """
+        options = self.options
+        repository_info = self.repository_info
+        tool = self.tool
+
         if self.needs_repository:
             # If we need the repository, we implicitly need the API and SCM
             # client as well.
@@ -884,41 +916,50 @@ class BaseCommand:
             # _init_server_url might have already done this, in the case that
             # it needed to use the SCM client to detect the server name. Only
             # repeat if necessary.
-            if self.repository_info is None and self.tool is None:
-                self.repository_info, self.tool = self.initialize_scm_tool(
-                    client_name=self.options.repository_type)
+            if repository_info is None and tool is None:
+                repository_info, tool = self.initialize_scm_tool(
+                    client_name=options.repository_type)
+                self.repository_info = repository_info
+                self.tool = tool
+
+            assert tool is not None
 
             # Some SCMs allow configuring the repository name in the SCM
             # metadata. This is a legacy configuration, and is only used as a
             # fallback for when the repository name is not specified through
             # the config or command line.
-            if self.options.repository_name is None:
-                self.options.repository_name = \
-                    self.tool.get_repository_name()
+            if options.repository_name is None:
+                options.repository_name = tool.get_repository_name()
 
-            self.tool.capabilities = self.capabilities
+            tool.capabilities = self.capabilities
 
         if self.needs_repository:
-            self.repository, info = get_repository_resource(
+            assert repository_info is not None
+
+            repository, info = get_repository_resource(
                 api_root=self.api_root,
-                tool=self.tool,
-                repository_name=self.options.repository_name,
-                repository_paths=self.repository_info.path)
+                tool=tool,
+                repository_name=options.repository_name,
+                repository_paths=repository_info.path)
+            self.repository = repository
 
-            if self.repository:
-                self.repository_info.update_from_remote(self.repository, info)
+            if repository:
+                repository_info.update_from_remote(repository, info)
 
-        if self.options.json_output:
+        if options.json_output:
             self.stdout.output_stream = None
             self.stderr.output_stream = None
             self.stderr_bytes.output_stream = None
             self.stdout_bytes.output_stream = None
 
-    def create_arg_parser(self, argv):
+    def create_arg_parser(
+        self,
+        argv: List[str],
+    ) -> argparse.ArgumentParser:
         """Create and return the argument parser.
 
         Args:
-            argv (list of unicode):
+            argv (list of str):
                 A list of command line arguments
 
         Returns:
@@ -931,26 +972,29 @@ class BaseCommand:
 
         return parser
 
-    def run_from_argv(self, argv):
+    def run_from_argv(
+        self,
+        argv: List[str],
+    ) -> None:
         """Execute the command using the provided arguments.
 
         The options and commandline arguments will be parsed
         from ``argv`` and the commands ``main`` method will
         be called.
+
+        Args:
+            argv (list of str):
+                A list of command line arguments
         """
+        maxargs: Optional[int]
+
         parser = self.create_arg_parser(argv)
         self.options = parser.parse_args(argv[2:])
 
         args = self.options.args
 
         # Check that the proper number of arguments have been provided.
-        if hasattr(inspect, 'getfullargspec'):
-            # Python 3
-            argspec = inspect.getfullargspec(self.main)
-        else:
-            # Python 2
-            argspec = inspect.getargspec(self.main)
-
+        argspec = inspect.getfullargspec(self.main)
         minargs = len(argspec.args) - 1
         maxargs = minargs
 
@@ -975,7 +1019,7 @@ class BaseCommand:
             exit_code = self.main(*args) or 0
         except CommandError as e:
             if isinstance(e, ParseError):
-                parser.error(e)
+                parser.error(str(e))
             elif self.options.debug:
                 raise
 
@@ -1000,7 +1044,7 @@ class BaseCommand:
         cleanup_tempfiles()
 
         if self.options.json_output:
-            if 'errors' in self.json._output:
+            if 'errors' in self.json.raw:
                 self.json.add('status', 'failed')
             else:
                 self.json.add('status', 'success')
@@ -1009,12 +1053,15 @@ class BaseCommand:
 
         sys.exit(exit_code)
 
-    def initialize_scm_tool(self, client_name=None,
-                            require_repository_info=True):
+    def initialize_scm_tool(
+        self,
+        client_name: Optional[str] = None,
+        require_repository_info: bool = True,
+    ) -> Tuple[RepositoryInfo, BaseSCMClient]:
         """Initialize the SCM tool for the current working directory.
 
         Args:
-            client_name (unicode, optional):
+            client_name (str, optional):
                 A specific client name, which can come from the configuration.
                 This can be used to disambiguate if there are nested
                 repositories, or to speed up detection.
@@ -1027,8 +1074,14 @@ class BaseCommand:
 
         Returns:
             tuple:
-            A 2-tuple, containing the repository info structure and the tool
-            instance.
+            A 2-tuple:
+
+            Tuple:
+                0 (rbtools.clients.base.repository.RepositoryInfo):
+                    The repository information.
+
+                1 (rbtools.clients.base.scmclient.BaseSCMClient):
+                    The SCMTool client instance.
         """
         if not require_repository_info:
             RemovedInRBTools40Warning.warn(
@@ -1093,13 +1146,54 @@ class BaseCommand:
 
         return self.server_url
 
-    def credentials_prompt(self, realm, uri, username=None, password=None,
-                           *args, **kwargs):
+    def credentials_prompt(
+        self,
+        realm: str,
+        uri: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        *args,
+        **kwargs,
+    ) -> Tuple[str, str]:
         """Prompt the user for credentials using the command line.
 
         This will prompt the user, and then return the provided
         username and password. This is used as a callback in the
         API when the user requires authorization.
+
+        Args:
+            realm (str):
+                The HTTP realm.
+
+            uri (str):
+                The URI of the endpoint requiring authentication.
+
+            username (str, optional):
+                The default username for authentication.
+
+            password (str, optional):
+                The default password for authentication.
+
+            *args (tuple, unused):
+                Unused additional positional arguments.
+
+            **kwargs (dict, unused):
+                Unused additional keyword arguments.
+
+        Returns:
+            tuple:
+            A 2-tuple of:
+
+            Tuple:
+                username (str):
+                    The user-provided username.
+
+                password (str):
+                    The user-provided password.
+
+        Raises:
+            rbtools.commands.base.errors.CommandError:
+                HTTP authentication failed.
         """
         # TODO: Consolidate the logic in this function with
         #       get_authenticated_session() in rbtools/utils/users.py.
@@ -1154,12 +1248,29 @@ class BaseCommand:
 
         return username, password
 
-    def otp_token_prompt(self, uri, token_method, *args, **kwargs):
+    def otp_token_prompt(
+        self,
+        uri: str,
+        token_method: str,
+        *args,
+        **kwargs,
+    ) -> str:
         """Prompt the user for a one-time password token.
 
         Their account is configured with two-factor authentication. The
         server will have sent a token to their configured mobile device
         or application. The user will be prompted for this token.
+
+        Args:
+            uri (str):
+                The URI of the endpoint requiring authentication.
+
+            token_method (str):
+                The token method requested.
+
+        Returns:
+            str:
+            The user-provided token.
         """
         if getattr(self.options, 'diff_filename', None) == '-':
             raise CommandError('A two-factor authentication token is '
@@ -1186,11 +1297,22 @@ class BaseCommand:
 
         return get_pass('Token: ', require=True)
 
-    def _make_api_client(self, server_url):
+    def _make_api_client(
+        self,
+        server_url: str,
+    ) -> RBClient:
         """Return an RBClient object for the server.
 
         The RBClient will be instantiated with the proper arguments
         for talking to the provided Review Board server url.
+
+        Args:
+            server_url (str):
+                The URL to the Review Board server.
+
+        Returns:
+            rbtools.api.client.RBClient:
+            The new API client.
         """
         return RBClient(
             server_url,
@@ -1212,11 +1334,29 @@ class BaseCommand:
             proxy_authorization=self.options.proxy_authorization,
             transport_cls=self.transport_cls)
 
-    def get_api(self, server_url):
-        """Returns an RBClient instance and the associated root resource.
+    def get_api(
+        self,
+        server_url: str,
+    ) -> Tuple[RBClient, RootResource]:
+        """Return an RBClient instance and the associated root resource.
 
         Commands should use this method to gain access to the API,
         instead of instantianting their own client.
+
+        Args:
+            server_url (str):
+                The URL to the Review Board server.
+
+        Returns:
+            tuple:
+            A 2-tuple of:
+
+            Tuple:
+                0 (rbtools.api.client.RBClient):
+                    The new API client.
+
+                1 (rbtools.api.resource.RootResource):
+                    The root resource for the API.
         """
         if not urlparse(server_url).scheme:
             server_url = '%s%s' % ('http://', server_url)
@@ -1280,15 +1420,23 @@ class BaseCommand:
         else:
             return Capabilities({})
 
-    def main(self, *args):
+    def main(self, *args) -> int:
         """The main logic of the command.
 
         This method should be overridden to implement the commands
         functionality.
+
+        Args:
+             *args (tuple):
+                Positional arguments passed to the command.
+
+        Returns:
+            int:
+            The resulting exit code.
         """
         raise NotImplementedError()
 
-    def _init_logging(self):
+    def _init_logging(self) -> None:
         """Initializes logging for the command.
 
         This will set up different log handlers based on the formatting we want
@@ -1358,18 +1506,18 @@ class BaseCommand:
         logging.debug('Home = %s', get_home_path())
         logging.debug('Current directory = %s', os.getcwd())
 
-    def _init_server_url(self):
+    def _init_server_url(self) -> str:
         """Initialize the server URL.
 
         This will discover the URL to the Review Board server (if possible),
         and store it in :py:attr:`server_url`.
 
         Returns:
-            unicode:
+            str:
             The Review Board server URL.
 
         Raises:
-            CommandError:
+            rbtools.commands.base.errors.CommandError:
                 The Review Board server could not be detected.
         """
         # First use anything directly provided on the command line or in the
@@ -1386,26 +1534,28 @@ class BaseCommand:
             if self.repository_info is not None and self.tool is not None:
                 server_url = self.tool.scan_for_server(self.repository_info)
 
+        repository_info = self.repository_info
+
         # Finally, fall back on the TREES config. Once upon a time, we
         # suggested that users create a TREES dict in their config
         # file that specified the REVIEWBOARD_URL for multiple repository
         # paths. This was never properly documented, and has long outlived its
         # usefulness. We're continuing to support it for now but emit a
         # deprecation warning.
-        if not server_url:
+        if not server_url and repository_info is not None:
             if 'TREES' in self.config:
                 trees = self.config['TREES']
                 path = None
 
                 # Some repositories will return a list of paths.
-                if isinstance(self.repository_info.path, list):
-                    for path in self.repository_info.path:
+                if isinstance(repository_info.path, list):
+                    for path in repository_info.path:
                         if path in trees:
                             break
                     else:
                         path = None
-                elif self.repository_info.path in trees:
-                    path = self.repository_info.path
+                elif repository_info.path in trees:
+                    path = repository_info.path
 
                 if path and 'REVIEWBOARD_URL' in trees[path]:
                     RemovedInRBTools40Warning.warn(
@@ -1423,7 +1573,10 @@ class BaseCommand:
 
         return server_url
 
-    def _get_text_type(self, markdown):
+    def _get_text_type(
+        self,
+        markdown: bool,
+    ) -> str:
         """Return the appropriate text type for a field.
 
         Args:
@@ -1432,9 +1585,11 @@ class BaseCommand:
                 text.
 
         Returns:
-            unicode:
+            str:
             The text type value to set for the field.
         """
+        assert self.capabilities
+
         if markdown and self.capabilities.has_capability('text', 'markdown'):
             return 'markdown'
         else:
@@ -1450,7 +1605,13 @@ class BaseSubCommand(BaseCommand):
     #:     str
     help_text: str = ''
 
-    def __init__(self, options, config, *args, **kwargs):
+    def __init__(
+        self,
+        options: argparse.Namespace,
+        config: Dict,
+        *args,
+        **kwargs,
+    ) -> None:
         """Initialize the subcommand.
 
         Args:
@@ -1466,7 +1627,7 @@ class BaseSubCommand(BaseCommand):
             **kwargs (dict):
                 Keyword arguments to pass to the Command class.
         """
-        super(BaseSubCommand, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.options = options
         self.config = RBToolsConfig()
 
@@ -1505,7 +1666,10 @@ class BaseMultiCommand(BaseCommand):
     #: A mapping of subcommand names to argument parsers.
     subcommand_parsers: Dict[str, argparse.ArgumentParser]
 
-    def usage(self, command_cls=None):
+    def usage(
+        self,
+        command_cls: Optional[Type[BaseSubCommand]] = None,
+    ) -> str:
         """Return a usage string for the command.
 
         Args:
@@ -1513,7 +1677,7 @@ class BaseMultiCommand(BaseCommand):
                 The subcommand class to generate usage information for.
 
         Returns:
-            unicode:
+            str:
             The usage string.
         """
         if command_cls is None:
@@ -1523,14 +1687,18 @@ class BaseMultiCommand(BaseCommand):
             subcommand = ''
             description = command_cls.description
 
-        usage = '%%(prog)s%s [options] %s' % (subcommand, self.args)
+        usage = f'%(prog)s{subcommand} [options] {self.args}'
 
         if description:
-            return '%s\n\n%s' % (usage, description)
+            return f'{usage}\n\n{description}'
         else:
             return usage
 
-    def create_parser(self, config, argv=[]):
+    def create_parser(
+        self,
+        config: RBToolsConfig,
+        argv: List[str] = [],
+    ) -> argparse.ArgumentParser:
         """Create and return the argument parser for this command.
 
         Args:
@@ -1544,7 +1712,7 @@ class BaseMultiCommand(BaseCommand):
             argparse.ArgumentParser:
             The argument parser.
         """
-        subcommand_parsers = {}
+        subcommand_parsers: Dict[str, argparse.ArgumentParser] = {}
 
         prog = '%s %s' % (RB_MAIN, self.name)
 
@@ -1599,9 +1767,9 @@ class BaseMultiCommand(BaseCommand):
 
         return parser
 
-    def initialize(self):
+    def initialize(self) -> None:
         """Initialize the command."""
-        super(BaseMultiCommand, self).initialize()
+        super().initialize()
 
         command = self.options.command_cls(options=self.options,
                                            config=self.config,
@@ -1612,6 +1780,15 @@ class BaseMultiCommand(BaseCommand):
         command.initialize()
         self.subcommand = command
 
-    def main(self):
-        """Run the command."""
-        self.subcommand.main()
+    def main(self, *args) -> int:
+        """Run the command.
+
+        Args:
+             *args (tuple):
+                Positional arguments passed to the command.
+
+        Returns:
+            int:
+            The resulting exit code.
+        """
+        return self.subcommand.main(*args)

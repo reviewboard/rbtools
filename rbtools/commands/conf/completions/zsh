@@ -13,4 +13,4 @@ _rbt_get_all_commands()
 opts_list=()
 _rbt_get_all_commands
 _arguments '1:commands:{_describe 'values' opts_list}' \
-		   '*:file:_files'
+           '*:file:_files'

@@ -1,7 +1,7 @@
 from typing import Optional, Type
 from urllib.parse import urlparse
 
-from rbtools.api.resource import Resource
+from rbtools.api.resource import Resource, RootResource
 from rbtools.api.transport import Transport
 from rbtools.api.transport.sync import SyncTransport
 
@@ -66,7 +66,7 @@ class RBClient:
         self,
         *args,
         **kwargs,
-    ) -> Optional[Resource]:
+    ) -> Optional[RootResource]:
         """Return the root resource of the API.
 
         Args:

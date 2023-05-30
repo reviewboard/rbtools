@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import json
 import logging
@@ -6,7 +8,7 @@ from collections import defaultdict, deque
 from collections.abc import MutableMapping
 from urllib.parse import urljoin
 
-from pkg_resources import parse_version
+from packaging.version import parse as parse_version
 
 from rbtools.api.cache import MINIMUM_VERSION
 from rbtools.api.decorators import request_method_decorator
@@ -1056,6 +1058,10 @@ class RootResource(ItemResource):
     resource. Template replacement values should be passed in as a
     dictionary to the values parameter.
     """
+
+    #: Capabilities for the Review Board server.
+    capabilities: ResourceDictField
+
     _excluded_attrs = ['uri_templates']
     _TEMPLATE_PARAM_RE = re.compile(r'\{(?P<key>[A-Za-z_0-9]*)\}')
 

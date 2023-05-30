@@ -4,21 +4,68 @@ Version Added:
     3.1
 """
 
+from __future__ import annotations
+
 import io
+from typing import (Any, Callable, Dict, Generic, List, Optional,
+                    TYPE_CHECKING, Type, TypeVar, Union)
 
 import kgb
+from housekeeping import deprecate_non_keyword_only_args
+from typing_extensions import TypedDict
 
 from rbtools.clients import scan_usable_client
+from rbtools.commands.base import BaseCommand
+from rbtools.deprecation import RemovedInRBTools70Warning
 from rbtools.testing.api.transport import URLMapTransport
 from rbtools.utils.filesystem import cleanup_tempfiles
 
+if TYPE_CHECKING:
+    from rbtools.api.transport import Transport
+    from rbtools.clients.base.scmclient import BaseSCMClient
+    from rbtools.clients.base.repository import RepositoryInfo
 
-class CommandTestsMixin(kgb.SpyAgency):
+
+_CommandT = TypeVar('_CommandT', bound=BaseCommand)
+
+
+class RunCommandResult(TypedDict, Generic[_CommandT]):
+    """The result form a run_command operation.
+
+    Version Added:
+        5.0
+    """
+
+    #: The command instance that was executed.
+    command: _CommandT
+
+    #: The exit code of the command.
+    exit_code: Optional[Union[int, str]]
+
+    #: The JSON results of the command.
+    json: Dict[str, Any]
+
+    #: Standard error output from the command.
+    stderr: bytes
+
+    #: Standard output from the command.
+    stdout: bytes
+
+
+class CommandTestsMixin(kgb.SpyAgency, Generic[_CommandT]):
     """Mixin for unit tests for commands.
 
     This provides utility commands for creating and running commands in a
     controlled environment, allowing API URLs to be created and output and
     exit codes to be captured.
+
+    Subclasses must provide the type of the class as a generic to the mixin,
+    and set :py:attr:`command_cls` appropriately.
+
+    Version Changed:
+        5.0:
+        Added generic support for the mixin, to type command classes and
+        instances.
 
     Version Added:
         3.1
@@ -30,18 +77,25 @@ class CommandTestsMixin(kgb.SpyAgency):
     #:
     #: Type:
     #:     type
-    command_cls = None
+    command_cls: Optional[Type[_CommandT]] = None
 
     needs_temp_home = True
 
     DEFAULT_SERVER_URL = 'https://reviews.example.com/'
 
-    def create_command(self, args=[], server_url=DEFAULT_SERVER_URL,
-                       initialize=False, **kwargs):
+    @deprecate_non_keyword_only_args(RemovedInRBTools70Warning)
+    def create_command(
+        self,
+        *,
+        args: List[str] = [],
+        server_url: str = DEFAULT_SERVER_URL,
+        initialize: bool = False,
+        **kwargs,
+    ) -> _CommandT:
         """Create an argument parser with the given extra fields.
 
         Args:
-            args (list of unicode, optional):
+            args (list of str, optional):
                 A list of command line arguments to be passed to the parser.
 
                 The command line will receive each item in the list.
@@ -61,7 +115,7 @@ class CommandTestsMixin(kgb.SpyAgency):
                 and ``repository_info`` and ``tool`` aren't provided, then
                 no repositories will be matched.
 
-            server_url (unicode, optional):
+            server_url (str, optional):
                 The URL to use as the Review Board URL.
 
             stdout (io.BytesIO, optional):
@@ -82,7 +136,7 @@ class CommandTestsMixin(kgb.SpyAgency):
                 Whether to initialize the command before returning.
 
         Returns:
-            rbtools.commands.Command:
+            rbtools.commands.base.commands.BaseCommand:
             The command instance.
         """
         command = self._create_command_common(args=args, **kwargs)
@@ -98,12 +152,16 @@ class CommandTestsMixin(kgb.SpyAgency):
 
         return command
 
-    def run_command(self, args=[], server_url=DEFAULT_SERVER_URL,
-                    **kwargs):
+    def run_command(
+        self,
+        args: List[str] = [],
+        server_url: str = DEFAULT_SERVER_URL,
+        **kwargs,
+    ) -> RunCommandResult[_CommandT]:
         """Run a command class and return results.
 
         Args:
-            args (list of unicode, optional):
+            args (list of str, optional):
                 A list of command line arguments to be passed to the parser.
 
                 The command line will receive each item in the list.
@@ -123,7 +181,7 @@ class CommandTestsMixin(kgb.SpyAgency):
                 and ``repository_info`` and ``tool`` aren't provided, then
                 no repositories will be matched.
 
-            server_url (unicode, optional):
+            server_url (str, optional):
                 The URL to use as the Review Board URL.
 
             stdin (io.BytesIO, optional):
@@ -136,20 +194,8 @@ class CommandTestsMixin(kgb.SpyAgency):
 
         Returns:
             dict:
-            A dictionary of results, containing:
-
-            Keys:
-                command (rbtools.commands.Command):
-                    The command instance.
-
-                exit_code (int):
-                    The exit code.
-
-                stderr (bytes):
-                    The standard error output.
-
-                stdout (bytes):
-                    The standard output.
+            A dictionary of results from the command execution. See
+            :py:class:`RunCommandResult` for details.
         """
         stdout = io.BytesIO()
         stderr = io.BytesIO()
@@ -165,30 +211,46 @@ class CommandTestsMixin(kgb.SpyAgency):
         # interfere with the test.
         self.spy_on(cleanup_tempfiles, call_original=False)
 
+        exit_code: Optional[Union[int, str]]
+
         try:
             command.run_from_argv(argv)
+            exit_code = 0
         except SystemExit as e:
             exit_code = e.code
+        finally:
+            cleanup_tempfiles.unspy()
 
-        cleanup_tempfiles.unspy()
+        if command.stdout.output_stream is not None:
+            command.stdout.output_stream.flush()
 
-        command.stdout.output_stream.flush()
-        command.stderr.output_stream.flush()
+        if command.stderr.output_stream is not None:
+            command.stderr.output_stream.flush()
 
         return {
             'command': command,
             'exit_code': exit_code,
+            'json': command.json.raw,
             'stderr': stderr.getvalue(),
             'stdout': stdout.getvalue(),
         }
 
-    def _create_command_common(self, args=[], repository_info=None, tool=None,
-                               scan=False, stdout=None, stderr=None,
-                               stdin=None, setup_transport_func=None):
+    def _create_command_common(
+        self,
+        *,
+        args: List[str] = [],
+        repository_info: Optional[RepositoryInfo] = None,
+        tool: Optional[BaseSCMClient] = None,
+        scan: bool = False,
+        stdout: Optional[io.BytesIO] = None,
+        stderr: Optional[io.BytesIO] = None,
+        stdin: Optional[io.BytesIO] = None,
+        setup_transport_func: Optional[Callable[[Transport], None]] = None,
+    ) -> _CommandT:
         """Common code to create a command instance.
 
         Args:
-            args (list of unicode, optional):
+            args (list of str, optional):
                 A list of command line arguments to be passed to the parser.
 
                 The command line will receive each item in the list.
@@ -234,6 +296,8 @@ class CommandTestsMixin(kgb.SpyAgency):
             'None.'
         )
 
+        assert self.command_cls is not None
+
         command_kwargs = {
             _name: io.TextIOWrapper(_stream)
             for _name, _stream in (('stdout', stdout),
@@ -244,6 +308,9 @@ class CommandTestsMixin(kgb.SpyAgency):
 
         command = self.command_cls(transport_cls=URLMapTransport,
                                    **command_kwargs)
+
+        if hasattr(scan_usable_client, 'spy'):
+            scan_usable_client.unspy()
 
         if repository_info or tool or not scan:
             self.spy_on(scan_usable_client,
@@ -261,22 +328,29 @@ class CommandTestsMixin(kgb.SpyAgency):
 
         return command
 
-    def _build_command_argv(self, args, server_url=None):
+    def _build_command_argv(
+        self,
+        *,
+        args: List[str],
+        server_url: Optional[str] = None,
+    ) -> List[str]:
         """Return a command line argument list.
 
         Args:
-            args (list of unicode):
+            args (list of str):
                 Arguments to append to the command.
 
-            server_url (unicode, optional):
+            server_url (str, optional):
                 The server URL to pass in the argument list, if the command
                 requires the API.
 
         Returns:
-            list of unicode:
+            list of str:
             The command line arguments.
         """
-        argv = ['rbt', self.command_cls.name]
+        assert self.command_cls is not None
+
+        argv: List[str] = ['rbt', self.command_cls.name]
 
         if server_url and self.command_cls.needs_api:
             argv += ['--server', server_url]

@@ -4,81 +4,35 @@ import logging
 import os
 import platform
 import sys
+from typing import Optional
 
-from pkg_resources import resource_string
+import importlib_resources
 
-from rbtools.commands.base import BaseCommand
+from rbtools.commands.base import BaseCommand, CommandError
 
 
 class SetupCompletion(BaseCommand):
     """Setup auto-completion for rbt.
 
-    By default, the command installs an auto-completion file for the user's
-    login shell. The user can optionally specify a shell for which the command
-    will install the auto-completion file for.
+    This outputs a script for the given shell to enable auto-completion of
+    :command:`rbt`.
+
+    Version Changed:
+        5.0:
+        This no longer attempts to write files to a system directory, and
+        instead outputs to the console.
     """
 
     name = 'setup-completion'
     author = 'The Review Board Project'
-    description = 'Setup auto-completion for bash or zsh.'
+    description = 'Output RBTools auto-completion code for bash or zsh.'
     args = '<shell>'
 
-    #: A dictionary of supported shells.
-    #:
-    #: Each shell contains paths to its completion file and the directory
-    #: where the file will be installed.
-    SHELLS = {
-        'bash': {
-            'Linux': {
-                'src': 'commands/conf/rbt-bash-completion',
-                'dest': '/etc/bash_completion.d',
-                'filename': 'rbt',
-            },
-            'Darwin': {
-                'src': 'commands/conf/rbt-bash-completion',
-                'dest': '/usr/local/etc/bash_completion.d',
-                'filename': 'rbt',
-            },
-        },
-        'zsh': {
-            'Linux': {
-                'src': 'commands/conf/_rbt-zsh-completion',
-                'dest': '/usr/share/zsh/functions/Completion',
-                'filename': '_rbt',
-            },
-            'Darwin': {
-                'src': 'commands/conf/_rbt-zsh-completion',
-                'dest': '/usr/share/zsh/site-functions',
-                'filename': '_rbt',
-            },
-        }
-    }
-
-    def setup(self, shell):
-        """Install auto-completions for the appropriate shell.
-
-        Args:
-            shell (str):
-                String specifying name of shell for which auto-completions
-                will be installed for.
-        """
-        system = platform.system()
-        script = resource_string('rbtools', self.SHELLS[shell][system]['src'])
-        dest = os.path.join(self.SHELLS[shell][system]['dest'],
-                            self.SHELLS[shell][system]['filename'])
-
-        try:
-            with open(dest, 'wb') as f:
-                f.write(script)
-        except IOError as e:
-            logging.error('I/O Error (%s): %s', e.errno, e.strerror)
-            sys.exit()
-
-        self.stdout.write('Successfully installed %s auto-completions.'
-                          % shell)
-        self.stdout.write('Restart the terminal for completions to work.')
-
-    def main(self, shell=None):
+    def main(
+        self,
+        shell: Optional[str] = None,
+        *args,
+    ) -> None:
         """Run the command.
 
         Args:
@@ -89,29 +43,26 @@ class SetupCompletion(BaseCommand):
         if not shell:
             shell = os.environ.get('SHELL')
 
-            if shell:
-                shell = os.path.basename(shell)
-            else:
-                logging.error('No login shell found. Re-run the command with '
-                              'a shell as an argument or refer to manual '
-                              'installation in documentation')
-                sys.exit()
+            if not shell:
+                raise CommandError(
+                    'Your current shell was not found. Please re-run '
+                    '`rbt setup-completion` with your shell (bash or zsh) '
+                    'as an argument.')
 
-        if shell in self.SHELLS:
-            system = platform.system()
+            shell = os.path.basename(shell)
 
-            if system in self.SHELLS[shell]:
-                if os.path.exists(self.SHELLS[shell][system]['dest']):
-                    self.setup(shell)
-                else:
-                    logging.error('Could not locate %s completion directory. '
-                                  'Refer to manual installation in '
-                                  'documentation',
-                                  shell)
-            else:
-                logging.error('The %s operating system is currently '
-                              'unsupported',
-                              system)
-        else:
-            logging.error('The shell "%s" is currently unsupported',
-                          shell)
+        shell = shell.lower()
+
+        try:
+            script = (
+                importlib_resources.files('rbtools')
+                .joinpath('commands', 'conf', 'completions', shell)
+                .read_text()
+            )
+        except FileNotFoundError:
+            raise CommandError(
+                f'Shell completions for {shell} are not supported.')
+            return 1
+
+        self.stdout.write(script.rstrip())
+        self.json.add('script', script)

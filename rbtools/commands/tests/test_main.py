@@ -133,50 +133,50 @@ class JSONOutputTests(kgb.SpyAgency, TestCase):
     def test_init(self):
         """Testing JSONOutput instantiates given stream object"""
         self.assertIs(self.json._output_stream, sys.stdout)
-        self.assertEqual(len(self.json._output), 0)
+        self.assertEqual(len(self.json.raw), 0)
 
     def test_add(self):
         """Testing JSONOutput.add adds a key value pair to output"""
         self.json.add('key', 'value')
 
-        self.assertEqual(self.json._output['key'], 'value')
+        self.assertEqual(self.json.raw['key'], 'value')
 
     def test_append(self):
         """Testing JSONOutput.append appends to list associated with a key"""
         self.json.add('test', [])
         self.json.append('test', 'test')
 
-        self.assertEqual(self.json._output['test'], ['test'])
+        self.assertEqual(self.json.raw['test'], ['test'])
 
         try:
             self.json.append('nonexistent', 'test')
         except KeyError:
             pass
 
-        self.assertNotIn('nonexistent', self.json._output)
+        self.assertNotIn('nonexistent', self.json.raw)
 
     def test_add_error_without_key(self):
         """Testing JSONOutput.add_error without existing key"""
         self.json.add_error('test_error')
 
-        self.assertEqual(self.json._output['errors'], ['test_error'])
+        self.assertEqual(self.json.raw['errors'], ['test_error'])
 
     def test_add_error_with_key(self):
         """Testing JSONOutput.add_error with existing key"""
         self.json.add_error('test_error')
         self.json.add_error('test_error2')
-        self.assertEqual(self.json._output['errors'],
+        self.assertEqual(self.json.raw['errors'],
                          ['test_error', 'test_error2'])
 
     def test_add_warning_without_key(self):
         """Testing JSONOutput.add_warning without existing key"""
         self.json.add_warning('test_warning')
 
-        self.assertEqual(self.json._output['warnings'], ['test_warning'])
+        self.assertEqual(self.json.raw['warnings'], ['test_warning'])
 
     def test_add_warning_with_key(self):
         """Testing JSONOutput.add_warning with existing key"""
         self.json.add_warning('test_warning')
         self.json.add_warning('test_warning2')
-        self.assertEqual(self.json._output['warnings'],
+        self.assertEqual(self.json.raw['warnings'],
                          ['test_warning', 'test_warning2'])

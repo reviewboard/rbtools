@@ -1,6 +1,6 @@
 from typing import Any, Callable, Optional
 
-from rbtools.api.resource import Resource
+from rbtools.api.resource import Resource, RootResource
 
 
 class Transport:
@@ -39,7 +39,7 @@ class Transport:
         self,
         *args,
         **kwargs,
-    ) -> Optional[Resource]:
+    ) -> Optional[RootResource]:
         """Return the root API resource.
 
         Args:

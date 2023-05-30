@@ -27,15 +27,22 @@ Version Changed:
       added a forwarding import.
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import sys
+from typing import Optional, TYPE_CHECKING, Tuple
 
 from rbtools.clients.base.patch import PatchAuthor, PatchResult
 from rbtools.clients.base.registry import scmclient_registry
 from rbtools.clients.base.repository import RepositoryInfo
 from rbtools.clients.base.scmclient import BaseSCMClient
 from rbtools.deprecation import RemovedInRBTools50Warning
+
+if TYPE_CHECKING:
+    import argparse
+    from rbtools.config import RBToolsConfig
 
 
 # The clients are lazy loaded via load_scmclients()
@@ -98,7 +105,11 @@ def load_scmclients(config, options):
                               scmclient_cls.scmclient_id)
 
 
-def scan_usable_client(config, options, client_name=None):
+def scan_usable_client(
+    config: RBToolsConfig,
+    options: argparse.Namespace,
+    client_name: Optional[str] = None,
+) -> Tuple[RepositoryInfo, BaseSCMClient]:
     """Scan for a usable SCMClient.
 
     Args:
@@ -229,6 +240,8 @@ def scan_usable_client(config, options, client_name=None):
         logging.error('The --p4-client and --p4-port options are not '
                       'valid for the current SCM client.\n')
         sys.exit(1)
+
+    assert scan_result.repository_info is not None
 
     return scan_result.repository_info, scmclient
 

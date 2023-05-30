@@ -159,15 +159,24 @@ setup(
         'rbtools_commands': rb_commands,
     },
     install_requires=[
-        'importlib-metadata~=4.12; python_version < "3.10"',
         'certifi>=2023.5.7',
         'colorama',
         'housekeeping~=1.0a0',
+        'packaging>=21.3',
         'pydiffx~=1.1.0',
-        'setuptools',
         'texttable',
         'typing_extensions>=4.3.0',
         'tqdm',
+
+        # importlib.metadata compatibility import.
+        #
+        # 5.0 is equivalent to importlib.metadata in Python 3.12.
+        'importlib-metadata>=5.0',
+
+        # importlib.resources compatibility import.
+        #
+        # 5.9 is equivalent to importlib.resources in Python 3.12.
+        'importlib-resources>=5.9',
     ],
     packages=find_packages(exclude=['tests']),
     include_package_data=True,

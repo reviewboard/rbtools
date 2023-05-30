@@ -7,7 +7,7 @@ from rbtools.api.request import (AuthCallback,
                                  HttpRequest,
                                  OTPCallback,
                                  ReviewBoardServer)
-from rbtools.api.resource import Resource
+from rbtools.api.resource import Resource, RootResource
 from rbtools.api.transport import Transport
 
 
@@ -160,7 +160,7 @@ class SyncTransport(Transport):
         self,
         *args,
         **kwargs,
-    ) -> Optional[Resource]:
+    ) -> Optional[RootResource]:
         """Return the root API resource.
 
         Args:
