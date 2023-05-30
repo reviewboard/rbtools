@@ -168,6 +168,7 @@ setup(
         'texttable',
         'typing_extensions>=4.3.0',
         'tqdm',
+        'setuptools',
     ],
     packages=find_packages(exclude=['tests']),
     include_package_data=True,
