@@ -179,7 +179,7 @@ class TestCase(unittest.TestCase):
         old_env: Dict[str, Optional[str]] = {}
 
         for key, value in env.items():
-            old_env[key] = os.environ[key]
+            old_env[key] = os.environ.get(key)
 
             if value is None:
                 os.environ.pop(key, None)
