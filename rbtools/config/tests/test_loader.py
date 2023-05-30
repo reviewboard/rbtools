@@ -7,6 +7,7 @@ Version Added:
 from __future__ import annotations
 
 import os
+import sys
 
 from rbtools.config.errors import ConfigSyntaxError
 from rbtools.config.loader import (get_config_paths,
@@ -134,7 +135,7 @@ class ParseConfigFileTests(TestCase):
 
         message = (
             f'Syntax error in RBTools configuration file "{config_file}" '
-            f'at line 1, column 11'
+            f'at line 1'
         )
 
         with self.assertRaisesMessage(ConfigSyntaxError, message) as ctx:
@@ -143,7 +144,11 @@ class ParseConfigFileTests(TestCase):
         e = ctx.exception
         self.assertEqual(e.filename, config_file)
         self.assertEqual(e.line, 1)
-        self.assertEqual(e.column, 11)
+
+        if sys.version_info[:2] >= (3, 10):
+            self.assertEqual(e.column, 11)
+        else:
+            self.assertEqual(e.column, 21)
 
 
 class LoadConfigTests(TestCase):
