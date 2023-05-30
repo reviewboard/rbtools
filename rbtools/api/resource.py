@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import json
 import logging
@@ -1056,6 +1058,10 @@ class RootResource(ItemResource):
     resource. Template replacement values should be passed in as a
     dictionary to the values parameter.
     """
+
+    #: Capabilities for the Review Board server.
+    capabilities: ResourceDictField
+
     _excluded_attrs = ['uri_templates']
     _TEMPLATE_PARAM_RE = re.compile(r'\{(?P<key>[A-Za-z_0-9]*)\}')
 

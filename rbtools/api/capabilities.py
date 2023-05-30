@@ -1,6 +1,6 @@
 """Review Board server capability management."""
 
-from typing import Dict
+from typing import Mapping
 
 
 class Capabilities:
@@ -10,11 +10,11 @@ class Capabilities:
     #:
     #: Type:
     #:     dict
-    capabilities: Dict
+    capabilities: Mapping
 
     def __init__(
         self,
-        capabilities: Dict,
+        capabilities: Mapping,
     ) -> None:
         """Initialize the capabilities information.
 
