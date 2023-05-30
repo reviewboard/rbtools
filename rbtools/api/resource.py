@@ -6,7 +6,7 @@ from collections import defaultdict, deque
 from collections.abc import MutableMapping
 from urllib.parse import urljoin
 
-from pkg_resources import parse_version
+from packaging.version import parse as parse_version
 
 from rbtools.api.cache import MINIMUM_VERSION
 from rbtools.api.decorators import request_method_decorator

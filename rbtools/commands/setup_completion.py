@@ -5,7 +5,7 @@ import os
 import platform
 import sys
 
-from pkg_resources import resource_string
+import importlib_resources
 
 from rbtools.commands.base import BaseCommand
 
@@ -63,13 +63,19 @@ class SetupCompletion(BaseCommand):
                 will be installed for.
         """
         system = platform.system()
-        script = resource_string('rbtools', self.SHELLS[shell][system]['src'])
-        dest = os.path.join(self.SHELLS[shell][system]['dest'],
-                            self.SHELLS[shell][system]['filename'])
+        shell_info = self.SHELLS[shell][system]
+
+        script = (
+            importlib_resources.files('rbtools')
+            .joinpath(shell_info['src'])
+            .read_bytes()
+        )
+
+        dest = os.path.join(shell_info['dest'], shell_info['filename'])
 
         try:
-            with open(dest, 'wb') as f:
-                f.write(script)
+            with open(dest, 'wb') as fp:
+                fp.write(script)
         except IOError as e:
             logging.error('I/O Error (%s): %s', e.errno, e.strerror)
             sys.exit()
