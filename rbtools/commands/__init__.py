@@ -1524,7 +1524,7 @@ class Command(object):
         # the SCM metadata.
         if not server_url:
             self.repository_info, self.tool = self.initialize_scm_tool(
-                client_name=self.options.repository_type)
+                client_name=getattr(self.options, 'repository_type', None))
 
             if self.repository_info is not None and self.tool is not None:
                 server_url = self.tool.scan_for_server(self.repository_info)
