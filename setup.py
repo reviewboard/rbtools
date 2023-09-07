@@ -159,8 +159,7 @@ setup(
     download_url=('https://downloads.reviewboard.org/releases/%s/%s.%s/'
                   % (PACKAGE_NAME, VERSION[0], VERSION[1])),
     python_requires=(
-        '>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*'
-        '!=3.5.*'
+        '>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*'
     ),
     classifiers=[
         'Development Status :: 5 - Production/Stable',
