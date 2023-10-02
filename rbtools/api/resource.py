@@ -1046,6 +1046,32 @@ class ListResource(Resource):
                                         self._item_mime_type))
 
 
+class GetPatchMixin:
+    """Mixin for resources that implement a get_patch method.
+
+    Version Added:
+        4.2
+    """
+
+    @request_method_decorator
+    def get_patch(self, **kwargs):
+        """Retrieve the diff file contents.
+
+        Args:
+            **kwargs (dict):
+                Query args to pass to
+                :py:meth:`~rbtools.api.request.HttpRequest.__init__`.
+
+        Returns:
+            ItemResource:
+            A resource payload whose :py:attr:`~ItemResource.data` attribute is
+            the requested patch.
+        """
+        return HttpRequest(self._url, query_args=kwargs, headers={
+            'Accept': 'text/x-patch',
+        })
+
+
 @resource_mimetype('application/vnd.reviewboard.org.root')
 class RootResource(ItemResource):
     """The Root resource specific base class.
@@ -1100,32 +1126,17 @@ class RootResource(ItemResource):
 
 
 @resource_mimetype('application/vnd.reviewboard.org.commit')
-class DiffCommitItemResource(ItemResource):
+class DiffCommitItemResource(GetPatchMixin, ItemResource):
     """The commit resource-specific class."""
-
-    @request_method_decorator
-    def get_patch(self, **kwargs):
-        """Retrieve the actual diff file contents.
-
-        Args:
-            **kwargs (dict):
-                Query args to pass to
-                :py:meth:`~rbtools.api.request.HttpRequest.__init__`.
-
-        Returns:
-            ItemResource:
-            A resource payload whose :py:attr:`~ItemResource.data` attribute is
-            the requested patch.
-        """
-        return HttpRequest(self._url, query_args=kwargs, headers={
-            'Accept': 'text/x-patch',
-        })
 
 
 @resource_mimetype('application/vnd.reviewboard.org.draft-commit')
-class DraftDiffCommitItemResource(ItemResource):
-    """The draft commit resource-specific class."""
-    pass
+class DraftDiffCommitItemResource(GetPatchMixin, ItemResource):
+    """The draft commit resource-specific class.
+
+    Version Added:
+        4.2
+    """
 
 
 @resource_mimetype('application/vnd.reviewboard.org.draft-commits')
@@ -1293,18 +1304,12 @@ class DiffListResource(DiffUploaderMixin, ListResource):
 
 
 @resource_mimetype('application/vnd.reviewboard.org.diff')
-class DiffResource(ItemResource):
+class DiffResource(GetPatchMixin, ItemResource):
     """The Diff resource specific base class.
 
     Provides the 'get_patch' method for retrieving the content of the
     actual diff file itself.
     """
-    @request_method_decorator
-    def get_patch(self, **kwargs):
-        """Retrieves the actual diff file contents."""
-        return HttpRequest(self._url, query_args=kwargs, headers={
-            'Accept': 'text/x-patch',
-        })
 
     @request_method_decorator
     def finalize_commit_series(self, cumulative_diff, validation_info,
@@ -1351,15 +1356,21 @@ class DiffResource(ItemResource):
         return request
 
 
+@resource_mimetype('application/vnd.reviewboard.org.draft-diff')
+class DraftDiffResource(GetPatchMixin, ItemResource):
+    """The Draft Diff resource specific base class.
+
+    Provides the :py:meth:`get_patch` method for retrieving the content of the
+    actual diff file itself.
+
+    Version Added:
+        4.2
+    """
+
+
 @resource_mimetype('application/vnd.reviewboard.org.file')
-class FileDiffResource(ItemResource):
+class FileDiffResource(GetPatchMixin, ItemResource):
     """The File Diff resource specific base class."""
-    @request_method_decorator
-    def get_patch(self, **kwargs):
-        """Retrieves the actual diff file contents."""
-        return HttpRequest(self._url, query_args=kwargs, headers={
-            'Accept': 'text/x-patch',
-        })
 
     @request_method_decorator
     def get_diff_data(self, **kwargs):

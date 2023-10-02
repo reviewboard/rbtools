@@ -1,11 +1,15 @@
 """Implementation of rbt patch."""
 
+from __future__ import annotations
+
 import logging
 import os
 import re
 from gettext import gettext as _, ngettext
+from typing import Any, Dict, Optional, Union
 
 from rbtools.api.errors import APIError
+from rbtools.api.resource import DiffResource, DraftDiffResource
 from rbtools.clients import PatchAuthor
 from rbtools.clients.errors import CreateCommitError
 from rbtools.commands import Command, CommandError, Option
@@ -53,6 +57,7 @@ class Patch(Command):
                dest='diff_revision',
                metavar='REVISION',
                default=None,
+               type=int,
                help='The Review Board diff revision ID to use for the patch.'),
         Option('--px',
                dest='px',
@@ -177,42 +182,24 @@ class Patch(Command):
                                'with history; ignoring --commit-ids=...')
                 commit_ids = None
 
-        # If a diff revision is not specified, we'll need to get the latest
-        # revision through the API.
-        if diff_revision is None:
-            try:
-                diffs = self.api_root.get_diffs(
-                    review_request_id=self._review_request_id,
-                    only_fields='',
-                    only_links='')
-            except APIError as e:
-                raise CommandError('Error getting diffs: %s' % e)
+        diff = self._get_diff(diff_revision=diff_revision,
+                              squashed=squashed)
 
-            # Use the latest diff if a diff revision was not given.
-            # Since diff revisions start a 1, increment by one, and
-            # never skip a number, the latest diff revisions number
-            # should be equal to the number of diffs.
-            diff_revision = diffs.total_results
-
-        try:
-            # Fetch the main diff and (unless we're squashing) any commits within.
-            if squashed:
-                diff = self.api_root.get_diff(
-                    review_request_id=self._review_request_id,
-                    diff_revision=diff_revision)
-            else:
-                diff = self.api_root.get_diff(
-                    review_request_id=self._review_request_id,
-                    diff_revision=diff_revision,
-                    expand='commits')
-        except APIError:
-            raise CommandError('The specified diff revision does not '
-                               'exist.')
+        if diff is None:
+            raise CommandError(
+                _('The specified diff revision does not exist.'))
 
         # Begin to gather results.
         patches = []
 
-        if squashed or len(diff.commits) == 0:
+        if hasattr(diff, 'draft_commits'):
+            commits = diff.draft_commits
+        elif hasattr(diff, 'commits'):
+            commits = diff.commits
+        else:
+            commits = []
+
+        if squashed or len(commits) == 0:
             # Either this was a review request created before we had
             # multi-commit, or the user requested to squash everything. Return
             # a single patch.
@@ -236,8 +223,6 @@ class Patch(Command):
         else:
             # We'll be returning one patch per commit. This may be the
             # entire list of the review request, or a filtered list.
-            commits = diff.commits
-
             if commit_ids:
                 # Filter the commits down by the specified list of IDs.
                 commit_ids = set(commit_ids)
@@ -453,10 +438,12 @@ class Patch(Command):
             rbtools.command.CommandError:
                 Patching the tree has failed.
         """
+        options = self.options
         self._review_request_id = review_request_id
-        patch_stdout = self.options.patch_stdout
-        patch_outfile = self.options.patch_outfile
-        revert = self.options.revert_patch
+        patch_stdout = options.patch_stdout
+        patch_outfile = options.patch_outfile
+        revert = options.revert_patch
+        diff_revision = options.diff_revision
         tool = self.tool
 
         if revert:
@@ -487,7 +474,7 @@ class Patch(Command):
                 if tool.has_pending_changes():
                     message = 'Working directory is not clean.'
 
-                    if self.options.commit:
+                    if options.commit:
                         raise CommandError(message)
                     else:
                         logger.warning(message)
@@ -495,13 +482,13 @@ class Patch(Command):
             except NotImplementedError:
                 pass
 
-        if self.options.commit_ids:
+        if options.commit_ids:
             # Do our best to normalize what gets passed in, so that we don't
             # end up with any blank entries.
             commit_ids = [
                 commit_id
                 for commit_id in COMMIT_ID_SPLIT_RE.split(
-                    self.options.commit_ids.trim())
+                    options.commit_ids.trim())
                 if commit_id
             ]
         else:
@@ -510,9 +497,9 @@ class Patch(Command):
         # Fetch the patches from the review request, based on the requested
         # options.
         patches = self.get_patches(
-            diff_revision=self.options.diff_revision,
+            diff_revision=diff_revision,
             commit_ids=commit_ids,
-            squashed=self.options.squash,
+            squashed=options.squash,
             reverted=revert)
 
         if patch_stdout:
@@ -526,6 +513,129 @@ class Patch(Command):
                                    % (patch_outfile, e))
         else:
             self._apply_patches(patches)
+
+    def _get_draft_diff(self, **query_kwargs) -> Optional[DraftDiffResource]:
+        """Return the latest draft diff for the review request.
+
+        Args:
+            **query_kwargs (dict):
+                Keyword arguments to pass when querying the diff resource
+
+        Returns:
+            rbtools.api.resource.DraftDiffResource:
+            The draft diff resource if found, or ``None``.
+        """
+        try:
+            draft = self.api_root.get_draft(
+                review_request_id=self._review_request_id)
+
+            return draft.get_draft_diffs(**query_kwargs)[0]
+        except (APIError, IndexError):
+            return None
+
+    def _get_diff(
+        self,
+        *,
+        diff_revision: Optional[int],
+        squashed: bool,
+    ) -> Optional[Union[DiffResource, DraftDiffResource]]:
+        """Retrieve the latest diff for a review request.
+
+        This will attempt to retrieve the diff for the given diff revision,
+        or the latest available diff if a revision is not specified.
+
+        If a revision is specified, both published and draft diffs (in that
+        order) will be considered.
+
+        If a revision is not specified, this will return a draft diff if
+        available, or the latest published diff if not.
+
+        Note that support for draft diffs were introduced in RBTools 4.2.
+
+        Args:
+            diff_revision (int):
+                An explicit diff revision to return.
+
+            squashed (bool):
+                Whether the resulting diff is intended to be squashed.
+
+        Returns:
+            rbtools.api.resource.DiffResource or
+            rbtools.api.resource.DraftDiffResource:
+            The resulting diff/draft diff resource, or ``None`` if a diff
+            was not found.
+
+        Raises:
+            rbtools.commands.CommandError:
+                There was an error fetching required information from the API.
+        """
+        diff: Optional[Union[DiffResource, DraftDiffResource]] = None
+        draft_diff: Optional[DraftDiffResource] = None
+        review_request_id = self._review_request_id
+        use_latest_diff = diff_revision is None
+        api_root = self.api_root
+
+        # Set default arguments for all our diff fetch requests.
+        get_diff_kwargs: Dict[str, Any] = {}
+        get_draft_diff_kwargs: Dict[str, Any] = {}
+
+        if not squashed:
+            get_diff_kwargs['expand'] = 'commits'
+            get_draft_diff_kwargs['expand'] = 'draft_commits'
+
+        # If a diff revision is not specified, we'll need to get the latest
+        # revision through the API.
+        if use_latest_diff:
+            # A draft diff may very well be the latest diff available. If we
+            # find one, then we'll return this.
+            draft_diff = self._get_draft_diff(**get_draft_diff_kwargs)
+
+            if draft_diff is not None:
+                # We found a draft diff. Consider this the latest.
+                diff = draft_diff
+            else:
+                # We didn't find a draft diff, so instead, find the latest
+                # published diff. Diff revisions are numeric, starting with 1,
+                # so we can base it on the total count.
+                try:
+                    diffs = api_root.get_diffs(
+                        review_request_id=review_request_id,
+                        only_fields='',
+                        only_links='')
+                except APIError as e:
+                    # Something went wrong, so we have to report it.
+                    raise CommandError(
+                        _('Error retrieving a list of diffs for review '
+                          'request %(review_request_id)s: %(error)s')
+                        % {
+                            'error': e,
+                            'review_request_id': review_request_id,
+                        })
+
+                diff_revision = diffs.total_results
+
+        if diff is None:
+            # Either the user specified --diff-revision, or we didn't find a
+            # suitable diff yet (on draft diff).
+            try:
+                # Fetch the main diff and (unless we're squashing) any commits
+                # within.
+                diff = api_root.get_diff(review_request_id=review_request_id,
+                                         diff_revision=diff_revision,
+                                         **get_diff_kwargs)
+            except APIError:
+                # We didn't find a diff. If we haven't yet fetched the draft
+                # diff, then do so now.
+                if not use_latest_diff:
+                    draft_diff = self._get_draft_diff(**get_draft_diff_kwargs)
+
+                    if draft_diff and draft_diff.revision == diff_revision:
+                        # This is only valid if it matches the diff revision
+                        # we're fetching. Note that we're only here if a diff
+                        # revision was explicitly specified.
+                        diff = draft_diff
+
+        return diff
 
     def _output_patches(self, patches, fp):
         """Output the contents of the patches to the console.
