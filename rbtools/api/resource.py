@@ -1,9 +1,14 @@
+"""API resource definitions."""
+
+from __future__ import annotations
+
 import copy
 import json
 import logging
 import re
 from collections import defaultdict, deque
 from collections.abc import MutableMapping
+from typing import Optional
 from urllib.parse import urljoin
 
 from pkg_resources import parse_version
@@ -946,6 +951,21 @@ class ListResource(Resource):
     resources 'get_next()' or 'get_prev()' should be used to grab
     additional pages of items.
     """
+
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The total number of results in the list across all pages.
+    #:
+    #: This is commonly set for most list resources, but is not always
+    #: guaranteed to be available. Callers should check to make sure this is
+    #: not ``None``.
+    #:
+    #: Type:
+    #:     int
+    total_results: Optional[int]
+
     def __init__(self, transport, payload, url, token=None,
                  item_mime_type=None, **kwargs):
         super(ListResource, self).__init__(transport, payload, url,
@@ -958,7 +978,7 @@ class ListResource(Resource):
             self._item_list = payload
 
         self.num_items = len(self._item_list)
-        self.total_results = payload['total_results']
+        self.total_results = payload.get('total_results')
 
     def __len__(self):
         return self.num_items

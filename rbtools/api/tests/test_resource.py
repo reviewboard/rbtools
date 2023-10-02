@@ -1,5 +1,6 @@
 """Unit tests for rbtools.api.resource."""
 
+import copy
 import re
 
 from rbtools.api.factory import create_resource
@@ -399,6 +400,14 @@ class ListResourceTests(TestWithPayloads):
                 self.assertEqual(
                     r[index][field],
                     self.list_payload['resource_token'][index][field])
+
+    def test_list_resource_list_without_total_results(self) -> None:
+        """Testing ListResource without total_results"""
+        payload = copy.deepcopy(self.list_payload)
+        del payload['total_results']
+
+        r = create_resource(self.transport, payload, '')
+        self.assertIsNone(r.total_results)
 
     def test_list_resource_links(self):
         """Testing link resource link generation"""
