@@ -76,7 +76,7 @@ class GitClient(BaseSCMClient):
 
     scmclient_id = 'git'
     name = 'Git'
-    server_tool_names = 'Git,Perforce,Subversion'
+    server_tool_names = 'Git,Perforce,Subversion,Team Foundation Server (git)'
 
     supports_commit_history = True
     supports_diff_exclude_patterns = True
