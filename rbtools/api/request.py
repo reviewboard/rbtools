@@ -809,7 +809,10 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
             return None
 
         # Next, figure out what credentials we'll be working with.
-        if self._otp_token_attempts > 0:
+        if self.passwd.api_token:
+            # The request included an API token. Don't make another request.
+            return None
+        elif self._otp_token_attempts > 0:
             # We've made at least one 2FA attempt. Reuse the login and
             # password so we don't prompt for it again.
             user = self.passwd.rb_user
