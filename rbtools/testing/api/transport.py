@@ -8,6 +8,7 @@ import json
 import logging
 from collections import defaultdict
 from urllib.parse import parse_qs, urljoin, urlparse
+from typing import Optional
 
 from rbtools.api.errors import create_api_error
 from rbtools.api.factory import create_resource
@@ -221,7 +222,7 @@ class URLMapTransport(Transport):
 
         if username:
             assert password
-            self.login(username, password)
+            self.login(username=username, password=password)
 
     def add_url(self, url, mimetype, method='GET', http_status=200,
                 headers={}, payload={}, link_expansion_types={},
@@ -646,18 +647,34 @@ class URLMapTransport(Transport):
         return self.execute_request_method(
             lambda: HttpRequest(url, query_args=kwargs))
 
-    def login(self, username, password, *args, **kwargs):
+    def login(
+        self,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        api_token: Optional[str] = None,
+        *args,
+        **kwargs,
+    ) -> None:
         """Log in to the server.
 
         This will simply set the :py:attr:`logged_in` and
         :py:attr:`login_credentials` login state.
 
-        Args:
-            username (unicode):
-                The username used for authentication.
+        Version Changed:
+            5.0:
+            Added an optional ``api_token`` parameter and made the
+            ``username`` and ``password`` parameters optional to allow
+            logging in with either a username and password or API token.
 
-            password (unicode):
-                The password used for authentication.
+        Args:
+            username (str, optional):
+                The username to log in with.
+
+            password (str, optional):
+                The password to log in with.
+
+            api_token (str, optional):
+                The API token to log in with.
 
             *args (tuple, unused):
                 Unused positional arguments.
@@ -669,6 +686,7 @@ class URLMapTransport(Transport):
         self.login_credentials = {
             'username': username,
             'password': password,
+            'api_token': api_token,
         }
 
     def logout(self):
