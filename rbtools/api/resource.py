@@ -1028,6 +1028,7 @@ class ListResource(Resource):
 
             try:
                 page = page.get_next()
+                yield page
             except StopIteration:
                 break
 
