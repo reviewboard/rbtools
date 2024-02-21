@@ -61,7 +61,7 @@ class HttpRequestTests(SpyAgency, TestCase):
         request = HttpRequest(url='/',
                               method='POST')
         request.add_field('foo', 'bar')
-        request.add_field('bar', 42)
+        request.add_field('bar', str(42))
         request.add_field('name', 'somestring')
         request.add_file(name='my-file',
                          filename='filename.txt',

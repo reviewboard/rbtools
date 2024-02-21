@@ -334,7 +334,7 @@ class SyncTransport(Transport):
         rsp = self.server.make_request(request)
         assert rsp is not None
 
-        info = rsp.info()
+        info = rsp.headers
         mime_type = info['Content-Type']
         item_content_type = info.get('Item-Content-Type', None)
 

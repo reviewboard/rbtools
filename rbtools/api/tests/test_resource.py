@@ -232,8 +232,8 @@ class ItemResourceTests(TestWithPayloads):
                             payload=self.item_payload,
                             url='')
         request = r.update(extra_data__key1='value1',
-                           extra_data__key2=True,
-                           extra_data__key3=123)
+                           extra_data__key2='True',
+                           extra_data__key3='123')
 
         self.assertEqual(
             request._fields,
@@ -315,8 +315,8 @@ class ListResourceTests(TestWithPayloads):
                             payload=self.list_payload,
                             url='')
         request = r.create(extra_data__key1='value1',
-                           extra_data__key2=True,
-                           extra_data__key3=123)
+                           extra_data__key2='True',
+                           extra_data__key3='123')
 
         self.assertEqual(
             request._fields,

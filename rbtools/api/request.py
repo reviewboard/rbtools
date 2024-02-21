@@ -232,7 +232,8 @@ class HttpRequest:
             RemovedInRBTools50Warning.warn(
                 'A value of type %s was passed to HttpRequest.add_field. In '
                 'RBTools 5.0, only values of bytes or str types will be '
-                'accepted.')
+                'accepted.'
+                % type(value))
             value = str(value)
 
         self._fields[force_bytes(name)] = force_bytes(value)
