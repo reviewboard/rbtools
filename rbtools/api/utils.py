@@ -1,49 +1,18 @@
-"""Utilities used by the API interfaces."""
+"""API-specific MIME type utilities."""
 
-from typing_extensions import TypedDict
+from __future__ import annotations
+
+from typing import cast
+
+from rbtools.utils import mimetypes
 
 
-class ParsedMIMEType(TypedDict):
-    """A MIME type, parsed into its component parts.
+class ParsedMIMEType(mimetypes.MIMEType):
+    """A parsed MIME type for resources.
 
     Version Added:
         4.0
     """
-
-    #: The full MIME type.
-    #:
-    #: Type:
-    #:     str
-    type: str
-
-    #: Main type (For example, "application" for "application/octet-stream")
-    #:
-    #: Type:
-    #:     str
-    main_type: str
-
-    #: Sub-type (for example, "plain" for "text/plain").
-    #:
-    #: Type:
-    #:     str
-    sub_type: str
-
-    #: The vendor tag, if available.
-    #:
-    #: For example, "vnd.reviewboard.org.test" in
-    #: "application/vnd.reviewboard.org.test+json".
-    #:
-    #: Type:
-    #:     str
-    vendor: str
-
-    #: The sub-type format, if available.
-    #:
-    #: For example, "json" in "application/vnd.reviewboard.org.test+json".
-    #:
-    #: Type:
-    #:     str
-    format: str
 
     #: The particular API resource name, if available.
     #:
@@ -57,7 +26,7 @@ class ParsedMIMEType(TypedDict):
 def parse_mimetype(
     mime_type: str,
 ) -> ParsedMIMEType:
-    """Parse a mime type into its component parts.
+    """Parse a MIME type into its component parts.
 
     Args:
         mime_type (str):
@@ -67,31 +36,18 @@ def parse_mimetype(
         ParsedMIMEType:
         The type, parsed into its component parts.
     """
-    types = mime_type.split(';')[0].split('/')
+    parsed = cast(ParsedMIMEType, mimetypes.parse_mimetype(mime_type))
 
-    sub_type = types[1].split('+')
-
-    if len(sub_type) == 1:
-        vendor = ''
-        format = sub_type[0]
-    else:
-        vendor = sub_type[0]
-        format = sub_type[1]
-
-    vendor_parts = vendor.split('.')
+    vendor_parts = parsed['vendor'].split('.')
 
     if len(vendor_parts) > 1:
         resource = vendor_parts[-1].replace('-', '_')
     else:
         resource = ''
 
-    return ParsedMIMEType(
-        type=mime_type,
-        main_type=types[0],
-        sub_type=types[0],
-        vendor=vendor,
-        format=format,
-        resource=resource)
+    parsed['resource'] = resource
+
+    return parsed
 
 
 def rem_mime_format(
