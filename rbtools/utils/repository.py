@@ -44,7 +44,7 @@ def get_repository_resource(api_root,
 
     query = {
         'only_fields': 'id,name,mirror_path,path',
-        'only_links': 'info',
+        'only_links': 'info,diff_file_attachments',
     }
 
     if tool and tool.server_tool_names:

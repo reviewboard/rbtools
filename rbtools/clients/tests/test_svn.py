@@ -55,7 +55,8 @@ class SVNRepositoryMatchTests(SCMClientTestCase):
         },
         (_MATCH_URL_BASE + '?' +
             _MATCH_URL_FIELDS +
-            '&only-links=info&path=https%3A%2F%2Fsvn1.example.com%2F&' +
+            '&only-links=info%2Cdiff_file_attachments&' +
+            'path=https%3A%2F%2Fsvn1.example.com%2F&' +
             _MATCH_URL_TOOL): {
             'mimetype': 'application/vnd.reviewboard.org.repositories+json',
             'rsp': {
@@ -72,6 +73,12 @@ class SVNRepositoryMatchTests(SCMClientTestCase):
                                          'repositories/1/info/'),
                                 'method': 'GET',
                             },
+                            'diff-file-attachments': {
+                                'href': ('http://localhost:8080/api/'
+                                         'repositories/1/'
+                                         'diff-file-attachments/'),
+                                'method': 'GET',
+                            },
                         },
                     },
                 ],
@@ -83,7 +90,8 @@ class SVNRepositoryMatchTests(SCMClientTestCase):
         },
         (_MATCH_URL_BASE + '?' +
             _MATCH_URL_FIELDS +
-            '&only-links=info&path=svn%2Bssh%3A%2F%2Fsvn2.example.com%2F&' +
+            '&only-links=info%2Cdiff_file_attachments&' +
+            'path=svn%2Bssh%3A%2F%2Fsvn2.example.com%2F&' +
             _MATCH_URL_TOOL): {
             'mimetype': 'application/vnd.reviewboard.org.repositories+json',
             'rsp': {
@@ -99,6 +107,12 @@ class SVNRepositoryMatchTests(SCMClientTestCase):
                                          'repositories/1/info/'),
                                 'method': 'GET',
                             },
+                            'diff-file-attachments': {
+                                'href': ('http://localhost:8080/api/'
+                                         'repositories/1/'
+                                         'diff-file-attachments/'),
+                                'method': 'GET',
+                            },
                         },
                     },
                 ],
@@ -110,7 +124,8 @@ class SVNRepositoryMatchTests(SCMClientTestCase):
         },
         (_MATCH_URL_BASE + '?' +
             _MATCH_URL_FIELDS +
-            '&only-links=info&path=svn%2Bssh%3A%2F%2Fblargle%2F&' +
+            '&only-links=info%2Cdiff_file_attachments&' +
+            'path=svn%2Bssh%3A%2F%2Fblargle%2F&' +
             _MATCH_URL_TOOL): {
             'mimetype': 'application/vnd.reviewboard.org.repositories+json',
             'rsp': {
@@ -138,7 +153,7 @@ class SVNRepositoryMatchTests(SCMClientTestCase):
         },
         (_MATCH_URL_BASE + '?' +
             _MATCH_URL_FIELDS +
-            '&only-links=info&' +
+            '&only-links=info%2Cdiff_file_attachments&' +
             _MATCH_URL_TOOL): {
             'mimetype': 'application/vnd.reviewboard.org.repositories+json',
             'rsp': {
@@ -155,6 +170,12 @@ class SVNRepositoryMatchTests(SCMClientTestCase):
                                          'repositories/1/info/'),
                                 'method': 'GET',
                             },
+                            'diff-file-attachments': {
+                                'href': ('http://localhost:8080/api/'
+                                         'repositories/1/'
+                                         'diff-file-attachments/'),
+                                'method': 'GET',
+                            },
                         },
                     },
                     {
@@ -168,13 +189,20 @@ class SVNRepositoryMatchTests(SCMClientTestCase):
                                          'repositories/2/info/'),
                                 'method': 'GET',
                             },
+                            'diff-file-attachments': {
+                                'href': ('http://localhost:8080/api/'
+                                         'repositories/1/'
+                                         'diff-file-attachments/'),
+                                'method': 'GET',
+                            },
                         },
                     },
                 ],
                 'links': {
                     'next': {
                         'href': ('http://localhost:8080/api/repositories/?'
-                                 'only-links=info&tool=Subversion&'
+                                 'only-links=info%2Cdiff_file_attachments&'
+                                 'tool=Subversion&'
                                  'only-fields=id%2Cname%2Cmirror_path%2Cpath&'
                                  'page=2'),
                         'method': 'GET',
@@ -186,7 +214,7 @@ class SVNRepositoryMatchTests(SCMClientTestCase):
         },
         (_MATCH_URL_BASE + '?' +
             _MATCH_URL_FIELDS +
-            '&only-links=info&page=2&' +
+            '&only-links=info%2Cdiff_file_attachments&page=2&' +
             _MATCH_URL_TOOL): {
             'mimetype': 'application/vnd.reviewboard.org.repositories+json',
             'rsp': {
@@ -200,6 +228,12 @@ class SVNRepositoryMatchTests(SCMClientTestCase):
                             'info': {
                                 'href': ('http://localhost:8080/api/'
                                          'repositories/3/info/'),
+                                'method': 'GET',
+                            },
+                            'diff-file-attachments': {
+                                'href': ('http://localhost:8080/api/'
+                                         'repositories/1/'
+                                         'diff-file-attachments/'),
                                 'method': 'GET',
                             },
                         },

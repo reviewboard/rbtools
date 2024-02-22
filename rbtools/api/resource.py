@@ -1,4 +1,8 @@
+"""Resource definitions for the RBTools Python API."""
+
 from __future__ import annotations
+
+from typing import Optional
 
 import copy
 import json
@@ -21,7 +25,7 @@ from rbtools.utils.graphs import path_exists
 RESOURCE_MAP = {}
 LINKS_TOK = 'links'
 EXPANDED_TOKEN = '_expanded'
-LINK_KEYS = set(['href', 'method', 'title', 'mimetype'])
+LINK_KEYS = {'href', 'method', 'title', 'mimetype'}
 _EXCLUDE_ATTRS = [LINKS_TOK, EXPANDED_TOKEN, 'stat']
 _EXTRA_DATA_PREFIX = 'extra_data__'
 
@@ -1381,13 +1385,33 @@ class FileDiffResource(ItemResource):
 @resource_mimetype('application/vnd.reviewboard.org.user-file-attachments')
 class FileAttachmentListResource(ListResource):
     """The File Attachment List resource specific base class."""
-    @request_method_decorator
-    def upload_attachment(self, filename, content, caption=None,
-                          attachment_history=None, **kwargs):
-        """Uploads a new attachment.
 
-        The content argument should contain the body of the file to be
-        uploaded, in string format.
+    @request_method_decorator
+    def upload_attachment(
+        self,
+        filename: str,
+        content: bytes,
+        caption: Optional[str] = None,
+        attachment_history: Optional[str] = None,
+        **kwargs,
+    ) -> HttpRequest:
+        """Upload a new attachment.
+
+        Args:
+            filename (str):
+                The name of the file.
+
+            content (bytes):
+                The content of the file to upload.
+
+            caption (str, optional):
+                The caption to set on the file attachment.
+
+            attachment_history (str, optional):
+                The ID of the FileAttachmentHistory to add this attachment to.
+
+            **kwargs (dict):
+                Additional keyword arguments to add to the request.
         """
         request = HttpRequest(self._url, method='POST', query_args=kwargs)
         request.add_file('path', filename, content)
@@ -1397,6 +1421,44 @@ class FileAttachmentListResource(ListResource):
 
         if attachment_history:
             request.add_field('attachment_history', attachment_history)
+
+        return request
+
+
+@resource_mimetype('application/vnd.reviewboard.org.diff-file-attachments')
+class DiffFileAttachmentListResource(ListResource):
+    """The Diff File Attachment List resource specific base class."""
+
+    @request_method_decorator
+    def upload_attachment(
+        self,
+        filename: str,
+        content: bytes,
+        filediff_id: str,
+        **kwargs,
+    ) -> HttpRequest:
+        """Upload a new attachment.
+
+        Args:
+            filename (str):
+                The name of the file.
+
+            content (bytes):
+                The content of the file to upload.
+
+            filediff_id (str):
+                The ID of the filediff to attach the file to.
+
+            **kwargs (dict):
+                Additional keyword arguments to add to the request
+
+        Returns:
+            rbtools.api.request.HttpRequest:
+            The request object.
+        """
+        request = HttpRequest(self._url, method='POST', query_args=kwargs)
+        request.add_file('path', filename, content)
+        request.add_field('filediff', filediff_id)
 
         return request
 

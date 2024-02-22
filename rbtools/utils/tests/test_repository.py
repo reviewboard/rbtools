@@ -21,6 +21,11 @@ _REPO1 = {
             'href': 'http://localhost:8080/api/repositories/1/info/',
             'method': 'GET',
         },
+        'diff_file_attachments': {
+            'href': 'http://localhost:8080/api/repositories/1/'
+                    'diff-file-attachments/',
+            'method': 'GET',
+        },
     },
 }
 
@@ -33,6 +38,11 @@ _REPO2 = {
     'links': {
         'info': {
             'href': 'http://localhost:8080/api/repositories/2/info/',
+            'method': 'GET',
+        },
+        'diff_file_attachments': {
+            'href': 'http://localhost:8080/api/repositories/1/'
+                    'diff-file-attachments/',
             'method': 'GET',
         },
     },
@@ -48,13 +58,19 @@ _REPO3 = {
             'href': 'http://localhost:8080/api/repositories/3/info/',
             'method': 'GET',
         },
+        'diff_file_attachments': {
+            'href': 'http://localhost:8080/api/repositories/1/'
+                    'diff-file-attachments/',
+            'method': 'GET',
+        },
     },
 }
 
 
 _MATCH_URL_BASE = (
     'http://localhost:8080/api/repositories/?'
-    'only-fields=id%2Cname%2Cmirror_path%2Cpath&only-links=info'
+    'only-fields=id%2Cname%2Cmirror_path%2Cpath&'
+    'only-links=info%2Cdiff_file_attachments'
 )
 
 
