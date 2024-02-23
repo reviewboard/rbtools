@@ -400,6 +400,15 @@ class BaseSCMClient(object):
     #:     bool
     can_squash_merges: bool = False
 
+    #: Whether the tool can get files at specific revisions.
+    #:
+    #: Version Added:
+    #:     5.0
+    #:
+    #: Type:
+    #:     bool
+    can_get_file_content: bool = False
+
     ######################
     # Instance variables #
     ######################
@@ -1422,5 +1431,59 @@ class BaseSCMClient(object):
         Raises:
             rbtools.clients.errors.AmendError:
                 The amend operation failed.
+        """
+        raise NotImplementedError
+
+    def get_file_content(
+        self,
+        *,
+        filename: str,
+        revision: str,
+    ) -> bytes:
+        """Return the contents of a file at a given revision.
+
+        This may be implemented by subclasses in order to support uploading
+        binary files to diffs.
+
+        Version Added:
+            5.0
+
+        Args:
+            filename (str):
+                The file to fetch.
+
+            revision (str):
+                The revision of the file to get.
+
+        Returns:
+            bytes:
+            The read file.
+        """
+        raise NotImplementedError
+
+    def get_file_size(
+        self,
+        *,
+        filename: str,
+        revision: str,
+    ) -> int:
+        """Return the size of a file at a given revision.
+
+        This may optionally be implemented by subclasses if the SCM supports
+        fetching file sizes.
+
+        Version Added:
+            5.0
+
+        Args:
+            filename (str):
+                The file to check.
+
+            revision (str):
+                The revision of the file to check.
+
+        Returns:
+            int:
+            The size of the file, in bytes.
         """
         raise NotImplementedError

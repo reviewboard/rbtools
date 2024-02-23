@@ -1,11 +1,14 @@
 """Implementation of rbt post."""
 
+from __future__ import annotations
+
 import logging
 import os
 import platform
 import re
 import sys
 from collections import namedtuple
+from typing import Iterable, Optional, TYPE_CHECKING
 
 from tqdm import tqdm
 
@@ -19,9 +22,22 @@ from rbtools.utils.commands import (AlreadyStampedError,
 from rbtools.utils.console import confirm
 from rbtools.utils.encoding import force_unicode
 from rbtools.utils.errors import MatchReviewRequestsError
+from rbtools.utils.mimetypes import (guess_mimetype,
+                                     match_mimetype,
+                                     parse_mimetype)
 from rbtools.utils.review_request import (get_draft_or_current_value,
                                           get_revisions,
                                           guess_existing_review_request)
+
+if TYPE_CHECKING:
+    from rbtools.api.resource import (
+        DraftDiffCommitItemResource,
+        FileDiffResource,
+        ReviewRequestResource,
+    )
+
+
+logger = logging.getLogger(__name__)
 
 
 #: A squashed diff that may be the product of one or more revisions.
@@ -266,7 +282,7 @@ class Post(BaseCommand):
                             '.reviewboardrc option and the -S command line '
                             'option.',
                        added_in='2.0'),
-            ]
+            ],
         ),
         BaseCommand.server_options,
         BaseCommand.repository_options,
@@ -407,7 +423,7 @@ class Post(BaseCommand):
                             '\n'
                             'This is only supported in Review Board 2.0+.',
                        added_in='0.6'),
-            ]
+            ],
         ),
         BaseCommand.diff_options,
         BaseCommand.branch_options,
@@ -432,8 +448,7 @@ class Post(BaseCommand):
                 raise CommandError(
                     'The --field argument should be in the form of: '
                     '--field name=value; got "%s" instead.'
-                    % field
-                )
+                    % field)
 
             key, value = key_value_pair
 
@@ -442,10 +457,8 @@ class Post(BaseCommand):
 
                 if getattr(self.options, key_var):
                     raise CommandError(
-                        'The "{0}" field was provided by both --{0}= '
-                        'and --field {0}=. Please use --{0} instead.'
-                        .format(key)
-                    )
+                        f'The "{key}" field was provided by both --{key}= '
+                        f'and --field {key}=. Please use --{key} instead.')
 
                 setattr(self.options, key_var, value)
             else:
@@ -572,11 +585,13 @@ class Post(BaseCommand):
             raise CommandError('Invalid value "%s" for argument "%s"'
                                % (guess, arg_name))
 
-    def post_request(self,
-                     review_request=None,
-                     diff_history=None,
-                     squashed_diff=None,
-                     submit_as=None):
+    def post_request(
+        self,
+        review_request: Optional[ReviewRequestResource] = None,
+        diff_history: Optional[DiffHistory] = None,
+        squashed_diff: Optional[SquashedDiff] = None,
+        submit_as: Optional[str] = None,
+    ) -> tuple[int, str]:
         """Create or update a review request, uploading a diff in the process.
 
         Args:
@@ -599,7 +614,7 @@ class Post(BaseCommand):
                 Exactly one of ``diff_history`` and ``squashed_diff`` must be
                 specified.
 
-            submit_as (unicode, optional):
+            submit_as (str, optional):
                 The username to submit the review request as.
 
         Returns:
@@ -611,8 +626,16 @@ class Post(BaseCommand):
 
         Raises:
             rbtools.commands.CommandError:
-                An error ocurred while posting the review request.
+                An error occurred while posting the review request.
+
+            ValueError:
+                The function was called without one of ``diff_history`` or
+                ``squashed_diff``.
         """
+        assert self.api_root is not None
+        assert self.capabilities is not None
+        assert self.tool is not None
+
         if ((diff_history is not None and squashed_diff is not None) or
             (diff_history is None and squashed_diff is None)):
             raise ValueError(
@@ -642,6 +665,7 @@ class Post(BaseCommand):
                     # Since this tool is using a changenum, we know it doesn't
                     # use DVCS support, so we don't have to check if the review
                     # request was created with history.
+                    assert e.rsp is not None
                     review_request_id = e.rsp['review_request']['id']
 
                     try:
@@ -651,32 +675,20 @@ class Post(BaseCommand):
                             only_links='diffs,draft')
                     except APIError as e:
                         raise CommandError(
-                            'Error getting review request %s: %s'
-                            % (review_request_id, e))
+                            f'Error getting review request '
+                            f'{review_request_id}: {e}')
                 else:
-                    raise CommandError('Error creating review request: %s' % e)
+                    raise CommandError(f'Error creating review request: {e}')
+
+        assert review_request is not None
 
         try:
             if diff_history:
                 self._post_diff_history(review_request, diff_history)
             elif (not self.tool.supports_changesets or
                   not self.options.change_only):
-                diff_kwargs = {
-                    'parent_diff': squashed_diff.parent_diff,
-                    'base_dir': squashed_diff.base_dir,
-                }
-
-                if (squashed_diff.base_commit_id and
-                    self.capabilities.has_capability('diffs',
-                                                     'base_commit_ids')):
-                    # Both the Review Board server and SCMClient support
-                    # base commit IDs, so pass that along when creating
-                    # the diff.
-                    diff_kwargs['base_commit_id'] = \
-                        squashed_diff.base_commit_id
-
-                review_request.get_diffs(only_fields='').upload_diff(
-                    squashed_diff.diff, **diff_kwargs)
+                assert squashed_diff is not None
+                self._post_squashed_diff(review_request, squashed_diff)
         except APIError as e:
             error_msg = [
                 'Error uploading diff\n',
@@ -736,7 +748,7 @@ class Post(BaseCommand):
                            'the review request URL.')
                     self.stdout.write(err)
                     self.json.add_error(err)
-                except Exception as e:
+                except Exception:
                     logging.debug('Caught exception while stamping the '
                                   'commit message. Proceeding to post '
                                   'without stamping.', exc_info=True)
@@ -880,7 +892,7 @@ class Post(BaseCommand):
                 try:
                     with open(diff_path, 'rb') as f:
                         diff = f.read()
-                except IOError as e:
+                except OSError as e:
                     raise CommandError('Unable to open diff filename: %s' % e)
 
             squashed_diff = SquashedDiff(
@@ -1469,7 +1481,11 @@ class Post(BaseCommand):
             'repository_info': self.repository_info,
         }
 
-    def _post_diff_history(self, review_request, diff_history):
+    def _post_diff_history(
+        self,
+        review_request: ReviewRequestResource,
+        diff_history: DiffHistory,
+    ) -> None:
         """Post the diff history to the review request.
 
         Args:
@@ -1487,6 +1503,8 @@ class Post(BaseCommand):
                                                    only_links='draft_diffs')
         diffs = draft.get_draft_diffs(only_fields='', only_links='')
 
+        assert self.capabilities is not None
+
         if self.capabilities.has_capability('diffs', 'base_commit_ids'):
             base_commit_id = diff_history.base_commit_id
         else:
@@ -1495,7 +1513,7 @@ class Post(BaseCommand):
         diff = diffs.create_empty(base_commit_id=base_commit_id,
                                   only_fields='',
                                   only_links='self,draft_commits')
-        commits = diff.get_draft_commits()
+        draft_commits = diff.get_draft_commits()
 
         iterable = self._show_progress(
             iterable=zip(diff_history.entries,
@@ -1503,15 +1521,195 @@ class Post(BaseCommand):
             desc='Uploading commits... ',
             total=len(diff_history.entries))
 
+        commits: list[DraftDiffCommitItemResource] = []
+
         for history_entry, validation_info in iterable:
-            commits.upload_commit(validation_info,
-                                  parent_diff=diff_history.parent_diff,
-                                  **history_entry)
+            commits.append(draft_commits.upload_commit(
+                validation_info,
+                parent_diff=diff_history.parent_diff,
+                **history_entry))
 
         diff.finalize_commit_series(
             cumulative_diff=diff_history.cumulative_diff,
             parent_diff=diff_history.parent_diff,
             validation_info=diff_history.validation_info[-1])
+
+        # We now need to go through and upload any binary files.
+        assert self.tool is not None
+
+        if (self.capabilities.has_capability('diffs', 'file_attachments') and
+            self.tool.can_get_file_content):
+            files_to_upload: list[FileDiffResource] = []
+
+            for commit in commits:
+                files = commit.get_draft_files(binary=True)
+                files_to_upload += files.all_items
+
+            self._upload_binary_files(files_to_upload)
+
+    def _post_squashed_diff(
+        self,
+        review_request: ReviewRequestResource,
+        squashed_diff: SquashedDiff,
+    ) -> None:
+        """Post a squashed diff to the review request.
+
+        Version Added:
+            5.0
+
+        Args:
+            review_request (rbtools.api.resource.ReviewRequestResource):
+                The review request to upload the diff to.
+
+            squashed_diff (SquashedDiff):
+                The squashed diff.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                An error occurred while communicating with the API.
+        """
+        assert self.capabilities is not None
+
+        diff_kwargs = {
+            'parent_diff': squashed_diff.parent_diff,
+            'base_dir': squashed_diff.base_dir,
+        }
+
+        if (squashed_diff.base_commit_id and
+            self.capabilities.has_capability('diffs', 'base_commit_ids')):
+            # Both the Review Board server and SCMClient support
+            # base commit IDs, so pass that along when creating
+            # the diff.
+            diff_kwargs['base_commit_id'] = \
+                squashed_diff.base_commit_id
+
+        # Fake an iterable here to show progress on uploading the diff.
+        iterable = self._show_progress(
+            iterable=[None],
+            desc='Uploading diff...',
+            total=1)
+        diff = None
+
+        for _ in iterable:
+            diff_resource = review_request.get_diffs(only_fields='')
+            diff = diff_resource.upload_diff(
+                squashed_diff.diff, **diff_kwargs)
+
+        if (self.capabilities.has_capability('diffs', 'file_attachments') and
+            self.tool.can_get_file_content):
+            self._upload_binary_files(
+                list(diff.get_draft_files(binary=True).all_items))
+
+    def _upload_binary_files(
+        self,
+        files_to_upload: list[FileDiffResource],
+    ) -> None:
+        """Upload binary files for the given FileDiffs.
+
+        Version Added:
+            5.0
+
+        Args:
+            files_to_upload (list):
+                The list of filediff resources that need uploaded files.
+        """
+        assert self.capabilities is not None
+        assert self.repository is not None
+        assert self.tool is not None
+
+        supported_mimetypes = [
+            parse_mimetype(mimetype) for mimetype in
+            self.capabilities.get_capability(
+                'review_uis', 'supported_mimetypes')
+        ]
+
+        valid_mimetypes = set()
+        invalid_mimetypes = set()
+
+        diff_file_attachments = self.repository.get_diff_file_attachments()
+
+        iterable = self._show_progress(
+            iterable=files_to_upload,
+            desc='Uploading binary files...',
+            total=len(files_to_upload))
+
+        logging.debug('Uploading binary files')
+
+        max_file_size = self.capabilities.get_capability(
+            'diffs', 'max_binary_size')
+
+        for file in iterable:
+            filename = file.dest_file
+            revision = file.dest_detail
+            checked_size = False
+
+            if file.status == 'deleted':
+                logging.debug('Skipping %s (file deleted in change)',
+                              filename)
+                continue
+
+            # If we can get the file size without actually loading the file,
+            # that's ideal. However, not all tools may be able to do this. If
+            # we can't, we'll check the size below after loading the file.
+            try:
+                file_size = self.tool.get_file_size(filename=filename,
+                                                    revision=revision)
+                if file_size > max_file_size:
+                    logger.info(
+                        'Skipping binary file "%s": file too large for '
+                        'configured limits.',
+                        filename)
+                    continue
+
+                checked_size = True
+            except NotImplementedError:
+                pass
+            except Exception as e:
+                logger.warning('Unable to check file size of %s (%s): %s',
+                               filename, revision, e)
+                continue
+
+            try:
+                file_content = self.tool.get_file_content(filename=filename,
+                                                          revision=revision)
+            except Exception as e:
+                logger.warning(
+                    'Unable to get binary file content for %s (%s): %s',
+                    filename, revision, e)
+                continue
+
+            if not checked_size and len(file_content) > max_file_size:
+                logger.info(
+                    'Skipping binary file "%s": file too large for '
+                    'configured limits.',
+                    filename)
+                continue
+
+            mimetype = guess_mimetype(file_content)
+
+            if not mimetype or mimetype in invalid_mimetypes:
+                logging.debug('Skipping %s (%s): MIME type %s is not '
+                              'supported',
+                              filename, revision, mimetype)
+                continue
+
+            if mimetype not in valid_mimetypes:
+                parsed = parse_mimetype(mimetype)
+                valid = any(match_mimetype(pattern, parsed)
+                            for pattern in supported_mimetypes)
+
+                if valid:
+                    valid_mimetypes.add(mimetype)
+                else:
+                    invalid_mimetypes.add(mimetype)
+                    continue
+
+            logging.debug('Uploading file %s (%s)', filename, revision)
+
+            diff_file_attachments.upload_attachment(
+                filename=os.path.basename(filename),
+                content=file_content,
+                filediff_id=file.id)
 
     def _validate_squashed_diff(self, squashed_diff):
         """Validate the diff to ensure that it can be parsed and files exist.
@@ -1599,7 +1797,12 @@ class Post(BaseCommand):
 
         return diff_history._replace(validation_info=validation_info_list)
 
-    def _show_progress(self, iterable, desc, total=None):
+    def _show_progress(
+        self,
+        iterable: Iterable,
+        desc: str,
+        total: Optional[int] = None,
+    ) -> Iterable:
         """Show a progress bar for commit validation and upload.
 
         Args:
@@ -1624,10 +1827,9 @@ class Post(BaseCommand):
             except TypeError:
                 pass
 
-        return tqdm(**{
-            'iterable': iterable,
-            'bar_format': '{desc} {bar} [{n_fmt}/{total_fmt}]',
-            'desc': desc,
-            'ncols': 80,
-            'total': total,
-        })
+        return tqdm(
+            iterable=iterable,
+            bar_format='{desc} {bar} [{n_fmt}/{total_fmt}]',
+            desc=desc,
+            ncols=80,
+            total=total)
