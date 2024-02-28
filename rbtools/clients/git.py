@@ -85,10 +85,11 @@ class GitClient(BaseSCMClient):
     supports_patch_revert = True
 
     can_amend_commit = True
+    can_branch = True
+    can_delete_branch = True
+    can_get_file_content = True
     can_merge = True
     can_push_upstream = True
-    can_delete_branch = True
-    can_branch = True
     can_squash_merges = True
 
     TYPE_GIT = 0
@@ -2031,3 +2032,72 @@ class GitClient(BaseSCMClient):
                 return all_remotes[0]
         else:
             raise SCMError('This clone has no configured remotes.')
+
+    def get_file_content(
+        self,
+        *,
+        filename: str,
+        revision: str,
+    ) -> bytes:
+        """Return the contents of a file at a given revision.
+
+        Version Added:
+            5.0
+
+        Args:
+            filename (str):
+                The file to fetch.
+
+            revision (str):
+                The revision of the file to get.
+
+        Returns:
+            bytes:
+            The read file.
+
+        Raises:
+            rbtools.clients.errors.SCMError:
+                The file could not be found.
+        """
+        try:
+            return (
+                self._run_git(['cat-file', 'blob', revision])
+                .stdout_bytes
+                .read()
+            )
+        except RunProcessError as e:
+            raise SCMError(e)
+
+    def get_file_size(
+        self,
+        *,
+        filename: str,
+        revision: str,
+    ) -> int:
+        """Return the size of a file at a given revision.
+
+        Version Added:
+            5.0
+
+        Args:
+            filename (str):
+                The file to check.
+
+            revision (object):
+                The revision of the file to check.
+
+        Returns:
+            int:
+            The size of the file, in bytes.
+
+        Raises:
+            rbtools.clients.errors.SCMError:
+                The file could not be found.
+        """
+        try:
+            return int(
+                self._run_git(['cat-file', '-s', revision])
+                .stdout
+                .read())
+        except Exception as e:
+            raise SCMError(e)
