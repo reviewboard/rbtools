@@ -58,6 +58,8 @@ class SVNClient(BaseSCMClient):
     supports_diff_exclude_patterns = True
     supports_patch_revert = True
 
+    can_get_file_content = True
+
     INDEX_SEP = b'=' * 67
     INDEX_FILE_RE = re.compile(br'^Index: (.+?)(?:\t\((added|deleted)\))?\n$')
 
@@ -548,6 +550,13 @@ class SVNClient(BaseSCMClient):
         tip = str(revisions['tip'])
 
         diff_cmd: List[str] = ['diff', '--diff-cmd=diff', '--notice-ancestry']
+
+        if (self.capabilities and
+            self.capabilities.has_capability('diffs', 'file_attachments')):
+            # Support for parsing the binary output when --force is included
+            # was added along with support for binary files in diffs.
+            diff_cmd.append('--force')
+
         changelist: Optional[str] = None
 
         if tip == self.REVISION_WORKING_COPY:
@@ -1526,6 +1535,85 @@ class SVNClient(BaseSCMClient):
                 'Invalid value \'%s\' for --svn-show-copies-as-adds '
                 'option. Valid values are \'y\' or \'n\'.' %
                 show_copies_as_adds)
+
+    def get_file_content(
+        self,
+        *,
+        filename: str,
+        revision: str,
+    ) -> bytes:
+        """Return the contents of a file at a given revision.
+
+        Version Added:
+            5.0
+
+        Args:
+            filename (str):
+                The file to fetch.
+
+            revision (str):
+                The revision of the file to get.
+
+        Returns:
+            bytes:
+            The read file.
+
+        Raises:
+            rbtools.clients.errors.SCMError:
+                The file could not be found.
+        """
+        try:
+            if revision == 'HEAD':
+                with open(filename, 'rb') as f:
+                    return f.read()
+            else:
+                return (
+                    self._run_svn(['cat', '-r', revision, filename])
+                    .stdout_bytes
+                    .read()
+                )
+        except Exception as e:
+            raise SCMError(e)
+
+    def get_file_size(
+        self,
+        *,
+        filename: str,
+        revision: str,
+    ) -> int:
+        """Return the size of a file at a given revision.
+
+        Version Added:
+            5.0
+
+        Args:
+            filename (str):
+                The file to check.
+
+            revision (object):
+                The revision of the file to check.
+
+        Returns:
+            int:
+            The size of the file, in bytes.
+
+        Raises:
+            rbtools.client.errors.SCMError:
+                An error occurred while attempting to get the file size.
+        """
+        try:
+            if revision == 'HEAD':
+                s = os.stat(filename)
+                return s.st_size
+            else:
+                return int(
+                    self._run_svn(['info', '--show-item', 'repos-size',
+                                   '-r', revision, filename])
+                    .stdout
+                    .read()
+                )
+        except Exception as e:
+            raise SCMError(e)
 
 
 class SVNRepositoryInfo(RepositoryInfo):
