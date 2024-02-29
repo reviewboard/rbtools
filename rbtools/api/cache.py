@@ -1,3 +1,7 @@
+"""Caching implementation for the RBTools API."""
+
+from __future__ import annotations
+
 import contextlib
 import datetime
 import json
@@ -8,11 +12,10 @@ import sqlite3
 import threading
 from email.message import Message
 from http.client import HTTPResponse
-from typing import Callable, Dict, List, MutableMapping, Optional, Union
+from typing import Dict, List, MutableMapping, Optional, Union
 from urllib.request import urlopen, Request
 
 from rbtools.api.errors import CacheError
-from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.appdirs import user_cache_dir
 
 
@@ -228,7 +231,6 @@ class APICache:
         self,
         create_db_in_memory: bool = False,
         db_location: Optional[str] = None,
-        urlopen: Optional[Callable] = None,
     ) -> None:
         """Create a new instance of the APICache
 
@@ -247,19 +249,10 @@ class APICache:
             db_location (str):
                 The filename of the cache database, if using.
 
-            urlopen (callable):
-                The method to call for urlopen. This parameter has been
-                deprecated.
-
         Raises:
             CacheError:
                 The database exists but the schema could not be read.
         """
-        if urlopen is not None:
-            RemovedInRBTools50Warning.warn(
-                'The urlopen parameter to APICache is deprecated and will be '
-                'removed in RBTools 5.0.')
-
         if create_db_in_memory:
             logging.debug('Creating API cache in memory.')
 

@@ -5,8 +5,8 @@ import os
 import textwrap
 
 from rbtools.commands.base import BaseCommand, CommandError
+from rbtools.config.loader import CONFIG_FILENAME
 from rbtools.utils.console import confirm, confirm_select
-from rbtools.utils.filesystem import CONFIG_FILE
 from rbtools.utils.repository import get_repository_resource
 
 
@@ -30,7 +30,7 @@ class SetupRepo(BaseCommand):
     author = 'The Review Board Project'
     description = ('Configure an existing repository to point to a Review '
                    'Board server by generating the configuration file %s'
-                   % CONFIG_FILE)
+                   % CONFIG_FILENAME)
     args = ''
     option_list = [
         BaseCommand.server_options,
@@ -129,7 +129,7 @@ class SetupRepo(BaseCommand):
                                % (e.errno, e.strerror))
 
         self.stdout.write('%s creation successful! Config written to %s'
-                          % (CONFIG_FILE, file_path))
+                          % (CONFIG_FILENAME, file_path))
 
     def main(self, *args):
         server = self.options.server
@@ -141,7 +141,7 @@ class SetupRepo(BaseCommand):
             'This command is intended to help users create a %s file in '
             'the current directory to connect a repository and Review '
             'Board server.')
-            % CONFIG_FILE)
+            % CONFIG_FILENAME)
         self.stdout.new_line()
         self.stdout.write(textwrap.fill(
             'Repositories must currently exist on your server (either '
@@ -204,7 +204,8 @@ class SetupRepo(BaseCommand):
                                   'Board server %s'
                                   % (tool.name, server))
                 self.stdout.new_line()
-                self.stdout.write('Cancelling %s creation...' % CONFIG_FILE)
+                self.stdout.write('Cancelling %s creation...'
+                                  % CONFIG_FILENAME)
                 self.stdout.new_line()
                 self.stdout.write(textwrap.fill(
                     'Please make sure your repositories '
@@ -230,7 +231,7 @@ class SetupRepo(BaseCommand):
             except NotImplementedError:
                 pass
 
-            outfile_path = os.path.join(os.getcwd(), CONFIG_FILE)
+            outfile_path = os.path.join(os.getcwd(), CONFIG_FILENAME)
             output = self._get_output(config)
 
             if not os.path.exists(outfile_path):

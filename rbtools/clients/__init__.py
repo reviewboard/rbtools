@@ -38,7 +38,6 @@ from rbtools.clients.base.patch import PatchAuthor, PatchResult
 from rbtools.clients.base.registry import scmclient_registry
 from rbtools.clients.base.repository import RepositoryInfo
 from rbtools.clients.base.scmclient import BaseSCMClient
-from rbtools.deprecation import RemovedInRBTools50Warning
 
 if TYPE_CHECKING:
     import argparse
@@ -47,38 +46,6 @@ if TYPE_CHECKING:
 
 # The clients are lazy loaded via load_scmclients()
 SCMCLIENTS = None
-
-
-class SCMClient(BaseSCMClient):
-    """A base representation of an SCM tool.
-
-    Deprecated:
-        4.0:
-        This has been moved to
-        :py:class:`rbtools.clients.base.scmclient.BaseSCMClient`. Callers
-        should updated to inherit from this.
-
-        This legacy class will be removed in RBTools 5.0.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """Initialize the client.
-
-        Args:
-            *args (tuple):
-                Positional arguments to pass to the parent class.
-
-            **kwargs (tuple):
-                Keyword arguments to pass to the parent class.
-        """
-        RemovedInRBTools50Warning.warn(
-            '%s should be updated to inherit from %s instead of %s. This '
-            'will be required starting in RBTools 5.0.'
-            % (type(self).__name__,
-               BaseSCMClient.__name__,
-               SCMClient.__name__))
-
-        super(SCMClient, self).__init__(*args, **kwargs)
 
 
 def load_scmclients(config, options):

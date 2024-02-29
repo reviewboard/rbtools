@@ -1,12 +1,12 @@
 """A client for Git."""
 
+from __future__ import annotations
+
 import logging
 import os
 import re
 import sys
 from typing import Dict, Iterator, List, Optional, cast
-
-from housekeeping import deprecate_non_keyword_only_args
 
 from rbtools.clients import PatchResult, RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
@@ -22,7 +22,6 @@ from rbtools.clients.errors import (AmendError,
                                     SCMError)
 from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.svn import SVNClient, SVNRepositoryInfo
-from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.checks import check_install
 from rbtools.utils.console import edit_text
 from rbtools.utils.diffs import (normalize_patterns,
@@ -823,7 +822,6 @@ class GitClient(BaseSCMClient):
 
         return youngest_remote_commit
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def diff(
         self,
         revisions: SCMClientRevisionSpec,

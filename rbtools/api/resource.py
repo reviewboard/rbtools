@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Iterator, Optional
 
 import copy
 import json
@@ -18,7 +18,6 @@ from rbtools.api.cache import MINIMUM_VERSION
 from rbtools.api.decorators import request_method_decorator
 from rbtools.api.request import HttpRequest
 from rbtools.api.utils import rem_mime_format
-from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.graphs import path_exists
 
 
@@ -598,51 +597,6 @@ class ResourceDictField(MutableMapping):
         """
         yield from self
 
-    # Backwards-compatibility functions.
-    def iterfields(self):
-        """Iterate through all fields in the dictionary.
-
-        This will yield each field name in the dictionary. This is the same
-        as calling :py:meth:`keys` or simply ``for field in dict_field``.
-
-        Deprecated:
-            4.0:
-            This will be removed in RBTools 5.0.
-
-        Yields:
-            str:
-            Each field in this dictionary.
-        """
-        RemovedInRBTools50Warning.warn(
-            '%s.iterfields() is deprecated and will be removed in RBTools '
-            '5.0. Please use fields() instead.'
-            % type(self).__name__)
-
-        yield from self.fields()
-
-    def iteritems(self):
-        """Iterate through all items in this dictionary.
-
-        This is a legacy interface that provides compatibility with code
-        written in Python 3 and RBTools <= 3.0.
-
-        Deprecated:
-            4.0:
-            This will be removed in RBTools 5.0.
-
-        Yields:
-            tuple:
-            A 2-tuple of:
-
-            1. The key
-            2. The value
-        """
-        RemovedInRBTools50Warning.warn(
-            '%s.iteritems() is deprecated and will be removed in RBTools '
-            '5.0. Please use .items() instead.')
-
-        yield from self.items()
-
     def _wrap_field(self, field_name):
         """Conditionally return a wrapped version of a field's value.
 
@@ -885,11 +839,17 @@ class ItemResource(Resource):
     def __contains__(self, key):
         return key in self._fields
 
-    def iterfields(self):
+    def iterfields(self) -> Iterator[str]:
+        """Iterate through all field names in the resource.
+
+        Yields:
+            str:
+            The name of each field name.
+        """
         for key in self._fields:
             yield key
 
-    def iteritems(self):
+    def iteritems(self) -> Iterator[str, Any]:
         """Iterate through all field/value pairs in the resource.
 
         Yields:

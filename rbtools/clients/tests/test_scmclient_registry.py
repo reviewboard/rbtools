@@ -29,7 +29,6 @@ from rbtools.clients.plastic import PlasticClient
 from rbtools.clients.sos import SOSClient
 from rbtools.clients.svn import SVNClient
 from rbtools.clients.tfs import TFSClient
-from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.testing import TestCase
 
 
@@ -38,17 +37,11 @@ class MySCMClient1(BaseSCMClient):
 
 
 class MySCMClient2(BaseSCMClient):
-    pass
+    scmclient_id = 'my_client2'
 
 
 class SCMClientRegistryTests(kgb.SpyAgency, TestCase):
     """Unit tests for SCMClientRegistry."""
-
-    def tearDown(self):
-        super().tearDown()
-
-        # Tests will end up patching MySCMClient2.scmtool_id. Unset this.
-        MySCMClient2.scmclient_id = None
 
     def test_init(self):
         """Testing SCMClientRegistry.__init__"""
@@ -71,28 +64,22 @@ class SCMClientRegistryTests(kgb.SpyAgency, TestCase):
                        group='rbtools_scm_clients'),
         ])
 
-        message = re.escape(
-            'MySCMClient2.scmclient_id must be set, and must be a unique '
-            'value. You probably want to set it to "my_client2".'
-        )
-
-        with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
-            self.assertEqual(
-                list(registry),
-                [
-                    BazaarClient,
-                    ClearCaseClient,
-                    CVSClient,
-                    GitClient,
-                    MercurialClient,
-                    PerforceClient,
-                    PlasticClient,
-                    SOSClient,
-                    SVNClient,
-                    TFSClient,
-                    MySCMClient1,
-                    MySCMClient2,
-                ])
+        self.assertEqual(
+            list(registry),
+            [
+                BazaarClient,
+                ClearCaseClient,
+                CVSClient,
+                GitClient,
+                MercurialClient,
+                PerforceClient,
+                PlasticClient,
+                SOSClient,
+                SVNClient,
+                TFSClient,
+                MySCMClient1,
+                MySCMClient2,
+            ])
 
         self.assertTrue(registry._builtin_loaded)
         self.assertTrue(registry._entrypoints_loaded)
@@ -116,30 +103,6 @@ class SCMClientRegistryTests(kgb.SpyAgency, TestCase):
         ])
 
         self.assertIs(registry.get('my_client1'), MySCMClient1)
-        self.assertTrue(registry._builtin_loaded)
-        self.assertTrue(registry._entrypoints_loaded)
-
-    def test_get_with_entrypoint_no_scmclient_id(self):
-        """Testing SCMClientRegistry.get with entry point SCMClient with no
-        scmclient_id set
-        """
-        registry = SCMClientRegistry()
-
-        self._add_fake_entrypoints([
-            EntryPoint(name='my_client2',
-                       value='%s:MySCMClient2' % __name__,
-                       group='rbtools_scm_clients'),
-        ])
-
-        message = re.escape(
-            'MySCMClient2.scmclient_id must be set, and must be a unique '
-            'value. You probably want to set it to "my_client2".'
-        )
-
-        with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
-            scmclient_cls = registry.get('my_client2')
-
-        self.assertIs(scmclient_cls, MySCMClient2)
         self.assertTrue(registry._builtin_loaded)
         self.assertTrue(registry._entrypoints_loaded)
 
@@ -188,22 +151,6 @@ class SCMClientRegistryTests(kgb.SpyAgency, TestCase):
                 TFSClient,
                 MySCMClient1,
             ])
-
-    def test_register_with_no_scmclient_id(self):
-        """Testing SCMClientRegistry.register with no scmclient_id"""
-        registry = SCMClientRegistry()
-
-        message = re.compile(
-            'MySCMClient2.scmclient_id must be set, and must be a unique '
-            'value.'
-        )
-
-        with self.assertRaisesRegex(ValueError, message):
-            registry.register(MySCMClient2)
-
-        self.assertTrue(registry._builtin_loaded)
-        self.assertFalse(registry._entrypoints_loaded)
-        self.assertNotIn(MySCMClient1, registry)
 
     def test_register_with_already_registered(self):
         """Testing SCMClientRegistry.register with class already registered"""

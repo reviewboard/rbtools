@@ -12,7 +12,6 @@ import re
 from typing import (Any, Dict, List, Mapping, Optional, Tuple, Union, cast,
                     TYPE_CHECKING)
 
-from housekeeping import deprecate_non_keyword_only_args
 from typing_extensions import NotRequired, TypedDict, final
 
 from rbtools.api.capabilities import Capabilities
@@ -478,26 +477,6 @@ class BaseSCMClient(object):
         self._diff_tool: Optional[BaseDiffTool] = None
         self._has_deps: Optional[bool] = None
 
-    @property
-    def entrypoint_name(self) -> str:
-        """An alias for the SCMClient ID.
-
-        This is here for backwards-compatibility purposes.
-
-        Deprecated:
-            4.0:
-            Callers should use :py:attr:`scmclient_id`. This attribute will
-            be removed in RBTools 5.0.
-        """
-        cls_name = type(self).__name__
-
-        RemovedInRBTools50Warning.warn(
-            '%s.entrypoint_name is deprecated. Please use %s.scmclient_id '
-            'instead. This will be removed in RBTools 5.0.'
-            % (cls_name, cls_name))
-
-        return self.scmclient_id
-
     @final
     def setup(self) -> None:
         """Set up the client.
@@ -866,7 +845,6 @@ class BaseSCMClient(object):
             'tip': None,
         }
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def get_tree_matches_review_request(
         self,
         review_request: ReviewRequestResource,
@@ -910,7 +888,6 @@ class BaseSCMClient(object):
         """
         return None
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def diff(
         self,
         revisions: SCMClientRevisionSpec,
@@ -1072,7 +1049,6 @@ class BaseSCMClient(object):
         """
         raise NotImplementedError
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def apply_patch(
         self,
         patch_file: str,
@@ -1168,7 +1144,6 @@ class BaseSCMClient(object):
         #       and when there are no empty files.
         return PatchResult(applied=(rc == 0), patch_output=patch_output)
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def create_commit(
         self,
         *,
@@ -1250,7 +1225,6 @@ class BaseSCMClient(object):
 
         return result
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def delete_branch(
         self,
         branch_name: str,
@@ -1273,7 +1247,6 @@ class BaseSCMClient(object):
         """
         raise NotImplementedError
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def merge(
         self,
         *,
@@ -1380,7 +1353,6 @@ class BaseSCMClient(object):
         """
         return False
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def apply_patch_for_empty_files(
         self,
         patch: bytes,
@@ -1408,7 +1380,6 @@ class BaseSCMClient(object):
         """
         raise NotImplementedError
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def amend_commit_description(
         self,
         message: str,

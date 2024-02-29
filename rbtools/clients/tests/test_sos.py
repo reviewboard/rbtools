@@ -18,7 +18,7 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
 from rbtools.clients.tests import SCMClientTestCase
 from rbtools.clients.sos import SOSClient
 from rbtools.deprecation import RemovedInRBTools50Warning
-from rbtools.utils.checks import check_gnu_diff, check_install
+from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempdir
 from rbtools.utils.process import run_process_exec
 
@@ -635,7 +635,6 @@ class SOSClientTests(BaseSOSTestCase):
             self.rule_query_project,
             self.rule_query_server,
         ]))
-        self.spy_on(check_gnu_diff, call_original=False)
 
         repo_info = client.get_repository_info()
         self.assertEqual(repo_info.path, 'SOS:test-server:test-project')

@@ -1,11 +1,11 @@
 """A client for Bazaar and Breezy."""
 
+from __future__ import annotations
+
 import logging
 import os
 import re
 from typing import List, Optional, cast
-
-from housekeeping import deprecate_non_keyword_only_args
 
 from rbtools.clients.base.repository import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
@@ -13,7 +13,6 @@ from rbtools.clients.base.scmclient import (BaseSCMClient,
                                             SCMClientRevisionSpec)
 from rbtools.clients.errors import (SCMClientDependencyError,
                                     TooManyRevisionsError)
-from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.checks import check_install
 from rbtools.utils.diffs import filter_diff, normalize_patterns
 from rbtools.utils.process import run_process
@@ -338,7 +337,6 @@ class BazaarClient(BaseSCMClient):
         else:
             return None
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def diff(
         self,
         revisions: SCMClientRevisionSpec,

@@ -13,8 +13,6 @@ from xml.etree import ElementTree
 from typing import Dict, Iterator, List, Optional, Tuple, Union, cast
 from urllib.parse import unquote
 
-from housekeeping import deprecate_non_keyword_only_args
-
 from rbtools.api.errors import APIError
 from rbtools.api.resource import ListResource
 from rbtools.clients import PatchResult, RepositoryInfo
@@ -28,7 +26,6 @@ from rbtools.clients.errors import (AuthenticationError,
                                     SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
-from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install
 from rbtools.utils.console import get_pass
@@ -489,7 +486,6 @@ class SVNClient(BaseSCMClient):
             if message.text is not None
         )
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def diff(
         self,
         revisions: SCMClientRevisionSpec,

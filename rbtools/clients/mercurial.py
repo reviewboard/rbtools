@@ -7,8 +7,6 @@ import uuid
 from typing import List, Optional
 from urllib.parse import urlsplit, urlunparse
 
-from housekeeping import deprecate_non_keyword_only_args
-
 from rbtools.clients import PatchResult, RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
                                             SCMClientDiffResult,
@@ -20,7 +18,6 @@ from rbtools.clients.errors import (CreateCommitError,
                                     SCMError,
                                     TooManyRevisionsError)
 from rbtools.clients.svn import SVNClient
-from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.checks import check_install
 from rbtools.utils.console import edit_file
 from rbtools.utils.errors import EditorError
@@ -668,7 +665,6 @@ class MercurialClient(BaseSCMClient):
 
         return '\n\n'.join(desc.strip() for desc in descs)
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def diff(
         self,
         revisions: SCMClientRevisionSpec,
