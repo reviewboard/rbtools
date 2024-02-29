@@ -11,7 +11,6 @@ from rbtools.api.resource import ListResource
 from rbtools.clients.errors import InvalidRevisionSpecError
 from rbtools.deprecation import RemovedInRBTools40Warning
 from rbtools.utils.errors import MatchReviewRequestsError
-from rbtools.utils.match_score import Score
 from rbtools.utils.repository import get_repository_id
 from rbtools.utils.users import get_user
 
@@ -29,69 +28,6 @@ def get_draft_or_current_value(field_name, review_request):
         fields = review_request
 
     return fields[field_name]
-
-
-def get_possible_matches(review_requests, summary, description, limit=5):
-    """Return a sorted list of tuples of score and review request.
-
-    Each review request is given a score based on the summary and
-    description provided. The result is a sorted list of tuples containing
-    the score and the corresponding review request, sorted by the highest
-    scoring review request first.
-
-    Deprecated:
-        3.1:
-        This will be removed in RBTools 4.0.
-
-    Args:
-        review_requests (list of rbtools.api.resource.ReviewRequestResource):
-            The list of review requests to match against.
-
-        summary (unicode):
-            The summary to match.
-
-        description (unicode):
-            The description to match.
-
-        limit (int, optional):
-            The maximum number of results to return.
-
-    Returns:
-        list of tuple:
-        A list of matches. Each match is a 2-tuple in the form of:
-
-        1. The match score (:py:class:`rbtools.utils.match_score.Score`)
-        2. The review request
-           (:py:class:`rbtools.api.resource.ReviewRequestResource`)
-    """
-    RemovedInRBTools40Warning.warn(
-        'rbtools.utils.review_request.get_possible_matches() is deprecated '
-        'and will be removed in RBTools 4.0.')
-
-    candidates = []
-
-    # Get all potential matches.
-    for review_request in review_requests.all_items:
-        summary_pair = (
-            get_draft_or_current_value('summary', review_request),
-            summary,
-        )
-        description_pair = (
-            get_draft_or_current_value('description', review_request),
-            description,
-        )
-
-        score = Score.get_match(summary_pair, description_pair)
-        candidates.append((score, review_request))
-
-    # Sort by summary and description on descending rank.
-    sorted_candidates = sorted(
-        candidates,
-        key=lambda m: (m[0].summary_score, m[0].description_score),
-        reverse=True
-    )
-
-    return sorted_candidates[:limit]
 
 
 def get_revisions(tool, cmd_args):
@@ -767,34 +703,6 @@ def guess_existing_review_request(repository_info=None,
                 return review_request
 
     return None
-
-
-def num_exact_matches(possible_matches):
-    """Return the number of exact matches in the possible match list.
-
-    Deprecated:
-        3.1:
-        This will be removed in RBTools 4.0.
-
-    Args:
-        possible_matches (list of tuple):
-            The list of possible matches from :py:func:`get_possible_matches`.
-
-    Returns:
-        int:
-        The number of exact matches found.
-    """
-    RemovedInRBTools40Warning.warn(
-        'rbtools.utils.review_request.num_exact_matches() is deprecated '
-        'and will be removed in RBTools 4.0.')
-
-    count = 0
-
-    for score, request in possible_matches:
-        if score.is_exact_match():
-            count += 1
-
-    return count
 
 
 def parse_review_request_url(url):

@@ -211,7 +211,6 @@ Utilities
    rbtools.utils.errors
    rbtools.utils.filesystem
    rbtools.utils.graphs
-   rbtools.utils.match_score
    rbtools.utils.process
    rbtools.utils.repository
    rbtools.utils.review_request
