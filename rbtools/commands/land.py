@@ -1,6 +1,9 @@
 """Implementation of rbt land."""
 
+from __future__ import annotations
+
 import logging
+from typing import Optional
 
 from rbtools.api.errors import APIError
 from rbtools.clients.errors import MergeError, PushError
@@ -16,6 +19,7 @@ from rbtools.utils.review_request import (get_draft_or_current_value,
                                           get_revisions,
                                           guess_existing_review_request,
                                           parse_review_request_url)
+from rbtools.utils.users import get_user
 
 
 class Land(BaseCommand):
@@ -305,28 +309,46 @@ class Land(BaseCommand):
 
         super(Land, self).initialize()
 
-    def main(self, branch_name=None, *args):
-        """Run the command."""
+    def main(
+        self,
+        branch_name: Optional[str] = None,
+        *args,
+    ) -> None:
+        """Run the command.
+
+        Args:
+            branch_name (str, optional):
+                The branch name to land the change on.
+        """
+        api_client = self.api_client
+        assert api_client is not None
+
+        api_root = self.api_root
+        assert api_root is not None
+
+        tool = self.tool
+        assert tool is not None
+
         self.cmd_args = list(args)
 
         if branch_name:
             self.cmd_args.insert(0, branch_name)
 
-        if not self.tool.can_merge:
+        if not tool.can_merge:
             raise CommandError('This command does not support %s repositories.'
-                               % self.tool.name)
+                               % tool.name)
 
-        if self.options.push and not self.tool.can_push_upstream:
+        if self.options.push and not tool.can_push_upstream:
             raise CommandError('--push is not supported for %s repositories.'
-                               % self.tool.name)
+                               % tool.name)
 
-        if self.tool.has_pending_changes():
+        if tool.has_pending_changes():
             raise CommandError('Working directory is not clean.')
 
         if not self.options.destination_branch:
             raise CommandError('Please specify a destination branch.')
 
-        if not self.tool.can_squash_merges:
+        if not tool.can_squash_merges:
             # If the client doesn't support squashing, then never squash.
             self.options.squash = False
 
@@ -335,13 +357,19 @@ class Land(BaseCommand):
             review_request_id = self.options.rid
         else:
             try:
-                revisions = get_revisions(self.tool, self.cmd_args)
+                revisions = get_revisions(tool, self.cmd_args)
+                assert revisions is not None
+
+                user = get_user(api_client=api_client,
+                                api_root=api_root,
+                                auth_required=True)
+                assert user is not None
 
                 review_request = guess_existing_review_request(
-                    api_root=self.api_root,
-                    api_client=self.api_client,
-                    tool=self.tool,
+                    api_root=api_root,
+                    tool=tool,
                     revisions=revisions,
+                    submit_as=user.username,
                     commit_id=revisions.get('commit_id'),
                     is_fuzzy_match_func=self._ask_review_request_match,
                     repository_id=self.repository.id)
@@ -356,7 +384,7 @@ class Land(BaseCommand):
             is_local = True
 
         try:
-            review_request = self.api_root.get_review_request(
+            review_request = api_root.get_review_request(
                 review_request_id=review_request_id)
         except APIError as e:
             raise CommandError('Error getting review request %s: %s'
@@ -367,7 +395,7 @@ class Land(BaseCommand):
 
         if is_local:
             if branch_name is None:
-                branch_name = self.tool.get_current_branch()
+                branch_name = tool.get_current_branch()
 
             if branch_name == self.options.destination_branch:
                 raise CommandError('The local branch cannot be merged onto '
@@ -445,7 +473,7 @@ class Land(BaseCommand):
 
             if not self.options.dry_run:
                 try:
-                    self.tool.push_upstream(self.options.destination_branch)
+                    tool.push_upstream(self.options.destination_branch)
                 except PushError as e:
                     raise CommandError(str(e))
 

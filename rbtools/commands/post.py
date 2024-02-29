@@ -28,6 +28,7 @@ from rbtools.utils.mimetypes import (guess_mimetype,
 from rbtools.utils.review_request import (get_draft_or_current_value,
                                           get_revisions,
                                           guess_existing_review_request)
+from rbtools.utils.users import get_user
 
 if TYPE_CHECKING:
     from rbtools.api.resource import (
@@ -1052,7 +1053,10 @@ class Post(BaseCommand):
 
         return with_history
 
-    def _get_review_request_to_update(self, server_supports_history=False):
+    def _get_review_request_to_update(
+        self,
+        server_supports_history: bool = False,
+    ) -> Optional[ReviewRequestResource]:
         """Retrieve and return the review request to update.
 
         Args:
@@ -1068,6 +1072,15 @@ class Post(BaseCommand):
             rbtools.commands.CommandError:
                 An error occurred while posting.
         """
+        api_client = self.api_client
+        assert api_client is not None
+
+        api_root = self.api_root
+        assert api_root is not None
+
+        tool = self.tool
+        assert tool is not None
+
         review_request = None
         additional_fields = []
 
@@ -1079,15 +1092,23 @@ class Post(BaseCommand):
             additional_fields.append('created_with_history')
 
         if self.options.update and self.revisions:
+            username = self.options.submit_as
+
+            if not username:
+                user = get_user(api_client=api_client,
+                                api_root=api_root,
+                                auth_required=True)
+                assert user is not None
+                username = user.username
+
             try:
                 review_request = guess_existing_review_request(
-                    api_root=self.api_root,
-                    api_client=self.api_client,
-                    tool=self.tool,
+                    api_root=api_root,
+                    tool=tool,
                     revisions=self.revisions,
                     commit_id=self.revisions.get('commit_id'),
                     is_fuzzy_match_func=self._ask_review_request_match,
-                    submit_as=self.options.submit_as,
+                    submit_as=username,
                     additional_fields=additional_fields,
                     repository_id=self.repository.id)
             except MatchReviewRequestsError as e:
@@ -1115,20 +1136,19 @@ class Post(BaseCommand):
             only_fields += additional_fields
 
             try:
-                review_request = self.api_root.get_review_request(
+                review_request = api_root.get_review_request(
                     review_request_id=self.options.rid,
                     only_fields=','.join(only_fields),
                     only_links='diffs,draft')
             except APIError as e:
-                raise CommandError('Error getting review request %s: %s'
-                                   % (self.options.rid, e))
+                raise CommandError(
+                    f'Error getting review request {self.options.rid}: {e}')
 
         if review_request and review_request.status == 'submitted':
             raise CommandError(
-                'Review request %s is marked as submitted. In order to '
-                'update it, please re-open the review request and try '
-                'again.'
-                % review_request.id)
+                f'Review request {review_request.id} is marked as submitted. '
+                f'In order to update it, please re-open the review request '
+                f'and try again.')
 
         return review_request
 
