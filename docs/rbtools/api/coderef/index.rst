@@ -216,5 +216,4 @@ Utilities
    rbtools.utils.repository
    rbtools.utils.review_request
    rbtools.utils.source_tree
-   rbtools.utils.testbase
    rbtools.utils.users
