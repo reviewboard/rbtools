@@ -964,7 +964,7 @@ class BaseSCMClient(object):
     def get_commit_history(
         self,
         revisions: SCMClientRevisionSpec,
-    ) -> List[SCMClientCommitHistoryItem]:
+    ) -> Optional[List[SCMClientCommitHistoryItem]]:
         """Return the commit history between the given revisions.
 
         Derived classes must override this method if they support posting with

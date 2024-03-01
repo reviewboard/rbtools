@@ -1,14 +1,20 @@
 """A client for Mercurial."""
 
+from __future__ import annotations
+
 import logging
 import os
 import re
 import uuid
-from typing import List, Optional
+from typing import Any, Optional, TYPE_CHECKING, Union, cast
 from urllib.parse import urlsplit, urlunparse
+
+from housekeeping import deprecate_non_keyword_only_args
 
 from rbtools.clients import PatchResult, RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
+                                            PatchAuthor,
+                                            SCMClientCommitHistoryItem,
                                             SCMClientDiffResult,
                                             SCMClientRevisionSpec)
 from rbtools.clients.errors import (CreateCommitError,
@@ -18,14 +24,18 @@ from rbtools.clients.errors import (CreateCommitError,
                                     SCMError,
                                     TooManyRevisionsError)
 from rbtools.clients.svn import SVNClient
+from rbtools.deprecation import RemovedInRBTools60Warning
 from rbtools.utils.checks import check_install
 from rbtools.utils.console import edit_file
 from rbtools.utils.errors import EditorError
 from rbtools.utils.filesystem import make_empty_files, make_tempfile
 from rbtools.utils.process import execute
 
+if TYPE_CHECKING:
+    from urllib.parse import SplitResult
 
-class MercurialRefType(object):
+
+class MercurialRefType:
     """Types of references in Mercurial."""
 
     #: Revision hashes.
@@ -66,7 +76,7 @@ class MercurialClient(BaseSCMClient):
     PRE_CREATION_DATE = 'Thu Jan 01 00:00:00 1970 +0000'
     NO_PARENT = '0' * 40
 
-    # The ASCII field seperator.
+    # The ASCII field separator.
     _FIELD_SEP = '\x1f'
 
     # The ASCII field separator as an escape sequence.
@@ -84,19 +94,60 @@ class MercurialClient(BaseSCMClient):
     # the actual character.
     _RECORD_SEP_ESC = r'\x1e'
 
-    def __init__(self, executable='hg', **kwargs):
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The loaded .hgrc content.
+    hgrc: dict[str, Any]
+
+    #: The executable to use for invoking hg.
+    _exe: str
+
+    #: The type of the hg backend (either "hg" or "svn").
+    _type: str
+
+    #: Whether the tool has been initialized.
+    _initted: bool
+
+    #: The environment to use when invoking hg.
+    _hg_env: dict[str, str]
+
+    #: The path to the hgext helper.
+    _hgext_path: str
+
+    #: The path to the remote.
+    _remote_path: list[str]
+
+    #: Candidates to check to find the remote path.
+    #:
+    #: This is an ordered set of hgrc paths that are checked if the
+    #: tracking option is not given # explicitly. The first candidate found
+    #: to exist will be used, falling back to ``default`` (the last member.)
+    _remote_path_candidates: list[str]
+
+    @deprecate_non_keyword_only_args(RemovedInRBTools60Warning)
+    def __init__(
+        self,
+        *,
+        executable: str = 'hg',
+        **kwargs,
+    ) -> None:
         """Initialize the client.
 
         Args:
+            executable (str, optional):
+                The name of the Mercurial executable to use.
+
             **kwargs (dict):
                 Keyword arguments to pass through to the superclass.
         """
-        super(MercurialClient, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.hgrc = {}
         self._exe = executable
         self._type = 'hg'
-        self._remote_path = ()
+        self._remote_path = []
         self._initted = False
         self._hg_env = {
             'HGPLAIN': '1',
@@ -106,10 +157,6 @@ class MercurialClient(BaseSCMClient):
             os.path.dirname(__file__),
             '..', 'helpers', 'hgext.py'))
 
-        # `self._remote_path_candidates` is an ordered set of hgrc
-        # paths that are checked if `tracking` option is not given
-        # explicitly.  The first candidate found to exist will be used,
-        # falling back to `default` (the last member.)
         self._remote_path_candidates = ['reviewboard', 'origin', 'parent',
                                         'default']
 
@@ -130,7 +177,7 @@ class MercurialClient(BaseSCMClient):
             raise SCMClientDependencyError(missing_exes=[self._exe])
 
     @property
-    def hidden_changesets_supported(self):
+    def hidden_changesets_supported(self) -> bool:
         """Return whether the repository supports hidden changesets.
 
         Mercurial 1.9 and above support hidden changesets. These are changesets
@@ -141,6 +188,9 @@ class MercurialClient(BaseSCMClient):
         Since we may encounter hidden changesets (e.g. the user specifies
         hidden changesets as part of the revision spec), we need to be aware
         of hidden changesets.
+
+        Type:
+            bool
         """
         if not hasattr(self, '_hidden_changesets_supported'):
             # The choice of command is arbitrary. parents for the initial
@@ -159,12 +209,15 @@ class MercurialClient(BaseSCMClient):
         return self._hidden_changesets_supported
 
     @property
-    def hg_root(self):
+    def hg_root(self) -> Optional[str]:
         """Return the root of the working directory.
 
         This will return the root directory of the current repository. If the
         current working directory is not inside a mercurial repository, this
         returns None.
+
+        Type:
+            str
         """
         if not hasattr(self, '_hg_root'):
             self._load_hgrc()
@@ -177,7 +230,7 @@ class MercurialClient(BaseSCMClient):
 
         return self._hg_root
 
-    def _init(self):
+    def _init(self) -> None:
         """Initialize the client."""
         if self._initted or not self.hg_root:
             return
@@ -201,14 +254,17 @@ class MercurialClient(BaseSCMClient):
                 rc_key = 'paths.%s' % candidate
 
                 if rc_key in self.hgrc:
-                    self._remote_path = (candidate, self.hgrc[rc_key])
+                    self._remote_path = [candidate, self.hgrc[rc_key]]
                     logging.debug('Using candidate path %r: %r',
                                   self._remote_path[0], self._remote_path[1])
                     break
 
         self._initted = True
 
-    def get_commit_history(self, revisions):
+    def get_commit_history(
+        self,
+        revisions: SCMClientRevisionSpec,
+    ) -> Optional[list[SCMClientCommitHistoryItem]]:
         """Return the commit history specified by the revisions.
 
         Args:
@@ -240,7 +296,7 @@ class MercurialClient(BaseSCMClient):
                 self._exe,
                 'log',
                 '--template',
-                '%s%s' % (log_format, self._RECORD_SEP_ESC),
+                f'{log_format}{self._RECORD_SEP_ESC}',
                 '-r',
                 '%(base)s::%(tip)s and not %(base)s' % revisions,
             ],
@@ -328,7 +384,7 @@ class MercurialClient(BaseSCMClient):
 
     def parse_revision_spec(
         self,
-        revisions: List[str] = [],
+        revisions: list[str] = [],
     ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
@@ -480,8 +536,9 @@ class MercurialClient(BaseSCMClient):
         if self._type == 'hg' and 'parent_base' not in result:
             # If there are missing changesets between base and the remote, we
             # need to generate a parent diff.
-            outgoing = self._get_outgoing_changesets(self._get_remote_branch(),
-                                                     rev=result['base'])
+            outgoing = self._get_outgoing_changesets(
+                self._get_remote_branch(),
+                rev=cast(str, result['base']))
 
             logging.debug('%d outgoing changesets between remote and base.',
                           len(outgoing))
@@ -505,11 +562,14 @@ class MercurialClient(BaseSCMClient):
 
         return result
 
-    def _identify_revision(self, revision):
+    def _identify_revision(
+        self,
+        revision: Union[str, int],
+    ) -> str:
         """Identify the given revision.
 
         Args:
-            revision (unicode):
+            revision (str or int):
                 The revision.
 
         Raises:
@@ -517,7 +577,7 @@ class MercurialClient(BaseSCMClient):
                 The specified revision could not be identified.
 
         Returns:
-            unicode:
+            str:
             The global revision ID of the commit.
         """
         identify = self._execute(
@@ -530,18 +590,23 @@ class MercurialClient(BaseSCMClient):
         else:
             return identify.split()[0]
 
-    def _calculate_hgsubversion_repository_info(self, svn_info):
+    def _calculate_hgsubversion_repository_info(
+        self,
+        svn_info: str,
+    ) -> Optional[RepositoryInfo]:
         """Return repository info for an hgsubversion checkout.
 
         Args:
-            svn_info (unicode):
+            svn_info (str):
                 The SVN info output.
 
         Returns:
             rbtools.clients.base.repository.RepositoryInfo:
             The repository info structure, if available.
         """
-        def _info(r):
+        def _info(
+            r: str,
+        ) -> Optional[SplitResult]:
             m = re.search(r, svn_info, re.M)
 
             if m:
@@ -566,7 +631,7 @@ class MercurialClient(BaseSCMClient):
                               base_path=base_path,
                               local_path=self.hg_root)
 
-    def _load_hgrc(self):
+    def _load_hgrc(self) -> None:
         """Load the hgrc file."""
         for line in execute([self._exe, 'showconfig'],
                             env=self._hg_env,
@@ -582,18 +647,21 @@ class MercurialClient(BaseSCMClient):
 
             self.hgrc[key] = value.strip()
 
-    def get_hg_ref_type(self, ref):
+    def get_hg_ref_type(
+        self,
+        ref: str,
+    ) -> str:
         """Return the type of a reference in Mercurial.
 
         This can be used to determine if something is a bookmark, branch,
         tag, or revision.
 
         Args:
-            ref (unicode):
+            ref (str):
                 The reference to return the type for.
 
         Returns:
-            unicode:
+            str:
             The reference type. This will be a value in
             :py:class:`MercurialRefType`.
         """
@@ -635,7 +703,10 @@ class MercurialClient(BaseSCMClient):
 
         return MercurialRefType.UNKNOWN
 
-    def get_raw_commit_message(self, revisions):
+    def get_raw_commit_message(
+        self,
+        revisions: SCMClientRevisionSpec,
+    ) -> str:
         """Return the raw commit message.
 
         This extracts all descriptions in the given revision range and
@@ -646,7 +717,7 @@ class MercurialClient(BaseSCMClient):
                 A dictionary containing ``base`` and ``tip`` keys.
 
         Returns:
-            unicode:
+            str:
             The commit messages of all commits between (base, tip].
         """
         rev1 = revisions['base']
@@ -654,7 +725,7 @@ class MercurialClient(BaseSCMClient):
 
         delim = str(uuid.uuid1())
         descs = self._execute(
-            [self._exe, 'log', '--hidden', '-r', '%s::%s' % (rev1, rev2),
+            [self._exe, 'log', '--hidden', '-r', f'{rev1}::{rev2}',
              '--template', '{desc}%s' % delim],
             env=self._hg_env)
 
@@ -669,8 +740,8 @@ class MercurialClient(BaseSCMClient):
         self,
         revisions: SCMClientRevisionSpec,
         *,
-        include_files: List[str] = [],
-        exclude_patterns: List[str] = [],
+        include_files: list[str] = [],
+        exclude_patterns: list[str] = [],
         with_parent_diff: bool = True,
         **kwargs,
     ) -> SCMClientDiffResult:
@@ -716,14 +787,14 @@ class MercurialClient(BaseSCMClient):
         for pattern in exclude_patterns:
             diff_args += ['-X', pattern]
 
-        node_base_id = revisions['base']
+        node_base_id = cast(str, revisions['base'])
 
         diff = self._run_diff(diff_args,
                               parent_id=node_base_id,
-                              node_id=revisions['tip'])
+                              node_id=cast(str, revisions['tip']))
 
         if with_parent_diff and 'parent_base' in revisions:
-            base_commit_id = revisions['parent_base']
+            base_commit_id = cast(str, revisions['parent_base'])
             parent_diff = self._run_diff(diff_args,
                                          parent_id=base_commit_id,
                                          node_id=node_base_id)
@@ -749,7 +820,12 @@ class MercurialClient(BaseSCMClient):
             'base_commit_id': base_commit_id,
         }
 
-    def _run_diff(self, diff_args, parent_id, node_id):
+    def _run_diff(
+        self,
+        diff_args: list[str],
+        parent_id: str,
+        node_id: str,
+    ) -> bytes:
         """Run a diff command and normalize its results.
 
         This will run :command:`hg diff` with the provided arguments for the
@@ -757,14 +833,14 @@ class MercurialClient(BaseSCMClient):
         prepare it for use in Review Board.
 
         Args:
-            diff_args (list of unicode):
+            diff_args (list of str):
                 The arguments to pass to :command:`hg diff` (except for any
                 revision ranges).
 
-            parent_id (unicode):
+            parent_id (str):
                 The ID of the parent commit for the range.
 
-            node_id (unicode):
+            node_id (str):
                 The ID of the latest commit for the range.
 
         Returns:
@@ -781,7 +857,12 @@ class MercurialClient(BaseSCMClient):
                                     node_id=node_id,
                                     parent_id=parent_id)
 
-    def _normalize_diff(self, diff, node_id, parent_id):
+    def _normalize_diff(
+        self,
+        diff: bytes,
+        node_id: str,
+        parent_id: str,
+    ) -> bytes:
         """Normalize a diff, adding any headers that may be needed.
 
         For Git-style diffs, this will ensure the diff starts with information
@@ -792,10 +873,10 @@ class MercurialClient(BaseSCMClient):
             diff (bytes):
                 The generated diff content to prepend to.
 
-            node_id (unicode):
+            node_id (str):
                 The revision of this change.
 
-            parent_id (unicode):
+            parent_id (str):
                 The revision of the parent change.
 
         Returns:
@@ -819,15 +900,18 @@ class MercurialClient(BaseSCMClient):
 
         return diff
 
-    def _get_files_in_changeset(self, rev):
+    def _get_files_in_changeset(
+        self,
+        rev: str,
+    ) -> set[str]:
         """Return a set of all files in the specified changeset.
 
         Args:
-            rev (unicode):
+            rev (str):
                 A changeset identifier.
 
         Returns:
-            set:
+            set of str:
             A set of filenames in the changeset.
         """
         cmd = [self._exe, 'locate', '-r', rev]
@@ -844,7 +928,7 @@ class MercurialClient(BaseSCMClient):
 
         return set()
 
-    def _get_parent_for_hgsubversion(self):
+    def _get_parent_for_hgsubversion(self) -> str:
         """Return the parent Subversion branch.
 
         Returns the parent branch defined in the command options if it exists,
@@ -852,7 +936,7 @@ class MercurialClient(BaseSCMClient):
         repository.
 
         Returns:
-            unicode:
+            str:
             The branch branch for the hgsubversion checkout.
         """
         return (
@@ -861,14 +945,14 @@ class MercurialClient(BaseSCMClient):
                 self._exe, 'parent', '--svn', '--template', '{node}\n',
             ]).strip())
 
-    def _get_remote_branch(self):
-        """Return the remote branch assoicated with this repository.
+    def _get_remote_branch(self) -> str:
+        """Return the remote branch associated with this repository.
 
         If the remote branch is not defined, the parent branch of the
         repository is returned.
 
         Returns:
-            unicode:
+            str:
             The name of the tracking branch.
         """
         remote = getattr(self.options, 'tracking', None)
@@ -886,8 +970,14 @@ class MercurialClient(BaseSCMClient):
 
         return remote
 
-    def create_commit(self, message, author, run_editor,
-                      files=[], all_files=False):
+    def create_commit(
+        self,
+        message: str,
+        author: PatchAuthor,
+        run_editor: bool,
+        files: list[str] = [],
+        all_files: bool = False,
+    ) -> None:
         """Commit the given modified files.
 
         This is expected to be called after applying a patch. This commits the
@@ -895,18 +985,18 @@ class MercurialClient(BaseSCMClient):
         message in $EDITOR to allow the user to update it.
 
         Args:
-            message (unicode):
+            message (str):
                 The commit message to use.
 
-            author (object):
+            author (rbtools.clients.base.scmclient.PatchAuthor):
                 The author of the commit. This is expected to have ``fullname``
                 and ``email`` attributes.
 
             run_editor (bool):
-                Whether to run the user's editor on the commmit message before
+                Whether to run the user's editor on the commit message before
                 committing.
 
-            files (list of unicode, optional):
+            files (list of str, optional):
                 The list of filenames to commit.
 
             all_files (bool, optional):
@@ -943,7 +1033,7 @@ class MercurialClient(BaseSCMClient):
         hg_command = [self._exe, 'commit', '-m', modified_message]
 
         try:
-            hg_command += ['-u', '%s <%s>' % (author.fullname, author.email)]
+            hg_command += ['-u', f'{author.fullname} <{author.email}>']
         except AttributeError:
             # Users who have marked their profile as private won't include the
             # fullname or email fields in the API payload. Just commit as the
@@ -962,21 +1052,30 @@ class MercurialClient(BaseSCMClient):
         except Exception as e:
             raise CreateCommitError(str(e))
 
-    def merge(self, target, destination, message, author, squash=False,
-              run_editor=False, close_branch=False, **kwargs):
+    def merge(
+        self,
+        target: str,
+        destination: str,
+        message: str,
+        author: PatchAuthor,
+        squash: bool = False,
+        run_editor: bool = False,
+        close_branch: bool = False,
+        **kwargs,
+    ) -> None:
         """Merge the target branch with destination branch.
 
         Args:
-            target (unicode):
+            target (str):
                 The name of the branch to merge.
 
-            destination (unicode):
+            destination (str):
                 The name of the branch to merge into.
 
-            message (unicode):
+            message (str):
                 The commit message to use.
 
-            author (object):
+            author (rbtools.clients.base.scmclient.PatchAuthor):
                 The author of the commit. This is expected to have ``fullname``
                 and ``email`` attributes.
 
@@ -985,7 +1084,7 @@ class MercurialClient(BaseSCMClient):
                 used for Mercurial.
 
             run_editor (bool, optional):
-                Whether to run the user's editor on the commmit message before
+                Whether to run the user's editor on the commit message before
                 committing.
 
             close_branch (bool, optional):
@@ -1009,27 +1108,28 @@ class MercurialClient(BaseSCMClient):
             try:
                 self._execute([self._exe, 'update', target])
             except Exception as e:
-                raise MergeError('Could not switch to branch "%s".\n\n%s'
-                                 % (target, e))
+                raise MergeError(
+                    f'Could not switch to branch "{target}".\n\n{e}')
 
             try:
                 self._execute([self._exe, 'commit', '-m', message,
                                '--close-branch'])
             except Exception as e:
-                raise MergeError('Could not close branch "%s".\n\n%s'
-                                 % (target, e))
+                raise MergeError(
+                    f'Could not close branch "{target}".\n\n{e}')
 
         try:
             self._execute([self._exe, 'update', destination])
         except Exception as e:
-            raise MergeError('Could not switch to branch "%s".\n\n%s'
-                             % (destination, e))
+            raise MergeError(
+                f'Could not switch to branch "{destination}".\n\n{e}')
 
         try:
             self._execute([self._exe, 'merge', target])
         except Exception as e:
-            raise MergeError('Could not merge %s "%s" into "%s".\n\n%s'
-                             % (ref_type, target, destination, e))
+            raise MergeError(
+                f'Could not merge {ref_type} "{target}" into '
+                f'"{destination}".\n\n{e}')
 
         self.create_commit(message=message,
                            author=author,
@@ -1039,23 +1139,26 @@ class MercurialClient(BaseSCMClient):
             try:
                 self._execute([self._exe, 'bookmark', '-d', target])
             except Exception as e:
-                raise MergeError('Could not delete bookmark "%s".\n\n%s'
-                                 % (target, e))
+                raise MergeError(
+                    f'Could not delete bookmark "{target}".\n\n{e}')
 
-    def _get_current_branch(self):
+    def _get_current_branch(self) -> str:
         """Return the current branch of this repository.
 
         Returns:
-            unicode:
+            str:
             The name of the currently checked-out branch.
         """
         return self._execute([self._exe, 'branch'], env=self._hg_env).strip()
 
-    def _get_bottom_and_top_outgoing_revs_for_remote(self, rev=None):
+    def _get_bottom_and_top_outgoing_revs_for_remote(
+        self,
+        rev: Optional[str] = None,
+    ) -> tuple[Optional[int], Optional[int]]:
         """Return the bottom and top outgoing revisions.
 
         Args:
-            rev (unicode, optional):
+            rev (str, optional):
                 An optional revision to limit the results. If specified, only
                 outgoing changesets which are ancestors of this revision will
                 be included.
@@ -1080,14 +1183,18 @@ class MercurialClient(BaseSCMClient):
 
         return bottom_rev, top_rev
 
-    def _get_outgoing_changesets(self, remote, rev=None):
+    def _get_outgoing_changesets(
+        self,
+        remote: str,
+        rev: Optional[str] = None,
+    ) -> list[tuple[int, str, str]]:
         """Return the outgoing changesets between us and a remote.
 
         Args:
-            remote (unicode):
+            remote (str):
                 The name of the remote.
 
-            rev (unicode, optional):
+            rev (str, optional):
                 An optional revision to limit the results. If specified, only
                 outgoing changesets which are ancestors of this revision will
                 be included.
@@ -1122,8 +1229,13 @@ class MercurialClient(BaseSCMClient):
             if line.startswith('warning: '):
                 continue
 
-            rev, node, branch = [f.strip() for f in line.split('\t')]
+            try:
+                rev, node, branch = (f.strip() for f in line.split('\t'))
+            except Exception:
+                raise Exception('Unexpected output from hg: %s' % line)
+
             branch = branch or 'default'
+            assert rev is not None
 
             if not rev.isdigit():
                 raise Exception('Unexpected output from hg: %s' % line)
@@ -1134,7 +1246,10 @@ class MercurialClient(BaseSCMClient):
 
         return outgoing_changesets
 
-    def _get_top_and_bottom_outgoing_revs(self, outgoing_changesets):
+    def _get_top_and_bottom_outgoing_revs(
+        self,
+        outgoing_changesets: list[tuple[int, str, str]],
+    ) -> tuple[int, int]:
         """Return top and bottom outgoing revisions for the given changesets.
 
         Args:
@@ -1146,7 +1261,7 @@ class MercurialClient(BaseSCMClient):
             A 2-tuple containing the top and bottom revisions for the given
             outgoing changesets.
         """
-        revs = set(t[0] for t in outgoing_changesets)
+        revs = {t[0] for t in outgoing_changesets}
 
         top_rev = max(revs)
         bottom_rev = min(revs)
@@ -1170,7 +1285,10 @@ class MercurialClient(BaseSCMClient):
 
         return top_rev, bottom_rev
 
-    def scan_for_server(self, repository_info):
+    def scan_for_server(
+        self,
+        repository_info: RepositoryInfo,
+    ) -> Optional[str]:
         """Find the Review Board server matching this repository.
 
         Args:
@@ -1178,7 +1296,7 @@ class MercurialClient(BaseSCMClient):
                 The repository information structure.
 
         Returns:
-            unicode:
+            str:
             The Review Board server URL, if available.
         """
         server_url = self.hgrc.get('reviewboard.url', '').strip()
@@ -1192,11 +1310,17 @@ class MercurialClient(BaseSCMClient):
 
         return None
 
-    def _execute(self, cmd, with_errors=False, *args, **kwargs):
+    def _execute(
+        self,
+        cmd: list[str],
+        with_errors: bool = False,
+        *args,
+        **kwargs,
+    ) -> Any:
         """Execute an hg command.
 
         Args:
-            cmd (list of unicode):
+            cmd (list of str):
                 A command line to execute.
 
             with_errors (bool, optional):
@@ -1207,11 +1331,11 @@ class MercurialClient(BaseSCMClient):
                 to ``False``.
 
             *args (list):
-                Addditional arguments to pass to
+                Additional arguments to pass to
                 :py:func:`rbtools.utils.process.execute`.
 
             **kwargs (dict):
-                Addditional keyword arguments to pass to
+                Additional keyword arguments to pass to
                 :py:func:`rbtools.utils.process.execute`.
 
         Returns:
@@ -1230,12 +1354,12 @@ class MercurialClient(BaseSCMClient):
         # a tail of diff-related config options.
         cmd += [
             '--config',
-            'extensions.rbtoolsnormalize=%s' % self._hgext_path
+            f'extensions.rbtoolsnormalize={self._hgext_path}',
         ]
 
         return execute(cmd, with_errors=with_errors, *args, **kwargs)
 
-    def has_pending_changes(self):
+    def has_pending_changes(self) -> bool:
         """Check if there are changes waiting to be committed.
 
         Returns:
@@ -1247,27 +1371,33 @@ class MercurialClient(BaseSCMClient):
                                 '--removed', '--deleted'])
         return status != ''
 
-    def apply_patch(self, patch_file, base_path=None, base_dir=None, p=None,
-                    revert=False):
+    def apply_patch(
+        self,
+        patch_file: str,
+        base_path: Optional[str] = None,
+        base_dir: Optional[str] = None,
+        p: Optional[str] = None,
+        revert: bool = False,
+    ) -> PatchResult:
         """Apply the given patch.
 
         This will take the given patch file and apply it to the working
         directory.
 
         Args:
-            patch_file (unicode):
+            patch_file (str):
                 The name of the patch file to apply.
 
-            base_path (unicode, unused):
+            base_path (str, unused):
                 The base path that the diff was generated in. All hg diffs are
                 absolute to the repository root, so this is unused.
 
-            base_dir (unicode, unused):
+            base_dir (str, unused):
                 The path of the current working directory relative to the root
                 of the repository. All hg diffs are absolute to the repository
                 root, so this is unused.
 
-            p (unicode, optional):
+            p (str, optional):
                 The prefix level of the diff.
 
             revert (bool, optional):
@@ -1292,36 +1422,41 @@ class MercurialClient(BaseSCMClient):
 
         return PatchResult(applied=(rc == 0), patch_output=data)
 
-    def apply_patch_for_empty_files(self, patch, p_num, revert=False):
+    def apply_patch_for_empty_files(
+        self,
+        patch: bytes,
+        p_num: str,
+        revert: bool = False,
+    ) -> bool:
         """Return whether any empty files in the patch are applied.
 
         Args:
             patch (bytes):
                 The contents of the patch.
 
-            p_num (unicode):
+            p_num (str):
                 The prefix level of the diff.
 
             revert (bool, optional):
                 Whether the patch should be reverted rather than applied.
 
         Returns:
+            bool:
             ``True`` if there are empty files in the patch. ``False`` if there
             were no empty files, or if an error occurred while applying the
             patch.
         """
         patched_empty_files = False
-        added_files = re.findall(r'--- %s\t%s\n'
-                                 r'\+\+\+ b/(\S+)\t[^\r\n\t\f]+\n'
-                                 r'(?:[^@]|$)'
-                                 % (self.PRE_CREATION,
-                                    re.escape(self.PRE_CREATION_DATE)), patch)
-        deleted_files = re.findall(r'--- a/(\S+)\t[^\r\n\t\f]+\n'
-                                   r'\+\+\+ %s\t%s\n'
-                                   r'(?:[^@]|$)'
-                                   % (self.PRE_CREATION,
-                                      re.escape(self.PRE_CREATION_DATE)),
-                                   patch)
+
+        added_files_re = (
+            r'--- %s\t%s\n\+\+\+ b/(\S+)\t[^\r\n\t\f]+\n(?:[^@]|$)'
+            % (self.PRE_CREATION, re.escape(self.PRE_CREATION_DATE)))
+        deleted_files_re = (
+            r'--- a/(\S+)\t[^\r\n\t\f]+\n\+\+\+ %s\t%s\n(?:[^@]|$)'
+            % (self.PRE_CREATION, re.escape(self.PRE_CREATION_DATE)))
+
+        added_files = re.findall(added_files_re.encode(), patch)
+        deleted_files = re.findall(deleted_files_re.encode(), patch)
 
         if added_files:
             added_files = self._strip_p_num_slashes(added_files, int(p_num))
@@ -1351,22 +1486,22 @@ class MercurialClient(BaseSCMClient):
 
         return patched_empty_files
 
-    def supports_empty_files(self):
+    def supports_empty_files(self) -> bool:
         """Return whether the RB server supports added/deleted empty files.
 
         Returns:
             bool:
             ``True`` if the Review Board server supports showing empty files.
         """
-        return (self.capabilities and
+        return (self.capabilities is not None and
                 self.capabilities.has_capability('scmtools', 'mercurial',
                                                  'empty_files'))
 
-    def get_current_bookmark(self):
+    def get_current_bookmark(self) -> str:
         """Return the name of the current bookmark.
 
         Returns:
-            unicode:
+            str:
             A string with the name of the current bookmark.
         """
         return self._execute([self._exe, 'id', '-B'],
