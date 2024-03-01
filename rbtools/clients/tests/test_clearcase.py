@@ -1,5 +1,7 @@
 """Unit tests for ClearCaseClient."""
 
+from __future__ import annotations
+
 import os
 import re
 
@@ -399,12 +401,13 @@ class ClearCaseClientTests(SCMClientTestCase):
 
         return checkout_dir
 
-    def setUp(self):
-        super(ClearCaseClientTests, self).setUp()
+    def setUp(self) -> None:
+        """Set up the test."""
+        super().setUp()
 
         self.set_user_home(os.path.join(self.testdata_dir, 'homedir'))
 
-    def test_check_dependencies_with_found(self):
+    def test_check_dependencies_with_found(self) -> None:
         """Testing ClearCaseClient.check_dependencies with found"""
         self.spy_on(check_install, op=kgb.SpyOpMatchAny([
             {
@@ -419,7 +422,7 @@ class ClearCaseClientTests(SCMClientTestCase):
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['cleartool', 'help'])
 
-    def test_check_dependencies_with_missing(self):
+    def test_check_dependencies_with_missing(self) -> None:
         """Testing ClearCaseClient.check_dependencies with dependencies
         missing
         """
@@ -435,7 +438,7 @@ class ClearCaseClientTests(SCMClientTestCase):
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['cleartool', 'help'])
 
-    def test_host_properties_with_deps_missing(self):
+    def test_host_properties_with_deps_missing(self) -> None:
         """Testing ClearCaseClient.host_properties with dependencies missing"""
         self.spy_on(check_install, op=kgb.SpyOpReturn(False))
         self.spy_on(RemovedInRBTools50Warning.warn)
@@ -459,7 +462,7 @@ class ClearCaseClientTests(SCMClientTestCase):
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['cleartool', 'help'])
 
-    def test_host_properties_with_deps_not_checked(self):
+    def test_host_properties_with_deps_not_checked(self) -> None:
         """Testing ClearCaseClient.host_properties with dependencies not
         checked
         """
@@ -473,8 +476,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             'Either ClearCaseClient.setup() or '
             'ClearCaseClient.has_dependencies() must be called before other '
             'functions are used. This will be required starting in '
-            'RBTools 5.0.'
-        )
+            'RBTools 5.0.')
 
         with self.assertLogs(level='DEBUG') as ctx:
             with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
@@ -487,7 +489,7 @@ class ClearCaseClientTests(SCMClientTestCase):
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['cleartool', 'help'])
 
-    def test_get_local_path_with_deps_missing(self):
+    def test_get_local_path_with_deps_missing(self) -> None:
         """Testing ClearCaseClient.get_local_path with dependencies missing"""
         self.spy_on(check_install, op=kgb.SpyOpReturn(False))
         self.spy_on(RemovedInRBTools50Warning.warn)
@@ -511,7 +513,7 @@ class ClearCaseClientTests(SCMClientTestCase):
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['cleartool', 'help'])
 
-    def test_get_local_path_with_deps_not_checked(self):
+    def test_get_local_path_with_deps_not_checked(self) -> None:
         """Testing ClearCaseClient.get_local_path with dependencies not
         checked
         """
@@ -525,8 +527,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             'Either ClearCaseClient.setup() or '
             'ClearCaseClient.has_dependencies() must be called before other '
             'functions are used. This will be required starting in '
-            'RBTools 5.0.'
-        )
+            'RBTools 5.0.')
 
         with self.assertLogs(level='DEBUG') as ctx:
             with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
@@ -539,7 +540,7 @@ class ClearCaseClientTests(SCMClientTestCase):
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['cleartool', 'help'])
 
-    def test_get_repository_info_with_deps_missing(self):
+    def test_get_repository_info_with_deps_missing(self) -> None:
         """Testing ClearCaseClient.get_repository_info with dependencies
         missing
         """
@@ -564,7 +565,7 @@ class ClearCaseClientTests(SCMClientTestCase):
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['cleartool', 'help'])
 
-    def test_get_repository_info_with_deps_not_checked(self):
+    def test_get_repository_info_with_deps_not_checked(self) -> None:
         """Testing ClearCaseClient.get_repository_info with dependencies
         not checked
         """
@@ -578,8 +579,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             'Either ClearCaseClient.setup() or '
             'ClearCaseClient.has_dependencies() must be called before other '
             'functions are used. This will be required starting in '
-            'RBTools 5.0.'
-        )
+            'RBTools 5.0.')
 
         with self.assertLogs(level='DEBUG') as ctx:
             with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
@@ -592,8 +592,7 @@ class ClearCaseClientTests(SCMClientTestCase):
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['cleartool', 'help'])
 
-
-    def test_get_local_path_outside_view(self):
+    def test_get_local_path_outside_view(self) -> None:
         """Testing ClearCaseClient.get_local_path outside of view"""
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
@@ -610,7 +609,7 @@ class ClearCaseClientTests(SCMClientTestCase):
 
         self.assertIsNone(client.get_local_path())
 
-    def test_get_local_path_inside_view(self):
+    def test_get_local_path_inside_view(self) -> None:
         """Testing ClearCaseClient.get_local_path inside view"""
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
@@ -643,7 +642,7 @@ class ClearCaseClientTests(SCMClientTestCase):
 
         self.assertEqual(client.get_local_path(), '/test/view/vob')
 
-    def test_get_repository_info_snapshot(self):
+    def test_get_repository_info_snapshot(self) -> None:
         """Testing ClearCaseClient.get_repository_info with snapshot view"""
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
@@ -695,7 +694,7 @@ class ClearCaseClientTests(SCMClientTestCase):
         self.assertEqual(client.viewtype, 'snapshot')
         self.assertFalse(client.is_ucm)
 
-    def test_get_repository_info_dynamic(self):
+    def test_get_repository_info_dynamic(self) -> None:
         """Testing ClearCaseClient.get_repository_info with dynamic view and
         base ClearCase
         """
@@ -749,7 +748,7 @@ class ClearCaseClientTests(SCMClientTestCase):
         self.assertEqual(client.viewtype, 'dynamic')
         self.assertFalse(client.is_ucm)
 
-    def test_get_repository_info_dynamic_UCM(self):
+    def test_get_repository_info_dynamic_UCM(self) -> None:
         """Testing ClearCaseClient.get_repository_info with dynamic view and
         UCM
         """
@@ -803,7 +802,7 @@ class ClearCaseClientTests(SCMClientTestCase):
         self.assertEqual(client.viewtype, 'dynamic')
         self.assertTrue(client.is_ucm)
 
-    def test_get_repository_info_automatic(self):
+    def test_get_repository_info_automatic(self) -> None:
         """Testing ClearCaseClient.get_repository_info with automatic view"""
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
@@ -853,7 +852,7 @@ class ClearCaseClientTests(SCMClientTestCase):
         else:
             self.fail('get_repository_info did not raise SCMError')
 
-    def test_get_repository_info_webview(self):
+    def test_get_repository_info_webview(self) -> None:
         """Testing ClearCaseClient.get_repository_info with webview"""
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
@@ -903,7 +902,7 @@ class ClearCaseClientTests(SCMClientTestCase):
         else:
             self.fail('get_repository_info did not raise SCMError')
 
-    def test_repository_info_update_from_remote_clearcase(self):
+    def test_repository_info_update_from_remote_clearcase(self) -> None:
         """Testing ClearCaseRepositoryInfo.update_from_remote with ClearCase
         remote
         """
@@ -953,7 +952,7 @@ class ClearCaseClientTests(SCMClientTestCase):
         })
         self.assertFalse(repository_info.is_legacy)
 
-    def test_repository_info_update_from_remote_versionvault(self):
+    def test_repository_info_update_from_remote_versionvault(self) -> None:
         """Testing ClearCaseRepositoryInfo.update_from_remote with
         VersionVault remote
         """
@@ -989,7 +988,7 @@ class ClearCaseClientTests(SCMClientTestCase):
         })
         self.assertTrue(repository_info.is_legacy)
 
-    def test_get_vobtag_success(self):
+    def test_get_vobtag_success(self) -> None:
         """Testing ClearCaseClient._get_vobtag inside view"""
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
@@ -1006,7 +1005,7 @@ class ClearCaseClientTests(SCMClientTestCase):
 
         self.assertEqual(client._get_vobtag(), '/vob')
 
-    def test_get_vobtag_error(self):
+    def test_get_vobtag_error(self) -> None:
         """Testing ClearCaseClient._get_vobtag outside view"""
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
@@ -1028,7 +1027,7 @@ class ClearCaseClientTests(SCMClientTestCase):
         with self.assertRaises(SCMError):
             client._get_vobtag()
 
-    def test_parse_revision_spec(self):
+    def test_parse_revision_spec(self) -> None:
         """Testing ClearCaseClient.parse_revision_spec"""
         cases = [
             (
@@ -1094,8 +1093,8 @@ class ClearCaseClientTests(SCMClientTestCase):
                 client.parse_revision_spec(spec),
                 {'base': base, 'tip': tip})
 
-    def test_checkedout_changeset(self):
-        """Testing ClearCaseClient._get_checkedout_changeset"""
+    def test_checkedout_changelist(self) -> None:
+        """Testing ClearCaseClient._get_checkedout_changelist"""
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': (['cleartool', 'lsregion'],),
@@ -1136,16 +1135,16 @@ class ClearCaseClientTests(SCMClientTestCase):
             'uuid': '9ac6856f.c9af11eb.9851.52:54:00:7f:63:a5',
         })
 
-        changeset = client._get_checkedout_changeset(repository_info)
+        changelist = client._get_checkedout_changelist(repository_info)
 
-        self.assertEqual(changeset, [
+        self.assertEqual(list(changelist), [
             ('test2.py@@/main/1', 'test2.py'),
             ('test.pdf@@/main/0', 'test.pdf'),
             ('test.py@@/main/1', 'test.py'),
         ])
 
-    def test_activity_changeset(self):
-        """Testing ClearCaseClient._get_activity_changeset"""
+    def test_activity_changelist(self) -> None:
+        """Testing ClearCaseClient._get_activity_changelist"""
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': (['cleartool', 'lsregion'],),
@@ -1210,10 +1209,10 @@ class ClearCaseClientTests(SCMClientTestCase):
             'uuid': '9ac6856f.c9af11eb.9851.52:54:00:7f:63:a5',
         })
 
-        changeset = client._get_activity_changeset('activity-name',
+        changelist = client._get_activity_changelist('activity-name',
                                                    repository_info)
 
-        self.assertEqual(changeset, [
+        self.assertEqual(list(changelist), [
             ('/view/x/vobs/els/.@@/main/int/1',
              '/view/x/vobs/els/.'),
             ('/view/x/vobs/els/test.pdf@@/main/int/0',
@@ -1224,7 +1223,7 @@ class ClearCaseClientTests(SCMClientTestCase):
              '/view/x/vobs/els/test.py'),
         ])
 
-    def test_file_changes_from_directories(self):
+    def test_file_changes_from_directories(self) -> None:
         """Testing ClearCaseClient._get_file_changes_from_directories"""
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
@@ -1302,7 +1301,7 @@ class ClearCaseClientTests(SCMClientTestCase):
                              'renamed-file.py-fake-oid')},
             })
 
-    def test_diff_legacy(self):
+    def test_diff_legacy(self) -> None:
         """Testing ClearCaseClient._do_diff in legacy mode"""
         client = self.build_client(allow_dep_checks=False,
                                    needs_diff=True)
@@ -1354,7 +1353,7 @@ class ClearCaseClientTests(SCMClientTestCase):
                     b'+\n'
                     b'+print(\'Test\')\n',
 
-                    b''
+                    b'',
                 )),
             },
             {
@@ -1450,19 +1449,19 @@ class ClearCaseClientTests(SCMClientTestCase):
         self.spy_on(os.path.exists, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ('test2.py',),
-                'op': kgb.SpyOpReturn(True)
+                'op': kgb.SpyOpReturn(True),
             },
             {
                 'args': ('test.pdf',),
-                'op': kgb.SpyOpReturn(True)
+                'op': kgb.SpyOpReturn(True),
             },
             {
                 'args': ('test.py',),
-                'op': kgb.SpyOpReturn(True)
+                'op': kgb.SpyOpReturn(True),
             },
         ]))
 
-        changeset = [
+        changelist = [
             ('test2.py@@/main/1', 'test2.py'),
             ('test.pdf@@/main/0', 'test.pdf'),
             ('test.py@@/main/1', 'test.py'),
@@ -1475,7 +1474,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             'tip': '--rbtools-checkedout-changeset',
         })
 
-        diff = client._do_diff(changeset, repository_info, metadata)
+        diff = client._do_diff(changelist, repository_info, metadata)
 
         self.assertEqual(
             self.normalize_diff_result(diff,
@@ -1484,7 +1483,7 @@ class ClearCaseClientTests(SCMClientTestCase):
                 'diff': _LEGACY_DIFF,
             })
 
-    def test_diff_diffx(self):
+    def test_diff_diffx(self) -> None:
         """Testing ClearCaseClient._do_diff in diffx mode"""
         client = self.build_client(allow_dep_checks=False,
                                    needs_diff=True)
@@ -1678,15 +1677,15 @@ class ClearCaseClientTests(SCMClientTestCase):
         self.spy_on(os.path.exists, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ('test2.py',),
-                'op': kgb.SpyOpReturn(True)
+                'op': kgb.SpyOpReturn(True),
             },
             {
                 'args': ('test.pdf',),
-                'op': kgb.SpyOpReturn(True)
+                'op': kgb.SpyOpReturn(True),
             },
         ]))
 
-        changeset = [
+        changelist = [
             ('test2.py@@/main/1', 'test2.py'),
             ('test.pdf@@/main/0', 'test.pdf'),
         ]
@@ -1699,7 +1698,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             'tip': '--rbtools-checkedout-changeset',
         })
 
-        diff = client._do_diff(changeset, repository_info, metadata)
+        diff = client._do_diff(changelist, repository_info, metadata)
 
         print(diff['diff'].decode('utf-8'))
         self.assertEqual(
@@ -1709,7 +1708,7 @@ class ClearCaseClientTests(SCMClientTestCase):
                 'diff': _DIFFX_DIFF,
             })
 
-    def test_diff_directory_legacy(self):
+    def test_diff_directory_legacy(self) -> None:
         """Testing ClearCaseClient._do_diff with a changed directory in legacy
         mode
         """
@@ -1915,7 +1914,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             },
         ]))
 
-        changeset = [
+        changelist = [
             ('test-dir@@/main/0', 'test-dir'),
             ('test-dir/empty-dir@@/main/0', 'test-dir/empty-dir'),
         ]
@@ -1927,7 +1926,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             'tip': '--rbtools-checkedout-changeset',
         })
 
-        diff = client._do_diff(changeset, repository_info, metadata)
+        diff = client._do_diff(changelist, repository_info, metadata)
 
         self.assertEqual(
             self.normalize_diff_result(diff,
@@ -1936,7 +1935,7 @@ class ClearCaseClientTests(SCMClientTestCase):
                 'diff': _LEGACY_DIRECTORY_DIFF,
             })
 
-    def test_diff_directory_diffx(self):
+    def test_diff_directory_diffx(self) -> None:
         """Testing ClearCaseClient._do_diff with a changed directory in diffx
         mode
         """
@@ -2223,7 +2222,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             },
         ]))
 
-        changeset = [
+        changelist = [
             ('test-dir@@/main/0', 'test-dir'),
             ('test-dir/empty-dir@@/main/0', 'test-dir/empty-dir'),
         ]
@@ -2236,7 +2235,7 @@ class ClearCaseClientTests(SCMClientTestCase):
             'tip': '--rbtools-checkedout-changeset',
         })
 
-        diff = client._do_diff(changeset, repository_info, metadata)
+        diff = client._do_diff(changelist, repository_info, metadata)
 
         self.assertEqual(
             self.normalize_diff_result(diff,
