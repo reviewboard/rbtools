@@ -993,7 +993,7 @@ class BaseSCMClient(object):
 
         Args:
             base_path (str):
-                The relative path beetween the repository root and the
+                The relative path between the repository root and the
                 directory that the diff file was generated in.
 
             base_dir (str):
@@ -1166,7 +1166,7 @@ class BaseSCMClient(object):
                 The author of the commit.
 
             run_editor (bool):
-                Whether to run the user's editor on the commmit message before
+                Whether to run the user's editor on the commit message before
                 committing.
 
             files (list of str, optional):
@@ -1277,7 +1277,7 @@ class BaseSCMClient(object):
                 Whether to squash the commits or do a plain merge.
 
             run_editor (bool, optional):
-                Whether to run the user's editor on the commmit message before
+                Whether to run the user's editor on the commit message before
                 committing.
 
             close_branch (bool, optional):

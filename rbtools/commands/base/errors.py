@@ -8,7 +8,7 @@ from __future__ import annotations
 
 
 class CommandExit(Exception):
-    """An errror indicating a command is ready to exit."""
+    """An error indicating a command is ready to exit."""
 
     ######################
     # Instance variables #

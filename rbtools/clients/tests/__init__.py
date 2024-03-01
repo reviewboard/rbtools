@@ -228,7 +228,7 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
             caps (dict, optional):
                 Custom capabilities to simulate retrieving from the server.
 
-                By defaut, :py:attr:`default_scmclient_caps` will be set.
+                By default, :py:attr:`default_scmclient_caps` will be set.
                 ``caps`` may override anything in these. Dictionaries will
                 *not* be merged recursively.
 

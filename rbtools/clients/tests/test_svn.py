@@ -694,7 +694,7 @@ class SVNClientTests(SCMClientTestCase):
                 'tip': '%smy-change' % SVNClient.REVISION_CHANGELIST_PREFIX,
             })
 
-    def test_parse_revision_spec_one_revision_nonexistant_changelist(self):
+    def test_parse_revision_spec_one_revision_nonexistent_changelist(self):
         """Testing SVNClient.parse_revision_spec with one specified invalid
         changelist revision
         """

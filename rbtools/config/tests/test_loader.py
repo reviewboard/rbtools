@@ -219,7 +219,7 @@ class LoadConfigTests(TestCase):
         })
 
     def test_with_no_files(self) -> None:
-        """Tesing load_config with no files found"""
+        """Testing load_config with no files found"""
         config = load_config()
 
         self.assertEqual(config._raw_config, {})

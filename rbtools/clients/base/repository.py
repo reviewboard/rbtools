@@ -165,7 +165,7 @@ class RepositoryInfo:
 
         Subclasses may override this to fetch additional data from the server.
 
-        By defaut, this simply sets the path based on the ``repository``.
+        By default, this simply sets the path based on the ``repository``.
 
         Args:
             repository (rbtools.api.resource.ItemResource):

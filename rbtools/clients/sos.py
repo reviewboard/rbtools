@@ -1460,7 +1460,7 @@ class SOSClient(BaseSCMClient):
         If the file is not explicitly renamed, this will go through the
         renamed directory entries and try to find a new directory name used
         as the prefix for this file. If found, a new path will be generated
-        based on the old directory name and the remaning part of the file
+        based on the old directory name and the remaining part of the file
         path.
 
         If an original name could not be found, this will just return the

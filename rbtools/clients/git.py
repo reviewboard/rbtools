@@ -943,7 +943,7 @@ class GitClient(BaseSCMClient):
                 Whether to skip rename detection.
 
             find_renames_threshold (unicode, optional):
-                The threshhold to pass to ``--find-renames``, if any.
+                The threshold to pass to ``--find-renames``, if any.
 
         Returns:
             bytes:
@@ -1497,7 +1497,7 @@ class GitClient(BaseSCMClient):
                 and ``email`` attributes.
 
             run_editor (bool):
-                Whether to run the user's editor on the commmit message before
+                Whether to run the user's editor on the commit message before
                 committing.
 
             files (list of unicode, optional):
@@ -1599,7 +1599,7 @@ class GitClient(BaseSCMClient):
                 Whether to squash the commits or do a plain merge.
 
             run_editor (bool, optional):
-                Whether to run the user's editor on the commmit message before
+                Whether to run the user's editor on the commit message before
                 committing.
 
             close_branch (bool, optional):

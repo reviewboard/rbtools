@@ -186,7 +186,7 @@ def scan_usable_client(
 
         sys.exit(1)
 
-    # Verify that options specific to an SCM Client have not been mis-used.
+    # Verify that options specific to an SCM Client have not been misused.
     if (getattr(options, 'change_only', False) and
         not scmclient.supports_changesets):
         logging.error('The --change-only option is not valid for the '

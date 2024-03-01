@@ -715,7 +715,7 @@ class ResourceExtraDataField(ResourceDictField):
             'extra_data attributes cannot be modified directly on this '
             'dictionary. To make a mutable copy of this and all its contents, '
             'call .copy(). To set or change extra_data state, issue a '
-            '.update(extra_data_json={...}) for a JSON Merge Patch requst or '
+            '.update(extra_data_json={...}) for a JSON Merge Patch request or '
             '.update(extra_data_json_patch=[...]) for a JSON Patch request '
             'on the parent resource. See %s for the format for these '
             'operations.'

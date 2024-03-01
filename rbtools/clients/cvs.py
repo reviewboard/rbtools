@@ -220,7 +220,7 @@ class CVSClient(BaseSCMClient):
             base_dir=cwd,
             cwd=cwd)
 
-        # Bulid the command to diff the files.
+        # Build the command to diff the files.
         diff_cmd = ['cvs', 'diff', '-uN']
 
         if not (base == 'BASE' and

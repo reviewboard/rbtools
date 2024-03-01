@@ -613,7 +613,7 @@ class PresetHTTPAuthHandler(BaseHandler):
 
         Args:
             url (str):
-                The URL fo the Review Board server.
+                The URL of the Review Board server.
 
             password_mgr (ReviewBoardHTTPPasswordMgr):
                 The password manager to use for requests.
@@ -643,7 +643,7 @@ class PresetHTTPAuthHandler(BaseHandler):
                 The username to use for authentication. If ``None`` and no API
                 token is provided, this will log out the user.
 
-            passsword (str, optional):
+            password (str, optional):
                 The password to use for authentication. If ``None`` and no API
                 token is provided, this will log out the user.
 
