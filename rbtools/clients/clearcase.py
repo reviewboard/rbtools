@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime
 import io
 import itertools
 import logging
@@ -11,7 +10,7 @@ import re
 import sys
 import threading
 from collections import OrderedDict, defaultdict, deque
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, cast
 
 from pydiffx.dom import DiffX
 from pydiffx.dom.objects import DiffXChangeSection
@@ -37,7 +36,7 @@ else:
 
 
 # This is used to split and assemble paths.
-_MAIN = '%smain%s' % (os.sep, os.sep)
+_MAIN = f'{os.sep}main{os.sep}'
 
 
 class _GetElementsFromLabelThread(threading.Thread):
@@ -51,17 +50,17 @@ class _GetElementsFromLabelThread(threading.Thread):
         """Initialize the thread.
 
         Args:
-            dir_name (unicode):
+            dir_name (str):
                 The directory name to search.
 
-            label (unicode):
+            label (str):
                 The label name.
 
             elements (dict):
                 A dictionary mapping element path to an info dictionary. Each
                 element contains ``oid`` and ``version`` keys.
 
-            vob_tags (list of unicode):
+            vob_tags (list of str):
                 A list of the VOBs to search.
         """
         self.dir_name = dir_name
@@ -105,14 +104,14 @@ class _GetElementsFromLabelThread(threading.Thread):
                 '-version',
                 'lbtype(%s)' % self.label,
                 '-exec',
-                ('cleartool describe -fmt "%%On\t%%En\t%%Vn\n" "%s"'
-                 % CLEARCASE_XPN)
+                (f'cleartool describe -fmt "%On\t%En\t%Vn\n" '
+                 f'"{CLEARCASE_XPN}"'),
             ]
         else:
             command = [
                 '-exec',
-                ('cleartool describe -fmt "%%On\t%%En\t%%Vn\n" "%s"'
-                 % CLEARCASE_PN),
+                (f'cleartool describe -fmt "%On\t%En\t%Vn\n" '
+                 f'"{CLEARCASE_PN}"'),
             ]
 
         output = execute(command,
@@ -133,7 +132,7 @@ class _GetElementsFromLabelThread(threading.Thread):
             }
 
 
-class ChangesetEntry(object):
+class ChangesetEntry:
     """An entry in a changeset.
 
     This is a helper class which wraps a changed element, and
@@ -155,22 +154,22 @@ class ChangesetEntry(object):
         """Initialize the changeset entry.
 
         Args:
-            root_path (unicode):
+            root_path (str):
                 The root path of the view.
 
-            old_path (unicode, optional):
+            old_path (str, optional):
                 The extended path of the "old" version of the element.
 
-            new_path (unicode, optional):
+            new_path (str, optional):
                 The extended path of the "new" version of the element.
 
-            old_oid (unicode, optional):
+            old_oid (str, optional):
                 The OID of the "old" version of the element.
 
-            new_oid (unicode, optional):
+            new_oid (str, optional):
                 The OID of the "new" version of the element.
 
-            op (unicode, optional):
+            op (str, optional):
                 The change operation.
 
             is_dir (bool, optional):
@@ -198,7 +197,7 @@ class ChangesetEntry(object):
         """The OID of the VOB that the element is in.
 
         Type:
-            unicode
+            str
         """
         if self._vob_oid is None:
             self._vob_oid = execute(
@@ -212,7 +211,7 @@ class ChangesetEntry(object):
         """The OID of the old version of the element.
 
         Type:
-            unicode
+            str
         """
         if self._old_oid is None:
             if self.old_path:
@@ -228,7 +227,7 @@ class ChangesetEntry(object):
         """The name of the old version of the element.
 
         Type:
-            unicode:
+            str:
         """
         if self._old_name is None and self.old_path:
             self._old_name = os.path.relpath(
@@ -243,12 +242,12 @@ class ChangesetEntry(object):
         """The version of the old version of the element.
 
         Type:
-            unicode
+            str
         """
         if self._old_version is None and self.old_path:
             self._old_version = execute(
                 ['cleartool', 'describe', '-fmt', '%Vn',
-                 'oid:%s@vobuuid:%s' % (self.old_oid, self.vob_oid)])
+                 f'oid:{self.old_oid}@vobuuid:{self.vob_oid}'])
 
         return self._old_version
 
@@ -257,7 +256,7 @@ class ChangesetEntry(object):
         """The OID of the new version of the element.
 
         Type:
-            unicode
+            str
         """
         if self._new_oid is None:
             if self.new_path:
@@ -273,7 +272,7 @@ class ChangesetEntry(object):
         """The name of the new version of the element.
 
         Type:
-            unicode:
+            str:
         """
         if self._new_name is None and self.new_path:
             self._new_name = os.path.relpath(
@@ -285,10 +284,15 @@ class ChangesetEntry(object):
 
     @property
     def new_version(self):
+        """The version of the new version of the element.
+
+        Type:
+            str
+        """
         if self._new_version is None and self.new_path:
             self._new_version = execute(
                 ['cleartool', 'describe', '-fmt', '%Vn',
-                 'oid:%s@vobuuid:%s' % (self.new_oid, self.vob_oid)],
+                 f'oid:{self.new_oid}@vobuuid:{self.vob_oid}'],
                 ignore_errors=True,
                 with_errors=True)
 
@@ -301,11 +305,12 @@ class ChangesetEntry(object):
         """Return a representation of the object.
 
         Returns:
-            unicode:
+            str:
             The internal representation of the object.
         """
-        return ('<ChangesetEntry op=%s old_path=%s new_path=%s>'
-                % (self.op, self.old_path, self.new_path))
+        return (
+            f'<ChangesetEntry op={self.op} old_path={self.old_path} '
+            f'new_path={self.new_path}>')
 
 
 class ClearCaseClient(BaseSCMClient):
@@ -347,7 +352,7 @@ class ClearCaseClient(BaseSCMClient):
             **kwargs (dict):
                 Keyword arguments to pass through to the superclass.
         """
-        super(ClearCaseClient, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.viewtype = None
         self.viewname = None
         self.is_ucm = False
@@ -619,7 +624,7 @@ class ClearCaseClient(BaseSCMClient):
 
                 if len(tip.rsplit('@', 1)) != 2:
                     raise InvalidRevisionSpecError(
-                        'UCM stream name %s must include a PVOB tag' % tip)
+                        f'UCM stream name {tip} must include a PVOB tag')
 
                 return {
                     'base': self.REVISION_STREAM_BASE,
@@ -648,8 +653,8 @@ class ClearCaseClient(BaseSCMClient):
 
                 if pvobs[0] != pvobs[1]:
                     raise InvalidRevisionSpecError(
-                        'Baselines %s and %s do not have the same PVOB tag'
-                        % (pvobs[0], pvobs[1]))
+                        f'Baselines {pvobs[0]} and {pvobs[1]} do not have '
+                        f'the same PVOB tag')
 
                 return {
                     'base': self.REVISION_BASELINE_BASE,
@@ -701,10 +706,10 @@ class ClearCaseClient(BaseSCMClient):
                 A dictionary of revisions, as returned by
                 :py:meth:`parse_revision_spec`.
 
-            include_files (list of unicode, optional):
+            include_files (list of str, optional):
                 A list of files to whitelist during the diff generation.
 
-            exclude_patterns (list of unicode, optional):
+            exclude_patterns (list of str, optional):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
 
@@ -759,7 +764,7 @@ class ClearCaseClient(BaseSCMClient):
         """Return the current repository's VOB tag.
 
         Returns:
-            unicode:
+            str:
             The VOB tag for the current working directory.
 
         Raises:
@@ -781,16 +786,12 @@ class ClearCaseClient(BaseSCMClient):
         """Return the current VOB's UUID.
 
         Args:
-            vobtag (unicode):
+            vobtag (str):
                 The VOB tag to query.
 
         Returns:
-            unicode:
+            str:
             The VOB UUID.
-
-        Raises:
-            rbtools.clients.errors.SCMError:
-                The current VOB tag was unable to be determined.
         """
         property_lines = execute(
             ['cleartool', 'lsvob', '-long', vobtag],
@@ -802,46 +803,14 @@ class ClearCaseClient(BaseSCMClient):
 
         return None
 
-    def _list_checkedout(self, path):
-        """List all checked out elements in current view below path.
-
-        Run the :command:`cleartool` command twice because ``recurse`` finds
-        checked out elements under path except path, and the directory is
-        detected only if the path directory is checked out.
-
-        Args:
-            path (unicode):
-                The path of the directory to find checked-out files in.
-
-        Returns:
-            list of unicode:
-            A list of the checked out files.
-        """
-        checkedout_elements = []
-
-        for option in ['-recurse', '-directory']:
-            # We ignore return code 1 in order to omit files that ClearCase
-            # cannot read.
-            output = execute(['cleartool', 'lscheckout', option, '-cview',
-                              '-fmt', r'%En@@%Vn\n', path],
-                             split_lines=True,
-                             extra_ignore_errors=(1,),
-                             with_errors=False)
-
-            if output:
-                checkedout_elements.extend(output)
-                logging.debug(output)
-
-        return checkedout_elements
-
     def _is_a_label(self, label, vobtag=None):
         """Return whether a given label is a valid ClearCase lbtype.
 
         Args:
-            label (unicode):
+            label (str):
                 The label to check.
 
-            vobtag (unicode, optional):
+            vobtag (str, optional):
                 An optional VOB tag to limit the label to.
 
         Raises:
@@ -862,13 +831,14 @@ class ClearCaseClient(BaseSCMClient):
 
         # Be sure label is prefix by lbtype, required by cleartool describe.
         if not label.startswith(self.REVISION_LABEL_PREFIX):
-            label = '%s%s' % (self.REVISION_LABEL_PREFIX, label)
+            label = f'{self.REVISION_LABEL_PREFIX}{label}'
 
         # If vobtag defined, check if it matches with the one extracted from
         # label, otherwise raise an exception.
         if vobtag and label_vobtag and label_vobtag != vobtag:
-            raise SCMError('label vobtag %s does not match expected vobtag '
-                           '%s' % (label_vobtag, vobtag))
+            raise SCMError(
+                f'label vobtag {label_vobtag} does not match expected vobtag '
+                f'{vobtag}')
 
         # Finally check if label exists in database, otherwise quit. Ignore
         # return code 1, it means label does not exist.
@@ -876,68 +846,6 @@ class ClearCaseClient(BaseSCMClient):
                          extra_ignore_errors=(1,),
                          with_errors=False)
         return bool(output)
-
-    def _get_tmp_label(self):
-        """Return a string that will be used to set a ClearCase label.
-
-        Returns:
-            unicode:
-            A string suitable for using as a temporary label.
-        """
-        now = datetime.datetime.now()
-        temporary_label = 'Current_%d_%d_%d_%d_%d_%d_%d' % (
-            now.year, now.month, now.day, now.hour, now.minute, now.second,
-            now.microsecond)
-        return temporary_label
-
-    def _set_label(self, label, path):
-        """Set a ClearCase label on elements seen under path.
-
-        Args:
-            label (unicode):
-                The label to set.
-
-            path (unicode):
-                The filesystem path to set the label on.
-        """
-        checkedout_elements = self._list_checkedout(path)
-        if checkedout_elements:
-            raise SCMError(
-                'ClearCase backend cannot set label when some elements are '
-                'checked out:\n%s' % ''.join(checkedout_elements))
-
-        # First create label in vob database.
-        execute(['cleartool', 'mklbtype', '-c', 'label created for rbtools',
-                 label],
-                with_errors=True)
-
-        # We ignore return code 1 in order to omit files that ClearCase cannot
-        # read.
-        recursive_option = ''
-        if cpath.isdir(path):
-            recursive_option = '-recurse'
-
-        # Apply label to path.
-        execute(['cleartool', 'mklabel', '-nc', recursive_option, label, path],
-                extra_ignore_errors=(1,),
-                with_errors=False)
-
-    def _remove_label(self, label):
-        """Remove a ClearCase label from vob database.
-
-        It will remove all references of this label on elements.
-
-        Args:
-            label (unicode):
-                The ClearCase label to remove.
-        """
-        # Be sure label is prefix by lbtype.
-        if not label.startswith(self.REVISION_LABEL_PREFIX):
-            label = '%s%s' % (self.REVISION_LABEL_PREFIX, label)
-
-        # Label exists so remove it.
-        execute(['cleartool', 'rmtype', '-rmall', '-force', label],
-                with_errors=True)
 
     def _determine_version(self, version_path):
         """Determine the numeric version of a version path.
@@ -947,7 +855,7 @@ class ClearCaseClient(BaseSCMClient):
         of a file, similar to ``HEAD`` in many other types of repositories.
 
         Args:
-            version_path (unicode):
+            version_path (str):
                 A version path consisting of a branch path and a version
                 number.
 
@@ -970,33 +878,33 @@ class ClearCaseClient(BaseSCMClient):
         returned.
 
         Args:
-            path (unicode):
+            path (str):
                 A file path.
 
-            version (unicode):
+            version (str):
                 The version of the file.
 
         Returns:
-            unicode:
+            str:
             The combined extended path.
         """
         if not version or self.CHECKEDOUT_RE.search(version):
             return path
 
-        return '%s@@%s' % (path, version)
+        return f'{path}@@{version}'
 
     def _construct_revision(self, branch_path, version_number):
         """Construct a revisioned path from a branch path and version ID.
 
         Args:
-            branch_path (unicode):
+            branch_path (str):
                 The path of a branch.
 
-            version_number (unicode):
+            version_number (str):
                 The version number of the revision.
 
         Returns:
-            unicode:
+            str:
             The combined revision.
         """
         return cpath.join(branch_path, version_number)
@@ -1010,10 +918,10 @@ class ClearCaseClient(BaseSCMClient):
         This method will query ClearCase for the predecessor version.
 
         Args:
-            path (unicode):
+            path (str):
                 The path to an element.
 
-            branch_path (unicode):
+            branch_path (str):
                 The path of the branch of the element (typically something like
                 /main/).
 
@@ -1025,8 +933,8 @@ class ClearCaseClient(BaseSCMClient):
             A 2-tuple consisting of the predecessor branch path and version
             number.
         """
-        full_version = cpath.join(branch_path, '%d' % version_number)
-        extended_path = '%s@@%s' % (path, full_version)
+        full_version = cpath.join(branch_path, str(version_number))
+        extended_path = f'{path}@@{full_version}'
 
         previous_version = execute(
             ['cleartool', 'desc', '-fmt', '%[version_predecessor]p',
@@ -1057,7 +965,7 @@ class ClearCaseClient(BaseSCMClient):
         ``<version number>`` is the version number of the file in branch_path
 
         Args:
-            changeset (unicode):
+            changeset (str):
                 The changeset to fetch.
 
             repository_info (ClearCaseRepositoryInfo):
@@ -1083,7 +991,7 @@ class ClearCaseClient(BaseSCMClient):
 
             # If a file isn't in the correct vob, then ignore it.
             for tag in repository_info.vob_tags:
-                if ('%s%s' % (tag, os.sep)) in path:
+                if f'{tag}{os.sep}' in path:
                     break
             else:
                 logging.debug('VOB tag does not match, ignoring changes on %s',
@@ -1097,8 +1005,8 @@ class ClearCaseClient(BaseSCMClient):
                 logging.warning('Unexpected version 0 for %s in activity '
                                 'changeset. Did you rmver the first version, '
                                 'or forget to check it in? This file will '
-                                'be ignored.'
-                                % path)
+                                'be ignored.',
+                                path)
                 ignored_changes.append(change)
                 continue
 
@@ -1148,8 +1056,7 @@ class ClearCaseClient(BaseSCMClient):
 
             changeranges.append(
                 (self._construct_extended_path(path, previous_version),
-                 self._construct_extended_path(path, current_version))
-            )
+                 self._construct_extended_path(path, current_version)))
 
         return changeranges
 
@@ -1159,7 +1066,7 @@ class ClearCaseClient(BaseSCMClient):
         Changeset contain only first and last version of file made on branch.
 
         Args:
-            changeset (unicode):
+            changeset (str):
                 The changeset to fetch.
 
         Returns:
@@ -1175,7 +1082,7 @@ class ClearCaseClient(BaseSCMClient):
                 changelist[path] = {
                     'highest': version_number,
                     'current': current,
-                    'previous': previous
+                    'previous': previous,
                 }
 
             if version_number == 0:
@@ -1195,7 +1102,7 @@ class ClearCaseClient(BaseSCMClient):
         """Return extended paths for all modifications in a changeset.
 
         Args:
-            changeset (unicode):
+            changeset (str):
                 The changeset to fetch.
 
         Returns:
@@ -1207,8 +1114,7 @@ class ClearCaseClient(BaseSCMClient):
         for path, previous, current in changeset:
             changeranges.append(
                 (self._construct_extended_path(path, previous),
-                 self._construct_extended_path(path, current))
-            )
+                 self._construct_extended_path(path, current)))
 
         return changeranges
 
@@ -1220,11 +1126,11 @@ class ClearCaseClient(BaseSCMClient):
         left as-is.
 
         Args:
-            file_revision (unicode):
+            file_revision (str):
                 The file revision to sanitize.
 
         Returns:
-            unicode:
+            str:
             The sanitized revision.
         """
         # There is no predecessor for @@/main/0, so keep current revision.
@@ -1271,7 +1177,7 @@ class ClearCaseClient(BaseSCMClient):
         """Construct a changeset from cleartool output.
 
         Args:
-            output (unicode):
+            output (str):
                 The result from a :command:`cleartool lsX` operation.
 
         Returns:
@@ -1334,7 +1240,7 @@ class ClearCaseClient(BaseSCMClient):
         (including rebase changes) in all vobs of the current view.
 
         Args:
-            activity (unicode):
+            activity (str):
                 The activity name.
 
             repository_info (ClearCaseRepositoryInfo):
@@ -1369,7 +1275,7 @@ class ClearCaseClient(BaseSCMClient):
         """Return information about versions changed between two baselines.
 
         Args:
-            baselines (list of unicode):
+            baselines (list of str):
                 A list of one or two baselines including PVOB tags. If one
                 baseline is included, this will do a diff between that and the
                 predecessor baseline.
@@ -1387,17 +1293,17 @@ class ClearCaseClient(BaseSCMClient):
         if len(baselines) == 1:
             command += [
                 '-predecessor',
-                'baseline:%s' % baselines[0],
+                f'baseline:{baselines[0]}',
             ]
         else:
             command += [
-                'baseline:%s' % baselines[0],
-                'baseline:%s' % baselines[1],
+                f'baseline:{baselines[0]}',
+                f'baseline:{baselines[1]}',
             ]
 
         diff = execute(command,
                        extra_ignore_errors=(1, 2),
-                       splitlines=True)
+                       split_lines=True)
 
         WS_RE = re.compile(r'\s+')
         versions = [
@@ -1431,7 +1337,7 @@ class ClearCaseClient(BaseSCMClient):
         current user in all vobs of the current view.
 
         Args:
-            branch (unicode):
+            branch (str):
                 The branch name.
 
             repository_info (ClearCaseRepositoryInfo):
@@ -1520,8 +1426,8 @@ class ClearCaseClient(BaseSCMClient):
 
             if not matched_vobs:
                 raise SCMError(
-                    'Label %s was not found in any of the configured VOBs'
-                    % label)
+                    'Labels %r were not found in any of the configured VOBs'
+                    % labels)
 
             previous_label, current_label = labels
             logging.debug('Comparison between labels %s and %s on %s',
@@ -1561,7 +1467,7 @@ class ClearCaseClient(BaseSCMClient):
                 seen.add(path)
 
                 # Initialize previous and current version to '/main/0'
-                main0 = '%s0' % _MAIN
+                main0 = f'{_MAIN}0'
                 changelist[path] = {
                     'current': main0,
                     'previous': main0,
@@ -1574,11 +1480,6 @@ class ClearCaseClient(BaseSCMClient):
                 if path in previous_elements:
                     changelist[path]['previous'] = \
                         previous_elements[path]['version']
-
-                logging.debug('path: %s\nprevious: %s\ncurrent:  %s\n',
-                              path,
-                              changelist[path]['previous'],
-                              changelist[path]['current'])
 
                 # Prevent adding identical version to comparison.
                 if changelist[path]['current'] == changelist[path]['previous']:
@@ -1604,7 +1505,7 @@ class ClearCaseClient(BaseSCMClient):
         """Return information about the versions changed in a stream.
 
         Args:
-            stream (unicode):
+            stream (str):
                 The UCM stream name. This must include the PVOB tag as well, so
                 that ``cleartool describe`` can fetch the branch name.
 
@@ -1779,7 +1680,7 @@ class ClearCaseClient(BaseSCMClient):
         """Return an ls-style directory listing for a versioned directory.
 
         Args:
-            extended_path (unicode):
+            extended_path (str):
                 The path of the directory to get the contents for.
 
         Returns:
@@ -1824,8 +1725,6 @@ class ClearCaseClient(BaseSCMClient):
             bytes:
             The diff between the two files, for writing legacy ClearCase diffs.
         """
-        diff_result_lines: List[bytes]
-
         diff_tool = self.get_diff_tool()
         assert diff_tool is not None
 
@@ -1892,7 +1791,7 @@ class ClearCaseClient(BaseSCMClient):
             # We need oids of files to translate them to paths on reviewboard
             # repository.
             vob_oid = execute(['cleartool', 'describe', '-fmt', '%On',
-                               'vob:%s' % (entry.new_path or entry.old_path)])
+                               f'vob:{entry.new_path or entry.old_path}'])
 
             vv_metadata = {
                 'vob': vob_oid,
@@ -1974,11 +1873,11 @@ class ClearCaseClient(BaseSCMClient):
         dynamic views do, so we have to fetch the content to a temporary file.
 
         Args:
-            filename (unicode):
+            filename (str):
                 The extended path of the file element to fetch.
 
         Returns:
-            unicode:
+            str:
             The filename of the temporary file with the content.
         """
         temp_file = make_tempfile()
@@ -2036,8 +1935,9 @@ class ClearCaseClient(BaseSCMClient):
                                                    repository_info,
                                                    diffx_change)
                 else:
-                    logging.error('File %s does not exist or access is denied.',
-                                  entry.new_path)
+                    logging.error(
+                        'File %s does not exist or access is denied.',
+                        entry.new_path)
                     continue
 
             if repository_info.is_legacy and legacy_diff:
@@ -2057,7 +1957,7 @@ class ClearCaseClient(BaseSCMClient):
         """Return whether a given path is a directory.
 
         Args:
-            path (unicode):
+            path (str):
                 The path of the element to check.
 
         Returns:
@@ -2128,11 +2028,12 @@ class ClearCaseClient(BaseSCMClient):
                     if not self._is_dir(filename):
                         # The extended path we get here doesn't include the
                         # revision of the element. While many operations can
-                        # succeed in this case, fetching the content of the file
-                        # from snapshot views does not. We therefore look at the
-                        # history of the file and get the last revision from it.
+                        # succeed in this case, fetching the content of the
+                        # file from snapshot views does not. We therefore
+                        # look at the history of the file and get the last
+                        # revision from it.
                         filename = execute(['cleartool', 'lshistory', '-last',
-                                            '1', '-fmt', '%Xn', 'oid:%s' % oid])
+                                            '1', '-fmt', '%Xn', f'oid:{oid}'])
                         files.append(ChangesetEntry(self.root_path,
                                                     old_path=filename,
                                                     old_oid=oid,
@@ -2149,7 +2050,7 @@ class ClearCaseClient(BaseSCMClient):
                         file.new_oid == new_oid):
                         old_version = execute(['cleartool', 'describe',
                                                '-fmt', '%Vn', file.old_path])
-                        file.old_path = '%s@@%s' % (old_file, old_version)
+                        file.old_path = f'{old_file}@@{old_version}'
                         file.op = 'move'
 
                         break
@@ -2171,10 +2072,10 @@ class ClearCaseClient(BaseSCMClient):
         properly detect added, renamed, and deleted files.
 
         Args:
-            old_dir (unicode):
+            old_dir (str):
                 The extended path of the directory at its old revision.
 
-            new_dir (unicode):
+            new_dir (str):
                 The extended path of the directory at its new revision.
 
         Returns:
@@ -2267,15 +2168,18 @@ class ClearCaseClient(BaseSCMClient):
             part of the FileDiff's extra_data field. Additional keys may be set
             on this before it gets serialized into the diff.
         """
+        host_properties = self.host_properties
+        assert host_properties is not None
+
         metadata = {
             'os': {
                 'short': os.name,
-                'long': self.host_properties.get('Operating system'),
+                'long': host_properties.get('Operating system'),
             },
-            'region': self.host_properties.get('Registry region'),
+            'region': host_properties.get('Registry region'),
             'scm': {
-                'name': self.host_properties.get('Product name'),
-                'version': self.host_properties.get('Product version'),
+                'name': host_properties.get('Product name'),
+                'version': host_properties.get('Product version'),
             },
             'view': {
                 'tag': self.viewname,
@@ -2298,6 +2202,8 @@ class ClearCaseClient(BaseSCMClient):
                 'type': 'activity',
             }
         elif base == self.REVISION_BASELINE_BASE:
+            assert isinstance(tip, list)
+
             if len(tip) == 1:
                 metadata['scope'] = {
                     'name': tip[0],
@@ -2305,7 +2211,7 @@ class ClearCaseClient(BaseSCMClient):
                 }
             else:
                 metadata['scope'] = {
-                    'name': '%s/%s' % (tip[0], tip[1]),
+                    'name': f'{tip[0]}/{tip[1]}',
                     'type': 'baseline/baseline',
                 }
         elif base == self.REVISION_BRANCH_BASE:
@@ -2314,6 +2220,8 @@ class ClearCaseClient(BaseSCMClient):
                 'type': 'branch',
             }
         elif base == self.REVISION_LABEL_BASE:
+            assert isinstance(tip, list)
+
             if len(tip) == 1:
                 metadata['scope'] = {
                     'name': tip[0],
@@ -2321,7 +2229,7 @@ class ClearCaseClient(BaseSCMClient):
                 }
             else:
                 metadata['scope'] = {
-                    'name': '%s/%s' % (tip[0], tip[1]),
+                    'name': f'{tip[0]}/{tip[1]}',
                     'type': 'label/label',
                 }
         elif base == self.REVISION_STREAM_BASE:
@@ -2392,16 +2300,16 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
         """Initialize the repsitory info.
 
         Args:
-            path (unicode):
+            path (str):
                 The path of the repository.
 
-            vobtag (unicode):
+            vobtag (str):
                 The VOB tag for the repository.
 
-            tool (rbtools.clients.base.scmclient.BaseSCMClient):
+            tool (ClearCaseClient):
                 The SCM client.
         """
-        super(ClearCaseRepositoryInfo, self).__init__(path=path)
+        super().__init__(path=path)
         self.vobtag = vobtag
         self.tool = tool
         self.vob_tags = {vobtag}
@@ -2418,24 +2326,26 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
             info (rbtools.api.resource.ItemResource):
                 The repository info resource.
         """
-        path = info['repopath']
+        path = cast(str, info['repopath'])
         self.path = path
 
         if 'uuid' in info:
             # Legacy ClearCase backend that supports a single VOB.
-            self.vob_uuids = [info['uuid']]
+            self.vob_uuids = cast(List[str], [info['uuid']])
         elif 'uuids' in info:
             # New VersionVault/ClearCase backend that supports multiple VOBs.
-            self.vob_uuids = info['uuids']
+            self.vob_uuids = cast(List[str], info['uuids'])
             self.is_legacy = False
         else:
             raise SCMError('Unable to fetch VOB information from server '
                            'repository info.')
 
         tags = defaultdict(set)
-        regions = execute(['cleartool', 'lsregion'],
-                          ignore_errors=True,
-                          split_lines=True)
+        regions = cast(
+            List[str],
+            execute(['cleartool', 'lsregion'],
+                    ignore_errors=True,
+                    split_lines=True))
 
         # Find local tag names for connected VOB UUIDs.
         for region, uuid in itertools.product(regions, self.vob_uuids):
