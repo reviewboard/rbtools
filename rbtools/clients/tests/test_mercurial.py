@@ -10,7 +10,6 @@ import time
 import unittest
 from random import randint
 from textwrap import dedent
-from typing import List
 
 import kgb
 
@@ -18,7 +17,8 @@ import rbtools.helpers
 from rbtools.clients import PatchAuthor, RepositoryInfo
 from rbtools.clients.errors import (CreateCommitError,
                                     MergeError,
-                                    SCMClientDependencyError)
+                                    SCMClientDependencyError,
+                                    SCMError)
 from rbtools.clients.mercurial import MercurialClient, MercurialRefType
 from rbtools.clients.tests import (FOO, FOO1, FOO2, FOO3, FOO4, FOO5, FOO6,
                                    SCMClientTestCase)
@@ -42,8 +42,8 @@ class MercurialTestCase(SCMClientTestCase):
     @classmethod
     def run_hg(
         cls,
-        command: List[str],
-        **kwargs
+        command: list[str],
+        **kwargs,
     ) -> RunProcessResult:
         """Run a Mercurial command.
 
@@ -1285,25 +1285,25 @@ class MercurialClientTests(MercurialTestCase):
         """Testing MercurialClient.get_commit_history"""
         client = self.build_client()
 
-        base_commit_id = self._hg_get_tip(full=True)
+        base_commit_id = self._hg_get_tip()
 
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO1,
                                 msg='commit 1\n\ndesc1',
                                 date='2022-08-04T11:00:00-07:00')
-        commit_id1 = self._hg_get_tip(full=True)
+        commit_id1 = self._hg_get_tip()
 
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO2,
                                 msg='commit 2\n\ndesc2',
                                 date='2022-08-05T12:00:00-07:00')
-        commit_id2 = self._hg_get_tip(full=True)
+        commit_id2 = self._hg_get_tip()
 
         self.hg_add_file_commit(filename='foo.txt',
                                 data=FOO3,
                                 msg='commit 3\n\ndesc3',
                                 date='2022-08-06T13:00:00-07:00')
-        commit_id3 = self._hg_get_tip(full=True)
+        commit_id3 = self._hg_get_tip()
 
         revisions = client.parse_revision_spec([])
         commit_history = client.get_commit_history(revisions)
@@ -1704,27 +1704,82 @@ class MercurialClientTests(MercurialTestCase):
         self.assertEqual(result.conflicting_files, [])
         self.assertEqual(result.patch_output, b'bad')
 
-    def _hg_get_tip(self, full=False):
+    def test_get_file_content(self) -> None:
+        """Testing MercurialClient.get_file_content"""
+        client = self.build_client()
+
+        self.hg_add_file_commit(filename='foo.txt',
+                                data=FOO1,
+                                msg='delete and modify stuff')
+
+        content = client.get_file_content(
+            filename='foo.txt',
+            revision=self._hg_get_tip())
+
+        self.assertEqual(content, FOO1)
+
+    def test_get_file_content_invalid_revision(self) -> None:
+        """Testing MercurialClient.get_file_content with an invalid revision
+        """
+        client = self.build_client()
+
+        with self.assertRaises(SCMError):
+            client.get_file_content(
+                filename='foo.txt',
+                revision='aoeu')
+
+    def test_get_file_content_invalid_filename(self) -> None:
+        """Testing MercurialClient.get_file_content with an invalid filename
+        """
+        client = self.build_client()
+
+        with self.assertRaises(SCMError):
+            client.get_file_content(
+                filename='unknown',
+                revision='1')
+
+    def test_get_file_size(self) -> None:
+        """Testing MercurialClient.get_file_size"""
+        client = self.build_client()
+
+        self.hg_add_file_commit(filename='foo.txt',
+                                data=FOO1,
+                                msg='delete and modify stuff')
+
+        size = client.get_file_size(
+            filename='foo.txt',
+            revision=self._hg_get_tip())
+
+        self.assertEqual(size, len(FOO1))
+
+    def test_get_file_size_invalid_revision(self) -> None:
+        """Testing MercurialClient.get_file_size with an invalid revision"""
+        client = self.build_client()
+
+        with self.assertRaises(SCMError):
+            client.get_file_size(
+                filename='foo.txt',
+                revision='aoeu')
+
+    def test_get_file_size_invalid_filename(self) -> None:
+        """Testing MercurialClient.get_file_size with an invalid filename"""
+        client = self.build_client()
+
+        with self.assertRaises(SCMError):
+            client.get_file_size(
+                filename='unknown',
+                revision='1')
+
+    def _hg_get_tip(self) -> str:
         """Return the revision at the tip of the branch.
 
-        Args:
-            full (bool, optional):
-                Whether to return a full ID. By default, a shortened ID is
-                returned.
-
-                Version Added:
-                    4.0
-
         Returns:
-            unicode:
+            str:
             The tip revision.
         """
-        cmdline = ['identify']
-
-        if full:
-            # This is currently the most cross-Mercurial way of getting a
-            # full ID.
-            cmdline.append('--debug')
+        # This is currently the most cross-Mercurial way of getting a
+        # full ID.
+        cmdline = ['identify', '--debug']
 
         return (
             self.run_hg(cmdline)

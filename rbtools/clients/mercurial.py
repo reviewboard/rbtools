@@ -70,6 +70,7 @@ class MercurialClient(BaseSCMClient):
     supports_parent_diffs = True
     can_bookmark = True
     can_branch = True
+    can_get_file_content = True
     can_merge = True
 
     PRE_CREATION = '/dev/null'
@@ -513,9 +514,9 @@ class MercurialClient(BaseSCMClient):
             tip = self._identify_revision(revisions[0])
             base = self._execute(
                 [self._exe, 'parents', '--hidden', '-r', tip,
-                 '--template', '{node|short}']).split()[0]
+                 '--template', '{node}']).split()[0]
 
-            if len(base) != 12:
+            if len(base) != 40:
                 raise InvalidRevisionSpecError(
                     "Can't determine parent revision")
 
@@ -548,7 +549,7 @@ class MercurialClient(BaseSCMClient):
 
             parent_base = self._execute(
                 [self._exe, 'parents', '--hidden', '-r', outgoing[0][1],
-                 '--template', '{node|short}']).split()
+                 '--template', '{node}']).split()
 
             if len(parent_base) == 0:
                 raise Exception(
@@ -580,8 +581,10 @@ class MercurialClient(BaseSCMClient):
             str:
             The global revision ID of the commit.
         """
+        # --debug ensures that we get the full ID.
         identify = self._execute(
-            [self._exe, 'identify', '-i', '--hidden', '-r', str(revision)],
+            [self._exe, 'identify', '--debug', '-i', '--hidden', '-r',
+             str(revision)],
             ignore_errors=True, none_on_ignored_error=True)
 
         if identify is None:
@@ -1208,7 +1211,7 @@ class MercurialClient(BaseSCMClient):
 
         args = [
             self._exe, '-q', 'outgoing', '--template',
-            '{rev}\\t{node|short}\\t{branch}\\n', remote,
+            '{rev}\\t{node}\\t{branch}\\n', remote,
         ]
 
         if rev:
@@ -1506,3 +1509,67 @@ class MercurialClient(BaseSCMClient):
         """
         return self._execute([self._exe, 'id', '-B'],
                              ignore_errors=True).strip()
+
+    def get_file_content(
+        self,
+        *,
+        filename: str,
+        revision: str,
+    ) -> bytes:
+        """Return the contents of a file at a given revision.
+
+        Version Added:
+            5.0
+
+        Args:
+            filename (str):
+                The file to fetch.
+
+            revision (str):
+                The revision of the file to get.
+
+        Returns:
+            bytes:
+            The read file.
+        """
+        try:
+            return self._execute(
+                [self._exe, 'cat', '-r', revision, filename],
+                env=self._hg_env,
+                log_output_on_error=False,
+                results_unicode=False)
+        except Exception as e:
+            raise SCMError(e)
+
+    def get_file_size(
+        self,
+        *,
+        filename: str,
+        revision: str,
+    ) -> int:
+        """Return the size of a file at a given revision.
+
+        Version Added:
+            5.0
+
+        Args:
+            filename (str):
+                The file to check.
+
+            revision (str):
+                The revision of the file to check.
+
+        Returns:
+            int:
+            The size of the file, in bytes.
+        """
+        try:
+            result = self._execute(
+                [self._exe, 'files', '--template', '{size}', '-r', revision,
+                 filename],
+                env=self._hg_env,
+                log_output_on_error=False)
+
+            return int(result)
+        except Exception as e:
+            raise SCMError(e)
