@@ -1708,9 +1708,8 @@ class Post(BaseCommand):
             mimetype = guess_mimetype(file_content)
 
             if not mimetype or mimetype in invalid_mimetypes:
-                logging.debug('Skipping %s (%s): MIME type %s is not '
-                              'supported',
-                              filename, revision, mimetype)
+                logger.debug('Skipping %s (%s): MIME type %s is not supported',
+                             filename, revision, mimetype)
                 continue
 
             if mimetype not in valid_mimetypes:
@@ -1724,12 +1723,56 @@ class Post(BaseCommand):
                     invalid_mimetypes.add(mimetype)
                     continue
 
-            logging.debug('Uploading file %s (%s)', filename, revision)
+            source_filename: Optional[str] = None
+            source_revision: Optional[str] = None
+            source_file_content: Optional[bytes] = None
+
+            if 'parent_source_revision' in file.extra_data:
+                # The diff additionally uses a parent diff. We therefore need
+                # to upload the source revision of the file as well.
+                source_filename = file.source_file
+                source_revision = file.source_revision
+
+                assert source_filename is not None
+                assert source_revision is not None
+
+                try:
+                    source_file_content = self.tool.get_file_content(
+                        filename=source_filename,
+                        revision=source_revision)
+                except Exception as e:
+                    logger.warning(
+                        'Unable to get binary file content for %s (%s): %s',
+                        source_filename, source_revision, e)
+                    continue
+
+                source_mimetype = guess_mimetype(source_file_content)
+
+                if mimetype != source_mimetype:
+                    logger.debug('Skipping %s (%s): MIME type of source '
+                                 'revision (%s) does not match MIME type of '
+                                 'modified revision (%s).',
+                                 filename, revision, source_mimetype, mimetype)
+                    continue
+
+            logger.debug('Uploading file "%s" revision %s (%s)',
+                         filename, revision, mimetype)
 
             diff_file_attachments.upload_attachment(
                 filename=os.path.basename(filename),
                 content=file_content,
                 filediff_id=file.id)
+
+            if source_file_content is not None:
+                assert source_filename is not None
+                logger.debug('Uploading parent revision for file %s (%s)',
+                             source_filename, source_revision)
+
+                diff_file_attachments.upload_attachment(
+                    filename=os.path.basename(source_filename),
+                    content=source_file_content,
+                    filediff_id=file.id,
+                    source_file=True)
 
     def _validate_squashed_diff(self, squashed_diff):
         """Validate the diff to ensure that it can be parsed and files exist.

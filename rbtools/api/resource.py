@@ -1387,14 +1387,20 @@ class FileAttachmentListResource(ListResource):
 
 @resource_mimetype('application/vnd.reviewboard.org.diff-file-attachments')
 class DiffFileAttachmentListResource(ListResource):
-    """The Diff File Attachment List resource specific base class."""
+    """The Diff File Attachment List resource specific base class.
+
+    Version Added:
+        5.0
+    """
 
     @request_method_decorator
     def upload_attachment(
         self,
+        *,
         filename: str,
         content: bytes,
         filediff_id: str,
+        source_file: bool = False,
         **kwargs,
     ) -> HttpRequest:
         """Upload a new attachment.
@@ -1409,6 +1415,9 @@ class DiffFileAttachmentListResource(ListResource):
             filediff_id (str):
                 The ID of the filediff to attach the file to.
 
+            source_file (bool, optional):
+                Whether to upload the source version of a file.
+
             **kwargs (dict):
                 Additional keyword arguments to add to the request
 
@@ -1419,6 +1428,9 @@ class DiffFileAttachmentListResource(ListResource):
         request = HttpRequest(self._url, method='POST', query_args=kwargs)
         request.add_file('path', filename, content)
         request.add_field('filediff', filediff_id)
+
+        if source_file:
+            request.add_field('source_file', '1')
 
         return request
 
