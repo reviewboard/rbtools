@@ -1,10 +1,14 @@
 """Common functionality for working with repository hooks."""
 
+from __future__ import annotations
+
 import logging
 import subprocess
+from typing import List, Optional, Union
 
 from rbtools.api.client import RBClient
 from rbtools.api.errors import APIError, ServerInterfaceError
+from rbtools.deprecation import PendingRemovalInRBToolsWarning
 
 
 SUBMITTED = 'submitted'
@@ -49,10 +53,54 @@ def get_api(server_url, **kwargs):
     return api_client, api_root
 
 
-def execute(command):
-    """Executes the specified command and returns the stdout output."""
-    process = subprocess.Popen(command, stdout=subprocess.PIPE)
-    output = process.communicate()[0].strip()
+def execute(
+    command: Union[List[str], str],
+    *,
+    text: bool = False,
+    strip: bool = True,
+) -> Optional[Union[bytes, str]]:
+    """Execute the specified command and return the stdout output.
+
+    Version Changed:
+        5.0:
+        Added the ``text`` and ``strip`` arguments.
+
+    Deprecated:
+        5.0:
+        Deprecated in favor of :py:func:`~rbtools.utils.process.run_process`.
+
+    Args:
+        command (str or list of str):
+            The command to execute.
+
+        text (bool, optional):
+            If ``True``, this will return the output as a string, otherwise
+            it will return bytes. This defaults to ``False``.
+
+            Version Added:
+                5.0
+
+        strip (bool, optional):
+            Whether to strip leading and trailing whitespace from the output
+            of the command. This defaults to ``True``.
+
+            Version Added:
+                5.0
+
+    Returns:
+        bytes or str:
+        The stdout output of the command or ``None`` if the command failed
+        to execute.
+    """
+    PendingRemovalInRBToolsWarning.warn(
+        'execute() is pending deprecation and will be removed in a future '
+        'version of RBTools. Use rbtools.utils.process.run_process() instead.')
+
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, text=text)
+    output = process.communicate()[0]
+
+    if strip:
+        output = output.strip()
 
     if process.returncode:
         logging.warning('Failed to execute command: %s', command)
