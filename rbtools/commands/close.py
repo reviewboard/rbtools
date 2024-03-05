@@ -35,7 +35,7 @@ class Close(BaseCommand):
     ]
 
     def check_valid_type(self, close_type):
-        """Check if the user specificed a proper type.
+        """Check if the user specified a proper type.
 
         Type must either be 'discarded' or 'submitted'. If the type
         is wrong, the command will stop and alert the user.

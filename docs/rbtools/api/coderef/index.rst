@@ -211,10 +211,8 @@ Utilities
    rbtools.utils.errors
    rbtools.utils.filesystem
    rbtools.utils.graphs
-   rbtools.utils.match_score
    rbtools.utils.process
    rbtools.utils.repository
    rbtools.utils.review_request
    rbtools.utils.source_tree
-   rbtools.utils.testbase
    rbtools.utils.users

@@ -44,7 +44,7 @@ def get_repository_resource(api_root,
 
     query = {
         'only_fields': 'id,name,mirror_path,path',
-        'only_links': 'info',
+        'only_links': 'info,diff_file_attachments',
     }
 
     if tool and tool.server_tool_names:
@@ -94,7 +94,7 @@ def get_repository_resource(api_root,
 
 
 def get_repository_id(repository_info, api_root, repository_name=None):
-    """Return the ID of a repostiory from the server.
+    """Return the ID of a repository from the server.
 
     This will look up all accessible repositories on the server and try to
     find the ID of one that matches the provided repository information.

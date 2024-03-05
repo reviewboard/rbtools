@@ -3,7 +3,8 @@
 from collections import defaultdict
 from copy import deepcopy
 
-from rbtools.hooks.common import execute, get_review_request_id
+from rbtools.hooks.common import get_review_request_id
+from rbtools.utils.process import run_process
 
 
 def get_branch_name(ref_name):
@@ -18,7 +19,13 @@ def get_commit_hashes(old_rev, new_rev):
     """Returns a list of abbreviated commit hashes from old_rev to new_rev."""
     git_command = ['git', 'rev-list', '--abbrev-commit', '--reverse', '%s..%s'
                    % (old_rev, new_rev)]
-    return execute(git_command).split('\n')
+
+    return (
+        run_process(git_command)
+        .stdout
+        .read()
+        .split('\n')
+    )
 
 
 def get_unique_commit_hashes(ref_name, new_rev):
@@ -26,27 +33,54 @@ def get_unique_commit_hashes(ref_name, new_rev):
     git_command = ['git', 'rev-list', new_rev, '--abbrev-commit', '--reverse',
                    '--not']
     git_command.extend(get_excluded_branches(ref_name))
-    return execute(git_command).strip().split('\n')
+
+    return (
+        run_process(git_command)
+        .stdout
+        .read()
+        .strip()
+        .split('\n')
+    )
 
 
 def get_excluded_branches(ref_name):
     """Returns a list of all branches, excluding the specified branch."""
     git_command = ['git', 'for-each-ref', 'refs/heads/', '--format=%(refname)']
-    all_branches = execute(git_command).strip().split('\n')
+    all_branches = (
+        run_process(git_command)
+        .stdout
+        .read()
+        .strip()
+        .split('\n')
+    )
+
     return [branch.strip() for branch in all_branches if branch != ref_name]
 
 
 def get_branches_containing_commit(commit_hash):
     """Returns a list of all branches containing the specified commit."""
     git_command = ['git', 'branch', '--contains', commit_hash]
-    branches = execute(git_command).replace('*', '').split('\n')
+    branches = (
+        run_process(git_command)
+        .stdout
+        .read()
+        .replace('*', '')
+        .split('\n')
+    )
+
     return [branch.strip() for branch in branches]
 
 
 def get_commit_message(commit):
     """Returns the specified commit's commit message."""
     git_command = ['git', 'show', '-s', '--pretty=format:%B', commit]
-    return execute(git_command).strip()
+
+    return (
+        run_process(git_command)
+        .stdout
+        .read()
+        .strip()
+    )
 
 
 def get_review_id_to_commits_map(lines, regex):

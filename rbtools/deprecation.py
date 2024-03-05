@@ -30,17 +30,6 @@ class BaseRemovedInRBToolsVersionWarning(BaseRemovedInWarning):
     product = 'RBTools'
 
 
-class RemovedInRBTools40Warning(BaseRemovedInRBToolsVersionWarning):
-    """Deprecations for features removed in RBTools 4.0.
-
-    Note that this class will itself be removed in RBTools 4.0. If you need to
-    check against RBTools deprecation warnings, please see
-    :py:class:`BaseRemovedInRBToolsVersionWarning`.
-    """
-
-    version = '4.0'
-
-
 class RemovedInRBTools50Warning(BaseRemovedInRBToolsVersionWarning):
     """Deprecations for features removed in RBTools 5.0.
 

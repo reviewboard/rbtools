@@ -333,11 +333,8 @@ class TestCase(unittest.TestCase):
                 The assertion failure, if the exception and message isn't
                 raised.
         """
-        # This explicitly uses the old name, as opposed to assertRaisesRegex,
-        # because we still need Python 2.7 support. Once we move to Python 3,
-        # we can fix this.
-        return self.assertRaisesRegexp(expected_exception,
-                                       re.escape(expected_message))
+        return self.assertRaisesRegex(expected_exception,
+                                      re.escape(expected_message))
 
     def create_rbclient(self):
         """Return a RBClient for testing.

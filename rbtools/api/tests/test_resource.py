@@ -1,7 +1,5 @@
 """Unit tests for rbtools.api.resource."""
 
-import re
-
 from rbtools.api.factory import create_resource
 from rbtools.api.request import HttpRequest
 from rbtools.api.resource import (CountResource,
@@ -15,7 +13,6 @@ from rbtools.api.resource import (CountResource,
                                   RootResource,
                                   _EXTRA_DATA_DOCS_URL)
 from rbtools.api.tests.base import TestWithPayloads
-from rbtools.deprecation import RemovedInRBTools50Warning
 
 
 class ExpandedItemResource(ItemResource):
@@ -232,8 +229,8 @@ class ItemResourceTests(TestWithPayloads):
                             payload=self.item_payload,
                             url='')
         request = r.update(extra_data__key1='value1',
-                           extra_data__key2=True,
-                           extra_data__key3=123)
+                           extra_data__key2='True',
+                           extra_data__key3='123')
 
         self.assertEqual(
             request._fields,
@@ -315,8 +312,8 @@ class ListResourceTests(TestWithPayloads):
                             payload=self.list_payload,
                             url='')
         request = r.create(extra_data__key1='value1',
-                           extra_data__key2=True,
-                           extra_data__key3=123)
+                           extra_data__key2='True',
+                           extra_data__key3='123')
 
         self.assertEqual(
             request._fields,
@@ -529,22 +526,6 @@ class ResourceFieldDictTests(TestWithPayloads):
             set(r.nested_field.fields()),
             set(self.item_payload['resource_token']['nested_field']))
 
-    def test_iterfields(self):
-        """Testing ResourceDictField.iterfields"""
-        r = create_resource(transport=self.transport,
-                            payload=self.item_payload,
-                            url='')
-
-        message = re.escape(
-            'ResourceDictField.iterfields() is deprecated and will be removed '
-            'in RBTools 5.0. Please use fields() instead.'
-        )
-
-        with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
-            self.assertEqual(
-                set(r.nested_field.iterfields()),
-                set(self.item_payload['resource_token']['nested_field']))
-
     def test_setitem(self):
         """Testing ResourceDictField.__setitem__"""
         r = create_resource(transport=self.transport,
@@ -675,7 +656,7 @@ class ResourceExtraDataFieldTests(TestWithPayloads):
             'extra_data attributes cannot be modified directly on this '
             'dictionary. To make a mutable copy of this and all its contents, '
             'call .copy(). To set or change extra_data state, issue a '
-            '.update(extra_data_json={...}) for a JSON Merge Patch requst or '
+            '.update(extra_data_json={...}) for a JSON Merge Patch request or '
             '.update(extra_data_json_patch=[...]) for a JSON Patch request '
             'on the parent resource. See %s for the format for these '
             'operations.'

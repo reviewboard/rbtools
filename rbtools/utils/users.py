@@ -62,7 +62,7 @@ def get_authenticated_session(api_client, api_root, auth_required=False,
         for i in range(num_retries + 1):
             username = get_input('Username: ', require=True)
             password = get_pass('Password: ', require=True)
-            api_client.login(username, password)
+            api_client.login(username=username, password=password)
 
             try:
                 session = session.get_self()

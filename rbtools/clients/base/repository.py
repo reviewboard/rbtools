@@ -4,12 +4,11 @@ Version Added:
     4.0
 """
 
+from __future__ import annotations
+
 from typing import List, Optional, Union
 
-from housekeeping import deprecate_non_keyword_only_args
-
 from rbtools.api.resource import ItemResource
-from rbtools.deprecation import RemovedInRBTools50Warning
 
 
 class RepositoryInfo:
@@ -53,7 +52,6 @@ class RepositoryInfo:
     #:     str
     local_path: Optional[str]
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def __init__(
         self,
         *,
@@ -167,7 +165,7 @@ class RepositoryInfo:
 
         Subclasses may override this to fetch additional data from the server.
 
-        By defaut, this simply sets the path based on the ``repository``.
+        By default, this simply sets the path based on the ``repository``.
 
         Args:
             repository (rbtools.api.resource.ItemResource):

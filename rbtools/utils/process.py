@@ -1,3 +1,5 @@
+"""Utilities for running processes."""
+
 import io
 import logging
 import os
@@ -502,35 +504,6 @@ def run_process_exec(
         cwd=cwd)
 
     return result.returncode, result.stdout, result.stderr
-
-
-def log_command_line(
-    fmt: str,
-    command: List[AnyStr],
-) -> None:
-    """Log a command line.
-
-    Deprecated:
-        4.0:
-        Callers should just pass the command line to
-        :py:func:`subprocess.list2cmdline` and log the results instead.
-
-    Args:
-        fmt (unicode):
-            A format string to use for the log message.
-
-        command (list):
-            A command line in list form.
-    """
-    RemovedInRBTools50Warning.warn(
-        'log_command_line is deprecated and will be removed in RBTools 5.0. '
-        'Please manually log the results of subprocess.list2cmdline instead.')
-
-    # While most of the subprocess library can deal with bytes objects in
-    # command lines, list2cmdline can't. Decode each part if necessary.
-    logging.debug(fmt, subprocess.list2cmdline([
-        force_unicode(part) for part in command
-    ]))
 
 
 def execute(

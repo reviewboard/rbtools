@@ -32,7 +32,6 @@ from rbtools.commands.base.errors import (CommandError,
 from rbtools.commands.base.options import Option, OptionGroup
 from rbtools.commands.base.output import JSONOutput, OutputWrapper
 from rbtools.config import RBToolsConfig, load_config
-from rbtools.deprecation import RemovedInRBTools40Warning
 from rbtools.diffs.tools.errors import MissingDiffToolError
 from rbtools.utils.console import get_input, get_pass
 from rbtools.utils.filesystem import cleanup_tempfiles, get_home_path
@@ -1056,21 +1055,18 @@ class BaseCommand:
     def initialize_scm_tool(
         self,
         client_name: Optional[str] = None,
-        require_repository_info: bool = True,
     ) -> Tuple[RepositoryInfo, BaseSCMClient]:
         """Initialize the SCM tool for the current working directory.
+
+        Version Changed:
+            5.0:
+            Removed deprecated ``require_repository_info`` argument.
 
         Args:
             client_name (str, optional):
                 A specific client name, which can come from the configuration.
                 This can be used to disambiguate if there are nested
                 repositories, or to speed up detection.
-
-            require_repository_info (bool, optional):
-                Whether information on a repository is required. This is the
-                default. If disabled, this will return ``None`` for the
-                repository information if a matching repository could not be
-                found.
 
         Returns:
             tuple:
@@ -1083,13 +1079,6 @@ class BaseCommand:
                 1 (rbtools.clients.base.scmclient.BaseSCMClient):
                     The SCMTool client instance.
         """
-        if not require_repository_info:
-            RemovedInRBTools40Warning.warn(
-                'The require_repository_info parameter to '
-                'Command.initialize_scm_tool is deprecated and will be '
-                'removed in RBTools 4.0. Commands which need to use only the '
-                'API should set the needs_api attribute.')
-
         repository_info, tool = scan_usable_client(
             self.config,
             self.options,
@@ -1107,44 +1096,6 @@ class BaseCommand:
                 raise CommandError(str(e))
 
         return repository_info, tool
-
-    def setup_tool(self, tool, api_root=None):
-        """Performs extra initialization on the tool.
-
-        If api_root is not provided we'll assume we want to
-        initialize the tool using only local information
-        """
-        RemovedInRBTools40Warning.warn(
-            'The Command.setup_tool method is deprecated and will be removed '
-            'in RBTools 4.0. Commands which need to use both the API and SCM '
-            'client should instead set the needs_api and needs_scm_client '
-            'attributes.')
-        tool.capabilities = self.get_capabilities(api_root)
-
-    def get_server_url(self, repository_info, tool):
-        """Return the Review Board server url.
-
-        Args:
-            repository_info (rbtools.clients.base.repository.RepositoryInfo,
-                             optional):
-                Information about the current repository
-
-            tool (rbtools.clients.base.BaseSCMClient, optional):
-                The repository client.
-
-        Returns:
-            unicode:
-            The server URL.
-        """
-        RemovedInRBTools40Warning.warn(
-            'The Command.get_server_url method is deprecated and will be '
-            'removed in RBTools 4.0. Commands which need the API client '
-            'should instead set the needs_api attribute.')
-
-        if self.server_url is None:
-            self.server_url = self._init_server_url()
-
-        return self.server_url
 
     def credentials_prompt(
         self,
@@ -1533,39 +1484,6 @@ class BaseCommand:
 
             if self.repository_info is not None and self.tool is not None:
                 server_url = self.tool.scan_for_server(self.repository_info)
-
-        repository_info = self.repository_info
-
-        # Finally, fall back on the TREES config. Once upon a time, we
-        # suggested that users create a TREES dict in their config
-        # file that specified the REVIEWBOARD_URL for multiple repository
-        # paths. This was never properly documented, and has long outlived its
-        # usefulness. We're continuing to support it for now but emit a
-        # deprecation warning.
-        if not server_url and repository_info is not None:
-            if 'TREES' in self.config:
-                trees = self.config['TREES']
-                path = None
-
-                # Some repositories will return a list of paths.
-                if isinstance(repository_info.path, list):
-                    for path in repository_info.path:
-                        if path in trees:
-                            break
-                    else:
-                        path = None
-                elif repository_info.path in trees:
-                    path = repository_info.path
-
-                if path and 'REVIEWBOARD_URL' in trees[path]:
-                    RemovedInRBTools40Warning.warn(
-                        'The TREES configuration for specifying the '
-                        'REVIEWBOARD_URL is no longer supported and will be '
-                        'removed in RBTools 4.0. If you have multiple Review '
-                        'Board servers for different repositories, create '
-                        'individual .reviewboardrc files in each repository '
-                        'to define REVIEWBOARD_URL.')
-                    server_url = trees[path]['REVIEWBOARD_URL']
 
         if not server_url:
             raise CommandError('Unable to find a Review Board server for this '

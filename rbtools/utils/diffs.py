@@ -1,16 +1,13 @@
 """Utilities for generating or parsing diffs."""
 
+from __future__ import annotations
+
 import fnmatch
 import os
 import sys
 from typing import Iterable, Iterator, List, Optional, Pattern
 
-from housekeeping import deprecate_non_keyword_only_args
 
-from rbtools.deprecation import RemovedInRBTools50Warning
-
-
-@deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
 def filename_match_any_patterns(
     filename: str,
     patterns: Iterable[str],
@@ -48,7 +45,6 @@ def filename_match_any_patterns(
     return any(fnmatch.fnmatch(filename, pattern) for pattern in patterns)
 
 
-@deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
 def filter_diff(
     diff: Iterable[bytes],
     file_index_re: Pattern[bytes],
@@ -113,7 +109,6 @@ def filter_diff(
             yield line
 
 
-@deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
 def normalize_patterns(
     patterns: Iterable[str],
     *,
@@ -166,7 +161,6 @@ def normalize_patterns(
     return [normalize(pattern) for pattern in patterns]
 
 
-@deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
 def remove_filenames_matching_patterns(
     filenames: Iterable[str],
     *,

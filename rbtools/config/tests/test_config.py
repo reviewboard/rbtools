@@ -265,7 +265,7 @@ class ConfigDataTests(TestCase):
             self.assertIsNone(config['FOO'])
 
     def test_merge(self) -> None:
-        """Tesing ConfigData.merge"""
+        """Testing ConfigData.merge"""
         config1 = MyConfigData(config_dict={
             'BOOL_KEY': False,
             'DICT_KEY': {

@@ -12,7 +12,6 @@ import re
 from typing import (Any, Dict, List, Mapping, Optional, Tuple, Union, cast,
                     TYPE_CHECKING)
 
-from housekeeping import deprecate_non_keyword_only_args
 from typing_extensions import NotRequired, TypedDict, final
 
 from rbtools.api.capabilities import Capabilities
@@ -400,6 +399,15 @@ class BaseSCMClient(object):
     #:     bool
     can_squash_merges: bool = False
 
+    #: Whether the tool can get files at specific revisions.
+    #:
+    #: Version Added:
+    #:     5.0
+    #:
+    #: Type:
+    #:     bool
+    can_get_file_content: bool = False
+
     ######################
     # Instance variables #
     ######################
@@ -468,26 +476,6 @@ class BaseSCMClient(object):
 
         self._diff_tool: Optional[BaseDiffTool] = None
         self._has_deps: Optional[bool] = None
-
-    @property
-    def entrypoint_name(self) -> str:
-        """An alias for the SCMClient ID.
-
-        This is here for backwards-compatibility purposes.
-
-        Deprecated:
-            4.0:
-            Callers should use :py:attr:`scmclient_id`. This attribute will
-            be removed in RBTools 5.0.
-        """
-        cls_name = type(self).__name__
-
-        RemovedInRBTools50Warning.warn(
-            '%s.entrypoint_name is deprecated. Please use %s.scmclient_id '
-            'instead. This will be removed in RBTools 5.0.'
-            % (cls_name, cls_name))
-
-        return self.scmclient_id
 
     @final
     def setup(self) -> None:
@@ -857,7 +845,6 @@ class BaseSCMClient(object):
             'tip': None,
         }
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def get_tree_matches_review_request(
         self,
         review_request: ReviewRequestResource,
@@ -901,7 +888,6 @@ class BaseSCMClient(object):
         """
         return None
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def diff(
         self,
         revisions: SCMClientRevisionSpec,
@@ -1007,7 +993,7 @@ class BaseSCMClient(object):
 
         Args:
             base_path (str):
-                The relative path beetween the repository root and the
+                The relative path between the repository root and the
                 directory that the diff file was generated in.
 
             base_dir (str):
@@ -1063,7 +1049,6 @@ class BaseSCMClient(object):
         """
         raise NotImplementedError
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def apply_patch(
         self,
         patch_file: str,
@@ -1159,7 +1144,6 @@ class BaseSCMClient(object):
         #       and when there are no empty files.
         return PatchResult(applied=(rc == 0), patch_output=patch_output)
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def create_commit(
         self,
         *,
@@ -1182,7 +1166,7 @@ class BaseSCMClient(object):
                 The author of the commit.
 
             run_editor (bool):
-                Whether to run the user's editor on the commmit message before
+                Whether to run the user's editor on the commit message before
                 committing.
 
             files (list of str, optional):
@@ -1241,7 +1225,6 @@ class BaseSCMClient(object):
 
         return result
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def delete_branch(
         self,
         branch_name: str,
@@ -1264,7 +1247,6 @@ class BaseSCMClient(object):
         """
         raise NotImplementedError
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def merge(
         self,
         *,
@@ -1295,7 +1277,7 @@ class BaseSCMClient(object):
                 Whether to squash the commits or do a plain merge.
 
             run_editor (bool, optional):
-                Whether to run the user's editor on the commmit message before
+                Whether to run the user's editor on the commit message before
                 committing.
 
             close_branch (bool, optional):
@@ -1371,7 +1353,6 @@ class BaseSCMClient(object):
         """
         return False
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def apply_patch_for_empty_files(
         self,
         patch: bytes,
@@ -1399,7 +1380,6 @@ class BaseSCMClient(object):
         """
         raise NotImplementedError
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def amend_commit_description(
         self,
         message: str,
@@ -1422,5 +1402,59 @@ class BaseSCMClient(object):
         Raises:
             rbtools.clients.errors.AmendError:
                 The amend operation failed.
+        """
+        raise NotImplementedError
+
+    def get_file_content(
+        self,
+        *,
+        filename: str,
+        revision: str,
+    ) -> bytes:
+        """Return the contents of a file at a given revision.
+
+        This may be implemented by subclasses in order to support uploading
+        binary files to diffs.
+
+        Version Added:
+            5.0
+
+        Args:
+            filename (str):
+                The file to fetch.
+
+            revision (str):
+                The revision of the file to get.
+
+        Returns:
+            bytes:
+            The read file.
+        """
+        raise NotImplementedError
+
+    def get_file_size(
+        self,
+        *,
+        filename: str,
+        revision: str,
+    ) -> int:
+        """Return the size of a file at a given revision.
+
+        This may optionally be implemented by subclasses if the SCM supports
+        fetching file sizes.
+
+        Version Added:
+            5.0
+
+        Args:
+            filename (str):
+                The file to check.
+
+            revision (str):
+                The revision of the file to check.
+
+        Returns:
+            int:
+            The size of the file, in bytes.
         """
         raise NotImplementedError

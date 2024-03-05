@@ -21,7 +21,6 @@ else:
 
 from rbtools.clients.base.scmclient import BaseSCMClient
 from rbtools.clients.errors import SCMClientNotFoundError
-from rbtools.deprecation import RemovedInRBTools50Warning
 
 
 logger = logging.getLogger(__name__)
@@ -244,15 +243,6 @@ class SCMClientRegistry:
         for ep in entry_points(group='rbtools_scm_clients'):
             try:
                 cls = ep.load()
-
-                if not getattr(cls, 'scmclient_id', None):
-                    RemovedInRBTools50Warning.warn(
-                        '%s.scmclient_id must be set, and must be a unique '
-                        'value. You probably want to set it to "%s".'
-                        % (cls.__name__, ep.name))
-
-                    cls.scmclient_id = ep.name
-
                 self.register(cls)
             except Exception as e:
                 logger.exception('Unexpected error loading non-default '

@@ -13,7 +13,6 @@ import threading
 from collections import OrderedDict, defaultdict, deque
 from typing import Dict, List, Optional
 
-from housekeeping import deprecate_non_keyword_only_args
 from pydiffx.dom import DiffX
 from pydiffx.dom.objects import DiffXChangeSection
 
@@ -25,13 +24,10 @@ from rbtools.clients.base.scmclient import (BaseSCMClient,
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     SCMError)
-from rbtools.deprecation import (RemovedInRBTools40Warning,
-                                 RemovedInRBTools50Warning)
 from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import execute
-from rbtools.utils.repository import get_repository_resource
 
 # This specific import is necessary to handle the paths when running on cygwin.
 if sys.platform.startswith(('cygwin', 'win')):
@@ -687,7 +683,6 @@ class ClearCaseClient(BaseSCMClient):
             'tip': pairs,
         }
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def diff(
         self,
         revisions: SCMClientRevisionSpec,
@@ -2460,45 +2455,6 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
 
         if self.is_legacy:
             self.base_path = self.vobtag
-
-    def find_server_repository_info(self, api_root):
-        """Find a matching repository on the server.
-
-        The point of this function is to find a repository on the server that
-        matches self, even if the paths aren't the same. (For example, if self
-        uses an 'http' path, but the server uses a 'file' path for the same
-        repository.) It does this by comparing the VOB's name and uuid. If the
-        repositories use the same path, you'll get back self, otherwise you'll
-        get a different ClearCaseRepositoryInfo object (with a different path).
-
-        Deprecated:
-            3.0:
-            Commands which need to use the remote repository, or need data from
-            the remote repository such as the base path, should set
-            :py:attr:`needs_repository`.
-
-        Args:
-            api_root (rbtools.api.resource.RootResource):
-                The root resource for the Review Board server.
-
-        Returns:
-            ClearCaseRepositoryInfo:
-            The server-side information for this repository.
-        """
-        RemovedInRBTools40Warning.warn(
-            'The find_server_repository_info method is deprecated, and will '
-            'be removed in RBTools 4.0. If you need to access the remote '
-            'repository, set the needs_repository attribute on your Command '
-            'subclass.')
-
-        repository, info = get_repository_resource(
-            api_root,
-            tool=self.tool)
-
-        if repository:
-            self.update_from_remote(repository, info)
-
-        return self
 
 
 _HostProperties = Optional[Dict[str, str]]

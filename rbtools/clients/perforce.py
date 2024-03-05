@@ -7,13 +7,10 @@ import os
 import re
 import socket
 import stat
-import string
 import subprocess
 import sys
 from fnmatch import fnmatch
 from typing import List, Optional, Tuple, Union
-
-from housekeeping import deprecate_non_keyword_only_args
 
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
@@ -25,7 +22,6 @@ from rbtools.clients.errors import (AmendError,
                                     SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
-from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.diffs.tools.base.diff_tool import BaseDiffTool
 from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install
@@ -842,7 +838,6 @@ class PerforceClient(BaseSCMClient):
 
         return None
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def diff(
         self,
         revisions: SCMClientRevisionSpec,

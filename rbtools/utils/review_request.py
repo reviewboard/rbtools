@@ -1,19 +1,28 @@
 """Utilities for matching review requests."""
 
+from __future__ import annotations
+
 import logging
 import re
 from collections import OrderedDict
 from difflib import SequenceMatcher
 from itertools import islice
+from typing import Callable, Optional, TYPE_CHECKING
+
+from housekeeping import deprecate_non_keyword_only_args
 
 from rbtools.api.errors import APIError
 from rbtools.api.resource import ListResource
 from rbtools.clients.errors import InvalidRevisionSpecError
-from rbtools.deprecation import RemovedInRBTools40Warning
+from rbtools.deprecation import RemovedInRBTools60Warning
 from rbtools.utils.errors import MatchReviewRequestsError
-from rbtools.utils.match_score import Score
-from rbtools.utils.repository import get_repository_id
 from rbtools.utils.users import get_user
+
+if TYPE_CHECKING:
+    from rbtools.api.client import RBClient
+    from rbtools.api.resource import ReviewRequestResource, RootResource
+    from rbtools.clients.base.scmclient import (BaseSCMClient,
+                                                SCMClientRevisionSpec)
 
 
 def get_draft_or_current_value(field_name, review_request):
@@ -29,69 +38,6 @@ def get_draft_or_current_value(field_name, review_request):
         fields = review_request
 
     return fields[field_name]
-
-
-def get_possible_matches(review_requests, summary, description, limit=5):
-    """Return a sorted list of tuples of score and review request.
-
-    Each review request is given a score based on the summary and
-    description provided. The result is a sorted list of tuples containing
-    the score and the corresponding review request, sorted by the highest
-    scoring review request first.
-
-    Deprecated:
-        3.1:
-        This will be removed in RBTools 4.0.
-
-    Args:
-        review_requests (list of rbtools.api.resource.ReviewRequestResource):
-            The list of review requests to match against.
-
-        summary (unicode):
-            The summary to match.
-
-        description (unicode):
-            The description to match.
-
-        limit (int, optional):
-            The maximum number of results to return.
-
-    Returns:
-        list of tuple:
-        A list of matches. Each match is a 2-tuple in the form of:
-
-        1. The match score (:py:class:`rbtools.utils.match_score.Score`)
-        2. The review request
-           (:py:class:`rbtools.api.resource.ReviewRequestResource`)
-    """
-    RemovedInRBTools40Warning.warn(
-        'rbtools.utils.review_request.get_possible_matches() is deprecated '
-        'and will be removed in RBTools 4.0.')
-
-    candidates = []
-
-    # Get all potential matches.
-    for review_request in review_requests.all_items:
-        summary_pair = (
-            get_draft_or_current_value('summary', review_request),
-            summary,
-        )
-        description_pair = (
-            get_draft_or_current_value('description', review_request),
-            description,
-        )
-
-        score = Score.get_match(summary_pair, description_pair)
-        candidates.append((score, review_request))
-
-    # Sort by summary and description on descending rank.
-    sorted_candidates = sorted(
-        candidates,
-        key=lambda m: (m[0].summary_score, m[0].description_score),
-        reverse=True
-    )
-
-    return sorted_candidates[:limit]
 
 
 def get_revisions(tool, cmd_args):
@@ -201,12 +147,14 @@ def get_pending_review_requests(api_root,
         **get_kwargs)
 
 
-def find_review_request_by_change_id(api_client,
-                                     api_root,
-                                     repository_info=None,
-                                     repository_name=None,
-                                     revisions=None,
-                                     repository_id=None):
+@deprecate_non_keyword_only_args(RemovedInRBTools60Warning)
+def find_review_request_by_change_id(
+    *,
+    api_client: RBClient,
+    api_root: RootResource,
+    revisions: SCMClientRevisionSpec,
+    repository_id: Optional[int] = None,
+) -> Optional[ReviewRequestResource]:
     """Ask Review Board for the review request ID for the tip revision.
 
     Note that this function calls the Review Board API with the ``only_fields``
@@ -214,6 +162,12 @@ def find_review_request_by_change_id(api_client,
     specified by the ``only_fields`` variable.
 
     If no review request is found, ``None`` will be returned instead.
+
+    Version Changed:
+        5.0:
+        * Removed deprecated ``repository_info`` and ``repository_name``
+          arguments.
+        * Made all arguments keyword-only.
 
     Version Changed:
         3.0:
@@ -227,18 +181,15 @@ def find_review_request_by_change_id(api_client,
         api_root (rbtools.api.resource.RootResource):
             The root resource of the Review Board server.
 
-        repository_info (rbtools.clients.base.repository.RepositoryInfo,
-                         deprecated):
-            The repository info object.
-
-        repository_name (unicode, deprecated):
-            The repository name.
-
         revisions (dict):
             The parsed revision information, including the ``tip`` key.
 
         repository_id (int, optional):
             The repository ID to use.
+
+    Returns:
+        rbtools.api.resource.ReviewRequestResource:
+        The matching review request, if found.
     """
     assert api_client is not None
     assert api_root is not None
@@ -246,6 +197,8 @@ def find_review_request_by_change_id(api_client,
 
     only_fields = 'id,commit_id,changenum,status,url,absolute_url'
     change_id = revisions['tip']
+    assert isinstance(change_id, str)
+
     logging.debug('Attempting to find review request from tip revision ID: %s',
                   change_id)
     # Strip off any prefix that might have been added by the SCM.
@@ -259,16 +212,7 @@ def find_review_request_by_change_id(api_client,
         optional_args['changenum'] = int(change_id)
 
     user = get_user(api_client, api_root, auth_required=True)
-
-    if repository_info or repository_name:
-        RemovedInRBTools40Warning.warn(
-            'The repository_info and repository_name arguments to '
-            'find_review_request_by_change_id are deprecated and will be '
-            'removed in RBTools 4.0. Please change your command to use the '
-            'needs_repository attribute and pass in the repository ID '
-            'directly.')
-        repository_id = get_repository_id(
-            repository_info, api_root, repository_name)
+    assert user is not None
 
     # Don't limit query to only pending requests because it's okay to stamp a
     # submitted review.
@@ -510,20 +454,21 @@ def find_review_request_matches(review_requests,
     }
 
 
-def guess_existing_review_request(repository_info=None,
-                                  repository_name=None,
-                                  api_root=None,
-                                  api_client=None,
-                                  tool=None,
-                                  revisions=None,
-                                  guess_summary=False,
-                                  guess_description=False,
-                                  is_fuzzy_match_func=None,
-                                  no_commit_error=None,
-                                  submit_as=None,
-                                  additional_fields=None,
-                                  repository_id=None,
-                                  commit_id=None):
+@deprecate_non_keyword_only_args(RemovedInRBTools60Warning)
+def guess_existing_review_request(
+    *,
+    api_root: RootResource,
+    api_client: Optional[RBClient] = None,
+    tool: BaseSCMClient,
+    revisions: SCMClientRevisionSpec,
+    is_fuzzy_match_func: Optional[
+        Callable[[ReviewRequestResource], bool]] = None,
+    no_commit_error: Optional[Callable[[], None]] = None,
+    submit_as: str,
+    additional_fields: Optional[list[str]] = None,
+    repository_id: Optional[int] = None,
+    commit_id: Optional[str] = None,
+) -> Optional[ReviewRequestResource]:
     """Try to guess the existing review request ID if it is available.
 
     The existing review request is guessed by comparing the existing
@@ -537,8 +482,16 @@ def guess_existing_review_request(repository_info=None,
     sorted by the highest ranked match first.
 
     Note that this function calls the ReviewBoard API with the only_fields
-    paramater, thus the returned review request will contain only the fields
+    parameter, thus the returned review request will contain only the fields
     specified by the only_fields variable.
+
+    Version Changed:
+        5.0:
+        * Removed the deprecated ``repository_info``, ``repository_name``,
+          ``guess_summary``, and ``guess_description`` arguments.
+        * Made ``submit_as`` required.
+        * Deprecated the ``api_client`` argument.
+        * Made all arguments keyword-only.
 
     Version Changed:
         3.1:
@@ -554,21 +507,6 @@ def guess_existing_review_request(repository_info=None,
         deprecated in favor of adding the new ``repository_id`` argument.
 
     Args:
-        repository_info (rbtools.clients.base.repository.RepositoryInfo,
-                         deprecated):
-            The repository info object.
-
-            Deprecated:
-                3.0:
-                ``repository_id`` must be provided instead.
-
-        repository_name (unicode, deprecated):
-            The repository name.
-
-            Deprecated:
-                3.0:
-                ``repository_id`` must be provided instead.
-
         api_root (rbtools.api.resource.RootResource):
             The root resource of the Review Board server.
 
@@ -581,28 +519,6 @@ def guess_existing_review_request(repository_info=None,
         revisions (dict):
             The parsed revisions object.
 
-        guess_summary (bool):
-            Whether to attempt to guess the summary for comparison.
-
-            Deprecated:
-                3.1:
-                In future versions, summaries will automatically be queried
-                from the SCMClient and matched. Internally, this has been
-                the default behavior regardless of settings for many years.
-
-                This will be removed in RBTools 4.0.
-
-        guess_description (bool):
-            Whether to attempt to guess the description for comparison.
-
-            Deprecated::
-                3.1:
-                In future versions, summaries will automatically be queried
-                from the SCMClient and matched. Internally, this has been
-                the default behavior regardless of settings for many years.
-
-                This will be removed in RBTools 4.0.
-
         is_fuzzy_match_func (callable, optional):
             A function which can check if a review request is a match for the
             data being posted.
@@ -610,7 +526,7 @@ def guess_existing_review_request(repository_info=None,
         no_commit_error (callable, optional):
             A function to be called when there's no local commit.
 
-        submit_as (unicode, optional):
+        submit_as (str):
             A username on the server which is used for posting review requests.
             If provided, review requests owned by this user will be matched.
 
@@ -618,14 +534,14 @@ def guess_existing_review_request(repository_info=None,
                 3.1:
                 This will be required in RBTools 4.0.
 
-        additional_fields (list of unicode, optional):
+        additional_fields (list of str, optional):
             A list of additional fields to include in the fetched review
             request resource.
 
         repository_id (int, optional):
             The ID of the repository to match.
 
-        commit_id (unicode, optional):
+        commit_id (str, optional):
             The ID of the commit to match.
 
             Version Added:
@@ -650,34 +566,13 @@ def guess_existing_review_request(repository_info=None,
     assert revisions is not None
     assert api_root is not None
 
-    if repository_info or repository_name:
-        RemovedInRBTools40Warning.warn(
-            'The repository_info and repository_name arguments to '
-            'guess_existing_review_request are deprecated and will be '
-            'removed in RBTools 4.0. Please change your command to use the '
-            'needs_repository attribute and pass in the repository ID '
-            'directly.')
-        repository_id = get_repository_id(
-            repository_info, api_root, repository_name)
+    if api_client is not None:
+        RemovedInRBTools60Warning.warn(
+            'The api_client argument to guess_existing_review_request is '
+            'deprecated and will be removed in RBTools 6.0.')
 
     # Fetch the pending review requests for this repository. These will be
     # the candidates for matching.
-    if not submit_as:
-        RemovedInRBTools40Warning.warn(
-            'The submit_as argument will be required in RBTools 4.0. '
-            'Callers should supply either the value of a --submit-as '
-            'parameter or the currently logged-in username.')
-
-        try:
-            user = get_user(api_client=api_client,
-                            api_root=api_root,
-                            auth_required=True)
-            submit_as = user.username
-        except APIError as e:
-            raise MatchReviewRequestsError(
-                'Error fetching the user session: %s' % e,
-                api_error=e)
-
     try:
         review_requests = get_pending_review_requests(
             api_root=api_root,
@@ -686,51 +581,25 @@ def guess_existing_review_request(repository_info=None,
             additional_fields=additional_fields)
     except APIError as e:
         raise MatchReviewRequestsError(
-            'Error getting review requests for user "%s": %s'
-            % (submit_as, e),
+            f'Error getting review requests for user "{submit_as}": {e}',
             api_error=e)
 
-    # Determine the summary and description used for matching review requests.
-    #
-    # XXX The argument names make some of this logic confusing. One may expect
-    #     that the "guess_*" arguments would opt into comparing the
-    #     summaries/descriptions, but that's not the case.
-    #
-    #     In practice, all built-in RBTools commands pass in
-    #     guess_summary=False and guess_description=False unconditionally,
-    #     which would enable this logic. Any other value is considered
-    #     deprecated at this point.
-    #
-    #     RBTools 4.0 will just remove the `if` statement and hard-code the
-    #     logic.
-    #
-    #     Along with this, we'll deprecate api_client in RBTools 4.0, with
-    #     removal scheduled for 5.0.
     summary = None
     description = None
 
-    if not guess_summary or not guess_description:
-        try:
-            commit_message = tool.get_commit_message(revisions)
+    try:
+        commit_message = tool.get_commit_message(revisions)
 
-            if commit_message:
-                if not guess_summary:
-                    summary = commit_message['summary']
-
-                if not guess_description:
-                    description = commit_message['description']
-            elif callable(no_commit_error):
-                # In RBTools 4.0, we'll want to deprecate this and instead
-                # add a flag to require a commit message, raising an
-                # exception if unavailable.
-                no_commit_error()
-        except NotImplementedError:
-            pass
-    else:
-        RemovedInRBTools40Warning.warn(
-            'The guess_summary and guess_description arguments in '
-            'rbtools.utils.review_request.guess_existing_review_request are '
-            'deprecated and will be removed in RBTools 4.0.')
+        if commit_message:
+            summary = commit_message['summary']
+            description = commit_message['description']
+        elif callable(no_commit_error):
+            # In a future version of RBTools, we'll want to deprecate this and
+            # instead add a flag to require a commit message, raising an
+            # exception if unavailable.
+            no_commit_error()
+    except NotImplementedError:
+        pass
 
     # Find any review requests that match either exactly or partially.
     matches = find_review_request_matches(
@@ -750,10 +619,11 @@ def guess_existing_review_request(repository_info=None,
     # We don't have an exact match. We may have fuzzy matches that need to
     # be confirmed.
     #
-    # In RBTools 4.0, we'll want to deprecate this functionality and leave this
-    # sort of operation up to the caller. We can use an opt-in flag for 4.0
-    # to change the return type, and then make that required for 5.0, or
-    # replace this method with a more tailored, future-proof version.
+    # In a future version of RBTools, we'll want to deprecate this
+    # functionality and leave this sort of operation up to the caller. We can
+    # use an opt-in flag to change the return type, and then make that
+    # required in a future version, or just replace this method entirely with
+    # a more tailored, future-proof version.
     if callable(is_fuzzy_match_func):
         # Allow the caller to decide what to do with any fuzzy matches.
         #
@@ -767,34 +637,6 @@ def guess_existing_review_request(repository_info=None,
                 return review_request
 
     return None
-
-
-def num_exact_matches(possible_matches):
-    """Return the number of exact matches in the possible match list.
-
-    Deprecated:
-        3.1:
-        This will be removed in RBTools 4.0.
-
-    Args:
-        possible_matches (list of tuple):
-            The list of possible matches from :py:func:`get_possible_matches`.
-
-    Returns:
-        int:
-        The number of exact matches found.
-    """
-    RemovedInRBTools40Warning.warn(
-        'rbtools.utils.review_request.num_exact_matches() is deprecated '
-        'and will be removed in RBTools 4.0.')
-
-    count = 0
-
-    for score, request in possible_matches:
-        if score.is_exact_match():
-            count += 1
-
-    return count
 
 
 def parse_review_request_url(url):

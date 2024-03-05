@@ -16,7 +16,6 @@ from collections import OrderedDict
 from contextlib import contextmanager
 from typing import List, Optional, Union, cast
 
-from housekeeping import deprecate_non_keyword_only_args
 from pydiffx import DiffType, DiffX
 from pydiffx.utils.text import guess_line_endings
 from typing_extensions import NotRequired, TypedDict
@@ -30,7 +29,6 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
-from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.diffs.tools.base import DiffFileResult
 from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install
@@ -448,7 +446,6 @@ class SOSClient(BaseSCMClient):
                 project == self._query_sos_info('project') and
                 server == self._query_sos_info('server'))
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def diff(
         self,
         revisions: SCMClientRevisionSpec,
@@ -1463,7 +1460,7 @@ class SOSClient(BaseSCMClient):
         If the file is not explicitly renamed, this will go through the
         renamed directory entries and try to find a new directory name used
         as the prefix for this file. If found, a new path will be generated
-        based on the old directory name and the remaning part of the file
+        based on the old directory name and the remaining part of the file
         path.
 
         If an original name could not be found, this will just return the

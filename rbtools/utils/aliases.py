@@ -19,7 +19,7 @@ _SHLEX_SUPPORTS_UNICODE = sys.version_info >= (2, 7, 3)
 def replace_arguments(cmd, args, posix):
     """Do parameter substitution for the given command.
 
-    Occurrances of variables ``$1``, ``$2``, etc. are replaced with the nth
+    Occurrences of variables ``$1``, ``$2``, etc. are replaced with the nth
     element of ``args`` (1-indexed). The special variable ``$*`` is expanded to
     contain all arguments.
 

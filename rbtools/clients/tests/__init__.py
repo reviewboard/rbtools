@@ -7,16 +7,15 @@ import os
 import re
 import shutil
 from datetime import datetime, timezone
-from typing import Any, Dict, Generic, Optional, Type, TypeVar
+from typing import Any, Dict, Final, Generic, Optional, Type, TypeVar
 from unittest import SkipTest
 
 import kgb
-from typing_extensions import Final, TypeAlias
+from typing_extensions import TypeAlias
 
 from rbtools.api.capabilities import Capabilities
 from rbtools.clients import BaseSCMClient
 from rbtools.clients.errors import SCMClientDependencyError
-from rbtools.deprecation import RemovedInRBTools40Warning
 from rbtools.diffs.tools.errors import MissingDiffToolError
 from rbtools.testing import TestCase
 from rbtools.utils.filesystem import make_tempdir
@@ -229,7 +228,7 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
             caps (dict, optional):
                 Custom capabilities to simulate retrieving from the server.
 
-                By defaut, :py:attr:`default_scmclient_caps` will be set.
+                By default, :py:attr:`default_scmclient_caps` will be set.
                 ``caps`` may override anything in these. Dictionaries will
                 *not* be merged recursively.
 
@@ -365,24 +364,6 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
                 diff_result[key] = date_re.sub(new_date, diff)
 
         return diff_result
-
-
-class SCMClientTests(SCMClientTestCase):
-    """Legacy class for SCM client test suites.
-
-    Deprecated:
-        3.0:
-        Subclasses should use :py:class:`SCMClientTestCase` instead.
-    """
-
-    @classmethod
-    def setUpClass(cls):
-        RemovedInRBTools40Warning.warn(
-            '%r should subclass rbtools.clients.tests.SCMClientTestCase '
-            'instead of SCMClientTests.'
-            % cls)
-
-        super(SCMClientTests, cls).setUpClass()
 
 
 FOO = b"""\

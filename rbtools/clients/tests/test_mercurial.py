@@ -1,5 +1,7 @@
 """Unit tests for MercurialClient."""
 
+from __future__ import annotations
+
 import os
 import re
 import shutil
@@ -20,10 +22,10 @@ from rbtools.clients.errors import (CreateCommitError,
 from rbtools.clients.mercurial import MercurialClient, MercurialRefType
 from rbtools.clients.tests import (FOO, FOO1, FOO2, FOO3, FOO4, FOO5, FOO6,
                                    SCMClientTestCase)
+from rbtools.config.loader import load_config
 from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import (is_exe_in_path,
-                                      load_config,
                                       make_tempdir)
 from rbtools.utils.process import (RunProcessResult,
                                    run_process,

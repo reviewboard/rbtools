@@ -238,27 +238,46 @@ class SyncTransport(Transport):
 
     def login(
         self,
-        username: str,
-        password: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        api_token: Optional[str] = None,
         *args,
         **kwargs,
     ) -> None:
         """Log in to the Review Board server.
 
+        Either a username and password combination or an API token
+        must be provided.
+
+        Version Changed:
+            5.0:
+            Added an optional ``api_token`` parameter and made the
+            ``username`` and ``password`` parameters optional to allow
+            logging in with either a username and password or API token.
+
         Args:
-            username (str):
+            username (str, optional):
                 The username to log in with.
 
-            password (str):
+            password (str, optional):
                 The password to log in with.
+
+            api_token (str, optional):
+                The API token to log in with.
 
             *args (tuple, unused):
                 Unused positional arguments.
 
             **kwargs (dict, unused):
                 Unused keyword arguments.
+
+        Raises:
+            ValueError:
+                No username and password or API token was provided.
         """
-        self.server.login(username, password)
+        self.server.login(username=username,
+                          password=password,
+                          api_token=api_token)
 
     def logout(self):
         """Log out of a session on the Review Board server."""
@@ -315,7 +334,7 @@ class SyncTransport(Transport):
         rsp = self.server.make_request(request)
         assert rsp is not None
 
-        info = rsp.info()
+        info = rsp.headers
         mime_type = info['Content-Type']
         item_content_type = info.get('Item-Content-Type', None)
 

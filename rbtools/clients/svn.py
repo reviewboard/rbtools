@@ -13,12 +13,8 @@ from xml.etree import ElementTree
 from typing import Dict, Iterator, List, Optional, Tuple, Union, cast
 from urllib.parse import unquote
 
-from housekeeping import deprecate_non_keyword_only_args
-
 from rbtools.api.errors import APIError
-from rbtools.api.resource import (ItemResource,
-                                  ListResource,
-                                  RootResource)
+from rbtools.api.resource import ListResource
 from rbtools.clients import PatchResult, RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
                                             SCMClientDiffResult,
@@ -30,8 +26,6 @@ from rbtools.clients.errors import (AuthenticationError,
                                     SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
-from rbtools.deprecation import (RemovedInRBTools40Warning,
-                                 RemovedInRBTools50Warning)
 from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install
 from rbtools.utils.console import get_pass
@@ -42,7 +36,6 @@ from rbtools.utils.filesystem import (make_empty_files, make_tempfile,
 from rbtools.utils.process import (RunProcessError,
                                    RunProcessResult,
                                    run_process)
-from rbtools.utils.repository import get_repository_resource
 from rbtools.utils.streams import BufferedIterator
 
 
@@ -493,7 +486,6 @@ class SVNClient(BaseSCMClient):
             if message.text is not None
         )
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def diff(
         self,
         revisions: SCMClientRevisionSpec,
@@ -1140,7 +1132,7 @@ class SVNClient(BaseSCMClient):
 
         Args:
             base_path (str):
-                The relative path beetween the repository root and the
+                The relative path between the repository root and the
                 directory that the diff file was generated in.
 
             base_dir (str, unused):
@@ -1635,49 +1627,6 @@ class SVNRepositoryInfo(RepositoryInfo):
             self.path = url
             self.base_path = relpath
             self.repository_id = cast(int, repository.id)
-
-    def find_server_repository_info(
-        self,
-        api_root: RootResource,
-    ) -> SVNRepositoryInfo:
-        """Return server-side information on the current Subversion repository.
-
-        The point of this function is to find a repository on the server that
-        matches self, even if the paths aren't the same. (For example, if self
-        uses an 'http' path, but the server uses a 'file' path for the same
-        repository.) It does this by comparing repository UUIDs. If the
-        repositories use the same path, you'll get back self, otherwise you'll
-        get a different SVNRepositoryInfo object (with a different path).
-
-        Deprecated:
-            3.0:
-            Commands which need to use the remote repository, or need data from
-            the remote repository such as the base path, should set
-            :py:attr:`needs_repository`.
-
-        Args:
-            api_root (rbtools.api.resource.RootResource):
-                The root resource for the Review Board server.
-
-        Returns:
-            SVNRepositoryInfo:
-            The server-side information for this repository.
-        """
-        RemovedInRBTools40Warning.warn(
-            'The find_server_repository_info method is deprecated, and will '
-            'be removed in RBTools 4.0. If you need to access the remote '
-            'repository, set the needs_repository attribute on your Command '
-            'subclass.')
-
-        repository, info = get_repository_resource(
-            api_root,
-            tool=self.tool,
-            repository_paths=self.path)
-
-        if repository:
-            self.update_from_remote(repository, info)
-
-        return self
 
     def _get_relative_path(
         self,

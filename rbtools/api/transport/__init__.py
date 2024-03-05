@@ -114,19 +114,29 @@ class Transport:
 
     def login(
         self,
-        username: str,
-        password: str,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        api_token: Optional[str] = None,
         *args,
         **kwargs,
     ) -> None:
         """Log in to the Review Board server.
 
+        Version Changed:
+            5.0:
+            Added an optional ``api_token`` parameter and made the
+            ``username`` and ``password`` parameters optional to allow
+            logging in with either a username and password or API token.
+
         Args:
-            username (str):
+            username (str, optional):
                 The username to log in with.
 
-            password (str):
+            password (str, optional):
                 The password to log in with.
+
+            api_token (str, optional):
+                The API token to log in with.
 
             *args (tuple, unused):
                 Positional arguments (may be used by the transport

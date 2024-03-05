@@ -9,7 +9,7 @@ from rbtools.clients.clearcase import ClearCaseClient, ClearCaseRepositoryInfo
 from rbtools.clients.errors import SCMClientDependencyError, SCMError
 from rbtools.clients.tests import SCMClientTestCase
 from rbtools.deprecation import RemovedInRBTools50Warning
-from rbtools.utils.checks import check_gnu_diff, check_install
+from rbtools.utils.checks import check_install
 from rbtools.utils.process import run_process_exec
 
 
@@ -645,7 +645,6 @@ class ClearCaseClientTests(SCMClientTestCase):
 
     def test_get_repository_info_snapshot(self):
         """Testing ClearCaseClient.get_repository_info with snapshot view"""
-        self.spy_on(check_gnu_diff, call_original=False)
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': (['cleartool', 'pwv', '-short'],),
@@ -700,7 +699,6 @@ class ClearCaseClientTests(SCMClientTestCase):
         """Testing ClearCaseClient.get_repository_info with dynamic view and
         base ClearCase
         """
-        self.spy_on(check_gnu_diff, call_original=False)
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': (['cleartool', 'pwv', '-short'],),
@@ -755,7 +753,6 @@ class ClearCaseClientTests(SCMClientTestCase):
         """Testing ClearCaseClient.get_repository_info with dynamic view and
         UCM
         """
-        self.spy_on(check_gnu_diff, call_original=False)
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': (['cleartool', 'pwv', '-short'],),
@@ -808,7 +805,6 @@ class ClearCaseClientTests(SCMClientTestCase):
 
     def test_get_repository_info_automatic(self):
         """Testing ClearCaseClient.get_repository_info with automatic view"""
-        self.spy_on(check_gnu_diff, call_original=False)
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': (['cleartool', 'pwv', '-short'],),
@@ -859,7 +855,6 @@ class ClearCaseClientTests(SCMClientTestCase):
 
     def test_get_repository_info_webview(self):
         """Testing ClearCaseClient.get_repository_info with webview"""
-        self.spy_on(check_gnu_diff, call_original=False)
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': (['cleartool', 'pwv', '-short'],),

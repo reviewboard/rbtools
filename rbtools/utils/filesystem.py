@@ -1,3 +1,7 @@
+"""Utilities for working with files."""
+
+from __future__ import annotations
+
 import logging
 import os
 import shutil
@@ -6,20 +10,10 @@ import tempfile
 from contextlib import contextmanager
 from typing import Dict, Generator, Iterable, List, Optional
 
-from housekeeping import deprecate_non_keyword_only_args, func_moved
+from housekeeping import func_moved
 
-from rbtools.deprecation import (RemovedInRBTools50Warning,
-                                 RemovedInRBTools60Warning)
+from rbtools.deprecation import RemovedInRBTools60Warning
 
-
-#: The name fo the default configuration file.
-#:
-#: Deprecated:
-#:     5.0:
-#:     This has been replaced with
-#:     :py:func:`rbtools.config.loader.CONFIG_FILENAME`, and will be removed
-#:     in RBTools 6.
-CONFIG_FILE = '.reviewboardrc'
 
 _iter_exes_in_path_cache: Dict[str, bool] = {}
 tempfiles: List[str] = []
@@ -121,7 +115,6 @@ def _load_python_file(filename, config):
         return config
 
 
-@deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
 def make_tempfile(
     *,
     content: Optional[bytes] = None,

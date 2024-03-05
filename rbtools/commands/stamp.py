@@ -1,6 +1,9 @@
 """Implementation of rbt stamp."""
 
+from __future__ import annotations
+
 import logging
+from typing import Optional, TYPE_CHECKING
 
 from rbtools.api.errors import APIError
 from rbtools.commands.base import (BaseCommand,
@@ -14,6 +17,10 @@ from rbtools.utils.review_request import (find_review_request_by_change_id,
                                           get_draft_or_current_value,
                                           get_revisions,
                                           guess_existing_review_request)
+from rbtools.utils.users import get_user
+
+if TYPE_CHECKING:
+    from rbtools.clients.base.scmclient import SCMClientRevisionSpec
 
 
 class Stamp(BaseCommand):
@@ -71,29 +78,48 @@ class Stamp(BaseCommand):
 
         return confirm(question)
 
-    def determine_review_request(self, revisions):
+    def determine_review_request(
+        self,
+        revisions: SCMClientRevisionSpec,
+    ) -> tuple[Optional[int], Optional[str]]:
         """Determine the correct review request for a commit.
 
         Args:
-            revisions (dict):
+            revisions (rbtools.clients.base.scmclient.SCMClientRevisionSpec):
                 The parsed revisions from the command line.
 
         Returns:
             tuple:
-            A 2-tuple of the matched review request ID, and the review request
-            URL. If no matching review request is found, both values will be
-            ``None``.
+            A 2-tuple containing:
+
+            Tuple:
+                0 (int):
+                    The matching review request ID. If no match was found, this
+                    will be ``None``.
+
+                1 (str):
+                    The matching review request URL. If no match was found,
+                    this will be ``None``.
 
         Raises:
             rbtools.commands.CommandError:
                 An error occurred while attempting to find a matching review
                 request.
         """
+        api_client = self.api_client
+        assert api_client is not None
+
+        api_root = self.api_root
+        assert api_root is not None
+
+        tool = self.tool
+        assert tool is not None
+
         # First, try to match the changeset to a review request directly.
-        if self.tool.supports_changesets:
+        if tool.supports_changesets:
             review_request = find_review_request_by_change_id(
-                api_client=self.api_client,
-                api_root=self.api_root,
+                api_client=api_client,
+                api_root=api_root,
                 revisions=revisions,
                 repository_id=self.repository.id)
 
@@ -105,12 +131,17 @@ class Stamp(BaseCommand):
         logging.debug('Attempting to guess review request based on '
                       'summary and description')
 
+        user = get_user(api_client=api_client,
+                        api_root=api_root,
+                        auth_required=True)
+        assert user is not None
+
         try:
             review_request = guess_existing_review_request(
-                api_root=self.api_root,
-                api_client=self.api_client,
-                tool=self.tool,
+                api_root=api_root,
+                tool=tool,
                 revisions=revisions,
+                submit_as=user.username,
                 commit_id=revisions.get('commit_id'),
                 is_fuzzy_match_func=self._ask_review_request_match,
                 no_commit_error=self.no_commit_error,

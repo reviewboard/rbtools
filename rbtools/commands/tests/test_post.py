@@ -809,7 +809,7 @@ class BuildReviewRequestDraftDataTests(BasePostCommandTests):
                 }),
             expected_request_data={})
 
-    def test_with_squashed_diff_extra_data_and_review_requst_is_new(self):
+    def test_with_squashed_diff_extra_data_and_review_request_is_new(self):
         """Testing Post._build_review_request_draft_data with squashed diff
         containing review_request_extra_data and review request is
         newly-created
@@ -877,7 +877,7 @@ class BuildReviewRequestDraftDataTests(BasePostCommandTests):
                 }),
             expected_request_data={})
 
-    def test_with_diff_history_extra_data_and_review_requst_is_new(self):
+    def test_with_diff_history_extra_data_and_review_request_is_new(self):
         """Testing Post._build_review_request_draft_data with squashed diff
         containing review_request_extra_data and review request is
         newly-created

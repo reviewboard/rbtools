@@ -32,6 +32,7 @@ from urllib.request import (
     urlopen)
 
 import certifi
+from housekeeping import deprecate_non_keyword_only_args
 from typing_extensions import TypeAlias
 
 from rbtools import get_package_version
@@ -40,7 +41,8 @@ from rbtools.api.errors import (APIError,
                                 ServerInterfaceError,
                                 ServerInterfaceSSLError,
                                 create_api_error)
-from rbtools.deprecation import RemovedInRBTools50Warning
+from rbtools.deprecation import (RemovedInRBTools50Warning,
+                                 RemovedInRBTools60Warning)
 from rbtools.utils.encoding import force_bytes, force_unicode
 from rbtools.utils.filesystem import get_home_path
 
@@ -230,7 +232,8 @@ class HttpRequest:
             RemovedInRBTools50Warning.warn(
                 'A value of type %s was passed to HttpRequest.add_field. In '
                 'RBTools 5.0, only values of bytes or str types will be '
-                'accepted.')
+                'accepted.'
+                % type(value))
             value = str(value)
 
         self._fields[force_bytes(name)] = force_bytes(value)
@@ -610,7 +613,7 @@ class PresetHTTPAuthHandler(BaseHandler):
 
         Args:
             url (str):
-                The URL fo the Review Board server.
+                The URL of the Review Board server.
 
             password_mgr (ReviewBoardHTTPPasswordMgr):
                 The password manager to use for requests.
@@ -619,24 +622,38 @@ class PresetHTTPAuthHandler(BaseHandler):
         self.password_mgr = password_mgr
         self.used = False
 
+    @deprecate_non_keyword_only_args(RemovedInRBTools60Warning)
     def reset(
         self,
-        username: Optional[str],
-        password: Optional[str],
+        *,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        api_token: Optional[str] = None,
     ) -> None:
         """Reset the stored authentication credentials.
 
-        Args:
-            username (str):
-                The username to use for authentication. If ``None``, this will
-                effectively log out the user.
+        Version Changed:
+            5.0:
+            Added an optional ``api_token`` parameter and made the
+            ``username`` and ``password`` parameters optional to allow
+            authentication with either a username and password or API token.
 
-            passsword (str):
-                The password to use for authentication. If ``None``, this will
-                effectively log out the user.
+        Args:
+            username (str, optional):
+                The username to use for authentication. If ``None`` and no API
+                token is provided, this will log out the user.
+
+            password (str, optional):
+                The password to use for authentication. If ``None`` and no API
+                token is provided, this will log out the user.
+
+            api_token (str, optional):
+                The API token to use for authentication. If ``None`` and no
+                username and password are provided, this will log out the user.
         """
         self.password_mgr.rb_user = username
         self.password_mgr.rb_pass = password
+        self.password_mgr.api_token = api_token
         self.used = False
 
     def http_request(
@@ -809,7 +826,10 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
             return None
 
         # Next, figure out what credentials we'll be working with.
-        if self._otp_token_attempts > 0:
+        if self.passwd.api_token:
+            # The request included an API token. Don't make another request.
+            return None
+        elif self._otp_token_attempts > 0:
             # We've made at least one 2FA attempt. Reuse the login and
             # password so we don't prompt for it again.
             user = self.passwd.rb_user
@@ -1181,25 +1201,50 @@ class ReviewBoardServer:
             self._cache = None
             self._urlopen = urlopen
 
+    @deprecate_non_keyword_only_args(RemovedInRBTools60Warning)
     def login(
         self,
-        username: str,
-        password: str,
+        *,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        api_token: Optional[str] = None,
     ) -> None:
         """Log in to the Review Board server.
 
+        Either a username and password combination or an API token
+        must be provided.
+
+        Version Changed:
+            5.0:
+            Added an optional ``api_token`` parameter and made the
+            ``username`` and ``password`` parameters optional to allow
+            logging in with either a username and password or API token.
+
         Args:
-            username (str):
+            username (str, optional):
                 The username to use to log in.
 
-            password (str):
+            password (str, optional):
                 The password to use to log in.
+
+            api_token (str, optional):
+                The API token to use to log in.
+
+        Raises:
+            ValueError:
+                No username and password or API token was provided.
         """
-        self.preset_auth_handler.reset(username, password)
+        if (username and password) or api_token:
+            self.preset_auth_handler.reset(username=username,
+                                           password=password,
+                                           api_token=api_token)
+        else:
+            raise ValueError('Either a username and password or API token '
+                             'must be provided to login.')
 
     def logout(self) -> None:
         """Log the user out of the session."""
-        self.preset_auth_handler.reset(None, None)
+        self.preset_auth_handler.reset()
         self.make_request(HttpRequest('%ssession/' % self.url,
                                       method='DELETE'))
         self.cookie_jar.clear(self.domain)

@@ -5,7 +5,7 @@ from rbtools.testing import CommandTestsMixin, TestCase
 
 
 class AliasCommandTests(CommandTestsMixin, TestCase):
-    """Tests for rbt alias commmand."""
+    """Tests for rbt alias command."""
 
     command_cls = Alias
 

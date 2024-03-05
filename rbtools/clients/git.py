@@ -1,12 +1,12 @@
 """A client for Git."""
 
+from __future__ import annotations
+
 import logging
 import os
 import re
 import sys
 from typing import Dict, Iterator, List, Optional, cast
-
-from housekeeping import deprecate_non_keyword_only_args
 
 from rbtools.clients import PatchResult, RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
@@ -22,7 +22,6 @@ from rbtools.clients.errors import (AmendError,
                                     SCMError)
 from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.svn import SVNClient, SVNRepositoryInfo
-from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.checks import check_install
 from rbtools.utils.console import edit_text
 from rbtools.utils.diffs import (normalize_patterns,
@@ -823,7 +822,6 @@ class GitClient(BaseSCMClient):
 
         return youngest_remote_commit
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools50Warning)
     def diff(
         self,
         revisions: SCMClientRevisionSpec,
@@ -945,7 +943,7 @@ class GitClient(BaseSCMClient):
                 Whether to skip rename detection.
 
             find_renames_threshold (unicode, optional):
-                The threshhold to pass to ``--find-renames``, if any.
+                The threshold to pass to ``--find-renames``, if any.
 
         Returns:
             bytes:
@@ -1499,7 +1497,7 @@ class GitClient(BaseSCMClient):
                 and ``email`` attributes.
 
             run_editor (bool):
-                Whether to run the user's editor on the commmit message before
+                Whether to run the user's editor on the commit message before
                 committing.
 
             files (list of unicode, optional):
@@ -1601,7 +1599,7 @@ class GitClient(BaseSCMClient):
                 Whether to squash the commits or do a plain merge.
 
             run_editor (bool, optional):
-                Whether to run the user's editor on the commmit message before
+                Whether to run the user's editor on the commit message before
                 committing.
 
             close_branch (bool, optional):

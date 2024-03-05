@@ -1,3 +1,7 @@
+"""Caching implementation for the RBTools API."""
+
+from __future__ import annotations
+
 import contextlib
 import datetime
 import json
@@ -8,11 +12,10 @@ import sqlite3
 import threading
 from email.message import Message
 from http.client import HTTPResponse
-from typing import Callable, Dict, List, MutableMapping, Optional, Union
+from typing import Dict, List, MutableMapping, Optional, Union
 from urllib.request import urlopen, Request
 
 from rbtools.api.errors import CacheError
-from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.appdirs import user_cache_dir
 
 
@@ -25,7 +28,7 @@ MINIMUM_VERSION = '2.0.14'
 _locale_lock = threading.Lock()  # Lock for getting / setting locale.
 
 
-class CacheEntry(object):
+class CacheEntry:
     """An entry in the API Cache."""
 
     DATE_FORMAT = '%Y-%m-%dT%H:%M:%S'  # ISO Date format
@@ -125,7 +128,7 @@ class CacheEntry(object):
         return False
 
 
-class LiveHTTPResponse(object):
+class LiveHTTPResponse:
     """An uncached HTTP response that can be read() more than once.
 
     This is intended to be API-compatible with an
@@ -145,7 +148,7 @@ class LiveHTTPResponse(object):
             response (http.client.HTTPResponse):
                 The response from the server.
         """
-        self.headers = response.info()
+        self.headers = response.headers
         self.content = response.read()
         self.status = response.status
 
@@ -158,22 +161,6 @@ class LiveHTTPResponse(object):
         """
         return self.status
 
-    def info(self) -> Message:
-        """Return the headers associated with the response.
-
-        Deprecated:
-            4.0:
-            Deprecated in favor of the :py:attr:`headers` attribute.
-
-        Returns:
-            email.message.Message:
-            The response headers.
-        """
-        RemovedInRBTools50Warning.warn(
-            'LiveHTTPResponse.info() is deprecated and will be removed in '
-            'RBTools 5.0. Use LiveHTTPResponse.headers instead.')
-        return self.headers
-
     def read(self) -> bytes:
         """Return the content associated with the response.
 
@@ -183,24 +170,8 @@ class LiveHTTPResponse(object):
         """
         return self.content
 
-    def getcode(self) -> int:
-        """Return the associated HTTP response code.
 
-        Deprecated:
-            4.0:
-            Deprecated in favor of the :py:attr:`code` attribute.
-
-        Returns:
-            int:
-            The HTTP response code.
-        """
-        RemovedInRBTools50Warning.warn(
-            'LiveHTTPResponseInfo.getcode() is deprecated and will be removed '
-            'in RBTools 5.0. Use LiveHTTPResponse.code instead.')
-        return self.status
-
-
-class CachedHTTPResponse(object):
+class CachedHTTPResponse:
     """A response returned from the APICache.
 
     This is intended to be API-compatible with a urllib response object.
@@ -233,22 +204,6 @@ class CachedHTTPResponse(object):
         """
         return self.status
 
-    def info(self) -> dict:
-        """Return the headers associated with the response.
-
-        Deprecated:
-            4.0:
-            Deprecated in favor of the :py:attr:`headers` attribute.
-
-        Returns:
-            dict:
-            The cached response headers.
-        """
-        RemovedInRBTools50Warning.warn(
-            'CachedHTTPResponse.info() is deprecated and will be removed in '
-            'RBTools 5.0. Use CachedHTTPResponse.headers instead.')
-        return self.headers
-
     def read(self) -> bytes:
         """Return the content associated with the response.
 
@@ -258,25 +213,8 @@ class CachedHTTPResponse(object):
         """
         return self.content
 
-    def getcode(self) -> int:
-        """Return the associated HTTP response code, which is always 200.
 
-        Deprecated:
-            4.0:
-            Deprecated in favor of the :py:attr:`code` attribute.
-
-        Returns:
-            int:
-            200, always. This pretends that the response is the successful
-            result of an HTTP request.
-        """
-        RemovedInRBTools50Warning.warn(
-            'CachedHTTPResponseInfo.getcode() is deprecated and will be '
-            'removed in RBTools 5.0. Use CachedHTTPResponse.code instead.')
-        return 200
-
-
-class APICache(object):
+class APICache:
     """An API cache backed by a SQLite database."""
 
     # The format for the Expires: header. Requires an English locale.
@@ -293,7 +231,6 @@ class APICache(object):
         self,
         create_db_in_memory: bool = False,
         db_location: Optional[str] = None,
-        urlopen: Optional[Callable] = None,
     ) -> None:
         """Create a new instance of the APICache
 
@@ -312,19 +249,10 @@ class APICache(object):
             db_location (str):
                 The filename of the cache database, if using.
 
-            urlopen (callable):
-                The method to call for urlopen. This parameter has been
-                deprecated.
-
         Raises:
             CacheError:
                 The database exists but the schema could not be read.
         """
-        if urlopen is not None:
-            RemovedInRBTools50Warning.warn(
-                'The urlopen parameter to APICache is deprecated and will be '
-                'removed in RBTools 5.0.')
-
         if create_db_in_memory:
             logging.debug('Creating API cache in memory.')
 
@@ -372,17 +300,17 @@ class APICache(object):
                 # connect fails. In either case, HTTP requests can still be
                 # made, they will just passed through to the URL opener without
                 # attempting to interact with the API cache.
-                logging.warn('Could not create or access API cache "%s". Try '
-                             'running "rbt clear-cache" to clear the HTTP '
-                             'cache for the API.',
-                             self.cache_path)
+                logging.warning(
+                    'Could not create or access API cache "%s". Try running '
+                    '"rbt clear-cache" to clear the HTTP cache for the API.',
+                    self.cache_path)
 
         if self.db is not None:
             self.db.row_factory = APICache._row_factory
 
     def make_request(
         self,
-        request: Request
+        request: Request,
     ) -> Union[LiveHTTPResponse, CachedHTTPResponse]:
         """Perform the specified request.
 
@@ -421,18 +349,18 @@ class APICache(object):
 
                 response = LiveHTTPResponse(urlopen(request))
 
-                if response.getcode() == 304:
+                if response.code == 304:
                     logging.debug('Cached response for HTTP GET %s expired '
                                   'and was not modified',
                                   request.get_full_url())
                     entry.local_date = datetime.datetime.now()
                     self._save_entry(entry)
                     response = CachedHTTPResponse(entry)
-                elif 200 <= response.getcode() < 300:
+                elif 200 <= response.code < 300:
                     logging.debug('Cached response for HTTP GET %s expired '
                                   'and was modified',
                                   request.get_full_url())
-                    response_headers = response.info()
+                    response_headers = response.headers
                     cache_info = self._get_caching_info(request.headers,
                                                         response_headers)
 
@@ -464,7 +392,7 @@ class APICache(object):
                         self._delete_entry(entry)
         else:
             response = LiveHTTPResponse(urlopen(request))
-            response_headers = response.info()
+            response_headers = response.headers
 
             cache_info = self._get_caching_info(request.headers,
                                                 response_headers)
@@ -528,7 +456,7 @@ class APICache(object):
                 try:
                     # 'setlocale' requires the second parameter to be a 'str'
                     # in both Python 2.x and Python 3+.
-                    locale.setlocale(locale.LC_TIME, str('C'))
+                    locale.setlocale(locale.LC_TIME, 'C')
                     expires = datetime.datetime.strptime(expires,
                                                          self.EXPIRES_FORMAT)
 
@@ -610,7 +538,7 @@ class APICache(object):
             'max_age': max_age,
             'etag': etag,
             'last_modified': last_modified,
-            'vary_headers': vary_headers
+            'vary_headers': vary_headers,
         }
 
     def _create_schema(self) -> None:
