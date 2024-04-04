@@ -36,6 +36,14 @@ class RBClient:
     #: Type: str
     url: str
 
+    #: The optional user agent for the client.
+    #:
+    #: Version Added:
+    #:     5.0
+    #:
+    #: Type: str
+    user_agent: Optional[str]
+
     def __init__(
         self,
         url: str,
@@ -58,9 +66,16 @@ class RBClient:
             **kwargs (dict):
                 Keyword arguments to pass to the transport.
         """
+        transport = transport_cls(url, *args, **kwargs)
+
         self.url = url
         self.domain = urlparse(url)[1]
-        self._transport = transport_cls(url, *args, **kwargs)
+        self._transport = transport
+
+        if hasattr(transport, 'server') and hasattr(transport.server, 'agent'):
+            self.user_agent = transport.server.agent
+        else:
+            self.user_agent = None
 
     def get_root(
         self,

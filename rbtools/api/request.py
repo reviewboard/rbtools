@@ -48,6 +48,7 @@ from rbtools.utils.filesystem import get_home_path
 
 
 RBTOOLS_COOKIE_FILE = '.rbtools-cookies'
+RBTOOLS_USER_AGENT = 'RBTools/' + get_package_version()
 RB_COOKIE_NAME = 'rbsessionid'
 
 
@@ -1150,7 +1151,7 @@ class ReviewBoardServer:
         if agent:
             self.agent = agent
         else:
-            self.agent = 'RBTools/' + get_package_version()
+            self.agent = RBTOOLS_USER_AGENT
 
         opener = build_opener(*handlers)
         headers = [(str('User-agent'), str(self.agent))]

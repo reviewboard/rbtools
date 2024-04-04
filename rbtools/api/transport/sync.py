@@ -139,6 +139,7 @@ class SyncTransport(Transport):
             username=username,
             password=password,
             api_token=api_token,
+            agent=agent,
             session=session,
             disable_proxy=disable_proxy,
             auth_callback=auth_callback,
