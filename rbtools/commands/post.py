@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import os
-import platform
 import re
 import sys
 from collections import namedtuple
@@ -17,6 +16,7 @@ from rbtools.commands.base import (BaseCommand,
                                    CommandError,
                                    Option,
                                    OptionGroup)
+from rbtools.utils.browser import open_browser
 from rbtools.utils.commands import (AlreadyStampedError,
                                     stamp_commit_with_review_url)
 from rbtools.utils.console import confirm
@@ -998,20 +998,7 @@ class Post(BaseCommand):
 
         # Load the review up in the browser if requested to.
         if self.options.open_browser:
-            try:
-                if (sys.platform == 'darwin' and
-                    platform.mac_ver()[0] == '10.12.5'):
-                    # The 'webbrowser' module currently does a bunch of stuff
-                    # with AppleScript, which is broken on macOS 10.12.5. This
-                    # was fixed in 10.12.6. See
-                    # https://bugs.python.org/issue30392 for more discussion.
-                    open(['open', review_request_url])
-                else:
-                    import webbrowser
-                    webbrowser.open_new_tab(review_request_url)
-            except Exception as e:
-                logging.exception('Error opening review URL %s: %s',
-                                  review_request_url, e)
+            open_browser(review_request_url)
 
     def _should_post_with_history(self, server_supports_history=False):
         """Determine whether or not we should post with history.
