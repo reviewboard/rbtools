@@ -732,7 +732,7 @@ class Patch(Command):
         # Start applying all the patches.
         for patch_data in patches:
             patch_num = patch_data['patch_num']
-            tmp_patch_file = make_tempfile(patch_data['diff'])
+            tmp_patch_file = make_tempfile(content=patch_data['diff'])
 
             success = self.apply_patch(
                 diff_file_path=tmp_patch_file,
