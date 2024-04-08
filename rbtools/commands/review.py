@@ -37,27 +37,42 @@ class ReviewSubCommand(BaseSubCommand):
             The review draft resource.
         """
         options = self.options
+        review_request_id = options.review_request_id
+
+        try:
+            review_request = self.api_root.get_review_request(
+                review_request_id=review_request_id)
+        except APIError as e:
+            raise CommandError('Error getting review request %s: %s'
+                               % (review_request_id, e))
 
         try:
             review_draft = self.api_root.get_review_draft(
-                review_request_id=options.review_request_id)
+                review_request_id=review_request_id)
 
             if review_draft:
                 logger.debug('RBTools found a pre-existing review draft for '
                              'review request %s',
-                             options.review_request_id)
+                             review_request_id)
         except APIError:
             review_draft = None
 
         if not review_draft and self.create_review_if_missing:
             try:
-                reviews = self.api_root.get_reviews(
-                    review_request_id=options.review_request_id)
+                reviews = review_request.get_reviews()
                 review_draft = reviews.create()
+
             except APIError as e:
                 raise CommandError(
                     'Error creating review draft for review request %s: %s'
-                    % (options.review_request_id, e))
+                    % (review_request_id, e))
+
+        self.json.add('review_id', review_draft.id)
+        self.json.add('review_api_url', review_draft.links.self.href)
+        self.json.add('review_url', review_draft.absolute_url)
+        self.json.add('review_status', 'draft')
+        self.json.add('review_request_id', review_request_id)
+        self.json.add('review_request_url', review_request.absolute_url)
 
         return review_draft
 
@@ -200,13 +215,17 @@ class AddDiffComment(AddCommentSubCommand):
                 'Could not find a file with name "%s" in the diff.'
                 % options.filename)
 
-        self.get_review_draft().get_diff_comments().create(
-            filediff_id=file.id,
+        comment = self.get_review_draft().get_diff_comments().create(
+            filediff_id=file_to_comment.id,
             text=options.text,
             text_type=text_type,
             issue_opened=options.open_issue,
             first_line=options.line,
             num_lines=options.num_lines)
+
+        self.json.add('comment_type', 'diff_comment')
+        self.json.add('comment_id', comment.id)
+        self.json.add('comment_api_url', comment.links.self.href)
 
 
 class AddFileAttachmentComment(AddCommentSubCommand):
@@ -253,11 +272,16 @@ class AddFileAttachmentComment(AddCommentSubCommand):
                 'request "%s".'
                 % (options.fid, options.review_request_id))
 
-        self.get_review_draft().get_file_attachment_comments().create(
-            text=options.text,
-            text_type=text_type,
-            issue_opened=options.open_issue,
-            file_attachment_id=options.fid)
+        comment = \
+            self.get_review_draft().get_file_attachment_comments().create(
+                text=options.text,
+                text_type=text_type,
+                issue_opened=options.open_issue,
+                file_attachment_id=options.fid)
+
+        self.json.add('comment_type', 'file_attachment_comment')
+        self.json.add('comment_id', comment.id)
+        self.json.add('comment_api_url', comment.links.self.href)
 
 
 class AddGeneralComment(AddCommentSubCommand):
@@ -277,10 +301,14 @@ class AddGeneralComment(AddCommentSubCommand):
             rbtools.api.errors.APIError:
                 An error occurred while performing API requests.
         """
-        self.get_review_draft().get_general_comments().create(
+        comment = self.get_review_draft().get_general_comments().create(
             text=self.options.text,
             text_type=text_type,
             issue_opened=self.options.open_issue)
+
+        self.json.add('comment_type', 'general_comment')
+        self.json.add('comment_id', comment.id)
+        self.json.add('comment_api_url', comment.links.self.href)
 
 
 class Discard(ReviewSubCommand):
@@ -301,6 +329,7 @@ class Discard(ReviewSubCommand):
 
         try:
             review_draft.delete()
+            self.json.add('review_status', 'discarded')
         except APIError as e:
             raise CommandError(
                 'Error discarding review draft: %s' % e)
@@ -396,6 +425,7 @@ class Publish(ReviewSubCommand):
 
         try:
             review_draft.update(public=True)
+            self.json.add('review_status', 'published')
         except APIError as e:
             raise CommandError('Unable to publish review draft: %s' % e)
 
