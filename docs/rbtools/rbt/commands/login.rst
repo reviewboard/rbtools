@@ -4,11 +4,17 @@
 login
 =====
 
-:command:`rbt login` will prompt for credentials, log the user into
-Review Board, and save a session cookie in :file:`.rbtools-cookies`.
+.. versionchanged:: 5.0
+   The login command now directs the user to log in via the Review Board web
+   page, instead of prompting for a username and password in the terminal.
 
-To log the user in without prompting, the :option:`--username` and
-:option:`--password` options can be provided.
+:command:`rbt login` will direct the user to log in via the Review Board web
+page, and save a session cookie in :file:`.rbtools-cookies` upon successful
+login.
+
+A username and password can be supplied directly in the terminal by
+using the :option:`--terminal` option, or the :option:`--username` and
+:option:`--password` options.
 
 
 .. rbt-command-usage::
