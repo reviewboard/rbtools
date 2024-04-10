@@ -427,6 +427,15 @@ class RBToolsConfig(ConfigData):
     #:     0.7.5
     EXT_AUTH_COOKIES: Optional[str] = None
 
+    #: Whether to default to using web-based login for authentication.
+    #:
+    #: If this is set, web-based login will be used instead of prompting
+    #: for authentication credentials in the terminal.
+    #:
+    #: Version Added:
+    #:     5.0
+    WEB_LOGIN: bool = False
+
     #######################################################################
     # HTTP proxy
     #######################################################################

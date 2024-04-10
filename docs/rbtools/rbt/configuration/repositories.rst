@@ -587,6 +587,31 @@ This can also be provided by passing :option:`--tracking-branch` to most
 commands.
 
 
+.. rbtconfig:: WEB_LOGIN
+
+WEB_LOGIN
+~~~~~~~~~
+
+.. versionadded:: 5.0
+
+**Type:** Boolean
+
+**Default:** ``False``
+
+If enabled, web-based login will be used to authenticate users by default.
+This means users will be directed to the Review Board web site to log in
+when using any commands that require authentication. When disabled, users
+will be prompted to enter a username and password directly into the
+terminal instead.
+
+Example::
+
+    WEB_LOGIN = True
+
+When using :command:`rbt login`, this can be enabled by passing
+:option:`--web`.
+
+
 Git Properties
 --------------
 

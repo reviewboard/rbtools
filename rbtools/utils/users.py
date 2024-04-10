@@ -7,6 +7,7 @@ import sys
 from typing import Optional, TYPE_CHECKING
 
 from rbtools.api.errors import AuthorizationError
+from rbtools.config.loader import load_config
 from rbtools.utils.console import get_input, get_pass
 from rbtools.utils.web_login import WebLoginManager, is_web_login_enabled
 
@@ -22,7 +23,7 @@ def get_authenticated_session(
     auth_required: bool = False,
     session: Optional[Resource] = None,
     num_retries: int = 3,
-    via_web: bool = False,
+    via_web: Optional[bool] = None,
     open_browser: bool = False,
     enable_logging: bool = False,
     capabilities: Optional[Capabilities] = None,
@@ -95,6 +96,10 @@ def get_authenticated_session(
     if not session.authenticated:
         if not auth_required:
             return None
+
+        if via_web is None:
+            config = load_config()
+            via_web = config.get('WEB_LOGIN')
 
         web_login_enabled = is_web_login_enabled(
             server_info=api_root.get_info(),
