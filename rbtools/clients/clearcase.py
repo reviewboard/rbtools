@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime
 import io
 import itertools
 import logging
@@ -11,10 +10,12 @@ import re
 import sys
 import threading
 from collections import OrderedDict, defaultdict, deque
-from typing import Dict, List, Optional
+from typing import (Any, Dict, Iterable, List, Optional, TYPE_CHECKING, Tuple,
+                    cast)
 
 from pydiffx.dom import DiffX
 from pydiffx.dom.objects import DiffXChangeSection
+from typing_extensions import TypeAlias, TypedDict
 
 from rbtools.api.errors import APIError
 from rbtools.clients.base.repository import RepositoryInfo
@@ -35,9 +36,65 @@ if sys.platform.startswith(('cygwin', 'win')):
 else:
     import os.path as cpath
 
+if TYPE_CHECKING:
+    from rbtools.api.resource import ItemResource, ListResource
+
+    _HostProperties: TypeAlias = Optional[Dict[str, str]]
+    _ExtendedPath: TypeAlias = str
+    _ChangedEntry: TypeAlias = Tuple[_ExtendedPath, _ExtendedPath]
+    _ChangedEntryList: TypeAlias = Iterable[_ChangedEntry]
+
+    #: Type for an entry with branched file versions.
+    #:
+    #: A 3-tuple containing the path, previous version, and current version.
+    _BranchChangedEntry: TypeAlias = Tuple[str, str, str]
+
+
+logger = logging.getLogger(__name__)
+
 
 # This is used to split and assemble paths.
-_MAIN = '%smain%s' % (os.sep, os.sep)
+_MAIN = f'{os.sep}main{os.sep}'
+
+_VERSION_CHECKEDOUT = sys.maxsize
+
+
+class DirectoryDiff(TypedDict):
+    """A difference between two directories.
+
+    Version Added:
+        5.0
+    """
+
+    #: The added files.
+    #:
+    #: Each entry is a tuple containing the new filename and new OID.
+    added: set[tuple[str, str]]
+
+    #: The deleted files.
+    #:
+    #: Each entry is a tuple containing the old filename and old OID.
+    deleted: set[tuple[str, str]]
+
+    #: The renamed files.
+    #:
+    #: Each entry is a tuple containing the old filename, old OID, new
+    #: filename, and new OID.
+    renamed: set[tuple[str, str, str, str]]
+
+
+class LabelElementInfo(TypedDict):
+    """Information about an element in a label.
+
+    Version Added:
+        5.0
+    """
+
+    #: The element's OID.
+    oid: str
+
+    #: The version of the element in the label.
+    version: str
 
 
 class _GetElementsFromLabelThread(threading.Thread):
@@ -47,21 +104,28 @@ class _GetElementsFromLabelThread(threading.Thread):
     thread allows us to do multiple finds concurrently.
     """
 
-    def __init__(self, dir_name, label, elements, vob_tags):
+    def __init__(
+        self,
+        *,
+        dir_name: str,
+        label: str,
+        elements: dict[str, LabelElementInfo],
+        vob_tags: set[str],
+    ) -> None:
         """Initialize the thread.
 
         Args:
-            dir_name (unicode):
+            dir_name (str):
                 The directory name to search.
 
-            label (unicode):
+            label (str):
                 The label name.
 
             elements (dict):
                 A dictionary mapping element path to an info dictionary. Each
                 element contains ``oid`` and ``version`` keys.
 
-            vob_tags (list of unicode):
+            vob_tags (set of str):
                 A list of the VOBs to search.
         """
         self.dir_name = dir_name
@@ -73,11 +137,12 @@ class _GetElementsFromLabelThread(threading.Thread):
             label, vobtag = label.rsplit('@', 1)
         except Exception:
             pass
+
         self.label = label
 
-        threading.Thread.__init__(self)
+        super().__init__()
 
-    def run(self):
+    def run(self) -> None:
         """Run the thread.
 
         This will store a dictionary of ClearCase elements (oid + version)
@@ -105,14 +170,14 @@ class _GetElementsFromLabelThread(threading.Thread):
                 '-version',
                 'lbtype(%s)' % self.label,
                 '-exec',
-                ('cleartool describe -fmt "%%On\t%%En\t%%Vn\n" "%s"'
-                 % CLEARCASE_XPN)
+                (f'cleartool describe -fmt "%On\t%En\t%Vn\n" '
+                 f'"{CLEARCASE_XPN}"'),
             ]
         else:
             command = [
                 '-exec',
-                ('cleartool describe -fmt "%%On\t%%En\t%%Vn\n" "%s"'
-                 % CLEARCASE_PN),
+                (f'cleartool describe -fmt "%On\t%En\t%Vn\n" '
+                 f'"{CLEARCASE_PN}"'),
             ]
 
         output = execute(command,
@@ -133,7 +198,7 @@ class _GetElementsFromLabelThread(threading.Thread):
             }
 
 
-class ChangesetEntry(object):
+class _ChangesetEntry:
     """An entry in a changeset.
 
     This is a helper class which wraps a changed element, and
@@ -144,33 +209,36 @@ class ChangesetEntry(object):
         3.0
     """
 
-    def __init__(self,
-                 root_path,
-                 old_path=None,
-                 new_path=None,
-                 old_oid=None,
-                 new_oid=None,
-                 op='modify',
-                 is_dir=False):
+    def __init__(
+        self,
+        *,
+        root_path: str,
+        old_path: Optional[str] = None,
+        new_path: Optional[str] = None,
+        old_oid: Optional[str] = None,
+        new_oid: Optional[str] = None,
+        op: str = 'modify',
+        is_dir: bool = False,
+    ) -> None:
         """Initialize the changeset entry.
 
         Args:
-            root_path (unicode):
+            root_path (str):
                 The root path of the view.
 
-            old_path (unicode, optional):
+            old_path (str, optional):
                 The extended path of the "old" version of the element.
 
-            new_path (unicode, optional):
+            new_path (str, optional):
                 The extended path of the "new" version of the element.
 
-            old_oid (unicode, optional):
+            old_oid (str, optional):
                 The OID of the "old" version of the element.
 
-            new_oid (unicode, optional):
+            new_oid (str, optional):
                 The OID of the "new" version of the element.
 
-            op (unicode, optional):
+            op (str, optional):
                 The change operation.
 
             is_dir (bool, optional):
@@ -194,11 +262,11 @@ class ChangesetEntry(object):
         self.is_dir = is_dir
 
     @property
-    def vob_oid(self):
+    def vob_oid(self) -> str:
         """The OID of the VOB that the element is in.
 
         Type:
-            unicode
+            str
         """
         if self._vob_oid is None:
             self._vob_oid = execute(
@@ -208,11 +276,11 @@ class ChangesetEntry(object):
         return self._vob_oid
 
     @property
-    def old_oid(self):
+    def old_oid(self) -> str:
         """The OID of the old version of the element.
 
         Type:
-            unicode
+            str
         """
         if self._old_oid is None:
             if self.old_path:
@@ -224,11 +292,11 @@ class ChangesetEntry(object):
         return self._old_oid
 
     @property
-    def old_name(self):
+    def old_name(self) -> Optional[str]:
         """The name of the old version of the element.
 
         Type:
-            unicode:
+            str:
         """
         if self._old_name is None and self.old_path:
             self._old_name = os.path.relpath(
@@ -239,25 +307,25 @@ class ChangesetEntry(object):
         return self._old_name
 
     @property
-    def old_version(self):
+    def old_version(self) -> Optional[str]:
         """The version of the old version of the element.
 
         Type:
-            unicode
+            str
         """
         if self._old_version is None and self.old_path:
             self._old_version = execute(
                 ['cleartool', 'describe', '-fmt', '%Vn',
-                 'oid:%s@vobuuid:%s' % (self.old_oid, self.vob_oid)])
+                 f'oid:{self.old_oid}@vobuuid:{self.vob_oid}'])
 
         return self._old_version
 
     @property
-    def new_oid(self):
+    def new_oid(self) -> str:
         """The OID of the new version of the element.
 
         Type:
-            unicode
+            str
         """
         if self._new_oid is None:
             if self.new_path:
@@ -269,11 +337,11 @@ class ChangesetEntry(object):
         return self._new_oid
 
     @property
-    def new_name(self):
+    def new_name(self) -> Optional[str]:
         """The name of the new version of the element.
 
         Type:
-            unicode:
+            str:
         """
         if self._new_name is None and self.new_path:
             self._new_name = os.path.relpath(
@@ -284,11 +352,16 @@ class ChangesetEntry(object):
         return self._new_name
 
     @property
-    def new_version(self):
+    def new_version(self) -> Optional[str]:
+        """The version of the new version of the element.
+
+        Type:
+            str
+        """
         if self._new_version is None and self.new_path:
             self._new_version = execute(
                 ['cleartool', 'describe', '-fmt', '%Vn',
-                 'oid:%s@vobuuid:%s' % (self.new_oid, self.vob_oid)],
+                 f'oid:{self.new_oid}@vobuuid:{self.vob_oid}'],
                 ignore_errors=True,
                 with_errors=True)
 
@@ -297,15 +370,16 @@ class ChangesetEntry(object):
 
         return self._new_version
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Return a representation of the object.
 
         Returns:
-            unicode:
+            str:
             The internal representation of the object.
         """
-        return ('<ChangesetEntry op=%s old_path=%s new_path=%s>'
-                % (self.op, self.old_path, self.new_path))
+        return (
+            f'<_ChangesetEntry op={self.op} old_path={self.old_path} '
+            f'new_path={self.new_path}>')
 
 
 class ClearCaseClient(BaseSCMClient):
@@ -340,14 +414,37 @@ class ClearCaseClient(BaseSCMClient):
 
     CHECKEDOUT_RE = re.compile(r'CHECKEDOUT(\.\d+)?$')
 
-    def __init__(self, **kwargs):
+    ######################
+    # Instance variables #
+    ######################
+
+    #: Whether the ClearCase setup is using UCM.
+    is_ucm: bool
+
+    #: The name of the user's view.
+    viewname: Optional[str]
+
+    #: The user's ClearCase view type.
+    #:
+    #: This will be either ``snapshot`` or ``dynamic``.
+    viewtype: Optional[str]
+
+    #: The current repository's VOB tag.
+    #:
+    #: This is only used for matching the Review Board server repository.
+    vobtag: Optional[str]
+
+    def __init__(
+        self,
+        **kwargs,
+    ) -> None:
         """Initialize the client.
 
         Args:
             **kwargs (dict):
                 Keyword arguments to pass through to the superclass.
         """
-        super(ClearCaseClient, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.viewtype = None
         self.viewname = None
         self.is_ucm = False
@@ -419,8 +516,8 @@ class ClearCaseClient(BaseSCMClient):
         """
         # NOTE: This can be removed once check_dependencies() is mandatory.
         if not self.has_dependencies(expect_checked=True):
-            logging.debug('Unable to execute "cleartool help": skipping '
-                          'ClearCase')
+            logger.debug('Unable to execute "cleartool help": skipping '
+                         'ClearCase')
             return None
 
         # Bail out early if we're not in a view.
@@ -483,10 +580,12 @@ class ClearCaseClient(BaseSCMClient):
                 break
 
         return ClearCaseRepositoryInfo(path=local_path,
-                                       vobtag=self._get_vobtag(),
-                                       tool=self)
+                                       vobtag=self._get_vobtag())
 
-    def find_matching_server_repository(self, repositories):
+    def find_matching_server_repository(
+        self,
+        repositories: ListResource,
+    ) -> tuple[Optional[ItemResource], Optional[ItemResource]]:
         """Find a match for the repository on the server.
 
         Args:
@@ -546,7 +645,7 @@ class ClearCaseClient(BaseSCMClient):
 
     def parse_revision_spec(
         self,
-        revisions: List[str] = [],
+        revisions: list[str] = [],
     ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
@@ -619,7 +718,7 @@ class ClearCaseClient(BaseSCMClient):
 
                 if len(tip.rsplit('@', 1)) != 2:
                     raise InvalidRevisionSpecError(
-                        'UCM stream name %s must include a PVOB tag' % tip)
+                        f'UCM stream name {tip} must include a PVOB tag')
 
                 return {
                     'base': self.REVISION_STREAM_BASE,
@@ -648,8 +747,8 @@ class ClearCaseClient(BaseSCMClient):
 
                 if pvobs[0] != pvobs[1]:
                     raise InvalidRevisionSpecError(
-                        'Baselines %s and %s do not have the same PVOB tag'
-                        % (pvobs[0], pvobs[1]))
+                        f'Baselines {pvobs[0]} and {pvobs[1]} do not have '
+                        f'the same PVOB tag')
 
                 return {
                     'base': self.REVISION_BASELINE_BASE,
@@ -687,11 +786,10 @@ class ClearCaseClient(BaseSCMClient):
         self,
         revisions: SCMClientRevisionSpec,
         *,
-        include_files: List[str] = [],
-        exclude_patterns: List[str] = [],
-        no_renames: bool = False,
-        repository_info: Optional[RepositoryInfo] = None,
-        extra_args: List[str] = [],
+        include_files: list[str] = [],
+        exclude_patterns: list[str] = [],
+        repository_info: ClearCaseRepositoryInfo,
+        extra_args: list[str] = [],
         **kwargs,
     ) -> SCMClientDiffResult:
         """Perform a diff using the given revisions.
@@ -701,10 +799,10 @@ class ClearCaseClient(BaseSCMClient):
                 A dictionary of revisions, as returned by
                 :py:meth:`parse_revision_spec`.
 
-            include_files (list of unicode, optional):
+            include_files (list of str, optional):
                 A list of files to whitelist during the diff generation.
 
-            exclude_patterns (list of unicode, optional):
+            exclude_patterns (list of str, optional):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
 
@@ -735,31 +833,43 @@ class ClearCaseClient(BaseSCMClient):
         tip = revisions['tip']
 
         if tip == self.REVISION_CHECKEDOUT_CHANGESET:
-            changeset = self._get_checkedout_changeset(repository_info)
+            changelist = self._get_checkedout_changelist(repository_info)
         elif base == self.REVISION_ACTIVITY_BASE:
-            changeset = self._get_activity_changeset(tip, repository_info)
+            assert isinstance(tip, str)
+
+            changelist = self._get_activity_changelist(tip, repository_info)
         elif base == self.REVISION_BASELINE_BASE:
-            changeset = self._get_baseline_changeset(tip)
+            assert isinstance(tip, list)
+
+            changelist = self._get_baseline_changelist(tip)
         elif base == self.REVISION_BRANCH_BASE:
-            changeset = self._get_branch_changeset(tip, repository_info)
+            assert isinstance(tip, str)
+
+            changelist = self._get_branch_changelist(tip, repository_info)
         elif base == self.REVISION_LABEL_BASE:
-            changeset = self._get_label_changeset(tip, repository_info)
+            assert isinstance(tip, list)
+
+            changelist = self._get_label_changelist(tip, repository_info)
         elif base == self.REVISION_STREAM_BASE:
-            changeset = self._get_stream_changeset(tip, repository_info)
+            assert isinstance(tip, str)
+
+            changelist = self._get_stream_changelist(tip, repository_info)
         elif base == self.REVISION_FILES:
-            changeset = tip
+            assert isinstance(tip, list)
+
+            changelist = tip
         else:
             assert False
 
         metadata = self._get_diff_metadata(revisions)
 
-        return self._do_diff(changeset, repository_info, metadata)
+        return self._do_diff(changelist, repository_info, metadata)
 
-    def _get_vobtag(self):
+    def _get_vobtag(self) -> str:
         """Return the current repository's VOB tag.
 
         Returns:
-            unicode:
+            str:
             The VOB tag for the current working directory.
 
         Raises:
@@ -777,20 +887,19 @@ class ClearCaseClient(BaseSCMClient):
 
         return self.vobtag
 
-    def _get_vob_uuid(self, vobtag):
+    def _get_vob_uuid(
+        self,
+        vobtag: str,
+    ) -> Optional[str]:
         """Return the current VOB's UUID.
 
         Args:
-            vobtag (unicode):
+            vobtag (str):
                 The VOB tag to query.
 
         Returns:
-            unicode:
+            str:
             The VOB UUID.
-
-        Raises:
-            rbtools.clients.errors.SCMError:
-                The current VOB tag was unable to be determined.
         """
         property_lines = execute(
             ['cleartool', 'lsvob', '-long', vobtag],
@@ -802,47 +911,19 @@ class ClearCaseClient(BaseSCMClient):
 
         return None
 
-    def _list_checkedout(self, path):
-        """List all checked out elements in current view below path.
-
-        Run the :command:`cleartool` command twice because ``recurse`` finds
-        checked out elements under path except path, and the directory is
-        detected only if the path directory is checked out.
-
-        Args:
-            path (unicode):
-                The path of the directory to find checked-out files in.
-
-        Returns:
-            list of unicode:
-            A list of the checked out files.
-        """
-        checkedout_elements = []
-
-        for option in ['-recurse', '-directory']:
-            # We ignore return code 1 in order to omit files that ClearCase
-            # cannot read.
-            output = execute(['cleartool', 'lscheckout', option, '-cview',
-                              '-fmt', r'%En@@%Vn\n', path],
-                             split_lines=True,
-                             extra_ignore_errors=(1,),
-                             with_errors=False)
-
-            if output:
-                checkedout_elements.extend(output)
-                logging.debug(output)
-
-        return checkedout_elements
-
-    def _is_a_label(self, label, vobtag=None):
+    def _is_a_label(
+        self,
+        label: str,
+        vobtag: str,
+    ) -> bool:
         """Return whether a given label is a valid ClearCase lbtype.
 
         Args:
-            label (unicode):
+            label (str):
                 The label to check.
 
-            vobtag (unicode, optional):
-                An optional VOB tag to limit the label to.
+            vobtag (str):
+                The VOB tag to limit the label to.
 
         Raises:
             rbtools.clients.errors.SCMError:
@@ -862,13 +943,14 @@ class ClearCaseClient(BaseSCMClient):
 
         # Be sure label is prefix by lbtype, required by cleartool describe.
         if not label.startswith(self.REVISION_LABEL_PREFIX):
-            label = '%s%s' % (self.REVISION_LABEL_PREFIX, label)
+            label = f'{self.REVISION_LABEL_PREFIX}{label}'
 
         # If vobtag defined, check if it matches with the one extracted from
         # label, otherwise raise an exception.
         if vobtag and label_vobtag and label_vobtag != vobtag:
-            raise SCMError('label vobtag %s does not match expected vobtag '
-                           '%s' % (label_vobtag, vobtag))
+            raise SCMError(
+                f'label vobtag {label_vobtag} does not match expected vobtag '
+                f'{vobtag}')
 
         # Finally check if label exists in database, otherwise quit. Ignore
         # return code 1, it means label does not exist.
@@ -877,69 +959,10 @@ class ClearCaseClient(BaseSCMClient):
                          with_errors=False)
         return bool(output)
 
-    def _get_tmp_label(self):
-        """Return a string that will be used to set a ClearCase label.
-
-        Returns:
-            unicode:
-            A string suitable for using as a temporary label.
-        """
-        now = datetime.datetime.now()
-        temporary_label = 'Current_%d_%d_%d_%d_%d_%d_%d' % (
-            now.year, now.month, now.day, now.hour, now.minute, now.second,
-            now.microsecond)
-        return temporary_label
-
-    def _set_label(self, label, path):
-        """Set a ClearCase label on elements seen under path.
-
-        Args:
-            label (unicode):
-                The label to set.
-
-            path (unicode):
-                The filesystem path to set the label on.
-        """
-        checkedout_elements = self._list_checkedout(path)
-        if checkedout_elements:
-            raise SCMError(
-                'ClearCase backend cannot set label when some elements are '
-                'checked out:\n%s' % ''.join(checkedout_elements))
-
-        # First create label in vob database.
-        execute(['cleartool', 'mklbtype', '-c', 'label created for rbtools',
-                 label],
-                with_errors=True)
-
-        # We ignore return code 1 in order to omit files that ClearCase cannot
-        # read.
-        recursive_option = ''
-        if cpath.isdir(path):
-            recursive_option = '-recurse'
-
-        # Apply label to path.
-        execute(['cleartool', 'mklabel', '-nc', recursive_option, label, path],
-                extra_ignore_errors=(1,),
-                with_errors=False)
-
-    def _remove_label(self, label):
-        """Remove a ClearCase label from vob database.
-
-        It will remove all references of this label on elements.
-
-        Args:
-            label (unicode):
-                The ClearCase label to remove.
-        """
-        # Be sure label is prefix by lbtype.
-        if not label.startswith(self.REVISION_LABEL_PREFIX):
-            label = '%s%s' % (self.REVISION_LABEL_PREFIX, label)
-
-        # Label exists so remove it.
-        execute(['cleartool', 'rmtype', '-rmall', '-force', label],
-                with_errors=True)
-
-    def _determine_version(self, version_path):
+    def _determine_version(
+        self,
+        version_path: str,
+    ) -> int:
         """Determine the numeric version of a version path.
 
         This will split a version path, pulling out the branch and version. A
@@ -947,7 +970,7 @@ class ClearCaseClient(BaseSCMClient):
         of a file, similar to ``HEAD`` in many other types of repositories.
 
         Args:
-            version_path (unicode):
+            version_path (str):
                 A version path consisting of a branch path and a version
                 number.
 
@@ -958,11 +981,15 @@ class ClearCaseClient(BaseSCMClient):
         branch, number = cpath.split(version_path)
 
         if self.CHECKEDOUT_RE.search(number):
-            return sys.maxsize
+            return _VERSION_CHECKEDOUT
 
         return int(number)
 
-    def _construct_extended_path(self, path, version):
+    def _construct_extended_path(
+        self,
+        path: str,
+        version: str,
+    ) -> str:
         """Construct an extended path from a file path and version identifier.
 
         This will construct a path in the form of ``path@version``. If the
@@ -970,38 +997,47 @@ class ClearCaseClient(BaseSCMClient):
         returned.
 
         Args:
-            path (unicode):
+            path (str):
                 A file path.
 
-            version (unicode):
+            version (str):
                 The version of the file.
 
         Returns:
-            unicode:
+            str:
             The combined extended path.
         """
         if not version or self.CHECKEDOUT_RE.search(version):
             return path
 
-        return '%s@@%s' % (path, version)
+        return f'{path}@@{version}'
 
-    def _construct_revision(self, branch_path, version_number):
+    def _construct_revision(
+        self,
+        branch_path: str,
+        version_number: str,
+    ) -> str:
         """Construct a revisioned path from a branch path and version ID.
 
         Args:
-            branch_path (unicode):
+            branch_path (str):
                 The path of a branch.
 
-            version_number (unicode):
+            version_number (str):
                 The version number of the revision.
 
         Returns:
-            unicode:
+            str:
             The combined revision.
         """
         return cpath.join(branch_path, version_number)
 
-    def _get_previous_version(self, path, branch_path, version_number):
+    def _get_previous_version(
+        self,
+        path: str,
+        branch_path: str,
+        version_number: str,
+    ) -> tuple[str, str]:
         """Return the previous version for a ClearCase versioned element.
 
         The previous version of an element can usually be found by simply
@@ -1010,10 +1046,10 @@ class ClearCaseClient(BaseSCMClient):
         This method will query ClearCase for the predecessor version.
 
         Args:
-            path (unicode):
+            path (str):
                 The path to an element.
 
-            branch_path (unicode):
+            branch_path (str):
                 The path of the branch of the element (typically something like
                 /main/).
 
@@ -1025,8 +1061,8 @@ class ClearCaseClient(BaseSCMClient):
             A 2-tuple consisting of the predecessor branch path and version
             number.
         """
-        full_version = cpath.join(branch_path, '%d' % version_number)
-        extended_path = '%s@@%s' % (path, full_version)
+        full_version = cpath.join(branch_path, str(version_number))
+        extended_path = f'{path}@@{full_version}'
 
         previous_version = execute(
             ['cleartool', 'desc', '-fmt', '%[version_predecessor]p',
@@ -1039,180 +1075,50 @@ class ClearCaseClient(BaseSCMClient):
 
         return cpath.split(previous_version)
 
-    def _sanitize_activity_changeset(self, changeset, repository_info):
-        """Return changeset containing non-binary, branched file versions.
-
-        A UCM activity changeset contains all file revisions created/touched
-        during this activity. File revisions are ordered earlier versions first
-        in the format::
-
-            changelist = [
-                '<path>@@<branch_path>/<version_number>',
-                '<path>@@<branch_path>/<version_number>',
-                ...
-            ]
-
-        ``<path>`` is relative path to file
-        ``<branch_path>`` is clearcase specific branch path to file revision
-        ``<version number>`` is the version number of the file in branch_path
-
-        Args:
-            changeset (unicode):
-                The changeset to fetch.
-
-            repository_info (ClearCaseRepositoryInfo):
-                The repository info structure.
-
-        Returns:
-            list:
-            The list of file versions.
-        """
-        changelist = OrderedDict()
-        ignored_changes = []
-        changeset = list(changeset)
-
-        for change in changeset:
-            # Split from the right on /main/, just in case some directory
-            # elements are reported with a different version.
-            path, current = change.rsplit(_MAIN, 1)
-
-            if path.endswith('@@'):
-                path = path[:-2]
-
-            current = _MAIN + current
-
-            # If a file isn't in the correct vob, then ignore it.
-            for tag in repository_info.vob_tags:
-                if ('%s%s' % (tag, os.sep)) in path:
-                    break
-            else:
-                logging.debug('VOB tag does not match, ignoring changes on %s',
-                              path)
-                ignored_changes.append(change)
-                continue
-
-            version_number = self._determine_version(current)
-
-            if version_number == 0:
-                logging.warning('Unexpected version 0 for %s in activity '
-                                'changeset. Did you rmver the first version, '
-                                'or forget to check it in? This file will '
-                                'be ignored.'
-                                % path)
-                ignored_changes.append(change)
-                continue
-
-            if path not in changelist:
-                changelist[path] = {
-                    'highest': version_number,
-                    'lowest': version_number,
-                    'current': current,
-                }
-
-            if version_number > changelist[path]['highest']:
-                changelist[path]['highest'] = version_number
-                changelist[path]['current'] = current
-            elif version_number < changelist[path]['lowest']:
-                changelist[path]['lowest'] = version_number
-
-        if ignored_changes:
-            print('The following elements from this change set are not part '
-                  'of the currently configured repository, and will be '
-                  'ignored:')
-
-            for change in ignored_changes:
-                print(change)
-
-            print()
-
-        # Convert to list
-        changeranges = []
-
-        for path, version in changelist.items():
-            current_version = version['current']
-            branch_path, current_version_number = cpath.split(current_version)
-
-            lowest_version = version['lowest']
-
-            if lowest_version == sys.maxsize:
-                # This is a new file.
-                prev_version_number = '0'
-            else:
-                # Query for the previous version, just in case an old revision
-                # was removed.
-                branch_path, prev_version_number = self._get_previous_version(
-                    path, branch_path, lowest_version)
-
-            previous_version = self._construct_revision(branch_path,
-                                                        prev_version_number)
-
-            changeranges.append(
-                (self._construct_extended_path(path, previous_version),
-                 self._construct_extended_path(path, current_version))
-            )
-
-        return changeranges
-
-    def _sanitize_branch_changeset(self, changeset):
+    def _sanitize_branch_changeset(
+        self,
+        changed_items: list[_BranchChangedEntry],
+    ) -> _ChangedEntryList:
         """Return changeset containing non-binary, branched file versions.
 
         Changeset contain only first and last version of file made on branch.
 
         Args:
-            changeset (unicode):
-                The changeset to fetch.
+            changed_items (list of _BranchChangedEntry):
+                The list of changed items.
 
-        Returns:
-            list:
-            The list of file versions.
+        Yields:
+            _ChangedEntry:
+            Each entry in the branch.
         """
-        changelist = {}
+        changes_by_path: dict[str, dict[str, Any]] = {}
 
-        for path, previous, current in changeset:
+        for path, previous, current in changed_items:
             version_number = self._determine_version(current)
 
-            if path not in changelist:
-                changelist[path] = {
+            if path not in changes_by_path:
+                changes_by_path[path] = {
                     'highest': version_number,
                     'current': current,
-                    'previous': previous
+                    'previous': previous,
                 }
-
-            if version_number == 0:
+            elif version_number == 0:
                 # Previous version of 0 version on branch is base
-                changelist[path]['previous'] = previous
-            elif version_number > changelist[path]['highest']:
-                changelist[path]['highest'] = version_number
-                changelist[path]['current'] = current
+                changes_by_path[path]['previous'] = previous
+            elif version_number > changes_by_path[path]['highest']:
+                changes_by_path[path]['highest'] = version_number
+                changes_by_path[path]['current'] = current
 
-        return [
-            (self._construct_extended_path(path, version['previous']),
-             self._construct_extended_path(path, version['current']))
-            for path, version in changelist.items()
-        ]
-
-    def _sanitize_checkedout_changeset(self, changeset):
-        """Return extended paths for all modifications in a changeset.
-
-        Args:
-            changeset (unicode):
-                The changeset to fetch.
-
-        Returns:
-            list:
-            The list of file versions.
-        """
-        changeranges = []
-
-        for path, previous, current in changeset:
-            changeranges.append(
-                (self._construct_extended_path(path, previous),
-                 self._construct_extended_path(path, current))
+        for path, version in changes_by_path.items():
+            yield (
+                self._construct_extended_path(path, version['previous']),
+                self._construct_extended_path(path, version['current']),
             )
 
-        return changeranges
-
-    def _sanitize_version_0_file(self, file_revision):
+    def _sanitize_version_0_file(
+        self,
+        file_revision: str,
+    ) -> str:
         """Sanitize a version 0 file.
 
         This fixes up a revision identifier to use the correct predecessor
@@ -1220,11 +1126,11 @@ class ClearCaseClient(BaseSCMClient):
         left as-is.
 
         Args:
-            file_revision (unicode):
+            file_revision (str):
                 The file revision to sanitize.
 
         Returns:
-            unicode:
+            str:
             The sanitized revision.
         """
         # There is no predecessor for @@/main/0, so keep current revision.
@@ -1232,17 +1138,20 @@ class ClearCaseClient(BaseSCMClient):
             return file_revision
 
         if file_revision.endswith('%s0' % os.sep):
-            logging.debug('Found file %s with version 0', file_revision)
+            logger.debug('Found file %s with version 0', file_revision)
             file_revision = execute(['cleartool',
                                      'describe',
                                      '-fmt', '%En@@%PSn',
                                      file_revision])
-            logging.debug('Sanitized with predecessor, new file: %s',
-                          file_revision)
+            logger.debug('Sanitized with predecessor, new file: %s',
+                         file_revision)
 
         return file_revision
 
-    def _sanitize_version_0_changeset(self, changeset):
+    def _sanitize_version_0_changeset(
+        self,
+        changeset: _ChangedEntryList,
+    ) -> _ChangedEntryList:
         """Return changeset sanitized of its <branch>/0 version.
 
         Indeed this predecessor (equal to <branch>/0) should already be
@@ -1252,38 +1161,22 @@ class ClearCaseClient(BaseSCMClient):
             changeset (list):
                 A list of changes in the changeset.
 
-        Returns:
-            list:
-            The sanitized changeset.
+        Yields:
+            _ChangedEntry:
+            Each changed entry in the changeset.
         """
-        sanitized_changeset = []
-
         for old_file, new_file in changeset:
             # This should not happen for new file but it is safer to sanitize
             # both file revisions.
-            sanitized_changeset.append(
-                (self._sanitize_version_0_file(old_file),
-                 self._sanitize_version_0_file(new_file)))
+            yield (
+                self._sanitize_version_0_file(old_file),
+                self._sanitize_version_0_file(new_file),
+            )
 
-        return sanitized_changeset
-
-    def _construct_changeset(self, output):
-        """Construct a changeset from cleartool output.
-
-        Args:
-            output (unicode):
-                The result from a :command:`cleartool lsX` operation.
-
-        Returns:
-            list:
-            A list of changes.
-        """
-        return [
-            info.split('\t')
-            for info in output.strip().split('\n')
-        ]
-
-    def _get_checkedout_changeset(self, repository_info):
+    def _get_checkedout_changelist(
+        self,
+        repository_info: ClearCaseRepositoryInfo,
+    ) -> _ChangedEntryList:
         """Return information about the checked out changeset.
 
         This function returns: kind of element, path to file, previous and
@@ -1293,9 +1186,9 @@ class ClearCaseClient(BaseSCMClient):
             repository_info (ClearCaseRepositoryInfo):
                 The repository info structure.
 
-        Returns:
-            list:
-            A list of the changed files.
+        Yields:
+            _ChangedEntry:
+            Each changed entry in the checkout.
         """
         env = os.environ.copy()
 
@@ -1318,33 +1211,39 @@ class ClearCaseClient(BaseSCMClient):
             ],
             extra_ignore_errors=(1,),
             with_errors=False,
-            env=env)
+            env=env,
+            split_lines=True)
 
-        if output:
-            changeset = self._construct_changeset(output)
-        else:
-            changeset = []
+        for line in output:
+            path, previous, current = line.strip().split('\t')
 
-        return self._sanitize_checkedout_changeset(changeset)
+            yield (
+                self._construct_extended_path(path, previous),
+                self._construct_extended_path(path, current),
+            )
 
-    def _get_activity_changeset(self, activity, repository_info):
+    def _get_activity_changelist(
+        self,
+        activity: str,
+        repository_info: ClearCaseRepositoryInfo,
+    ) -> _ChangedEntryList:
         """Return information about the versions changed on a branch.
 
         This takes into account the changes attached to this activity
         (including rebase changes) in all vobs of the current view.
 
         Args:
-            activity (unicode):
+            activity (str):
                 The activity name.
 
             repository_info (ClearCaseRepositoryInfo):
                 The repository info structure.
 
-        Returns:
-            list:
-            A list of the changed files.
+        Yields:
+            _ChangedEntry:
+            Each changed entry in the activity.
         """
-        changeset = []
+        changed_items: list[str] = []
 
         # Get list of revisions and get the diff of each one. Return code 1 is
         # ignored in order to omit files that ClearCase can't read.
@@ -1358,18 +1257,87 @@ class ClearCaseClient(BaseSCMClient):
 
         if output:
             # UCM activity changeset with %[versions]Qp is split by spaces but
-            # not EOL, so we cannot reuse self._construct_changeset here.
-            # However, since each version is enclosed in double quotes, we can
-            # split and consolidate the list.
-            changeset = filter(None, [x.strip() for x in output.split('"')])
+            # not EOL. However, since each version is enclosed in double
+            # quotes, we can split and consolidate the list.
+            changed_items = cast(List[str], filter(
+                None,
+                (x.strip() for x in output.split('"'))))
 
-        return self._sanitize_activity_changeset(changeset, repository_info)
+        # Accumulate all changes to find the lowest and highest versions.
+        changes_by_path: OrderedDict[str, dict[str, Any]] = OrderedDict()
+        ignored_changes: list[str] = []
 
-    def _get_baseline_changeset(self, baselines):
+        for item in changed_items:
+            path, current = item.rsplit(_MAIN, 1)
+
+            if path.endswith('@@'):
+                path = path[:-2]
+
+            current = _MAIN + current
+
+            # If a file isn't in the correct vob, ignore it.
+            for tag in repository_info.vob_tags:
+                if f'{tag}{os.sep}' in path:
+                    break
+            else:
+                logger.debug('VOB tag does not match, ignoring changes on %s',
+                             path)
+                ignored_changes.append(item)
+                continue
+
+            version = self._determine_version(current)
+
+            if path not in changes_by_path:
+                changes_by_path[path] = {
+                    'highest': version,
+                    'lowest': version,
+                    'current': current,
+                }
+            elif version > changes_by_path[path]['highest']:
+                changes_by_path[path]['highest'] = version
+                changes_by_path[path]['current'] = current
+            elif version < changes_by_path[path]['lowest']:
+                changes_by_path[path]['lowest'] = version
+
+        if ignored_changes:
+            logger.warning(
+                'The following elements from this change set are not part '
+                'of the currently configured repository, and will be '
+                'ignored:')
+
+            for change in ignored_changes:
+                logger.warning(change)
+
+        for path, version_info in changes_by_path.items():
+            current = version_info['current']
+            branch_path, current_version = cpath.split(current)
+
+            lowest = version_info['lowest']
+
+            if lowest == _VERSION_CHECKEDOUT:
+                # This is a new file in the workspace.
+                prev_version = '0'
+            else:
+                # Query for the previous version, just in case an old revision
+                # was removed.
+                branch_path, prev_version = self._get_previous_version(
+                    path, branch_path, lowest)
+
+            previous = self._construct_revision(branch_path, prev_version)
+
+            yield (
+                self._construct_extended_path(path, previous),
+                self._construct_extended_path(path, current),
+            )
+
+    def _get_baseline_changelist(
+        self,
+        baselines: list[str],
+    ) -> _ChangedEntryList:
         """Return information about versions changed between two baselines.
 
         Args:
-            baselines (list of unicode):
+            baselines (list of str):
                 A list of one or two baselines including PVOB tags. If one
                 baseline is included, this will do a diff between that and the
                 predecessor baseline.
@@ -1387,17 +1355,17 @@ class ClearCaseClient(BaseSCMClient):
         if len(baselines) == 1:
             command += [
                 '-predecessor',
-                'baseline:%s' % baselines[0],
+                f'baseline:{baselines[0]}',
             ]
         else:
             command += [
-                'baseline:%s' % baselines[0],
-                'baseline:%s' % baselines[1],
+                f'baseline:{baselines[0]}',
+                f'baseline:{baselines[1]}',
             ]
 
         diff = execute(command,
                        extra_ignore_errors=(1, 2),
-                       splitlines=True)
+                       split_lines=True)
 
         WS_RE = re.compile(r'\s+')
         versions = [
@@ -1420,18 +1388,27 @@ class ClearCaseClient(BaseSCMClient):
             for version in versions
         ])
 
-        changeset = self._construct_changeset(''.join(version_info))
+        entry_lines = ''.join(version_info).split('\n')
 
-        return self._sanitize_branch_changeset(changeset)
+        changed_items = cast(List[_BranchChangedEntry], [
+            line.strip().split('\t')
+            for line in entry_lines
+        ])
 
-    def _get_branch_changeset(self, branch, repository_info):
+        return self._sanitize_branch_changeset(changed_items)
+
+    def _get_branch_changelist(
+        self,
+        branch: str,
+        repository_info: ClearCaseRepositoryInfo,
+    ) -> _ChangedEntryList:
         """Return information about the versions changed on a branch.
 
         This takes into account the changes on the branch owned by the
         current user in all vobs of the current view.
 
         Args:
-            branch (unicode):
+            branch (str):
                 The branch name.
 
             repository_info (ClearCaseRepositoryInfo):
@@ -1460,21 +1437,26 @@ class ClearCaseClient(BaseSCMClient):
                 '-version',
                 'brtype(%s)' % branch,
                 '-exec',
-                ('cleartool descr -fmt "%%En\t%%PVn\t%%Vn\n" "%s"'
-                 % CLEARCASE_XPN),
+                (f'cleartool descr -fmt "%En\t%PVn\t%Vn\n" '
+                 f'"{CLEARCASE_XPN}"'),
             ],
             extra_ignore_errors=(1,),
             with_errors=False,
-            env=env)
+            env=env,
+            split_lines=True)
 
-        if output:
-            changeset = self._construct_changeset(output)
-        else:
-            changeset = []
+        changed_items = cast(List[_BranchChangedEntry], [
+            line.strip().split('\t')
+            for line in output
+        ])
 
-        return self._sanitize_branch_changeset(changeset)
+        return self._sanitize_branch_changeset(changed_items)
 
-    def _get_label_changeset(self, labels, repository_info):
+    def _get_label_changelist(
+        self,
+        labels: list[str],
+        repository_info: ClearCaseRepositoryInfo,
+    ) -> _ChangedEntryList:
         """Return information about the versions changed between labels.
 
         This takes into account the changes done between labels and restrict
@@ -1488,12 +1470,10 @@ class ClearCaseClient(BaseSCMClient):
             repository_info (ClearCaseRepositoryInfo):
                 The repository info structure.
 
-        Returns:
-            list:
-            A list of the changed files.
+        Yields:
+            _ChangedEntry:
+            Each entry changed between the two labels.
         """
-        changeset = []
-
         # Initialize comparison_path to current working directory.
         # TODO: support another argument to manage a different comparison path.
         comparison_path = os.getcwd()
@@ -1520,29 +1500,29 @@ class ClearCaseClient(BaseSCMClient):
 
             if not matched_vobs:
                 raise SCMError(
-                    'Label %s was not found in any of the configured VOBs'
-                    % label)
+                    'Labels %r were not found in any of the configured VOBs'
+                    % labels)
 
             previous_label, current_label = labels
-            logging.debug('Comparison between labels %s and %s on %s',
-                          previous_label, current_label, comparison_path)
+            logger.debug('Comparison between labels %s and %s on %s',
+                         previous_label, current_label, comparison_path)
 
             # List ClearCase element path and version belonging to previous and
             # current labels, element path is the key of each dict.
             previous_elements = {}
             current_elements = {}
             previous_label_elements_thread = _GetElementsFromLabelThread(
-                comparison_path,
-                previous_label,
-                previous_elements,
-                matched_vobs)
+                dir_name=comparison_path,
+                label=previous_label,
+                elements=previous_elements,
+                vob_tags=matched_vobs)
             previous_label_elements_thread.start()
 
             current_label_elements_thread = _GetElementsFromLabelThread(
-                comparison_path,
-                current_label,
-                current_elements,
-                matched_vobs)
+                dir_name=comparison_path,
+                label=current_label,
+                elements=current_elements,
+                vob_tags=matched_vobs)
             current_label_elements_thread.start()
 
             previous_label_elements_thread.join()
@@ -1561,7 +1541,7 @@ class ClearCaseClient(BaseSCMClient):
                 seen.add(path)
 
                 # Initialize previous and current version to '/main/0'
-                main0 = '%s0' % _MAIN
+                main0 = f'{_MAIN}0'
                 changelist[path] = {
                     'current': main0,
                     'previous': main0,
@@ -1575,36 +1555,33 @@ class ClearCaseClient(BaseSCMClient):
                     changelist[path]['previous'] = \
                         previous_elements[path]['version']
 
-                logging.debug('path: %s\nprevious: %s\ncurrent:  %s\n',
-                              path,
-                              changelist[path]['previous'],
-                              changelist[path]['current'])
-
                 # Prevent adding identical version to comparison.
                 if changelist[path]['current'] == changelist[path]['previous']:
                     continue
 
-                changeset.append(
-                    (self._construct_extended_path(
+                yield (
+                    self._construct_extended_path(
                         path,
                         changelist[path]['previous']),
-                     self._construct_extended_path(
+                    self._construct_extended_path(
                         path,
-                        changelist[path]['current'])))
-
+                        changelist[path]['current']),
+                )
         except Exception as e:
             error_message = str(e)
 
             if error_message:
                 raise SCMError('Label comparison failed:\n%s' % error_message)
 
-        return changeset
-
-    def _get_stream_changeset(self, stream, repository_info):
+    def _get_stream_changelist(
+        self,
+        stream: str,
+        repository_info: ClearCaseRepositoryInfo,
+    ) -> _ChangedEntryList:
         """Return information about the versions changed in a stream.
 
         Args:
-            stream (unicode):
+            stream (str):
                 The UCM stream name. This must include the PVOB tag as well, so
                 that ``cleartool describe`` can fetch the branch name.
 
@@ -1633,29 +1610,29 @@ class ClearCaseClient(BaseSCMClient):
                 break
 
         if not branch:
-            logging.error('Unable to determine branch name for UCM stream %s',
-                          stream)
-            return ''
+            logger.error('Unable to determine branch name for UCM stream %s',
+                         stream)
+            return []
 
         # TODO: It's possible that some project VOBs may exist in the stream
         # but not be included in the Review Board repository configuration. In
-        # this case, _get_branch_changeset will only include changes in the
+        # this case, _get_branch_changelist will only include changes in the
         # configured VOBs. There's also a possibility that some non-UCM or
         # other non-related UCM VOBs may have the same stream name or branch
         # name as the one being searched, and so it could include unexpected
         # versions. The chances of this in reality are probably pretty small.
-        return self._get_branch_changeset(branch, repository_info)
+        return self._get_branch_changelist(branch, repository_info)
 
     def _diff_directories(
         self,
-        entry: ChangesetEntry,
+        entry: _ChangesetEntry,
         repository_info: ClearCaseRepositoryInfo,
         diffx_change: DiffXChangeSection,
     ) -> bytes:
         """Return a unified diff for a changed directory.
 
         Args:
-            entry (ChangesetEntry):
+            entry (_ChangesetEntry):
                 The changeset entry.
 
             repository_info (ClearCaseRepositoryInfo):
@@ -1672,10 +1649,16 @@ class ClearCaseClient(BaseSCMClient):
         diff_tool = self.get_diff_tool()
         assert diff_tool is not None
 
-        old_content = self._get_directory_contents(entry.old_path)
+        old_path = entry.old_path
+        assert old_path is not None
+
+        old_content = self._get_directory_contents(old_path)
         old_tmp = make_tempfile(content=old_content)
 
-        new_content = self._get_directory_contents(entry.new_path)
+        new_path = entry.new_path
+        assert new_path is not None
+
+        new_content = self._get_directory_contents(new_path)
         new_tmp = make_tempfile(content=new_content)
 
         # Diff the two files.
@@ -1702,7 +1685,7 @@ class ClearCaseClient(BaseSCMClient):
         diff_contents = stream.getvalue()
 
         if not repository_info.is_legacy:
-            vv_metadata = {
+            vv_metadata: dict[str, Any] = {
                 'directory-diff': 'legacy-filenames',
                 'vob': entry.vob_oid,
             }
@@ -1757,7 +1740,7 @@ class ClearCaseClient(BaseSCMClient):
                     'path': new_path_rel,
                 }
             else:
-                logging.warning(
+                logger.warning(
                     'Unexpected operation "%s" for directory %s %s',
                     entry.op, entry.old_path, entry.new_path)
                 return b''
@@ -1775,11 +1758,14 @@ class ClearCaseClient(BaseSCMClient):
 
         return diff_contents
 
-    def _get_directory_contents(self, extended_path):
+    def _get_directory_contents(
+        self,
+        extended_path: str,
+    ) -> bytes:
         """Return an ls-style directory listing for a versioned directory.
 
         Args:
-            extended_path (unicode):
+            extended_path (str):
                 The path of the directory to get the contents for.
 
         Returns:
@@ -1804,28 +1790,26 @@ class ClearCaseClient(BaseSCMClient):
 
     def _diff_files(
         self,
-        entry: ChangesetEntry,
+        entry: _ChangesetEntry,
         repository_info: ClearCaseRepositoryInfo,
         diffx_change: DiffXChangeSection,
     ) -> bytes:
         """Return a unified diff for a changed file.
 
         Args:
-            entry (ChangesetEntry):
+            entry (_ChangesetEntry):
                 The changeset entry.
 
             repository_info (ClearCaseRepositoryInfo):
                 The repository info structure.
 
-            diffx (pydiffx.dom.DiffXChangeSection):
+            diffx_change (pydiffx.dom.DiffXChangeSection):
                 The DiffX DOM object for writing VersionVault diffs.
 
         Returns:
             bytes:
             The diff between the two files, for writing legacy ClearCase diffs.
         """
-        diff_result_lines: List[bytes]
-
         diff_tool = self.get_diff_tool()
         assert diff_tool is not None
 
@@ -1851,10 +1835,16 @@ class ClearCaseClient(BaseSCMClient):
             # For snapshot views, we have to explicitly query to get the file
             # content and store in temporary files.
             try:
-                diff_old_file = self._get_content_snapshot(entry.old_path)
-                diff_new_file = self._get_content_snapshot(entry.new_path)
+                old_path = entry.old_path
+                assert old_path is not None
+
+                new_path = entry.new_path
+                assert new_path is not None
+
+                diff_old_file = self._get_content_snapshot(old_path)
+                diff_new_file = self._get_content_snapshot(new_path)
             except Exception as e:
-                logging.exception(e)
+                logger.exception(e)
                 return b''
         else:
             # Dynamic views can access any version in history, but we may have
@@ -1892,7 +1882,7 @@ class ClearCaseClient(BaseSCMClient):
             # We need oids of files to translate them to paths on reviewboard
             # repository.
             vob_oid = execute(['cleartool', 'describe', '-fmt', '%On',
-                               'vob:%s' % (entry.new_path or entry.old_path)])
+                               f'vob:{entry.new_path or entry.old_path}'])
 
             vv_metadata = {
                 'vob': vob_oid,
@@ -1950,8 +1940,8 @@ class ClearCaseClient(BaseSCMClient):
                 if entry.op == 'move' and diff_contents:
                     entry.op = 'move-modify'
             else:
-                logging.warning('Unexpected operation "%s" for file %s %s',
-                                entry.op, entry.old_path, entry.new_path)
+                logger.warning('Unexpected operation "%s" for file %s %s',
+                               entry.op, entry.old_path, entry.new_path)
                 return b''
 
             diffx_change.add_file(
@@ -1967,18 +1957,21 @@ class ClearCaseClient(BaseSCMClient):
 
         return diff_contents
 
-    def _get_content_snapshot(self, filename):
+    def _get_content_snapshot(
+        self,
+        filename: str,
+    ) -> str:
         """Return the content of a file in a snapshot view.
 
         Snapshot views don't support accessing file content directly like
         dynamic views do, so we have to fetch the content to a temporary file.
 
         Args:
-            filename (unicode):
+            filename (str):
                 The extended path of the file element to fetch.
 
         Returns:
-            unicode:
+            str:
             The filename of the temporary file with the content.
         """
         temp_file = make_tempfile()
@@ -1994,11 +1987,16 @@ class ClearCaseClient(BaseSCMClient):
 
         return temp_file
 
-    def _do_diff(self, changeset, repository_info, metadata):
+    def _do_diff(
+        self,
+        changelist: _ChangedEntryList,
+        repository_info: ClearCaseRepositoryInfo,
+        metadata: dict[str, Any],
+    ) -> SCMClientDiffResult:
         """Generate a unified diff for all files in the given changeset.
 
         Args:
-            changeset (list):
+            changelist (list):
                 A list of changes.
 
             repository_info (ClearCaseRepositoryInfo):
@@ -2008,12 +2006,12 @@ class ClearCaseClient(BaseSCMClient):
                 Extra data to inject into the diff headers.
 
         Returns:
-            dict:
-            A dictionary containing a ``diff`` key.
+            rbtools.clients.base.scmclient.SCMClientDiffResult:
+            The diff result.
         """
         # Sanitize all changesets of version 0 before processing
-        changeset = self._sanitize_version_0_changeset(changeset)
-        changeset = self._process_directory_changes(changeset)
+        changelist = self._sanitize_version_0_changeset(changelist)
+        changeset = self._process_directory_changes(changelist)
 
         diffx = DiffX()
         diffx_change = diffx.add_change(meta={
@@ -2021,7 +2019,7 @@ class ClearCaseClient(BaseSCMClient):
         })
         legacy_diffs = io.BytesIO()
 
-        logging.debug('Doing diff of changeset: %s', changeset)
+        logger.debug('Doing diff of changeset: %s', changeset)
 
         for entry in changeset:
             legacy_diff: bytes
@@ -2031,13 +2029,16 @@ class ClearCaseClient(BaseSCMClient):
                                                      repository_info,
                                                      diffx_change)
             else:
-                if self.viewtype == 'snapshot' or cpath.exists(entry.new_path):
+                if (self.viewtype == 'snapshot' or
+                    (entry.new_path is not None and
+                     cpath.exists(entry.new_path))):
                     legacy_diff = self._diff_files(entry,
                                                    repository_info,
                                                    diffx_change)
                 else:
-                    logging.error('File %s does not exist or access is denied.',
-                                  entry.new_path)
+                    logger.error(
+                        'File %s does not exist or access is denied.',
+                        entry.new_path)
                     continue
 
             if repository_info.is_legacy and legacy_diff:
@@ -2053,11 +2054,14 @@ class ClearCaseClient(BaseSCMClient):
             'diff': diff,
         }
 
-    def _is_dir(self, path):
+    def _is_dir(
+        self,
+        path: str,
+    ) -> bool:
         """Return whether a given path is a directory.
 
         Args:
-            path (unicode):
+            path (str):
                 The path of the element to check.
 
         Returns:
@@ -2072,7 +2076,10 @@ class ClearCaseClient(BaseSCMClient):
 
             return object_kind.startswith('directory')
 
-    def _process_directory_changes(self, changeset):
+    def _process_directory_changes(
+        self,
+        changelist: _ChangedEntryList,
+    ) -> list[_ChangesetEntry]:
         """Scan through the changeset and handle directory elements.
 
         Depending on how the changeset is created, it may include changes to
@@ -2084,25 +2091,28 @@ class ClearCaseClient(BaseSCMClient):
         later.
 
         Args:
-            changeset (list):
+            changelist (_ChangedEntryList):
                 The list of changed elements (2-tuples of element versions to
                 compare)
 
         Returns:
-            list of ChangesetEntry:
+            list of _ChangesetEntry:
             The new changeset including adds, deletes, and moves.
         """
         files = []
         directories = []
 
-        for old_file, new_file in changeset:
+        for old_file, new_file in changelist:
             if self._is_dir(new_file):
                 directories.append((old_file, new_file))
-                files.append(ChangesetEntry(self.root_path, old_path=old_file,
-                                            new_path=new_file, is_dir=True))
+                files.append(_ChangesetEntry(root_path=self.root_path,
+                                             old_path=old_file,
+                                             new_path=new_file,
+                                             is_dir=True))
             else:
-                files.append(ChangesetEntry(self.root_path, old_path=old_file,
-                                            new_path=new_file))
+                files.append(_ChangesetEntry(root_path=self.root_path,
+                                             old_path=old_file,
+                                             new_path=new_file))
 
         for old_dir, new_dir in directories:
             changes = self._get_file_changes_from_directories(old_dir, new_dir)
@@ -2114,10 +2124,10 @@ class ClearCaseClient(BaseSCMClient):
                         break
                 else:
                     if not self._is_dir(filename):
-                        files.append(ChangesetEntry(self.root_path,
-                                                    new_path=filename,
-                                                    new_oid=oid,
-                                                    op='create'))
+                        files.append(_ChangesetEntry(root_path=self.root_path,
+                                                     new_path=filename,
+                                                     new_oid=oid,
+                                                     op='create'))
 
             for filename, oid in changes['deleted']:
                 for file in files:
@@ -2128,15 +2138,16 @@ class ClearCaseClient(BaseSCMClient):
                     if not self._is_dir(filename):
                         # The extended path we get here doesn't include the
                         # revision of the element. While many operations can
-                        # succeed in this case, fetching the content of the file
-                        # from snapshot views does not. We therefore look at the
-                        # history of the file and get the last revision from it.
+                        # succeed in this case, fetching the content of the
+                        # file from snapshot views does not. We therefore
+                        # look at the history of the file and get the last
+                        # revision from it.
                         filename = execute(['cleartool', 'lshistory', '-last',
-                                            '1', '-fmt', '%Xn', 'oid:%s' % oid])
-                        files.append(ChangesetEntry(self.root_path,
-                                                    old_path=filename,
-                                                    old_oid=oid,
-                                                    op='delete'))
+                                            '1', '-fmt', '%Xn', f'oid:{oid}'])
+                        files.append(_ChangesetEntry(root_path=self.root_path,
+                                                     old_path=filename,
+                                                     old_oid=oid,
+                                                     op='delete'))
 
             for old_file, old_oid, new_file, new_oid in changes['renamed']:
                 # Just using the old filename that we get from the
@@ -2149,32 +2160,36 @@ class ClearCaseClient(BaseSCMClient):
                         file.new_oid == new_oid):
                         old_version = execute(['cleartool', 'describe',
                                                '-fmt', '%Vn', file.old_path])
-                        file.old_path = '%s@@%s' % (old_file, old_version)
+                        file.old_path = f'{old_file}@@{old_version}'
                         file.op = 'move'
 
                         break
                 else:
                     if not self._is_dir(new_file):
-                        files.append(ChangesetEntry(self.root_path,
-                                                    old_path=old_file,
-                                                    new_path=new_file,
-                                                    old_oid=old_oid,
-                                                    new_oid=new_oid,
-                                                    op='move'))
+                        files.append(_ChangesetEntry(root_path=self.root_path,
+                                                     old_path=old_file,
+                                                     new_path=new_file,
+                                                     old_oid=old_oid,
+                                                     new_oid=new_oid,
+                                                     op='move'))
 
         return files
 
-    def _get_file_changes_from_directories(self, old_dir, new_dir):
+    def _get_file_changes_from_directories(
+        self,
+        old_dir: str,
+        new_dir: str,
+    ) -> DirectoryDiff:
         """Get directory differences.
 
         This will query and parse the diff of a directory element, in order to
         properly detect added, renamed, and deleted files.
 
         Args:
-            old_dir (unicode):
+            old_dir (str):
                 The extended path of the directory at its old revision.
 
-            new_dir (unicode):
+            new_dir (str):
                 The extended path of the directory at its new revision.
 
         Returns:
@@ -2196,11 +2211,11 @@ class ClearCaseClient(BaseSCMClient):
         current_mode = None
         mode_re = re.compile(r'^-----\[ (?P<mode>[\w ]+) \]-----$')
 
-        def _extract_filename(fileline):
+        def _extract_filename(fileline: str) -> str:
             return fileline.rsplit(None, 2)[0][2:]
 
         i = 0
-        results = {
+        results: DirectoryDiff = {
             'added': set(),
             'deleted': set(),
             'renamed': set(),
@@ -2245,15 +2260,18 @@ class ClearCaseClient(BaseSCMClient):
                 # added or removed. In this cases, we'll just log a warning
                 # and skip them for this step. We'll still show it when the
                 # directory contents get diffed later.
-                logging.debug('Got error while processing directory changes '
-                              'from %s to %s: %s',
-                              old_dir,
-                              new_dir,
-                              e)
+                logger.debug('Got error while processing directory changes '
+                             'from %s to %s: %s',
+                             old_dir,
+                             new_dir,
+                             e)
 
         return results
 
-    def _get_diff_metadata(self, revisions):
+    def _get_diff_metadata(
+        self,
+        revisions: SCMClientRevisionSpec,
+    ) -> dict[str, Any]:
         """Return a starting set of metadata to inject into the diff.
 
         Args:
@@ -2267,15 +2285,18 @@ class ClearCaseClient(BaseSCMClient):
             part of the FileDiff's extra_data field. Additional keys may be set
             on this before it gets serialized into the diff.
         """
+        host_properties = self.host_properties
+        assert host_properties is not None
+
         metadata = {
             'os': {
                 'short': os.name,
-                'long': self.host_properties.get('Operating system'),
+                'long': host_properties.get('Operating system'),
             },
-            'region': self.host_properties.get('Registry region'),
+            'region': host_properties.get('Registry region'),
             'scm': {
-                'name': self.host_properties.get('Product name'),
-                'version': self.host_properties.get('Product version'),
+                'name': host_properties.get('Product name'),
+                'version': host_properties.get('Product version'),
             },
             'view': {
                 'tag': self.viewname,
@@ -2298,6 +2319,8 @@ class ClearCaseClient(BaseSCMClient):
                 'type': 'activity',
             }
         elif base == self.REVISION_BASELINE_BASE:
+            assert isinstance(tip, list)
+
             if len(tip) == 1:
                 metadata['scope'] = {
                     'name': tip[0],
@@ -2305,7 +2328,7 @@ class ClearCaseClient(BaseSCMClient):
                 }
             else:
                 metadata['scope'] = {
-                    'name': '%s/%s' % (tip[0], tip[1]),
+                    'name': f'{tip[0]}/{tip[1]}',
                     'type': 'baseline/baseline',
                 }
         elif base == self.REVISION_BRANCH_BASE:
@@ -2314,6 +2337,8 @@ class ClearCaseClient(BaseSCMClient):
                 'type': 'branch',
             }
         elif base == self.REVISION_LABEL_BASE:
+            assert isinstance(tip, list)
+
             if len(tip) == 1:
                 metadata['scope'] = {
                     'name': tip[0],
@@ -2321,7 +2346,7 @@ class ClearCaseClient(BaseSCMClient):
                 }
             else:
                 metadata['scope'] = {
-                    'name': '%s/%s' % (tip[0], tip[1]),
+                    'name': f'{tip[0]}/{tip[1]}',
                     'type': 'label/label',
                 }
         elif base == self.REVISION_STREAM_BASE:
@@ -2354,8 +2379,8 @@ class ClearCaseClient(BaseSCMClient):
         """
         # NOTE: This can be removed once check_dependencies() is mandatory.
         if not self.has_dependencies(expect_checked=True):
-            logging.debug('Unable to execute "cleartool help": skipping '
-                          'ClearCase')
+            logger.debug('Unable to execute "cleartool help": skipping '
+                         'ClearCase')
             return None
 
         property_lines = execute(['cleartool', 'hostinfo', '-l'],
@@ -2388,27 +2413,61 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
     the URLs differ.
     """
 
-    def __init__(self, path, vobtag, tool=None):
+    #: Whether the server uses the legacy ClearCase SCMTool.
+    #:
+    #: Type:
+    #:     bool
+    is_legacy: bool
+
+    #: The SCM client.
+    #:
+    #: Type:
+    #:     ClearCaseClient
+    tool: ClearCaseClient
+
+    #: A mapping from VOB UUID to matching VOB tags.
+    #:
+    #: Type:
+    #:     dict
+    uuid_to_tags: dict[str, list[str]]
+
+    #: The set of VOB tags that the server has registered.
+    #:
+    #: Type:
+    #:     set of str
+    vob_tags: set[str]
+
+    #: A list of the VOB UUIDs that the server has registered.
+    #:
+    #: Type:
+    #:     list of str
+    vob_uuids: list[str]
+
+    def __init__(
+        self,
+        path: str,
+        vobtag: str,
+    ) -> None:
         """Initialize the repsitory info.
 
         Args:
-            path (unicode):
+            path (str):
                 The path of the repository.
 
-            vobtag (unicode):
+            vobtag (str):
                 The VOB tag for the repository.
-
-            tool (rbtools.clients.base.scmclient.BaseSCMClient):
-                The SCM client.
         """
-        super(ClearCaseRepositoryInfo, self).__init__(path=path)
+        super().__init__(path=path)
         self.vobtag = vobtag
-        self.tool = tool
         self.vob_tags = {vobtag}
         self.uuid_to_tags = {}
         self.is_legacy = True
 
-    def update_from_remote(self, repository, info):
+    def update_from_remote(
+        self,
+        repository: ItemResource,
+        info: ItemResource,
+    ) -> None:
         """Update the info from a remote repository.
 
         Args:
@@ -2418,24 +2477,26 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
             info (rbtools.api.resource.ItemResource):
                 The repository info resource.
         """
-        path = info['repopath']
+        path = cast(str, info['repopath'])
         self.path = path
 
         if 'uuid' in info:
             # Legacy ClearCase backend that supports a single VOB.
-            self.vob_uuids = [info['uuid']]
+            self.vob_uuids = cast(List[str], [info['uuid']])
         elif 'uuids' in info:
             # New VersionVault/ClearCase backend that supports multiple VOBs.
-            self.vob_uuids = info['uuids']
+            self.vob_uuids = cast(List[str], info['uuids'])
             self.is_legacy = False
         else:
             raise SCMError('Unable to fetch VOB information from server '
                            'repository info.')
 
         tags = defaultdict(set)
-        regions = execute(['cleartool', 'lsregion'],
-                          ignore_errors=True,
-                          split_lines=True)
+        regions = cast(
+            List[str],
+            execute(['cleartool', 'lsregion'],
+                    ignore_errors=True,
+                    split_lines=True))
 
         # Find local tag names for connected VOB UUIDs.
         for region, uuid in itertools.product(regions, self.vob_uuids):
@@ -2455,6 +2516,3 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
 
         if self.is_legacy:
             self.base_path = self.vobtag
-
-
-_HostProperties = Optional[Dict[str, str]]

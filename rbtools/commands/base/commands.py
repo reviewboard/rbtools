@@ -917,7 +917,7 @@ class BaseCommand:
             # repeat if necessary.
             if repository_info is None and tool is None:
                 repository_info, tool = self.initialize_scm_tool(
-                    client_name=options.repository_type)
+                    client_name=getattr(self.options, 'repository_type', None))
                 self.repository_info = repository_info
                 self.tool = tool
 

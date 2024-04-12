@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import os
-import platform
 import re
 import sys
 from collections import namedtuple
@@ -17,6 +16,7 @@ from rbtools.commands.base import (BaseCommand,
                                    CommandError,
                                    Option,
                                    OptionGroup)
+from rbtools.utils.browser import open_browser
 from rbtools.utils.commands import (AlreadyStampedError,
                                     stamp_commit_with_review_url)
 from rbtools.utils.console import confirm
@@ -998,20 +998,7 @@ class Post(BaseCommand):
 
         # Load the review up in the browser if requested to.
         if self.options.open_browser:
-            try:
-                if (sys.platform == 'darwin' and
-                    platform.mac_ver()[0] == '10.12.5'):
-                    # The 'webbrowser' module currently does a bunch of stuff
-                    # with AppleScript, which is broken on macOS 10.12.5. This
-                    # was fixed in 10.12.6. See
-                    # https://bugs.python.org/issue30392 for more discussion.
-                    open(['open', review_request_url])
-                else:
-                    import webbrowser
-                    webbrowser.open_new_tab(review_request_url)
-            except Exception as e:
-                logging.exception('Error opening review URL %s: %s',
-                                  review_request_url, e)
+            open_browser(review_request_url)
 
     def _should_post_with_history(self, server_supports_history=False):
         """Determine whether or not we should post with history.
@@ -1708,9 +1695,8 @@ class Post(BaseCommand):
             mimetype = guess_mimetype(file_content)
 
             if not mimetype or mimetype in invalid_mimetypes:
-                logging.debug('Skipping %s (%s): MIME type %s is not '
-                              'supported',
-                              filename, revision, mimetype)
+                logger.debug('Skipping %s (%s): MIME type %s is not supported',
+                             filename, revision, mimetype)
                 continue
 
             if mimetype not in valid_mimetypes:
@@ -1724,12 +1710,56 @@ class Post(BaseCommand):
                     invalid_mimetypes.add(mimetype)
                     continue
 
-            logging.debug('Uploading file %s (%s)', filename, revision)
+            source_filename: Optional[str] = None
+            source_revision: Optional[str] = None
+            source_file_content: Optional[bytes] = None
+
+            if 'parent_source_revision' in file.extra_data:
+                # The diff additionally uses a parent diff. We therefore need
+                # to upload the source revision of the file as well.
+                source_filename = file.source_file
+                source_revision = file.source_revision
+
+                assert source_filename is not None
+                assert source_revision is not None
+
+                try:
+                    source_file_content = self.tool.get_file_content(
+                        filename=source_filename,
+                        revision=source_revision)
+                except Exception as e:
+                    logger.warning(
+                        'Unable to get binary file content for %s (%s): %s',
+                        source_filename, source_revision, e)
+                    continue
+
+                source_mimetype = guess_mimetype(source_file_content)
+
+                if mimetype != source_mimetype:
+                    logger.debug('Skipping %s (%s): MIME type of source '
+                                 'revision (%s) does not match MIME type of '
+                                 'modified revision (%s).',
+                                 filename, revision, source_mimetype, mimetype)
+                    continue
+
+            logger.debug('Uploading file "%s" revision %s (%s)',
+                         filename, revision, mimetype)
 
             diff_file_attachments.upload_attachment(
                 filename=os.path.basename(filename),
                 content=file_content,
                 filediff_id=file.id)
+
+            if source_file_content is not None:
+                assert source_filename is not None
+                logger.debug('Uploading parent revision for file %s (%s)',
+                             source_filename, source_revision)
+
+                diff_file_attachments.upload_attachment(
+                    filename=os.path.basename(source_filename),
+                    content=source_file_content,
+                    filediff_id=file.id,
+                    source_file=True)
 
     def _validate_squashed_diff(self, squashed_diff):
         """Validate the diff to ensure that it can be parsed and files exist.

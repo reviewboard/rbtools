@@ -9,9 +9,10 @@ import kgb
 
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
+                                    SCMError,
                                     TooManyRevisionsError)
 from rbtools.clients.perforce import PerforceClient, P4Wrapper
-from rbtools.clients.tests import SCMClientTestCase
+from rbtools.clients.tests import FOO1, SCMClientTestCase
 from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.testing import TestCase
 from rbtools.utils.checks import check_install
@@ -1095,3 +1096,181 @@ class PerforceClientTests(SCMClientTestCase):
             '\t\n'
             '\tReviewed at https://reviews.example.com/r/123/\n'
         ))
+
+    def test_get_file_content_pending_changelist(self) -> None:
+        """Testing PerforceClient.get_file_content with a pending changelist"""
+        client = self.build_client()
+        readme_file = make_tempfile(content=FOO1)
+
+        client.p4.where_files = {
+            '//mydepot/test/README': readme_file,
+        }
+
+        content = client.get_file_content(
+            filename='//mydepot/test/README',
+            revision='')
+
+        self.assertEqual(content, FOO1)
+
+    def test_get_file_content_pending_changelist_invalid_file(self) -> None:
+        """Testing PerforceClient.get_file_content with a pending changelist
+        and an invalid filename
+        """
+        client = self.build_client()
+        readme_file = make_tempfile(content=FOO1)
+
+        client.p4.where_files = {
+            '//mydepot/test/README': readme_file,
+        }
+
+        with self.assertRaises(SCMError):
+            client.get_file_content(
+                filename='//mydepot/test/README2',
+                revision='')
+
+    def test_get_file_content_submitted_changelist(self) -> None:
+        """Testing PerforceClient.get_file_content with a submitted changelist
+        """
+        client = self.build_client()
+
+        client.p4.repo_files = [
+            {
+                'depotFile': '//mydepot/test/README',
+                'rev': '2',
+                'action': 'edit',
+                'change': '12345',
+                'text': 'This is a test.\n',
+            },
+            {
+                'depotFile': '//mydepot/test/README',
+                'rev': '3',
+                'action': 'edit',
+                'change': '',
+                'text': FOO1.decode(),
+            },
+        ]
+
+        content = client.get_file_content(
+            filename='//mydepot/test/README',
+            revision='3')
+
+        self.assertEqual(content, FOO1)
+
+    def test_get_file_content_submitted_changelist_invalid_file(self) -> None:
+        """Testing PerforceClient.get_file_content with a sibmutted changelist
+        and invalid filename/revision
+        """
+        client = self.build_client()
+
+        client.p4.repo_files = [
+            {
+                'depotFile': '//mydepot/test/README',
+                'rev': '2',
+                'action': 'edit',
+                'change': '12345',
+                'text': 'This is a test.\n',
+            },
+            {
+                'depotFile': '//mydepot/test/README',
+                'rev': '3',
+                'action': 'edit',
+                'change': '',
+                'text': FOO1.decode(),
+            },
+        ]
+
+        with self.assertRaises(SCMError):
+            client.get_file_content(
+                filename='//mydepot/test/README2',
+                revision='3')
+
+    def test_get_file_size_pending_changelist(self) -> None:
+        """Testing PerforceClient.get_file_size with a pending changelist"""
+        client = self.build_client()
+        readme_file = make_tempfile(content=FOO1)
+
+        client.p4.where_files = {
+            '//mydepot/test/README': readme_file,
+        }
+
+        size = client.get_file_size(
+            filename='//mydepot/test/README',
+            revision='')
+
+        self.assertEqual(size, len(FOO1))
+
+    def test_get_file_size_pending_changelist_invalid_file(self) -> None:
+        """Testing PerforceClient.get_file_size with a pending changelist and
+        an invalid filename/revision
+        """
+        client = self.build_client()
+        readme_file = make_tempfile(content=FOO1)
+
+        client.p4.where_files = {
+            '//mydepot/test/README': readme_file,
+        }
+
+        with self.assertRaises(SCMError):
+            client.get_file_size(
+                filename='//mydepot/test/README2',
+                revision='')
+
+    def test_get_file_size_submitted_changelist(self) -> None:
+        """Testing PerforceClient.get_file_size with a submitted changelist"""
+        client = self.build_client()
+
+        client.p4.repo_files = [
+            {
+                'depotFile': '//mydepot/test/README',
+                'rev': '2',
+                'action': 'edit',
+                'change': '12345',
+                'text': 'This is a test.\n',
+            },
+            {
+                'depotFile': '//mydepot/test/README',
+                'rev': '3',
+                'action': 'edit',
+                'change': '',
+                'text': FOO1.decode(),
+            },
+        ]
+        client.p4.fstat_files = {
+            '//mydepot/test/README#3': {
+                'fileSize': len(FOO1),
+            },
+        }
+
+        size = client.get_file_size(
+            filename='//mydepot/test/README',
+            revision='3')
+
+        self.assertEqual(size, len(FOO1))
+
+    def test_get_file_size_submitted_changelist_invalid_file(self) -> None:
+        """Testing PerforceClient.get_file_size with a submitted changelist and
+        invalid filename/revision
+        """
+        client = self.build_client()
+
+        client.p4.repo_files = [
+            {
+                'depotFile': '//mydepot/test/README',
+                'rev': '2',
+                'action': 'edit',
+                'change': '12345',
+                'text': 'This is a test.\n',
+            },
+            {
+                'depotFile': '//mydepot/test/README',
+                'rev': '3',
+                'action': 'edit',
+                'change': '',
+                'text': FOO1.decode(),
+            },
+        ]
+
+        with self.assertRaises(SCMError):
+            client.get_file_size(
+                filename='//mydepot/test/README2',
+                revision='3')

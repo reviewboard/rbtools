@@ -12,26 +12,25 @@ Login Sessions
 ==============
 
 When running a command which requires authenticating with the server, RBTools
-will prompt you for your username and password. You can also do this explicitly
-by running :command:`rbt login`.
+will either direct you to log in via the Review Board web site, or prompt you
+for your username and password. This depends on whether :rbtconfig:`WEB_LOGIN`
+is set in :file:`.reviewboardrc`.
+
+You can also log in by explicitly by running :command:`rbt login`, which has
+the :option:`--web` option for enabling web-based login.
 
 After logging in, your session will be stored in the :file:`.rbtools-cookies`
 file. Depending on how the server is set up, these sessions will periodically
 expire.
 
-.. admonition:: Using Single Sign-On?
-
-   When Review Board is configured to use Single Sign-On, you may not have a
-   password to use to log in with RBTools. In this case, you'll need to
-   authenticate using API Tokens.
-
 
 Using API Tokens
 ================
 
-Instead of a username and password, RBTools can authenticate to the server
-using an API token. This has the additional benefit that tokens can be limited
-in their scope, and can be individually created and revoked as necessary.
+Instead of web-based login or a username and password, RBTools can authenticate
+to the server using an API token. This has the additional benefit that tokens
+can be limited in their scope, and can be individually created and revoked as
+necessary.
 
 API Tokens can be created inside Review Board by selecting :guilabel:`My
 Account`, and then choosing :guilabel:`Authentication`. See

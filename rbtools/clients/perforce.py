@@ -1,5 +1,7 @@
 """A client for Perforce."""
 
+from __future__ import annotations
+
 import io
 import logging
 import marshal
@@ -169,6 +171,9 @@ class P4Wrapper(object):
 
         if fields:
             args += ['-T', ','.join(fields)]
+
+        if 'fileSize' in fields:
+            args.append('-Ol')
 
         args.append(depot_path)
 
@@ -444,6 +449,7 @@ class PerforceClient(BaseSCMClient):
     requires_diff_tool = True
 
     can_amend_commit = True
+    can_get_file_content = True
     supports_changesets = True
     supports_diff_exclude_patterns = True
     supports_diff_extra_args = True
@@ -1097,6 +1103,7 @@ class PerforceClient(BaseSCMClient):
                           new_file=new_file,
                           depot_file=depot_file,
                           base_revision=base_revision,
+                          tip_revision=None,
                           new_depot_file=new_depot_file,
                           changetype_short=changetype_short,
                           ignore_unmodified=True)
@@ -1329,6 +1336,7 @@ class PerforceClient(BaseSCMClient):
                               new_file=new_file,
                               depot_file=depot_file,
                               base_revision=0,
+                              tip_revision=rev,
                               new_depot_file='',
                               changetype_short='A',
                               ignore_unmodified=True)
@@ -1349,6 +1357,7 @@ class PerforceClient(BaseSCMClient):
                               new_file=new_file,
                               depot_file=initial_depot_file,
                               base_revision=initial_rev,
+                              tip_revision=rev,
                               new_depot_file=depot_file,
                               changetype_short='D',
                               ignore_unmodified=True)
@@ -1374,6 +1383,7 @@ class PerforceClient(BaseSCMClient):
                               new_file=new_file,
                               depot_file=initial_depot_file,
                               base_revision=initial_rev,
+                              tip_revision=rev,
                               new_depot_file=depot_file,
                               changetype_short='M',
                               ignore_unmodified=True)
@@ -1402,6 +1412,7 @@ class PerforceClient(BaseSCMClient):
                                   new_file=new_file_b,
                                   depot_file=initial_depot_file,
                                   base_revision=initial_rev,
+                                  tip_revision=rev,
                                   new_depot_file=depot_file,
                                   changetype_short='MV',
                                   ignore_unmodified=True)
@@ -1413,6 +1424,7 @@ class PerforceClient(BaseSCMClient):
                                   new_file=new_file_a,
                                   depot_file=depot_file,
                                   base_revision=0,
+                                  tip_revision=rev,
                                   new_depot_file='',
                                   changetype_short='A',
                                   ignore_unmodified=True)
@@ -1422,6 +1434,7 @@ class PerforceClient(BaseSCMClient):
                                   new_file=new_file_b,
                                   depot_file=initial_depot_file,
                                   base_revision=initial_rev,
+                                  tip_revision=rev,
                                   new_depot_file=depot_file,
                                   changetype_short='D',
                                   ignore_unmodified=True)
@@ -1896,21 +1909,34 @@ class PerforceClient(BaseSCMClient):
 
     def _do_diff(
         self,
+        *,
         diff_tool: BaseDiffTool,
         diff_writer: UnifiedDiffWriter,
         old_file: str,
         new_file: str,
         depot_file: str,
         base_revision: int,
+        tip_revision: Optional[int],
         new_depot_file: str,
         changetype_short: str,
         ignore_unmodified: bool = False,
     ) -> None:
         """Create a diff of a single file.
 
+        Version Changed:
+            5.0:
+            * Added ``diff_writer`` and ``tip_revision`` arguments.
+            * Made all arguments keyword-only.
+
         Args:
             diff_tool (rbtools.diffs.tools.base.diff_tool.BaseDiffTool):
                 The diff tool being used to generate diffs.
+
+            diff_writer (rbtools.diffs.writers.UnifiedDiffWriter):
+                The diff writer object.
+
+                Version Added:
+                    5.0
 
             old_file (str):
                 The absolute path of the "old" file.
@@ -1923,6 +1949,13 @@ class PerforceClient(BaseSCMClient):
 
             base_revision (int):
                 The base Perforce revision number of the old file.
+
+            tip_revision (int):
+                The tip revision number of the new file. For pending
+                changesets, this will be None.
+
+                Version Added:
+                    5.0
 
             new_depot_file (str):
                 The depot path in Perforce for the new location of this ifle.
@@ -1964,6 +1997,9 @@ class PerforceClient(BaseSCMClient):
             if ((not diff_result.has_text_differences and
                  (is_move or is_empty_and_changed)) or
                 diff_result.is_binary):
+                if tip_revision is not None:
+                    new_local_path = f'{new_local_path}#{tip_revision}'
+
                 diff_writer.write_line(
                     '==== %s#%d ==%s== %s ===='
                     % (depot_file,
@@ -2365,3 +2401,85 @@ class PerforceClient(BaseSCMClient):
         new_change = self._replace_changeset_description(change, message)
 
         self.p4.modify_change(new_change)
+
+    def get_file_content(
+        self,
+        *,
+        filename: str,
+        revision: str,
+    ) -> bytes:
+        """Return the contents of a file at a given revision.
+
+        Version Added:
+            5.0
+
+        Args:
+            filename (str):
+                The file to fetch.
+
+            revision (str):
+                The revision of the file to get.
+
+        Returns:
+            bytes:
+            The read file.
+
+        Raises:
+            rbtools.clients.errors.SCMError:
+                The file could not be found.
+        """
+        try:
+            if revision == '':
+                local_path = self._depot_to_local(filename)
+
+                with open(local_path, 'rb') as f:
+                    return f.read()
+            else:
+                local_path = make_tempfile()
+                self.p4.print_file(f'{filename}#{revision}', local_path)
+
+                with open(local_path, 'rb') as f:
+                    return f.read()
+        except Exception as e:
+            raise SCMError(e)
+
+    def get_file_size(
+        self,
+        *,
+        filename: str,
+        revision: str,
+    ) -> int:
+        """Return the size of a file at a given revision.
+
+        Version Added:
+            5.0
+
+        Args:
+            filename (str):
+                The file to check.
+
+            revision (str):
+                The revision of the file to check.
+
+        Returns:
+            int:
+            The size of the file, in bytes.
+
+        Raises:
+            rbtools.client.errors.SCMError:
+                An error occurred while attempting to get the file size.
+        """
+        try:
+            if revision == '':
+                local_path = self._depot_to_local(filename)
+
+                s = os.stat(local_path)
+                return s.st_size
+            else:
+                fstat = self.p4.fstat(
+                    f'{filename}#{revision}',
+                    fields=['fileSize'])
+
+                return int(fstat['fileSize'])
+        except Exception as e:
+            raise SCMError(e)

@@ -12,6 +12,7 @@ from rbtools.clients.errors import (CreateCommitError,
                                     MergeError,
                                     PushError,
                                     SCMClientDependencyError,
+                                    SCMError,
                                     TooManyRevisionsError)
 from rbtools.clients.git import GitClient, get_git_candidates
 from rbtools.clients.tests import FOO1, FOO2, FOO3, FOO4, SCMClientTestCase
@@ -1792,6 +1793,52 @@ class GitClientTests(BaseGitClientTests):
         client.get_repository_info()
 
         self.assertEqual(client._get_parent_branch(), 'origin/main')
+
+    def test_get_file_content(self) -> None:
+        """Testing GitClient.get_file_content"""
+        client = self.build_client()
+
+        self._git_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
+
+        content = client.get_file_content(
+            filename='foo.txt',
+            revision='5e98e9540e1b741b5be24fcb33c40c1c8069c1fb')
+
+        self.assertEqual(content, FOO1)
+
+    def test_get_file_content_invalid_revision(self) -> None:
+        """Testing GitClient.get_file_content with an invalid revision"""
+        client = self.build_client()
+
+        self._git_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
+
+        with self.assertRaises(SCMError):
+            client.get_file_content(
+                filename='foo.txt',
+                revision='5e98e9540e1b741b5be240000000000000000000')
+
+    def test_get_file_size(self) -> None:
+        """Testing GitClient.get_file_size"""
+        client = self.build_client()
+
+        self._git_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
+
+        size = client.get_file_size(
+            filename='foo.txt',
+            revision='5e98e9540e1b741b5be24fcb33c40c1c8069c1fb')
+
+        self.assertEqual(size, len(FOO1))
+
+    def test_get_file_size_invalid_revision(self) -> None:
+        """Testing GitClient.get_file_size with an invalid revision"""
+        client = self.build_client()
+
+        self._git_add_file_commit('foo.txt', FOO1, 'delete and modify stuff')
+
+        with self.assertRaises(SCMError):
+            client.get_file_size(
+                filename='foo.txt',
+                revision='5e98e9540e1b741b5be240000000000000000000')
 
 
 class GitPerforceClientTests(BaseGitClientTests):

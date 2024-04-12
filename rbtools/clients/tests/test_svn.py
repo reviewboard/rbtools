@@ -16,6 +16,7 @@ from rbtools.api.tests.base import MockResponse
 from rbtools.clients.base.scmclient import SCMClientDiffResult
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
+                                    SCMError,
                                     TooManyRevisionsError)
 from rbtools.clients.svn import SVNRepositoryInfo, SVNClient
 from rbtools.clients.tests import FOO1, FOO2, FOO3, SCMClientTestCase
@@ -1915,3 +1916,109 @@ class SVNClientTests(SCMClientTestCase):
             b'>         rejected hunk @@ -6,6 +6,6 @@\n'
             b'Summary of conflicts:\n'
             b'  Text conflicts: 1\n')
+
+    def test_get_file_content_HEAD(self):
+        """Testing SVNClient.get_file_content with HEAD revision"""
+        client = self.build_client()
+        self._svn_add_file('A.txt', FOO1)
+
+        content = client.get_file_content(
+            filename='A.txt',
+            revision='HEAD')
+        self.assertEqual(content, FOO1)
+
+    def test_get_file_content_committed(self):
+        """Testing SVNClient.get_file_content with committed revision"""
+        client = self.build_client()
+
+        content = client.get_file_content(
+            filename='foo.txt',
+            revision='2')
+
+        self.assertEqual(content, FOO2)
+
+        content = client.get_file_content(
+            filename='foo.txt',
+            revision='3')
+
+        self.assertEqual(content, FOO3)
+
+    def test_get_file_content_HEAD_invalid_file(self):
+        """Testing SVNClient.get_file_content with HEAD revision and invalid
+        filename
+        """
+        client = self.build_client()
+
+        with self.assertRaises(SCMError):
+            client.get_file_content(
+                filename='notfound',
+                revision='HEAD')
+
+    def test_get_file_content_committed_invalid_file(self) -> None:
+        """Testing SVNClient.get_file_content with comitted revision and
+        invalid filename/revision
+        """
+        client = self.build_client()
+
+        with self.assertRaises(SCMError):
+            client.get_file_content(
+                filename='foo.txt',
+                revision='12')
+
+        with self.assertRaises(SCMError):
+            client.get_file_content(
+                filename='notfound',
+                revision='2')
+
+    def test_get_file_size_HEAD(self):
+        """Testing SVNClient.get_file_size with HEAD revision"""
+        client = self.build_client()
+        self._svn_add_file('A.txt', FOO1)
+
+        size = client.get_file_size(
+            filename='A.txt',
+            revision='HEAD')
+        self.assertEqual(size, len(FOO1))
+
+    def test_get_file_size_committed(self):
+        """Testing SVNClient.get_file_size with committed revision"""
+        client = self.build_client()
+
+        size = client.get_file_size(
+            filename='foo.txt',
+            revision='2')
+
+        self.assertEqual(size, len(FOO2))
+
+        size = client.get_file_size(
+            filename='foo.txt',
+            revision='3')
+
+        self.assertEqual(size, len(FOO3))
+
+    def test_get_file_size_HEAD_invalid_file(self):
+        """Testing SVNClient.get_file_size with HEAD revision and invalid
+        filename
+        """
+        client = self.build_client()
+
+        with self.assertRaises(SCMError):
+            client.get_file_size(
+                filename='notfound',
+                revision='HEAD')
+
+    def test_get_file_size_committed_invalid_file(self) -> None:
+        """Testing SVNClient.get_file_size with comitted revision and
+        invalid filename/revision
+        """
+        client = self.build_client()
+
+        with self.assertRaises(SCMError):
+            client.get_file_size(
+                filename='foo.txt',
+                revision='12')
+
+        with self.assertRaises(SCMError):
+            client.get_file_size(
+                filename='notfound',
+                revision='2')
