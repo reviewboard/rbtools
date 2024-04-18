@@ -64,4 +64,16 @@ On the other hand, to discard a draft review, run::
     $ rbt review discard -r 23
 
 
+.. _rbt-review-json:
+
+JSON Output
+===========
+
+.. versionadded:: 5.0
+
+When running with :option:`--json`, the results of posting the review request
+will be outputted as JSON. This can be used by programs that wrap RBTools in
+order to automate posting changes for review.
+
+
 .. rbt-command-options::

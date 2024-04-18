@@ -203,6 +203,7 @@ Utilities
 
    rbtools.utils
    rbtools.utils.aliases
+   rbtools.utils.browser
    rbtools.utils.checks
    rbtools.utils.commands
    rbtools.utils.console
@@ -211,6 +212,7 @@ Utilities
    rbtools.utils.errors
    rbtools.utils.filesystem
    rbtools.utils.graphs
+   rbtools.utils.mimetypes
    rbtools.utils.process
    rbtools.utils.repository
    rbtools.utils.review_request
