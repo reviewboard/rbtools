@@ -1710,16 +1710,14 @@ class Post(BaseCommand):
                     invalid_mimetypes.add(mimetype)
                     continue
 
-            source_filename: Optional[str] = None
-            source_revision: Optional[str] = None
+            source_filename = file.source_file
+            source_revision = file.source_revision
             source_file_content: Optional[bytes] = None
 
-            if 'parent_source_revision' in file.extra_data:
+            if ('parent_source_revision' in file.extra_data and
+                source_revision != 'PRE-CREATION'):
                 # The diff additionally uses a parent diff. We therefore need
                 # to upload the source revision of the file as well.
-                source_filename = file.source_file
-                source_revision = file.source_revision
-
                 assert source_filename is not None
                 assert source_revision is not None
 
