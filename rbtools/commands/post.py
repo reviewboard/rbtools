@@ -1552,7 +1552,8 @@ class Post(BaseCommand):
                 files = commit.get_draft_files(binary=True)
                 files_to_upload += files.all_items
 
-            self._upload_binary_files(files_to_upload)
+            if files_to_upload:
+                self._upload_binary_files(files_to_upload)
 
     def _post_squashed_diff(
         self,
@@ -1604,8 +1605,12 @@ class Post(BaseCommand):
 
         if (self.capabilities.has_capability('diffs', 'file_attachments') and
             self.tool.can_get_file_content):
-            self._upload_binary_files(
-                list(diff.get_draft_files(binary=True).all_items))
+
+            files_to_upload = list(
+                diff.get_draft_files(binary=True).all_items)
+
+            if files_to_upload:
+                self._upload_binary_files(files_to_upload)
 
     def _upload_binary_files(
         self,
