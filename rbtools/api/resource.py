@@ -1452,7 +1452,7 @@ class DiffFileAttachmentListResource(ListResource):
             rbtools.api.request.HttpRequest:
             The request object.
         """
-        request = HttpRequest(self._url, method='POST', query_args=kwargs)
+        request = self.create(query_args=kwargs, internal=True)
         request.add_file('path', filename, content)
         request.add_field('filediff', filediff_id)
 
