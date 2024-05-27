@@ -1781,7 +1781,7 @@ class Post(BaseCommand):
                 logger.debug('Uploading parent revision for file %s (%s)',
                              source_filename, source_revision)
 
-                diff_file_attachments.upload_attachment(
+                self.diff_file_attachments_resource.upload_attachment(
                     filename=os.path.basename(source_filename),
                     content=source_file_content,
                     filediff_id=file.id,
