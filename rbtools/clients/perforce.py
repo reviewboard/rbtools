@@ -941,9 +941,18 @@ class PerforceClient(BaseSCMClient):
                 local_include_files=local_include_files,
                 exclude_patterns=exclude_patterns)
 
-            return {
+            result = {
                 'diff': stream.getvalue(),
             }
+
+            if int(tip) == int(base) + 1:
+                # There was just one changelist in the revision spec. We can
+                # include the change number in the result. We set this as
+                # commit_id instead of changenum because we don't want to
+                # trigger the update_from_pending_change path in Review Board.
+                result['commit_id'] = tip
+
+            return result
 
         # Strip off the prefix
         tip = tip.split(':', 1)[1]

@@ -181,6 +181,9 @@ Bug Fixes
   server name is configured through that. With some commands, this would fail
   with a crash instead of a useful error message.
 
+* Fixed Perforce backend to properly set the change number in the review
+  request when posting submitted changelists.
+
 
 RBTools API Changes
 ===================
