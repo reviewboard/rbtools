@@ -5,7 +5,7 @@
 RBTools 5.0 Release Notes
 =========================
 
-**Release date:** TBD
+**Release date:** June 6, 2024
 
 
 Installation

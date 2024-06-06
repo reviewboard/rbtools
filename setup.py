@@ -44,6 +44,13 @@ elif sys.version_info < (3, 7):
         '3.7.x.\n'
         % get_package_version())
     sys.exit(1)
+elif sys.version_info < (3, 8):
+    sys.stderr.write(
+        'RBTools %s is incompatible with your version of Python.\n'
+        'Please install RBTools 4.x or upgrade Python to at least '
+        '3.8.x.\n'
+        % get_package_version())
+    sys.exit(1)
 
 
 rb_commands = [
@@ -197,11 +204,11 @@ setup(
         'Operating System :: OS Independent',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
         'Topic :: Software Development',
         'Topic :: Software Development :: Quality Assurance',
     ],
