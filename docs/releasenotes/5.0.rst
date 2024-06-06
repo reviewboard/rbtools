@@ -1,0 +1,377 @@
+.. default-intersphinx:: rbt5.x rb-latest
+
+
+=========================
+RBTools 5.0 Release Notes
+=========================
+
+**Release date:** TBD
+
+
+Installation
+============
+
+Follow our :ref:`installation guide <rbtools-installation>` to install RBTools.
+
+To learn more, see:
+
+* `Documentation <https://www.reviewboard.org/docs/rbtools/5.x/>`_
+* `RBTools on PyPI <https://pypi.org/project/rbtools/>`_
+* `RBTools on GitHub <https://github.com/reviewboard/rbtools/>`_
+
+
+Compatibility
+=============
+
+* RBTools supports Python 3.8 through 3.12.
+
+  Support for Python 3.7 has been dropped. For continued support, please use
+  RBTools 4.x.
+
+* Removed the dependency on :pypi:`setuptools`.
+* Added a dependency on :pypi:`housekeeping` 1.1.x.
+* Added a dependency on :pypi:`packaging` 21.3.x.
+* Added a dependency on :pypi:`importlib-metadata` 5.0+.
+* Added a dependency on :pypi:`importlib-resources` 5.9+.
+
+
+New Features
+============
+
+Binary Files in Diffs
+---------------------
+
+Review Board 7.0 is introducing the ability to include binary files in the diff
+viewer, starting with images. RBTools 5.0 is necessary to use this feature, to
+upload the data for any binary files which are part of your change.
+
+This is enabled for select version control systems:
+
+* Git
+* Mercurial
+* Perforce
+* Subversion
+
+If you are using a different version control system, and would like support
+added for it, please `contact us`_ to request it.
+
+
+.. _contact us: support@beanbaginc.com
+
+
+Authentication Improvements
+---------------------------
+
+.. program:: rbt login
+
+* Web-based login.
+
+  The new option :option:`--web` will allow users to authenticate RBTools to
+  their Review Board server by logging in via a web page. Using this along with
+  :option:`--open` will automatically open the page in the browser.
+
+  This is particularly useful in the case where users are authenticating
+  with Single Sign-On, and do not have a specific password to use for Review
+  Board.
+
+  You may set ``WEB_LOGIN = True`` in :ref:`.reviewboardrc
+  <rbtools-reviewboardrc>` to always prefer web-based login.
+
+  .. note:: Web-based login only works when :command:`rbt` is running on the
+            local system. If you are logged in to another host via SSH, you
+            will need to use a username/password or API token.
+
+* Log in with an API token.
+
+  The new option :option:`--api-token` allows logging in with an API token
+  passed on the command line. This is extra handy for writing automations with
+  RBTools, since it does not require creating a :ref:`.reviewboardrc
+  <rbtools-reviewboardrc>` file to store the API token.
+
+* Added better error messages when trying to log in with an expired or invalid
+  API token.
+
+
+rbt review
+----------
+
+.. program:: rbt review
+
+* :ref:`JSON output <rbt-review-json>` mode has been added for the
+  :rbtcommand:`rbt review` command.
+
+  The output contains information relevant to the review, such as:
+
+  * The review ID.
+  * The review API URL.
+  * The review URL.
+  * The review status, which can be ``draft``, ``published``, or ``discarded``.
+  * The review request ID.
+  * The review request URL.
+
+  When a comment subcommand is used, the following comment details are also
+  included in the output:
+
+  * The comment type, which can be ``diff_comment``, ``file_attachment_comment``,
+    or ``general_comment``.
+  * The comment ID.
+  * The comment API URL.
+
+* Fixed a bug where :command:`rbt review add-diff-comment` would always add
+  the comment to the last file in the diffset, instead of the specified file.
+
+
+rbt patch
+---------
+
+.. program:: rbt patch
+
+* Added the ability for :rbtcommand:`rbt patch` to download and apply draft
+  patches which have not yet been published.
+
+  Only the owner of a review request, or a special user with the
+  ``can_edit_review_request`` permission can fetch draft diffs.
+
+
+rbt setup-completion
+--------------------
+
+.. program:: rbt setup-completion
+
+* Updated :rbtcommand:`rbt setup-completion` to print out the completion
+  settings to the terminal, rather than attempting to write them to the user's
+  configuration.
+
+  Determining the correct place to put auto-completion information for a user's
+  shell is extremely difficult, and the prior implementation often got things
+  wrong on Windows and macOS. This command will now print out the relevant
+  configuration lines, allowing the user to integrate it within their own shell
+  configuration as they see fit.
+
+
+Performance Improvements
+========================
+
+* RBTools now enables HTTP caching by default for all REST API usage.
+
+  Previously, RBTools caching was mostly disabled, due to some bugs in very old
+  versions of Review Board. Very few people are still using these versions, so
+  caching has been enabled by default and will be disabled when those old
+  versions are detected.
+
+* Improved performance when creating review requests.
+
+  The RBTools client was fetching more data from the server than necessary when
+  creating new review requests. This has been fixed.
+
+
+Bug Fixes
+=========
+
+* Fixed matching of repository types when using
+  :ref:`TFS-Git <repository-hosting-visualstudio>` repositories hosted in
+  Azure DevOps.
+
+* Fixed posting changes from within bare Git repositories.
+
+* Fixed crashes for some commands when repository-based server detection fails.
+
+  When a server is not specified in the configuration or command line, RBTools
+  will try to find the current repository in order to see if the Review Board
+  server name is configured through that. With some commands, this would fail
+  with a crash instead of a useful error message.
+
+* Fixed Perforce backend to properly set the change number in the review
+  request when posting submitted changelists.
+
+
+RBTools API Changes
+===================
+
+* Moved the base command classes into :py:mod:`rbtools.commands.base`.
+
+  The old import paths for the following classes will still work with RBTools 5
+  but are deprecated:
+
+  * :py:class:`rbtools.commands.BaseMultiCommand`
+  * :py:class:`rbtools.commands.BaseSubCommand`
+  * :py:class:`rbtools.commands.Command`
+  * :py:class:`rbtools.commands.JSONOutput`
+  * :py:class:`rbtools.commands.LogLevelFilter`
+  * :py:class:`rbtools.commands.OptionGroup`
+  * :py:class:`rbtools.commands.Option`
+  * :py:class:`rbtools.commands.OutputWrapper`
+  * :py:class:`rbtools.commands.SmartHelpFormatter`
+
+* Added the :py:mod:`rbtools.utils.browser` module.
+
+* Added the :py:mod:`rbtools.utils.mimetypes` module.
+
+* Added :py:attr:`RBClient.user_agent <rbtools.api.client.RBClient.user_agent>`
+  to get the current User-Agent string, and a default value in
+  :py:data:`rbtools.api.request.RBTOOLS_USER_AGENT`.
+
+* Added :py:attr:`JSONOutput.raw <rbtools.commands.base.output.JSONOutput.raw>`
+  for custom code to get the raw (un-stringified) data for a command's JSON
+  output.
+
+* Added :py:meth:`Capabilities.get_capability()
+  <rbtools.api.capabilities.Capabilities.get_capability>` for accessing the
+  value of a server capability.
+
+* Custom SCM client classes may implement
+  :py:meth:`~rbtools.clients.base.scmclient.BaseSCMClient.get_file_content` and
+  :py:meth:`~rbtools.clients.base.scmclient.BaseSCMClient.get_file_size`
+  methods in order to support binary file review. These require also setting
+  :py:attr:`~rbtools.clients.base.scmclient.BaseSCMClient.can_get_file_content`.
+
+* Fixed crashes when commands try to write both Unicode and byte strings to
+  their output.
+
+* Added the ``strings_only`` argument to
+  :py:func:`~rbtools.utils.encoding.force_bytes` and
+  :py:func:`~rbtools.utils.encoding.force_unicode`.
+
+  These methods would previously only work on string-type objects. If this
+  argument is set to ``False``, any value can be passed and it will be cast to
+  a string.
+
+* Added :py:class:`rbtools.api.resource.DiffFileAttachmentListResource` to
+  facilitate uploading binary files for diffs.
+
+* Added the :py:mod:`rbtools.config` module.
+
+  The APIs in this module focus on loading the RBTools configuration and
+  looking up options. If you are implementing a custom command, the config
+  object is available as :py:attr:`BaseCommand.config
+  <rbtools.commands.base.commands.BaseCommand.config>`
+
+
+Deprecated Code Removal
+-----------------------
+
+The following APIs have been removed:
+
+* The
+  :py:meth:`~rbtools.clients.base.scmclient.BaseSCMClient.
+  find_server_repository_info` method has been removed from
+  :py:class:`~rbtools.clients.base.scmclient.BaseSCMClient` subclasses.
+
+* The :py:mod:`rbtools.utils.match_score` module has been removed.
+
+* The ``repository_info`` and ``repository_name`` arguments to
+  :py:func:`~rbtools.utils.review_request.find_review_request_by_change_id`
+  have been removed.
+
+* The ``repository_info``, ``repository_name``, ``guess_summary``, and
+  ``guess_description`` arguments to
+  :py:func:`~rbtools.utils.review_request.guess_existing_review_request` have
+  been removed. The ``submit_as`` argument is now required.
+
+* The ``require_repository_info`` argument to
+  :py:meth:`BaseCommand.initialize_scm_tool()
+  <rbtools.commands.base.commands.BaseCommand.initialize_scm_tool>` has been
+  removed.
+
+* The ``urlopen`` parameter to :py:meth:`APICache.__init__()
+  <rbtools.api.cache.APICache.__init__>` has been removed.
+
+* :py:meth:`ResourceDictField.iterfields()
+  <rbtools.api.resource.ResourceDictField.iterfields>` and
+  :py:meth:`ResourceDictField.iteritems()
+  <rbtools.api.resource.ResourceDictField.iteritems>` have been removed.
+
+* :py:class:`rbtools.clients.SCMClient` has been renamed to
+  :py:class:`rbtools.clients.base.scmclient.BaseSCMClient`.
+
+* :py:attr:`BaseSCMClient.scmclient_id
+  <rbtools.clients.base.scmclient.BaseSCMClient.scmclient_id>` is now always
+  required.
+
+* :py:meth:`BaseCommand.setup_tool()
+  <rbtools.commands.base.commands.BaseCommand.setup_tool>` has been removed.
+
+* :py:meth:`BaseCommand.get_server_url()
+  <rbtools.commands.base.commands.BaseCommand.get_server_url>` has been removed.
+
+* :py:attr:`BaseSCMClient.entrypoint_name
+  <rbtools.commands.base.commands.BaseCommand.entrypoint_name>` has been removed.
+
+* :py:func:`rbtools.utils.checks.check_gnu_diff` has been removed.
+
+* :py:func:`rbtools.utils.checks.is_valid_version` has been removed.
+
+* :py:data:`rbtools.utils.filesystem.CONFIG_FILE` has been removed.
+
+* :py:func:`rbtools.utils.process.log_command_line` has been removed.
+
+* :py:func:`rbtools.utils.review_request.get_possible_matches` has been removed.
+
+* :py:func:`rbtools.utils.review_request.num_exact_matches` has been removed.
+
+
+The following APIs now require keyword-only arguments and will raise an error
+if called with positional arguments:
+
+* :py:meth:`BaseSCMClient.amend_commit_description()
+  <rbtools.clients.base.scmclient.BaseSCMClient.amend_commit_description>`
+
+* :py:meth:`BaseSCMClient.apply_patch()
+  <rbtools.clients.base.scmclient.BaseSCMClient.apply_patch>`
+
+* :py:meth:`BaseSCMClient.apply_patch_for_empty_files()
+  <rbtools.clients.base.scmclient.BaseSCMClient.apply_patch_for_empty_files>`
+
+* :py:meth:`BaseSCMClient.create_commit()
+  <rbtools.clients.base.scmclient.BaseSCMClient.create_commit>`
+
+* :py:meth:`BaseSCMClient.delete_branch()
+  <rbtools.clients.base.scmclient.BaseSCMClient.delete_branch>`
+
+* :py:meth:`BaseSCMClient.diff()
+  <rbtools.clients.base.scmclient.BaseSCMClient>`
+
+* :py:meth:`BaseSCMClient.get_tree_matches_review_request()
+  <rbtools.clients.base.scmclient.BaseSCMClient>`
+
+* :py:meth:`BaseSCMClient.merge()
+  <rbtools.clients.base.scmclient.BaseSCMClient.merge>`
+
+* :py:meth:`RepositoryInfo.__init__()
+  <rbtools.commands.base.repository.RepositoryInfo.__init__>`
+
+* :py:func:`rbtools.utils.diffs.filename_match_any_patterns`
+
+* :py:func:`rbtools.utils.diffs.filter_diff`
+
+* :py:func:`rbtools.utils.diffs.normalize_patterns`
+
+* :py:func:`rbtools.utils.diffs.remove_filenames_matching_patterns`
+
+* :py:func:`rbtools.utils.filesystem.make_tempfile`
+
+
+New Deprecations
+----------------
+
+* Deprecated :py:func:`rbtools.utils.process.execute`.
+
+  New code should use :py:func:`rbtools.utils.process.run_process` instead.
+
+* The ``api_client`` argument to
+  :py:func:`rbtools.utils.review_request.guess_existing_review_request` has
+  been deprecated.
+
+* The following APIs now require keyword-only arguments and will warn if called
+  with positional arguments:
+
+  * :py:func:`rbtools.utils.review_request.find_review_request_by_change_id`
+  * :py:func:`rbtools.utils.review_request.guess_existing_review_request`
+
+
+Contributors
+============
+
+* Christian Hammond
+* David Trowbridge
+* Michelle Aubin

@@ -360,9 +360,10 @@ class GitClient(BaseSCMClient):
                           '--help": skipping Git')
             return None
 
-        self._git_dir = self._get_git_dir()
+        git_dir = self._get_git_dir()
+        self._git_dir = git_dir
 
-        if self._git_dir is None:
+        if git_dir is None:
             return None
 
         # Sometimes core.bare is not set, and generates an error, so ignore
@@ -370,10 +371,10 @@ class GitClient(BaseSCMClient):
         self.bare = self._get_git_config('core.bare') in ('true', '1')
 
         # Running in directories other than the top level of
-        # of a work-tree would result in broken diffs on the server
-        if not self.bare:
-            git_top: str
-
+        # of a work-tree would result in broken diffs on the server.
+        if self.bare:
+            git_toplevel = os.path.abspath(git_dir)
+        else:
             process_result = self._run_git(['rev-parse', '--show-toplevel'],
                                            ignore_errors=True)
 
@@ -382,14 +383,17 @@ class GitClient(BaseSCMClient):
             # Top level might not work on old git version se we use git dir
             # to find it.
             if (stderr.startswith((b'fatal:', b'cygdrive')) or
-                not os.path.isdir(self._git_dir)):
-                git_top = self._git_dir
+                not os.path.isdir(git_dir)):
+                git_toplevel = git_dir
             else:
-                git_top = process_result.stdout.read().strip()
+                git_toplevel = process_result.stdout.read().strip()
 
-            self._git_toplevel = os.path.abspath(git_top)
+            git_toplevel = os.path.abspath(git_toplevel)
 
-        return self._git_toplevel
+        assert git_toplevel
+        self._git_toplevel = git_toplevel
+
+        return git_toplevel
 
     def get_repository_info(self) -> Optional[RepositoryInfo]:
         """Return repository information for the current working tree.

@@ -161,7 +161,7 @@ setup(
     install_requires=[
         'certifi>=2023.5.7',
         'colorama',
-        'housekeeping~=1.0a0',
+        'housekeeping~=1.1',
         'packaging>=21.3',
         'pydiffx~=1.1.0',
         'texttable',

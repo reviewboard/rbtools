@@ -622,6 +622,7 @@ class PerforceClientTests(SCMClientTestCase):
         self.assertEqual(
             self.normalize_diff_result(client.diff(revisions)),
             {
+                'commit_id': '12345',
                 'diff': (
                     b'--- //mydepot/test/README\t//mydepot/test/README#2\n'
                     b'+++ //mydepot/test/README\t2022-01-02 12:34:56\n'

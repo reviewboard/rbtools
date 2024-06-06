@@ -32,6 +32,7 @@ from rbtools.utils.users import get_user
 
 if TYPE_CHECKING:
     from rbtools.api.resource import (
+        DiffFileAttachmentListResource,
         DraftDiffCommitItemResource,
         FileDiffResource,
         ReviewRequestResource,
@@ -434,6 +435,22 @@ class Post(BaseCommand):
         BaseCommand.tfs_options,
     ]
 
+    ######################
+    # Instance variables #
+    ######################
+
+    #: Whether both the server and tool can upload binary files to diffs.
+    #:
+    #: Version Added:
+    #:     5.0
+    can_upload_binary_files: bool
+
+    #: The DiffFileAttachments resource for the repository.
+    #:
+    #: Version Added:
+    #:     5.0
+    diff_file_attachments_resource: Optional[DiffFileAttachmentListResource]
+
     def post_process_options(self):
         super(Post, self).post_process_options()
 
@@ -653,7 +670,7 @@ class Post(BaseCommand):
 
             try:
                 review_requests = self.api_root.get_review_requests(
-                    only_fields='',
+                    max_results=0,
                     only_links='create')
                 review_request = review_requests.create(**request_data)
             except APIError as e:
@@ -875,6 +892,12 @@ class Post(BaseCommand):
 
         server_supports_history = self.capabilities.has_capability(
             'review_requests', 'supports_history')
+
+        self.can_upload_binary_files = (
+            self.capabilities.has_capability('diffs', 'file_attachments') and
+            self.tool.can_get_file_content)
+
+        self.diff_file_attachments_resource = None
 
         # If we are passing --diff-filename, we attempt to read the diff before
         # we normally would. This allows us to exit early if the file does not
@@ -1544,15 +1567,15 @@ class Post(BaseCommand):
         # We now need to go through and upload any binary files.
         assert self.tool is not None
 
-        if (self.capabilities.has_capability('diffs', 'file_attachments') and
-            self.tool.can_get_file_content):
+        if self.can_upload_binary_files:
             files_to_upload: list[FileDiffResource] = []
 
             for commit in commits:
                 files = commit.get_draft_files(binary=True)
                 files_to_upload += files.all_items
 
-            self._upload_binary_files(files_to_upload)
+            if files_to_upload:
+                self._upload_binary_files(files_to_upload)
 
     def _post_squashed_diff(
         self,
@@ -1602,10 +1625,12 @@ class Post(BaseCommand):
             diff = diff_resource.upload_diff(
                 squashed_diff.diff, **diff_kwargs)
 
-        if (self.capabilities.has_capability('diffs', 'file_attachments') and
-            self.tool.can_get_file_content):
-            self._upload_binary_files(
-                list(diff.get_draft_files(binary=True).all_items))
+        if self.can_upload_binary_files:
+            files_to_upload = list(
+                diff.get_draft_files(binary=True).all_items)
+
+            if files_to_upload:
+                self._upload_binary_files(files_to_upload)
 
     def _upload_binary_files(
         self,
@@ -1623,6 +1648,11 @@ class Post(BaseCommand):
         assert self.capabilities is not None
         assert self.repository is not None
         assert self.tool is not None
+        assert self.can_upload_binary_files
+
+        if self.diff_file_attachments_resource is None:
+            self.diff_file_attachments_resource = \
+                self.repository.get_diff_file_attachments(max_results=0)
 
         supported_mimetypes = [
             parse_mimetype(mimetype) for mimetype in
@@ -1632,8 +1662,6 @@ class Post(BaseCommand):
 
         valid_mimetypes = set()
         invalid_mimetypes = set()
-
-        diff_file_attachments = self.repository.get_diff_file_attachments()
 
         iterable = self._show_progress(
             iterable=files_to_upload,
@@ -1710,16 +1738,14 @@ class Post(BaseCommand):
                     invalid_mimetypes.add(mimetype)
                     continue
 
-            source_filename: Optional[str] = None
-            source_revision: Optional[str] = None
+            source_filename = file.source_file
+            source_revision = file.source_revision
             source_file_content: Optional[bytes] = None
 
-            if 'parent_source_revision' in file.extra_data:
+            if ('parent_source_revision' in file.extra_data and
+                source_revision != 'PRE-CREATION'):
                 # The diff additionally uses a parent diff. We therefore need
                 # to upload the source revision of the file as well.
-                source_filename = file.source_file
-                source_revision = file.source_revision
-
                 assert source_filename is not None
                 assert source_revision is not None
 
@@ -1745,7 +1771,7 @@ class Post(BaseCommand):
             logger.debug('Uploading file "%s" revision %s (%s)',
                          filename, revision, mimetype)
 
-            diff_file_attachments.upload_attachment(
+            self.diff_file_attachments_resource.upload_attachment(
                 filename=os.path.basename(filename),
                 content=file_content,
                 filediff_id=file.id)
@@ -1755,7 +1781,7 @@ class Post(BaseCommand):
                 logger.debug('Uploading parent revision for file %s (%s)',
                              source_filename, source_revision)
 
-                diff_file_attachments.upload_attachment(
+                self.diff_file_attachments_resource.upload_attachment(
                     filename=os.path.basename(source_filename),
                     content=source_file_content,
                     filediff_id=file.id,
