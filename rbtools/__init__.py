@@ -4,39 +4,41 @@ These variables and functions can be used to identify the version of
 Beanbag Tools. They're largely used for packaging purposes.
 """
 
+from __future__ import annotations
+
+
 #: The version of RBTools
 #:
 #: This is in the format of:
 #:
 #: (Major, Minor, Micro, Patch, alpha/beta/rc/final, Release Number, Released)
 #:
-VERSION = (5, 0, 0, 0, 'alpha', 0, False)
+VERSION: tuple[int, int, int, int, str, int, bool] = \
+    (6, 0, 0, 0, 'alpha', 0, False)
 
 
-def get_version_string():
+def get_version_string() -> str:
     """Return the version as a human-readable string.
 
     Returns:
         str:
         The version number as a human-readable string.
     """
-    major, minor, micro, patch, tag, relnum, is_release = VERSION
+    major, minor, micro, patch, tag, release_num, is_release = VERSION
 
-    version = '%s.%s' % (major, minor)
+    version = f'{major}.{minor}'
 
     if micro or patch:
-        version += '.%s' % micro
+        version += '.{micro}'
 
         if patch:
-            version += '.%s' % patch
+            version += '.{patch}'
 
     if tag != 'final':
         if tag == 'rc':
-            version += ' RC'
+            version += f' RC {release_num}'
         else:
-            version += ' %s ' % tag
-
-        version += '%s' % relnum
+            version += f' {tag} {release_num}'
 
     if not is_release:
         version += ' (dev)'
@@ -44,35 +46,35 @@ def get_version_string():
     return version
 
 
-def get_package_version():
+def get_package_version() -> str:
     """Return the version as a Python package version string.
 
     Returns:
         str:
         The version number as used in a Python package.
     """
-    major, minor, micro, patch, tag, relnum = __version_info__
+    major, minor, micro, patch, tag, release_num = VERSION[:-1]
 
-    version = '%s.%s' % (major, minor)
+    version = f'{major}.{minor}'
 
     if micro or patch:
-        version += '.%s' % micro
+        version += f'.{micro}'
 
         if patch:
-            version += '.%s' % patch
+            version += f'.{patch}'
 
     if tag != 'final':
-        version += '%s%s' % (
-            {
-                'alpha': 'a',
-                'beta': 'b',
-            }.get(tag, tag),
-            relnum)
+        if tag == 'alpha':
+            tag = 'a'
+        elif tag == 'beta':
+            tag = 'b'
+
+        version += f'{tag}{release_num}'
 
     return version
 
 
-def is_release():
+def is_release() -> bool:
     """Return whether this is a released version.
 
     Returns:
