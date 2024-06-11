@@ -76,7 +76,15 @@ class GitClient(BaseSCMClient):
 
     scmclient_id = 'git'
     name = 'Git'
-    server_tool_names = 'Git,Perforce,Subversion,Team Foundation Server (git)'
+
+    # Review Board versions that use the old names-based repositories/?tool=
+    # API parameter also have a bug where a missing name could cause a
+    # server-side crash. This was making it so servers that did not have Power
+    # Pack were failing when we tried to make a query that included the TFS-Git
+    # name. We therefore only include it when we know the server can use
+    # server_tool_ids instead.
+    server_tool_names = 'Git,Perforce,Subversion'
+    server_tool_ids = ['git', 'perforce', 'subversion', 'tfs_git']
 
     supports_commit_history = True
     supports_diff_exclude_patterns = True

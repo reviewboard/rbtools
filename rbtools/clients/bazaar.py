@@ -37,6 +37,7 @@ class BazaarClient(BaseSCMClient):
     scmclient_id = 'bazaar'
     name = 'Bazaar'
     server_tool_names = 'Bazaar'
+    server_tool_ids = ['bazaar']
     supports_diff_exclude_patterns = True
     supports_parent_diffs = True
     can_branch = True

@@ -392,7 +392,15 @@ class ClearCaseClient(BaseSCMClient):
 
     scmclient_id = 'clearcase'
     name = 'VersionVault / ClearCase'
-    server_tool_names = 'ClearCase,VersionVault / ClearCase'
+
+    # Review Board versions that use the old names-based repositories/?tool=
+    # API parameter also have a bug where a missing name could cause a
+    # server-side crash. This was making it so servers that did not have Power
+    # Pack were failing when we tried to make a query that included the
+    # VersionVault name. We therefore only include it when we know the server
+    # can use server_tool_ids instead.
+    server_tool_names = 'ClearCase'
+    server_tool_ids = ['clearcase', 'versionvault']
 
     requires_diff_tool = True
 

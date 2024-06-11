@@ -9,24 +9,24 @@ from __future__ import annotations
 import argparse
 import logging
 import re
-from typing import (Any, Dict, List, Mapping, Optional, Tuple, Union, cast,
-                    TYPE_CHECKING)
+from typing import (Any, cast, ClassVar, Dict, List, Mapping, Optional,
+                    TYPE_CHECKING, Tuple, Union)
 
 from typing_extensions import NotRequired, TypedDict, final
 
-from rbtools.api.capabilities import Capabilities
-from rbtools.api.resource import (ItemResource,
-                                  ListResource,
-                                  ReviewRequestResource)
 from rbtools.clients.base.patch import PatchAuthor, PatchResult
-from rbtools.clients.base.repository import RepositoryInfo
 from rbtools.clients.errors import SCMClientDependencyError, SCMError
 from rbtools.deprecation import RemovedInRBTools50Warning
-from rbtools.diffs.tools.base import BaseDiffTool
 from rbtools.diffs.tools.registry import diff_tools_registry
 from rbtools.utils.process import execute
 
 if TYPE_CHECKING:
+    from rbtools.api.capabilities import Capabilities
+    from rbtools.api.resource import (ItemResource,
+                                      ListResource,
+                                      ReviewRequestResource)
+    from rbtools.clients.base.repository import RepositoryInfo
+    from rbtools.diffs.tools.base import BaseDiffTool
     from rbtools.config import RBToolsConfig
 
 
@@ -281,14 +281,27 @@ class BaseSCMClient(object):
     #:     str
     name: str = ''
 
-    #: A comma-separated list of SCMClient names on the server
+    #: A comma-separated list of SCMClient names on the server.
     #:
     #: Version Added:
     #:    3.0
     #:
     #: Type:
     #:     str
-    server_tool_names: Optional[str] = None
+    server_tool_names: ClassVar[Optional[str]] = None
+
+    #: A comma-separated list of SCMClient IDs on the server.
+    #:
+    #: This supersedes :py:attr:`server_tool_names` when running on a version
+    #: of Review Board that supports passing tool IDs to the repositories
+    #: list API.
+    #:
+    #: Version Added:
+    #:    5.0.1
+    #:
+    #: Type:
+    #:     str
+    server_tool_ids: ClassVar[Optional[List[str]]] = None
 
     #: Whether this tool requires a command line diff tool.
     #:
@@ -691,6 +704,32 @@ class BaseSCMClient(object):
             self._diff_tool = diff_tool
 
         return diff_tool
+
+    def get_server_tool_names(
+        self,
+        capabilities: Optional[Capabilities],
+    ) -> Optional[str]:
+        """Return the list of supported tool names on the server.
+
+        Version Added:
+            5.0.1
+
+        Args:
+            capabilities (rbtools.api.capabilities.Capabilities):
+                The server capabilities, if present.
+
+        Returns:
+            str:
+            A comma-separated list of server-side tool names to match with.
+        """
+        if (capabilities is not None and
+            capabilities.get_capability('scmtools', 'supported_tools') and
+            self.server_tool_ids is not None):
+            # Versions of Review Board that have this capability allow us to
+            # pass SCMTool IDs rather than names.
+            return ','.join(self.server_tool_ids)
+        else:
+            return self.server_tool_names
 
     def find_matching_server_repository(
         self,

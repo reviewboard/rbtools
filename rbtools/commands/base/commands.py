@@ -939,7 +939,8 @@ class BaseCommand:
                 api_root=self.api_root,
                 tool=tool,
                 repository_name=options.repository_name,
-                repository_paths=repository_info.path)
+                repository_paths=repository_info.path,
+                capabilities=self.capabilities)
             self.repository = repository
 
             if repository:

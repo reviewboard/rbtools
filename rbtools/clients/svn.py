@@ -52,6 +52,7 @@ class SVNClient(BaseSCMClient):
     scmclient_id = 'svn'
     name = 'Subversion'
     server_tool_names = 'Subversion'
+    server_tool_ids = ['subversion']
 
     requires_diff_tool = True
 
