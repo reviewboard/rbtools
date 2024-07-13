@@ -14,7 +14,7 @@ from textwrap import dedent
 import kgb
 
 import rbtools.helpers
-from rbtools.clients import PatchAuthor, RepositoryInfo
+from rbtools.clients import RepositoryInfo
 from rbtools.clients.errors import (CreateCommitError,
                                     MergeError,
                                     SCMClientDependencyError,
@@ -24,6 +24,7 @@ from rbtools.clients.tests import (FOO, FOO1, FOO2, FOO3, FOO4, FOO5, FOO6,
                                    SCMClientTestCase)
 from rbtools.config.loader import load_config
 from rbtools.deprecation import RemovedInRBTools50Warning
+from rbtools.diffs.patches import PatchAuthor
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import (is_exe_in_path,
                                       make_tempdir)

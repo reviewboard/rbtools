@@ -8,7 +8,7 @@ import re
 import sys
 from typing import Dict, Iterator, List, Optional, cast
 
-from rbtools.clients import PatchResult, RepositoryInfo
+from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
                                             SCMClientDiffResult,
                                             SCMClientRevisionSpec)
@@ -22,6 +22,7 @@ from rbtools.clients.errors import (AmendError,
                                     SCMError)
 from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.svn import SVNClient, SVNRepositoryInfo
+from rbtools.diffs.patches import PatchResult
 from rbtools.utils.checks import check_install
 from rbtools.utils.console import edit_text
 from rbtools.utils.diffs import (normalize_patterns,
@@ -1460,7 +1461,7 @@ class GitClient(BaseSCMClient):
                 Whether the patch should be reverted rather than applied.
 
         Returns:
-            rbtools.clients.base.patch.PatchResult:
+            rbtools.diffs.patches.PatchResult:
             The result of the patch operation.
         """
         cmd = ['apply', '-3']

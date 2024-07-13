@@ -11,9 +11,8 @@ from urllib.parse import urlsplit, urlunparse
 
 from housekeeping import deprecate_non_keyword_only_args
 
-from rbtools.clients import PatchResult, RepositoryInfo
+from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
-                                            PatchAuthor,
                                             SCMClientCommitHistoryItem,
                                             SCMClientDiffResult,
                                             SCMClientRevisionSpec)
@@ -25,6 +24,7 @@ from rbtools.clients.errors import (CreateCommitError,
                                     TooManyRevisionsError)
 from rbtools.clients.svn import SVNClient
 from rbtools.deprecation import RemovedInRBTools60Warning
+from rbtools.diffs.patches import PatchAuthor, PatchResult
 from rbtools.utils.checks import check_install
 from rbtools.utils.console import edit_file
 from rbtools.utils.errors import EditorError
@@ -1408,7 +1408,7 @@ class MercurialClient(BaseSCMClient):
                 Whether the patch should be reverted rather than applied.
 
         Returns:
-            rbtools.clients.base.patch.PatchResult:
+            rbtools.diffs.patches.PatchResult:
             The result of the patch operation.
         """
         cmd = [self._exe, 'patch', '--no-commit']

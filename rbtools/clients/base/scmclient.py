@@ -14,9 +14,9 @@ from typing import (Any, cast, ClassVar, Dict, List, Mapping, Optional,
 
 from typing_extensions import NotRequired, TypedDict, final
 
-from rbtools.clients.base.patch import PatchAuthor, PatchResult
 from rbtools.clients.errors import SCMClientDependencyError, SCMError
 from rbtools.deprecation import RemovedInRBTools50Warning
+from rbtools.diffs.patches import PatchResult
 from rbtools.diffs.tools.registry import diff_tools_registry
 from rbtools.utils.process import execute
 
@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from rbtools.clients.base.repository import RepositoryInfo
     from rbtools.diffs.tools.base import BaseDiffTool
     from rbtools.config import RBToolsConfig
+    from rbtools.diffs.patches import PatchAuthor
 
 
 class SCMClientRevisionSpec(TypedDict):

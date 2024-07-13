@@ -15,7 +15,7 @@ from urllib.parse import unquote
 
 from rbtools.api.errors import APIError
 from rbtools.api.resource import ListResource
-from rbtools.clients import PatchResult, RepositoryInfo
+from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
                                             SCMClientDiffResult,
                                             SCMClientRevisionSpec)
@@ -26,6 +26,7 @@ from rbtools.clients.errors import (AuthenticationError,
                                     SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
+from rbtools.diffs.patches import PatchResult
 from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install
 from rbtools.utils.console import get_pass
@@ -1253,7 +1254,7 @@ class SVNClient(BaseSCMClient):
                 Whether the patch should be reverted rather than applied.
 
         Returns:
-            rbtools.clients.base.patch.PatchResult:
+            rbtools.diffs.patches.PatchResult:
             The result of the patch operation.
         """
         if self.subversion_client_version < self.PATCH_MIN_VERSION:
