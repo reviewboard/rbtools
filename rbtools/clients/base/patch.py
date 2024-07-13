@@ -4,8 +4,16 @@ Version Added:
     4.0
 """
 
+from __future__ import annotations
 
-class PatchAuthor(object):
+from typing import Optional
+
+from housekeeping import deprecate_non_keyword_only_args
+
+from rbtools.deprecation import RemovedInRBTools70Warning
+
+
+class PatchAuthor:
     """The author of a patch or commit.
 
     This wraps the full name and e-mail address of a commit or patch's
@@ -16,30 +24,44 @@ class PatchAuthor(object):
         4.0:
         * Moved from :py:mod:`rbtools.clients`. That module still provides
           compatibility imports.
-
-    Attributes:
-        fullname (unicode):
-            The full name of the author.
-
-        email (unicode):
-            The e-mail address of the author.
     """
 
-    def __init__(self, full_name, email):
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The e-mail address of the author.
+    email: str
+
+    #: The full name of the author.
+    fullname: str
+
+    @deprecate_non_keyword_only_args(RemovedInRBTools70Warning)
+    def __init__(
+        self,
+        *,
+        full_name: str,
+        email: str,
+    ) -> None:
         """Initialize the author information.
 
+        Version Changed:
+            5.1:
+            This now requires keyword-only arguments. Support for positional
+            arguments will be removed in RBTools 7.
+
         Args:
-            full_name (unicode):
+            full_name (str):
                 The full name of the author.
 
-            email (unicode):
+            email (str):
                 The e-mail address of the author.
         """
         self.fullname = full_name
         self.email = email
 
 
-class PatchResult(object):
+class PatchResult:
     """The result of a patch operation.
 
     This stores state on whether the patch could be applied (fully or
@@ -53,9 +75,37 @@ class PatchResult(object):
           compatibility imports.
     """
 
-    def __init__(self, applied, has_conflicts=False,
-                 conflicting_files=[], patch_output=None):
+    ######################
+    # Instance variables #
+    ######################
+
+    #: Whether the patch was applied.
+    applied: bool
+
+    #: A list of the filenames containing conflicts.
+    conflicting_files: list[str]
+
+    #: Whether the applied patch included conflicts.
+    has_conflicts: bool
+
+    #: The output of the patch command.
+    patch_output: Optional[bytes]
+
+    @deprecate_non_keyword_only_args(RemovedInRBTools70Warning)
+    def __init__(
+        self,
+        *,
+        applied: bool,
+        has_conflicts: bool = False,
+        conflicting_files: list[str] = [],
+        patch_output: Optional[bytes] = None,
+    ) -> None:
         """Initialize the object.
+
+        Version Changed:
+            5.1:
+            This now requires keyword-only arguments. Support for positional
+            arguments will be removed in RBTools 7.
 
         Args:
             applied (bool):
@@ -64,10 +114,10 @@ class PatchResult(object):
             has_conflicts (bool, optional):
                 Whether the applied patch included conflicts.
 
-            conflicting_files (list of unicode, optional):
+            conflicting_files (list of str, optional):
                 A list of the filenames containing conflicts.
 
-            patch_output (unicode, optional):
+            patch_output (str, optional):
                 The output of the patch command.
         """
         self.applied = applied
