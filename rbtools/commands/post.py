@@ -1781,11 +1781,20 @@ class Post(BaseCommand):
                 logger.debug('Uploading parent revision for file %s (%s)',
                              source_filename, source_revision)
 
-                self.diff_file_attachments_resource.upload_attachment(
-                    filename=os.path.basename(source_filename),
-                    content=source_file_content,
-                    filediff_id=file.id,
-                    source_file=True)
+                try:
+                    self.diff_file_attachments_resource.upload_attachment(
+                        filename=os.path.basename(source_filename),
+                        content=source_file_content,
+                        filediff_id=file.id,
+                        source_file=True)
+                except APIError as e:
+                    if e.http_status == 409 and e.error_code == 111:
+                        logger.debug(
+                            'Attachment for parent revision for file %s '
+                            '(%s) already exists',
+                            source_filename, source_revision)
+                    else:
+                        raise e
 
     def _validate_squashed_diff(self, squashed_diff):
         """Validate the diff to ensure that it can be parsed and files exist.
