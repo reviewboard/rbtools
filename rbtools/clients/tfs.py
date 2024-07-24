@@ -1321,6 +1321,7 @@ class TFSClient(BaseSCMClient):
     scmclient_id = 'tfs'
     name = 'Team Foundation Server'
     server_tool_names = 'Team Foundation Server'
+    server_tool_ids = ['tfs']
 
     requires_diff_tool = True
 

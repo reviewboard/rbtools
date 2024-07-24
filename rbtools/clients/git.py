@@ -8,7 +8,7 @@ import re
 import sys
 from typing import Dict, Iterator, List, Optional, cast
 
-from rbtools.clients import PatchResult, RepositoryInfo
+from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
                                             SCMClientDiffResult,
                                             SCMClientRevisionSpec)
@@ -22,6 +22,7 @@ from rbtools.clients.errors import (AmendError,
                                     SCMError)
 from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.svn import SVNClient, SVNRepositoryInfo
+from rbtools.diffs.patches import PatchResult
 from rbtools.utils.checks import check_install
 from rbtools.utils.console import edit_text
 from rbtools.utils.diffs import (normalize_patterns,
@@ -76,7 +77,15 @@ class GitClient(BaseSCMClient):
 
     scmclient_id = 'git'
     name = 'Git'
-    server_tool_names = 'Git,Perforce,Subversion,Team Foundation Server (git)'
+
+    # Review Board versions that use the old names-based repositories/?tool=
+    # API parameter also have a bug where a missing name could cause a
+    # server-side crash. This was making it so servers that did not have Power
+    # Pack were failing when we tried to make a query that included the TFS-Git
+    # name. We therefore only include it when we know the server can use
+    # server_tool_ids instead.
+    server_tool_names = 'Git,Perforce,Subversion'
+    server_tool_ids = ['git', 'perforce', 'subversion', 'tfs_git']
 
     supports_commit_history = True
     supports_diff_exclude_patterns = True
@@ -1452,7 +1461,7 @@ class GitClient(BaseSCMClient):
                 Whether the patch should be reverted rather than applied.
 
         Returns:
-            rbtools.clients.base.patch.PatchResult:
+            rbtools.diffs.patches.PatchResult:
             The result of the patch operation.
         """
         cmd = ['apply', '-3']

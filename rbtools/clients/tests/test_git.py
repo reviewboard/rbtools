@@ -7,7 +7,7 @@ from typing import List, Optional
 
 import kgb
 
-from rbtools.clients import PatchAuthor, RepositoryInfo
+from rbtools.clients import RepositoryInfo
 from rbtools.clients.errors import (CreateCommitError,
                                     MergeError,
                                     PushError,
@@ -17,6 +17,7 @@ from rbtools.clients.errors import (CreateCommitError,
 from rbtools.clients.git import GitClient, get_git_candidates
 from rbtools.clients.tests import FOO1, FOO2, FOO3, FOO4, SCMClientTestCase
 from rbtools.deprecation import RemovedInRBTools50Warning
+from rbtools.diffs.patches import PatchAuthor
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import is_exe_in_path
 from rbtools.utils.process import (RunProcessResult,

@@ -445,6 +445,7 @@ class PerforceClient(BaseSCMClient):
     scmclient_id = 'perforce'
     name = 'Perforce'
     server_tool_names = 'Perforce'
+    server_tool_ids = ['perforce']
 
     requires_diff_tool = True
 

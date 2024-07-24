@@ -1,16 +1,33 @@
 """Utility functions for working with repositories."""
 
+from __future__ import annotations
+
+from typing import Optional, TYPE_CHECKING, Union
+
 from rbtools.api.errors import APIError
 
+if TYPE_CHECKING:
+    from rbtools.api.capabilities import Capabilities
+    from rbtools.api.resource import ItemResource, RootResource
+    from rbtools.clients.base.repository import RepositoryInfo
+    from rbtools.clients.base.scmclient import BaseSCMClient
 
-def get_repository_resource(api_root,
-                            tool=None,
-                            repository_name=None,
-                            repository_paths=None):
+
+def get_repository_resource(
+    api_root: RootResource,
+    tool: Optional[BaseSCMClient] = None,
+    repository_name: Optional[str] = None,
+    repository_paths: Optional[Union[str, list[str]]] = None,
+    capabilities: Optional[Capabilities] = None,
+) -> tuple[Optional[ItemResource], Optional[ItemResource]]:
     """Return the API resource for the matching repository on the server.
 
     Version Added:
         3.0
+
+    Version Changed:
+        5.0.1:
+        Added the ``capabilities`` argument.
 
     Args:
         api_root (rbtools.api.resource.RootResource):
@@ -19,11 +36,14 @@ def get_repository_resource(api_root,
         tool (rbtools.clients.base.BaseSCMClient, optional):
             The SCM client corresponding to the local working directory.
 
-        repository_name (unicode, optional):
+        repository_name (str, optional):
             An explicit repository name provided by the local configuration.
 
-        repository_paths (list or unicode, optional):
+        repository_paths (list or str, optional):
             A list of potential paths to match for the repository.
+
+        capabilities (rbtools.api.capabilities.Capabilities, optional):
+            The capabilities fetched from the server.
 
     Returns:
         tuple of rbtools.api.resource.ItemResource:
@@ -47,8 +67,11 @@ def get_repository_resource(api_root,
         'only_links': 'info,diff_file_attachments',
     }
 
-    if tool and tool.server_tool_names:
-        query['tool'] = tool.server_tool_names
+    if tool:
+        server_tool_names = tool.get_server_tool_names(capabilities)
+
+        if server_tool_names:
+            query['tool'] = server_tool_names
 
     if repository_name:
         query['name'] = repository_name
@@ -70,9 +93,12 @@ def get_repository_resource(api_root,
     # configured path than the client. In that case, we want to try again
     # without filtering by path, and ask each tool to match based on other
     # conditions.
-    query.pop('path', None)
+    if 'path' in query:
+        query.pop('path', None)
 
-    all_repositories = api_root.get_repositories(**query)
+        all_repositories = api_root.get_repositories(**query)
+    else:
+        all_repositories = repositories
 
     if all_repositories.total_results > 0 and tool:
         repository, info = tool.find_matching_server_repository(
@@ -93,7 +119,11 @@ def get_repository_resource(api_root,
     return None, None
 
 
-def get_repository_id(repository_info, api_root, repository_name=None):
+def get_repository_id(
+    repository_info: RepositoryInfo,
+    api_root: RootResource,
+    repository_name: Optional[str] = None,
+) -> Optional[int]:
     """Return the ID of a repository from the server.
 
     This will look up all accessible repositories on the server and try to
@@ -106,18 +136,18 @@ def get_repository_id(repository_info, api_root, repository_name=None):
         api_root (rbtools.api.resource.RootResource):
             The root resource for the API.
 
-        repository_name (unicode, optional):
+        repository_name (str, optional):
             An explicit repository name provided by local configuration.
 
     Returns:
         int:
         The ID of the repository, or ``None`` if not found.
     """
-    repository, info = get_repository_resource(
+    repository = get_repository_resource(
         api_root,
         tool=None,
         repository_name=repository_name,
-        repository_paths=repository_info.path)
+        repository_paths=repository_info.path)[0]
 
     if repository:
         return repository.id

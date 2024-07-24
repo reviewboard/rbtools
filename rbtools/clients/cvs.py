@@ -28,6 +28,7 @@ class CVSClient(BaseSCMClient):
     scmclient_id = 'cvs'
     name = 'CVS'
     server_tool_names = 'CVS'
+    server_tool_ids = ['cvs']
     supports_diff_exclude_patterns = True
     supports_patch_revert = True
 

@@ -1,13 +1,19 @@
 """Implementation of rbt setup-repo."""
 
+from __future__ import annotations
+
 import difflib
 import os
 import textwrap
+from typing import Optional, TYPE_CHECKING, Union
 
 from rbtools.commands.base import BaseCommand, CommandError
 from rbtools.config.loader import CONFIG_FILENAME
 from rbtools.utils.console import confirm, confirm_select
 from rbtools.utils.repository import get_repository_resource
+
+if TYPE_CHECKING:
+    from rbtools.api.resource import ItemResource, RootResource
 
 
 class SetupRepo(BaseCommand):
@@ -38,22 +44,27 @@ class SetupRepo(BaseCommand):
         BaseCommand.tfs_options,
     ]
 
-    def prompt_rb_repository(self, local_tool_name, server_tool_names,
-                             repository_paths, api_root):
+    def prompt_rb_repository(
+        self,
+        local_tool_name: str,
+        server_tool_names: Optional[str],
+        repository_paths: Optional[Union[str, list[str]]],
+        api_root: RootResource,
+    ) -> Optional[ItemResource]:
         """Interactively prompt to select a matching repository.
 
         The user is prompted to choose a matching repository found on the
         Review Board server.
 
         Args:
-            local_tool_name (unicode):
+            local_tool_name (str):
                 The local name of the detected tool.
 
-            server_tool_names (unicode):
+            server_tool_names (str):
                 A comma-separated list of potentially matching SCMTool names in
                 the Review Board server.
 
-            repository_paths (list or unicode, optional):
+            repository_paths (list or str, optional):
                 A list of potential paths to match for the repository.
 
             api_root (rbtools.api.resource.RootResource):
@@ -192,9 +203,11 @@ class SetupRepo(BaseCommand):
         while True:
             self.stdout.new_line()
             self.stdout.write('Current server: %s' % server)
+
+            tool_names = tool.get_server_tool_names(self.capabilities)
             selected_repo = self.prompt_rb_repository(
                 local_tool_name=tool.name,
-                server_tool_names=tool.server_tool_names,
+                server_tool_names=tool_names,
                 repository_paths=repository_info.path,
                 api_root=api_root)
 
