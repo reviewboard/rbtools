@@ -364,11 +364,17 @@ class SetStatusUpdateSubCommand(BaseStatusUpdateSubCommand):
             raise CommandError('No information in review file, this will '
                                'create an empty review.')
 
-        if 'reviews' in file_contents:
-            # Make sure public is false so that comments can be added.
-            file_contents['reviews']['public'] = False
+        # Prior to RBTools 5.1, the implementation of this used the key
+        # 'reviews' while the documentation said to use 'review'. We therefore
+        # prefer 'review' but fall-back to 'reviews' in case there are any
+        # existing scripts that are using the old name.
+        review = file_contents.get('review') or file_contents.get('reviews')
 
-            new_review_draft = review_draft.create(**file_contents['reviews'])
+        if review is not None:
+            # Make sure public is false so that comments can be added.
+            review['public'] = False
+
+            new_review_draft = review_draft.create(**review)
         else:
             new_review_draft = review_draft.create()
 
