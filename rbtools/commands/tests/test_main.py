@@ -117,7 +117,12 @@ class MainCommandTests(TestCase):
             unicode:
             The resulting output from the command.
         """
-        return execute([sys.executable, _rbt_path] + list(args))
+        return execute([
+            sys.executable,
+            '-W',
+            'ignore',
+            _rbt_path,
+        ] + list(args))
 
 
 class JSONOutputTests(kgb.SpyAgency, TestCase):
