@@ -400,6 +400,9 @@ The format of the file looks like:
         // Optional list of general comments, not bound to a file or diff.
         "general_comments": [
             {
+                // Optional: Set to true to open an issue.
+                "issue_opened": true|false,
+
                 // Required: Text shown in the comment.
                 "text": "<string>",
 
