@@ -1850,6 +1850,13 @@ class GitPerforceClientTests(BaseGitClientTests):
     """
 
     @classmethod
+    def setUpClass(cls) -> None:
+        """Set up the test case class."""
+
+        if not is_exe_in_path('p4'):
+            raise unittest.SkipTest('p4 executable not available')
+
+    @classmethod
     def setup_checkout(
         cls,
         checkout_dir: str,
