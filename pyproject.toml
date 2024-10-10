@@ -1,0 +1,102 @@
+[build-system]
+requires = ['setuptools>=74']
+build-backend = 'setuptools.build_meta'
+
+
+[project]
+name = 'RBTools'
+description = 'Command line tools and API for working with code and document reviews on Review Board'
+authors = [
+	{name = 'Beanbag, Inc.', email = 'questions@beanbaginc.com' },
+]
+license = { text = 'MIT' }
+readme = 'README.md'
+requires-python = '>=3.8'
+dynamic = ['version']
+
+dependencies = [
+	'certifi>=2023.5.7',
+	'colorama',
+	'housekeeping~=1.1',
+	'packaging>=21.3',
+	'pydiffx~=1.1.0',
+	'texttable',
+	'typing_extensions>=4.3.0',
+	'tqdm',
+
+	# importlib.metadata compatibility import.
+	#
+	# 5.0 is equivalent to importlib.metadata in Python 3.12.
+	'importlib-metadata>=5.0',
+
+	# importlib.resources compatibility import.
+	#
+	# 5.9 is equivalent to importlib.resources in Python 3.12.
+	'importlib-resources>=5.9',
+]
+
+classifiers = [
+	'Development Status :: 5 - Production/Stable',
+	'Environment :: Console',
+	'Framework :: Review Board',
+	'Intended Audience :: Developers',
+	'License :: OSI Approved :: MIT License',
+	'Natural Language :: English',
+	'Operating System :: OS Independent',
+	'Programming Language :: Python',
+	'Programming Language :: Python :: 3',
+	'Programming Language :: Python :: 3.8',
+	'Programming Language :: Python :: 3.9',
+	'Programming Language :: Python :: 3.10',
+	'Programming Language :: Python :: 3.11',
+	'Programming Language :: Python :: 3.12',
+	'Topic :: Software Development',
+	'Topic :: Software Development :: Quality Assurance',
+]
+
+
+[project.urls]
+homepage = 'https://www.reviewboard.org/downloads/rbtools/'
+documentation = 'https://www.reviewboard.org/docs/rbtools/'
+repository = 'https://github.com/reviewboard/rbtools'
+
+
+[project.scripts]
+rbt = 'rbtools.commands.main:main'
+
+
+[project.entry-points."rbtools_commands"]
+alias = 'rbtools.commands.alias:Alias'
+api-get = 'rbtools.commands.api_get:APIGet'
+attach = 'rbtools.commands.attach:Attach'
+clear-cache = 'rbtools.commands.clearcache:ClearCache'
+close = 'rbtools.commands.close:Close'
+diff = 'rbtools.commands.diff:Diff'
+info = 'rbtools.commands.info:Info'
+land = 'rbtools.commands.land:Land'
+list-repo-types = 'rbtools.commands.list_repo_types:ListRepoTypes'
+login = 'rbtools.commands.login:Login'
+logout = 'rbtools.commands.logout:Logout'
+patch = 'rbtools.commands.patch:Patch'
+post = 'rbtools.commands.post:Post'
+publish = 'rbtools.commands.publish:Publish'
+review = 'rbtools.commands.review:Review'
+setup-completion = 'rbtools.commands.setup_completion:SetupCompletion'
+setup-repo = 'rbtools.commands.setup_repo:SetupRepo'
+stamp = 'rbtools.commands.stamp:Stamp'
+status = 'rbtools.commands.status:Status'
+status-update = 'rbtools.commands.status_update:StatusUpdate'
+
+
+[tool.setuptools.package-data]
+rbtools = ['py.typed']
+
+
+[tool.setuptools.packages.find]
+where = ['.']
+include = ['rbtools*']
+namespaces = false
+
+
+[tool.setuptools.dynamic]
+version = { attr = 'rbtools.__version__' }
