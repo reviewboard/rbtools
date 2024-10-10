@@ -1,9 +1,15 @@
-recursive-include contrib *.py *.txt README*
-recursive-include rbtools/commands *
-include ez_setup.py
-include pytest.ini
+graft contrib
+graft docs
+graft rbtools
+
 include AUTHORS
 include COPYING
 include INSTALL
 include NEWS
 include README.md
+
+prune **/__pycache__
+prune **/.cache
+prune **/.mypy_cache
+
+global-exclude .*.sw[op] *.py[co] *.rej *.orig .DS_Store history
