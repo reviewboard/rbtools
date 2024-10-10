@@ -45,7 +45,11 @@ class PatchAuthor:
     email: str
 
     #: The full name of the author.
-    fullname: str
+    #:
+    #: Version Added:
+    #:     5.1:
+    #:     This was added as a replacement for :py:attr:`fullname`.
+    full_name: str
 
     @deprecate_non_keyword_only_args(RemovedInRBTools70Warning)
     def __init__(
@@ -68,8 +72,60 @@ class PatchAuthor:
             email (str):
                 The e-mail address of the author.
         """
-        self.fullname = full_name
+        self.full_name = full_name
         self.email = email
+
+    @property
+    def fullname(self) -> str:
+        """The full name  of this author.
+
+        Deprecated:
+            5.1:
+            This is deprecated in favor of :py:attr:`full_name`. It will be
+            removed in RBTools 7.
+
+        Returns:
+            bool:
+            The full name of the author.
+        """
+        RemovedInRBTools70Warning.warn(
+            'PatchAuthor.fullname is deprecated. Please use '
+            'PatchAuthor.full_name instead. This will be removed in '
+            'RBTools 7.')
+
+        return self.full_name
+
+    def __eq__(
+        self,
+        other: object,
+    ) -> bool:
+        """Return whether this author is equal to another.
+
+        Args:
+            other (object):
+                The other object to compare to.
+
+        Returns:
+            bool:
+            ``True`` if the other object is equal to this one.
+            ``False`` if it is not.
+        """
+        return (isinstance(other, PatchAuthor) and
+                self.email == other.email and
+                self.full_name == other.full_name)
+
+    def __repr__(self) -> str:
+        """Return a string representation of this object.
+
+        Version Added:
+            5.1
+
+        Returns:
+            str:
+            The string representation.
+        """
+        return (f'<PatchAuthor(email={self.email!r},'
+                f' full_name={self.full_name!r})>')
 
 
 class Patch:
@@ -286,6 +342,29 @@ class Patch:
         if not self._opened:
             raise IOError(_('Patch objects must be opened before being read.'))
 
+    def __repr__(self) -> str:
+        """Return a string representation of the object.
+
+        Returns:
+            str:
+            The string representation.
+        """
+        if self._path is not None:
+            path = repr(self._path)
+        else:
+            path = '<PENDING>'
+
+        if self._content is not None:
+            content = repr(b'%s[...]' % self._content[:30])
+        else:
+            content = '<PENDING>'
+
+        return (
+            f'<Patch(path={path}, base_dir={self.base_dir!r},'
+            f' prefix_level={self.prefix_level!r}, author={self.author!r},'
+            f' content={content})>'
+        )
+
 
 class PatchResult:
     """The result of a patch operation.
@@ -311,6 +390,11 @@ class PatchResult:
     ######################
 
     #: Whether the patch was applied.
+    #:
+    #: This will be ``True`` whether the patch was fully applied without
+    #: issues, or partially applied. Callers sohuld check :py:attr:`success`
+    #: to check for a successful application, and :py:attr:`has_conflicts`
+    #: to check for conflicts.
     applied: bool
 
     #: A list of the filenames containing conflicts.
@@ -327,6 +411,21 @@ class PatchResult:
     #:     5.1
     patch: Optional[Patch]
 
+    #: The range of patches represented by this result.
+    #:
+    #: This is in the form of:
+    #:
+    #: Tuple:
+    #:     0 (int):
+    #:         The 1-based starting patch number.
+    #:
+    #:     1 (int):
+    #:         The 1-based ending patch number.
+    #:
+    #: Version Added:
+    #:     5.1
+    patch_range: Optional[tuple[int, int]]
+
     #: The output of the patch command.
     patch_output: Optional[bytes]
 
@@ -339,6 +438,7 @@ class PatchResult:
         conflicting_files: list[str] = [],
         patch_output: Optional[bytes] = None,
         patch: Optional[Patch] = None,
+        patch_range: Optional[tuple[int, int]] = None,
     ) -> None:
         """Initialize the object.
 
@@ -347,7 +447,7 @@ class PatchResult:
             * This now requires keyword-only arguments. Support for positional
               arguments will be removed in RBTools 7.
 
-            * Added the ``patch`` argument.
+            * Added the ``patch`` and ``patch_range`` arguments.
 
         Args:
             applied (bool):
@@ -367,13 +467,45 @@ class PatchResult:
 
                 Version Added:
                     5.1
+
+            patch_range (tuple, optional):
+                The range of patches represented by this result.
+
+                This is in the form of:
+
+                Tuple:
+                    0 (int):
+                        The 1-based starting patch number.
+
+                    1 (int):
+                        The 1-based ending patch number.
+
+                Version Added:
+                    5.1
         """
         self.applied = applied
         self.conflicting_files = conflicting_files
         self.has_conflicts = has_conflicts
         self.patch = patch
         self.patch_output = patch_output
+        self.patch_range = patch_range
 
     @property
     def success(self) -> bool:
+        """Whether this was a successful patch application."""
         return self.applied and not self.has_conflicts
+
+    def __repr__(self) -> str:
+        """Return a string representation of the object.
+
+        Returns:
+            str:
+            The string representation.
+        """
+        return (
+            f'<PatchResult(success={self.success}, applied={self.applied},'
+            f' has_conflicts={self.has_conflicts},'
+            f' patch_range={self.patch_range!r},'
+            f' conflicting_files={self.conflicting_files!r},'
+            f' patch={self.patch!r})>'
+        )
