@@ -63,4 +63,15 @@ class RemovedInRBTools70Warning(BaseRemovedInRBToolsVersionWarning):
     version = '7.0'
 
 
+class RemovedInRBTools80Warning(BaseRemovedInRBToolsVersionWarning):
+    """Deprecations for features removed in RBTools 8.0.
+
+    Note that this class will itself be removed in RBTools 8.0. If you need to
+    check against RBTools deprecation warnings, please see
+    :py:class:`BaseRemovedInRBToolsVersionWarning`.
+    """
+
+    version = '8.0'
+
+
 RemovedInNextRBToolsVersionWarning = RemovedInRBTools60Warning
