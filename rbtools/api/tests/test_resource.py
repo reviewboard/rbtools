@@ -13,8 +13,8 @@ from rbtools.api.resource import (CountResource,
                                   ResourceExtraDataField,
                                   ResourceLinkField,
                                   ResourceListField,
-                                  RootResource,
-                                  _EXTRA_DATA_DOCS_URL)
+                                  RootResource)
+from rbtools.api.resource.base import _EXTRA_DATA_DOCS_URL
 from rbtools.api.tests.base import TestWithPayloads
 
 
