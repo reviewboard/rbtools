@@ -8,6 +8,7 @@ Version Added:
 from __future__ import annotations
 
 import logging
+from typing import Optional, TYPE_CHECKING
 
 from rbtools.api.decorators import request_method_decorator
 from rbtools.api.request import HttpRequest
@@ -18,13 +19,16 @@ from rbtools.api.resource.base import (
 )
 from rbtools.api.resource.mixins import GetPatchMixin
 
+if TYPE_CHECKING:
+    from rbtools.api.request import QueryArgs
+
 
 logger = logging.getLogger(__name__)
 
 
 @resource_mimetype('application/vnd.reviewboard.org.draft-commit')
 class DraftDiffCommitItemResource(GetPatchMixin, ItemResource):
-    """The draft commit resource-specific class.
+    """Item resource for draft diff commits.
 
     Version Added:
         4.2
@@ -33,57 +37,68 @@ class DraftDiffCommitItemResource(GetPatchMixin, ItemResource):
 
 @resource_mimetype('application/vnd.reviewboard.org.draft-commits')
 class DraftDiffCommitListResource(ListResource):
-    """The draft commit list resource-specific class.
-
-    Provides additional functionality in the uploading of new commits.
-    """
+    """List resource for draft diff commits."""
 
     @request_method_decorator
-    def upload_commit(self, validation_info, diff, commit_id, parent_id,
-                      author_name, author_email, author_date, commit_message,
-                      committer_name=None, committer_email=None,
-                      committer_date=None, parent_diff=None, **kwargs):
+    def upload_commit(
+        self,
+        validation_info: str,
+        diff: bytes,
+        commit_id: str,
+        parent_id: str,
+        author_name: str,
+        author_email: str,
+        author_date: str,
+        commit_message: str,
+        committer_name: Optional[str] = None,
+        committer_email: Optional[str] = None,
+        committer_date: Optional[str] = None,
+        parent_diff: Optional[bytes] = None,
+        **kwargs: QueryArgs,
+    ) -> HttpRequest:
         """Upload a commit.
 
         Args:
-            validation_info (unicode):
+            validation_info (str):
                 The validation info, or ``None`` if this is the first commit in
                 a series.
 
             diff (bytes):
                 The diff contents.
 
-            commit_id (unicode):
+            commit_id (str):
                 The ID of the commit being uploaded.
 
-            parent_id (unicode):
+            parent_id (str):
                 The ID of the parent commit.
 
-            author_name (unicode):
+            author_name (str):
                 The name of the author.
 
-            author_email (unicode):
+            author_email (str):
                 The e-mail address of the author.
 
-            author_date (unicode):
+            author_date (str):
                 The date and time the commit was authored in ISO 8601 format.
 
-            committer_name (unicode, optional):
+            commit_message (str):
+                The commit message.
+
+            committer_name (str, optional):
                 The name of the committer (if applicable).
 
-            committer_email (unicode, optional):
+            committer_email (str, optional):
                 The e-mail address of the committer (if applicable).
 
-            committer_date (unicode, optional):
+            committer_date (str, optional):
                 The date and time the commit was committed in ISO 8601 format
                 (if applicable).
 
             parent_diff (bytes, optional):
                 The contents of the parent diff.
 
-            **kwargs (dict):
-                Keyword argument used to build the querystring for the request
-                URL.
+            **kwargs (dict of rbtools.api.request.QueryArgs):
+                Query arguments to include with the request.
 
         Returns:
             DraftDiffCommitItemResource:

@@ -7,20 +7,52 @@ Version Added:
 
 from __future__ import annotations
 
+from typing import Optional, TYPE_CHECKING
+
 from rbtools.api.decorators import request_method_decorator
 from rbtools.api.request import HttpRequest
+
+if TYPE_CHECKING:
+    from rbtools.api.request import QueryArgs
 
 
 class DiffUploaderMixin:
     """A mixin for uploading diffs to a resource."""
 
-    def prepare_upload_diff_request(self, diff, parent_diff=None,
-                                    base_dir=None, base_commit_id=None,
-                                    **kwargs):
+    _url: str
+
+    def prepare_upload_diff_request(
+        self,
+        diff: bytes,
+        parent_diff: Optional[bytes] = None,
+        base_dir: Optional[str] = None,
+        base_commit_id: Optional[str] = None,
+        **kwargs: QueryArgs,
+    ) -> HttpRequest:
         """Create a request that can be used to upload a diff.
 
         The diff and parent_diff arguments should be strings containing the
         diff output.
+
+        Args:
+            diff (bytes):
+                The diff content.
+
+            parent_diff (bytes, optional):
+                The parent diff content, if present.
+
+            base_dir (str, optional):
+                The base directory for the diff, if present.
+
+            base_commit_id (str, optional):
+                The ID of the commit that the diff is against, if present.
+
+            **kwargs (dict of rbtools.api.request.QueryArgs):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.request.HttpRequest:
+            The API request.
         """
         request = HttpRequest(self._url, method='POST', query_args=kwargs)
         request.add_file('path', 'diff', diff)
@@ -44,19 +76,23 @@ class GetPatchMixin:
         4.2
     """
 
+    _url: str
+
     @request_method_decorator
-    def get_patch(self, **kwargs):
+    def get_patch(
+        self,
+        **kwargs: QueryArgs,
+    ) -> HttpRequest:
         """Retrieve the diff file contents.
 
         Args:
-            **kwargs (dict):
-                Query args to pass to
-                :py:meth:`~rbtools.api.request.HttpRequest.__init__`.
+            **kwargs (dict of rbtools.api.request.QueryArgs):
+                Query arguments to include with the request.
 
         Returns:
-            ItemResource:
-            A resource payload whose :py:attr:`~ItemResource.data` attribute is
-            the requested patch.
+            rbtools.api.resource.ItemResource:
+            A resource containing the patch. The patch data will be in the
+            ``data`` attribute.
         """
         return HttpRequest(self._url, query_args=kwargs, headers={
             'Accept': 'text/x-patch',

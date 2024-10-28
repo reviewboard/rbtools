@@ -7,17 +7,33 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from rbtools.api.decorators import request_method_decorator
 from rbtools.api.request import HttpRequest
-from rbtools.api.resource.base import ListResource, resource_mimetype
+from rbtools.api.resource.base import (
+    ItemResource,
+    ListResource,
+    resource_mimetype,
+)
+
+if TYPE_CHECKING:
+    from rbtools.api.request import QueryArgs
+
+
+@resource_mimetype('application/vnd.reviewboard.org.file-attachment')
+class FileAttachmentItemResource(ItemResource):
+    """Item resource for file attachments.
+
+    Version Added:
+        6.0
+    """
 
 
 @resource_mimetype('application/vnd.reviewboard.org.file-attachments')
 @resource_mimetype('application/vnd.reviewboard.org.user-file-attachments')
 class FileAttachmentListResource(ListResource):
-    """The File Attachment List resource specific base class."""
+    """List resource for file attachments."""
 
     @request_method_decorator
     def upload_attachment(
@@ -26,7 +42,7 @@ class FileAttachmentListResource(ListResource):
         content: bytes,
         caption: Optional[str] = None,
         attachment_history: Optional[str] = None,
-        **kwargs,
+        **kwargs: QueryArgs,
     ) -> HttpRequest:
         """Upload a new attachment.
 
@@ -43,9 +59,14 @@ class FileAttachmentListResource(ListResource):
             attachment_history (str, optional):
                 The ID of the FileAttachmentHistory to add this attachment to.
 
-            **kwargs (dict):
-                Additional keyword arguments to add to the request.
+            **kwargs (dict of rbtools.api.request.QueryArgs):
+                Query arguments to include with the request.
+
+        Returns:
+            FileAttachmentItemResource:
+            The newly-created file attachment.
         """
+        assert self._url is not None
         request = HttpRequest(self._url, method='POST', query_args=kwargs)
         request.add_file('path', filename, content)
 

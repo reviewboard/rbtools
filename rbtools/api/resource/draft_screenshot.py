@@ -7,10 +7,19 @@ Version Added:
 
 from __future__ import annotations
 
-from rbtools.api.resource.base import resource_mimetype
+from rbtools.api.resource.base import ItemResource, resource_mimetype
 from rbtools.api.resource.screenshot import ScreenshotListResource
+
+
+@resource_mimetype('application/vnd.reviewboard.org.draft-screenshot')
+class DraftScreenshotItemResource(ItemResource):
+    """Item resource for draft screenshots.
+
+    Version Added:
+        6.0
+    """
 
 
 @resource_mimetype('application/vnd.reviewboard.org.draft-screenshots')
 class DraftScreenshotListResource(ScreenshotListResource):
-    """The Draft Screenshot List resource specific base class."""
+    """List resource for draft screenshots."""
