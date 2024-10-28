@@ -6,16 +6,23 @@ import logging
 import os
 import re
 from gettext import gettext as _, ngettext
-from typing import Any, Dict, Optional, Union
+from typing import (Any, BinaryIO, Dict, Optional, Sequence, TYPE_CHECKING,
+                    Union)
+
+from typing_extensions import TypedDict
 
 from rbtools.api.errors import APIError
 from rbtools.api.resource import DiffResource, DraftDiffResource
-from rbtools.clients import PatchAuthor
 from rbtools.clients.errors import CreateCommitError
 from rbtools.commands.base import BaseCommand, CommandError, Option
+from rbtools.diffs.patches import Patch, PatchAuthor
 from rbtools.utils.commands import extract_commit_message
+from rbtools.utils.encoding import force_unicode
 from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.review_request import parse_review_request_url
+
+if TYPE_CHECKING:
+    from rbtools.commands.base.output import OutputWrapper
 
 
 logger = logging.getLogger(__name__)
@@ -24,7 +31,26 @@ logger = logging.getLogger(__name__)
 COMMIT_ID_SPLIT_RE = re.compile(r'\s*,\s*')
 
 
-class Patch(BaseCommand):
+class PendingPatchInfo(TypedDict):
+    """Information on a pending patch to apply.
+
+    Version Added:
+        5.1
+    """
+
+    #: The diff revision from the review request.
+    diff_revision: Optional[int]
+
+    #: Whether this patch contains scanned metadata.
+    #:
+    #: This is ``True`` when an author and commit message could be determined.
+    has_metadata: bool
+
+    #: The patch to apply.
+    patch: Patch
+
+
+class PatchCommand(BaseCommand):
     """Applies a specific patch from a RB server.
 
     The patch file indicated by the request id is downloaded from the
@@ -104,8 +130,14 @@ class Patch(BaseCommand):
         BaseCommand.repository_options,
     ]
 
-    def get_patches(self, diff_revision=None, commit_ids=None, squashed=False,
-                    reverted=False):
+    def get_patches(
+        self,
+        *,
+        diff_revision: Optional[int] = None,
+        commit_ids: Optional[set[str]] = None,
+        squashed: bool = False,
+        reverted: bool = False,
+    ) -> Sequence[PendingPatchInfo]:
         """Return the requested patches and their metadata.
 
         If a diff revision is not specified, then this will look at the most
@@ -132,24 +164,8 @@ class Patch(BaseCommand):
                 Return patches in the order needed to revert them.
 
         Returns:
-            list of dict:
-            A list of dictionaries with the following keys:
-
-            ``basedir`` (:py:class:`unicode`):
-                The base directory of the returned patch.
-
-            ``diff`` (:py:class:`bytes`):
-                The actual patch contents.
-
-            ``patch_num`` (:py:class:`int`):
-                The application number for the patch. This is 1-based.
-
-            ``revision`` (:py:class:`int`):
-                The revision of the returned patch.
-
-            ``commit_meta`` (:py:class:`dict`):
-                Metadata about the requested commit if one was requested.
-                Otherwise, this will be ``None``.
+            list of PendingPatchInfo:
+            A list of dictionaries with patch information.
 
         Raises:
             rbtools.command.CommandError:
@@ -160,12 +176,14 @@ class Patch(BaseCommand):
                   ``commit_ids`` was provided.
                 * One or more requested commit IDs could not be found.
         """
-        if commit_ids is not None:
-            commit_ids = set(commit_ids)
+        patch_prefix_level: Optional[int] = self.options.px
 
         # Sanity-check the arguments, making sure that the options provided
         # are compatible with each other and with the Review Board server.
-        server_supports_history = self.capabilities.has_capability(
+        capabilities = self.capabilities
+        assert capabilities
+
+        server_supports_history = capabilities.has_capability(
             'review_requests', 'supports_history')
 
         if server_supports_history:
@@ -190,7 +208,7 @@ class Patch(BaseCommand):
                 _('The specified diff revision does not exist.'))
 
         # Begin to gather results.
-        patches = []
+        patches: list[PendingPatchInfo] = []
 
         if hasattr(diff, 'draft_commits'):
             commits = diff.draft_commits
@@ -214,11 +232,11 @@ class Patch(BaseCommand):
             # We only have one patch to apply, containing a squashed version
             # of all commits.
             patches.append({
-                'base_dir': getattr(diff, 'basedir', ''),
-                'commit_meta': None,
-                'diff': diff_content,
-                'patch_num': 1,
-                'revision': diff_revision,
+                'diff_revision': diff_revision,
+                'has_metadata': False,
+                'patch': Patch(base_dir=getattr(diff, 'basedir', None),
+                               content=diff_content,
+                               prefix_level=patch_prefix_level),
             })
         else:
             # We'll be returning one patch per commit. This may be the
@@ -258,22 +276,18 @@ class Patch(BaseCommand):
                 assert isinstance(diff_content, bytes)
 
                 patches.append({
-                    # DiffSets on review requests created with history
-                    # support *always* have an empty base dir.
-                    'base_dir': '',
+                    'diff_revision': diff_revision,
+                    'has_metadata': True,
 
-                    'commit_meta': {
-                        'author': PatchAuthor(full_name=commit.author_name,
-                                              email=commit.author_email),
-                        'author_date': commit.author_date,
-                        'committer_date': commit.committer_date,
-                        'committer_email': commit.committer_email,
-                        'committer_name': commit.committer_name,
-                        'message': commit.commit_message,
-                    },
-                    'diff': diff_content,
-                    'patch_num': patch_num,
-                    'revision': diff_revision,
+                    # Note that DiffSets on review requests created with
+                    # history support *always* have an empty base dir, so
+                    # we don't pass base_dir= here.
+                    'patch': Patch(
+                        author=PatchAuthor(full_name=commit.author_name,
+                                           email=commit.author_email),
+                        content=diff_content,
+                        prefix_level=patch_prefix_level,
+                        message=commit.commit_message),
                 })
 
         if reverted:
@@ -281,15 +295,22 @@ class Patch(BaseCommand):
 
         return patches
 
-    def apply_patch(self, diff_file_path, base_dir, patch_num, total_patches,
-                    revert=False):
+    def apply_patch(
+        self,
+        *,
+        diff_file_path: str,
+        base_dir: str,
+        patch_num: int,
+        total_patches: int,
+        revert: bool = False,
+    ) -> bool:
         """Apply a patch to the tree.
 
         Args:
-            diff_file_path (unicode):
+            diff_file_path (str):
                 The file path of the diff being applied.
 
-            base_dir (unicode):
+            base_dir (str):
                 The base directory within which to apply the patch.
 
             patch_num (int):
@@ -311,6 +332,12 @@ class Patch(BaseCommand):
             rbtools.command.CommandError:
                 There was an error applying or reverting the patch.
         """
+        repository_info = self.repository_info
+        tool = self.tool
+
+        assert repository_info is not None
+        assert tool is not None
+
         # If we're working with more than one patch, show the patch number
         # we're applying or reverting. If we're only working with one, the
         # previous log from _apply_patches() will suffice.
@@ -327,17 +354,16 @@ class Patch(BaseCommand):
                     'total': total_patches,
                 })
 
-        result = self.tool.apply_patch(
+        result = tool.apply_patch(
             patch_file=diff_file_path,
-            base_path=self.repository_info.base_path,
+            base_path=repository_info.base_path,
             base_dir=base_dir,
             p=self.options.px,
             revert=revert)
+        patch_output = (result.patch_output or b'').strip()
 
-        if result.patch_output:
+        if patch_output:
             self.stdout.new_line()
-
-            patch_output = result.patch_output.strip()
             self.stdout_bytes.write(patch_output)
             self.stdout.new_line()
             self.stdout.new_line()
@@ -370,7 +396,7 @@ class Patch(BaseCommand):
                 self.json.add('conflicting_files', [])
 
                 for filename in result.conflicting_files:
-                    filename = filename.decode('utf-8')
+                    filename = force_unicode(filename)
                     self.stdout.write('    %s' % filename)
                     self.json.append('conflicting_files', filename)
 
@@ -391,7 +417,7 @@ class Patch(BaseCommand):
 
         return True
 
-    def initialize(self):
+    def initialize(self) -> None:
         """Initialize the command.
 
         This overrides :py:meth:`BaseCommand.initialize
@@ -405,7 +431,8 @@ class Patch(BaseCommand):
                 A review request URL passed in as the review request ID could
                 not be parsed correctly or included a bad diff revision.
         """
-        review_request_id = self.options.args[0]
+        options = self.options
+        review_request_id = options.args[0]
 
         if review_request_id.startswith('http'):
             server_url, review_request_id, diff_revision = \
@@ -419,22 +446,29 @@ class Patch(BaseCommand):
                 raise CommandError('The URL %s does not appear to be a '
                                    'review request.')
 
-            self.options.server = server_url
-            self.options.diff_revision = diff_revision
-            self.options.args[0] = review_request_id
+            options.server = server_url
+            options.diff_revision = diff_revision
+            options.args[0] = review_request_id
 
-        self.needs_scm_client = (not self.options.patch_stdout and
-                                 not self.options.patch_outfile)
+        self.needs_scm_client = (not options.patch_stdout and
+                                 not options.patch_outfile)
         self.needs_repository = self.needs_scm_client
 
-        super(Patch, self).initialize()
+        super().initialize()
 
-    def main(self, review_request_id):
+    def main(
+        self,
+        review_request_id: int,
+    ) -> int:
         """Run the command.
 
         Args:
             review_request_id (int):
                 The ID of the review request to patch from.
+
+        Returns:
+            int:
+            The resulting exit code.
 
         Raises:
             rbtools.command.CommandError:
@@ -447,6 +481,8 @@ class Patch(BaseCommand):
         revert = options.revert_patch
         diff_revision = options.diff_revision
         tool = self.tool
+
+        assert tool is not None
 
         if revert:
             if patch_stdout:
@@ -484,15 +520,17 @@ class Patch(BaseCommand):
             except NotImplementedError:
                 pass
 
+        commit_ids: Optional[set[str]]
+
         if options.commit_ids:
             # Do our best to normalize what gets passed in, so that we don't
             # end up with any blank entries.
-            commit_ids = [
+            commit_ids = {
                 commit_id
                 for commit_id in COMMIT_ID_SPLIT_RE.split(
                     options.commit_ids.trim())
                 if commit_id
-            ]
+            }
         else:
             commit_ids = None
 
@@ -515,6 +553,8 @@ class Patch(BaseCommand):
                                    % (patch_outfile, e))
         else:
             self._apply_patches(patches)
+
+        return 0
 
     def _get_draft_diff(self, **query_kwargs) -> Optional[DraftDiffResource]:
         """Return the latest draft diff for the review request.
@@ -639,36 +679,51 @@ class Patch(BaseCommand):
 
         return diff
 
-    def _output_patches(self, patches, fp):
+    def _output_patches(
+        self,
+        patches: Sequence[PendingPatchInfo],
+        fp: Union[BinaryIO, OutputWrapper[bytes]],
+    ) -> None:
         """Output the contents of the patches to the console.
 
         Args:
             patches (list of dict):
                 The list of patches that would be applied.
 
-            fp (file or io.BufferedIOBase):
+            fp (rbtools.commands.base.output.OutputWrapper):
                 The file pointer or stream to write the patch content to.
                 This must accept byte strings.
         """
-        for patch_data in patches:
-            fp.write(patch_data['diff'])
+        for pending_patch in patches:
+            patch = pending_patch['patch']
+
+            with patch.open():
+                fp.write(patch.content)
+
             fp.write(b'\n')
 
-    def _apply_patches(self, patches):
+    def _apply_patches(
+        self,
+        patches: Sequence[PendingPatchInfo],
+    ) -> None:
         """Apply a list of patches to the tree.
 
         Args:
-            patches (list of dict):
+            patches (list of PendingPatchInfo):
                 The list of patches to apply.
 
         Raises:
             rbtools.command.CommandError:
                 Patching the tree has failed.
         """
-        squash = self.options.squash
-        revert = self.options.revert_patch
-        commit_no_edit = self.options.commit_no_edit
-        will_commit = self.options.commit or commit_no_edit
+        tool = self.tool
+        assert tool
+
+        options = self.options
+        squash = options.squash
+        revert = options.revert_patch
+        commit_no_edit = options.commit_no_edit
+        will_commit = options.commit or commit_no_edit
         total_patches = len(patches)
 
         # Check if we're planning to commit and have any patch without
@@ -676,7 +731,10 @@ class Patch(BaseCommand):
         # review request so we can generate a commit message.
         needs_review_request_metadata = will_commit and (
             squash or total_patches == 1 or
-            any(patch_data['commit_meta'] is None for patch_data in patches)
+            any(
+                not patch_data['has_metadata']
+                for patch_data in patches
+            )
         )
 
         # Fetch the review request to use as a description and for URLs in
@@ -702,7 +760,7 @@ class Patch(BaseCommand):
             default_commit_message = None
 
         # Display a summary of what's about to be applied.
-        diff_revision = patches[0]['revision']
+        diff_revision = patches[0]['diff_revision']
 
         if revert:
             summary = ngettext(
@@ -731,19 +789,20 @@ class Patch(BaseCommand):
         self.json.add('diff_revision', diff_revision)
         self.json.add('total_patches', total_patches)
 
+        author: Optional[PatchAuthor]
+        message: Optional[str]
+
         # Start applying all the patches.
-        for patch_data in patches:
-            patch_num = patch_data['patch_num']
-            tmp_patch_file = make_tempfile(content=patch_data['diff'])
+        for patch_num, pending_patch in enumerate(patches, start=1):
+            patch = pending_patch['patch']
 
-            success = self.apply_patch(
-                diff_file_path=tmp_patch_file,
-                base_dir=patch_data['base_dir'],
-                patch_num=patch_num,
-                total_patches=total_patches,
-                revert=revert)
-
-            os.unlink(tmp_patch_file)
+            with patch.open():
+                success = self.apply_patch(
+                    diff_file_path=str(patch.path),
+                    base_dir=patch.base_dir or '',
+                    patch_num=patch_num,
+                    total_patches=total_patches,
+                    revert=revert)
 
             if not success:
                 if revert:
@@ -762,13 +821,16 @@ class Patch(BaseCommand):
             # patch individually, unless the user wants to squash commits in
             # which case we'll only do this on the final commit.
             if will_commit and (not squash or patch_num == total_patches):
-                meta = patch_data.get('commit_meta')
-
-                if meta is not None and not squash and total_patches > 1:
+                if (not pending_patch['has_metadata'] and
+                    not squash and
+                    total_patches > 1):
                     # We are patching a commit so we already have the metadata
                     # required without making additional HTTP requests.
-                    message = meta['message']
-                    author = meta['author']
+                    message = patch.message
+                    author = patch.author
+
+                    assert author is not None
+                    assert message is not None
                 else:
                     # We'll build this based on the summary/description from
                     # the review request and the patch number.
@@ -794,7 +856,7 @@ class Patch(BaseCommand):
                     message = '[Revert] %s' % message
 
                 try:
-                    self.tool.create_commit(
+                    tool.create_commit(
                         message=message,
                         author=author,
                         run_editor=not commit_no_edit)
@@ -802,4 +864,4 @@ class Patch(BaseCommand):
                     raise CommandError(str(e))
                 except NotImplementedError:
                     raise CommandError('--commit is not supported with %s'
-                                       % self.tool.name)
+                                       % tool.name)
