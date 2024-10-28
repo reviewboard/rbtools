@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from rbtools.api.decorators import request_method_decorator
 from rbtools.api.request import HttpRequest
+from rbtools.api.resource.base import request_method
 
 if TYPE_CHECKING:
     from rbtools.api.request import QueryArgs
@@ -78,7 +78,7 @@ class GetPatchMixin:
 
     _url: str
 
-    @request_method_decorator
+    @request_method
     def get_patch(
         self,
         **kwargs: QueryArgs,

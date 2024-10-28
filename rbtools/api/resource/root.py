@@ -14,11 +14,11 @@ from packaging.version import parse as parse_version
 from typelets.json import JSONDict
 
 from rbtools.api.cache import MINIMUM_VERSION
-from rbtools.api.decorators import request_method_decorator
 from rbtools.api.request import HttpRequest
 from rbtools.api.resource.base import (
     ItemResource,
     ResourceDictField,
+    request_method,
     resource_mimetype,
 )
 
@@ -88,7 +88,7 @@ class RootResource(ItemResource):
             # bugs before this version). Disable caching.
             transport.disable_cache()
 
-    @request_method_decorator
+    @request_method
     def _get_template_request(
         self,
         url_template: str,

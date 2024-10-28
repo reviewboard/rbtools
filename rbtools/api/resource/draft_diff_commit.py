@@ -10,11 +10,11 @@ from __future__ import annotations
 import logging
 from typing import Optional, TYPE_CHECKING
 
-from rbtools.api.decorators import request_method_decorator
 from rbtools.api.request import HttpRequest
 from rbtools.api.resource.base import (
     ItemResource,
     ListResource,
+    request_method,
     resource_mimetype,
 )
 from rbtools.api.resource.mixins import GetPatchMixin
@@ -39,7 +39,7 @@ class DraftDiffCommitItemResource(GetPatchMixin, ItemResource):
 class DraftDiffCommitListResource(ListResource):
     """List resource for draft diff commits."""
 
-    @request_method_decorator
+    @request_method
     def upload_commit(
         self,
         validation_info: str,

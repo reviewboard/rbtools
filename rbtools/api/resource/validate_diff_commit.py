@@ -9,9 +9,12 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from rbtools.api.decorators import request_method_decorator
 from rbtools.api.request import HttpRequest
-from rbtools.api.resource.base import ItemResource, resource_mimetype
+from rbtools.api.resource.base import (
+    ItemResource,
+    request_method,
+    resource_mimetype,
+)
 
 if TYPE_CHECKING:
     from rbtools.api.request import QueryArgs
@@ -21,7 +24,7 @@ if TYPE_CHECKING:
 class ValidateDiffCommitResource(ItemResource):
     """Singleton resource for commit validation."""
 
-    @request_method_decorator
+    @request_method
     def validate_commit(
         self,
         repository: str,

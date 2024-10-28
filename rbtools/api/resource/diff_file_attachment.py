@@ -9,10 +9,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from rbtools.api.decorators import request_method_decorator
 from rbtools.api.resource.base import (
     ItemResource,
     ListResource,
+    request_method,
     resource_mimetype,
 )
 
@@ -37,7 +37,7 @@ class DiffFileAttachmentListResource(ListResource):
         5.0
     """
 
-    @request_method_decorator
+    @request_method
     def upload_attachment(
         self,
         *,

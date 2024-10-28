@@ -9,11 +9,11 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from rbtools.api.decorators import request_method_decorator
 from rbtools.api.request import HttpRequest
 from rbtools.api.resource.base import (
     ItemResource,
     ListResource,
+    request_method,
     resource_mimetype,
 )
 
@@ -34,7 +34,7 @@ class ScreenshotItemResource(ItemResource):
 class ScreenshotListResource(ListResource):
     """List resource for screenshots."""
 
-    @request_method_decorator
+    @request_method
     def upload_screenshot(
         self,
         filename: str,

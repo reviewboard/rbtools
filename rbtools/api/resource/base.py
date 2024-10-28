@@ -13,7 +13,6 @@ from collections.abc import Iterator, MutableMapping
 from typing import Any, Optional
 from urllib.parse import urljoin
 
-from rbtools.api.decorators import request_method_decorator
 from rbtools.api.request import HttpRequest
 from rbtools.api.utils import rem_mime_format
 
@@ -39,6 +38,49 @@ def resource_mimetype(mimetype):
         return cls
 
     return wrapper
+
+
+def request_method(f):
+    """Wrap a method returned from a resource to capture HttpRequests.
+
+    When a method which returns HttpRequests is called, it will
+    pass the method and arguments off to the transport to be executed.
+
+    This wrapping allows the transport to skim arguments off the top
+    of the method call, and modify any return values (such as executing
+    a returned HttpRequest).
+
+    However, if called with the ``internal`` argument set to True,
+    the method itself will be executed and the value returned as-is.
+    Thus, any method calls embedded inside the code for another method
+    should use the ``internal`` argument to access the expected value.
+
+    Version Changed:
+        6.0:
+        Moved and renamed from rbtools.api.decorators.request_method_decorator.
+
+    Args:
+        f (callable):
+            The method to wrap.
+
+    Returns:
+        callable:
+        The wrapped method.
+    """
+    def request_method(self, *args, **kwargs):
+        if kwargs.pop('internal', False):
+            return f(self, *args, **kwargs)
+        else:
+            def method_wrapper(*args, **kwargs):
+                return f(self, *args, **kwargs)
+
+            return self._transport.execute_request_method(method_wrapper,
+                                                          *args, **kwargs)
+
+    request_method.__name__ = f.__name__
+    request_method.__doc__ = f.__doc__
+    request_method.__dict__.update(f.__dict__)
+    return request_method
 
 
 def _preprocess_fields(fields):
@@ -132,7 +174,7 @@ def _create_resource_for_field(parent_resource, field_payload,
                            guess_token=False)
 
 
-@request_method_decorator
+@request_method
 def _create(resource, data=None, query_args={}, *args, **kwargs):
     """Generate a POST request on a resource.
 
@@ -184,20 +226,20 @@ def _create(resource, data=None, query_args={}, *args, **kwargs):
     return request
 
 
-@request_method_decorator
+@request_method
 def _delete(resource, *args, **kwargs):
     """Generate a DELETE request on a resource."""
     return HttpRequest(resource._links['delete']['href'], method='DELETE',
                        query_args=kwargs)
 
 
-@request_method_decorator
+@request_method
 def _get_self(resource, *args, **kwargs):
     """Generate a request for a resource's 'self' link."""
     return HttpRequest(resource._links['self']['href'], query_args=kwargs)
 
 
-@request_method_decorator
+@request_method
 def _update(resource, data=None, query_args={}, *args, **kwargs):
     """Generate a PUT request on a resource.
 
@@ -429,7 +471,7 @@ class Resource(object):
         using array syntax."""
         return ResourceDictField(self, self._links)
 
-    @request_method_decorator
+    @request_method
     def _get_url(self, url, **kwargs):
         return HttpRequest(url, query_args=kwargs)
 
@@ -647,7 +689,7 @@ class ResourceLinkField(ResourceDictField):
         super(ResourceLinkField, self).__init__(resource, fields)
         self._transport = resource._transport
 
-    @request_method_decorator
+    @request_method
     def get(self, **query_args):
         return HttpRequest(self._fields['href'], query_args=query_args)
 
@@ -877,7 +919,7 @@ class CountResource(ItemResource):
         super(CountResource, self).__init__(transport, payload, url,
                                             token=None)
 
-    @request_method_decorator
+    @request_method
     def get_self(self, **kwargs):
         """Generate an GET request for the resource list.
 
@@ -970,21 +1012,21 @@ class ListResource(Resource):
         for i in range(self.num_items):
             yield self[i]
 
-    @request_method_decorator
+    @request_method
     def get_next(self, **kwargs):
         if 'next' not in self._links:
             raise StopIteration()
 
         return HttpRequest(self._links['next']['href'], query_args=kwargs)
 
-    @request_method_decorator
+    @request_method
     def get_prev(self, **kwargs):
         if 'prev' not in self._links:
             raise StopIteration()
 
         return HttpRequest(self._links['prev']['href'], query_args=kwargs)
 
-    @request_method_decorator
+    @request_method
     def get_item(self, pk, **kwargs):
         """Retrieve the item resource with the corresponding primary key."""
         return HttpRequest(urljoin(self._url, '%s/' % pk),

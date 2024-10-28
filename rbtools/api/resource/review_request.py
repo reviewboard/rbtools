@@ -13,10 +13,10 @@ from urllib.parse import urljoin
 
 from typing_extensions import Self
 
-from rbtools.api.decorators import request_method_decorator
 from rbtools.api.resource.base import (
     ItemResource,
     ListResource,
+    request_method,
     resource_mimetype,
 )
 from rbtools.utils.graphs import path_exists
@@ -62,7 +62,7 @@ class ReviewRequestResource(ItemResource):
         """
         return self._fields.get('url', f'/r/{self.id}/')
 
-    @request_method_decorator
+    @request_method
     def submit(
         self,
         description: Optional[str] = None,
@@ -94,7 +94,7 @@ class ReviewRequestResource(ItemResource):
 
         return self.update(data=data, internal=True)
 
-    @request_method_decorator
+    @request_method
     def get_or_create_draft(
         self,
         **kwargs: QueryArgs,

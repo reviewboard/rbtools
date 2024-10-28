@@ -9,8 +9,11 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from rbtools.api.decorators import request_method_decorator
-from rbtools.api.resource.base import ItemResource, resource_mimetype
+from rbtools.api.resource.base import (
+    ItemResource,
+    request_method,
+    resource_mimetype,
+)
 from rbtools.api.resource.mixins import DiffUploaderMixin
 
 if TYPE_CHECKING:
@@ -21,7 +24,7 @@ if TYPE_CHECKING:
 class ValidateDiffResource(DiffUploaderMixin, ItemResource):
     """Singleton resource for diff validation."""
 
-    @request_method_decorator
+    @request_method
     def validate_diff(
         self,
         repository: str,

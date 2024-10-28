@@ -9,11 +9,11 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from rbtools.api.decorators import request_method_decorator
 from rbtools.api.request import HttpRequest
 from rbtools.api.resource.base import (
     ItemResource,
     ListResource,
+    request_method,
     resource_mimetype,
 )
 from rbtools.api.resource.mixins import DiffUploaderMixin, GetPatchMixin
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 class DiffResource(GetPatchMixin, ItemResource):
     """Item resource for diffs."""
 
-    @request_method_decorator
+    @request_method
     def finalize_commit_series(
         self,
         cumulative_diff: bytes,
@@ -79,7 +79,7 @@ class DiffResource(GetPatchMixin, ItemResource):
 class DiffListResource(DiffUploaderMixin, ListResource):
     """List resource for diffs."""
 
-    @request_method_decorator
+    @request_method
     def upload_diff(
         self,
         diff: bytes,
@@ -120,7 +120,7 @@ class DiffListResource(DiffUploaderMixin, ListResource):
             base_commit_id=base_commit_id,
             **kwargs)
 
-    @request_method_decorator
+    @request_method
     def create_empty(
         self,
         base_commit_id: Optional[str] = None,

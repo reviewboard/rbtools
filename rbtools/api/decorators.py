@@ -1,3 +1,15 @@
+"""Decorators for API requests."""
+
+from __future__ import annotations
+
+from housekeeping import func_moved
+
+from rbtools.api.resource.base import request_method
+from rbtools.deprecation import RemovedInRBTools80Warning
+
+
+@func_moved(RemovedInRBTools80Warning,
+            request_method)
 def request_method_decorator(f):
     """Wrap a method returned from a resource to capture HttpRequests.
 
@@ -13,17 +25,4 @@ def request_method_decorator(f):
     Thus, any method calls embedded inside the code for another method
     should use the ``internal`` argument to access the expected value.
     """
-    def request_method(self, *args, **kwargs):
-        if kwargs.pop('internal', False):
-            return f(self, *args, **kwargs)
-        else:
-            def method_wrapper(*args, **kwargs):
-                return f(self, *args, **kwargs)
-
-            return self._transport.execute_request_method(method_wrapper,
-                                                          *args, **kwargs)
-
-    request_method.__name__ = f.__name__
-    request_method.__doc__ = f.__doc__
-    request_method.__dict__.update(f.__dict__)
-    return request_method
+    return request_method(f)

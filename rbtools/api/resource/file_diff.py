@@ -9,11 +9,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from rbtools.api.decorators import request_method_decorator
 from rbtools.api.request import HttpRequest
 from rbtools.api.resource.base import (
     ItemResource,
     ListResource,
+    request_method,
     resource_mimetype,
 )
 from rbtools.api.resource.mixins import GetPatchMixin
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 class FileDiffResource(GetPatchMixin, ItemResource):
     """Item resource for file diffs."""
 
-    @request_method_decorator
+    @request_method
     def get_diff_data(
         self,
         **kwargs: QueryArgs,
