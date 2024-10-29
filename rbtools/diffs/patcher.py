@@ -15,7 +15,7 @@ from typing import Iterator, Optional, Sequence, TYPE_CHECKING
 
 from typing_extensions import NotRequired, TypedDict
 
-from rbtools.api.resource import ReviewRequestResource
+from rbtools.api.resource import ReviewRequestItemResource
 from rbtools.diffs.errors import ApplyPatchError
 from rbtools.diffs.patches import PatchAuthor, PatchResult
 from rbtools.utils.commands import extract_commit_message
@@ -243,7 +243,7 @@ class Patcher:
         *,
         default_author: Optional[PatchAuthor] = None,
         default_message: Optional[str] = None,
-        review_request: Optional[ReviewRequestResource] = None,
+        review_request: Optional[ReviewRequestItemResource] = None,
         run_commit_editor: bool = False,
     ) -> None:
         """Prepare the patching process to commit applied changes.
@@ -264,7 +264,7 @@ class Patcher:
             default_message (str, optional):
                 The default message to use for commits.
 
-            review_request (rbtools.api.resource.ReviewRequestResource,
+            review_request (rbtools.api.resource.ReviewRequestItemResource,
                             optional):
                 The review request to use for a default author and message.
 

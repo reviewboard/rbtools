@@ -20,7 +20,7 @@ from rbtools.utils.users import get_user
 
 if TYPE_CHECKING:
     from rbtools.api.client import RBClient
-    from rbtools.api.resource import ReviewRequestResource, RootResource
+    from rbtools.api.resource import ReviewRequestItemResource, RootResource
     from rbtools.clients.base.scmclient import (BaseSCMClient,
                                                 SCMClientRevisionSpec)
 
@@ -154,7 +154,7 @@ def find_review_request_by_change_id(
     api_root: RootResource,
     revisions: SCMClientRevisionSpec,
     repository_id: Optional[int] = None,
-) -> Optional[ReviewRequestResource]:
+) -> Optional[ReviewRequestItemResource]:
     """Ask Review Board for the review request ID for the tip revision.
 
     Note that this function calls the Review Board API with the ``only_fields``
@@ -188,7 +188,7 @@ def find_review_request_by_change_id(
             The repository ID to use.
 
     Returns:
-        rbtools.api.resource.ReviewRequestResource:
+        rbtools.api.resource.ReviewRequestItemResource:
         The matching review request, if found.
     """
     assert api_client is not None
@@ -291,7 +291,8 @@ def find_review_request_matches(review_requests,
         review_requests (list or rbtools.api.resource.ListResource):
             Either a list resource for review requests (in which case all
             pages will be searched for matches), or a list of
-            :py:class:`rbtools.api.resource.ReviewRequestResource` instances.
+            :py:class:`rbtools.api.resource.ReviewRequestItemResource`
+            instances.
 
             Note:
                 It's expected that these will all be backed by the same
@@ -320,7 +321,7 @@ def find_review_request_matches(review_requests,
         A dictionary of results, containing:
 
         Keys:
-            exact (rbtools.api.resource.ReviewRequestResource):
+            exact (rbtools.api.resource.ReviewRequestItemResource):
                 An exact review request match. This may be ``None``.
 
             fuzzy (list of dict):
@@ -328,7 +329,7 @@ def find_review_request_matches(review_requests,
 
                 Keys:
                     review_request (rbtools.api.resource.
-                                    ReviewRequestResource):
+                                    ReviewRequestItemResource):
                         The review request match candidate.
 
                     score (float):
@@ -462,13 +463,13 @@ def guess_existing_review_request(
     tool: BaseSCMClient,
     revisions: SCMClientRevisionSpec,
     is_fuzzy_match_func: Optional[
-        Callable[[ReviewRequestResource], bool]] = None,
+        Callable[[ReviewRequestItemResource], bool]] = None,
     no_commit_error: Optional[Callable[[], None]] = None,
     submit_as: str,
     additional_fields: Optional[list[str]] = None,
     repository_id: Optional[int] = None,
     commit_id: Optional[str] = None,
-) -> Optional[ReviewRequestResource]:
+) -> Optional[ReviewRequestItemResource]:
     """Try to guess the existing review request ID if it is available.
 
     The existing review request is guessed by comparing the existing
@@ -548,7 +549,7 @@ def guess_existing_review_request(
                 3.1
 
     Returns:
-        rbtools.api.resource.ReviewRequestResource:
+        rbtools.api.resource.ReviewRequestItemResource:
         The resulting review request, if a match was made, or ``None`` if
         no review request could be matched.
 

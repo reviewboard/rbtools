@@ -56,7 +56,7 @@ Diff Resource Functionality
 The resource object for a :ref:`webapi2.0-diff-resource` provides
 the following additional methods.
 
-.. py:method:: DiffResource.get_patch()
+.. py:method:: DiffItemResource.get_patch()
 
    Retrieve the actual contents of the uploaded diff.
 
@@ -69,11 +69,11 @@ File Diff Resource Functionality
 The resource object for a :ref:`webapi2.0-file-diff-resource` provides
 the following additional methods.
 
-.. py:method:: FileDiffResource.get_patch()
+.. py:method:: FileDiffItemResource.get_patch()
 
    Retrieve the actual contents of the uploaded diff for this file.
 
-.. py:method:: FileDiffResource.get_diff_data()
+.. py:method:: FileDiffItemResource.get_diff_data()
 
    Retrieves the actual raw diff data for the file. For more information
    about what this contains, see the :ref:`webapi2.0-file-diff-resource`
@@ -144,7 +144,7 @@ Review Request Resource Functionality
 The resource object for a :ref:`webapi2.0-review-request-resource`
 provides the following additional methods.
 
-.. py:method:: ReviewRequestResource.get_or_create_draft(**kwargs)
+.. py:method:: ReviewRequestItemResource.get_or_create_draft(**kwargs)
 
    Retrieve the review request's draft resource. If the draft does not exist
    it will be created and retrieved.

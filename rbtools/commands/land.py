@@ -207,7 +207,7 @@ class Land(BaseCommand):
                 The destination branch that the change will be committed or
                 merged to.
 
-            review_request (rbtools.api.resource.ReviewRequestResource):
+            review_request (rbtools.api.resource.ReviewRequestItemResource):
                 The review request containing the change to land.
 
             source_branch (unicode, optional):

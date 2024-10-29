@@ -26,8 +26,13 @@ if TYPE_CHECKING:
 
 
 @resource_mimetype('application/vnd.reviewboard.org.review-request')
-class ReviewRequestResource(ItemResource):
-    """Item resource for review requests."""
+class ReviewRequestItemResource(ItemResource):
+    """Item resource for review requests.
+
+    Version Changed:
+        6.0:
+        Renamed from ReviewRequestResource.
+    """
 
     @property
     def absolute_url(self) -> str:

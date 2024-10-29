@@ -23,8 +23,13 @@ if TYPE_CHECKING:
 
 
 @resource_mimetype('application/vnd.reviewboard.org.diff')
-class DiffResource(GetPatchMixin, ItemResource):
-    """Item resource for diffs."""
+class DiffItemResource(GetPatchMixin, ItemResource):
+    """Item resource for diffs.
+
+    Version Changed:
+        6.0:
+        Renamed from DiffResource.
+    """
 
     @request_method
     def finalize_commit_series(

@@ -11,7 +11,7 @@ from pathlib import Path
 
 import kgb
 
-from rbtools.api.resource import ReviewRequestResource
+from rbtools.api.resource import ReviewRequestItemResource
 from rbtools.api.tests.base import MockTransport
 from rbtools.clients.base.repository import RepositoryInfo
 from rbtools.diffs.errors import ApplyPatchError
@@ -171,7 +171,7 @@ class PatcherTests(kgb.SpyAgency, TestCase):
 
     def test_prepare_for_commit_with_review_request(self) -> None:
         """Testing Patcher.prepare_for_commit with review_request="""
-        review_request = ReviewRequestResource(
+        review_request = ReviewRequestItemResource(
             transport=MockTransport(),
             payload={
                 'id': 123,
@@ -251,7 +251,7 @@ class PatcherTests(kgb.SpyAgency, TestCase):
         """Testing Patcher.prepare_for_commit with review_request= and
         submitter expanded
         """
-        review_request = ReviewRequestResource(
+        review_request = ReviewRequestItemResource(
             transport=MockTransport(),
             payload={
                 'id': 123,

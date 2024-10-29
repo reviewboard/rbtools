@@ -13,6 +13,7 @@ from tqdm import tqdm
 from typing_extensions import TypeVar
 
 from rbtools.api.errors import APIError
+from rbtools.api.resource.file_diff import FileDiffItemResource
 from rbtools.commands.base import (BaseCommand,
                                    CommandError,
                                    Option,
@@ -35,8 +36,8 @@ if TYPE_CHECKING:
     from rbtools.api.resource import (
         DiffFileAttachmentListResource,
         DraftDiffCommitItemResource,
-        FileDiffResource,
-        ReviewRequestResource,
+        FileDiffItemResource,
+        ReviewRequestItemResource,
     )
 
 
@@ -609,7 +610,7 @@ class Post(BaseCommand):
 
     def post_request(
         self,
-        review_request: Optional[ReviewRequestResource] = None,
+        review_request: Optional[ReviewRequestItemResource] = None,
         diff_history: Optional[DiffHistory] = None,
         squashed_diff: Optional[SquashedDiff] = None,
         submit_as: Optional[str] = None,
@@ -617,7 +618,7 @@ class Post(BaseCommand):
         """Create or update a review request, uploading a diff in the process.
 
         Args:
-            review_request (rbtools.api.resources.ReviewRequestResource,
+            review_request (rbtools.api.resources.ReviewRequestItemResource,
                             optional):
                 The review request to update.
 
@@ -1070,7 +1071,7 @@ class Post(BaseCommand):
     def _get_review_request_to_update(
         self,
         server_supports_history: bool = False,
-    ) -> Optional[ReviewRequestResource]:
+    ) -> Optional[ReviewRequestItemResource]:
         """Retrieve and return the review request to update.
 
         Args:
@@ -1078,7 +1079,7 @@ class Post(BaseCommand):
                 Whether or not the server supports posting with history.
 
         Returns:
-            rbtools.api.resources.ReviewRequestResource:
+            rbtools.api.resources.ReviewRequestItemResource:
             The review request to update, or ``None`` if we are not updating an
             existing review request.
 
@@ -1517,13 +1518,13 @@ class Post(BaseCommand):
 
     def _post_diff_history(
         self,
-        review_request: ReviewRequestResource,
+        review_request: ReviewRequestItemResource,
         diff_history: DiffHistory,
     ) -> None:
         """Post the diff history to the review request.
 
         Args:
-            review_request (rbtools.api.resource.ReviewRequestResource):
+            review_request (rbtools.api.resource.ReviewRequestItemResource):
                 The review request to upload the diffs to.
 
             diff_history (DiffHistory):
@@ -1572,7 +1573,7 @@ class Post(BaseCommand):
         assert self.tool is not None
 
         if self.can_upload_binary_files:
-            files_to_upload: list[FileDiffResource] = []
+            files_to_upload: list[FileDiffItemResource] = []
 
             for commit in commits:
                 files = commit.get_draft_files(binary=True)
@@ -1583,7 +1584,7 @@ class Post(BaseCommand):
 
     def _post_squashed_diff(
         self,
-        review_request: ReviewRequestResource,
+        review_request: ReviewRequestItemResource,
         squashed_diff: SquashedDiff,
     ) -> None:
         """Post a squashed diff to the review request.
@@ -1592,7 +1593,7 @@ class Post(BaseCommand):
             5.0
 
         Args:
-            review_request (rbtools.api.resource.ReviewRequestResource):
+            review_request (rbtools.api.resource.ReviewRequestItemResource):
                 The review request to upload the diff to.
 
             squashed_diff (SquashedDiff):
@@ -1638,7 +1639,7 @@ class Post(BaseCommand):
 
     def _upload_binary_files(
         self,
-        files_to_upload: list[FileDiffResource],
+        files_to_upload: list[FileDiffItemResource],
     ) -> None:
         """Upload binary files for the given FileDiffs.
 

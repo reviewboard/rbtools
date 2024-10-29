@@ -20,7 +20,7 @@ from pydiffx import DiffType, DiffX
 from pydiffx.utils.text import guess_line_endings
 from typing_extensions import NotRequired, TypedDict
 
-from rbtools.api.resource import ReviewRequestResource
+from rbtools.api.resource import ReviewRequestItemResource
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
                                             SCMClientDiffResult,
@@ -394,7 +394,7 @@ class SOSClient(BaseSCMClient):
 
     def get_tree_matches_review_request(
         self,
-        review_request: ReviewRequestResource,
+        review_request: ReviewRequestItemResource,
         revisions: SCMClientRevisionSpec,
         **kwargs,
     ) -> bool:
@@ -408,7 +408,7 @@ class SOSClient(BaseSCMClient):
         RBTools 3.1+.
 
         Args:
-            review_request (rbtools.api.resources.ReviewRequestResource):
+            review_request (rbtools.api.resources.ReviewRequestItemResource):
                 The review request being matched.
 
             revisions (dict):

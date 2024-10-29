@@ -11,7 +11,6 @@ from typing import (Any, BinaryIO, Dict, Optional, Sequence, TYPE_CHECKING,
 from typing_extensions import TypedDict
 
 from rbtools.api.errors import APIError
-from rbtools.api.resource import DiffResource, DraftDiffResource
 from rbtools.commands.base import BaseCommand, CommandError, Option
 from rbtools.diffs.errors import ApplyPatchError
 from rbtools.diffs.patches import Patch, PatchAuthor
@@ -19,6 +18,7 @@ from rbtools.utils.encoding import force_unicode
 from rbtools.utils.review_request import parse_review_request_url
 
 if TYPE_CHECKING:
+    from rbtools.api.resource import DiffItemResource
     from rbtools.commands.base.output import OutputWrapper
 
 
@@ -561,7 +561,7 @@ class PatchCommand(BaseCommand):
 
         return 0
 
-    def _get_draft_diff(self, **query_kwargs) -> Optional[DraftDiffResource]:
+    def _get_draft_diff(self, **query_kwargs) -> Optional[DiffItemResource]:
         """Return the latest draft diff for the review request.
 
         Args:
@@ -569,7 +569,7 @@ class PatchCommand(BaseCommand):
                 Keyword arguments to pass when querying the diff resource
 
         Returns:
-            rbtools.api.resource.DraftDiffResource:
+            rbtools.api.resource.DiffItemResource:
             The draft diff resource if found, or ``None``.
         """
         try:
@@ -585,7 +585,7 @@ class PatchCommand(BaseCommand):
         *,
         diff_revision: Optional[int],
         squashed: bool,
-    ) -> Optional[Union[DiffResource, DraftDiffResource]]:
+    ) -> Optional[DiffItemResource]:
         """Retrieve the latest diff for a review request.
 
         This will attempt to retrieve the diff for the given diff revision,
@@ -607,8 +607,7 @@ class PatchCommand(BaseCommand):
                 Whether the resulting diff is intended to be squashed.
 
         Returns:
-            rbtools.api.resource.DiffResource or
-            rbtools.api.resource.DraftDiffResource:
+            rbtools.api.resource.DiffItemResource:
             The resulting diff/draft diff resource, or ``None`` if a diff
             was not found.
 
@@ -616,8 +615,8 @@ class PatchCommand(BaseCommand):
             rbtools.commands.CommandError:
                 There was an error fetching required information from the API.
         """
-        diff: Optional[Union[DiffResource, DraftDiffResource]] = None
-        draft_diff: Optional[DraftDiffResource] = None
+        diff: Optional[DiffItemResource] = None
+        draft_diff: Optional[DiffItemResource] = None
         review_request_id = self._review_request_id
         use_latest_diff = diff_revision is None
         api_root = self.api_root

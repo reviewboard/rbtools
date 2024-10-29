@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from rbtools.api.capabilities import Capabilities
     from rbtools.api.resource import (ItemResource,
                                       ListResource,
-                                      ReviewRequestResource)
+                                      ReviewRequestItemResource)
     from rbtools.clients.base.repository import RepositoryInfo
     from rbtools.config import RBToolsConfig
     from rbtools.diffs.tools.base import BaseDiffTool
@@ -1129,7 +1129,7 @@ class BaseSCMClient:
 
     def get_tree_matches_review_request(
         self,
-        review_request: ReviewRequestResource,
+        review_request: ReviewRequestItemResource,
         *,
         revisions: SCMClientRevisionSpec,
         **kwargs,
@@ -1148,7 +1148,7 @@ class BaseSCMClient:
             3.1
 
         Args:
-            review_request (rbtools.api.resource.ReviewRequestResource):
+            review_request (rbtools.api.resource.ReviewRequestItemResource):
                 The review request being matched.
 
             revisions (dict):

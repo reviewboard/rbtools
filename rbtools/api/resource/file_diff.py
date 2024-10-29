@@ -23,8 +23,13 @@ if TYPE_CHECKING:
 
 
 @resource_mimetype('application/vnd.reviewboard.org.file')
-class FileDiffResource(GetPatchMixin, ItemResource):
-    """Item resource for file diffs."""
+class FileDiffItemResource(GetPatchMixin, ItemResource):
+    """Item resource for file diffs.
+
+    Version Changed:
+        6.0:
+        Renamed from FileDiffResource.
+    """
 
     @request_method
     def get_diff_data(

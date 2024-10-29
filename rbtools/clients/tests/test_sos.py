@@ -10,7 +10,7 @@ from typing import Any, Dict, List
 
 import kgb
 
-from rbtools.api.resource import ReviewRequestResource
+from rbtools.api.resource import ReviewRequestItemResource
 from rbtools.api.tests.base import MockTransport
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
@@ -710,7 +710,7 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_get_tree_matches_review_request_with_match(self):
         """Testing SOSClient.get_tree_matches_review_request with match"""
-        review_request = ReviewRequestResource(
+        review_request = ReviewRequestItemResource(
             transport=MockTransport(),
             payload={
                 'id': 123,
@@ -739,7 +739,7 @@ class SOSClientTests(BaseSOSTestCase):
 
     def test_get_tree_matches_review_request_without_match(self):
         """Testing SOSClient.get_tree_matches_review_request without match"""
-        review_request = ReviewRequestResource(
+        review_request = ReviewRequestItemResource(
             transport=MockTransport(),
             payload={
                 'id': 123,
@@ -770,7 +770,7 @@ class SOSClientTests(BaseSOSTestCase):
         """Testing SOSClient.get_tree_matches_review_request without SOS
         state
         """
-        review_request = ReviewRequestResource(
+        review_request = ReviewRequestItemResource(
             transport=MockTransport(),
             payload={
                 'id': 123,

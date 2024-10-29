@@ -15,8 +15,8 @@ from rbtools.api.resource.base import (
     resource_mimetype,
 )
 from rbtools.api.resource.diff import (
+    DiffItemResource,
     DiffListResource,
-    DiffResource,
 )
 from rbtools.api.resource.diff_commit import (
     DiffCommitItemResource,
@@ -43,7 +43,7 @@ from rbtools.api.resource.file_attachment import (
     FileAttachmentListResource,
 )
 from rbtools.api.resource.file_diff import (
-    FileDiffResource,
+    FileDiffItemResource,
     FileDiffListResource,
 )
 from rbtools.api.resource.mixins import (
@@ -51,7 +51,7 @@ from rbtools.api.resource.mixins import (
     GetPatchMixin,
 )
 from rbtools.api.resource.review_request import (
-    ReviewRequestResource,
+    ReviewRequestItemResource,
     ReviewRequestListResource,
 )
 from rbtools.api.resource.root import RootResource
@@ -66,7 +66,10 @@ from rbtools.api.resource.validate_diff_commit import (
 
 
 # Compatibility names for renamed resource subclasses.
-DraftDiffResource = DiffResource
+DiffResource = DiffItemResource
+DraftDiffResource = DiffItemResource
+FileDiffResource = FileDiffItemResource
+ReviewRequestResource = ReviewRequestItemResource
 
 
 __all__ = [
@@ -74,6 +77,7 @@ __all__ = [
     'DiffCommitItemResource',
     'DiffCommitListResource',
     'DiffFileAttachmentListResource',
+    'DiffItemResource',
     'DiffListResource',
     'DiffResource',
     'DiffUploaderMixin',
@@ -87,6 +91,7 @@ __all__ = [
     'DraftScreenshotListResource',
     'FileAttachmentItemResource',
     'FileAttachmentListResource',
+    'FileDiffItemResource',
     'FileDiffResource',
     'FileDiffListResource',
     'GetPatchMixin',
@@ -98,6 +103,7 @@ __all__ = [
     'ResourceExtraDataField',
     'ResourceLinkField',
     'ResourceListField',
+    'ReviewRequestItemResource',
     'ReviewRequestResource',
     'ReviewRequestListResource',
     'RootResource',
