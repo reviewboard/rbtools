@@ -1,5 +1,6 @@
-# coding: utf-8
 """Unit tests for SubversionClient."""
+
+from __future__ import annotations
 
 import json
 import os
@@ -1432,7 +1433,7 @@ class SVNClientTests(SCMClientTestCase):
                 ),
             })
 
-    def test_apply_patch(self):
+    def test_apply_patch(self) -> None:
         """Testing SVNClient.apply_patch"""
         client = self.build_client()
         repository_info = client.get_repository_info()
@@ -1484,7 +1485,7 @@ class SVNClientTests(SCMClientTestCase):
             b'U         \xc3\xa2.txt\n'
             b'U         foo.txt\n')
 
-    def test_apply_patch_with_p(self):
+    def test_apply_patch_with_p(self) -> None:
         """Testing SVNClient.apply_patch with p="""
         client = self.build_client()
         repository_info = client.get_repository_info()
@@ -1532,7 +1533,7 @@ class SVNClientTests(SCMClientTestCase):
         result = client.apply_patch(base_path=repository_info.base_path,
                                     base_dir='',
                                     patch_file='test.diff',
-                                    p=3)
+                                    p='3')
 
         self.assertSpyCalled(run_process_exec)
 
@@ -1544,7 +1545,7 @@ class SVNClientTests(SCMClientTestCase):
             b'U         \xc3\xa2.txt\n'
             b'U         foo.txt\n')
 
-    def test_apply_patch_with_revert(self):
+    def test_apply_patch_with_revert(self) -> None:
         """Testing SVNClient.apply_patch with revert=True"""
         client = self.build_client()
         repository_info = client.get_repository_info()
@@ -1622,7 +1623,7 @@ class SVNClientTests(SCMClientTestCase):
             b'U         \xc3\xa2.txt\n'
             b'U         foo.txt\n')
 
-    def test_apply_patch_with_empty_files(self):
+    def test_apply_patch_with_empty_files(self) -> None:
         """Testing SVNClient.apply_patch with empty files"""
         client = self.build_client()
         repository_info = client.get_repository_info()
@@ -1686,7 +1687,7 @@ class SVNClientTests(SCMClientTestCase):
         self.assertEqual(result.conflicting_files, [])
         self.assertEqual(result.patch_output, b'')
 
-    def test_apply_patch_with_empty_files_revert(self):
+    def test_apply_patch_with_empty_files_revert(self) -> None:
         """Testing SVNClient.apply_patch with empty files and revert=True"""
         client = self.build_client()
         repository_info = client.get_repository_info()
@@ -1751,7 +1752,7 @@ class SVNClientTests(SCMClientTestCase):
         self.assertEqual(result.conflicting_files, [])
         self.assertEqual(result.patch_output, b'')
 
-    def test_apply_patch_with_not_applied(self):
+    def test_apply_patch_with_not_applied(self) -> None:
         """Testing SVNClient.apply_patch with not applied"""
         client = self.build_client()
         repository_info = client.get_repository_info()
@@ -1788,7 +1789,7 @@ class SVNClientTests(SCMClientTestCase):
         self.assertEqual(result.conflicting_files, [])
         self.assertEqual(result.patch_output, b'')
 
-    def test_apply_patch_with_conflicts(self):
+    def test_apply_patch_with_conflicts(self) -> None:
         """Testing SVNClient.apply_patch with conflicts"""
         client = self.build_client()
         repository_info = client.get_repository_info()
@@ -1855,7 +1856,7 @@ class SVNClientTests(SCMClientTestCase):
             b'Summary of conflicts:\n'
             b'  Text conflicts: 2\n')
 
-    def test_apply_patch_with_applied_and_conflicts(self):
+    def test_apply_patch_with_applied_and_conflicts(self) -> None:
         """Testing SVNClient.apply_patch with applied and conflicts"""
         client = self.build_client()
         repository_info = client.get_repository_info()
