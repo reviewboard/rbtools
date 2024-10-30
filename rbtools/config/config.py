@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, Optional
 
 from typing_extensions import Self, TypeAlias
 
@@ -34,7 +34,7 @@ class ConfigData:
     #: A mapping of configuration keys to ConfigData wrappers.
     #:
     #: This can be set by subclasses to add type hints to nested dictionaries.
-    _wrappers: Dict[str, Type[ConfigData]] = {}
+    _wrappers: dict[str, type[ConfigData]] = {}
 
     ######################
     # Instance variables #
@@ -49,7 +49,7 @@ class ConfigData:
     def __init__(
         self,
         *,
-        config_dict: ConfigDict = {},
+        config_dict: Optional[ConfigDict] = None,
         filename: Optional[str] = None,
     ) -> None:
         """Initialize the configuration data wrapper.
@@ -62,6 +62,9 @@ class ConfigData:
                 The name of the associated configuration file.
         """
         self.filename = filename
+
+        if config_dict is None:
+            config_dict = {}
 
         # Load the configuration, and apply any wrappers if needed.
         wrappers = self._wrappers
@@ -92,7 +95,7 @@ class ConfigData:
 
     def get(
         self,
-        key,
+        key: str,
         default: Any = None,
     ) -> Any:
         """Return a value from a configuration item.
@@ -277,7 +280,7 @@ class ConfigData:
 
     def __set_name__(
         self,
-        owner: Type,
+        owner: type[object],
         name: str,
     ) -> None:
         """Handle an assignment of this instance to a class.
@@ -302,9 +305,8 @@ class ConfigData:
             str:
             The string representation.
         """
-        return '<RBToolsConfig(filename=%s, config=%r)>' % (
-            self.filename,
-            self._raw_config)
+        return (f'<RBToolsConfig(filename={self.filename}, '
+                f'config={self._raw_config})>')
 
 
 class GuessFlag(str, Enum):
@@ -379,7 +381,7 @@ class RBToolsConfig(ConfigData):
     #:
     #: Version Added:
     #:     1.0
-    ALIASES: Dict[str, str] = {}
+    ALIASES: dict[str, str] = {}
 
     #: Colors used for log/text output.
     #:
@@ -523,14 +525,6 @@ class RBToolsConfig(ConfigData):
     #:     That now must be provided in :py:attr:`REPOSITORY`.
     REPOSITORY_URL: Optional[str] = None
 
-    #: A mapping of repository paths to configuration data.
-    #:
-    #: Deprecated:
-    #:     3.0:
-    #:     This should no longer be used. This functionality is scheduled to
-    #:     be removed in a future version.
-    TREES: Dict[str, Any] = {}
-
     #######################################################################
     # Diff generation
     #######################################################################
@@ -548,7 +542,7 @@ class RBToolsConfig(ConfigData):
     #:
     #: Version Added:
     #:     0.7
-    EXCLUDE_PATTERNS: List[str] = []
+    EXCLUDE_PATTERNS: list[str] = []
 
     #: The parent branch the generate diffs relative to.
     #:

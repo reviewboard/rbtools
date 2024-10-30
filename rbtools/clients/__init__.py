@@ -38,7 +38,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from typing import Optional, TYPE_CHECKING, Tuple
+from typing import Optional, TYPE_CHECKING
 
 from housekeeping import ClassMovedMixin
 
@@ -113,7 +113,7 @@ def scan_usable_client(
     config: RBToolsConfig,
     options: argparse.Namespace,
     client_name: Optional[str] = None,
-) -> Tuple[RepositoryInfo, BaseSCMClient]:
+) -> tuple[RepositoryInfo, BaseSCMClient]:
     """Scan for a usable SCMClient.
 
     Args:
@@ -256,7 +256,6 @@ __all__ = [
     'PatchResult',
     'RepositoryInfo',
     'SCMCLIENTS',
-    'SCMClient',
     'load_scmclients',
     'scan_usable_client',
     'scmclient_registry',

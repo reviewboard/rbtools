@@ -6,9 +6,10 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import List, Optional, Union
+from typing import List, Optional, TYPE_CHECKING, Union
 
-from rbtools.api.resource import ItemResource
+if TYPE_CHECKING:
+    from rbtools.api.resource import ItemResource
 
 
 class RepositoryInfo:
@@ -159,7 +160,7 @@ class RepositoryInfo:
     def update_from_remote(
         self,
         repository: ItemResource,
-        info: ItemResource,
+        info: Optional[ItemResource],
     ) -> None:
         """Update the info from a remote repository.
 

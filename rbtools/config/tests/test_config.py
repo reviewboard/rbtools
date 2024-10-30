@@ -6,15 +6,17 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from rbtools.config.config import ConfigData
 from rbtools.testing import TestCase
 
 
 class MyConfigSubData(ConfigData):
+    """Test cass for sub-keys within a config."""
+
     SUB_STR_KEY: str = 'sub-value'
-    SUB_DICT_KEY: Dict[str, Any] = {
+    SUB_DICT_KEY: dict[str, Any] = {
         'subkey1': 'value1',
         'subkey2': {
             'subkey2.1': 'value2',
@@ -24,11 +26,13 @@ class MyConfigSubData(ConfigData):
 
 
 class MyConfigData(ConfigData):
+    """Test class for an example config."""
+
     INT_KEY: int = 123
     BOOL_KEY: bool = True
     STR_KEY: str = 'value'
     OPT_STR_KEY: Optional[str] = None
-    LIST_KEY: List[Any] = [
+    LIST_KEY: list[Any] = [
         1,
         2,
         3,
@@ -37,7 +41,7 @@ class MyConfigData(ConfigData):
             '6': '6!',
         },
     ]
-    DICT_KEY: Dict[str, Any] = {
+    DICT_KEY: dict[str, Any] = {
         'key1': 'value1',
         'key2': ['value2'],
         'key3': {
@@ -161,7 +165,7 @@ class ConfigDataTests(TestCase):
 
         self.assertIsNot(config.SUB_KEYS, MyConfigData.SUB_KEYS)
 
-    def test_contains(self):
+    def test_contains(self) -> None:
         """Testing ConfigData.__contains__"""
         config = MyConfigData(config_dict={
             'CUSTOM': 'value',
@@ -172,7 +176,7 @@ class ConfigDataTests(TestCase):
         self.assertTrue('INT_KEY' in config)
         self.assertTrue('CUSTOM' in config)
 
-    def test_copy(self):
+    def test_copy(self) -> None:
         """Testing ConfigData.copy"""
         config1 = MyConfigData()
         config2 = config1.copy()
@@ -192,7 +196,7 @@ class ConfigDataTests(TestCase):
             if isinstance(item1, (list, dict)):
                 self.assertIsNot(item1, item2)
 
-    def test_get(self):
+    def test_get(self) -> None:
         """Testing ConfigData.get"""
         config = MyConfigData(config_dict={
             'INT_KEY': 456,
@@ -200,25 +204,25 @@ class ConfigDataTests(TestCase):
 
         self.assertEqual(config.get('INT_KEY'), 456)
 
-    def test_get_with_class_default(self):
+    def test_get_with_class_default(self) -> None:
         """Testing ConfigData.get with class-provided default"""
         config = MyConfigData()
 
         self.assertEqual(config.get('INT_KEY'), 123)
 
-    def test_get_with_caller_default(self):
+    def test_get_with_caller_default(self) -> None:
         """Testing ConfigData.get with caller-provided default"""
         config = MyConfigData()
 
         self.assertEqual(config.get('FOO', 'bar'), 'bar')
 
-    def test_get_with_no_value(self):
+    def test_get_with_no_value(self) -> None:
         """Testing ConfigData.get with no value stored and no default"""
         config = MyConfigData()
 
         self.assertIsNone(config.get('FOO'))
 
-    def test_getattr(self):
+    def test_getattr(self) -> None:
         """Testing ConfigData.__getattribute__"""
         config = MyConfigData(config_dict={
             'INT_KEY': 456,
@@ -226,13 +230,13 @@ class ConfigDataTests(TestCase):
 
         self.assertEqual(config.INT_KEY, 456)
 
-    def test_getattr_with_class_default(self):
+    def test_getattr_with_class_default(self) -> None:
         """Testing ConfigData.__getattribute__ with class-provided default"""
         config = MyConfigData()
 
         self.assertEqual(config.INT_KEY, 123)
 
-    def test_getattr_with_no_value(self):
+    def test_getattr_with_no_value(self) -> None:
         """Testing ConfigData.__getattribute__ with no value stored and no
         default
         """
@@ -241,7 +245,7 @@ class ConfigDataTests(TestCase):
         with self.assertRaises(AttributeError):
             self.assertIsNone(config.FOO)
 
-    def test_getitem(self):
+    def test_getitem(self) -> None:
         """Testing ConfigData.__getitem__"""
         config = MyConfigData(config_dict={
             'INT_KEY': 456,
@@ -249,13 +253,13 @@ class ConfigDataTests(TestCase):
 
         self.assertEqual(config['INT_KEY'], 456)
 
-    def test_getitem_with_class_default(self):
+    def test_getitem_with_class_default(self) -> None:
         """Testing ConfigData.__getitem__ with class-provided default"""
         config = MyConfigData()
 
         self.assertEqual(config['INT_KEY'], 123)
 
-    def test_getitem_with_no_value(self):
+    def test_getitem_with_no_value(self) -> None:
         """Testing ConfigData.__getitem__ with no value stored and no
         default
         """
