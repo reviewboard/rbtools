@@ -122,7 +122,7 @@ Base Command Support
    :toctree: python
 
    rbtools.commands
-   rbtools.commands.base.
+   rbtools.commands.base
    rbtools.commands.base.commands
    rbtools.commands.base.errors
    rbtools.commands.base.options

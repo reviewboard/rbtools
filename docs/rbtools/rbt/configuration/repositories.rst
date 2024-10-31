@@ -68,7 +68,9 @@ BASEDIR
 This is used only for Subversion repositories, and specifies a path within
 the repository that should be prepended to all files in a diff.
 
-Example::
+Example:
+
+.. code-block:: python
 
     BASEDIR = "trunk/myproject/"
 
@@ -99,7 +101,9 @@ branch that the code is being developed on.
 This also does not affect code generation. It's used solely to display to the
 reviewers where the code will land.
 
-Example::
+Example:
+
+.. code-block:: python
 
     BRANCH = "release-2.0.x"
 
@@ -109,7 +113,7 @@ This can also be provided by passing :option:`--branch` to most commands.
 .. rbtconfig:: CA_CERTS
 
 CA_CERTS
---------
+~~~~~~~~
 
 **Type:** String
 
@@ -117,7 +121,9 @@ CA_CERTS
 
 A path to a custom SSL CA certifications file.
 
-Example::
+Example:
+
+.. code-block:: python
 
     CA_CERTS = "/mnt/corp-shared/ssl/ca-certs.pem"
 
@@ -127,7 +133,7 @@ This can also be provided by passing :option:`--ca-certs` to any command.
 .. rbtconfig:: CLIENT_CERT
 
 CLIENT_CERT
------------
+~~~~~~~~~~~
 
 **Type:** String
 
@@ -135,7 +141,9 @@ CLIENT_CERT
 
 A path to a SSL certification file.
 
-Example::
+Example:
+
+.. code-block:: python
 
     CLIENT_CERT = "/mnt/corp-shared/ssl/repo.pem"
 
@@ -145,7 +153,7 @@ This can also be provided by passing :option:`--client-cert` to any command.
 .. rbtconfig:: CLIENT_KEY
 
 CLIENT_KEY
-----------
+~~~~~~~~~~
 
 **Type:** String
 
@@ -153,7 +161,9 @@ CLIENT_KEY
 
 A path to a SSL client authentication key.
 
-Example::
+Example:
+
+.. code-block:: python
 
     CLIENT_KEY = "/mnt/corp-shared/ssl/repo.key"
 
@@ -163,7 +173,7 @@ This can also be provided by passing :option:`--client-key` to any command.
 .. rbtconfig:: DEPENDS_ON
 
 DEPENDS_ON
-----------
+~~~~~~~~~~
 
 **Commands:** :rbtcommand:`rbt post`
 
@@ -171,13 +181,15 @@ DEPENDS_ON
 
 **Default:** Unset
 
-A comma-separated list of review request IDs that any posted chagne will
+A comma-separated list of review request IDs that any posted change will
 automatically depend on.
 
 This is rarely needed, but can be useful if all the work being done on a
 branch depends on some main review request.
 
-Example::
+Example:
+
+.. code-block:: python
 
     DEPENDS_ON = '42,43'
 
@@ -196,7 +208,9 @@ ENABLE_PROXY
 By default, any configured HTTP/HTTPS proxy will be used for requests. If
 your server is within your own network, you may want to turn this off.
 
-Example::
+Example:
+
+.. code-block:: python
 
     ENABLE_PROXY = False
 
@@ -215,7 +229,9 @@ EXCLUDE_PATTERNS
 Excludes one or more files or file patterns from being posted for review.
 This uses standard UNIX glob patterns, like most shell commands.
 
-Example::
+Example:
+
+.. code-block:: python
 
     EXCLUDE_PATTERNS = ['_build', '*.min.js', '.*.swp']
 
@@ -252,7 +268,9 @@ Includes one or more files or file patterns when posting a review. Only these
 files will be posted by default. This uses standard UNIX glob patterns, like
 most shell commands.
 
-Example::
+Example:
+
+.. code-block:: python
 
     INCLUDE_PATTERNS = ['src/*.c', 'doc/*.txt']
 
@@ -262,7 +280,7 @@ This can also be provided by passing :option:`--include` to most commands.
 .. rbtconfig:: LAND_DELETE_BRANCH
 
 LAND_DELETE_BRANCH
-------------------
+~~~~~~~~~~~~~~~~~~
 
 **Commands:** :rbtcommand:`rbt land`
 
@@ -274,7 +292,9 @@ If enabled, and :rbtcommand:`rbt land` is landing a local branch, then that
 branch will be deleted once landed. This is the default behavior, as it
 indicates that work on that branch is complete.
 
-Example::
+Example:
+
+.. code-block:: python
 
     LAND_DELETE_BRANCH = False
 
@@ -285,7 +305,7 @@ disabled by using :option:`rbt land --no-delete-branch`.
 .. rbtconfig:: LAND_DEST_BRANCH
 
 LAND_DEST_BRANCH
-----------------
+~~~~~~~~~~~~~~~~
 
 **Commands:** :rbtcommand:`rbt land`
 
@@ -298,7 +318,9 @@ The branch where :rbtcommand:`rbt land` should land changes.
 This is often set in common upstream branches where feature branches are
 derived from.
 
-Example::
+Example:
+
+.. code-block:: python
 
     LAND_DEST_BRANCH = "release-4.x"
 
@@ -308,7 +330,7 @@ This can also be provided by using :option:`rbt land --dest`.
 .. rbtconfig:: LAND_SQUASH
 
 LAND_SQUASH
------------
+~~~~~~~~~~~
 
 **Commands:** :rbtcommand:`rbt land`
 
@@ -320,7 +342,9 @@ If enabled, :rbtcommand:`rbt land` will squash all commits on a review request
 into a single commit before landing it, which can lead to cleaner, more linear
 commit histories.
 
-Example::
+Example:
+
+.. code-block:: python
 
     LAND_SQUASH = True
 
@@ -331,7 +355,7 @@ if using :option:`rbt land --no-squash`.
 .. rbtconfig:: LAND_PUSH
 
 LAND_PUSH
----------
+~~~~~~~~~
 
 **Commands:** :rbtcommand:`rbt land`
 
@@ -342,7 +366,9 @@ LAND_PUSH
 If enabled, :rbtcommand:`rbt land` will push the branch upstream once
 successfully landing a change.
 
-Example::
+Example:
+
+.. code-block:: python
 
     LAND_PUSH = True
 
@@ -353,7 +379,7 @@ if using :option:`rbt land --no-push`.
 .. rbtconfig:: MARKDOWN
 
 MARKDOWN
---------
+~~~~~~~~
 
 **Commands:** :rbtcommand:`rbt post`
 
@@ -368,7 +394,9 @@ This can be a useful setting if standardizing on Markdown-formatted commit
 descriptions, as it will also allow for nicely-formatted review requests by
 default.
 
-Example::
+Example:
+
+.. code-block:: python
 
     MARKDOWN = True
 
@@ -387,7 +415,9 @@ P4_PORT
 The IP address or hostname of the Perforce server, overriding
 the :envvar:`P4PORT` environment variable.
 
-Example::
+Example:
+
+.. code-block:: python
 
     P4_PORT = "perforce.example.com:1666"
 
@@ -428,7 +458,9 @@ You can use the ``REPOSITORY`` setting to specify the name of the
 repository to use. This is the same as on Review Board's New Review Request
 page.
 
-Example::
+Example:
+
+.. code-block:: python
 
     REPOSITORY = "RBTools"
 
@@ -460,7 +492,9 @@ Valid repository types include:
 * ``svn``
 * ``tfs``
 
-Example::
+Example:
+
+.. code-block:: python
 
     REPOSITORY_TYPE = "git"
 
@@ -488,7 +522,9 @@ view).
 For Git, this specifies the origin URL of the current repository, overriding
 the origin URL supplied by the client.
 
-Example::
+Example:
+
+.. code-block:: python
 
     REPOSITORY_URL = "https://git.example.com/myrepo.git"
 
@@ -510,7 +546,9 @@ To specify the Review Board server to use, you can use the
 ``REVIEWBOARD_URL`` setting. This takes the URL to the Review Board server
 as a value.
 
-Example::
+Example:
+
+.. code-block:: python
 
     REVIEWBOARD_URL = "https://reviewboard.example.com"
 
@@ -535,7 +573,9 @@ request into a single diff when uploading to Review Board. The default is to
 retain each commit so the reviewer has the option of reviewing each
 individually.
 
-Example::
+Example:
+
+.. code-block:: python
 
     SQUASH_HISTORY = True
 
@@ -554,7 +594,9 @@ TF_CMD
 The full path to the :command:`tf` command, overriding any detected path. This
 can be useful if there's a central copy of this command on a shared drive.
 
-Example::
+Example:
+
+.. code-block:: python
 
     TF_CMD = "/opt/tfs/bin/tf"
 
@@ -579,7 +621,9 @@ force the usage of a specific branch. This is equivalent to providing the
 We recommend you set this for any :file:`.reviewboardrc` files on any
 long-running release or feature branches.
 
-Example::
+Example:
+
+.. code-block:: python
 
     TRACKING_BRANCH = "origin/release-2.0.x"
 
@@ -604,7 +648,9 @@ when using any commands that require authentication. When disabled, users
 will be prompted to enter a username and password directly into the
 terminal instead.
 
-Example::
+Example:
+
+.. code-block:: python
 
     WEB_LOGIN = True
 

@@ -32,11 +32,15 @@ documentation on what to set to change the default.
 
 For instance, if you look at the :rbtcommand:`rbt post` documentation, you'll
 see that you can automatically open your browser when posting a review request
-by setting::
+by setting:
+
+.. code-block:: python
 
     OPEN_BROWSER = True
 
-Or, you can disable usage of your HTTP proxy on any command by setting::
+Or, you can disable usage of your HTTP proxy on any command by setting:
+
+.. code-block:: python
 
     ENABLE_PROXY = False
 
@@ -76,7 +80,9 @@ CACHE_LOCATION
 
 A custom path used to store any cached HTTP responses.
 
-Example::
+Example:
+
+.. code-block:: python
 
     CACHE_LOCATION = "/tmp/rbtools-cache"
 
@@ -95,7 +101,9 @@ DEBUG
 
 If enabled, RBTools commands will output extra debug information.
 
-Example::
+Example:
+
+.. code-block:: python
 
     DEBUG = True
 
@@ -115,9 +123,11 @@ If enabled, HTTP responses will be cached (either in memory or saved to a
 local cache -- see :rbtconfig:`IN_MEMORY_CACHE`), speeding up subsequent
 requests.
 
-If diasbled, RBTools always perform full HTTP requests.
+If disabled, RBTools always perform full HTTP requests.
 
-Example::
+Example:
+
+.. code-block:: python
 
     DISABLE_CACHE = True
 
@@ -135,7 +145,9 @@ DISABLE_SSL_VERIFICATION
 
 If enabled, SSL certificates won't be verified.
 
-Example::
+Example:
+
+.. code-block:: python
 
     DISABLE_SSL_VERIFICATION = True
 
@@ -161,7 +173,9 @@ This can be set to a local file path to use an existing pre-fetched cookie
 store, which can be useful for automation. This file must be compatible with
 Python's urllib2 cookie
 
-Example::
+Example:
+
+.. code-block:: python
 
     EXT_AUTH_COOKIES = "/opt/scripts/rbtools/cookies.txt"
 
@@ -197,7 +211,9 @@ override any fields.
 
 See :ref:`guessing-behavior` for more information.
 
-For example::
+For example:
+
+.. code-block:: python
 
     GUESS_FIELDS = "yes"
 
@@ -221,7 +237,9 @@ based on the posted commit's message.
 Most of the time, you'll just want to use :rbtconfig:`GUESS_FIELDS`. See
 :ref:`guessing-behavior` for additional information.
 
-Example::
+Example:
+
+.. code-block:: python
 
     GUESS_DESCRIPTION = "no"
 
@@ -245,7 +263,9 @@ the posted commit's message.
 Most of the time, you'll just want to use :rbtconfig:`GUESS_FIELDS`. See
 :ref:`guessing-behavior` for additional information.
 
-Example::
+Example:
+
+.. code-block:: python
 
     GUESS_DESCRIPTION = "yes"
 
@@ -264,12 +284,14 @@ IN_MEMORY_CACHE
 If enabled, any cached HTTP responses will be stored only in local memory, and
 not saved to disk.
 
-If diasbled, and :rbtconfig:`DISABLE_CACHE` isn't used, HTTP responses will be
+If disabled, and :rbtconfig:`DISABLE_CACHE` isn't used, HTTP responses will be
 saved locally.
 
 See :rbtconfig:`CACHE_LOCATION` for configuring the cache location.
 
-Example::
+Example:
+
+.. code-block:: python
 
     IN_MEMORY_CACHE = True
 
@@ -290,7 +312,9 @@ OPEN_BROWSER
 If set, a web browser will be opened to the review request after running
 :rbtcommand:`rbt post`.
 
-Example::
+Example:
+
+.. code-block:: python
 
     OPEN_BROWSER = True
 
@@ -309,7 +333,9 @@ P4_CLIENT
 The Perforce client name to use, overriding the default for your local
 setup.
 
-Example::
+Example:
+
+.. code-block:: python
 
     P4_CLIENT = "my-client"
 
@@ -328,7 +354,9 @@ P4_PASSWD
 The password or ticket for your Perforce user, corresponding to the user
 set in the :envvar:`P4USER` environment variable.
 
-Example::
+Example:
+
+.. code-block:: python
 
     P4_PASSWD = "ticket123"
 
@@ -352,7 +380,9 @@ PASSWORD
 
 Your password, for logging into Review Board.
 
-Example::
+Example:
+
+.. code-block:: python
 
     PASSWORD = "s3cr3t"
 
@@ -379,7 +409,9 @@ PUBLISH
 If set, any new review request drafts will be automatically published. This
 does require all fields on the review request to be provided.
 
-Example::
+Example:
+
+.. code-block:: python
 
     PUBLISH = True
 
@@ -398,10 +430,12 @@ SAVE_COOKIES
 If enabled, cookies will be saved after logging in (see
 :ref:`rbtools-user-cookies` for cookie store location).
 
-If diasbled, no cookies will be stored, and the next RBTools command will
+If disabled, no cookies will be stored, and the next RBTools command will
 require logging in again.
 
-Example::
+Example:
+
+.. code-block:: python
 
     SAVE_COOKIES = False
 
@@ -423,7 +457,9 @@ STAMP_WHEN_POSTING
 If enabled, the latest commit for a review request will be stamped with the
 review request URL when posting the commit for review.
 
-Example::
+Example:
+
+.. code-block:: python
 
     STAMP_WHEN_POSTING = True
 
@@ -452,7 +488,9 @@ Most of the time, it won't make much sense to put this in
 :file:`.reviewboardrc`. Using :option:`rbt post --submit-as` might be a better
 option.
 
-Example::
+Example:
+
+.. code-block:: python
 
     SUBMIT_AS = "other-user"
 
@@ -500,7 +538,9 @@ USERNAME
 
 Your username, for logging into Review Board.
 
-Example::
+Example:
+
+.. code-block:: python
 
     USERNAME = "myuser"
 
