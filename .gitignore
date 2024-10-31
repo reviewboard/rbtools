@@ -28,6 +28,8 @@ temp
 
 rbtools/clients/tests/testdata/cvs-repo/CVSROOT/history
 rbtools/clients/tests/testdata/homedir/.bzr.log
+rbtools/clients/tests/testdata/hg-repo/.hg/cache
+rbtools/clients/tests/testdata/hg-repo/.hg/wcache
 
 contrib/installers/windows/deps
 contrib/installers/windows/wix/*.suo
