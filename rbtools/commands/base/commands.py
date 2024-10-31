@@ -27,12 +27,15 @@ from rbtools.api.errors import APIError, ServerInterfaceError
 from rbtools.api.transport.sync import SyncTransport
 from rbtools.clients import scan_usable_client
 from rbtools.clients.errors import OptionsCheckError
-from rbtools.commands.base.errors import (CommandError,
-                                          CommandExit,
-                                          ParseError)
+from rbtools.commands.base.errors import (
+    CommandError,
+    CommandExit,
+    NeedsReinitialize,
+    ParseError,
+)
 from rbtools.commands.base.options import Option, OptionGroup
 from rbtools.commands.base.output import JSONOutput, OutputWrapper
-from rbtools.config import RBToolsConfig, load_config
+from rbtools.config import ConfigData, RBToolsConfig, load_config
 from rbtools.diffs.tools.errors import MissingDiffToolError
 from rbtools.utils.console import get_input, get_pass
 from rbtools.utils.filesystem import cleanup_tempfiles, get_home_path
@@ -259,7 +262,7 @@ class BaseCommand:
     #:     5.0:
     #:     This is now a :py:class:`~rbtools.config.config.RBToolsConfig`
     #:     instance, instead of a plain dictionary.
-    config: RBToolsConfig
+    config: Optional[RBToolsConfig]
 
     #: An output buffer for JSON results.
     #:
@@ -818,7 +821,7 @@ class BaseCommand:
         self.repository_info = None
         self.server_url = None
         self.tool = None
-        self.config = RBToolsConfig()
+        self.config = None
 
         self.stdout = OutputWrapper[str](stdout)
         self.stderr = OutputWrapper[str](stderr)
@@ -940,10 +943,18 @@ class BaseCommand:
         This will set up various prerequisites for commands. Individual command
         subclasses can control what gets done by setting the various
         ``needs_*`` attributes (as documented in this class).
+
+        Raises:
+            rbtools.commands.base.errors.CommandError:
+                An error occurred while initializing the command.
+
+            rbtools.commands.base.errors.NeedsReinitialize:
+                The initialization process needs to be restarted (due to
+                loading additional config).
         """
+        assert self.config is not None
+
         options = self.options
-        repository_info = self.repository_info
-        tool = self.tool
 
         if self.needs_repository:
             # If we need the repository, we implicitly need the API and SCM
@@ -951,10 +962,8 @@ class BaseCommand:
             self.needs_api = True
             self.needs_scm_client = True
 
-        if self.needs_api:
-            self.server_url = self._init_server_url()
-            self.api_client, self.api_root = self.get_api(self.server_url)
-            self.capabilities = self.get_capabilities(self.api_root)
+        repository_info = self.repository_info
+        tool = self.tool
 
         if self.needs_scm_client:
             # _init_server_url might have already done this, in the case that
@@ -975,7 +984,47 @@ class BaseCommand:
             if options.repository_name is None:
                 options.repository_name = tool.get_repository_name()
 
-            tool.capabilities = self.capabilities
+        # The TREES config allows people to namespace config keys in a single
+        # .reviewboardrc file. We look for matching keys in that for the local
+        # repository path, as well as all remote paths for the repository. If
+        # one is found, we want to merge that into the config dictionary and
+        # restart the entire initialization process.
+        if 'TREES' in self.config:
+            paths: list[str] = []
+
+            if repository_info is not None:
+                if repository_info.local_path:
+                    paths.append(repository_info.local_path)
+
+                if isinstance(repository_info.path, list):
+                    paths.extend(repository_info.path)
+                elif repository_info.path is not None:
+                    paths.append(repository_info.path)
+            else:
+                paths.append(os.getcwd())
+
+            trees = self.config['TREES']
+
+            if not isinstance(trees, dict):
+                raise CommandError(
+                    'TREES is defined in the Review Board configuration, but '
+                    'is not a dictionary.')
+
+            for path in paths:
+                if path in trees:
+                    trees_config = trees[path]
+                    self.config.merge(ConfigData(config_dict=trees_config))
+                    del self.config['TREES']
+
+                    raise NeedsReinitialize()
+
+        if self.needs_api:
+            self.server_url = self._init_server_url()
+            self.api_client, self.api_root = self.get_api(self.server_url)
+            self.capabilities = self.get_capabilities(self.api_root)
+
+            if tool is not None:
+                tool.capabilities = self.capabilities
 
         if self.needs_repository:
             assert self.api_root is not None
@@ -1012,7 +1061,9 @@ class BaseCommand:
             argparse.ArgumentParser:
             Argument parser for commandline arguments
         """
-        self.config = load_config()
+        if self.config is None:
+            self.config = load_config()
+
         parser = self.create_parser(self.config, argv)
         parser.add_argument('args', nargs=argparse.REMAINDER)
 
@@ -1032,8 +1083,6 @@ class BaseCommand:
             argv (list of str):
                 A list of command line arguments
         """
-        maxargs: Optional[int]
-
         parser = self.create_arg_parser(argv)
         self.options = parser.parse_args(argv[2:])
 
@@ -1042,7 +1091,7 @@ class BaseCommand:
         # Check that the proper number of arguments have been provided.
         argspec = inspect.getfullargspec(self.main)
         minargs = len(argspec.args) - 1
-        maxargs = minargs
+        maxargs: Optional[int] = minargs
 
         # Arguments that have a default value are considered optional.
         if argspec.defaults is not None:
@@ -1054,13 +1103,31 @@ class BaseCommand:
         if len(args) < minargs or (maxargs is not None and
                                    len(args) > maxargs):
             parser.error('Invalid number of arguments provided')
+
             sys.exit(1)
 
         try:
             self._init_logging()
             logging.debug('Command line: %s', subprocess.list2cmdline(argv))
 
-            self.initialize()
+            try:
+                self.initialize()
+            except NeedsReinitialize:
+                # This happens when we find a matching path in the TREES
+                # config. That gets merged into self.config, but then we need
+                # to rerun argument parsing and initialization so that we can
+                # incorporate those settings.
+                parser = self.create_arg_parser(argv)
+                self.options = parser.parse_args(argv[2:])
+
+                self.server_url = None
+                self.api_client = None
+                self.api_root = None
+                self.capabilities = None
+                self.repository_info = None
+                self.tool = None
+
+                self.initialize()
 
             exit_code = self.main(*args) or 0
         except CommandError as e:
@@ -1532,8 +1599,9 @@ class BaseCommand:
         # ways for the administrator to configure the Review Board server in
         # the SCM metadata.
         if not server_url:
-            self.repository_info, self.tool = self.initialize_scm_tool(
-                client_name=getattr(self.options, 'repository_type', None))
+            if self.repository_info is None or self.tool is None:
+                self.repository_info, self.tool = self.initialize_scm_tool(
+                    client_name=getattr(self.options, 'repository_type', None))
 
             server_url = self.tool.scan_for_server(self.repository_info)
 

@@ -1,5 +1,7 @@
 """Test for RBTools post command."""
 
+from __future__ import annotations
+
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.git import GitClient
 from rbtools.commands import CommandError
@@ -7,7 +9,7 @@ from rbtools.commands.post import DiffHistory, Post, SquashedDiff
 from rbtools.testing import CommandTestsMixin, TestCase
 
 
-class BasePostCommandTests(CommandTestsMixin, TestCase):
+class BasePostCommandTests(CommandTestsMixin[Post], TestCase):
     """Base class for rbt post tests.
 
     Version Added:

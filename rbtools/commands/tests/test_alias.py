@@ -1,10 +1,12 @@
 """Tests for RBTools alias command."""
 
+from __future__ import annotations
+
 from rbtools.commands.alias import Alias
 from rbtools.testing import CommandTestsMixin, TestCase
 
 
-class AliasCommandTests(CommandTestsMixin, TestCase):
+class AliasCommandTests(CommandTestsMixin[Alias], TestCase):
     """Tests for rbt alias command."""
 
     command_cls = Alias

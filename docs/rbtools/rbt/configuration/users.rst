@@ -457,6 +457,38 @@ Example::
     SUBMIT_AS = "other-user"
 
 
+.. rbtconfig:: TREES
+
+TREES
+-----
+
+**Type:** Dictionary
+
+**Default:** Unset
+
+This setting allows a central :file:`.reviewboardrc` file to override settings
+for individual repositories or directories. This is defined as a dictionary
+where the keys can be either the remote or local repository paths. The values
+should be a dictionary of configuration settings to apply for that directory or
+repository.
+
+This was available in RBTools 4 and earlier, but was previously limited to just
+the :rbtconfig:`REVIEWBOARD_URL` setting. As of RBTools 5.1, this allows
+including any configuration settings.
+
+.. code-block:: python
+
+    TREES = {
+        'https://svn.example.com/': {
+            'REVIEWBOARD_URL': 'https://reviews.example.com',
+        },
+        '/home/user/dev': {
+            'MARKDOWN': False,
+            'TRACKING_BRANCH': 'origin/rewrite',
+        }
+    }
+
+
 .. rbtconfig:: USERNAME
 
 USERNAME

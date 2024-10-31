@@ -37,3 +37,11 @@ class CommandError(Exception):
 
 class ParseError(CommandError):
     """An error indicating a command failed to parse some information."""
+
+
+class NeedsReinitialize(Exception):
+    """Exception thrown when we need to restart the command initialization.
+
+    Version Added:
+        5.1
+    """

@@ -13,13 +13,14 @@ Version Added:
     5.0
 """
 
-from rbtools.config.config import RBToolsConfig
+from rbtools.config.config import ConfigData, RBToolsConfig
 from rbtools.config.loader import (get_config_paths,
                                    load_config,
                                    parse_config_file)
 
 
 __all__ = (
+    'ConfigData',
     'RBToolsConfig',
     'get_config_paths',
     'load_config',
