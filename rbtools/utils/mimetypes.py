@@ -6,11 +6,16 @@ Version Added:
 
 from __future__ import annotations
 
+import logging
 import subprocess
+from typing import Optional
 
 from typing_extensions import TypedDict
 
 from rbtools.utils.filesystem import is_exe_in_path
+
+
+logger = logging.getLogger(__name__)
 
 
 class MIMEType(TypedDict):
@@ -130,30 +135,46 @@ def guess_mimetype(
     if not _has_file_exe:
         return DEFAULT_MIMETYPE
 
-    p = subprocess.Popen(['file', '--mime-type', '-b', '-'],
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE,
-                         stdin=subprocess.PIPE)
+    mimetype: Optional[str] = None
 
-    assert p.stdin is not None
-    assert p.stdout is not None
+    try:
+        p = subprocess.Popen(['file', '--mime-type', '-b', '-'],
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE,
+                             stdin=subprocess.PIPE)
 
-    # Write the content of the file in 4k chunks until the ``file`` utility has
-    # enough data to make a determination.
-    for i in range(0, len(data), 4096):
+        assert p.stdin is not None
+        assert p.stdout is not None
+
+        # Write the content of the file in 4k chunks until the ``file`` utility has
+        # enough data to make a determination.
+        for i in range(0, len(data), 4096):
+            try:
+                p.stdin.write(data[i:i + 4096])
+            except OSError:
+                # ``file`` closed, so we hopefully have an answer.
+                break
+
         try:
-            p.stdin.write(data[i:i + 4096])
+            p.stdin.close()
         except OSError:
-            # ``file`` closed, so we hopefully have an answer.
-            break
+            # This was closed by `file`.
+            #
+            # Note that we may not get this on all Python environments. A
+            # closed pipe doesn't necessarily fail when calling close() again.
+            pass
 
-    p.stdin.close()
-    ret = p.wait()
+        ret = p.wait()
 
-    mimetype = None
+        if ret == 0:
+            result = p.stdout.read().strip().decode('utf-8')
 
-    if ret == 0:
-        mimetype = p.stdout.read().strip().decode('utf-8')
+            if result:
+                mimetype = result
+    except Exception as e:
+        logger.exception('Unexpected error when determining mimetype '
+                         'using `file`: %s',
+                         e)
 
     return mimetype or DEFAULT_MIMETYPE
 
