@@ -1,5 +1,7 @@
 """Base test cases for RBTools unit tests."""
 
+from __future__ import annotations
+
 import os
 import re
 import shutil
@@ -7,7 +9,7 @@ import sys
 import tempfile
 import unittest
 from contextlib import contextmanager
-from typing import Dict, Iterator, List, Optional, Union
+from typing import Iterator, Optional, Sequence, TYPE_CHECKING, Union
 
 import kgb
 
@@ -16,6 +18,11 @@ from rbtools.testing.api.transport import URLMapTransport
 from rbtools.utils.filesystem import (cleanup_tempfiles,
                                       make_tempdir,
                                       make_tempfile)
+
+if TYPE_CHECKING:
+    from unittest.case import _AssertRaisesContext
+
+    from rbtools.api.transport import Transport
 
 
 class TestCase(unittest.TestCase):
@@ -27,15 +34,20 @@ class TestCase(unittest.TestCase):
     as the base class.
     """
 
+    #: Regex for matching consecutive whitespace characters.
     ws_re = re.compile(r'\s+')
 
-    default_text_editor = '%s %s' % (
+    maxDiff = None
+
+    #: The default text editor to use for tests.
+    #:
+    #: By default, this will use a fake editor that's bundled with the test
+    #: suite.
+    default_text_editor: str = '%s %s' % (
         sys.executable,
         os.path.abspath(os.path.join(os.path.dirname(__file__),
                                      'scripts', 'editor.py'))
     )
-
-    maxDiff = 10000
 
     #: A sample test URL for a Review Board server.
     #:
@@ -52,20 +64,48 @@ class TestCase(unittest.TestCase):
     #:     3.0
     needs_temp_home: bool = False
 
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The current directory before any tests are run.
+    _cls_old_cwd: str
+
+    #: The current directory before the current test was run.
+    _old_cwd: str
+
+    #: The home directory before the current test was run.
+    old_home: str
+
     @classmethod
-    def setUpClass(cls):
-        super(TestCase, cls).setUpClass()
+    def setUpClass(cls) -> None:
+        """Set up the test suite.
+
+        This will store some state that can be restored once all tests in the
+        class have been run.
+        """
+        super().setUpClass()
 
         cls._cls_old_cwd = os.getcwd()
 
     @classmethod
-    def tearDownClass(cls):
+    def tearDownClass(cls) -> None:
+        """Tear down the test suite.
+
+        This will restore the current directory to what was set prior to
+        the test runs, and then call any parent tear-down logic.
+        """
         os.chdir(cls._cls_old_cwd)
 
-        super(TestCase, cls).tearDownClass()
+        super().tearDownClass()
 
-    def setUp(self):
-        super(TestCase, self).setUp()
+    def setUp(self) -> None:
+        """Set up a single test.
+
+        This will store some initial state for tests and optionally create a
+        new current HOME directory to run the tests within.
+        """
+        super().setUp()
 
         self._old_cwd = os.getcwd()
         self.old_home = self.get_user_home()
@@ -80,10 +120,15 @@ class TestCase(unittest.TestCase):
             # instead default to running within the new home directory.
             os.chdir(home_dir)
 
-        os.environ[str('RBTOOLS_EDITOR')] = str(self.default_text_editor)
+        os.environ['RBTOOLS_EDITOR'] = self.default_text_editor
 
-    def tearDown(self):
-        super(TestCase, self).tearDown()
+    def tearDown(self) -> None:
+        """Tear down a single test.
+
+        This will clean up any temporary files and directories, and restore
+        the current directory and HOME direcotry.
+        """
+        super().tearDown()
 
         os.chdir(self._old_cwd)
         cleanup_tempfiles()
@@ -91,7 +136,7 @@ class TestCase(unittest.TestCase):
         if self.old_home:
             self.set_user_home(self.old_home)
 
-    def shortDescription(self):
+    def shortDescription(self) -> str:
         """Returns the description of the current test.
 
         This changes the default behavior to replace all newlines with spaces,
@@ -99,7 +144,7 @@ class TestCase(unittest.TestCase):
         short, though.
 
         Returns:
-            unicode:
+            str:
             The descriptive text for the current unit test.
         """
         doc = self._testMethodDoc
@@ -110,19 +155,22 @@ class TestCase(unittest.TestCase):
 
         return doc
 
-    def get_user_home(self):
+    def get_user_home(self) -> str:
         """Return the user's current home directory.
 
         Version Added:
             3.0
 
         Returns:
-            unicode:
+            str:
             The current home directory.
         """
         return os.environ['HOME']
 
-    def set_user_home(self, path):
+    def set_user_home(
+        self,
+        path: str,
+    ) -> None:
         """Set the user's current home directory.
 
         This will be unset when the unit test has finished.
@@ -131,12 +179,12 @@ class TestCase(unittest.TestCase):
             3.0
 
         Args:
-            path (unicode):
+            path (str):
                 The new home directory.
         """
         os.environ['HOME'] = path
 
-    def chdir_tmp(self):
+    def chdir_tmp(self) -> str:
         """Create a temporary directory and set it as the working directory.
 
         The directory will be deleted after the test has finished.
@@ -145,7 +193,7 @@ class TestCase(unittest.TestCase):
             3.0
 
         Returns:
-            unicode:
+            str:
             The path to the temp directory.
         """
         dirname = make_tempdir()
@@ -156,7 +204,7 @@ class TestCase(unittest.TestCase):
     @contextmanager
     def env(
         self,
-        env: Dict[str, Optional[str]],
+        env: dict[str, Optional[str]],
     ) -> Iterator[None]:
         """Run code with custom environment variables temporarily set.
 
@@ -176,7 +224,7 @@ class TestCase(unittest.TestCase):
         Context:
             Code will execute with the new environment set.
         """
-        old_env: Dict[str, Optional[str]] = {}
+        old_env: dict[str, Optional[str]] = {}
 
         for key, value in env.items():
             old_env[key] = os.environ.get(key)
@@ -195,7 +243,10 @@ class TestCase(unittest.TestCase):
                 else:
                     os.environ[key] = value
 
-    def precreate_tempfiles(self, count):
+    def precreate_tempfiles(
+        self,
+        count: int,
+    ) -> Sequence[str]:
         """Pre-create a specific number of temporary files.
 
         This will call :py:func:`~rbtools.utils.filesystem.make_tempfile`
@@ -221,6 +272,10 @@ class TestCase(unittest.TestCase):
             count (int):
                 The number of temporary filenames to pre-create.
 
+        Returns:
+            list of str:
+            The list of temporary file paths.
+
         Raises:
             AssertionError:
                 The test suite class did not mix in :py:class:`kgb.SpyAgency`.
@@ -231,7 +286,7 @@ class TestCase(unittest.TestCase):
             '%r must mix in kgb.SpyAgency in order to call this method.'
             % self.__class__)
 
-        tmpfiles: List[str] = [
+        tmpfiles: list[str] = [
             make_tempfile()
             for i in range(count)
         ]
@@ -257,7 +312,10 @@ class TestCase(unittest.TestCase):
 
         return tmpfiles
 
-    def precreate_tempdirs(self, count):
+    def precreate_tempdirs(
+        self,
+        count: int,
+    ) -> Sequence[str]:
         """Pre-create a specific number of temporary directories.
 
         This will call :py:func:`~rbtools.utils.filesystem.make_tempdir`
@@ -282,6 +340,10 @@ class TestCase(unittest.TestCase):
             count (int):
                 The number of temporary directories to pre-create.
 
+        Returns:
+            list of str:
+            The list of temporary directory paths.
+
         Raises:
             AssertionError:
                 The test suite class did not mix in :py:class:`kgb.SpyAgency`.
@@ -299,7 +361,11 @@ class TestCase(unittest.TestCase):
 
         return tmpdirs
 
-    def assertDiffEqual(self, diff, expected_diff):
+    def assertDiffEqual(
+        self,
+        diff: bytes,
+        expected_diff: bytes,
+    ) -> None:
         """Assert that two diffs are equal.
 
         Args:
@@ -318,14 +384,18 @@ class TestCase(unittest.TestCase):
 
         self.assertEqual(diff.splitlines(), expected_diff.splitlines())
 
-    def assertRaisesMessage(self, expected_exception, expected_message):
+    def assertRaisesMessage(
+        self,
+        expected_exception: type[Exception],
+        expected_message: str,
+    ) -> _AssertRaisesContext[Exception]:
         """Assert that a call raises an exception with the given message.
 
         Args:
             expected_exception (type):
                 The type of exception that's expected to be raised.
 
-            expected_message (unicode):
+            expected_message (str):
                 The expected exception message.
 
         Raises:
@@ -336,7 +406,7 @@ class TestCase(unittest.TestCase):
         return self.assertRaisesRegex(expected_exception,
                                       re.escape(expected_message))
 
-    def create_rbclient(self):
+    def create_rbclient(self) -> RBClient:
         """Return a RBClient for testing.
 
         This will set up a :py:class:`~rbtools.testing.api.transport.
@@ -357,7 +427,10 @@ class TestCase(unittest.TestCase):
         return RBClient(url=self.TEST_SERVER_URL,
                         transport_cls=URLMapTransport)
 
-    def get_rbclient_transport(self, client):
+    def get_rbclient_transport(
+        self,
+        client: RBClient,
+    ) -> Transport:
         """Return the transport associated with a RBClient.
 
         This allows tests to avoid reaching into
@@ -379,7 +452,7 @@ class TestCase(unittest.TestCase):
 
     def write_reviewboardrc(
         self,
-        config: Union[str, Dict[str, object]] = {},
+        config: Union[str, dict[str, object]] = {},
         *,
         parent_dir: Optional[str] = None,
         filename: str = '.reviewboardrc',
@@ -429,7 +502,11 @@ class TestCase(unittest.TestCase):
         return full_path
 
     @contextmanager
-    def reviewboardrc(self, config, use_temp_dir=False):
+    def reviewboardrc(
+        self,
+        config: Union[str, dict[str, object]],
+        use_temp_dir: bool = False,
+    ) -> Iterator[None]:
         """Populate a temporary .reviewboardrc file.
 
         This will create a :file:`.reviewboardrc` file, either in the current
@@ -440,9 +517,10 @@ class TestCase(unittest.TestCase):
             3.0
 
         Args:
-            config (dict):
+            config (dict or str):
                 A dictionary of key-value pairs to write into the
-                :file:`.reviewboardrc` file.
+                :file:`.reviewboardrc` file, or the string contents of the
+                file.
 
                 A best effort attempt will be made to write each configuration
                 to the file.
