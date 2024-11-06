@@ -10,6 +10,7 @@ import logging
 import subprocess
 from typing import Optional
 
+import puremagic
 from typing_extensions import TypedDict
 
 from rbtools.utils.filesystem import is_exe_in_path
@@ -112,7 +113,9 @@ _has_file_exe = None
 
 
 def guess_mimetype(
+    *,
     data: bytes,
+    filename: Optional[str] = None,
 ) -> str:
     """Guess the MIME type of the given file content.
 
@@ -133,6 +136,11 @@ def guess_mimetype(
         _has_file_exe = is_exe_in_path('file')
 
     if not _has_file_exe:
+        types = puremagic.magic_string(data)
+
+        if len(types) > 0:
+            return types[0].mime_type
+
         return DEFAULT_MIMETYPE
 
     mimetype: Optional[str] = None

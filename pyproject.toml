@@ -19,6 +19,7 @@ dependencies = [
 	'colorama',
 	'housekeeping~=1.1',
 	'packaging>=21.3',
+        'puremagic',
 	'pydiffx~=1.1.0',
 	'texttable',
 	'typing_extensions>=4.3.0',
