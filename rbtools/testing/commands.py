@@ -7,8 +7,8 @@ Version Added:
 from __future__ import annotations
 
 import io
-from typing import (Any, Callable, Dict, Generic, List, Optional,
-                    TYPE_CHECKING, Type, TypeVar, Union)
+from typing import (Any, Callable, Generic, Optional, TYPE_CHECKING, TypeVar,
+                    Union)
 
 import kgb
 from housekeeping import deprecate_non_keyword_only_args
@@ -43,7 +43,7 @@ class RunCommandResult(TypedDict, Generic[_CommandT]):
     exit_code: Optional[Union[int, str]]
 
     #: The JSON results of the command.
-    json: Dict[str, Any]
+    json: dict[str, Any]
 
     #: Standard error output from the command.
     stderr: bytes
@@ -77,7 +77,7 @@ class CommandTestsMixin(kgb.SpyAgency, Generic[_CommandT]):
     #:
     #: Type:
     #:     type
-    command_cls: Optional[Type[_CommandT]] = None
+    command_cls: Optional[type[_CommandT]] = None
 
     needs_temp_home = True
 
@@ -87,7 +87,7 @@ class CommandTestsMixin(kgb.SpyAgency, Generic[_CommandT]):
     def create_command(
         self,
         *,
-        args: List[str] = [],
+        args: Optional[list[str]] = None,
         server_url: str = DEFAULT_SERVER_URL,
         initialize: bool = False,
         **kwargs,
@@ -100,45 +100,22 @@ class CommandTestsMixin(kgb.SpyAgency, Generic[_CommandT]):
 
                 The command line will receive each item in the list.
 
-            repository_info (rbtools.clients.base.repository.RepositoryInfo):
-                The repository information to set for the command.
-
-                If being set, ``tool`` must also be set.
-
-            tool (rbtools.clients.base.BaseSCMClient):
-                The SCM client to set for the command.
-
-                If being set, ``repository_info`` must also be set.
-
-            scan (bool, optional):
-                Whether to allow for repository scanning. If ``False``,
-                and ``repository_info`` and ``tool`` aren't provided, then
-                no repositories will be matched.
-
             server_url (str, optional):
                 The URL to use as the Review Board URL.
 
-            stdout (io.BytesIO, optional):
-                A stream used to capture standard output.
-
-            stderr (io.BytesIO, optional):
-                A stream used to capture standard error.
-
-            stdin (io.BytesIO, optional):
-                A stream used to provide standard input.
-
-            setup_transport_func (callable, optional):
-                A callback to call in order to set up transport URLs.
-
-                This must take a ``transport`` argument.
-
             initialize (bool, optional):
                 Whether to initialize the command before returning.
+
+            **kwargs (dict):
+                Additional keyword arguments.
 
         Returns:
             rbtools.commands.base.commands.BaseCommand:
             The command instance.
         """
+        if args is None:
+            args = []
+
         command = self._create_command_common(args=args, **kwargs)
 
         argv = self._build_command_argv(args=args,
@@ -154,7 +131,7 @@ class CommandTestsMixin(kgb.SpyAgency, Generic[_CommandT]):
 
     def run_command(
         self,
-        args: List[str] = [],
+        args: Optional[list[str]] = None,
         server_url: str = DEFAULT_SERVER_URL,
         **kwargs,
     ) -> RunCommandResult[_CommandT]:
@@ -166,37 +143,20 @@ class CommandTestsMixin(kgb.SpyAgency, Generic[_CommandT]):
 
                 The command line will receive each item in the list.
 
-            repository_info (rbtools.clients.base.repository.RepositoryInfo):
-                The repository information to set for the command.
-
-                If being set, ``tool`` must also be set.
-
-            tool (rbtools.clients.base.BaseSCMClient):
-                The SCM client to set for the command.
-
-                If being set, ``repository_info`` must also be set.
-
-            scan (bool, optional):
-                Whether to allow for repository scanning. If ``False``,
-                and ``repository_info`` and ``tool`` aren't provided, then
-                no repositories will be matched.
-
             server_url (str, optional):
                 The URL to use as the Review Board URL.
 
-            stdin (io.BytesIO, optional):
-                A stream used to provide standard input.
-
-            setup_transport_func (callable, optional):
-                A callback to call in order to set up transport URLs.
-
-                This must take a ``transport`` argument.
+            **kwargs (dict):
+                Additional keyword arguments.
 
         Returns:
             dict:
             A dictionary of results from the command execution. See
             :py:class:`RunCommandResult` for details.
         """
+        if args is None:
+            args = []
+
         stdout = io.BytesIO()
         stderr = io.BytesIO()
 
@@ -238,7 +198,7 @@ class CommandTestsMixin(kgb.SpyAgency, Generic[_CommandT]):
     def _create_command_common(
         self,
         *,
-        args: List[str] = [],
+        args: Optional[list[str]] = None,
         repository_info: Optional[RepositoryInfo] = None,
         tool: Optional[BaseSCMClient] = None,
         scan: bool = False,
@@ -247,7 +207,7 @@ class CommandTestsMixin(kgb.SpyAgency, Generic[_CommandT]):
         stdin: Optional[io.BytesIO] = None,
         setup_transport_func: Optional[Callable[[Transport], None]] = None,
     ) -> _CommandT:
-        """Common code to create a command instance.
+        """Create a command instance.
 
         Args:
             args (list of str, optional):
@@ -291,6 +251,9 @@ class CommandTestsMixin(kgb.SpyAgency, Generic[_CommandT]):
             rbtools.commands.Command:
             The command instance.
         """
+        if args is None:
+            args = []
+
         assert (repository_info is not None) == (tool is not None), (
             'repository_info and tool must either both be set or both be '
             'None.'
@@ -331,9 +294,9 @@ class CommandTestsMixin(kgb.SpyAgency, Generic[_CommandT]):
     def _build_command_argv(
         self,
         *,
-        args: List[str],
+        args: list[str],
         server_url: Optional[str] = None,
-    ) -> List[str]:
+    ) -> list[str]:
         """Return a command line argument list.
 
         Args:
@@ -350,7 +313,7 @@ class CommandTestsMixin(kgb.SpyAgency, Generic[_CommandT]):
         """
         assert self.command_cls is not None
 
-        argv: List[str] = ['rbt', self.command_cls.name]
+        argv: list[str] = ['rbt', self.command_cls.name]
 
         if server_url and self.command_cls.needs_api:
             argv += ['--server', server_url]

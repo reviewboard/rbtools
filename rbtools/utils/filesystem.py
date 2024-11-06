@@ -8,15 +8,18 @@ import shutil
 import sys
 import tempfile
 from contextlib import contextmanager
-from typing import Dict, Generator, Iterable, List, Optional
+from typing import Generator, Iterable, Optional, Sequence, TYPE_CHECKING
 
 from housekeeping import func_moved
 
 from rbtools.deprecation import RemovedInRBTools60Warning
 
+if TYPE_CHECKING:
+    from rbtools.config import RBToolsConfig
 
-_iter_exes_in_path_cache: Dict[str, bool] = {}
-tempfiles: List[str] = []
+
+_iter_exes_in_path_cache: dict[str, bool] = {}
+tempfiles: list[str] = []
 tempdirs = []
 
 
@@ -72,7 +75,7 @@ def iter_exes_in_path(
         str:
         The location of an executable in the path.
     """
-    names: List[str] = []
+    names: list[str] = []
 
     if (sys.platform == 'win32' and not name.endswith(('.exe', '.cmd'))):
         names += [
@@ -98,7 +101,8 @@ def iter_exes_in_path(
                 yield path
 
 
-def cleanup_tempfiles():
+def cleanup_tempfiles() -> None:
+    """Clean up temporary files which have been created."""
     for tmpfile in tempfiles:
         try:
             os.unlink(tmpfile)
@@ -107,12 +111,6 @@ def cleanup_tempfiles():
 
     for tmpdir in tempdirs:
         shutil.rmtree(tmpdir, ignore_errors=True)
-
-
-def _load_python_file(filename, config):
-    with open(filename) as f:
-        exec(compile(f.read(), filename, 'exec'), config)
-        return config
 
 
 def make_tempfile(
@@ -171,7 +169,10 @@ def make_tempfile(
     return tmpfile
 
 
-def make_tempdir(parent=None, track=True):
+def make_tempdir(
+    parent: Optional[str] = None,
+    track: bool = True,
+) -> str:
     """Create a temporary directory and return the path.
 
     By default, the path will be stored in a list for cleanup when calling
@@ -182,7 +183,7 @@ def make_tempdir(parent=None, track=True):
         Added ``track``.
 
     Args:
-        parent (unicode, optional):
+        parent (str, optional):
             An optional parent directory to create the path in.
 
         track (bool, optional):
@@ -191,7 +192,7 @@ def make_tempdir(parent=None, track=True):
             .. versionadded:: 3.0
 
     Returns:
-        unicode:
+        str:
         The name of the new temporary directory.
     """
     tmpdir = tempfile.mkdtemp(prefix='rbtools.',
@@ -203,8 +204,15 @@ def make_tempdir(parent=None, track=True):
     return tmpdir
 
 
-def make_empty_files(files):
-    """Creates each file in the given list and any intermediate directories."""
+def make_empty_files(
+    files: Sequence[str],
+) -> None:
+    """Create each file in the given list and any intermediate directories.
+
+    Args:
+        files (list of str):
+            The list of filenames to create.
+    """
     for f in files:
         path = os.path.dirname(f)
 
@@ -219,19 +227,32 @@ def make_empty_files(files):
             with open(f, 'w'):
                 # Set the file access and modified times to the current time.
                 os.utime(f, None)
-        except IOError as e:
+        except OSError as e:
             logging.error('Unable to create empty file %s: %s', f, e)
 
 
-def walk_parents(path):
-    """Walks up the tree to the root directory."""
+def walk_parents(
+    path: str,
+) -> Iterable[str]:
+    """Walk up the tree to the root directory.
+
+    Yields:
+        str:
+        Each directory name while walking up to the root.
+    """
     while os.path.splitdrive(path)[1] != os.sep:
         yield path
+
         path = os.path.dirname(path)
 
 
-def get_home_path():
-    """Retrieve the homepath."""
+def get_home_path() -> str:
+    """Return the path to the home directory.
+
+    Returns:
+        str:
+        The user's home directory (or general place to store application data).
+    """
     if 'HOME' in os.environ:
         return os.environ['HOME']
     elif 'APPDATA' in os.environ:
@@ -242,7 +263,7 @@ def get_home_path():
 
 @func_moved(RemovedInRBTools60Warning,
             'rbtools.config.loader.get_config_paths')
-def get_config_paths():
+def get_config_paths() -> Sequence[str]:
     """Return the paths to each :file:`.reviewboardrc` influencing the cwd.
 
     A list of paths to :file:`.reviewboardrc` files will be returned, where
@@ -266,7 +287,9 @@ def get_config_paths():
 
 @func_moved(RemovedInRBTools60Warning,
             'rbtools.config.loader.parse_config_file')
-def parse_config_file(filename):
+def parse_config_file(
+    filename: str,
+) -> RBToolsConfig:
     """Parse a .reviewboardrc file.
 
     Returns a dictionary containing the configuration from the file.
@@ -296,7 +319,7 @@ def parse_config_file(filename):
 
 @func_moved(RemovedInRBTools60Warning,
             'rbtools.config.loader.load_config')
-def load_config():
+def load_config() -> RBToolsConfig:
     """Load configuration from .reviewboardrc files.
 
     This will read all of the :file:`.reviewboardrc` files influencing the

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, Optional
 
 from typing_extensions import Self, TypeAlias
 
@@ -34,7 +34,7 @@ class ConfigData:
     #: A mapping of configuration keys to ConfigData wrappers.
     #:
     #: This can be set by subclasses to add type hints to nested dictionaries.
-    _wrappers: Dict[str, Type[ConfigData]] = {}
+    _wrappers: dict[str, type[ConfigData]] = {}
 
     ######################
     # Instance variables #
@@ -49,7 +49,7 @@ class ConfigData:
     def __init__(
         self,
         *,
-        config_dict: ConfigDict = {},
+        config_dict: Optional[ConfigDict] = None,
         filename: Optional[str] = None,
     ) -> None:
         """Initialize the configuration data wrapper.
@@ -62,6 +62,9 @@ class ConfigData:
                 The name of the associated configuration file.
         """
         self.filename = filename
+
+        if config_dict is None:
+            config_dict = {}
 
         # Load the configuration, and apply any wrappers if needed.
         wrappers = self._wrappers
@@ -92,7 +95,7 @@ class ConfigData:
 
     def get(
         self,
-        key,
+        key: str,
         default: Any = None,
     ) -> Any:
         """Return a value from a configuration item.
@@ -154,7 +157,7 @@ class ConfigData:
         self,
         other: Any,
     ) -> bool:
-        """Return whether this configuration is equal toa nother.
+        """Return whether this configuration is equal to another.
 
         Configurations are equal if they are of the same type and have the
         same stored settings.
@@ -171,6 +174,18 @@ class ConfigData:
         """
         return (type(self) is type(other) and
                 self._raw_config == other._raw_config)
+
+    def __delitem__(
+        self,
+        name: str,
+    ) -> None:
+        """Remove a key from the configuration.
+
+        Args:
+            name (str):
+                The name of the key to remove.
+        """
+        del self._raw_config[name]
 
     def __contains__(
         self,
@@ -277,7 +292,7 @@ class ConfigData:
 
     def __set_name__(
         self,
-        owner: Type,
+        owner: type[object],
         name: str,
     ) -> None:
         """Handle an assignment of this instance to a class.
@@ -302,9 +317,8 @@ class ConfigData:
             str:
             The string representation.
         """
-        return '<RBToolsConfig(filename=%s, config=%r)>' % (
-            self.filename,
-            self._raw_config)
+        return (f'<RBToolsConfig(filename={self.filename}, '
+                f'config={self._raw_config})>')
 
 
 class GuessFlag(str, Enum):
@@ -379,7 +393,7 @@ class RBToolsConfig(ConfigData):
     #:
     #: Version Added:
     #:     1.0
-    ALIASES: Dict[str, str] = {}
+    ALIASES: dict[str, str] = {}
 
     #: Colors used for log/text output.
     #:
@@ -389,6 +403,21 @@ class RBToolsConfig(ConfigData):
 
     #: Whether to automatically open a browser for any URLs.
     OPEN_BROWSER: bool = False
+
+    #: A mapping of paths to directory- or repository-specific configuration.
+    #:
+    #: This allows the creation of a single .reviewboardrc file which can
+    #: contain separate configurations for multiple repositories. The keys
+    #: for this can be the repository path (remote) or the local directories.
+    #: The values are dictionaries which can contain any valid .reviewboardrc
+    #: config keys.
+    #:
+    #: This existed in older versions (4 and below) but was limited to just the
+    #: REVIEWBOARD_URL setting.
+    #:
+    #: Version Added:
+    #:     5.1
+    TREES: dict[str, Any] = {}
 
     #######################################################################
     # Review Board server communication/authentication
@@ -523,14 +552,6 @@ class RBToolsConfig(ConfigData):
     #:     That now must be provided in :py:attr:`REPOSITORY`.
     REPOSITORY_URL: Optional[str] = None
 
-    #: A mapping of repository paths to configuration data.
-    #:
-    #: Deprecated:
-    #:     3.0:
-    #:     This should no longer be used. This functionality is scheduled to
-    #:     be removed in a future version.
-    TREES: Dict[str, Any] = {}
-
     #######################################################################
     # Diff generation
     #######################################################################
@@ -548,7 +569,7 @@ class RBToolsConfig(ConfigData):
     #:
     #: Version Added:
     #:     0.7
-    EXCLUDE_PATTERNS: List[str] = []
+    EXCLUDE_PATTERNS: list[str] = []
 
     #: The parent branch the generate diffs relative to.
     #:

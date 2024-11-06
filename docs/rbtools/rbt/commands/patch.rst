@@ -1,4 +1,4 @@
-.. rbt-command:: rbtools.commands.patch.Patch
+.. rbt-command:: rbtools.commands.patch.PatchCommand
 
 =====
 patch

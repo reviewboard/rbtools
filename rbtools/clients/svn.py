@@ -1228,8 +1228,14 @@ class SVNClient(BaseSCMClient):
 
         return excluded_files, empty_patch
 
-    def apply_patch(self, patch_file, base_path, base_dir, p=None,
-                    revert=False):
+    def apply_patch(
+        self,
+        patch_file: str,
+        base_path: str,
+        base_dir: str,
+        p: Optional[str] = None,
+        revert: bool = False,
+    ) -> PatchResult:
         """Apply the patch and return a PatchResult indicating its success.
 
         Version Changed:
@@ -1281,7 +1287,15 @@ class SVNClient(BaseSCMClient):
                     logging.warn('All files were excluded from the patch.')
 
         cmd: List[str] = ['patch']
-        p_num = p or self._get_p_number(base_path, base_dir)
+
+        if p:
+            try:
+                p_num = int(p)
+            except ValueError:
+                logging.error('Invalid --px value "%s"', p)
+                return PatchResult(applied=False)
+        else:
+            p_num = self._get_p_number(base_path, base_dir)
 
         if p_num >= 0:
             cmd.append('--strip=%s' % p_num)

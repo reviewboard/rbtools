@@ -7,9 +7,7 @@ Version Added:
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, List
-
-from typing_extensions import Final
+from typing import Any, Final
 
 from rbtools.config.config import ConfigDict, RBToolsConfig
 from rbtools.config.errors import ConfigSyntaxError
@@ -20,7 +18,7 @@ from rbtools.utils.filesystem import get_home_path, walk_parents
 #:
 #: This is used to exclude data from loaded Python-based
 #: :file:`.reviewboardrc` configuration files.
-_builtins: Dict[str, Any] = {}
+_builtins: dict[str, Any] = {}
 
 
 #: The name of the default configuration file.
@@ -42,13 +40,13 @@ def _load_python_reviewboardrc(
     """
     config: ConfigDict = {}
 
-    with open(filename, 'r') as fp:
+    with open(filename) as fp:
         exec(compile(fp.read(), filename, 'exec'), config)
 
     return config
 
 
-def get_config_paths() -> List[str]:
+def get_config_paths() -> list[str]:
     """Return the paths to each :file:`.reviewboardrc` influencing the cwd.
 
     A list of paths to :file:`.reviewboardrc` files will be returned, where
@@ -63,7 +61,7 @@ def get_config_paths() -> List[str]:
         list of str:
         The list of configuration paths.
     """
-    config_paths: List[str] = []
+    config_paths: list[str] = []
 
     # Apply config files from $RBTOOLS_CONFIG_PATH first, ...
     for path in os.environ.get('RBTOOLS_CONFIG_PATH', '').split(os.pathsep):

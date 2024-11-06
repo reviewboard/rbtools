@@ -6,12 +6,12 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Tuple
-
-from rbtools.config import RBToolsConfig
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     import argparse
+
+    from rbtools.config import RBToolsConfig
 
 
 class Option:
@@ -42,13 +42,13 @@ class Option:
     #:
     #: Type:
     #:     tuple
-    opts: Tuple[str, ...]
+    opts: tuple[str, ...]
 
     #: The attributes for the option.
     #:
     #: Type:
     #:     dict
-    attrs: Dict[str, Any]
+    attrs: dict[str, Any]
 
     def __init__(
         self,
@@ -71,9 +71,9 @@ class Option:
         self,
         parent: argparse._ActionsContainer,
         config: Optional[RBToolsConfig] = None,
-        argv: List[str] = [],
+        argv: Optional[list[str]] = None,
     ) -> None:
-        """Adds the option to the parent parser or group.
+        """Add the option to the parent parser or group.
 
         If the option maps to a configuration key, this will handle figuring
         out the correct default.
@@ -155,13 +155,13 @@ class OptionGroup:
     #:
     #: Type:
     #:     list of Option
-    option_list: List[Option]
+    option_list: list[Option]
 
     def __init__(
         self,
         name: Optional[str] = None,
         description: Optional[str] = None,
-        option_list: List[Option] = [],
+        option_list: Optional[list[Option]] = None,
     ) -> None:
         """Initialize the option group.
 
@@ -177,13 +177,13 @@ class OptionGroup:
         """
         self.name = name
         self.description = description
-        self.option_list = option_list
+        self.option_list = option_list or []
 
     def add_to(
         self,
         parser: argparse.ArgumentParser,
         config: RBToolsConfig,
-        argv: List[str] = [],
+        argv: Optional[list[str]] = None,
     ) -> None:
         """Add the group and all its contained options to the parser.
 
