@@ -11,10 +11,10 @@ from rbtools.api.request import (AuthCallback,
                                  HttpRequest,
                                  OTPCallback,
                                  ReviewBoardServer)
-from rbtools.api.resource import Resource, RootResource
 from rbtools.api.transport import Transport
 
 if TYPE_CHECKING:
+    from rbtools.api.resource import Resource, RootResource
     from rbtools.config import RBToolsConfig
 
 
@@ -24,19 +24,21 @@ logger = logging.getLogger(__name__)
 class SyncTransport(Transport):
     """A synchronous transport layer for the API client.
 
-    The file provided in cookie_file is used to store and retrieve
-    the authentication cookies for the API.
+    The file provided in cookie_file is used to store and retrieve the
+    authentication cookies for the API.
 
-    The optional agent parameter can be used to specify a custom
-    User-Agent string for the API. If not provided, the default
-    RBTools User-Agent will be used.
+    The optional agent parameter can be used to specify a custom User-Agent
+    string for the API. If not provided, the default RBTools User-Agent will
+    be used.
 
-    The optional session can be used to specify an 'rbsessionid'
-    to use when authenticating with reviewboard.
+    The optional session can be used to specify an 'rbsessionid' to use when
+    authenticating with reviewboard.
     """
+
     def __init__(
         self,
         url: str,
+        *args,
         cookie_file: Optional[str] = None,
         username: Optional[str] = None,
         password: Optional[str] = None,
@@ -56,13 +58,15 @@ class SyncTransport(Transport):
         client_key: Optional[str] = None,
         client_cert: Optional[str] = None,
         proxy_authorization: Optional[str] = None,
-        *args,
         config: Optional[RBToolsConfig] = None,
         **kwargs,
     ) -> None:
         """Initialize the transport.
 
         Args:
+            *args (tuple):
+                Positional arguments to pass to the base class.
+
             url (str):
                 The URL of the Review Board server.
 
@@ -130,8 +134,8 @@ class SyncTransport(Transport):
             proxy_authorization (str, optional):
                 A string to use for the ``Proxy-Authorization`` header.
 
-            *args (tuple):
-                Positional arguments to pass to the base class.
+            config (rbtools.config.RBToolsConfig):
+                The RBTools config.
 
             **kwargs (dict):
                 Keyword arguments to pass to the base class.
@@ -170,7 +174,7 @@ class SyncTransport(Transport):
         self,
         *args,
         **kwargs,
-    ) -> Optional[RootResource]:
+    ) -> RootResource:
         """Return the root API resource.
 
         Args:
@@ -186,14 +190,19 @@ class SyncTransport(Transport):
             rbtools.api.resource.Resource:
             The root API resource.
         """
-        return self._execute_request(HttpRequest(self.server.url))
+        resource = self._execute_request(HttpRequest(self.server.url))
+
+        from rbtools.api.resource import RootResource
+        assert isinstance(resource, RootResource)
+
+        return resource
 
     def get_path(
         self,
         path: str,
         *args,
         **kwargs,
-    ) -> Optional[Resource]:
+    ) -> Resource:
         """Return the API resource at the provided path.
 
         Args:
@@ -216,15 +225,20 @@ class SyncTransport(Transport):
         if path.startswith('/'):
             path = path[1:]
 
-        return self._execute_request(
+        resource = self._execute_request(
             HttpRequest(self.server.url + path, query_args=kwargs))
+
+        from rbtools.api.resource import Resource
+        assert isinstance(resource, Resource)
+
+        return resource
 
     def get_url(
         self,
         url: str,
         *args,
         **kwargs,
-    ) -> Optional[Resource]:
+    ) -> Resource:
         """Return the API resource at the provided URL.
 
         Args:
@@ -244,7 +258,12 @@ class SyncTransport(Transport):
         if not url.endswith('/'):
             url = url + '/'
 
-        return self._execute_request(HttpRequest(url, query_args=kwargs))
+        resource = self._execute_request(HttpRequest(url, query_args=kwargs))
+
+        from rbtools.api.resource import Resource
+        assert isinstance(resource, Resource)
+
+        return resource
 
     def login(
         self,
@@ -289,13 +308,13 @@ class SyncTransport(Transport):
                           password=password,
                           api_token=api_token)
 
-    def logout(self):
+    def logout(self) -> None:
         """Log out of a session on the Review Board server."""
         self.server.logout()
 
     def execute_request_method(
         self,
-        method: Callable,
+        method: Callable[..., Any],
         *args,
         **kwargs,
     ) -> Any:
@@ -305,7 +324,7 @@ class SyncTransport(Transport):
             method (callable):
                 The method to run.
 
-            *s (tuple):
+            *args (tuple):
                 Positional arguments to pass to the method.
 
             **kwargs (dict):

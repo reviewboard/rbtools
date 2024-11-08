@@ -1,12 +1,20 @@
-from typing import Optional, Type
+"""Resource creation method(s)."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Optional
 
 from rbtools.api.resource import (CountResource,
                                   ItemResource,
                                   ListResource,
                                   Resource,
                                   RESOURCE_MAP)
-from rbtools.api.transport import Transport
 from rbtools.api.utils import rem_mime_format
+
+if TYPE_CHECKING:
+    from typelets.json import JSONDict
+
+    from rbtools.api.transport import Transport
 
 
 SPECIAL_KEYS = {
@@ -19,7 +27,7 @@ SPECIAL_KEYS = {
 
 def create_resource(
     transport: Transport,
-    payload: dict,
+    payload: JSONDict,
     url: str,
     mime_type: Optional[str] = None,
     item_mime_type: Optional[str] = None,
@@ -57,7 +65,6 @@ def create_resource(
         rbtools.api.resource.Resource:
         The resource instance.
     """
-
     # Determine the key for the resources data.
     token = None
 
@@ -67,7 +74,7 @@ def create_resource(
         if len(other_keys) == 1:
             token = other_keys.pop()
 
-    resource_class: Type[Resource]
+    resource_class: type[Resource]
 
     # Select the base class for the resource.
     if 'count' in payload:
@@ -78,6 +85,9 @@ def create_resource(
         resource_class = ListResource
     else:
         resource_class = ItemResource
+
+    if issubclass(resource_class, ListResource):
+        assert token is not None
 
     return resource_class(transport, payload, url, token=token,
                           item_mime_type=item_mime_type)

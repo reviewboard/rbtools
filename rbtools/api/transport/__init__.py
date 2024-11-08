@@ -1,6 +1,11 @@
-from typing import Any, Callable, Optional
+"""Base class for API Transport layers."""
 
-from rbtools.api.resource import Resource, RootResource
+from __future__ import annotations
+
+from typing import Any, Callable, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from rbtools.api.resource import Resource, RootResource
 
 
 class Transport:
@@ -39,7 +44,7 @@ class Transport:
         self,
         *args,
         **kwargs,
-    ) -> Optional[RootResource]:
+    ) -> RootResource:
         """Return the root API resource.
 
         Args:
@@ -62,7 +67,7 @@ class Transport:
         path: str,
         *args,
         **kwargs,
-    ) -> Optional[Resource]:
+    ) -> Resource:
         """Return the API resource at the provided path.
 
         Args:
@@ -88,7 +93,7 @@ class Transport:
         url: str,
         *args,
         **kwargs,
-    ) -> Optional[Resource]:
+    ) -> Resource:
         """Return the API resource at the provided URL.
 
         The URL is not guaranteed to be part of the configured Review
@@ -154,7 +159,7 @@ class Transport:
 
     def execute_request_method(
         self,
-        method: Callable,
+        method: Callable[..., Any],
         *args,
         **kwargs,
     ) -> Any:

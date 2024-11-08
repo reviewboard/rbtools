@@ -19,8 +19,7 @@ from http.cookiejar import (Cookie,
                             MozillaCookieJar)
 from io import BytesIO
 from json import loads as json_loads
-from typing import (Any, Callable, Dict, List, Optional, TYPE_CHECKING,
-                    Tuple, Union)
+from typing import Any, Callable, Optional, TYPE_CHECKING, Union
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import (
@@ -62,7 +61,7 @@ RBTOOLS_USER_AGENT = 'RBTools/' + get_package_version()
 RB_COOKIE_NAME = 'rbsessionid'
 
 
-AuthCallback: TypeAlias = Callable[..., Tuple[str, str]]
+AuthCallback: TypeAlias = Callable[..., tuple[str, str]]
 OTPCallback: TypeAlias = Callable[[str, str], str]
 QueryArgs: TypeAlias = Union[bool, int, float, bytes, str]
 
@@ -120,12 +119,12 @@ class HttpRequest:
     other HTTP backends.
     """
 
-    #: HTTP headers to provide when making the request
+    #: HTTP headers to provide when making the request.
     #:
     #: Type: dict
-    headers: Dict[str, str]
+    headers: dict[str, str]
 
-    #: The URL te request
+    #: The URL to request.
     #:
     #: Type: str
     url: str
@@ -134,8 +133,8 @@ class HttpRequest:
         self,
         url: str,
         method: str = 'GET',
-        query_args: Dict[str, QueryArgs] = {},
-        headers: Dict[str, str] = {},
+        query_args: Optional[dict[str, QueryArgs]] = None,
+        headers: Optional[dict[str, str]] = None,
     ) -> None:
         """Initialize the HTTP request.
 
@@ -153,18 +152,20 @@ class HttpRequest:
                 Any HTTP headers to provide in the request.
         """
         self._method = method
-        self.headers = headers
+        self.headers = headers or {}
         self._fields = OrderedDict()
         self._files = OrderedDict()
 
         # Add the query arguments to the url
         url_parts = list(urlparse(url))
-        query: Dict[str, str] = dict(parse_qsl(url_parts[4]))
-        query.update({
-            # Replace all underscores in each query argument key with dashes.
-            self.encode_url_key(key): self.encode_url_value(key, value)
-            for key, value in query_args.items()
-        })
+        query: dict[str, str] = dict(parse_qsl(url_parts[4]))
+
+        if query_args:
+            query.update({
+                # Replace all underscores in each query argument key with dashes.
+                self.encode_url_key(key): self.encode_url_value(key, value)
+                for key, value in query_args.items()
+            })
 
         url_parts[4] = urlencode(
             OrderedDict(
@@ -325,7 +326,7 @@ class HttpRequest:
 
     def encode_multipart_formdata(
         self,
-    ) -> Tuple[Optional[str], Optional[bytes]]:
+    ) -> tuple[Optional[str], Optional[bytes]]:
         """Encode the request into a multi-part form-data payload.
 
         Returns:
@@ -365,8 +366,9 @@ class HttpRequest:
             content.write(NEWLINE)
 
         content.write(b'--%s--%s%s' % (BOUNDARY, NEWLINE, NEWLINE))
-        content_type = ('multipart/form-data; boundary=%s'
-                        % BOUNDARY.decode('utf-8'))
+
+        boundary_str = BOUNDARY.decode('utf-8')
+        content_type = f'multipart/form-data; boundary={boundary_str}'
 
         return content_type, content.getvalue()
 
@@ -444,7 +446,7 @@ class RBToolsHTTPSHandler(HTTPSHandler):
 
     def do_open(
         self,
-        http_class,
+        http_class: HTTPSConnection,
         *args,
         **kwargs,
     ) -> HTTPResponse:
@@ -474,8 +476,7 @@ class RBToolsHTTPSHandler(HTTPSHandler):
         # do_open() mistakenly lack the 'self' parameter and think that
         # RBToolsHTTPSConnection is therefore a mismatch on a different
         # parameter.
-        return super().do_open(RBToolsHTTPSConnection,  # type: ignore
-                               *args, **kwargs)
+        return super().do_open(RBToolsHTTPSConnection, *args, **kwargs)
 
 
 class Request(URLRequest):
@@ -490,7 +491,7 @@ class Request(URLRequest):
         self,
         url: str,
         body: Optional[bytes] = b'',
-        headers: Dict[str, str] = {},
+        headers: Optional[dict[str, str]] = None,
         method: str = 'PUT',
     ) -> None:
         """Initialize the request.
@@ -508,7 +509,7 @@ class Request(URLRequest):
             method (str, optional):
                 The HTTP method to use.
         """
-        super().__init__(url, body, headers)
+        super().__init__(url, data=body, headers=headers or {})
         self.method = method
 
     def get_method(self) -> str:
@@ -588,7 +589,7 @@ class ReviewBoardHTTPPasswordMgr(HTTPPasswordMgr):
         self,
         realm: str,
         uri: str,
-    ) -> Tuple[Optional[str], Optional[str]]:
+    ) -> tuple[Optional[str], Optional[str]]:
         """Return the username and password for the given realm.
 
         Args:
@@ -1007,7 +1008,7 @@ def _create_cookie_jar(
     *,
     cookie_file: Optional[str] = None,
     config: RBToolsConfig,
-) -> Tuple[MozillaCookieJar, str]:
+) -> tuple[MozillaCookieJar, str]:
     """Return a cookie jar backed by cookie_file
 
     If cooie_file is not provided, we will default it. If the
@@ -1314,7 +1315,7 @@ class ReviewBoardServer:
             context.load_cert_chain(client_cert, client_key)
 
         # Set default headers and install urllib handlers.
-        handlers: List[BaseHandler] = [
+        handlers: list[BaseHandler] = [
             RBToolsHTTPSHandler(context=context),
         ]
 

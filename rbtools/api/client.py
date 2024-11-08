@@ -1,9 +1,15 @@
-from typing import Optional, Type
+"""Main client used to talk to a Review Board server's API."""
+
+from __future__ import annotations
+
+from typing import Optional, TYPE_CHECKING
 from urllib.parse import urlparse
 
-from rbtools.api.resource import Resource, RootResource
-from rbtools.api.transport import Transport
 from rbtools.api.transport.sync import SyncTransport
+
+if TYPE_CHECKING:
+    from rbtools.api.resource import Resource, RootResource
+    from rbtools.api.transport import Transport
 
 
 class RBClient:
@@ -47,7 +53,7 @@ class RBClient:
     def __init__(
         self,
         url: str,
-        transport_cls: Type[Transport] = SyncTransport,
+        transport_cls: type[Transport] = SyncTransport,
         *args,
         **kwargs,
     ) -> None:
@@ -81,7 +87,7 @@ class RBClient:
         self,
         *args,
         **kwargs,
-    ) -> Optional[RootResource]:
+    ) -> RootResource:
         """Return the root resource of the API.
 
         Args:

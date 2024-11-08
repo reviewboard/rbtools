@@ -8,7 +8,7 @@ Version Added:
 from __future__ import annotations
 
 import re
-from typing import Optional, TYPE_CHECKING, cast
+from typing import ClassVar, Optional, TYPE_CHECKING, cast
 
 from packaging.version import parse as parse_version
 from typelets.json import JSONDict
@@ -41,7 +41,7 @@ class RootResource(ItemResource):
     #: Capabilities for the Review Board server.
     capabilities: ResourceDictField
 
-    _excluded_attrs = ['uri_templates']
+    _excluded_attrs: ClassVar[set[str]] = {'uri_templates'}
     _TEMPLATE_PARAM_RE = re.compile(r'\{(?P<key>[A-Za-z_0-9]*)\}')
 
     def __init__(

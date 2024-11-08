@@ -1,10 +1,13 @@
 """Utilities for working with console interactions."""
 
+from __future__ import annotations
+
 import getpass
 import logging
 import os
 import subprocess
 import sys
+from typing import Optional, TextIO
 
 from rbtools.utils.encoding import force_unicode
 from rbtools.utils.errors import EditorError
@@ -14,7 +17,12 @@ from rbtools.utils.filesystem import make_tempfile
 logger = logging.getLogger(__name__)
 
 
-def get_input(prompt, require=False, stderr=sys.stderr, stdin=sys.stdin):
+def get_input(
+    prompt: str,
+    require: bool = False,
+    stderr: TextIO = sys.stderr,
+    stdin: TextIO = sys.stdin,
+) -> str:
     """Ask the user for input.
 
     Version Changed:
@@ -26,7 +34,7 @@ def get_input(prompt, require=False, stderr=sys.stderr, stdin=sys.stdin):
     receives a valid answer.
 
     Args:
-        prompt (unicode):
+        prompt (str):
             The text to prompt the user with.
 
         require (bool, optional):
@@ -46,10 +54,10 @@ def get_input(prompt, require=False, stderr=sys.stderr, stdin=sys.stdin):
                 3.1
 
     Returns:
-        unicode:
+        str:
         The entered user data.
     """
-    def _get_input():
+    def _get_input() -> str:
         # `input`'s usual prompt gets written to stdout, which results in
         # really crummy behavior if stdout is redirected to a file. Because
         # this is often paired with getpass (entering a username/password
@@ -77,7 +85,12 @@ def get_input(prompt, require=False, stderr=sys.stderr, stdin=sys.stdin):
     return value
 
 
-def get_pass(prompt, require=False, stderr=sys.stderr, stdin=sys.stdin):
+def get_pass(
+    prompt: str,
+    require: bool = False,
+    stderr: TextIO = sys.stderr,
+    stdin: TextIO = sys.stdin,
+) -> str:
     """Ask the user for a password.
 
     Version Changed:
@@ -89,7 +102,7 @@ def get_pass(prompt, require=False, stderr=sys.stderr, stdin=sys.stdin):
     receives a valid answer.
 
     Args:
-        prompt (unicode):
+        prompt (str):
             The text to prompt the user with.
 
         require (bool, optional):
@@ -109,10 +122,12 @@ def get_pass(prompt, require=False, stderr=sys.stderr, stdin=sys.stdin):
                 3.1
 
     Returns:
-        bytes:
+        str:
         The entered password.
     """
-    def _get_pass(prompt):
+    def _get_pass(
+        prompt: str,
+    ) -> str:
         if hasattr(stdin, 'isatty') and stdin.isatty():
             result = getpass.getpass(prompt)
         else:
@@ -134,7 +149,11 @@ def get_pass(prompt, require=False, stderr=sys.stderr, stdin=sys.stdin):
     return password
 
 
-def confirm(question, stderr=sys.stderr, stdin=sys.stdin):
+def confirm(
+    question: str,
+    stderr: TextIO = sys.stderr,
+    stdin: TextIO = sys.stdin,
+) -> bool:
     """Interactively prompt for a Yes/No answer.
 
     This requires a Yes or a No answer. These are case-insensitive.
@@ -152,7 +171,7 @@ def confirm(question, stderr=sys.stderr, stdin=sys.stdin):
         used with a non-TTY input stream.
 
     Args:
-        question (unicode):
+        question (str):
             The question to ask.
 
         stderr (io.TextIOWrapper or file, optional):
@@ -174,7 +193,7 @@ def confirm(question, stderr=sys.stderr, stdin=sys.stdin):
     valid_yes = ('yes', 'y', 'true', 't', 'on', '1')
     valid_no = ('no', 'n', 'false', 'f', 'off', '0')
 
-    full_question = '%s [Yes/No]: ' % question
+    full_question = f'{question} [Yes/No]: '
 
     while True:
         answer = get_input(full_question,
@@ -186,11 +205,15 @@ def confirm(question, stderr=sys.stderr, stdin=sys.stdin):
         elif answer in valid_no:
             return False
         else:
-            stderr.write('"%s" is not a valid answer.\n' % answer)
+            stderr.write(f'"{answer}" is not a valid answer.\n')
 
 
-def confirm_select(question, options_length, stderr=sys.stderr,
-                   stdin=sys.stdin):
+def confirm_select(
+    question: str,
+    options_length: int,
+    stderr: TextIO = sys.stderr,
+    stdin: TextIO = sys.stdin,
+) -> int:
     """Interactively prompt for a specific answer from a list of options.
 
     Accepted answers are integers starting from 1 until an integer n
@@ -205,7 +228,7 @@ def confirm_select(question, options_length, stderr=sys.stderr,
         used with a non-TTY input stream.
 
     Args:
-        question (unicode):
+        question (str):
             The prompt to be displayed.
 
         options_length (int):
@@ -225,7 +248,7 @@ def confirm_select(question, options_length, stderr=sys.stderr,
                 3.1
 
     Returns:
-        unicode:
+        str:
         The user's chosen response. If the user decides to cancel the
         prompt, None is returned.
     """
@@ -242,10 +265,12 @@ def confirm_select(question, options_length, stderr=sys.stderr,
 
             raise ValueError
         except ValueError:
-            stderr.write('"%s" is not a valid answer.\n' % answer)
+            stderr.write(f'"{answer}" is not a valid answer.\n')
 
 
-def edit_file(filename):
+def edit_file(
+    filename: str,
+) -> str:
     """Run a user-configured editor to edit an existing file.
 
     This will run a configured text editor (trying the :envvar:`VISUAL` or
@@ -253,11 +278,11 @@ def edit_file(filename):
     to request text for use in a commit message or some other purpose.
 
     Args:
-        filename (unicode):
+        filename (str):
             The file to edit.
 
     Returns:
-        unicode:
+        str:
         The resulting content.
 
     Raises:
@@ -266,33 +291,36 @@ def edit_file(filename):
             error.
     """
     if not os.path.exists(filename):
-        raise EditorError('The file "%s" does not exist or is not accessible.'
-                          % filename)
+        raise EditorError(
+            f'The file "{filename}" does not exist or is not accessible.')
 
     editor = force_unicode(
-        os.environ.get(str('RBTOOLS_EDITOR')) or
-        os.environ.get(str('VISUAL')) or
-        os.environ.get(str('EDITOR')) or
+        os.environ.get('RBTOOLS_EDITOR') or
+        os.environ.get('VISUAL') or
+        os.environ.get('EDITOR') or
         'vi'
     )
 
     try:
-        subprocess.call(editor.split() + [filename])
+        subprocess.call([*editor.split(), filename])
     except OSError:
-        raise EditorError('The editor "%s" was not found or could not be run. '
-                          'Make sure the EDITOR environment variable is set '
-                          'to your preferred editor.'
-                          % editor)
+        raise EditorError(
+            f'The editor "{editor}" was not found or could not be run. Make '
+            f'sure the EDITOR environment variable is set to your preferred '
+            f'editor.')
 
     try:
-        with open(filename, 'r') as fp:
+        with open(filename) as fp:
             return force_unicode(fp.read())
-    except IOError:
-        raise EditorError('The edited file "%s" was deleted during edit.'
-                          % filename)
+    except OSError:
+        raise EditorError(
+            f'The edited file "{filename}" was deleted during edit.')
 
 
-def edit_text(content='', filename=None):
+def edit_text(
+    content: str = '',
+    filename: Optional[str] = None,
+) -> str:
     """Run a user-configured editor to prompt for text.
 
     This will run a configured text editor (trying the :envvar:`VISUAL` or
@@ -300,16 +328,16 @@ def edit_text(content='', filename=None):
     to request text for use in a commit message or some other purpose.
 
     Args:
-        content (unicode, optional):
+        content (str, optional):
             Existing content to edit.
 
-        filename (unicode, optional):
+        filename (str, optional):
             The optional name of the temp file to edit. This can be used to
             help the editor provide a proper editing environment for the
             file.
 
     Returns:
-        unicode:
+        str:
         The resulting content.
 
     Raises:
