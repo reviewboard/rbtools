@@ -10,7 +10,7 @@ from __future__ import annotations
 import copy
 import json
 from collections.abc import Iterator, Mapping, MutableMapping
-from functools import wraps
+from functools import update_wrapper, wraps
 from typing import (Any, Callable, ClassVar, Final, Optional, NoReturn,
                     TypeVar, TYPE_CHECKING, Union, cast)
 from urllib.parse import urljoin
@@ -99,6 +99,79 @@ def request_method(
                                                           *args, **kwargs)
 
     return request_method
+
+
+_STUB_ATTR_NAME = '_rbtools_api_stub'
+
+
+def api_stub(
+    f: Callable[_P, _T],
+) -> Callable[_P, _T]:
+    """Mark a method as being an API stub.
+
+    Version Added:
+        6.0
+
+    Args:
+        f (callable):
+            The stub method.
+
+    Returns:
+        callable:
+        The stub method.
+    """
+    setattr(f, _STUB_ATTR_NAME, True)
+
+    return f
+
+
+def is_api_stub(
+    f: Callable[..., Any],
+) -> bool:
+    """Return whether a given method is an API stub.
+
+    Version Added:
+        6.0
+
+    Args:
+        f (callable):
+            The method to check.
+
+    Returns:
+        bool:
+        ``True`` if the method was decorated with :py:func:`api_stub`.
+        ``False``, otherwise.
+    """
+    return getattr(f, _STUB_ATTR_NAME, False)
+
+
+def replace_api_stub(
+    obj: Resource,
+    attr: str,
+    stub: Callable[..., Any],
+    implementation: Callable[..., Any],
+) -> None:
+    """Replace an API stub with a real implementation.
+
+    Version Added:
+        6.0
+
+    Args:
+        obj (Resource):
+            The resource object which owns the method.
+
+        attr (str):
+            The name of the method.
+
+        stub (callable):
+            The stub method.
+
+        implementation (callable):
+            The method implementation.
+    """
+    update_wrapper(implementation, stub)
+    delattr(implementation, _STUB_ATTR_NAME)
+    setattr(obj, attr, implementation)
 
 
 def _preprocess_fields(
