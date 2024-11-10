@@ -10,6 +10,7 @@ from collections import namedtuple
 from typing import Iterable, Optional, TYPE_CHECKING
 
 from tqdm import tqdm
+from typing_extensions import TypeVar
 
 from rbtools.api.errors import APIError
 from rbtools.commands.base import (BaseCommand,
@@ -37,6 +38,9 @@ if TYPE_CHECKING:
         FileDiffResource,
         ReviewRequestResource,
     )
+
+
+_T = TypeVar('_T')
 
 
 logger = logging.getLogger(__name__)
@@ -1720,7 +1724,7 @@ class Post(BaseCommand):
                     filename)
                 continue
 
-            mimetype = guess_mimetype(file_content)
+            mimetype = guess_mimetype(data=file_content, filename=filename)
 
             if not mimetype or mimetype in invalid_mimetypes:
                 logger.debug('Skipping %s (%s): MIME type %s is not supported',
@@ -1884,10 +1888,10 @@ class Post(BaseCommand):
 
     def _show_progress(
         self,
-        iterable: Iterable,
+        iterable: Iterable[_T],
         desc: str,
         total: Optional[int] = None,
-    ) -> Iterable:
+    ) -> Iterable[_T]:
         """Show a progress bar for commit validation and upload.
 
         Args:
