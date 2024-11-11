@@ -1,3 +1,5 @@
+"""Support for forming requests to a Review Board server."""
+
 from __future__ import annotations
 
 import base64
@@ -14,7 +16,8 @@ from http.client import (HTTPMessage, HTTPResponse, HTTPSConnection,
 from http.cookiejar import Cookie, CookieJar, MozillaCookieJar
 from io import BytesIO
 from json import loads as json_loads
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import (Any, Callable, Dict, List, Optional, TYPE_CHECKING,
+                    Tuple, Union)
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import (
@@ -41,10 +44,14 @@ from rbtools.api.errors import (APIError,
                                 ServerInterfaceError,
                                 ServerInterfaceSSLError,
                                 create_api_error)
+from rbtools.config import load_config
 from rbtools.deprecation import (RemovedInRBTools50Warning,
                                  RemovedInRBTools60Warning)
 from rbtools.utils.encoding import force_bytes, force_unicode
 from rbtools.utils.filesystem import get_home_path
+
+if TYPE_CHECKING:
+    from rbtools.config import RBToolsConfig
 
 
 RBTOOLS_COOKIE_FILE = '.rbtools-cookies'
@@ -949,6 +956,12 @@ class ReviewBoardServer:
     # Instance variables #
     ######################
 
+    #: The loaded RBTools configuration.
+    #:
+    #: Version Added:
+    #:     5.1
+    config: RBToolsConfig
+
     #: The path to the file for storing authentication cookies.
     #:
     #: Type:
@@ -982,8 +995,14 @@ class ReviewBoardServer:
         client_key: Optional[str] = None,
         client_cert: Optional[str] = None,
         proxy_authorization: Optional[str] = None,
+        *,
+        config: Optional[RBToolsConfig] = None,
     ) -> None:
         """Initialize the server object.
+
+        Version Changed:
+            5.1:
+            Added the ``config`` argument.
 
         Args:
             url (str):
@@ -1041,11 +1060,25 @@ class ReviewBoardServer:
 
             proxy_authorization (str, optional):
                 A string to use for the ``Proxy-Authorization`` header.
+
+            config (rbtools.config.RBToolsConfig, optional):
+                The loaded RBTools configuration.
+
+                If not provided, the configuration will be loaded.
+
+                Version Added:
+                    5.1
         """
         if not url.endswith('/'):
             url += '/'
 
         self.url = url + 'api/'
+
+        # Load the configuration, if not already provided.
+        if config is None:
+            config = load_config()
+
+        self.config = config
 
         self.save_cookies = save_cookies
         self.ext_auth_cookies = ext_auth_cookies
