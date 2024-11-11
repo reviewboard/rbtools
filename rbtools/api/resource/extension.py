@@ -1,0 +1,81 @@
+"""Resource definitions for extensions.
+
+Version Added:
+    6.0
+"""
+
+from __future__ import annotations
+
+from typing import ClassVar, Optional
+
+from rbtools.api.resource.base import (
+    ItemResource,
+    ListResource,
+    resource_mimetype,
+)
+
+
+@resource_mimetype('application/vnd.reviewboard.org.extension')
+class ExtensionItemResource(ItemResource):
+    """Item resource for extensions.
+
+    Version Added:
+        6.0
+    """
+
+    _excluded_links: ClassVar[set[str]] = {
+        'admin_configure',
+        'admin_database',
+    }
+
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The author of the extension
+    author: Optional[str]
+
+    #: The author's website.
+    author_url: Optional[str]
+
+    #: Whether or not the extension can be disabled.
+    can_disable: bool
+
+    #: Whether or not the extension can be enabled.
+    can_enable: bool
+
+    #: The class name for the extension.
+    class_name: str
+
+    #: Whether or not the extension is enabled.
+    enabled: bool
+
+    #: Whether or not the extension is installed.
+    installed: bool
+
+    #: Any errors captured while attempting to load the extension.
+    load_error: Optional[str]
+
+    #: Whether or not the extension is currently loadable.
+    #:
+    #: An extension may be installed but missing, or may be broken due to a
+    #: bug.
+    loadable: bool
+
+    #: The name of the extension
+    name: str
+
+    #: A summary of the extension's functionality.
+    summary: Optional[str]
+
+    #: The installed version of the extension.
+    version: str
+
+
+@resource_mimetype('application/vnd.reviewboard.org.extensions')
+class ExtensionListResource(ListResource[ExtensionItemResource]):
+    """List resource for extensions.
+
+    Version Added:
+        6.0
+    """

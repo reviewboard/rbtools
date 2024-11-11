@@ -616,6 +616,9 @@ class Resource:
     #:     Changed the type from a list to a set.
     _excluded_attrs: ClassVar[set[str]] = set()
 
+    #: Links which should be excluded when processing the payload.
+    _excluded_links: ClassVar[set[str]] = set()
+
     #: A mapping for rewriting HTTP query parameters.
     #:
     #: The Review Board Web API uses hyphens for many parameters, but that
@@ -738,8 +741,10 @@ class Resource:
                     replace_api_stub(self, attr_name, stub, special_method)
 
         # Generate request methods for any additional links the resource has.
+        excluded_links = self._excluded_links
+
         for link, body in self._links.items():
-            if link not in SPECIAL_LINKS:
+            if link not in SPECIAL_LINKS and link not in excluded_links:
                 # Some resources have hyphens in the links.
                 attr_name = f'get_{link.replace("-", "_")}'
                 url = body['href']

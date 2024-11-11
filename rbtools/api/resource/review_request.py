@@ -11,7 +11,7 @@ from collections import defaultdict, deque
 from typing import ClassVar, Literal, Optional, TYPE_CHECKING, Union, cast
 from urllib.parse import urljoin
 
-from typing_extensions import Self
+from typing_extensions import Self, Unpack
 
 from rbtools.api.resource.base import (
     BaseGetListParams,
@@ -37,9 +37,12 @@ if TYPE_CHECKING:
         ResourceListField,
         TextType,
     )
+    from rbtools.api.resource.base_user import UserGetParams
     from rbtools.api.resource.diff import DiffItemResource, DiffListResource
     from rbtools.api.resource.file_attachment import FileAttachmentListResource
+    from rbtools.api.resource.review_group import ReviewGroupItemResource
     from rbtools.api.resource.screenshot import ScreenshotListResource
+    from rbtools.api.resource.user import UserItemResource
 
 
 @resource_mimetype('application/vnd.reviewboard.org.review-request')
@@ -149,13 +152,11 @@ class ReviewRequestItemResource(ItemResource):
     summary: str
 
     #: The list of review groups who were requested to review this change.
-    # TODO
-    # target_groups: ResourceListField[
-    #     ResourceLinkField[ReviewGroupItemResource]]
+    target_groups: ResourceListField[
+        ResourceLinkField[ReviewGroupItemResource]]
 
     #: The list of users who were requested to review this change.
-    # TODO
-    # target_people: ResourceListField[ResourceLinkField[UserItemResource]]
+    target_people: ResourceListField[ResourceLinkField[UserItemResource]]
 
     #: The information on the testing that was done for the change.
     testing_done: str
@@ -419,6 +420,30 @@ class ReviewRequestItemResource(ItemResource):
         """
         raise NotImplementedError
 
+    @api_stub
+    def get_submitter(
+        self,
+        **kwargs: Unpack[UserGetParams],
+    ) -> UserItemResource:
+        """Get the submitter of the review request.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.UserItemResource:
+            The user item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
     # TODO get_changes stub
     # TODO get_diff_context stub
     # TODO get_draft stub
@@ -426,7 +451,6 @@ class ReviewRequestItemResource(ItemResource):
     # TODO get_repository stub
     # TODO get_reviews stub
     # TODO get_status_updates stub
-    # TODO get_submitter stub
 
 
 class ReviewRequestGetListParams(BaseGetListParams, total=False):

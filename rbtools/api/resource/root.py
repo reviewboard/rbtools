@@ -34,6 +34,15 @@ if TYPE_CHECKING:
         BaseGetListParams,
         BaseGetParams,
     )
+    from rbtools.api.resource.base_user import (
+        UserGetListParams,
+        UserGetParams,
+    )
+    from rbtools.api.resource.default_reviewer import (
+        DefaultReviewerGetListParams,
+        DefaultReviewerItemResource,
+        DefaultReviewerListResource,
+    )
     from rbtools.api.resource.diff import (
         DiffItemResource,
         DiffListResource,
@@ -47,6 +56,10 @@ if TYPE_CHECKING:
         DiffFileAttachmentItemResource,
         DiffFileAttachmentListResource,
     )
+    from rbtools.api.resource.extension import (
+        ExtensionItemResource,
+        ExtensionListResource,
+    )
     from rbtools.api.resource.file_attachment import (
         FileAttachmentItemResource,
         FileAttachmentListResource,
@@ -54,6 +67,15 @@ if TYPE_CHECKING:
     from rbtools.api.resource.file_diff import (
         FileDiffItemResource,
         FileDiffListResource,
+    )
+    from rbtools.api.resource.review_group import (
+        ReviewGroupGetListParams,
+        ReviewGroupItemResource,
+        ReviewGroupListResource,
+    )
+    from rbtools.api.resource.review_group_user import (
+        ReviewGroupUserItemResource,
+        ReviewGroupUserListResource,
     )
     from rbtools.api.resource.review_request import (
         ReviewRequestGetListParams,
@@ -64,10 +86,19 @@ if TYPE_CHECKING:
         ScreenshotItemResource,
         ScreenshotListResource,
     )
+    from rbtools.api.resource.user import (
+        UserItemResource,
+        UserListResource,
+    )
+    from rbtools.api.resource.user_file_attachment import (
+        UserFileAttachmentItemResource,
+        UserFileAttachmentListResource,
+    )
     from rbtools.api.resource.validate_diff import ValidateDiffResource
     from rbtools.api.resource.validate_diff_commit import (
         ValidateDiffCommitResource,
     )
+    from rbtools.api.resource.validation import ValidationResource
     from rbtools.api.transport import Transport
 
 
@@ -253,6 +284,59 @@ class RootResource(ItemResource):
         Returns:
             rbtools.api.resource.ValidateDiffCommitResource:
             The diff commit validation resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_default_reviewer(
+        self,
+        *,
+        default_reviewer_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> DefaultReviewerItemResource:
+        """Get a default reviewer item resource.
+
+        Args:
+            default_reviewer_id (int):
+                The ID of the default reviewer to get.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.DefaultReviewerItemResource:
+            The default reviewer item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_default_reviewers(
+        self,
+        **kwargs: Unpack[DefaultReviewerGetListParams],
+    ) -> DefaultReviewerListResource:
+        """Get the default reviewer list resource.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.DefaultReviewerListResource:
+            The default reviewer list resource.
 
         Raises:
             rbtools.api.errors.APIError:
@@ -469,6 +553,60 @@ class RootResource(ItemResource):
 
         Returns:
             rbtools.api.resource.DiffFileAttachmentListResource:
+            The extensions list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_extension(
+        self,
+        *,
+        extension_name: str,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> ExtensionItemResource:
+        """Get an extension item resource.
+
+        Args:
+            extension_name (str):
+                The class path of the extension class (for example,
+                ``rbintegrations.extension.RBIntegrationsExtension``).
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ExtensionItemResource:
+            The extension item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_extensions(
+        self,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> ExtensionListResource:
+        """Get the extensions list resource.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ExtensionListResource:
             The diff file attachments list resource.
 
         Raises:
@@ -695,6 +833,121 @@ class RootResource(ItemResource):
         raise NotImplementedError
 
     @api_stub
+    def get_group(
+        self,
+        *,
+        group_name: str,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> ReviewGroupItemResource:
+        """Get a review group item resource.
+
+        Args:
+            group_name (str):
+                The review group name.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ReviewGroupItemResource:
+            The review group item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_groups(
+        self,
+        **kwargs: Unpack[ReviewGroupGetListParams],
+    ) -> ReviewGroupListResource:
+        """Get the review group list resource.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ReviewGroupListResource:
+            The review group list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_group_user(
+        self,
+        *,
+        group_name: str,
+        username: str,
+        **kwargs: Unpack[UserGetParams],
+    ) -> ReviewGroupUserItemResource:
+        """Get a review group user item resource.
+
+        Args:
+            group_name (str):
+                The name of the review group.
+
+            username (str):
+                The username of the user.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ReviewGroupUserItemResource:
+            The review group user item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_group_users(
+        self,
+        *,
+        group_name: str,
+        **kwargs: Unpack[UserGetParams],
+    ) -> ReviewGroupUserListResource:
+        """Get a review group user list resource.
+
+        Args:
+            group_name (str):
+                The name of the review group.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ReviewGroupUserListResource:
+            The review group user list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
     def get_review_request(
         self,
         *,
@@ -885,6 +1138,145 @@ class RootResource(ItemResource):
         Returns:
             rbtools.api.resource.ScreenshotListResource:
             The screenshot list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_user(
+        self,
+        *,
+        username: str,
+        **kwargs: Unpack[UserGetParams],
+    ) -> UserItemResource:
+        """Get a user item resource.
+
+        Args:
+            username (str):
+                The username of the user.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.UserItemResource:
+            The user item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_users(
+        self,
+        **kwargs: Unpack[UserGetListParams],
+    ) -> UserListResource:
+        """Get the user list resource.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.UserListResource:
+            The user list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_user_file_attachment(
+        self,
+        *,
+        username: str,
+        file_attachment_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> UserFileAttachmentItemResource:
+        """Get a user file attachment item resource.
+
+        Args:
+            username (str):
+                The username of the user.
+
+            file_attachment_id (int):
+                The ID of the file attachment.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.UserFileAttachmentItemResource:
+            The user file attachment item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_user_file_attachments(
+        self,
+        *,
+        username: str,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> UserFileAttachmentListResource:
+        """Get a user file attachment list resource.
+
+        Args:
+            username (str):
+                The username of the user.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.UserFileAttachmentListResource:
+            The user file attachment list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_validation(
+        self,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> ValidationResource:
+        """Get the validation list resource.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ValidationResource:
+            The validation list resource.
 
         Raises:
             rbtools.api.errors.APIError:

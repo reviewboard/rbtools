@@ -1,8 +1,7 @@
-"""Resource definitions for file attachments.
+"""Resource definitions for user file attachments.
 
 Version Added:
     6.0:
-    This was moved from :py:mod:`rbtools.api.resource`.
 """
 
 from __future__ import annotations
@@ -20,8 +19,8 @@ if TYPE_CHECKING:
     from rbtools.api.resource.base import ResourceExtraDataField
 
 
-@resource_mimetype('application/vnd.reviewboard.org.file-attachment')
-class FileAttachmentItemResource(ItemResource):
+@resource_mimetype('application/vnd.reviewboard.org.user-file-attachment')
+class UserFileAttachmentItemResource(ItemResource):
     """Item resource for file attachments.
 
     Version Added:
@@ -34,9 +33,6 @@ class FileAttachmentItemResource(ItemResource):
 
     #: The absolute URL of the file, for downloading purposes.
     absolute_url: str
-
-    #: The ID of the file attachment history.
-    attachment_history_id: int
 
     #: The file's descriptive caption.
     caption: str
@@ -59,24 +55,16 @@ class FileAttachmentItemResource(ItemResource):
     #: The mimetype for the file.
     mimetype: str
 
-    #: The URL to a review UI for this file.
-    review_url: str
-
-    #: The revision of the file attachment.
-    revision: int
-
     #: A thumbnail representing this file.
     thumbnail: str
 
-    #: The URL of the file, for downloading purposes.
-    #:
-    #: This is deprecated in favor of the ``absolute_url`` attribute.
-    url: str
 
-    # TODO get_file_attachment_comments stub
+@resource_mimetype('application/vnd.reviewboard.org.user-file-attachments')
+class UserFileAttachmentListResource(
+    AttachmentUploadMixin,
+    ListResource[UserFileAttachmentItemResource]):
+    """List resource for user file attachments.
 
-
-@resource_mimetype('application/vnd.reviewboard.org.file-attachments')
-class FileAttachmentListResource(AttachmentUploadMixin,
-                                 ListResource[FileAttachmentItemResource]):
-    """List resource for file attachments."""
+    Version Added:
+        6.0
+    """

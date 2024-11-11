@@ -14,6 +14,10 @@ from rbtools.api.resource.base import (
     ResourceListField,
     resource_mimetype,
 )
+from rbtools.api.resource.default_reviewer import (
+    DefaultReviewerItemResource,
+    DefaultReviewerListResource,
+)
 from rbtools.api.resource.diff import (
     DiffItemResource,
     DiffListResource,
@@ -38,6 +42,10 @@ from rbtools.api.resource.draft_screenshot import (
     DraftScreenshotItemResource,
     DraftScreenshotListResource,
 )
+from rbtools.api.resource.extension import (
+    ExtensionItemResource,
+    ExtensionListResource,
+)
 from rbtools.api.resource.file_attachment import (
     FileAttachmentItemResource,
     FileAttachmentListResource,
@@ -50,6 +58,14 @@ from rbtools.api.resource.mixins import (
     DiffUploaderMixin,
     GetPatchMixin,
 )
+from rbtools.api.resource.review_group import (
+    ReviewGroupItemResource,
+    ReviewGroupListResource,
+)
+from rbtools.api.resource.review_group_user import (
+    ReviewGroupUserItemResource,
+    ReviewGroupUserListResource,
+)
 from rbtools.api.resource.review_request import (
     ReviewRequestItemResource,
     ReviewRequestListResource,
@@ -59,10 +75,16 @@ from rbtools.api.resource.screenshot import (
     ScreenshotItemResource,
     ScreenshotListResource,
 )
+from rbtools.api.resource.user import UserItemResource, UserListResource
+from rbtools.api.resource.user_file_attachment import (
+    UserFileAttachmentItemResource,
+    UserFileAttachmentListResource,
+)
 from rbtools.api.resource.validate_diff import ValidateDiffResource
 from rbtools.api.resource.validate_diff_commit import (
     ValidateDiffCommitResource,
 )
+from rbtools.api.resource.validation import ValidationResource
 
 
 # Compatibility names for renamed resource subclasses.
@@ -74,6 +96,8 @@ ReviewRequestResource = ReviewRequestItemResource
 
 __all__ = [
     'CountResource',
+    'DefaultReviewerItemResource',
+    'DefaultReviewerListResource',
     'DiffCommitItemResource',
     'DiffCommitListResource',
     'DiffFileAttachmentListResource',
@@ -89,6 +113,8 @@ __all__ = [
     'DraftFileAttachmentListResource',
     'DraftScreenshotItemResource',
     'DraftScreenshotListResource',
+    'ExtensionItemResource',
+    'ExtensionListResource',
     'FileAttachmentItemResource',
     'FileAttachmentListResource',
     'FileDiffItemResource',
@@ -103,13 +129,22 @@ __all__ = [
     'ResourceExtraDataField',
     'ResourceLinkField',
     'ResourceListField',
+    'ReviewGroupItemResource',
+    'ReviewGroupListResource',
+    'ReviewGroupUserItemResource',
+    'ReviewGroupUserListResource',
     'ReviewRequestItemResource',
     'ReviewRequestResource',
     'ReviewRequestListResource',
     'RootResource',
     'ScreenshotItemResource',
     'ScreenshotListResource',
+    'UserFileAttachmentItemResource',
+    'UserFileAttachmentListResource',
+    'UserItemResource',
+    'UserListResource',
     'ValidateDiffCommitResource',
     'ValidateDiffResource',
+    'ValidationResource',
     'resource_mimetype',
 ]
