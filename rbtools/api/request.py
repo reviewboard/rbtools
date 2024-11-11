@@ -64,6 +64,46 @@ OTPCallback: TypeAlias = Callable[[str, str], str]
 QueryArgs: TypeAlias = Union[bool, int, float, bytes, str]
 
 
+def _normalize_url_parts(
+    url: str,
+    *,
+    host_header: Optional[str] = '',
+) -> tuple[str, str]:
+    """Return a normalized domain from a URL.
+
+    This will strip any port number and ensure any dotless domain has a
+    ``.local`` prefix. The result will be lowercased and returned, along
+    with the path.
+
+    Version Added:
+        5.1
+
+    Args:
+        url (str):
+            The URL containing the domain.
+
+        host_header (str, optional):
+            The optional value from a :mailheader:`Host` header in a HTTP
+            response.
+
+    Returns:
+        str:
+        The normalized domain.
+    """
+    parts = urlparse(url)
+    domain = parts[1] or host_header or ''
+
+    # Remove any port.
+    domain = domain.partition(':')[0]
+
+    # Append ".local" if there are no dots in the domain (e.g., "localhost").
+    # This is required by RFC 2109.
+    if '.' not in domain:
+        domain += '.local'
+
+    return domain.lower(), parts[2]
+
+
 class HttpRequest:
     """A high-level HTTP request.
 
@@ -1069,10 +1109,15 @@ class ReviewBoardServer:
                 Version Added:
                     5.1
         """
+        # Normalize the URLs and compute the API URL.
         if not url.endswith('/'):
             url += '/'
 
-        self.url = url + 'api/'
+        api_url = url + 'api/'
+        self.url = api_url
+
+        domain, path = _normalize_url_parts(url)
+        self.domain = domain
 
         # Load the configuration, if not already provided.
         if config is None:
@@ -1080,38 +1125,39 @@ class ReviewBoardServer:
 
         self.config = config
 
+        # Compute a user agent.
+        if not agent:
+            agent = RBTOOLS_USER_AGENT
+
+        self.agent = agent
+
+        # Load and construct any cookies.
         self.save_cookies = save_cookies
         self.ext_auth_cookies = ext_auth_cookies
 
-        if self.save_cookies:
-            self.cookie_jar, self.cookie_file = create_cookie_jar(
+        cookie_jar: Optional[CookieJar]
+
+        if save_cookies:
+            cookie_jar, self.cookie_file = create_cookie_jar(
                 cookie_file=cookie_file)
 
             try:
-                self.cookie_jar.load(ignore_expires=True)
+                cookie_jar.load(ignore_expires=True)
             except IOError:
                 pass
         else:
-            self.cookie_jar = CookieJar()
+            cookie_jar = CookieJar()
             self.cookie_file = None
 
         if self.ext_auth_cookies:
             try:
-                assert isinstance(self.cookie_jar, MozillaCookieJar)
-                self.cookie_jar.load(ext_auth_cookies, ignore_expires=True)
+                assert isinstance(cookie_jar, MozillaCookieJar)
+                cookie_jar.load(ext_auth_cookies, ignore_expires=True)
             except IOError as e:
                 logging.critical('There was an error while loading a '
                                  'cookie file: %s', e)
-                pass
 
-        # Get the cookie domain from the url. If the domain
-        # does not contain a '.' (e.g. 'localhost'), we assume
-        # it is a local domain and suffix it (See RFC 2109).
-        parsed_url = urlparse(url)
-        self.domain = parsed_url[1].partition(':')[0]  # Remove Port.
-
-        if self.domain.count('.') < 1:
-            self.domain = '%s.local' % self.domain
+        self.cookie_jar = cookie_jar
 
         if session:
             cookie = Cookie(
@@ -1120,10 +1166,10 @@ class ReviewBoardServer:
                 value=session,
                 port=None,
                 port_specified=False,
-                domain=self.domain,
+                domain=domain,
                 domain_specified=True,
                 domain_initial_dot=True,
-                path=parsed_url[2],
+                path=path,
                 path_specified=True,
                 secure=False,
                 expires=None,
@@ -1131,34 +1177,36 @@ class ReviewBoardServer:
                 comment=None,
                 comment_url=None,
                 rest={'HttpOnly': ''})
-            self.cookie_jar.set_cookie(cookie)
+            cookie_jar.set_cookie(cookie)
 
-            if self.save_cookies:
-                assert isinstance(self.cookie_jar, MozillaCookieJar)
-                self.cookie_jar.save()
+            if save_cookies:
+                assert isinstance(cookie_jar, MozillaCookieJar)
+                cookie_jar.save()
 
         if username:
             # If the username parameter is given, we have to clear the session
             # cookie manually or it will override the username:password
             # combination retrieved from the authentication callback.
             try:
-                self.cookie_jar.clear(self.domain, parsed_url[2],
-                                      RB_COOKIE_NAME)
+                cookie_jar.clear(domain=domain,
+                                 path=path,
+                                 name=RB_COOKIE_NAME)
             except KeyError:
                 pass
 
-        # Set up the HTTP libraries to support all of the features we need.
-        password_mgr = ReviewBoardHTTPPasswordMgr(self.url,
-                                                  username,
-                                                  password,
-                                                  api_token,
-                                                  auth_callback,
-                                                  otp_token_callback)
-        self.preset_auth_handler = PresetHTTPAuthHandler(self.url,
-                                                         password_mgr)
+        # Configure our custom authentication handler for urllib.
+        password_mgr = ReviewBoardHTTPPasswordMgr(
+            reviewboard_url=api_url,
+            rb_user=username,
+            rb_pass=password,
+            api_token=api_token,
+            auth_callback=auth_callback,
+            otp_token_callback=otp_token_callback)
+        self.preset_auth_handler = PresetHTTPAuthHandler(
+            url=api_url,
+            password_mgr=password_mgr)
 
-        handlers: List[BaseHandler] = []
-
+        # Determine our SSL behavior and load any requested certs.
         if verify_ssl:
             context = ssl.create_default_context(
                 cafile=ca_certs or certifi.where())
@@ -1168,26 +1216,24 @@ class ReviewBoardServer:
         if client_cert and client_key:
             context.load_cert_chain(client_cert, client_key)
 
-        handlers.append(RBToolsHTTPSHandler(context=context))
+        # Set default headers and install urllib handlers.
+        handlers: List[BaseHandler] = [
+            RBToolsHTTPSHandler(context=context),
+        ]
 
         if disable_proxy:
             handlers.append(ProxyHandler({}))
 
         handlers += [
-            HTTPCookieProcessor(self.cookie_jar),
+            HTTPCookieProcessor(cookie_jar),
             ReviewBoardHTTPBasicAuthHandler(password_mgr),
             HTTPDigestAuthHandler(password_mgr),
             self.preset_auth_handler,
             ReviewBoardHTTPErrorProcessor(),
         ]
 
-        if agent:
-            self.agent = agent
-        else:
-            self.agent = RBTOOLS_USER_AGENT
-
         opener = build_opener(*handlers)
-        headers = [(str('User-agent'), str(self.agent))]
+        headers = [(str('User-agent'), str(agent))]
 
         if proxy_authorization:
             headers.append((str('Proxy-Authorization'),
