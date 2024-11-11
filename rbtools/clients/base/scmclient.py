@@ -1372,13 +1372,16 @@ class BaseSCMClient:
                 logging.warning('Invalid -p value: %s; assuming zero.', p)
                 p_num = None
 
+        repository_info = self.get_repository_info()
+
         patcher = self.get_patcher(
             patches=[
                 Patch(path=Path(patch_file),
                       base_dir=base_dir,
                       prefix_level=p_num),
             ],
-            revert=revert)
+            revert=revert,
+            repository_info=repository_info)
 
         results: Sequence[PatchResult]
 

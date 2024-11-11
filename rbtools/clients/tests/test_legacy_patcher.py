@@ -102,7 +102,7 @@ class LegacyPatcherTests(kgb.SpyAgency, TestCase):
             client.apply_patch,
             base_dir='',
             base_path=None,
-            p='0',
+            p=None,
             patch_file=make_tempfile.calls[0].return_value,
             revert=False)
 
@@ -142,6 +142,6 @@ class LegacyPatcherTests(kgb.SpyAgency, TestCase):
             client.apply_patch,
             base_dir='',
             base_path=None,
-            p='0',
+            p=None,
             patch_file=make_tempfile.calls[0].return_value,
             revert=False)

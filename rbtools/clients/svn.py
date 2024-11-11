@@ -10,7 +10,7 @@ import posixpath
 import re
 import sys
 from xml.etree import ElementTree
-from typing import Dict, Iterator, List, Optional, Tuple, Union, cast
+from typing import Dict, Iterator, List, Optional, TYPE_CHECKING, Tuple, cast
 from urllib.parse import unquote
 
 from rbtools.api.errors import APIError
@@ -18,6 +18,7 @@ from rbtools.api.resource import ListResource
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
                                             SCMClientDiffResult,
+                                            SCMClientPatcher,
                                             SCMClientRevisionSpec)
 from rbtools.clients.errors import (AuthenticationError,
                                     InvalidRevisionSpecError,
@@ -39,8 +40,329 @@ from rbtools.utils.process import (RunProcessError,
                                    run_process)
 from rbtools.utils.streams import BufferedIterator
 
+if TYPE_CHECKING:
+    from rbtools.diffs.patches import Patch
+
+
+logger = logging.getLogger(__name__)
 
 _fs_encoding = sys.getfilesystemencoding()
+
+
+class SVNPatcher(SCMClientPatcher['SVNClient']):
+    """A patcher that applies Subversion patches to a tree.
+
+    This applies patches using :command:`svn patch` and to manually handle
+    added and deleted empty files.
+
+    The patcher supports tracking conflicts and partially-applied patches.
+
+    Version Added:
+        5.1
+    """
+
+    ADDED_FILES_RE = re.compile(br'^Index:\s+(\S+)\t\(added\)$', re.M)
+    DELETED_FILES_RE = re.compile(br'^Index:\s+(\S+)\t\(deleted\)$', re.M)
+
+    SVN_PATCH_STATUS_RE = re.compile(
+        br'^(?P<status>[ACDGU]) {9}(?P<filename>.+)$'
+    )
+
+    def get_default_prefix_level(
+        self,
+        *,
+        patch: Patch,
+    ) -> Optional[int]:
+        """Return the default path prefix strip level for a patch.
+
+        This function determines how much of a path to strip by default,
+        if an explicit value isn't given.
+
+        For Subversion, we always strip off any leading ``/``.
+
+        Args:
+            patch (rbtools.diffs.patches.Patch):
+                The path to generate a default prefix strip level for.
+
+        Returns:
+            int:
+            The prefix strip level, or ``None`` if a clear one could not be
+            determined.
+        """
+        repository_info = self.repository_info
+
+        if repository_info is not None:
+            base_path = repository_info.base_path
+
+            if base_path == '/':
+                # We always need to strip off the leading forward slash.
+                return 1
+            elif base_path:
+                # We strip all leading directories from base_path. The last
+                # directory will not be suffixed with a slash.
+                return base_path.count('/') + 1
+
+        return None
+
+    def apply_single_patch(
+        self,
+        *,
+        patch: Patch,
+        patch_num: int,
+    ) -> PatchResult:
+        """Internal function to apply a single patch.
+
+        This will take a single patch and apply it using Subversion.
+
+        Args:
+            patch (rbtools.diffs.patches.Patch):
+                The patch to apply, opened for reading.
+
+            patch_num (int):
+                The 1-based index of this patch in the full list of patches.
+
+        Returns:
+            rbtools.diffs.patches.PatchResult:
+            The result of the patch application, whether the patch applied
+            successfully or with normal patch failures.
+        """
+        scmclient = self.scmclient
+
+        # Make sure this is a version that supports patching. It should be
+        # safe to assume a reasonable version these days, but this remains a
+        # good bit of history and there's no harm.
+        if scmclient.subversion_client_version < scmclient.PATCH_MIN_VERSION:
+            raise MinimumVersionError(
+                'Using "rbt patch" with the SVN backend requires at least '
+                'svn 1.7.0')
+
+        revert = self.revert
+        repository_info = self.repository_info
+
+        if repository_info is not None:
+            base_path = repository_info.base_path or ''
+        else:
+            base_path = ''
+
+        patch_file = str(patch.path)
+        base_dir = patch.base_dir
+
+        if base_dir and not base_dir.startswith(base_path):
+            # The patch was created in either a higher level directory or a
+            # directory not under this one. We should exclude files from the
+            # patch that are not under this directory.
+            excluded, empty = self._exclude_files_not_in_tree(patch_file,
+                                                              base_path)
+
+            if excluded:
+                logger.warning(
+                    'This patch was generated in a different '
+                    'directory. To prevent conflicts, all files '
+                    'not under the current directory have been '
+                    'excluded. To apply all files in this '
+                    'patch, apply this patch from the %s directory.',
+                    base_dir)
+
+                if empty:
+                    logger.warning('All files were excluded from the patch.')
+
+        # Build the command line.
+        cmd: list[str] = ['patch']
+
+        prefix_level = patch.prefix_level
+
+        if prefix_level is None:
+            prefix_level = self.get_default_prefix_level(patch=patch)
+
+            # Set this back so we can refer to it later when handling empty
+            # files.
+            patch.prefix_level = prefix_level
+
+        if prefix_level is not None and prefix_level >= 0:
+            cmd.append(f'--strip={prefix_level}')
+
+        if revert:
+            cmd.append('--reverse-diff')
+
+        cmd.append(patch_file)
+
+        # Apply the patch.
+        patch_output = (
+            scmclient._run_svn(cmd,
+                               ignore_errors=True,
+                               redirect_stderr=True)
+            .stdout_bytes
+            .read()
+        )
+
+        # We'll now check the results of the application, and determine if
+        # we need to handle empty files.
+        #
+        # We can't trust exit codes for svn patch, since we'll get 0 even if
+        # we fail to patch anything. Instead, we'll look for the status output.
+        applied: bool = False
+
+        if self.can_patch_empty_files:
+            applied = self.apply_patch_for_empty_files(patch)
+
+        # Check for conflicts.
+        patch_status_re = self.SVN_PATCH_STATUS_RE
+        conflicting_files: list[str] = []
+
+        for line in patch_output.splitlines():
+            m = patch_status_re.match(line)
+
+            if m:
+                status = m.group('status')
+
+                if status == b'C':
+                    # There was a conflict.
+                    conflicting_files.append(
+                        m.group('filename').decode('utf-8'))
+                else:
+                    # Anything else is a successful result.
+                    applied = True
+
+        return PatchResult(applied=applied,
+                           patch=patch,
+                           patch_output=patch_output,
+                           patch_range=(patch_num, patch_num),
+                           has_conflicts=len(conflicting_files) > 0,
+                           conflicting_files=conflicting_files)
+
+    def apply_patch_for_empty_files(
+        self,
+        patch: Patch,
+    ) -> bool:
+        """Attempt to add or delete empty files in the patch.
+
+        Args:
+            patch (rbtools.diffs.patches.Patch):
+                The opened patch to check and possibly apply.
+
+        Returns:
+            ``True`` if there are empty files in the patch that were applied.
+            ``False`` if there were no empty files or the files could not be
+            applied (which will lead to an error).
+        """
+        patched_empty_files: bool = False
+        patch_content = patch.content
+        prefix_level = patch.prefix_level
+        scmclient = self.scmclient
+
+        if self.revert:
+            added_files_re = self.DELETED_FILES_RE
+            deleted_files_re = self.ADDED_FILES_RE
+        else:
+            added_files_re = self.ADDED_FILES_RE
+            deleted_files_re = self.DELETED_FILES_RE
+
+        added_files = [
+            _filename.decode('utf-8')
+            for _filename in added_files_re.findall(patch_content)
+        ]
+        deleted_files = [
+            _filename.decode('utf-8')
+            for _filename in deleted_files_re.findall(patch_content)
+        ]
+
+        if added_files:
+            if prefix_level:
+                added_files = scmclient._strip_p_num_slashes(added_files,
+                                                             prefix_level)
+
+            make_empty_files(added_files)
+
+            # We require --force here because svn will complain if we run
+            # `svn add` on a file that has already been added or deleted.
+            try:
+                scmclient._run_svn(['add', '--force'] + added_files)
+                patched_empty_files = True
+            except RunProcessError:
+                logger.error('Unable to execute "svn add" on: %s',
+                             ', '.join(added_files))
+
+        if deleted_files:
+            if prefix_level:
+                deleted_files = scmclient._strip_p_num_slashes(deleted_files,
+                                                               prefix_level)
+
+            # We require --force here because svn will complain if we run
+            # `svn delete` on a file that has already been added or deleted.
+            try:
+                scmclient._run_svn(['delete', '--force'] + deleted_files)
+                patched_empty_files = True
+            except RunProcessError:
+                logger.error('Unable to execute "svn delete" on: %s',
+                             ', '.join(deleted_files))
+
+        return patched_empty_files
+
+    def _exclude_files_not_in_tree(
+        self,
+        patch_file: str,
+        base_path: str,
+    ) -> tuple[bool, bool]:
+        """Process a diff and remove entries not in the current directory.
+
+        Args:
+            patch_file (str):
+                The filename of the patch file to process. This file will be
+                overwritten by the processed patch.
+
+            base_path (str):
+                The relative path between the root of the repository and the
+                directory that the patch was created in.
+
+        Returns:
+            tuple:
+            A 2-tuple of:
+
+            Tuple:
+                0 (bool):
+                    Whether any files have been excluded.
+
+                1 (bool):
+                    Whether the diff is empty.
+        """
+        excluded_files = False
+        empty_patch = True
+
+        # If our base path does not have a trailing slash (which it won't
+        # unless we are at a checkout root), we append a slash so that we can
+        # determine if files are under the base_path. We do this so that files
+        # like /trunkish (which begins with /trunk) do not mistakenly get
+        # placed in /trunk if that is the base_path.
+        if not base_path.endswith('/'):
+            base_path += '/'
+
+        filtered_patch_name = make_tempfile()
+
+        with open(filtered_patch_name, 'wb') as filtered_patch:
+            with open(patch_file, 'rb') as original_patch:
+                include_file = True
+
+                INDEX_FILE_RE = SVNClient.INDEX_FILE_RE
+
+                for line in original_patch.readlines():
+                    m = INDEX_FILE_RE.match(line)
+
+                    if m:
+                        filename = m.group(1).decode('utf-8')
+
+                        include_file = filename.startswith(base_path)
+
+                        if not include_file:
+                            excluded_files = True
+                        else:
+                            empty_patch = False
+
+                    if include_file:
+                        filtered_patch.write(line)
+
+        os.rename(filtered_patch_name, patch_file)
+
+        return excluded_files, empty_patch
 
 
 class SVNClient(BaseSCMClient):
@@ -54,6 +376,8 @@ class SVNClient(BaseSCMClient):
     name = 'Subversion'
     server_tool_names = 'Subversion'
     server_tool_ids = ['subversion']
+
+    patcher_cls = SVNPatcher
 
     requires_diff_tool = True
 
@@ -69,9 +393,6 @@ class SVNClient(BaseSCMClient):
     DIFF_ORIG_FILE_LINE_RE = re.compile(br'^---\s+.*\s+\(.*\)')
     DIFF_NEW_FILE_LINE_RE = re.compile(br'^\+\+\+\s+.*\s+\(.*\)')
     DIFF_COMPLETE_REMOVAL_RE = re.compile(br'^@@ -1,\d+ \+0,0 @@$')
-
-    ADDED_FILES_RE = re.compile(br'^Index:\s+(\S+)\t\(added\)$', re.M)
-    DELETED_FILES_RE = re.compile(br'^Index:\s+(\S+)\t\(deleted\)$', re.M)
 
     REVISION_WORKING_COPY = '--rbtools-working-copy'
     REVISION_CHANGELIST_PREFIX = '--rbtools-changelist:'
@@ -1130,299 +1451,6 @@ class SVNClient(BaseSCMClient):
         # Strip off ending newline, and return it as the second component.
         return (diff_line.split(b'\n')[0].decode(_fs_encoding),
                 b'\n')
-
-    def _get_p_number(
-        self,
-        base_path: str,
-        base_dir: str,
-    ) -> int:
-        """Return the argument for --strip in svn patch.
-
-        This determines the number of path components to remove from file paths
-        in the diff to be applied.
-
-        Args:
-            base_path (str):
-                The relative path between the repository root and the
-                directory that the diff file was generated in.
-
-            base_dir (str, unused):
-                The current relative path between the repository root and the
-                user's working directory.
-
-        Returns:
-            int:
-            The prefix number to pass into the :command:`patch` command.
-        """
-        if base_path == '/':
-            # We always need to strip off the leading forward slash.
-            return 1
-        else:
-            # We strip all leading directories from base_path. The last
-            # directory will not be suffixed with a slash.
-            return base_path.count('/') + 1
-
-    def _exclude_files_not_in_tree(
-        self,
-        patch_file: str,
-        base_path: str,
-    ) -> Tuple[bool, bool]:
-        """Process a diff and remove entries not in the current directory.
-
-        Args:
-            patch_file (str):
-                The filename of the patch file to process. This file will be
-                overwritten by the processed patch.
-
-            base_path (str):
-                The relative path between the root of the repository and the
-                directory that the patch was created in.
-
-        Returns:
-            tuple:
-            A 2-tuple of:
-
-            Tuple:
-                0 (bool):
-                    Whether any files have been excluded.
-
-                1 (bool):
-                    Whether the diff is empty.
-        """
-        excluded_files = False
-        empty_patch = True
-
-        # If our base path does not have a trailing slash (which it won't
-        # unless we are at a checkout root), we append a slash so that we can
-        # determine if files are under the base_path. We do this so that files
-        # like /trunkish (which begins with /trunk) do not mistakenly get
-        # placed in /trunk if that is the base_path.
-        if not base_path.endswith('/'):
-            base_path += '/'
-
-        filtered_patch_name = make_tempfile()
-
-        with open(filtered_patch_name, 'wb') as filtered_patch:
-            with open(patch_file, 'rb') as original_patch:
-                include_file = True
-
-                INDEX_FILE_RE = self.INDEX_FILE_RE
-
-                for line in original_patch.readlines():
-                    m = INDEX_FILE_RE.match(line)
-
-                    if m:
-                        filename = m.group(1).decode('utf-8')
-
-                        include_file = filename.startswith(base_path)
-
-                        if not include_file:
-                            excluded_files = True
-                        else:
-                            empty_patch = False
-
-                    if include_file:
-                        filtered_patch.write(line)
-
-        os.rename(filtered_patch_name, patch_file)
-
-        return excluded_files, empty_patch
-
-    def apply_patch(
-        self,
-        patch_file: str,
-        base_path: str,
-        base_dir: str,
-        p: Optional[str] = None,
-        revert: bool = False,
-    ) -> PatchResult:
-        """Apply the patch and return a PatchResult indicating its success.
-
-        Version Changed:
-            4.0:
-            This now supports returning information on files with conflicts.
-
-        Args:
-            patch_file (str):
-                The name of the patch file to apply.
-
-            base_path (str):
-                The base path that the diff was generated in.
-
-            base_dir (str):
-                The path of the current working directory relative to the root
-                of the repository.
-
-            p (str, optional):
-                The prefix level of the diff.
-
-            revert (bool, optional):
-                Whether the patch should be reverted rather than applied.
-
-        Returns:
-            rbtools.diffs.patches.PatchResult:
-            The result of the patch operation.
-        """
-        if self.subversion_client_version < self.PATCH_MIN_VERSION:
-            raise MinimumVersionError(
-                'Using "rbt patch" with the SVN backend requires at least '
-                'svn 1.7.0')
-
-        if base_dir and not base_dir.startswith(base_path):
-            # The patch was created in either a higher level directory or a
-            # directory not under this one. We should exclude files from the
-            # patch that are not under this directory.
-            excluded, empty = self._exclude_files_not_in_tree(patch_file,
-                                                              base_path)
-
-            if excluded:
-                logging.warn('This patch was generated in a different '
-                             'directory. To prevent conflicts, all files '
-                             'not under the current directory have been '
-                             'excluded. To apply all files in this '
-                             'patch, apply this patch from the %s directory.',
-                             base_dir)
-
-                if empty:
-                    logging.warn('All files were excluded from the patch.')
-
-        cmd: List[str] = ['patch']
-
-        if p:
-            try:
-                p_num = int(p)
-            except ValueError:
-                logging.error('Invalid --px value "%s"', p)
-                return PatchResult(applied=False)
-        else:
-            p_num = self._get_p_number(base_path, base_dir)
-
-        if p_num >= 0:
-            cmd.append('--strip=%s' % p_num)
-
-        if revert:
-            cmd.append('--reverse-diff')
-
-        cmd.append(patch_file)
-
-        patch_output = (
-            self._run_svn(cmd,
-                          ignore_errors=True,
-                          redirect_stderr=True)
-            .stdout_bytes
-            .read()
-        )
-
-        applied = False
-
-        if self.supports_empty_files():
-            try:
-                with open(patch_file, 'rb') as f:
-                    patch = f.read()
-            except IOError as e:
-                logging.error('Unable to read file %s: %s', patch_file, e)
-                return PatchResult(applied=False)
-
-            applied = self.apply_patch_for_empty_files(
-                patch=patch,
-                p_num=p_num,
-                revert=revert)
-
-        patch_status_re = re.compile(
-            b'^(?P<status>[ACDGU]) {9}(?P<filename>.+)$'
-        )
-
-        conflicting_files: List[str] = []
-
-        # We can't trust exit codes for svn patch, since we'll get 0 even if
-        # we fail to patch anything. Instead, look for the status output.
-        for line in patch_output.splitlines():
-            m = patch_status_re.match(line)
-
-            if m:
-                status = m.group('status')
-
-                if status == b'C':
-                    # There was a conflict.
-                    conflicting_files.append(
-                        m.group('filename').decode('utf-8'))
-                else:
-                    # Anything else is a successful result.
-                    applied = True
-
-        return PatchResult(applied=applied,
-                           has_conflicts=bool(conflicting_files),
-                           conflicting_files=conflicting_files,
-                           patch_output=patch_output)
-
-    def apply_patch_for_empty_files(
-        self,
-        patch: bytes,
-        p_num: Union[int, str],
-        revert: bool = False,
-    ) -> bool:
-        """Attempt to add or delete empty files in the patch.
-
-        Args:
-            patch (bytes):
-                The contents of the patch.
-
-            p_num (int):
-                The prefix level of the diff.
-
-            revert (bool, optional):
-                Whether the patch should be reverted rather than applied.
-
-        Returns:
-            ``True`` if there are empty files in the patch. ``False`` if there
-            were no empty files, or if an error occurred while applying the
-            patch.
-        """
-        patched_empty_files = False
-
-        if revert:
-            added_files_re = self.DELETED_FILES_RE
-            deleted_files_re = self.ADDED_FILES_RE
-        else:
-            added_files_re = self.ADDED_FILES_RE
-            deleted_files_re = self.DELETED_FILES_RE
-
-        added_files = [
-            _filename.decode('utf-8')
-            for _filename in added_files_re.findall(patch)
-        ]
-        deleted_files = [
-            _filename.decode('utf-8')
-            for _filename in deleted_files_re.findall(patch)
-        ]
-
-        if added_files:
-            added_files = self._strip_p_num_slashes(added_files, int(p_num))
-            make_empty_files(added_files)
-
-            # We require --force here because svn will complain if we run
-            # `svn add` on a file that has already been added or deleted.
-            try:
-                self._run_svn(['add', '--force'] + added_files)
-                patched_empty_files = True
-            except RunProcessError:
-                logging.error('Unable to execute "svn add" on: %s',
-                              ', '.join(added_files))
-
-        if deleted_files:
-            deleted_files = self._strip_p_num_slashes(deleted_files,
-                                                      int(p_num))
-
-            # We require --force here because svn will complain if we run
-            # `svn delete` on a file that has already been added or deleted.
-            try:
-                self._run_svn(['delete', '--force'] + deleted_files)
-                patched_empty_files = True
-            except RunProcessError:
-                logging.error('Unable to execute "svn delete" on: %s',
-                              ', '.join(deleted_files))
-
-        return patched_empty_files
 
     def supports_empty_files(self) -> bool:
         """Check if the server supports added/deleted empty files.

@@ -22,7 +22,10 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
 from rbtools.clients.svn import SVNRepositoryInfo, SVNClient
 from rbtools.clients.tests import FOO1, FOO2, FOO3, SCMClientTestCase
 from rbtools.deprecation import RemovedInRBTools50Warning
+from rbtools.diffs.errors import ApplyPatchError
+from rbtools.diffs.patches import Patch
 from rbtools.utils.checks import check_install
+from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import (RunProcessResult,
                                    run_process,
                                    run_process_exec)
@@ -377,8 +380,12 @@ class SVNRepositoryMatchTests(SCMClientTestCase):
             '/')
 
 
-class SVNClientTests(SCMClientTestCase):
-    """Unit tests for SVNClient."""
+class BaseSVNClientTests(SCMClientTestCase):
+    """Base class for SVN client test.
+
+    Version Added:
+        5.1
+    """
 
     scmclient_cls = SVNClient
 
@@ -485,6 +492,10 @@ class SVNClientTests(SCMClientTestCase):
             os.mkdir(dirname)
 
         self._run_svn(['add', dirname])
+
+
+class SVNClientTests(BaseSVNClientTests):
+    """Unit tests for SVNClient."""
 
     def test_check_dependencies_with_found(self):
         """Testing SVNClient.check_dependencies with hg found"""
@@ -2023,3 +2034,557 @@ class SVNClientTests(SCMClientTestCase):
             client.get_file_size(
                 filename='notfound',
                 revision='2')
+
+
+class SVNPatcherTests(BaseSVNClientTests):
+    """Unit tests for SVNPatcher.
+
+    Version Added:
+        5.1
+    """
+
+    def test_patch(self) -> None:
+        """Testing SVNPatcher.patch"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(run_process_exec)
+        self.spy_on(make_tempfile)
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=(
+                    b'Index: /\xc3\xa2.txt\n'
+                    b'================================================'
+                    b'===================\n'
+                    b'--- /\xc3\xa2.txt\t(revision 5)\n'
+                    b'+++ /\xc3\xa2.txt\t(working copy)\n'
+                    b'@@ -1,2 +1,3 @@\n'
+                    b' This file has a non-utf8 filename.\n'
+                    b' It also contains a non-utf8 character: \xc3\xa9.\n'
+                    b'+And this! \xf0\x9f\xa5\xb9\n'
+                    b'Index: /foo.txt\n'
+                    b'================================================'
+                    b'===================\n'
+                    b'--- /foo.txt\t(revision 5)\n'
+                    b'+++ /foo.txt\t(working copy)\n'
+                    b'@@ -6,6 +6,6 @@\n'
+                    b' dum conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b'-Albanique patres, atque altae moenia Romae.\n'
+                    b'+Albanique patres, atque altae moenia Romae!\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'\n'
+                )),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+        self.assertEqual(
+            result.patch_output,
+            b'U         \xc3\xa2.txt\n'
+            b'U         foo.txt\n')
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            [
+                'svn', '--non-interactive', 'patch', '--strip=1',
+                make_tempfile.calls[0].return_value,
+            ],
+            redirect_stderr=True)
+
+        with open('foo.txt', 'rb') as fp:
+            self.assertEqual(
+                fp.read(),
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'Italiam, fato profugus, Laviniaque venit\n'
+                b'litora, multum ille et terris iactatus et alto\n'
+                b'vi superum saevae memorem Iunonis ob iram;\n'
+                b'dum conderet urbem,\n'
+                b'inferretque deos Latio, genus unde Latinum,\n'
+                b'Albanique patres, atque altae moenia Romae.\n'
+                b'Albanique patres, atque altae moenia Romae!\n'
+                b'Musa, mihi causas memora, quo numine laeso,\n'
+                b'\n')
+
+    def test_patch_with_prefix_level(self) -> None:
+        """Testing SVNPatcher.patch with Patch.prefix_level="""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(run_process_exec)
+        self.spy_on(make_tempfile)
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(
+                    prefix_level=3,
+                    content=(
+                        b'Index: /a/b/\xc3\xa2.txt\n'
+                        b'================================================'
+                        b'===================\n'
+                        b'--- /a/b/\xc3\xa2.txt\t(revision 5)\n'
+                        b'+++ /a/b/\xc3\xa2.txt\t(working copy)\n'
+                        b'@@ -1,2 +1,3 @@\n'
+                        b' This file has a non-utf8 filename.\n'
+                        b' It also contains a non-utf8 character: \xc3\xa9.\n'
+                        b'+And this! \xf0\x9f\xa5\xb9\n'
+                        b'Index: /a/b/foo.txt\n'
+                        b'================================================'
+                        b'===================\n'
+                        b'--- /a/b/foo.txt\t(revision 5)\n'
+                        b'+++ /a/b/foo.txt\t(working copy)\n'
+                        b'@@ -6,6 +6,6 @@\n'
+                        b' dum conderet urbem,\n'
+                        b' inferretque deos Latio, genus unde Latinum,\n'
+                        b' Albanique patres, atque altae moenia Romae.\n'
+                        b'-Albanique patres, atque altae moenia Romae.\n'
+                        b'+Albanique patres, atque altae moenia Romae!\n'
+                        b' Musa, mihi causas memora, quo numine laeso,\n'
+                        b'\n'
+                    )),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+        self.assertEqual(
+            result.patch_output,
+            b'U         \xc3\xa2.txt\n'
+            b'U         foo.txt\n')
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            [
+                'svn', '--non-interactive', 'patch', '--strip=3',
+                make_tempfile.calls[0].return_value,
+            ],
+            redirect_stderr=True)
+
+        with open('foo.txt', 'rb') as fp:
+            self.assertEqual(
+                fp.read(),
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'Italiam, fato profugus, Laviniaque venit\n'
+                b'litora, multum ille et terris iactatus et alto\n'
+                b'vi superum saevae memorem Iunonis ob iram;\n'
+                b'dum conderet urbem,\n'
+                b'inferretque deos Latio, genus unde Latinum,\n'
+                b'Albanique patres, atque altae moenia Romae.\n'
+                b'Albanique patres, atque altae moenia Romae!\n'
+                b'Musa, mihi causas memora, quo numine laeso,\n'
+                b'\n')
+
+    def test_patch_with_revert(self) -> None:
+        """Testing SVNPatcher.patch with revert=True"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(run_process_exec)
+        self.spy_on(make_tempfile)
+
+        with open('â.txt', 'ab') as fp:
+            fp.write(b'And this! \xf0\x9f\xa5\xb9\n')
+
+        with open('foo.txt', 'wb') as fp:
+            fp.write(
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'Italiam, fato profugus, Laviniaque venit\n'
+                b'litora, multum ille et terris iactatus et alto\n'
+                b'vi superum saevae memorem Iunonis ob iram;\n'
+                b'dum conderet urbem,\n'
+                b'inferretque deos Latio, genus unde Latinum,\n'
+                b'Albanique patres, atque altae moenia Romae.\n'
+                b'Albanique patres, atque altae moenia Romae!\n'
+                b'Musa, mihi causas memora, quo numine laeso,\n'
+                b'\n'
+            )
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            revert=True,
+            patches=[
+                Patch(content=(
+                    b'Index: /\xc3\xa2.txt\n'
+                    b'================================================'
+                    b'===================\n'
+                    b'--- /\xc3\xa2.txt\t(revision 5)\n'
+                    b'+++ /\xc3\xa2.txt\t(working copy)\n'
+                    b'@@ -1,2 +1,3 @@\n'
+                    b' This file has a non-utf8 filename.\n'
+                    b' It also contains a non-utf8 character: \xc3\xa9.\n'
+                    b'+And this! \xf0\x9f\xa5\xb9\n'
+                    b'Index: /foo.txt\n'
+                    b'================================================'
+                    b'===================\n'
+                    b'--- /foo.txt\t(revision 5)\n'
+                    b'+++ /foo.txt\t(working copy)\n'
+                    b'@@ -6,6 +6,6 @@\n'
+                    b' dum conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b'-Albanique patres, atque altae moenia Romae.\n'
+                    b'+Albanique patres, atque altae moenia Romae!\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'\n'
+                )),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+        self.assertEqual(
+            result.patch_output,
+            b'U         \xc3\xa2.txt\n'
+            b'U         foo.txt\n')
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            [
+                'svn', '--non-interactive', 'patch', '--strip=1',
+                '--reverse-diff', make_tempfile.calls[0].return_value,
+            ],
+            redirect_stderr=True)
+
+        with open('foo.txt', 'rb') as fp:
+            self.assertEqual(
+                fp.read(),
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'Italiam, fato profugus, Laviniaque venit\n'
+                b'litora, multum ille et terris iactatus et alto\n'
+                b'vi superum saevae memorem Iunonis ob iram;\n'
+                b'dum conderet urbem,\n'
+                b'inferretque deos Latio, genus unde Latinum,\n'
+                b'Albanique patres, atque altae moenia Romae.\n'
+                b'Albanique patres, atque altae moenia Romae.\n'
+                b'Musa, mihi causas memora, quo numine laeso,\n'
+                b'\n')
+
+    def test_patch_with_empty_files(self) -> None:
+        """Testing SVNPatcher.patch with empty files"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(run_process_exec)
+        self.spy_on(make_tempfile)
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=(
+                    b'Index: empty-file\t(deleted)\n'
+                    b'================================================'
+                    b'===================\n'
+                    b'Index: new-empty-file-1\t(added)\n'
+                    b'================================================'
+                    b'===================\n'
+                    b'Index: new-empty-file-2\t(added)\n'
+                    b'================================================'
+                    b'===================\n'
+                )),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+        self.assertEqual(result.patch_output, b'')
+
+        self.assertSpyCallCount(run_process_exec, 3)
+        self.assertSpyCalledWith(
+            run_process_exec.calls[0],
+            [
+                'svn', '--non-interactive', 'patch', '--strip=1',
+                make_tempfile.calls[0].return_value,
+            ],
+            redirect_stderr=True)
+        self.assertSpyCalledWith(
+            run_process_exec.calls[1],
+            [
+                'svn', '--non-interactive', 'add', '--force',
+                'new-empty-file-1', 'new-empty-file-2',
+            ])
+        self.assertSpyCalledWith(
+            run_process_exec.calls[2],
+            [
+                'svn', '--non-interactive', 'delete', '--force',
+                'empty-file',
+            ])
+
+        self.assertFalse(os.path.exists('empty-file'))
+        self.assertTrue(os.path.exists('new-empty-file-1'))
+        self.assertTrue(os.path.exists('new-empty-file-2'))
+
+        with open('new-empty-file-1', 'rb') as fp:
+            self.assertEqual(fp.read(), b'')
+
+        with open('new-empty-file-2', 'rb') as fp:
+            self.assertEqual(fp.read(), b'')
+
+    def test_patch_with_empty_files_revert(self) -> None:
+        """Testing SVNPatcher.patch with empty files and revert=True"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(run_process_exec)
+        self.spy_on(make_tempfile)
+
+        with open('new-empty-file-1', 'wb'):
+            pass
+
+        with open('new-empty-file-2', 'wb'):
+            pass
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            revert=True,
+            patches=[
+                Patch(content=(
+                    b'Index: empty-file\t(deleted)\n'
+                    b'================================================'
+                    b'===================\n'
+                    b'Index: new-empty-file-1\t(added)\n'
+                    b'================================================'
+                    b'===================\n'
+                    b'Index: new-empty-file-2\t(added)\n'
+                    b'================================================'
+                    b'===================\n'
+                )),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+        self.assertEqual(result.patch_output, b'')
+
+        self.assertSpyCallCount(run_process_exec, 3)
+        self.assertSpyCalledWith(
+            run_process_exec.calls[0],
+            [
+                'svn', '--non-interactive', 'patch', '--strip=1',
+                '--reverse-diff', make_tempfile.calls[0].return_value,
+            ],
+            redirect_stderr=True)
+        self.assertSpyCalledWith(
+            run_process_exec.calls[1],
+            [
+                'svn', '--non-interactive', 'add', '--force',
+                'empty-file',
+            ])
+        self.assertSpyCalledWith(
+            run_process_exec.calls[2],
+            [
+                'svn', '--non-interactive', 'delete', '--force',
+                'new-empty-file-1', 'new-empty-file-2',
+            ])
+
+        self.assertTrue(os.path.exists('empty-file'))
+        self.assertFalse(os.path.exists('new-empty-file-1'))
+        self.assertFalse(os.path.exists('new-empty-file-2'))
+
+        with open('empty-file', 'rb') as fp:
+            self.assertEqual(fp.read(), b'')
+
+    def test_patch_with_not_applied(self) -> None:
+        """Testing SVNPatcher.patch with not applied"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(run_process_exec)
+        self.spy_on(make_tempfile)
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=(
+                    b'Index: foorp.txt\n'
+                    b'================================================'
+                    b'===================\n'
+                )),
+            ])
+
+        message = (
+            'Could not apply patch 1 of 1. The patch may be invalid, or '
+            'there may be conflicts that could not be resolved.'
+        )
+
+        with self.assertRaisesMessage(ApplyPatchError, message) as ctx:
+            list(patcher.patch())
+
+        result = ctx.exception.failed_patch_result
+        self.assertFalse(result.success)
+        self.assertFalse(result.applied)
+        self.assertFalse(result.has_conflicts)
+        self.assertIsNotNone(result.patch)
+        self.assertEqual(result.conflicting_files, [])
+        self.assertEqual(result.patch_output, b'')
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            [
+                'svn', '--non-interactive', 'patch', '--strip=1',
+                make_tempfile.calls[0].return_value,
+            ],
+            redirect_stderr=True)
+
+    def test_patch_with_conflicts(self) -> None:
+        """Testing SVNPatcher.patch with conflicts"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(run_process_exec)
+        self.spy_on(make_tempfile)
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=(
+                    b'Index: /\xc3\xa2.txt\n'
+                    b'================================================'
+                    b'===================\n'
+                    b'--- /\xc3\xa2.txt\t(revision 5)\n'
+                    b'+++ /\xc3\xa2.txt\t(working copy)\n'
+                    b'@@ -1,1 +1,1 @@\n'
+                    b'-This is a bad line\n'
+                    b'+Oh hi! \xf0\x9f\xa5\xb9\n'
+                    b'Index: /foo.txt\n'
+                    b'================================================'
+                    b'===================\n'
+                    b'--- /foo.txt\t(revision 5)\n'
+                    b'+++ /foo.txt\t(working copy)\n'
+                    b'@@ -6,6 +6,6 @@\n'
+                    b' dum conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b'-foo\n'
+                    b'+Albanique patres, atque altae moenia Romae!\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'\n'
+                )),
+            ])
+
+        message = (
+            'Could not apply patch 1 of 1. The patch may be invalid, or '
+            'there may be conflicts that could not be resolved.'
+        )
+
+        with self.assertRaisesMessage(ApplyPatchError, message) as ctx:
+            list(patcher.patch())
+
+        result = ctx.exception.failed_patch_result
+        self.assertFalse(result.success)
+        self.assertFalse(result.applied)
+        self.assertTrue(result.has_conflicts)
+        self.assertIsNotNone(result.patch)
+        self.assertEqual(
+            result.conflicting_files,
+            [
+                'â.txt',
+                'foo.txt',
+            ])
+        self.assertEqual(
+            result.patch_output,
+            b'C         \xc3\xa2.txt\n'
+            b'>         rejected hunk @@ -1,1 +1,1 @@\n'
+            b'C         foo.txt\n'
+            b'>         rejected hunk @@ -6,6 +6,6 @@\n'
+            b'Summary of conflicts:\n'
+            b'  Text conflicts: 2\n')
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            [
+                'svn', '--non-interactive', 'patch', '--strip=1',
+                make_tempfile.calls[0].return_value,
+            ],
+            redirect_stderr=True)
+
+    def test_patch_with_applied_and_conflicts(self) -> None:
+        """Testing SVNPatcher.patch with applied and conflicts"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(run_process_exec)
+        self.spy_on(make_tempfile)
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=(
+                    b'Index: /\xc3\xa2.txt\n'
+                    b'================================================'
+                    b'===================\n'
+                    b'--- /\xc3\xa2.txt\t(revision 5)\n'
+                    b'+++ /\xc3\xa2.txt\t(working copy)\n'
+                    b'@@ -1,2 +1,3 @@\n'
+                    b' This file has a non-utf8 filename.\n'
+                    b' It also contains a non-utf8 character: \xc3\xa9.\n'
+                    b'+And this! \xf0\x9f\xa5\xb9\n'
+                    b'Index: /foo.txt\n'
+                    b'================================================'
+                    b'===================\n'
+                    b'--- /foo.txt\t(revision 5)\n'
+                    b'+++ /foo.txt\t(working copy)\n'
+                    b'@@ -6,6 +6,6 @@\n'
+                    b' dum conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b'-foo\n'
+                    b'+Albanique patres, atque altae moenia Romae!\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'\n'
+                )),
+            ])
+
+        message = 'Partially applied patch 1 of 1, but there were conflicts.'
+
+        with self.assertRaisesMessage(ApplyPatchError, message) as ctx:
+            list(patcher.patch())
+
+        result = ctx.exception.failed_patch_result
+        self.assertFalse(result.success)
+        self.assertTrue(result.applied)
+        self.assertTrue(result.has_conflicts)
+        self.assertIsNotNone(result.patch)
+        self.assertEqual(
+            result.conflicting_files,
+            [
+                'foo.txt',
+            ])
+        self.assertEqual(
+            result.patch_output,
+            b'U         \xc3\xa2.txt\n'
+            b'C         foo.txt\n'
+            b'>         rejected hunk @@ -6,6 +6,6 @@\n'
+            b'Summary of conflicts:\n'
+            b'  Text conflicts: 1\n')
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            [
+                'svn', '--non-interactive', 'patch', '--strip=1',
+                make_tempfile.calls[0].return_value,
+            ],
+            redirect_stderr=True)
