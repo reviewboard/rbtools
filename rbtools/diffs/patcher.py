@@ -307,7 +307,7 @@ class Patcher:
                         'prepare_for_commit().'
                     )
 
-                default_author = PatchAuthor(full_name=submitter.full_name,
+                default_author = PatchAuthor(full_name=submitter.fullname,
                                              email=submitter.email)
                 default_message = extract_commit_message(review_request)
 

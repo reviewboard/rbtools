@@ -9,16 +9,20 @@ from __future__ import annotations
 import argparse
 import logging
 import re
-from typing import (Any, cast, ClassVar, Dict, List, Mapping, Optional,
-                    TYPE_CHECKING, Tuple, Union)
+from pathlib import Path
+from typing import (Any, ClassVar, Dict, Generic, List, Mapping, Optional,
+                    Sequence, TYPE_CHECKING, Tuple, TypeVar, Union, cast)
 
-from typing_extensions import NotRequired, TypedDict, final
+from typing_extensions import NotRequired, TypedDict, Unpack, final
 
-from rbtools.clients.errors import SCMClientDependencyError, SCMError
-from rbtools.deprecation import RemovedInRBTools50Warning
-from rbtools.diffs.patches import PatchResult
+from rbtools.clients.errors import (SCMClientDependencyError,
+                                    SCMError)
+from rbtools.deprecation import (RemovedInRBTools50Warning,
+                                 RemovedInRBTools70Warning)
+from rbtools.diffs.errors import ApplyPatchError
+from rbtools.diffs.patcher import Patcher
+from rbtools.diffs.patches import Patch
 from rbtools.diffs.tools.registry import diff_tools_registry
-from rbtools.utils.process import execute
 
 if TYPE_CHECKING:
     from rbtools.api.capabilities import Capabilities
@@ -26,9 +30,17 @@ if TYPE_CHECKING:
                                       ListResource,
                                       ReviewRequestResource)
     from rbtools.clients.base.repository import RepositoryInfo
-    from rbtools.diffs.tools.base import BaseDiffTool
     from rbtools.config import RBToolsConfig
-    from rbtools.diffs.patches import PatchAuthor
+    from rbtools.diffs.tools.base import BaseDiffTool
+    from rbtools.diffs.patcher import PatcherKwargs
+    from rbtools.diffs.patches import PatchAuthor, PatchResult
+
+
+#: A generic type variable for BaseSCMClient subclasses.
+#:
+#: Version Added:
+#:     5.1
+TSCMClient = TypeVar('TSCMClient', bound='BaseSCMClient')
 
 
 class SCMClientRevisionSpec(TypedDict):
@@ -248,7 +260,190 @@ class SCMClientCommitMessage(TypedDict):
     description: NotRequired[Optional[str]]
 
 
-class BaseSCMClient(object):
+class SCMClientPatcher(Generic[TSCMClient], Patcher):
+    """A Patcher provided by a SCMClient.
+
+    SCMClients that define custom patchers can subclass this to implement a
+    new patcher. It takes care of storing initial state for the patcher based
+    on the SCMClient, providing access to the parent SCMClient instance, and
+    generating commits from patches.
+
+    Version Added:
+        5.1
+    """
+
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The SCMClient that owns the patcher.
+    scmclient: TSCMClient
+
+    def __init__(
+        self,
+        *,
+        scmclient: TSCMClient,
+        **kwargs: Unpack[PatcherKwargs],
+    ) -> None:
+        """Initialize the patcher.
+
+        Args:
+            scmclient (BaseSCMClient):
+                The SCMClient object.
+        """
+        super().__init__(**kwargs)
+
+        self.scmclient = scmclient
+        self.can_patch_empty_files = scmclient.supports_empty_files()
+        self.can_commit = (
+            type(scmclient).create_commit is not
+            BaseSCMClient.create_commit
+        )
+
+    def create_commit(
+        self,
+        *,
+        patch_result: PatchResult,
+        run_commit_editor: bool,
+    ) -> None:
+        """Internal method to create a commit based on a patch result.
+
+        This will invoke the SCMClient's logic for committing files from
+        a patch.
+
+        Args:
+            patch_result (rbtools.diffs.patches.PatchResult):
+                The patch result containing the patch/patches to commit.
+
+            run_commit_editor (bool):
+                Whether to run the configured commit editor to alter the
+                commit message.
+
+        Raises:
+            rbtools.diffs.errors.ApplyPatchResult:
+                There was an error attempting to commit the patch.
+        """
+        patch = patch_result.patch
+        assert patch
+
+        author = patch.author
+        message = patch.message
+
+        assert author
+        assert message
+
+        self.scmclient.create_commit(author=author,
+                                     message=message,
+                                     run_editor=self.run_commit_editor)
+
+
+class _LegacyPatcher(SCMClientPatcher['BaseSCMClient']):
+    """A Patcher that wraps legacy SCMClient patching functions.
+
+    This is used for SCMClients that don't yet support the modern patching
+    support introduced in RBTools 5.1.
+
+    This is scheduled to be removed in RBTools 7.
+
+    Version Added:
+        5.1
+    """
+
+    def apply_single_patch(
+        self,
+        *,
+        patch: Patch,
+        patch_num: int,
+    ) -> PatchResult:
+        """Internal function to apply a single patch.
+
+        This will take a single patch and apply it using the SCMClient's
+        legacy patching methods.
+
+        Args:
+            patch (rbtools.diffs.patches.Patch):
+                The patch to apply, opened for reading.
+
+            patch_num (int):
+                The 1-based index of this patch in the full list of patches.
+
+        Returns:
+            rbtools.diffs.patches.PatchResult:
+            The result of the patch application, whether the patch applied
+            successfully or with normal patch failures.
+
+        Raises:
+            rbtools.diffs.errors.ApplyPatchResult:
+                There was an error attempting to apply the patch.
+
+                This won't be raised simply for conflicts or normal patch
+                failures. It may be raised for errors encountered during
+                the patching process.
+        """
+        repository_info = self.repository_info
+
+        assert repository_info is not None
+
+        # NOTE: Typing is bad here, but was before. It's non-trivial to sort
+        #       out the base_path and base_dir typing requirements, since the
+        #       logic and expectations are all over the map. We'll fix it with
+        #       the move to the new Patcher support.
+        base_path = repository_info.base_path
+        base_dir = patch.base_dir or ''
+        prefix_level = patch.prefix_level
+
+        norm_prefix_level: Optional[str]
+
+        if prefix_level is not None:
+            norm_prefix_level = str(prefix_level)
+        else:
+            norm_prefix_level = None
+
+        return self.scmclient.apply_patch(
+            patch_file=str(patch.path),
+            base_path=base_path,  # type: ignore
+            base_dir=base_dir,
+            p=norm_prefix_level,
+            revert=self.revert)
+
+    def apply_patch_for_empty_files(
+        self,
+        patch: Patch,
+    ) -> bool:
+        """Apply an empty file patch to a file.
+
+        This will invoke the SCMClient's logic for applying a patch for an
+        empty file.
+
+        Args:
+            patch (rbtools.diffs.patches.Patch):
+                The opened patch to check and possibly apply.
+
+        Returns:
+            bool:
+            ``True`` if there are empty files in the patch that were applied.
+            ``False`` if there were no empty files or the files could not be
+            applied (which will lead to an error).
+
+        Raises:
+            rbtools.diffs.errors.ApplyPatchError:
+                There was an error while applying the patch.
+        """
+        norm_prefix_level: Optional[str]
+        prefix_level = patch.prefix_level
+
+        if prefix_level is not None:
+            norm_prefix_level = str(prefix_level)
+        else:
+            norm_prefix_level = None
+
+        return self.scmclient.apply_patch_for_empty_files(
+            patch.content,
+            p_num=norm_prefix_level,  # type: ignore
+            revert=self.revert)
+
+
+class BaseSCMClient:
     """A base class for interfacing with a source code management tool.
 
     These are used for fetching repository information and generating diffs.
@@ -421,6 +616,15 @@ class BaseSCMClient(object):
     #: Type:
     #:     bool
     can_get_file_content: bool = False
+
+    #: The Patcher class used to apply patches.
+    #:
+    #: Version Added:
+    #:     5.1:
+    #:     This replaces the old :py:meth:`apply_patch` and
+    #:     :py:meth:`apply_patch_for_empty_files` methods from earlier
+    #:     releases.
+    patcher_cls: type[SCMClientPatcher] = SCMClientPatcher
 
     ######################
     # Instance variables #
@@ -731,6 +935,44 @@ class BaseSCMClient(object):
             return ','.join(self.server_tool_ids)
         else:
             return self.server_tool_names
+
+    def get_patcher(
+        self,
+        **kwargs: Unpack[PatcherKwargs],
+    ) -> SCMClientPatcher:
+        """Return a patcher for this client.
+
+        Version Added:
+            5.1
+
+        Args:
+            **kwargs (dict):
+                Keyword arguments to pass to the patcher.
+
+                See :py:class:`~rbtools.diffs.patcher.Patcher` for details.
+
+        Returns:
+            SCMClientPatcher:
+            The patcher used to apply patches for this client.
+        """
+        patcher_cls = self.patcher_cls
+        scmclient_cls = type(self)
+
+        if (scmclient_cls.apply_patch is not BaseSCMClient.apply_patch and
+            patcher_cls is BaseSCMClient.patcher_cls):
+            # This is a legacy SCMClient implementation that overrode
+            # apply_patch() without providing a custom patcher. We need to
+            # return a compatibility wrapper.
+            RemovedInRBTools70Warning.warn(
+                '%(name)s must be updated to set a custom patcher class as '
+                '%(name)s.patcher_cls. Support for apply_patch() will be '
+                'removed in RBTools 7.'
+                % {
+                    'name': scmclient_cls.__name__,
+                })
+            patcher_cls = _LegacyPatcher
+
+        return patcher_cls(scmclient=self, **kwargs)
 
     def find_matching_server_repository(
         self,
@@ -1121,68 +1363,35 @@ class BaseSCMClient(object):
             rbtools.clients.base.patch.PatchResult:
             The result of the patch operation.
         """
-        # Figure out the -p argument for patch. We override the calculated
-        # value if it is supplied via a commandline option.
-        p_num = p or self._get_p_number(base_path, base_dir)
+        if p is None:
+            p_num = None
+        else:
+            try:
+                p_num = int(p)
+            except ValueError:
+                logging.warning('Invalid -p value: %s; assuming zero.', p)
+                p_num = None
 
-        cmd = ['patch']
+        patcher = self.get_patcher(
+            patches=[
+                Patch(path=Path(patch_file),
+                      base_dir=base_dir,
+                      prefix_level=p_num),
+            ],
+            revert=revert)
 
-        if revert:
-            cmd.append('-R')
+        results: Sequence[PatchResult]
 
         try:
-            p_num = int(p_num)
-        except ValueError:
-            p_num = 0
-            logging.warning('Invalid -p value: %s; assuming zero.', p_num)
-
-        if p_num is not None:
-            if p_num >= 0:
-                cmd.append('-p%d' % p_num)
+            results = list(patcher.patch())
+        except ApplyPatchError as e:
+            if e.failed_patch_result:
+                results = [e.failed_patch_result]
             else:
-                logging.warning('Unsupported -p value: %d; assuming zero.',
-                                p_num)
+                raise SCMError(str(e))
 
-        cmd.extend(['-i', patch_file])
-
-        # Ignore return code 2 in case the patch file consists of only empty
-        # files, which 'patch' can't handle. Other 'patch' errors also give
-        # return code 2, so we must check the command output.
-        rc, patch_output = execute(cmd, extra_ignore_errors=(2,),
-                                   return_error_code=True)
-        only_garbage_in_patch = ('patch: **** Only garbage was found in the '
-                                 'patch input.\n')
-
-        if (patch_output and patch_output.startswith('patch: **** ') and
-            patch_output != only_garbage_in_patch):
-            raise SCMError('Failed to execute command: %s\n%s'
-                           % (cmd, patch_output))
-
-        # Check the patch for any added/deleted empty files to handle.
-        if self.supports_empty_files():
-            try:
-                with open(patch_file, 'rb') as f:
-                    patch = f.read()
-            except IOError as e:
-                raise SCMError('Failed to read patch file "%s": %s'
-                               % (patch_file, e))
-
-            patched_empty_files = self.apply_patch_for_empty_files(
-                patch,
-                p_num=str(p_num),
-                revert=revert)
-
-            # If there are no empty files in a "garbage-only" patch, the patch
-            # is probably malformed.
-            if (patch_output == only_garbage_in_patch and
-                not patched_empty_files):
-                raise SCMError('Failed to execute command: %s\n%s'
-                               % (cmd, patch_output))
-
-        # TODO: Should this take into account apply_patch_for_empty_files ?
-        #       The return value of that function is False both when it fails
-        #       and when there are no empty files.
-        return PatchResult(applied=(rc == 0), patch_output=patch_output)
+        assert len(results) == 1
+        return results[0]
 
     def create_commit(
         self,

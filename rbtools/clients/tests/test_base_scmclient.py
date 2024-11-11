@@ -1,17 +1,27 @@
-"""Unit tests for rbtools.clients.base.scmclient."""
+"""Unit tests for rbtools.clients.base.scmclient.BaseSCMClient."""
+
+from __future__ import annotations
 
 import re
 import warnings
+from typing import TYPE_CHECKING
 
 import kgb
 
 from rbtools.clients import BaseSCMClient
+from rbtools.clients.base.scmclient import _LegacyPatcher, SCMClientPatcher
 from rbtools.clients.errors import SCMClientDependencyError
-from rbtools.deprecation import RemovedInRBTools50Warning
+from rbtools.deprecation import (RemovedInRBTools50Warning,
+                                 RemovedInRBTools70Warning)
+from rbtools.diffs.errors import ApplyPatchError
+from rbtools.diffs.patches import PatchResult
 from rbtools.diffs.tools.backends.gnu import GNUDiffTool
 from rbtools.diffs.tools.errors import MissingDiffToolError
 from rbtools.diffs.tools.registry import diff_tools_registry
 from rbtools.testing import TestCase
+
+if TYPE_CHECKING:
+    from rbtools.diffs.patches import Patch
 
 
 class MySCMClient(BaseSCMClient):
@@ -227,3 +237,183 @@ class BaseSCMClientTests(kgb.SpyAgency, TestCase):
 
         with self.assertRaises(MissingDiffToolError):
             client.get_diff_tool()
+
+    def test_get_patcher(self) -> None:
+        """Testing BaseSCMClient.get_patcher"""
+        client = MySCMClient()
+        patcher = client.get_patcher(patches=[])
+
+        self.assertIs(type(patcher), SCMClientPatcher)
+
+    def test_get_patcher_with_legacy_apply_patch(self) -> None:
+        """Testing BaseSCMClient.get_patcher with legacy custom apply_patch()
+        """
+        class LegacySCMClient(MySCMClient):
+            def apply_patch(self, *args, **kwargs):
+                pass
+
+        client = LegacySCMClient()
+
+        message = re.escape(
+            'LegacySCMClient must be updated to set a custom patcher class '
+            'as LegacySCMClient.patcher_cls. Support for apply_patch() will '
+            'be removed in RBTools 7.'
+        )
+
+        with self.assertWarnsRegex(RemovedInRBTools70Warning, message):
+            patcher = client.get_patcher(patches=[])
+
+        self.assertIs(type(patcher), _LegacyPatcher)
+
+    def test_get_patcher_with_legacy_apply_patch_and_custom_patcher(
+        self,
+    ) -> None:
+        """Testing BaseSCMClient.get_patcher with legacy custom apply_patch()
+        and custom patcher
+        """
+        class MyPatcher(SCMClientPatcher):
+            pass
+
+        class LegacySCMClient(MySCMClient):
+            patcher_cls = MyPatcher
+
+            def apply_patch(self, *args, **kwargs):
+                pass
+
+        client = LegacySCMClient()
+        patcher = client.get_patcher(patches=[])
+
+        self.assertIs(type(patcher), MyPatcher)
+
+    def test_apply_patch(self) -> None:
+        """Testing SCMClient.apply_patch"""
+        class MyPatcher(SCMClientPatcher):
+            def apply_single_patch(
+                self,
+                *,
+                patch: Patch,
+                patch_num: int,
+            ) -> PatchResult:
+                return PatchResult(applied=True,
+                                   patch=patch,
+                                   patch_range=(patch_num, patch_num))
+
+        class MyPatcherSCMClient(MySCMClient):
+            patcher_cls = MyPatcher
+
+        client = MyPatcherSCMClient()
+        result = client.apply_patch(patch_file='mypatch.diff',
+                                    base_path='/',
+                                    base_dir='/')
+
+        self.assertIsInstance(result, PatchResult)
+        self.assertTrue(result.applied)
+        self.assertEqual(result.patch_range, (1, 1))
+
+        patch = result.patch
+        assert patch is not None
+        self.assertEqual(str(patch.path), 'mypatch.diff')
+        self.assertIsNone(patch.prefix_level)
+
+    def test_apply_patch_with_patch_level(self) -> None:
+        """Testing SCMClient.apply_patch with patch level"""
+        class MyPatcher(SCMClientPatcher):
+            def apply_single_patch(
+                self,
+                *,
+                patch: Patch,
+                patch_num: int,
+            ) -> PatchResult:
+                return PatchResult(applied=True,
+                                   patch=patch,
+                                   patch_range=(patch_num, patch_num))
+
+        class MyPatcherSCMClient(MySCMClient):
+            patcher_cls = MyPatcher
+
+        client = MyPatcherSCMClient()
+        result = client.apply_patch(patch_file='mypatch.diff',
+                                    base_path='/',
+                                    base_dir='/',
+                                    p='2')
+
+        self.assertIsInstance(result, PatchResult)
+        self.assertTrue(result.applied)
+        self.assertEqual(result.patch_range, (1, 1))
+
+        patch = result.patch
+        assert patch is not None
+        self.assertEqual(str(patch.path), 'mypatch.diff')
+        self.assertEqual(patch.prefix_level, 2)
+
+    def test_apply_patch_with_patch_level_invalid(self) -> None:
+        """Testing SCMClient.apply_patch with invalid patch level"""
+        class MyPatcher(SCMClientPatcher):
+            def apply_single_patch(
+                self,
+                *,
+                patch: Patch,
+                patch_num: int,
+            ) -> PatchResult:
+                return PatchResult(applied=True,
+                                   patch=patch,
+                                   patch_range=(patch_num, patch_num))
+
+        class MyPatcherSCMClient(MySCMClient):
+            patcher_cls = MyPatcher
+
+        client = MyPatcherSCMClient()
+
+        with self.assertLogs(level='WARNING') as ctx:
+            result = client.apply_patch(patch_file='mypatch.diff',
+                                        base_path='/',
+                                        base_dir='/',
+                                        p='XXX')
+
+        self.assertEqual(ctx.records[0].msg,
+                         'Invalid -p value: %s; assuming zero.')
+        self.assertEqual(ctx.records[0].args, ('XXX',))
+
+        self.assertIsInstance(result, PatchResult)
+        self.assertTrue(result.applied)
+        self.assertEqual(result.patch_range, (1, 1))
+
+        patch = result.patch
+        assert patch is not None
+        self.assertEqual(str(patch.path), 'mypatch.diff')
+        self.assertIsNone(patch.prefix_level)
+
+    def test_apply_patch_with_patch_error(self) -> None:
+        """Testing SCMClient.apply_patch with ApplyPatchError"""
+        class MyPatcher(SCMClientPatcher):
+            def apply_single_patch(
+                self,
+                *,
+                patch: Patch,
+                patch_num: int,
+            ) -> PatchResult:
+                raise ApplyPatchError(
+                    'Something went wrong',
+                    patcher=self,
+                    failed_patch_result=PatchResult(
+                        applied=False,
+                        patch=patch,
+                        patch_output=b'XXX Output',
+                        patch_range=(patch_num, patch_num)))
+
+        class MyPatcherSCMClient(MySCMClient):
+            patcher_cls = MyPatcher
+
+        client = MyPatcherSCMClient()
+        result = client.apply_patch(patch_file='mypatch.diff',
+                                    base_path='/',
+                                    base_dir='/')
+
+        self.assertIsInstance(result, PatchResult)
+        self.assertFalse(result.applied)
+        self.assertEqual(result.patch_range, (1, 1))
+
+        patch = result.patch
+        assert patch is not None
+        self.assertEqual(str(patch.path), 'mypatch.diff')
+        self.assertIsNone(patch.prefix_level)

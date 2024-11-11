@@ -181,7 +181,7 @@ class PatcherTests(kgb.SpyAgency, TestCase):
                 'bugs_closed': ['123', '456'],
                 'submitter': {
                     'email': 'default@example.com',
-                    'full_name': 'Default Author',
+                    'fullname': 'Default Author',
                 },
             },
             url='https://reviews.example.com/api/review-requests/123/')
@@ -261,7 +261,7 @@ class PatcherTests(kgb.SpyAgency, TestCase):
                 'bugs_closed': ['123', '456'],
                 'submitter': {
                     'email': 'default@example.com',
-                    'full_name': 'Default Author',
+                    'fullname': 'Default Author',
                 },
             },
             url='https://reviews.example.com/api/review-requests/123/')
