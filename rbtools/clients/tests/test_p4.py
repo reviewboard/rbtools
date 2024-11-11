@@ -1,9 +1,10 @@
 """Unit tests for PerforceClient."""
 
+from __future__ import annotations
+
 import os
 import re
 import time
-from typing import Type
 
 import kgb
 
@@ -14,9 +15,11 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
 from rbtools.clients.perforce import PerforceClient, P4Wrapper
 from rbtools.clients.tests import FOO1, SCMClientTestCase
 from rbtools.deprecation import RemovedInRBTools50Warning
+from rbtools.diffs.patches import Patch
 from rbtools.testing import TestCase
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempfile
+from rbtools.utils.process import run_process_exec
 
 
 SAMPLE_CHANGEDESC_TEMPLATE_BASIC = (
@@ -38,6 +41,60 @@ SAMPLE_CHANGEDESC_TEMPLATE_BASIC = (
     '\t//depot/main/test1\t# edit\n'
     '\t//depot/main/test2\t# edit\n'
 )
+
+
+class P4DiffTestWrapper(P4Wrapper):
+    def __init__(self, options):
+        super().__init__(options)
+
+        self._timestamp = time.mktime(time.gmtime(0))
+
+    def fstat(self, depot_path, fields=[]):
+        assert depot_path in self.fstat_files
+
+        fstat_info = self.fstat_files[depot_path]
+
+        for field in fields:
+            assert field in fstat_info
+
+        return fstat_info
+
+    def opened(self, changenum):
+        return [info for info in self.repo_files
+                if info['change'] == changenum]
+
+    def print_file(self, depot_path, out_file):
+        for info in self.repo_files:
+            if depot_path == '%s#%s' % (info['depotFile'], info['rev']):
+                fp = open(out_file, 'w')
+                fp.write(info['text'])
+                fp.close()
+                return
+        assert False
+
+    def where(self, depot_path):
+        assert depot_path in self.where_files
+
+        return [{
+            'path': self.where_files[depot_path],
+        }]
+
+    def change(self, changenum):
+        return [{
+            'Change': str(changenum),
+            'Date': '2013/01/02 22:33:44',
+            'User': 'joe@example.com',
+            'Status': 'pending',
+            'Description': 'This is a test.\n',
+        }]
+
+    def info(self):
+        return {
+            'Client root': '/',
+        }
+
+    def run_p4(self, *args, **kwargs):
+        assert False
 
 
 class P4WrapperTests(TestCase):
@@ -93,9 +150,7 @@ class P4WrapperTests(TestCase):
             })
 
 
-class PerforceClientTests(SCMClientTestCase):
-    """Unit tests for PerforceClient."""
-
+class PerforceSCMClientTestCase(SCMClientTestCase):
     scmclient_cls = PerforceClient
 
     default_scmclient_options = {
@@ -104,61 +159,8 @@ class PerforceClientTests(SCMClientTestCase):
         'p4_port': 'perforce.example.com:1666',
     }
 
-    class P4DiffTestWrapper(P4Wrapper):
-        def __init__(self, options):
-            super(
-                PerforceClientTests.P4DiffTestWrapper, self).__init__(options)
-
-            self._timestamp = time.mktime(time.gmtime(0))
-
-        def fstat(self, depot_path, fields=[]):
-            assert depot_path in self.fstat_files
-
-            fstat_info = self.fstat_files[depot_path]
-
-            for field in fields:
-                assert field in fstat_info
-
-            return fstat_info
-
-        def opened(self, changenum):
-            return [info for info in self.repo_files
-                    if info['change'] == changenum]
-
-        def print_file(self, depot_path, out_file):
-            for info in self.repo_files:
-                if depot_path == '%s#%s' % (info['depotFile'], info['rev']):
-                    fp = open(out_file, 'w')
-                    fp.write(info['text'])
-                    fp.close()
-                    return
-            assert False
-
-        def where(self, depot_path):
-            assert depot_path in self.where_files
-
-            return [{
-                'path': self.where_files[depot_path],
-            }]
-
-        def change(self, changenum):
-            return [{
-                'Change': str(changenum),
-                'Date': '2013/01/02 22:33:44',
-                'User': 'joe@example.com',
-                'Status': 'pending',
-                'Description': 'This is a test.\n',
-            }]
-
-        def info(self):
-            return {
-                'Client root': '/',
-            }
-
-        def run_p4(self, *args, **kwargs):
-            assert False
-
-    def setUp(self):
+    def setUp(self) -> None:
+        """Set up the state for a test."""
         super().setUp()
 
         # Our unit tests simulate results for p4, so we don't actually
@@ -173,7 +175,7 @@ class PerforceClientTests(SCMClientTestCase):
 
     def build_client(
         self,
-        wrapper_cls: Type[P4Wrapper] = P4DiffTestWrapper,
+        wrapper_cls: type[P4Wrapper] = P4DiffTestWrapper,
         **kwargs,
     ) -> PerforceClient:
         """Build a client for testing.
@@ -182,7 +184,8 @@ class PerforceClientTests(SCMClientTestCase):
         server, and allow for specifying a custom Perforce wrapper class.
 
         Version Added:
-            4.0
+            4.0:
+            This was part of :py:class:`PerforceClientTests`.
 
         Args:
             wrapper_cls (type, optional):
@@ -195,11 +198,15 @@ class PerforceClientTests(SCMClientTestCase):
             rbtools.clients.perforce.PerforceClient:
             The client instance.
         """
-        return super(PerforceClientTests, self).build_client(
+        return super().build_client(
             client_kwargs={
                 'p4_class': wrapper_cls,
             },
             **kwargs)
+
+
+class PerforceClientTests(PerforceSCMClientTestCase):
+    """Unit tests for PerforceClient."""
 
     def test_check_dependencies_with_found(self):
         """Testing PerforceClient.check_dependencies with p4 found"""
@@ -555,7 +562,7 @@ class PerforceClientTests(SCMClientTestCase):
 
     def test_diff_for_submitted_changelist(self):
         """Testing PerforceClient.diff with a submitted changelist"""
-        class TestWrapper(self.P4DiffTestWrapper):
+        class TestWrapper(P4DiffTestWrapper):
             def change(self, changelist):
                 return [{
                     'Change': '12345',
@@ -1275,3 +1282,193 @@ class PerforceClientTests(SCMClientTestCase):
             client.get_file_size(
                 filename='//mydepot/test/README2',
                 revision='3')
+
+
+class PerforcePatcherTests(PerforceSCMClientTestCase):
+    """Unit tests for PerforcePatcher.
+
+    Version Added:
+        5.1
+    """
+
+    def test_patch(self) -> None:
+        """Testing PerforcePatcher.patch"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
+
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': (['patch', '-f', '-i', tempfiles[0]],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+        ]))
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=(
+                    b'--- //mydepot/test/README\t//mydepot/test/README#2\n'
+                    b'+++ //mydepot/test/README\t2022-01-02 12:34:56\n'
+                    b'@@ -1 +1 @@\n'
+                    b'-This is a test.\n'
+                    b'+This is a mess.\n'
+                    b'--- //mydepot/test/COPYING\t//mydepot/test/COPYING#0\n'
+                    b'+++ //mydepot/test/COPYING\t2022-01-02 12:34:56\n'
+                    b'@@ -0,0 +1 @@\n'
+                    b'+Copyright 2013 Joe User.\n'
+                    b'--- //mydepot/test/Makefile\t//mydepot/test/Makefile#3\n'
+                    b'+++ //mydepot/test/Makefile\t2022-01-02 12:34:56\n'
+                    b'@@ -1 +0,0 @@\n'
+                    b'-all: all\n'
+                )),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        self.assertSpyCallCount(run_process_exec, 1)
+
+    def test_patch_with_prefix_level(self) -> None:
+        """Testing PerforcePatcher.patch with Patch.prefix_level="""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
+
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': (['patch', '-f', '-p3', '-i', tempfiles[0]],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+        ]))
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(
+                    prefix_level=3,
+                    content=(
+                        b'--- //mydepot/test/README\t//mydepot/test/README#2\n'
+                        b'+++ //mydepot/test/README\t2022-01-02 12:34:56\n'
+                        b'@@ -1 +1 @@\n'
+                        b'-This is a test.\n'
+                        b'+This is a mess.\n'
+                        b'--- //mydepot/test/COPYING\t//mydepot/test/COPYING#0'
+                        b'\n'
+                        b'+++ //mydepot/test/COPYING\t2022-01-02 12:34:56\n'
+                        b'@@ -0,0 +1 @@\n'
+                        b'+Copyright 2013 Joe User.\n'
+                        b'--- //mydepot/test/Makefile\t//mydepot/test/Makefile'
+                        b'#3\n'
+                        b'+++ //mydepot/test/Makefile\t2022-01-02 12:34:56\n'
+                        b'@@ -1 +0,0 @@\n'
+                        b'-all: all\n'
+                    )),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        self.assertSpyCallCount(run_process_exec, 1)
+
+    def test_patch_with_revert(self) -> None:
+        """Testing PerforcePatcher.patch with revert=True"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
+
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': (['patch', '-f', '-R', '-i', tempfiles[0]],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+        ]))
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            revert=True,
+            patches=[
+                Patch(content=(
+                    b'--- //mydepot/test/README\t//mydepot/test/README#2\n'
+                    b'+++ //mydepot/test/README\t2022-01-02 12:34:56\n'
+                    b'@@ -1 +1 @@\n'
+                    b'-This is a test.\n'
+                    b'+This is a mess.\n'
+                    b'--- //mydepot/test/COPYING\t//mydepot/test/COPYING#0\n'
+                    b'+++ //mydepot/test/COPYING\t2022-01-02 12:34:56\n'
+                    b'@@ -0,0 +1 @@\n'
+                    b'+Copyright 2013 Joe User.\n'
+                    b'--- //mydepot/test/Makefile\t//mydepot/test/Makefile#3\n'
+                    b'+++ //mydepot/test/Makefile\t2022-01-02 12:34:56\n'
+                    b'@@ -1 +0,0 @@\n'
+                    b'-all: all\n'
+                )),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        self.assertSpyCallCount(run_process_exec, 1)
+
+    def test_patch_with_empty_files(self) -> None:
+        """Testing PerforcePatcher.patch with empty files"""
+        client = self.build_client(caps={
+            'scmtools': {
+                'perforce': {
+                    'empty_files': True,
+                },
+            },
+        })
+        repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
+
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': (['patch', '-f', '-i', tempfiles[0]],),
+                'op': kgb.SpyOpReturn((
+                    2,
+                    b"  I can't seem to find a patch in there anywhere.\n",
+                    b'',
+                )),
+            },
+            {
+                'args': (['p4', 'add', '//mydepot/test/NEWFILE'],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'delete', '//mydepot/test/README'],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+        ]))
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=(
+                    b'==== //mydepot/test/README#1 ==D=='
+                    b' //mydepot/test/README#1 ====\n'
+                    b'==== //mydepot/test/NEWFILE#1 ==A=='
+                    b' //mydepot/test/NEWFILE#1 ====\n'
+                )),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        self.assertSpyCallCount(run_process_exec, 3)
