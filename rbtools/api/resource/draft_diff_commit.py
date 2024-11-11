@@ -36,7 +36,7 @@ class DraftDiffCommitItemResource(GetPatchMixin, ItemResource):
 
 
 @resource_mimetype('application/vnd.reviewboard.org.draft-commits')
-class DraftDiffCommitListResource(ListResource):
+class DraftDiffCommitListResource(ListResource[DraftDiffCommitItemResource]):
     """List resource for draft diff commits."""
 
     @request_method

@@ -16,9 +16,72 @@ if TYPE_CHECKING:
     from rbtools.api.request import QueryArgs
 
 
+class AttachmentUploadMixin:
+    """A mixin for resources that implement an upload_attachment method.
+
+    Version Added:
+        6.0
+    """
+
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The URL for the resource.
+    _url: str
+
+    @request_method
+    def upload_attachment(
+        self,
+        filename: str,
+        content: bytes,
+        caption: Optional[str] = None,
+        attachment_history: Optional[str] = None,
+        **kwargs: QueryArgs,
+    ) -> HttpRequest:
+        """Upload a new attachment.
+
+        Args:
+            filename (str):
+                The name of the file.
+
+            content (bytes):
+                The content of the file to upload.
+
+            caption (str, optional):
+                The caption to set on the file attachment.
+
+            attachment_history (str, optional):
+                The ID of the FileAttachmentHistory to add this attachment to.
+
+            **kwargs (dict of rbtools.api.request.QueryArgs):
+                Query arguments to include with the request.
+
+        Returns:
+            FileAttachmentItemResource:
+            The newly-created file attachment.
+        """
+        assert self._url is not None
+        request = HttpRequest(self._url, method='POST', query_args=kwargs)
+        request.add_file('path', filename, content)
+
+        if caption:
+            request.add_field('caption', caption)
+
+        if attachment_history:
+            request.add_field('attachment_history', attachment_history)
+
+        return request
+
+
 class DiffUploaderMixin:
     """A mixin for uploading diffs to a resource."""
 
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The URL for the resource.
     _url: str
 
     def prepare_upload_diff_request(
@@ -76,6 +139,11 @@ class GetPatchMixin:
         4.2
     """
 
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The URL for the resource.
     _url: str
 
     @request_method
@@ -97,3 +165,57 @@ class GetPatchMixin:
         return HttpRequest(self._url, query_args=kwargs, headers={
             'Accept': 'text/x-patch',
         })
+
+
+class ScreenshotUploadMixin:
+    """Mixin for resources that implement an upload_screenshot method.
+
+    Version Added:
+        6.0
+    """
+
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The URL for the resource.
+    _url: str
+
+    @request_method
+    def upload_screenshot(
+        self,
+        filename: str,
+        content: bytes,
+        caption: Optional[str] = None,
+        **kwargs: QueryArgs,
+    ) -> HttpRequest:
+        """Upload a new screenshot.
+
+        The content argument should contain the body of the screenshot
+        to be uploaded, in string format.
+
+        Args:
+            filename (str):
+                The filename of the screenshot.
+
+            content (bytes):
+                The image file content.
+
+            caption (str, optional):
+                The caption to add to the screenshot.
+
+            **kwargs (rbtools.api.request.QueryArgs):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ScreenshotItemResource or
+            rbtools.api.resource.DraftScreenshotItemResource:
+            The newly-created screenshot.
+        """
+        request = HttpRequest(self._url, method='POST', query_args=kwargs)
+        request.add_file('path', filename, content)
+
+        if caption:
+            request.add_field('caption', caption)
+
+        return request

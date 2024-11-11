@@ -7,8 +7,12 @@ Version Added:
 
 from __future__ import annotations
 
-from rbtools.api.resource.base import ItemResource, resource_mimetype
-from rbtools.api.resource.screenshot import ScreenshotListResource
+from rbtools.api.resource.base import (
+    ItemResource,
+    ListResource,
+    resource_mimetype,
+)
+from rbtools.api.resource.mixins import ScreenshotUploadMixin
 
 
 @resource_mimetype('application/vnd.reviewboard.org.draft-screenshot')
@@ -21,5 +25,6 @@ class DraftScreenshotItemResource(ItemResource):
 
 
 @resource_mimetype('application/vnd.reviewboard.org.draft-screenshots')
-class DraftScreenshotListResource(ScreenshotListResource):
+class DraftScreenshotListResource(ScreenshotUploadMixin,
+                                  ListResource[DraftScreenshotItemResource]):
     """List resource for draft screenshots."""

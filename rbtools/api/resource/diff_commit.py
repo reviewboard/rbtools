@@ -21,7 +21,8 @@ class DiffCommitItemResource(GetPatchMixin, ItemResource):
 
 
 @resource_mimetype('application/vnd.reviewboard.org.commits')
-class DiffCommitListResource(GetPatchMixin, ListResource):
+class DiffCommitListResource(GetPatchMixin,
+                             ListResource[DiffCommitItemResource]):
     """List resource for diff commits.
 
     Version Added:

@@ -206,8 +206,7 @@ class RootResource(ItemResource):
         """Get a diff commit item resource.
 
         This method exists for compatibility with older versions of Review
-        Board which had broken URL names. :py:meth:`get_diff_commit` should be
-        used instead for modern servers.
+        Board. :py:meth:`get_diff_commit` should be used instead.
 
         Args:
             review_request_id (int):
@@ -811,32 +810,6 @@ class RootResource(ItemResource):
         **kwargs,
     ) -> RootResource:
         """Get the root resource.
-
-        Args:
-            **kwargs (dict):
-                Query arguments to include with the request.
-
-        Returns:
-            RootResource:
-            The root resource.
-
-        Raises:
-            rbtools.api.errors.APIError:
-                The Review Board API returned an error.
-
-            rbtools.api.errors.ServerInterfaceError:
-                An error occurred while communicating with the server.
-        """
-        raise NotImplementedError
-
-    @api_stub
-    def get_self(
-        self,
-        **kwargs,
-    ) -> RootResource:
-        """Get the 'self' link.
-
-        This is functionally equivalent to :py:meth:`get_root`.
 
         Args:
             **kwargs (dict):

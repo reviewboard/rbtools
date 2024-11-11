@@ -81,7 +81,8 @@ class DiffItemResource(GetPatchMixin, ItemResource):
 
 
 @resource_mimetype('application/vnd.reviewboard.org.diffs')
-class DiffListResource(DiffUploaderMixin, ListResource):
+class DiffListResource(DiffUploaderMixin,
+                       ListResource[DiffItemResource]):
     """List resource for diffs."""
 
     @request_method

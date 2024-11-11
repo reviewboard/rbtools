@@ -7,8 +7,12 @@ Version Added:
 
 from __future__ import annotations
 
-from rbtools.api.resource.base import ItemResource, resource_mimetype
-from rbtools.api.resource.file_attachment import FileAttachmentListResource
+from rbtools.api.resource.base import (
+    ItemResource,
+    ListResource,
+    resource_mimetype,
+)
+from rbtools.api.resource.mixins import AttachmentUploadMixin
 
 
 @resource_mimetype('application/vnd.reviewboard.org.draft-file-attachment')
@@ -21,5 +25,7 @@ class DraftFileAttachmentItemResource(ItemResource):
 
 
 @resource_mimetype('application/vnd.reviewboard.org.draft-file-attachments')
-class DraftFileAttachmentListResource(FileAttachmentListResource):
+class DraftFileAttachmentListResource(
+    AttachmentUploadMixin,
+    ListResource[DraftFileAttachmentItemResource]):
     """List resource for draft file attachments."""

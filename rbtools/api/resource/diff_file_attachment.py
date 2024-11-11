@@ -30,7 +30,8 @@ class DiffFileAttachmentItemResource(ItemResource):
 
 
 @resource_mimetype('application/vnd.reviewboard.org.diff-file-attachments')
-class DiffFileAttachmentListResource(ListResource):
+class DiffFileAttachmentListResource(
+    ListResource[DiffFileAttachmentItemResource]):
     """List resource for diff file attachments.
 
     Version Added:

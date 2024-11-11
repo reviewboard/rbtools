@@ -52,7 +52,7 @@ class FileDiffItemResource(GetPatchMixin, ItemResource):
 
 
 @resource_mimetype('application/vnd.reviewboard.org.files')
-class FileDiffListResource(ListResource):
+class FileDiffListResource(ListResource[FileDiffItemResource]):
     """List resource for file diffs.
 
     Version Added:

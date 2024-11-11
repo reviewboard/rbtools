@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 from collections.abc import Iterator, Mapping, MutableMapping
 from functools import update_wrapper, wraps
-from typing import (Any, Callable, ClassVar, Final, Optional, NoReturn,
-                    TypeVar, TYPE_CHECKING, Union, cast)
+from typing import (Any, Callable, ClassVar, Final, Generic, Literal,
+                    NoReturn, Optional, TYPE_CHECKING, TypeVar, Union, cast,
+                    overload)
 from urllib.parse import urljoin
 
 from typelets.json import JSONDict, JSONValue
@@ -23,6 +25,9 @@ from rbtools.api.utils import rem_mime_format
 
 if TYPE_CHECKING:
     from rbtools.api.transport import Transport
+
+
+logger = logging.getLogger(__name__)
 
 
 #: Map from MIME type to resource class.
@@ -643,22 +648,50 @@ class Resource:
         else:
             self._expanded_info = {}
 
+        members = set(dir(self))
+
         # Add a method for each supported REST operation, and
         # for retrieving 'self'.
         for link, method in SPECIAL_LINKS.items():
             if link in self._links and method[1]:
-                setattr(self,
-                        method[0],
-                        lambda resource=self, meth=method[1], **kwargs: (
-                            meth(resource, **kwargs)))
+                attr_name = method[0]
+
+                def special_method(
+                    resource: Self = self,
+                    meth: Callable[..., RequestMethodResult] = method[1],
+                    **kwargs,
+                ) -> RequestMethodResult:
+                    return meth(resource, **kwargs)
+
+                if attr_name not in members:
+                    # This log message is useful for adding new stubs.
+                    logger.debug('%s is missing API stub for %s',
+                                 self.__class__.__name__, attr_name)
+                    setattr(self, attr_name, special_method)
+                elif is_api_stub(stub := getattr(self, attr_name)):
+                    replace_api_stub(self, attr_name, stub, special_method)
 
         # Generate request methods for any additional links the resource has.
         for link, body in self._links.items():
             if link not in SPECIAL_LINKS:
-                setattr(self,
-                        f'get_{link}',
-                        lambda resource=self, url=body['href'], **kwargs: (
-                            self._get_url(url, **kwargs)))
+                # Some resources have hyphens in the links.
+                attr_name = f'get_{link.replace("-", "_")}'
+                url = body['href']
+
+                def link_method(
+                    resource: Self = self,
+                    url: str = url,
+                    **kwargs,
+                ) -> RequestMethodResult:
+                    return resource._get_url(url, **kwargs)
+
+                if attr_name not in members:
+                    # This log message is useful for adding new stubs.
+                    logger.debug('%s is missing API stub for %s (%s)',
+                                 self.__class__.__name__, attr_name, url)
+                    setattr(self, attr_name, link_method)
+                elif is_api_stub(stub := getattr(self, attr_name)):
+                    replace_api_stub(self, attr_name, stub, link_method)
 
     def _wrap_field(
         self,
@@ -796,7 +829,36 @@ class Resource:
         """
         return self._payload
 
+    @api_stub
+    def get_self(
+        self,
+        *args,
+        **kwargs: QueryArgs,
+    ) -> Self:
+        """Get the resource's 'self' link.
 
+        Args:
+            *args (tuple, unused):
+                Unused positional arguments.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            Resource:
+            The newly-fetched resource instance.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+
+_TResource = TypeVar('_TResource', bound=Resource)
 _TResourceClass = TypeVar('_TResourceClass', bound=type[Resource])
 
 
@@ -825,6 +887,40 @@ def resource_mimetype(
 #: Version Added:
 #:     6.0
 RequestMethodResult = Union[HttpRequest, Resource, None]
+
+
+class request_method_returns(Generic[_TResource]):
+    """Decorator to mark request methods with a specific return type.
+
+    When the return type of a method is known to be a specific type, this
+    decorator can be used in place of @request_method, and will rewrite the
+    annotation of the return value of the decorated method.
+
+    Version Added:
+        6.0
+    """
+
+    def __call__(
+        self,
+        f: Callable[_P, HttpRequest],
+    ) -> Callable[_P, _TResource]:
+        """Decorate the method.
+
+        Args:
+            f (callable):
+                The method to decorate.
+        """
+        @request_method
+        def wrapper(
+            self: Resource,
+            *args,
+            **kwargs,
+        ) -> HttpRequest:
+            return f(self, *args, **kwargs)
+
+        update_wrapper(wrapper, f)
+
+        return cast(Callable[_P, _TResource], wrapper)
 
 
 class ResourceDictField(MutableMapping[str, Any]):
@@ -1052,7 +1148,7 @@ class ResourceDictField(MutableMapping[str, Any]):
             'parent resource.')
 
 
-class ResourceLinkField(ResourceDictField):
+class ResourceLinkField(ResourceDictField, Generic[_TResource]):
     """Wrapper for link dictionaries returned from a resource.
 
     In order to support operations on links found outside of a
@@ -1089,7 +1185,7 @@ class ResourceLinkField(ResourceDictField):
         super().__init__(resource, field_payload)
         self._transport = resource._transport
 
-    @request_method
+    @request_method_returns[_TResource]()
     def get(
         self,
         **query_args: QueryArgs,
@@ -1176,7 +1272,10 @@ class ResourceExtraDataField(ResourceDictField):
             f'{_EXTRA_DATA_DOCS_URL} for the format for these operations.')
 
 
-class ResourceListField(list[Any]):
+_TListValue = TypeVar('_TListValue')
+
+
+class ResourceListField(Generic[_TListValue], list[_TListValue]):
     """Wrapper for lists returned from a resource.
 
     Acts as a normal list, but wraps any returned items.
@@ -1195,7 +1294,7 @@ class ResourceListField(list[Any]):
     def __init__(
         self,
         resource: Resource,
-        list_field: list[Any],
+        list_field: list[_TListValue],
         item_mimetype: Optional[str] = None,
     ) -> None:
         """Initialize the field.
@@ -1218,7 +1317,7 @@ class ResourceListField(list[Any]):
     def __getitem__(
         self,
         key: int,
-    ) -> Any:
+    ) -> _TListValue:
         """Return the item at the given index.
 
         Args:
@@ -1234,7 +1333,7 @@ class ResourceListField(list[Any]):
         return self._resource._wrap_field(item,
                                           field_mimetype=self._item_mimetype)
 
-    def __iter__(self) -> Iterator[Any]:
+    def __iter__(self) -> Iterator[_TListValue]:
         """Iterate through the list.
 
         Yields:
@@ -1449,6 +1548,100 @@ class ItemResource(Resource):
                 f'payload={self._payload}, url={self._url}, '
                 f'token={self._token})')
 
+    @api_stub
+    def delete(
+        self,
+        *args,
+        **kwargs: QueryArgs,
+    ) -> None:
+        """Delete the resource.
+
+        Args:
+            *args (tuple, unused):
+                Unused positional arguments.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @overload
+    def update(
+        self,
+        data: Optional[dict[str, Any]] = None,
+        query_args: Optional[dict[str, QueryArgs]] = None,
+        *args,
+        internal: Literal[False] = False,
+        **kwargs,
+    ) -> Self:
+        ...
+
+    @overload
+    def update(
+        self,
+        data: Optional[dict[str, Any]] = None,
+        query_args: Optional[dict[str, QueryArgs]] = None,
+        *args,
+        internal: Literal[True],
+        **kwargs,
+    ) -> HttpRequest:
+        ...
+
+    @api_stub
+    def update(
+        self,
+        data: Optional[dict[str, Any]] = None,
+        query_args: Optional[dict[str, QueryArgs]] = None,
+        *args,
+        **kwargs,
+    ) -> Union[Self, HttpRequest]:
+        """Update the resource.
+
+        Any ``extra_data_json`` (JSON Merge Patch) or ``extra_data_json_patch``
+        (JSON Patch) fields will be serialized to JSON and stored.
+
+        Any :samp:`extra_data__{key}` fields will be converted to
+        :samp:`extra_data.{key}` fields, which will be handled by the Review
+        Board API. These cannot store complex types.
+
+        Args:
+            resource (Resource):
+                The resource instance owning this create method.
+
+            data (dict, optional):
+                Data to send in the PUT request. This will be merged with
+                ``**kwargs``.
+
+            query_args (dict, optional):
+                Optional query arguments for the URL.
+
+            *args (tuple, unused):
+                Unused positional arguments.
+
+            **kwargs (dict):
+                Keyword arguments representing additional fields to set in the
+                request. This will be merged with ``data``.
+
+        Returns:
+            ItemResource:
+            The updated resource instance.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
 
 class CountResource(ItemResource):
     """Resource returned by a query with 'counts-only' true.
@@ -1507,7 +1700,10 @@ class CountResource(ItemResource):
         return HttpRequest(self._url, query_args=kwargs)
 
 
-class ListResource(Resource):
+TItemResource = TypeVar('TItemResource', bound=ItemResource)
+
+
+class ListResource(Generic[TItemResource], Resource):
     """The base class for List Resources.
 
     Any resource specific base classes for List Resources should
@@ -1620,7 +1816,7 @@ class ListResource(Resource):
     def __getitem__(
         self,
         index: int,
-    ) -> Any:
+    ) -> TItemResource:
         """Return the item at the specified index.
 
         Args:
@@ -1754,3 +1950,80 @@ class ListResource(Resource):
         return (f'{self.__class__.__name__}(transport={self._transport}, '
                 f'payload={self._payload}, url={self._url}, '
                 f'token={self._token}, item_mime_type={self._item_mime_type})')
+
+    @overload
+    def create(
+        self,
+        data: Optional[dict[str, Any]] = None,
+        query_args: Optional[dict[str, QueryArgs]] = None,
+        *args,
+        internal: Literal[False] = False,
+        **kwargs,
+    ) -> TItemResource:
+        ...
+
+    @overload
+    def create(
+        self,
+        data: Optional[dict[str, Any]] = None,
+        query_args: Optional[dict[str, QueryArgs]] = None,
+        *args,
+        internal: Literal[True],
+        **kwargs,
+    ) -> HttpRequest:
+        ...
+
+    @api_stub
+    def create(
+        self,
+        data: Optional[dict[str, Any]] = None,
+        query_args: Optional[dict[str, QueryArgs]] = None,
+        *args,
+        **kwargs,
+    ) -> Union[TItemResource, HttpRequest]:
+        """Create an item resource.
+
+        Any ``extra_data_json`` (JSON Merge Patch) or ``extra_data_json_patch``
+        (JSON Patch) fields will be serialized to JSON and stored.
+
+        Any :samp:`extra_data__{key}` fields will be converted to
+        :samp:`extra_data.{key}` fields, which will be handled by the Review
+        Board API. These cannot store complex types.
+
+        Args:
+            resource (Resource):
+                The resource instance owning this create method.
+
+            data (dict, optional):
+                Data to send in the POST request. This will be merged with
+                ``**kwargs``.
+
+            query_args (dict, optional):
+                Optional query arguments for the URL.
+
+            *args (tuple, unused):
+                Unused positional arguments.
+
+            **kwargs (dict):
+                Keyword arguments representing additional fields to set in the
+                request. This will be merged with ``data``.
+
+        Returns:
+            ItemResource:
+            The newly-created item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+
+#: Constants for text type fields.
+#:
+#: Version Added:
+#:     6.0
+TextType = Literal['plain', 'markdown', 'html']
