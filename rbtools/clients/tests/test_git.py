@@ -17,7 +17,7 @@ from rbtools.clients.errors import (CreateCommitError,
 from rbtools.clients.git import GitClient, get_git_candidates
 from rbtools.clients.tests import FOO1, FOO2, FOO3, FOO4, SCMClientTestCase
 from rbtools.deprecation import RemovedInRBTools50Warning
-from rbtools.diffs.patches import PatchAuthor
+from rbtools.diffs.patches import Patch, PatchAuthor
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import is_exe_in_path
 from rbtools.utils.process import (RunProcessResult,
@@ -35,6 +35,9 @@ class BaseGitClientTests(SCMClientTestCase):
     scmclient_cls = GitClient
 
     _git: str = ''
+
+    #: The top-level Git directory.
+    git_dir: str
 
     @classmethod
     def setup_checkout(
@@ -130,6 +133,22 @@ class BaseGitClientTests(SCMClientTestCase):
             .stdout
             .read()
             .strip()
+        )
+
+    def _git_get_num_commits(self) -> int:
+        """Return the number of commits in the repository.
+
+        Version Added:
+            5.1
+
+        Returns:
+            int:
+            The number of commits.
+        """
+        return len(
+            self._run_git(['log', '--oneline'])
+            .stdout
+            .readlines()
         )
 
 
@@ -1206,7 +1225,7 @@ class GitClientTests(BaseGitClientTests):
                 'tip': tip_commit_id,
             })
 
-    def testparse_revision_spec_with__diff_finding_parent_case_four(self):
+    def test_parse_revision_spec_with__diff_finding_parent_case_four(self):
         """Testing GitClient.parse_revision_spec with a target branch that
         merged a tracking branch off another tracking branch
         """
@@ -2578,3 +2597,405 @@ class GitSubversionClientTests(BaseGitClientTests):
                 ),
                 'parent_diff': None,
             })
+
+
+class GitPatcherTests(BaseGitClientTests):
+    """Unit tests for GitPatcher.
+
+    Version Added:
+        5.1
+    """
+
+    @classmethod
+    def setup_checkout(
+        cls,
+        checkout_dir: str,
+    ) -> Optional[str]:
+        """Populate a Git checkout.
+
+        This will create a checkout of the sample Git repository stored
+        in the :file:`testdata` directory, along with a child clone and a
+        grandchild clone.
+
+        Args:
+            checkout_dir (str):
+                The top-level directory in which the clones will be placed.
+
+        Returns:
+            str:
+            The main checkout directory, or ``None`` if :command:`git` isn't
+            in the path.
+        """
+        clone_dir = super().setup_checkout(checkout_dir)
+
+        if clone_dir is None:
+            return None
+
+        orig_clone_dir = os.path.join(checkout_dir, 'orig')
+        cls._run_git(['clone', cls.git_dir, orig_clone_dir])
+
+        return orig_clone_dir
+
+    def test_patch(self) -> None:
+        """Testing GitPatcher.patch"""
+        client = self.build_client()
+
+        # Refresh state so that indexes will be looked up. For some reason,
+        # we need to do this after building the client.
+        self._run_git(['update-index', '--refresh'])
+
+        head = self._git_get_head()
+
+        patcher = client.get_patcher(patches=[
+            Patch(content=(
+                b'diff --git a/foo.txt b/foo.txt\n'
+                b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+                b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
+                b'--- a/foo.txt\n'
+                b'+++ b/foo.txt\n'
+                b'@@ -6,7 +6,4 @@ multa quoque et bello passus, '
+                b'dum conderet urbem,\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'-quidve dolens, regina deum tot volvere casus\n'
+                b'-insignem pietate virum, tot adire labores\n'
+                b'-impulerit. Tantaene animis caelestibus irae?\n'
+                b' \n'
+            )),
+        ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        with open('foo.txt', 'rb') as fp:
+            self.assertEqual(fp.read(), FOO1)
+
+        # There should not be a new commit. HEAD won't change.
+        self.assertEqual(self._git_get_head(), head)
+
+    def test_patch_with_commit(self) -> None:
+        """Testing GitPatcher.patch with commiting"""
+        client = self.build_client()
+
+        # Refresh state so that indexes will be looked up. For some reason,
+        # we need to do this after building the client.
+        self._run_git(['update-index', '--refresh'])
+
+        num_commits = self._git_get_num_commits()
+
+        patcher = client.get_patcher(patches=[
+            Patch(content=(
+                b'diff --git a/foo.txt b/foo.txt\n'
+                b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+                b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
+                b'--- a/foo.txt\n'
+                b'+++ b/foo.txt\n'
+                b'@@ -6,7 +6,4 @@ multa quoque et bello passus, '
+                b'dum conderet urbem,\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'-quidve dolens, regina deum tot volvere casus\n'
+                b'-insignem pietate virum, tot adire labores\n'
+                b'-impulerit. Tantaene animis caelestibus irae?\n'
+                b' \n'
+            )),
+        ])
+        patcher.prepare_for_commit(
+            default_author=PatchAuthor(full_name='Test User',
+                                       email='test@example.com'),
+            default_message='Test message')
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        with open('foo.txt', 'rb') as fp:
+            self.assertEqual(fp.read(), FOO1)
+
+        # There should be a new commit.
+        self.assertEqual(self._git_get_num_commits(), num_commits + 1)
+
+    def test_patch_with_multiple_patches(self) -> None:
+        """Testing GitPatcher.patch with multiple patches"""
+        client = self.build_client()
+
+        # Refresh state so that indexes will be looked up. For some reason,
+        # we need to do this after building the client.
+        self._run_git(['update-index', '--refresh'])
+
+        num_commits = self._git_get_num_commits()
+
+        patcher = client.get_patcher(patches=[
+            Patch(content=(
+                b'diff --git a/foo.txt b/foo.txt\n'
+                b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+                b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
+                b'--- a/foo.txt\n'
+                b'+++ b/foo.txt\n'
+                b'@@ -6,7 +6,4 @@ multa quoque et bello passus, '
+                b'dum conderet urbem,\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'-quidve dolens, regina deum tot volvere casus\n'
+                b'-insignem pietate virum, tot adire labores\n'
+                b'-impulerit. Tantaene animis caelestibus irae?\n'
+                b' \n'
+            )),
+            Patch(content=(
+                b'diff --git a/foo.txt b/foo.txt\n'
+                b'index 5e98e9540e1b741b5be24fcb33c40c1c8069c1fb..'
+                b'e619c1387f5feb91f0ca83194650bfe4f6c2e347 100644\n'
+                b'--- a/foo.txt\n'
+                b'+++ b/foo.txt\n'
+                b'@@ -1,4 +1,6 @@\n'
+                b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                b' Italiam, fato profugus, Laviniaque venit\n'
+                b' litora, multum ille et terris iactatus et alto\n'
+                b' vi superum saevae memorem Iunonis ob iram;\n'
+            )),
+        ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 2)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        result = results[1]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        with open('foo.txt', 'rb') as fp:
+            self.assertEqual(fp.read(), FOO2)
+
+        # There should not be a new commit. HEAD won't change.
+        self.assertEqual(self._git_get_num_commits(), num_commits)
+
+    def test_patch_with_multiple_patches_and_commit(self) -> None:
+        """Testing GitPatcher.patch with multiple patches"""
+        client = self.build_client()
+
+        # Refresh state so that indexes will be looked up. For some reason,
+        # we need to do this after building the client.
+        self._run_git(['update-index', '--refresh'])
+
+        num_commits = self._git_get_num_commits()
+
+        patcher = client.get_patcher(patches=[
+            Patch(content=(
+                b'diff --git a/foo.txt b/foo.txt\n'
+                b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+                b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
+                b'--- a/foo.txt\n'
+                b'+++ b/foo.txt\n'
+                b'@@ -6,7 +6,4 @@ multa quoque et bello passus, '
+                b'dum conderet urbem,\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'-quidve dolens, regina deum tot volvere casus\n'
+                b'-insignem pietate virum, tot adire labores\n'
+                b'-impulerit. Tantaene animis caelestibus irae?\n'
+                b' \n'
+            )),
+            Patch(content=(
+                b'diff --git a/foo.txt b/foo.txt\n'
+                b'index 5e98e9540e1b741b5be24fcb33c40c1c8069c1fb..'
+                b'e619c1387f5feb91f0ca83194650bfe4f6c2e347 100644\n'
+                b'--- a/foo.txt\n'
+                b'+++ b/foo.txt\n'
+                b'@@ -1,4 +1,6 @@\n'
+                b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                b' Italiam, fato profugus, Laviniaque venit\n'
+                b' litora, multum ille et terris iactatus et alto\n'
+                b' vi superum saevae memorem Iunonis ob iram;\n'
+            )),
+        ])
+        patcher.prepare_for_commit(
+            default_author=PatchAuthor(full_name='Test User',
+                                       email='test@example.com'),
+            default_message='Test message')
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 2)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        result = results[1]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        with open('foo.txt', 'rb') as fp:
+            self.assertEqual(fp.read(), FOO2)
+
+        # There should not be a new commit. HEAD won't change.
+        self.assertEqual(self._git_get_num_commits(), num_commits + 2)
+
+    def test_patch_with_revert(self) -> None:
+        """Testing GitPatcher.patch with revert"""
+        client = self.build_client()
+
+        # Refresh state so that indexes will be looked up. For some reason,
+        # we need to do this after building the client.
+        self._run_git(['update-index', '--refresh'])
+
+        num_commits = self._git_get_num_commits()
+
+        patcher = client.get_patcher(
+            revert=True,
+            patches=[
+                Patch(content=(
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+                    b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -6,4 +6,7 @@ multa quoque et bello passus, '
+                    b'dum conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'+quidve dolens, regina deum tot volvere casus\n'
+                    b'+insignem pietate virum, tot adire labores\n'
+                    b'+impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                )),
+                Patch(content=(
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'index 5e98e9540e1b741b5be24fcb33c40c1c8069c1fb..'
+                    b'e619c1387f5feb91f0ca83194650bfe4f6c2e347 100644\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -1,6 +1,4 @@\n'
+                    b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'-ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'-ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b' Italiam, fato profugus, Laviniaque venit\n'
+                    b' litora, multum ille et terris iactatus et alto\n'
+                    b' vi superum saevae memorem Iunonis ob iram;\n'
+                )),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 2)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        result = results[1]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        with open('foo.txt', 'rb') as fp:
+            self.assertEqual(
+                fp.read(),
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'Italiam, fato profugus, Laviniaque venit\n'
+                b'litora, multum ille et terris iactatus et alto\n'
+                b'vi superum saevae memorem Iunonis ob iram;\n'
+                b'multa quoque et bello passus, dum conderet urbem,\n'
+                b'inferretque deos Latio, genus unde Latinum,\n'
+                b'Albanique patres, atque altae moenia Romae.\n'
+                b'Musa, mihi causas memora, quo numine laeso,\n'
+                b'\n')
+
+        # There should not be a new commit. HEAD won't change.
+        self.assertEqual(self._git_get_num_commits(), num_commits)
+
+    def test_patch_with_revert_and_commit(self) -> None:
+        """Testing GitPatcher.patch with revert and commit"""
+        client = self.build_client()
+
+        # Refresh state so that indexes will be looked up. For some reason,
+        # we need to do this after building the client.
+        self._run_git(['update-index', '--refresh'])
+
+        num_commits = self._git_get_num_commits()
+
+        patcher = client.get_patcher(
+            revert=True,
+            patches=[
+                Patch(content=(
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+                    b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -6,4 +6,7 @@ multa quoque et bello passus, '
+                    b'dum conderet urbem,\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'+quidve dolens, regina deum tot volvere casus\n'
+                    b'+insignem pietate virum, tot adire labores\n'
+                    b'+impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                )),
+                Patch(content=(
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'index 5e98e9540e1b741b5be24fcb33c40c1c8069c1fb..'
+                    b'e619c1387f5feb91f0ca83194650bfe4f6c2e347 100644\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -1,6 +1,4 @@\n'
+                    b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'-ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'-ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b' Italiam, fato profugus, Laviniaque venit\n'
+                    b' litora, multum ille et terris iactatus et alto\n'
+                    b' vi superum saevae memorem Iunonis ob iram;\n'
+                )),
+            ])
+        patcher.prepare_for_commit(
+            default_author=PatchAuthor(full_name='Test User',
+                                       email='test@example.com'),
+            default_message='Test message')
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 2)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        result = results[1]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        with open('foo.txt', 'rb') as fp:
+            self.assertEqual(
+                fp.read(),
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'Italiam, fato profugus, Laviniaque venit\n'
+                b'litora, multum ille et terris iactatus et alto\n'
+                b'vi superum saevae memorem Iunonis ob iram;\n'
+                b'multa quoque et bello passus, dum conderet urbem,\n'
+                b'inferretque deos Latio, genus unde Latinum,\n'
+                b'Albanique patres, atque altae moenia Romae.\n'
+                b'Musa, mihi causas memora, quo numine laeso,\n'
+                b'\n')
+
+        # There should not be a new commit. HEAD won't change.
+        self.assertEqual(self._git_get_num_commits(), num_commits + 2)

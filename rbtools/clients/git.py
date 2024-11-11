@@ -6,11 +6,12 @@ import logging
 import os
 import re
 import sys
-from typing import Dict, Iterator, List, Optional, cast
+from typing import Dict, Iterator, List, Optional, TYPE_CHECKING, cast
 
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
                                             SCMClientDiffResult,
+                                            SCMClientPatcher,
                                             SCMClientRevisionSpec)
 from rbtools.clients.errors import (AmendError,
                                     CreateCommitError,
@@ -32,6 +33,9 @@ from rbtools.utils.errors import EditorError
 from rbtools.utils.process import (RunProcessError,
                                    RunProcessResult,
                                    run_process)
+
+if TYPE_CHECKING:
+    from rbtools.diffs.patches import Patch
 
 
 def get_git_candidates(
@@ -67,6 +71,81 @@ def get_git_candidates(
     return candidates
 
 
+class GitPatcher(SCMClientPatcher['GitClient']):
+    """A patcher that applies Git patches to a tree.
+
+    This applies patches one-by-one using :command:`git apply -3`. This
+    enables merging of patches, and will stop the patching process at the
+    first patch that has conflicts or otherwise fails.
+
+    Version Added:
+        5.1
+    """
+
+    def apply_single_patch(
+        self,
+        *,
+        patch: Patch,
+        patch_num: int,
+    ) -> PatchResult:
+        """Internal function to apply a single patch.
+
+        This will take a single patch and apply it using Git.
+
+        Args:
+            patch (rbtools.diffs.patches.Patch):
+                The patch to apply, opened for reading.
+
+            patch_num (int):
+                The 1-based index of this patch in the full list of patches.
+
+        Returns:
+            rbtools.diffs.patches.PatchResult:
+            The result of the patch application, whether the patch applied
+            successfully or with normal patch failures.
+        """
+        cmd: list[str] = ['apply', '-3']
+
+        if self.revert:
+            cmd.append('-R')
+
+        p = patch.prefix_level
+
+        if p:
+            cmd += ['-p', str(p)]
+
+        cmd.append(str(patch.path))
+
+        patch_output = self.scmclient._run_git(cmd,
+                                               ignore_errors=True,
+                                               redirect_stderr=True)
+        data = patch_output.stdout_bytes.read()
+
+        applied: bool
+        has_conflicts: bool = False
+        conflicting_files: list[str] = []
+
+        if patch_output.exit_code == 0:
+            applied = True
+        elif b'with conflicts' in data:
+            applied = True
+            has_conflicts = True
+            conflicting_files = [
+                line.split(b' ', 1)[1].decode('utf-8')
+                for line in data.splitlines()
+                if line.startswith(b'U')
+            ]
+        else:
+            applied = False
+
+        return PatchResult(applied=applied,
+                           has_conflicts=has_conflicts,
+                           conflicting_files=conflicting_files,
+                           patch_output=data,
+                           patch=patch,
+                           patch_range=(patch_num, patch_num))
+
+
 class GitClient(BaseSCMClient):
     """A client for Git.
 
@@ -86,6 +165,8 @@ class GitClient(BaseSCMClient):
     # server_tool_ids instead.
     server_tool_names = 'Git,Perforce,Subversion'
     server_tool_ids = ['git', 'perforce', 'subversion', 'tfs_git']
+
+    patcher_cls = GitPatcher
 
     supports_commit_history = True
     supports_diff_exclude_patterns = True
@@ -1433,66 +1514,6 @@ class GitClient(BaseSCMClient):
             self._run_git(['commit', '--amend', '-m', message])
         except RunProcessError as e:
             raise AmendError(str(e))
-
-    def apply_patch(self, patch_file, base_path=None, base_dir=None, p=None,
-                    revert=False):
-        """Apply the given patch to index.
-
-        This will take the given patch file and apply it to the index,
-        scheduling all changes for commit.
-
-        Args:
-            patch_file (unicode):
-                The name of the patch file to apply.
-
-            base_path (unicode, unused):
-                The base path that the diff was generated in. All git diffs are
-                absolute to the repository root, so this is unused.
-
-            base_dir (unicode, unused):
-                The path of the current working directory relative to the root
-                of the repository. All git diffs are absolute to the repository
-                root, so this is unused.
-
-            p (unicode, optional):
-                The prefix level of the diff.
-
-            revert (bool, optional):
-                Whether the patch should be reverted rather than applied.
-
-        Returns:
-            rbtools.diffs.patches.PatchResult:
-            The result of the patch operation.
-        """
-        cmd = ['apply', '-3']
-
-        if revert:
-            cmd.append('-R')
-
-        if p:
-            cmd += ['-p', p]
-
-        cmd.append(patch_file)
-
-        patch_output = self._run_git(cmd,
-                                     ignore_errors=True,
-                                     redirect_stderr=True)
-        data = patch_output.stdout_bytes.read()
-
-        if patch_output.exit_code == 0:
-            return PatchResult(applied=True, patch_output=data)
-        elif b'with conflicts' in data:
-            return PatchResult(
-                applied=True,
-                has_conflicts=True,
-                conflicting_files=[
-                    line.split(b' ', 1)[1]
-                    for line in data.splitlines()
-                    if line.startswith(b'U')
-                ],
-                patch_output=data)
-        else:
-            return PatchResult(applied=False, patch_output=data)
 
     def create_commit(self, message, author, run_editor,
                       files=[], all_files=False):
