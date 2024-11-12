@@ -90,6 +90,30 @@ This can also be provided by passing :option:`--cache-location` to any
 command.
 
 
+COOKIES_STRICT_DOMAIN_MATCH
+---------------------------
+
+.. rbtconfig:: COOKIES_STRICT_DOMAIN_MATCH
+
+.. versionadded:: 5.1
+
+**Type:** Boolean
+
+**Default:** ``False``
+
+RBTools uses cookies to manage Review Board login sessions. By defaut,
+if RBTools has stored cookies for both a domain and a parent domain
+(e.g., ``staging.rb.example.com`` and ``rb.example.com``), both cookies
+may be passed, and this may interfere with authentication.
+
+Setting ``COOKIES_STRICT_DOMAIN_MATCH = True`` will only match cookies that
+exactly match the domain name you're connecting to.
+
+Example::
+
+    COOKIES_STRICT_DOMAIN_MATCH = True
+
+
 .. rbtconfig:: DEBUG
 
 DEBUG

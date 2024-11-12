@@ -13,7 +13,10 @@ import sys
 from collections import OrderedDict
 from http.client import (HTTPMessage, HTTPResponse, HTTPSConnection,
                          NOT_MODIFIED)
-from http.cookiejar import Cookie, CookieJar, MozillaCookieJar
+from http.cookiejar import (Cookie,
+                            CookieJar,
+                            DefaultCookiePolicy,
+                            MozillaCookieJar)
 from io import BytesIO
 from json import loads as json_loads
 from typing import (Any, Callable, Dict, List, Optional, TYPE_CHECKING,
@@ -925,8 +928,85 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
         return self.parent.open(request, timeout=request.timeout)
 
 
-def create_cookie_jar(
+class CookiePolicy(DefaultCookiePolicy):
+    """A cookie policy for cookie storage and retrieval.
+
+    By default, this uses the default cookie policy imposed by Python, which is
+    very lax with domain lookup. If there's a cookie for
+    ``subdomain.example.com`` and an identical cookie for ``example.com``, both
+    cookies will be returned when accessing ``subdomain.example.com``.
+
+    Strict cookie behavior can be enabled by setting
+    ``COOKIES_STRICT_DOMAIN_MATCH = True`` in :file:`.reviewboardrc`.
+
+    Version Added:
+        5.1
+    """
+
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The loaded RBTools configuration.
+    config: RBToolsConfig
+
+    def __init__(
+        self,
+        *,
+        config: RBToolsConfig,
+        **kwargs,
+    ) -> None:
+        """Initialize the cookie policy.
+
+        Args:
+            config (rbtools.config.config.RBToolsConfig):
+                The loaded RBTools configuration.
+
+            **kwargs (dict):
+                Keyword arguments for the parent constructor.
+        """
+        self.config = config
+
+        super().__init__(**kwargs)
+
+    def domain_return_ok(
+        self,
+        domain: str,
+        request: URLRequest,
+    ) -> bool:
+        """Return whether a domain for a stored cookie should be used.
+
+        This will check if a stored cookie is considered valid for an HTTP
+        request to a server based on a domain check. The behavior depends on
+        the ``COOKIES_STRICT_DOMAIN_MATCH`` setting.
+
+        Args:
+            domain (str):
+                The domain of the stored cookie.
+
+            request (urllib.request.Request):
+                The HTTP request to be sent to the server.
+
+        Returns:
+            bool:
+            ``True`` if the cookie's domain is a match and should be a
+            candidate for the request. ``False`` if it should not be included.
+        """
+        if self.config.COOKIES_STRICT_DOMAIN_MATCH:
+            url_domain = _normalize_url_parts(
+                request.get_full_url(),
+                host_header=request.get_header('Host'))[0]
+
+            if not domain.startswith('.') and domain != url_domain:
+                return False
+
+        return super().domain_return_ok(domain, request)
+
+
+def _create_cookie_jar(
+    *,
     cookie_file: Optional[str] = None,
+    config: RBToolsConfig,
 ) -> Tuple[MozillaCookieJar, str]:
     """Return a cookie jar backed by cookie_file
 
@@ -937,14 +1017,26 @@ def create_cookie_jar(
     In the case where we default cookie_file, and it does not exist,
     we will attempt to copy the .post-review-cookies.txt file.
 
+    Version Changed:
+        5.1:
+        * Added the required ``config`` argument.
+        * Made ``cookie_file`` keyword-only.
+        * Renamed this from ``create_cookie_jar()` to make it clear this
+          function is private.
+
     Args:
         cookie_file (str, optional):
             The filename to use for cookies.
 
+        config (rbtools.config.config.RBToolsConfig):
+            The loaded RBTools configuration.
+
+            Version Added:
+                5.1
+
     Returns:
         tuple:
         A two-tuple containing:
-
 
         Tuple:
             0 (http.cookiejar.MozillaCookieJar):
@@ -976,7 +1068,11 @@ def create_cookie_jar(
             logging.warning('There was an error while creating a '
                             'cookie file: %s', e)
 
-    return MozillaCookieJar(cookie_file), cookie_file
+    return (
+        MozillaCookieJar(filename=cookie_file,
+                         policy=CookiePolicy(config=config)),
+        cookie_file,
+    )
 
 
 class ReviewBoardServer:
@@ -1138,8 +1234,9 @@ class ReviewBoardServer:
         cookie_jar: Optional[CookieJar]
 
         if save_cookies:
-            cookie_jar, self.cookie_file = create_cookie_jar(
-                cookie_file=cookie_file)
+            cookie_jar, self.cookie_file = _create_cookie_jar(
+                cookie_file=cookie_file,
+                config=config)
 
             try:
                 cookie_jar.load(ignore_expires=True)
