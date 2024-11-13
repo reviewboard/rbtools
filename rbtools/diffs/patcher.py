@@ -38,32 +38,63 @@ _PATCHING_RE = re.compile(
 _CHECK_EMPTY_FILES_RE = re.compile(
     br"("
 
-    # GNU Diff
+    # GNU Patch
     br"[A-Za-z0-9_-]+: \*{4} Only garbage was found in the patch input\."
     br"|"
 
-    # Apple/BSD Diff
+    # Apple/BSD Patch
     br"I can't seem to find a patch in there anywhere\."
     br")"
 )
 
 _FATAL_PATCH_ERROR_RE = re.compile(
-    br"("
+    br"(?P<error>"
 
-    # GNU Diff
-    br"[A-Za-z0-9_-]+: \*{4}"
+    # GNU Patch
+    br"[A-Za-z0-9_-]+: \*{4}(.*)"
     br"|"
 
-    # Apple Diff
-    br"I can't seem to find a patch in there anywhere\."
-    br")"
-)
+    # Apple Patch
+    br"I can't seem to find a patch in there anywhere\.(.*)"
+    br")",
+    re.S)
 
 _CONFLICTS_RE = re.compile(
     # Cover both the BSD/Apple Diff and GNU Diff variations of the output.
     br'(?P<num_hunks>\d+) out of (?P<total_hunks>\d+) hunks? '
     br'(failed|FAILED)\s?--\s?saving rejects to (file )?(?P<filename>.+)\.rej'
 )
+
+
+class ParsedPatchOutput(TypedDict):
+    """Parsed output from a patch command.
+
+    This is designed to collect information from parsing an unstructured
+    :command:`patch` output stream. The default :py:class:`Patcher` supports
+    pulling information from GNU Patch and Apple Patch commands, though this
+    data can be returned from any patch tool.
+
+    Version Added:
+        5.1
+    """
+
+    #: A list of conflicting filenames.
+    conflicting_files: list[str]
+
+    #: Whether the patch indicates any empty files were potentially found.
+    has_empty_files: bool
+
+    #: Whether the patch may have partially-applied files.
+    has_partial_applied_files: bool
+
+    #: A list of filenames for files patched or attempted to be patched.
+    #:
+    #: This may include files that had conflicts and coud not be fully
+    #: patched.
+    patched_files: list[str]
+
+    #: Any fatal error text present in the stream.
+    fatal_error: NotRequired[Optional[str]]
 
 
 class PatcherKwargs(TypedDict):
@@ -562,17 +593,15 @@ class Patcher:
         patch_output = result.stdout_bytes.read()
 
         conflicting_files: list[str] = []
-        has_partial_applied: bool = False
         patched: bool = False
 
         if result.exit_code == 0:
             patched = True
         else:
-            patch_output = patch_output.strip()
+            parsed_output = self.parse_patch_output(patch_output)
 
             # Check the patch for any added/deleted empty files to handle.
-            if (self.can_patch_empty_files and
-                _CHECK_EMPTY_FILES_RE.match(patch_output)):
+            if self.can_patch_empty_files and parsed_output['has_empty_files']:
                 # We'll let the patcher's special implementation handle this,
                 # if it can.
                 #
@@ -581,8 +610,7 @@ class Patcher:
                 patched = self.apply_patch_for_empty_files(patch)
                 has_fatal_error = not patched
             else:
-                has_fatal_error = \
-                    bool(_FATAL_PATCH_ERROR_RE.search(patch_output))
+                has_fatal_error = bool(parsed_output.get('fatal_error'))
 
             if has_fatal_error:
                 raise ApplyPatchError(
@@ -598,25 +626,10 @@ class Patcher:
                         patch_output=patch_output,
                         patch_range=(patch_num, patch_num)))
 
-            # Start looking for any files with failed hunks. We'll determine
-            # if this patch was partially applied.
-            for m in _CONFLICTS_RE.finditer(patch_output):
-                num_hunks = int(m.group('num_hunks'))
-                total_hunks = int(m.group('total_hunks'))
-                filename = force_unicode(m.group('filename'))
+            # Handle any conflicts/partially-applied state from the result.
+            conflicting_files = parsed_output['conflicting_files']
 
-                conflicting_files.append(filename)
-
-                if num_hunks != total_hunks:
-                    # This is a partially-applied patch.
-                    has_partial_applied = True
-
-            if not has_partial_applied and conflicting_files:
-                num_patched_files = len(_PATCHING_RE.findall(patch_output))
-                has_partial_applied = \
-                    (len(conflicting_files) != num_patched_files)
-
-            if has_partial_applied:
+            if parsed_output['has_partial_applied_files']:
                 patched = True
 
         # We're done here. Send the result.
@@ -658,6 +671,79 @@ class Patcher:
                 return base_path.count('/') + 1
 
         return None
+
+    def parse_patch_output(
+        self,
+        patch_output: bytes,
+    ) -> ParsedPatchOutput:
+        """Parse the patch command's output for useful information.
+
+        This will parse the standard output from a supported patch command
+        to return information that can be used to identify patched files,
+        partially-applied files, conflicting files, and error messages.
+
+        It's only used if the patcher uses the default patch application
+        logic or if it's called explicitly.
+
+        Args:
+            patch_output (bytes):
+                The patch output to parse.
+
+        Returns:
+            ParsedPatchOutput:
+            The parsed data found from the patch output.
+        """
+        patch_output = patch_output.strip()
+
+        # Check if there are empty files found.
+        has_empty_files = bool(_CHECK_EMPTY_FILES_RE.search(patch_output))
+
+        # Check if there's a fatal error found.
+        #
+        # There's some overlap with empty file indicators, so both states may
+        # be returned.
+        fatal_error: Optional[str]
+
+        m = _FATAL_PATCH_ERROR_RE.search(patch_output)
+
+        if m:
+            fatal_error = force_unicode(m.group('error'))
+        else:
+            fatal_error = None
+
+        # Look for any patched files.
+        patched_files: list[str] = [
+            force_unicode(m.group('filename'))
+            for m in _PATCHING_RE.finditer(patch_output)
+        ]
+
+        # Start looking for any files with failed hunks. We'll determine
+        # if this patch was partially applied.
+        conflicting_files: list[str] = []
+        has_partial_applied_files: bool = False
+
+        for m in _CONFLICTS_RE.finditer(patch_output):
+            num_hunks = int(m.group('num_hunks'))
+            total_hunks = int(m.group('total_hunks'))
+            filename = force_unicode(m.group('filename'))
+
+            conflicting_files.append(filename)
+
+            if num_hunks != total_hunks:
+                # This is a partially-applied patch.
+                has_partial_applied_files = True
+
+        if not has_partial_applied_files and conflicting_files:
+            has_partial_applied_files = \
+                (len(conflicting_files) != len(patched_files))
+
+        return {
+            'conflicting_files': conflicting_files,
+            'fatal_error': fatal_error,
+            'has_empty_files': has_empty_files,
+            'has_partial_applied_files': has_partial_applied_files,
+            'patched_files': patched_files,
+        }
 
     def create_commit(
         self,
