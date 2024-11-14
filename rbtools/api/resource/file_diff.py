@@ -7,12 +7,13 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Literal, Optional, TYPE_CHECKING
 
 from rbtools.api.request import HttpRequest
 from rbtools.api.resource.base import (
     ItemResource,
     ListResource,
+    api_stub,
     request_method,
     resource_mimetype,
 )
@@ -20,6 +21,8 @@ from rbtools.api.resource.mixins import GetPatchMixin
 
 if TYPE_CHECKING:
     from rbtools.api.request import QueryArgs
+    from rbtools.api.resource.base import ResourceExtraDataField
+    from rbtools.api.resource.file_attachment import FileAttachmentItemResource
 
 
 @resource_mimetype('application/vnd.reviewboard.org.file')
@@ -30,6 +33,43 @@ class FileDiffItemResource(GetPatchMixin, ItemResource):
         6.0:
         Renamed from FileDiffResource.
     """
+
+    ######################
+    # Instance variables #
+    ######################
+
+    #: Whether this represents a binary file.
+    binary: bool
+
+    #: Additional information of the destination file.
+    #:
+    #: This is parsed from the diff, but is usually not used for anything.
+    dest_detail: Optional[str]
+
+    #: The new name of the patched file.
+    #:
+    #: This may be the same as the source file.
+    dest_file: Optional[str]
+
+    #: The encoding of the original and patched file, if available.
+    encoding: str
+
+    #: Extra data as part of the diff.
+    extra_data: ResourceExtraDataField
+
+    #: The numeric ID of the file diff.
+    id: int
+
+    #: The original name of the file.
+    source_file: str
+
+    #: The revision of the file being modified.
+    #:
+    #: This is a valid revision in the repository.
+    source_revision: str
+
+    #: The status of the file.
+    status: Literal['copied', 'deleted', 'modified', 'moved', 'unknown']
 
     @request_method
     def get_diff_data(
@@ -45,10 +85,75 @@ class FileDiffItemResource(GetPatchMixin, ItemResource):
         Returns:
             rbtools.api.resource.ItemResource:
             A resource wrapping the diff data.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
         """
         return HttpRequest(self._url, query_args=kwargs, headers={
             'Accept': 'application/vnd.reviewboard.org.diff.data+json',
         })
+
+    @api_stub
+    def get_dest_attachment(
+        self,
+        **kwargs: QueryArgs,
+    ) -> FileAttachmentItemResource:
+        """Get the file attachment for the modified file.
+
+        For binary files where an uploaded attachment exists, this will return
+        the modified version of the file.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.FileAttachmentItemResource:
+            The file attachment for the modified version.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_source_attachment(
+        self,
+        **kwargs: QueryArgs,
+    ) -> FileAttachmentItemResource:
+        """Get the file attachment for the original file.
+
+        For binary files where an uploaded attachment exists, this will return
+        the original version of the file.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.FileAttachmentItemResource:
+            The file attachment for the original version.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    # TODO get_diff_comments stub
+    # TODO get_original_file stub
+    # TODO get_patched_file stub
 
 
 @resource_mimetype('application/vnd.reviewboard.org.files')

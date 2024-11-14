@@ -12,14 +12,15 @@ from typing import Optional, TYPE_CHECKING
 
 from rbtools.api.request import HttpRequest
 from rbtools.api.resource.base import (
-    ItemResource,
     ListResource,
-    request_method,
+    request_method_returns,
+    api_stub,
     resource_mimetype,
 )
-from rbtools.api.resource.mixins import GetPatchMixin
+from rbtools.api.resource.base_diff_commit import BaseDiffCommitItemResource
 
 if TYPE_CHECKING:
+    from rbtools.api.resource.file_diff import FileDiffListResource
     from rbtools.api.request import QueryArgs
 
 
@@ -27,19 +28,43 @@ logger = logging.getLogger(__name__)
 
 
 @resource_mimetype('application/vnd.reviewboard.org.draft-commit')
-class DraftDiffCommitItemResource(GetPatchMixin, ItemResource):
+class DraftDiffCommitItemResource(BaseDiffCommitItemResource):
     """Item resource for draft diff commits.
 
     Version Added:
         4.2
     """
 
+    @api_stub
+    def get_draft_files(
+        self,
+        **kwargs: QueryArgs,
+    ) -> FileDiffListResource:
+        """Get the files for this commit.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.FileDiffListResource:
+            The file diff list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
 
 @resource_mimetype('application/vnd.reviewboard.org.draft-commits')
 class DraftDiffCommitListResource(ListResource[DraftDiffCommitItemResource]):
     """List resource for draft diff commits."""
 
-    @request_method
+    @request_method_returns[DraftDiffCommitItemResource]()
     def upload_commit(
         self,
         validation_info: str,

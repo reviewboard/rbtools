@@ -9,17 +9,25 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
+from typing_extensions import Self
+
 from rbtools.api.request import HttpRequest
 from rbtools.api.resource.base import (
     ItemResource,
     ListResource,
-    request_method,
+    api_stub,
+    request_method_returns,
     resource_mimetype,
 )
 from rbtools.api.resource.mixins import DiffUploaderMixin, GetPatchMixin
 
 if TYPE_CHECKING:
     from rbtools.api.request import QueryArgs
+    from rbtools.api.resource.base import ResourceExtraDataField
+    from rbtools.api.resource.diff_commit import DiffCommitListResource
+    from rbtools.api.resource.draft_diff_commit import \
+        DraftDiffCommitListResource
+    from rbtools.api.resource.file_diff import FileDiffListResource
 
 
 @resource_mimetype('application/vnd.reviewboard.org.diff')
@@ -31,7 +39,47 @@ class DiffItemResource(GetPatchMixin, ItemResource):
         Renamed from DiffResource.
     """
 
-    @request_method
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The ID/revision that this change is built upon.
+    #:
+    #: If using a parent diff, then this is the base for that diff. This may
+    #: not be provided for all diffs or repository types, depending on how the
+    #: diff was uploaded.
+    base_commit_id: str
+
+    #: The base directory that will be prepended to all paths in the diff.
+    #:
+    #: This is needed for some types of repositories. The directory must be
+    #: between the root of the repository and the top directory referenced in
+    #: the diff paths.
+    basedir: str
+
+    #: The number of commits present.
+    #:
+    #: This will only be set for review requests created with commit history.
+    commit_count: str
+
+    #: Extra data as part of the diff.
+    extra_data: ResourceExtraDataField
+
+    #: The numeric ID of the diff.
+    id: int
+
+    #: The name of the diff, usually the filename.
+    name: str
+
+    #: The revision of the diff.
+    #:
+    #: This starts at 1 for public diffs. Draft diffs may be 0.
+    revision: int
+
+    #: The date and time that the diff was uploaded, in ISO-8601 format.
+    timestamp: str
+
+    @request_method_returns[Self]()
     def finalize_commit_series(
         self,
         cumulative_diff: bytes,
@@ -57,6 +105,13 @@ class DiffItemResource(GetPatchMixin, ItemResource):
         Returns:
             DiffItemResource:
             The finalized diff resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
         """
         if not isinstance(cumulative_diff, bytes):
             raise TypeError(
@@ -79,13 +134,111 @@ class DiffItemResource(GetPatchMixin, ItemResource):
 
         return request
 
+    @api_stub
+    def get_commits(
+        self,
+        **kwargs: QueryArgs,
+    ) -> DiffCommitListResource:
+        """Get the commits for the diff.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.DiffCommitListResource:
+            The diff commit list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_draft_commits(
+        self,
+        **kwargs: QueryArgs,
+    ) -> DraftDiffCommitListResource:
+        """Get the commits for the diff when the diff is a draft.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.DraftDiffCommitListResource:
+            The diff commit list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_draft_files(
+        self,
+        **kwargs: QueryArgs,
+    ) -> FileDiffListResource:
+        """Get the files for the diff when the diff is a draft.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.FileDiffListResource:
+            The diff commit list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_files(
+        self,
+        **kwargs: QueryArgs,
+    ) -> FileDiffListResource:
+        """Get the files for the diff.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.FileDiffListResource:
+            The file diff list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    # TODO get_repository stub
+
 
 @resource_mimetype('application/vnd.reviewboard.org.diffs')
 class DiffListResource(DiffUploaderMixin,
                        ListResource[DiffItemResource]):
     """List resource for diffs."""
 
-    @request_method
+    @request_method_returns[DiffItemResource]()
     def upload_diff(
         self,
         diff: bytes,
@@ -126,7 +279,7 @@ class DiffListResource(DiffUploaderMixin,
             base_commit_id=base_commit_id,
             **kwargs)
 
-    @request_method
+    @request_method_returns[DiffItemResource]()
     def create_empty(
         self,
         base_commit_id: Optional[str] = None,
