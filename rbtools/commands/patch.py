@@ -481,8 +481,6 @@ class PatchCommand(BaseCommand):
         diff_revision = options.diff_revision
         tool = self.tool
 
-        assert tool is not None
-
         if revert:
             if patch_stdout:
                 raise CommandError(
@@ -492,6 +490,13 @@ class PatchCommand(BaseCommand):
                 raise CommandError(
                     _('--write and --revert cannot both be used.'))
 
+            assert tool is not None
+
+            if not tool.supports_patch_revert:
+                raise CommandError(
+                    _('The %s backend does not support reverting patches.')
+                    % tool.name)
+
         if patch_stdout and patch_outfile:
             raise CommandError(
                 _('--print and --write cannot both be used.'))
@@ -500,13 +505,10 @@ class PatchCommand(BaseCommand):
             raise CommandError(
                 _('--print and --json cannot both be used.'))
 
-        if revert and not tool.supports_patch_revert:
-            raise CommandError(
-                _('The %s backend does not support reverting patches.')
-                % tool.name)
-
         if not patch_stdout and not patch_outfile:
             # Check if the working directory is clean.
+            assert tool is not None
+
             try:
                 if tool.has_pending_changes():
                     message = 'Working directory is not clean.'
@@ -697,9 +699,11 @@ class PatchCommand(BaseCommand):
             patch = pending_patch['patch']
 
             with patch.open():
-                fp.write(patch.content)
+                content = patch.content
+                fp.write(content)
 
-            fp.write(b'\n')
+                if not content.endswith(b'\n'):
+                    fp.write(b'\n')
 
     def _apply_patches(
         self,
