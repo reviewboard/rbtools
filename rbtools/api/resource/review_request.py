@@ -8,20 +8,24 @@ Version Added:
 from __future__ import annotations
 
 from collections import defaultdict, deque
-from typing import ClassVar, Literal, Optional, TYPE_CHECKING, Union, cast
+from typing import (ClassVar, Literal, Optional, TYPE_CHECKING, Union, cast,
+                    overload)
 from urllib.parse import urljoin
 
 from typing_extensions import Self, Unpack
 
 from rbtools.api.resource.base import (
     BaseGetListParams,
-    ItemResource,
+    BaseGetParams,
     ListResource,
     api_stub,
-    request_method,
     request_method_returns,
     resource_mimetype,
 )
+from rbtools.api.resource.base_review_request import \
+    BaseReviewRequestItemResource
+from rbtools.api.resource.review_request_draft import \
+    ReviewRequestDraftResource
 from rbtools.utils.graphs import path_exists
 
 if TYPE_CHECKING:
@@ -29,24 +33,29 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
-    from rbtools.api.request import HttpRequest, QueryArgs
+    from rbtools.api.request import HttpRequest
     from rbtools.api.resource.base import (
-        BaseGetParams,
-        ResourceExtraDataField,
         ResourceLinkField,
         ResourceListField,
         TextType,
     )
-    from rbtools.api.resource.base_user import UserGetParams
+    from rbtools.api.resource.change import ChangeListResource
     from rbtools.api.resource.diff import DiffItemResource, DiffListResource
+    from rbtools.api.resource.diff_context import (
+        DiffContextGetParams,
+        DiffContextResource,
+    )
     from rbtools.api.resource.file_attachment import FileAttachmentListResource
-    from rbtools.api.resource.review_group import ReviewGroupItemResource
+    from rbtools.api.resource.last_update import LastUpdateResource
     from rbtools.api.resource.screenshot import ScreenshotListResource
-    from rbtools.api.resource.user import UserItemResource
+    from rbtools.api.resource.status_update import (
+        StatusUpdateGetListParams,
+        StatusUpdateListResource,
+    )
 
 
 @resource_mimetype('application/vnd.reviewboard.org.review-request')
-class ReviewRequestItemResource(ItemResource):
+class ReviewRequestItemResource(BaseReviewRequestItemResource):
     """Item resource for review requests.
 
     Version Changed:
@@ -71,14 +80,6 @@ class ReviewRequestItemResource(ItemResource):
     #: The list of review requests that this review request is blocking.
     blocks: ResourceListField[ReviewRequestItemResource]
 
-    #: The branch that the code was changed on or will be committed to.
-    #:
-    #: This is a free-form field that can store any text.
-    branch: str
-
-    #: The list of bugs closed or referenced by this change.
-    bugs_closed: ResourceListField[str]
-
     #: The change number that the review request represents.
     #:
     #: These are server-side repository-specific change numbers, and are not
@@ -92,26 +93,11 @@ class ReviewRequestItemResource(ItemResource):
     #: The current or forced text type for the ``close_description`` field.
     close_description_text_type: TextType
 
-    #: The commit that the review request represents.
-    commit_id: str
-
     #: Whether or not the review request was created with history support.
     #:
     #: A value of ``True`` indicates that the review request will have commits
     #: attached.
     created_with_history: bool
-
-    #: The list of review requests that this review request depends on.
-    depends_on: ResourceListField[ReviewRequestItemResource]
-
-    #: The review request's description.
-    description: str
-
-    #: The current or forced text type for the ``description`` field.
-    description_text_type: TextType
-
-    #: Extra data as part of the review request.
-    extra_data: ResourceExtraDataField
 
     #: The numeric ID of the review request.
     id: int
@@ -128,17 +114,11 @@ class ReviewRequestItemResource(ItemResource):
     #: The number of issues waiting for verification to resolve or drop.
     issue_verifying_count: int
 
-    #: The date and time that the review request was last updated.
-    last_updated: str
-
     #: The most recent diff.
     latest_diff: Optional[ResourceLinkField[DiffItemResource]]
 
     #: Whether or not the review request is currently visible to other users.
     public: bool
-
-    #: The screenshots attached to the review request.
-    screenshots: ResourceLinkField[ScreenshotListResource]
 
     #: The number of Ship It-s given to this review request.
     ship_it_count: int
@@ -147,22 +127,6 @@ class ReviewRequestItemResource(ItemResource):
     status: Union[Literal['discarded'],
                   Literal['pending'],
                   Literal['submitted']]
-
-    #: The review request's brief summary.
-    summary: str
-
-    #: The list of review groups who were requested to review this change.
-    target_groups: ResourceListField[
-        ResourceLinkField[ReviewGroupItemResource]]
-
-    #: The list of users who were requested to review this change.
-    target_people: ResourceListField[ResourceLinkField[UserItemResource]]
-
-    #: The information on the testing that was done for the change.
-    testing_done: str
-
-    #: The current or forced text type for the ``testing_done`` field.
-    testing_done_text_type: TextType
 
     #: The date and time that the review request was added.
     time_added: str
@@ -232,10 +196,10 @@ class ReviewRequestItemResource(ItemResource):
 
         return self.update(data=data, internal=True)
 
-    @request_method  # TODO TYPING
+    @request_method_returns[ReviewRequestDraftResource]()
     def get_or_create_draft(
         self,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetParams],
     ) -> HttpRequest:
         """Retrieve or create a draft.
 
@@ -251,6 +215,9 @@ class ReviewRequestItemResource(ItemResource):
         request.method = 'POST'
 
         for name, value in kwargs.items():
+            if not isinstance(value, (str, bytes)):
+                value = str(value)
+
             request.add_field(name, value)
 
         return request
@@ -325,6 +292,54 @@ class ReviewRequestItemResource(ItemResource):
         return graph
 
     @api_stub
+    def get_changes(
+        self,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> ChangeListResource:
+        """Get the change descriptions for the review request.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ChangeListResource:
+            The change description list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_diff_context(
+        self,
+        **kwargs: Unpack[DiffContextGetParams],
+    ) -> DiffContextResource:
+        """Get the diff context resource.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.DiffContextResource:
+            The diff context resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
     def get_diffs(
         self,
         **kwargs: Unpack[BaseGetListParams],
@@ -338,6 +353,46 @@ class ReviewRequestItemResource(ItemResource):
         Returns:
             rbtools.api.resource.DiffListResource:
             The diff list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @overload
+    def get_draft(
+        self,
+        internal: Literal[False] = False,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> ReviewRequestDraftResource:
+        ...
+
+    @overload
+    def get_draft(
+        self,
+        internal: Literal[True],
+        **kwargs: Unpack[BaseGetParams],
+    ) -> HttpRequest:
+        ...
+
+    @api_stub
+    def get_draft(
+        self,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> Union[HttpRequest, ReviewRequestDraftResource]:
+        """Get the review request draft.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ReviewRequestDraftResource:
+            The draft resource.
 
         Raises:
             rbtools.api.errors.APIError:
@@ -362,6 +417,30 @@ class ReviewRequestItemResource(ItemResource):
         Returns:
             rbtools.api.resource.FileAttachmentListResource:
             The file attachment list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_last_update(
+        self,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> LastUpdateResource:
+        """Get the last update resource for a review request.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.LastUpdateResource:
+            The last update resource.
 
         Raises:
             rbtools.api.errors.APIError:
@@ -421,19 +500,19 @@ class ReviewRequestItemResource(ItemResource):
         raise NotImplementedError
 
     @api_stub
-    def get_submitter(
+    def get_status_updates(
         self,
-        **kwargs: Unpack[UserGetParams],
-    ) -> UserItemResource:
-        """Get the submitter of the review request.
+        **kwargs: Unpack[StatusUpdateGetListParams],
+    ) -> StatusUpdateListResource:
+        """Get the status updates for the review request.
 
         Args:
             **kwargs (dict):
                 Query arguments to include with the request.
 
         Returns:
-            rbtools.api.resource.UserItemResource:
-            The user item resource.
+            rbtools.api.resource.StatusUpdateListResource:
+            The status update list resource.
 
         Raises:
             rbtools.api.errors.APIError:
@@ -444,13 +523,8 @@ class ReviewRequestItemResource(ItemResource):
         """
         raise NotImplementedError
 
-    # TODO get_changes stub
-    # TODO get_diff_context stub
-    # TODO get_draft stub
-    # TODO get_last_update stub
     # TODO get_repository stub
     # TODO get_reviews stub
-    # TODO get_status_updates stub
 
 
 class ReviewRequestGetListParams(BaseGetListParams, total=False):

@@ -14,6 +14,7 @@ from rbtools.api.resource.base import (
     ResourceListField,
     resource_mimetype,
 )
+from rbtools.api.resource.change import ChangeItemResource, ChangeListResource
 from rbtools.api.resource.default_reviewer import (
     DefaultReviewerItemResource,
     DefaultReviewerListResource,
@@ -22,6 +23,7 @@ from rbtools.api.resource.diff import (
     DiffItemResource,
     DiffListResource,
 )
+from rbtools.api.resource.diff_context import DiffContextResource
 from rbtools.api.resource.diff_commit import (
     DiffCommitItemResource,
     DiffCommitListResource,
@@ -54,6 +56,7 @@ from rbtools.api.resource.file_diff import (
     FileDiffItemResource,
     FileDiffListResource,
 )
+from rbtools.api.resource.last_update import LastUpdateResource
 from rbtools.api.resource.mixins import (
     DiffUploaderMixin,
     GetPatchMixin,
@@ -70,10 +73,17 @@ from rbtools.api.resource.review_request import (
     ReviewRequestItemResource,
     ReviewRequestListResource,
 )
+from rbtools.api.resource.review_request_draft import (
+    ReviewRequestDraftResource,
+)
 from rbtools.api.resource.root import RootResource
 from rbtools.api.resource.screenshot import (
     ScreenshotItemResource,
     ScreenshotListResource,
+)
+from rbtools.api.resource.status_update import (
+    StatusUpdateItemResource,
+    StatusUpdateListResource,
 )
 from rbtools.api.resource.user import UserItemResource, UserListResource
 from rbtools.api.resource.user_file_attachment import (
@@ -95,11 +105,14 @@ ReviewRequestResource = ReviewRequestItemResource
 
 
 __all__ = [
+    'ChangeItemResource',
+    'ChangeListResource',
     'CountResource',
     'DefaultReviewerItemResource',
     'DefaultReviewerListResource',
     'DiffCommitItemResource',
     'DiffCommitListResource',
+    'DiffContextResource',
     'DiffFileAttachmentListResource',
     'DiffItemResource',
     'DiffListResource',
@@ -122,6 +135,7 @@ __all__ = [
     'FileDiffListResource',
     'GetPatchMixin',
     'ItemResource',
+    'LastUpdateResource',
     'ListResource',
     'RESOURCE_MAP',
     'Resource',
@@ -135,10 +149,13 @@ __all__ = [
     'ReviewGroupUserListResource',
     'ReviewRequestItemResource',
     'ReviewRequestResource',
+    'ReviewRequestDraftResource',
     'ReviewRequestListResource',
     'RootResource',
     'ScreenshotItemResource',
     'ScreenshotListResource',
+    'StatusUpdateItemResource',
+    'StatusUpdateListResource',
     'UserFileAttachmentItemResource',
     'UserFileAttachmentListResource',
     'UserItemResource',

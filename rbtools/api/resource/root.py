@@ -43,6 +43,10 @@ if TYPE_CHECKING:
         DefaultReviewerItemResource,
         DefaultReviewerListResource,
     )
+    from rbtools.api.resource.change import (
+        ChangeItemResource,
+        ChangeListResource,
+    )
     from rbtools.api.resource.diff import (
         DiffItemResource,
         DiffListResource,
@@ -50,6 +54,10 @@ if TYPE_CHECKING:
     from rbtools.api.resource.diff_commit import (
         DiffCommitItemResource,
         DiffCommitListResource,
+    )
+    from rbtools.api.resource.diff_context import (
+        DiffContextGetParams,
+        DiffContextResource,
     )
     from rbtools.api.resource.diff_file_attachment import (
         DiffFileAttachmentGetListParams,
@@ -68,6 +76,7 @@ if TYPE_CHECKING:
         FileDiffItemResource,
         FileDiffListResource,
     )
+    from rbtools.api.resource.last_update import LastUpdateResource
     from rbtools.api.resource.review_group import (
         ReviewGroupGetListParams,
         ReviewGroupItemResource,
@@ -82,9 +91,17 @@ if TYPE_CHECKING:
         ReviewRequestItemResource,
         ReviewRequestListResource,
     )
+    from rbtools.api.resource.review_request_draft import (
+        ReviewRequestDraftResource,
+    )
     from rbtools.api.resource.screenshot import (
         ScreenshotItemResource,
         ScreenshotListResource,
+    )
+    from rbtools.api.resource.status_update import (
+        StatusUpdateGetListParams,
+        StatusUpdateItemResource,
+        StatusUpdateListResource,
     )
     from rbtools.api.resource.user import (
         UserItemResource,
@@ -231,6 +248,74 @@ class RootResource(ItemResource):
         return self._make_httprequest(url=url, query_args=kwargs)
 
     @api_stub
+    def get_change(
+        self,
+        *,
+        review_request_id: int,
+        change_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> ChangeItemResource:
+        """Get a change description item resource.
+
+        This method is for compatibility with older versions of Review Board.
+        :py:meth:`get_review_request_change` should be used instead.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            change_id (int):
+                The change description ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ChangeItemResource:
+            The change description item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_changes(
+        self,
+        *,
+        review_request_id: int,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> ChangeListResource:
+        """Get a change description list resource.
+
+        This method is for compatibility with older versions of Review Board.
+        :py:meth:`get_review_request_changes` should be used instead.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ChangeListResource:
+            The change description list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
     def get_commit(
         self,
         *,
@@ -370,6 +455,35 @@ class RootResource(ItemResource):
         Returns:
             rbtools.api.resource.DiffItemResource:
             The diff item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_diff_context(
+        self,
+        *,
+        review_request_id: int,
+        **kwargs: Unpack[DiffContextGetParams],
+    ) -> DiffContextResource:
+        """Get the diff context resource.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.DiffContextResource:
+            The diff context resource.
 
         Raises:
             rbtools.api.errors.APIError:
@@ -554,6 +668,38 @@ class RootResource(ItemResource):
         Returns:
             rbtools.api.resource.DiffFileAttachmentListResource:
             The extensions list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_draft(
+        self,
+        *,
+        review_request_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> ReviewRequestDraftResource:
+        """Get a review request draft.
+
+        This method is for compatibility with older versions of Review Board.
+        :py:meth:`get_review_request_draft` should be used instead.
+
+        Args:
+            review_request_id (int):
+                The ID of the review request.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ReviewRequestDraftResource:
+            The draft resource.
 
         Raises:
             rbtools.api.errors.APIError:
@@ -886,6 +1032,38 @@ class RootResource(ItemResource):
         raise NotImplementedError
 
     @api_stub
+    def get_last_update(
+        self,
+        *,
+        review_request_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> LastUpdateResource:
+        """Get the last update resource for a review request.
+
+        This method is for compatibility with older versions of Review Board.
+        :py:meth:`get_review_request_last_update` should be used instead.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.LastUpdateResource:
+            The last update resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
     def get_review_group_user(
         self,
         *,
@@ -1001,6 +1179,68 @@ class RootResource(ItemResource):
         raise NotImplementedError
 
     @api_stub
+    def get_review_request_change(
+        self,
+        *,
+        review_request_id: int,
+        change_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> ChangeItemResource:
+        """Get a change description item resource.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            change_id (int):
+                The change description ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ChangeItemResource:
+            The change description item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_request_changes(
+        self,
+        *,
+        review_request_id: int,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> ChangeListResource:
+        """Get a change description list resource.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ChangeListResource:
+            The change description list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
     def get_review_request_file_attachment(
         self,
         *,
@@ -1052,6 +1292,126 @@ class RootResource(ItemResource):
         Returns:
             rbtools.api.resource.FileAttachmentListResource:
             The file attachments list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_request_draft(
+        self,
+        *,
+        review_request_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> ReviewRequestDraftResource:
+        """Get a review request draft.
+
+        Args:
+            review_request_id (int):
+                The ID of the review request.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ReviewRequestDraftResource:
+            The draft resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_request_last_update(
+        self,
+        *,
+        review_request_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> LastUpdateResource:
+        """Get the last update resource for a review request.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.LastUpdateResource:
+            The last update resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_request_status_update(
+        self,
+        *,
+        review_request_id: int,
+        status_update_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> StatusUpdateItemResource:
+        """Get a status update item resource.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            status_update_id (int):
+                The status update ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.StatusUpdateItemResource:
+            The status update item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_request_status_updates(
+        self,
+        *,
+        review_request_id: int,
+        **kwargs: Unpack[StatusUpdateGetListParams],
+    ) -> StatusUpdateListResource:
+        """Get a status update list resource.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.StatusUpdateListResource:
+            The status update list resource.
 
         Raises:
             rbtools.api.errors.APIError:
@@ -1138,6 +1498,74 @@ class RootResource(ItemResource):
         Returns:
             rbtools.api.resource.ScreenshotListResource:
             The screenshot list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_status_update(
+        self,
+        *,
+        review_request_id: int,
+        status_update_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> StatusUpdateItemResource:
+        """Get a status update item resource.
+
+        This method is for compatibility with older versions of Review Board.
+        :py:meth:`get_review_request_status_update` should be used instead.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            status_update_id (int):
+                The status update ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.StatusUpdateItemResource:
+            The status update item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_status_updates(
+        self,
+        *,
+        review_request_id: int,
+        **kwargs: Unpack[StatusUpdateGetListParams],
+    ) -> StatusUpdateListResource:
+        """Get a status update list resource.
+
+        This method is for compatibility with older versions of Review Board.
+        :py:meth:`get_review_request_status_updates` should be used instead.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.StatusUpdateListResource:
+            The status update list resource.
 
         Raises:
             rbtools.api.errors.APIError:
