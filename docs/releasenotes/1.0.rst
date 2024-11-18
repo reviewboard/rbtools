@@ -210,7 +210,7 @@ Python API
 Contributors
 ------------
 
-* Barret Rennie
+* Beth Rennie
 * Brian LeBlanc
 * Christian Hammond
 * Daniel Arteaga

@@ -74,7 +74,7 @@ Aliases
   ``!``), RBTools no longer strips any quotes in the command or evaluates
   escape sequences, instead allowing the shell to handle this.
 
-  Patch by Barret Rennie.
+  Patch by Beth Rennie.
 
 
 API
@@ -134,8 +134,8 @@ rbt post
 Contributors
 ============
 
-* Barret Rennie
 * Basil Crow
+* Beth Rennie
 * Brian LeBlanc
 * Christian Hammond
 * David Cain

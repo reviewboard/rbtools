@@ -168,7 +168,7 @@ Contributors
 * Akis Kalligeros
 * Alexander Goncahrov
 * André Klitzing
-* Barret Rennie
+* Beth Rennie
 * Ben Asher
 * Brandon Martin
 * Christian Hammond

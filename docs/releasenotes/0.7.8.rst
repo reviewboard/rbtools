@@ -98,7 +98,7 @@ Team Foundation Server
 Contributors
 ============
 
-* Barret Rennie
+* Beth Rennie
 * Christian Hammond
 * David Trowbridge
 * Stephen Kiernan

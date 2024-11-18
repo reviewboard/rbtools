@@ -270,7 +270,7 @@ Contributors
 ============
 
 * Andrew Brandon
-* Barret Rennie
+* Beth Rennie
 * Christian Hammond
 * David Trowbridge
 * Griffin Myers

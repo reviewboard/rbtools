@@ -28,7 +28,7 @@ command lines, or can call out to external commands or scripts.
 
 See the :ref:`aliases documentation <rbtools-aliases>` for more information.
 
-Patch by Barret Rennie.
+Patch by Beth Rennie.
 
 
 Windows and Mac OS X Installers
@@ -58,7 +58,7 @@ RBTools now includes a simple HTTP caching mechanism for API calls. This can
 speed up the time it takes to run various commands, especially on servers with
 many repositories or users.
 
-Patch by Barret Rennie.
+Patch by Beth Rennie.
 
 
 rbt diff
@@ -72,7 +72,7 @@ rbt diff
   of the :option:`-I` flag. It can be used to exclude certain file paths
   (including wildcards) from the resulting diff.
 
-  Patch by Barret Rennie.
+  Patch by Beth Rennie.
 
 
 rbt land
@@ -127,7 +127,7 @@ rbt post
   of the :option:`-I` flag. It can be used to exclude certain file paths
   (including wildcards) from the resulting diff.
 
-  Patch by Barret Rennie.
+  Patch by Beth Rennie.
 
 * Perform additional validation on diffs before creating a review request.
   (:bug:`2733`)
@@ -189,7 +189,7 @@ CVS
 
   The old behavior can be used with the command :command:`rbt post -I .`
 
-  Patch by Barret Rennie.
+  Patch by Beth Rennie.
 
 
 Mercurial
@@ -225,7 +225,7 @@ Subversion
 
   The old behavior can be used with the command :command:`rbt post -I .`
 
-  Patch by Barret Rennie.
+  Patch by Beth Rennie.
 
 
 Team Foundation Server
@@ -262,7 +262,7 @@ Contributors
 ------------
 
 * Azad Salahli
-* Barret Rennie
+* Beth Rennie
 * Bruce Cran
 * Christian Hammond
 * David Trowbridge

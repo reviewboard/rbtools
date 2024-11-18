@@ -75,7 +75,7 @@ General
 * Fixed encoding issues with deserializing error messages from the Review
   Board API on Python 3.
 
-  Patch by Barret Rennie.
+  Patch by Beth Rennie.
 
 
 Git
@@ -111,7 +111,7 @@ Subversion
 Contributors
 ============
 
-* Barret Rennie
+* Beth Rennie
 * Christian Hammond
 * David Trowbridge
 * Joshua Olson

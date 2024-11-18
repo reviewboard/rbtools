@@ -74,7 +74,7 @@ Mercurial
   case, :rbtcommand:`rbt post` would print a cryptic error message. This now
   explains better what went wrong.
 
-  Patch by Barret Rennie.
+  Patch by Beth Rennie.
 
 
 Perforce
@@ -116,7 +116,7 @@ Python API
 Contributors
 ============
 
-* Barret Rennie
+* Beth Rennie
 * Bruce Cran
 * David Trowbridge
 * Nicolas Dély

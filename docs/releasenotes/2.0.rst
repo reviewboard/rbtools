@@ -216,7 +216,7 @@ Contributors
 
 * Allessandro
 * André Klitzing
-* Barret Rennie
+* Beth Rennie
 * Boris Krasnovskiy
 * Cecilia Wei
 * Christian Hammond
