@@ -6,7 +6,10 @@ import logging
 import os
 import re
 import uuid
-from typing import Any, Optional, TYPE_CHECKING, Union, cast
+from contextlib import ExitStack
+from gettext import gettext as _
+from typing import (Any, Iterator, Optional, Sequence, TYPE_CHECKING, Union,
+                    cast)
 from urllib.parse import urlsplit, urlunparse
 
 from housekeeping import deprecate_non_keyword_only_args
@@ -15,6 +18,7 @@ from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
                                             SCMClientCommitHistoryItem,
                                             SCMClientDiffResult,
+                                            SCMClientPatcher,
                                             SCMClientRevisionSpec)
 from rbtools.clients.errors import (CreateCommitError,
                                     InvalidRevisionSpecError,
@@ -24,15 +28,22 @@ from rbtools.clients.errors import (CreateCommitError,
                                     TooManyRevisionsError)
 from rbtools.clients.svn import SVNClient
 from rbtools.deprecation import RemovedInRBTools60Warning
+from rbtools.diffs.errors import ApplyPatchError
 from rbtools.diffs.patches import PatchAuthor, PatchResult
 from rbtools.utils.checks import check_install
 from rbtools.utils.console import edit_file
+from rbtools.utils.encoding import force_unicode
 from rbtools.utils.errors import EditorError
-from rbtools.utils.filesystem import make_empty_files, make_tempfile
+from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import execute
 
 if TYPE_CHECKING:
     from urllib.parse import SplitResult
+
+    from rbtools.diffs.patches import Patch
+
+
+logger = logging.getLogger(__name__)
 
 
 class MercurialRefType:
@@ -54,6 +65,205 @@ class MercurialRefType:
     UNKNOWN = 'unknown'
 
 
+class MercurialPatcher(SCMClientPatcher):
+    """A patcher that applies Mercurial patches to a tree.
+
+    This applies patches using :command:`hg import` and to manually handle
+    added and deleted empty files.
+
+    The patcher supports tracking conflicts and partially-applied patches.
+
+    Version Added:
+        5.1
+    """
+
+    def apply_patches(self) -> Iterator[PatchResult]:
+        """Internal function to apply the patches.
+
+        If applying files without committing, we'll open all the files and
+        apply in one :command:`hg import` operation, helping Mercurial apply
+        them correctly and without triggering an "uncommitted changes" error.
+
+        If we're applying while committing, we'll use the default Patcher
+        logic to apply and commit them one-by-one.
+
+        Yields:
+            rbtools.diffs.patches.PatchResult:
+            The result of each patch application, whether the patch applied
+            successfully or with normal patch failures.
+
+        Raises:
+            rbtools.diffs.errors.ApplyPatchResult:
+                There was an error attempting to apply a patch.
+
+                This won't be raised simply for conflicts or normal patch
+                failures. It may be raised for errors encountered during
+                the patching process.
+        """
+        if self.revert:
+            raise ApplyPatchError(
+                'Mercurial does not support reverting patches.',
+                patcher=self)
+
+        if self.squash:
+            raise ApplyPatchError(
+                'Mercurial does not support squashing patches.',
+                patcher=self)
+
+        if self.commit:
+            # We're going to process these one-by-one, so that we can use
+            # the generated or provided commit messages and author
+            # information.
+            yield from super().apply_patches()
+        else:
+            # We're going to apply all these in one go. We can't do these
+            # one-by-one since Mercurial won't let us apply patches to a
+            # dirty tree, and the tree will always be dirty after the first
+            # patch.
+            patches = self.patches
+            prefix_level = patches[0].prefix_level
+
+            # Open all patches at once so we can get filenames to apply.
+            with ExitStack() as stack:
+                filenames: list[str] = []
+
+                for patch in patches:
+                    stack.enter_context(patch.open())
+
+                    if patch.prefix_level != prefix_level:
+                        raise ApplyPatchError(
+                            'Mercurial does not support applying multiple '
+                            'patches with different --strip levels.',
+                            patcher=self)
+
+                    filenames.append(str(patch.path))
+
+                if len(patches) == 1:
+                    result_patch = patches[0]
+                else:
+                    result_patch = None
+
+                yield self._run_hg_import(filenames=filenames,
+                                          patch=result_patch,
+                                          prefix_level=prefix_level,
+                                          patch_range=(1, len(patches)))
+
+    def apply_single_patch(
+        self,
+        *,
+        patch: Patch,
+        patch_num: int,
+    ) -> PatchResult:
+        """Internal function to apply a single patch.
+
+        This will take a single patch and apply it using Subversion.
+
+        Args:
+            patch (rbtools.diffs.patches.Patch):
+                The patch to apply, opened for reading.
+
+            patch_num (int):
+                The 1-based index of this patch in the full list of patches.
+
+        Returns:
+            rbtools.diffs.patches.PatchResult:
+            The result of the patch application, whether the patch applied
+            successfully or with normal patch failures.
+        """
+        return self._run_hg_import(filenames=[str(patch.path)],
+                                   prefix_level=patch.prefix_level,
+                                   patch=patch,
+                                   patch_range=(patch_num, patch_num))
+
+    def _run_hg_import(
+        self,
+        *,
+        filenames: Sequence[str],
+        prefix_level: Optional[int],
+        patch: Optional[Patch],
+        patch_range: tuple[int, int],
+    ) -> PatchResult:
+        """Run hg import and return a result.
+
+        This will run :command:`hg import` in a non-commit mode, taking a list
+        of files and applying them to the local tree.
+
+        Args:
+            filenames (list of str):
+                The list of patch filenames to apply.
+
+            prefix_level (int):
+                The number of path components to strip from each path in the
+                patch files.
+
+            patch (rbtools.diffs.patches.Patch):
+                The optional patch to associate with a result.
+
+            patch_range (tuple):
+                The patch range to associate with a result.
+
+        Returns:
+            rbtools.diffs.patches.PatchResult:
+            The result from the patch operation.
+        """
+        scmclient = self.scmclient
+
+        # For Mercurial, if we apply + commit, then we're going to commit in a
+        # separate step instead of letting `hg import` do it. This lets us
+        # handle our standard open-editor logic, data normalization, and error
+        # handling without duplicating all that here, in exchange for one extra
+        # call per patch.
+        #
+        # We are going to apply failing commits partially, since users will
+        # have conflict and reject information to work from.
+        cmd: list[str] = [scmclient._exe, 'import', '--no-commit', '--partial']
+
+        if prefix_level is not None:
+            cmd += ['-p', str(prefix_level)]
+
+        cmd += filenames
+
+        rc, patch_output = scmclient._execute(cmd,
+                                              with_errors=True,
+                                              return_error_code=True,
+                                              ignore_errors=True,
+                                              results_unicode=False)
+
+        conflicting_files: list[str] = []
+        applied: bool
+
+        if rc == 0:
+            applied = True
+        else:
+            parsed_output = self.parse_patch_output(patch_output)
+
+            if parsed_output.get('fatal_error'):
+                raise ApplyPatchError(
+                    _('There was an error applying %%(patch_subject)s: '
+                      '%(error)s')
+                    % {
+                        'error': force_unicode(patch_output).strip(),
+                    },
+                    patcher=self,
+                    failed_patch_result=PatchResult(
+                        applied=False,
+                        patch=patch,
+                        patch_output=patch_output,
+                        patch_range=patch_range))
+
+            conflicting_files = parsed_output['conflicting_files']
+            applied = parsed_output['has_partial_applied_files']
+
+        # We're done here. Send the result.
+        return PatchResult(
+            applied=applied,
+            patch=patch,
+            patch_output=patch_output,
+            patch_range=patch_range,
+            has_conflicts=len(conflicting_files) > 0,
+            conflicting_files=conflicting_files)
+
+
 class MercurialClient(BaseSCMClient):
     """A client for Mercurial.
 
@@ -66,6 +276,8 @@ class MercurialClient(BaseSCMClient):
     server_tool_names = 'Mercurial,Subversion'
     server_tool_ids = ['mercurial', 'subversion']
 
+    patcher_cls = MercurialPatcher
+
     supports_commit_history = True
     supports_diff_exclude_patterns = True
     supports_parent_diffs = True
@@ -74,8 +286,6 @@ class MercurialClient(BaseSCMClient):
     can_get_file_content = True
     can_merge = True
 
-    PRE_CREATION = '/dev/null'
-    PRE_CREATION_DATE = 'Thu Jan 01 00:00:00 1970 +0000'
     NO_PARENT = '0' * 40
 
     # The ASCII field separator.
@@ -1037,14 +1247,14 @@ class MercurialClient(BaseSCMClient):
         hg_command = [self._exe, 'commit', '-m', modified_message]
 
         try:
-            hg_command += ['-u', f'{author.fullname} <{author.email}>']
+            hg_command += ['-u', f'{author.full_name} <{author.email}>']
         except AttributeError:
             # Users who have marked their profile as private won't include the
             # fullname or email fields in the API payload. Just commit as the
             # user running RBTools.
-            logging.warning('The author has marked their Review Board profile '
-                            'information as private. Committing without '
-                            'author attribution.')
+            logger.warning('The author has marked their Review Board profile '
+                           'information as private. Committing without '
+                           'author attribution.')
 
         if all_files:
             hg_command.append('-A')
@@ -1374,121 +1584,6 @@ class MercurialClient(BaseSCMClient):
         status = self._execute([self._exe, 'status', '--modified', '--added',
                                 '--removed', '--deleted'])
         return status != ''
-
-    def apply_patch(
-        self,
-        patch_file: str,
-        base_path: Optional[str] = None,
-        base_dir: Optional[str] = None,
-        p: Optional[str] = None,
-        revert: bool = False,
-    ) -> PatchResult:
-        """Apply the given patch.
-
-        This will take the given patch file and apply it to the working
-        directory.
-
-        Args:
-            patch_file (str):
-                The name of the patch file to apply.
-
-            base_path (str, unused):
-                The base path that the diff was generated in. All hg diffs are
-                absolute to the repository root, so this is unused.
-
-            base_dir (str, unused):
-                The path of the current working directory relative to the root
-                of the repository. All hg diffs are absolute to the repository
-                root, so this is unused.
-
-            p (str, optional):
-                The prefix level of the diff.
-
-            revert (bool, optional):
-                Whether the patch should be reverted rather than applied.
-
-        Returns:
-            rbtools.diffs.patches.PatchResult:
-            The result of the patch operation.
-        """
-        cmd = [self._exe, 'patch', '--no-commit']
-
-        if p:
-            cmd += ['-p', p]
-
-        cmd.append(patch_file)
-
-        rc, data = self._execute(cmd,
-                                 with_errors=True,
-                                 return_error_code=True,
-                                 ignore_errors=True,
-                                 results_unicode=False)
-
-        return PatchResult(applied=(rc == 0), patch_output=data)
-
-    def apply_patch_for_empty_files(
-        self,
-        patch: bytes,
-        p_num: str,
-        revert: bool = False,
-    ) -> bool:
-        """Return whether any empty files in the patch are applied.
-
-        Args:
-            patch (bytes):
-                The contents of the patch.
-
-            p_num (str):
-                The prefix level of the diff.
-
-            revert (bool, optional):
-                Whether the patch should be reverted rather than applied.
-
-        Returns:
-            bool:
-            ``True`` if there are empty files in the patch. ``False`` if there
-            were no empty files, or if an error occurred while applying the
-            patch.
-        """
-        patched_empty_files = False
-
-        added_files_re = (
-            r'--- %s\t%s\n\+\+\+ b/(\S+)\t[^\r\n\t\f]+\n(?:[^@]|$)'
-            % (self.PRE_CREATION, re.escape(self.PRE_CREATION_DATE)))
-        deleted_files_re = (
-            r'--- a/(\S+)\t[^\r\n\t\f]+\n\+\+\+ %s\t%s\n(?:[^@]|$)'
-            % (self.PRE_CREATION, re.escape(self.PRE_CREATION_DATE)))
-
-        added_files = re.findall(added_files_re.encode(), patch)
-        deleted_files = re.findall(deleted_files_re.encode(), patch)
-
-        if added_files:
-            added_files = self._strip_p_num_slashes(added_files, int(p_num))
-            make_empty_files(added_files)
-            result = self._execute([self._exe, 'add'] + added_files,
-                                   ignore_errors=True,
-                                   none_on_ignored_error=True)
-
-            if result is None:
-                logging.error('Unable to execute "hg add" on: %s',
-                              ', '.join(added_files))
-            else:
-                patched_empty_files = True
-
-        if deleted_files:
-            deleted_files = self._strip_p_num_slashes(deleted_files,
-                                                      int(p_num))
-            result = self._execute([self._exe, 'remove'] + deleted_files,
-                                   ignore_errors=True,
-                                   none_on_ignored_error=True)
-
-            if result is None:
-                logging.error('Unable to execute "hg remove" on: %s',
-                              ', '.join(deleted_files))
-            else:
-                patched_empty_files = True
-
-        return patched_empty_files
 
     def supports_empty_files(self) -> bool:
         """Return whether the RB server supports added/deleted empty files.
