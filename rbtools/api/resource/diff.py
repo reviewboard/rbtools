@@ -11,7 +11,6 @@ from typing import Optional, TYPE_CHECKING
 
 from typing_extensions import Self
 
-from rbtools.api.request import HttpRequest
 from rbtools.api.resource.base import (
     ItemResource,
     ListResource,
@@ -22,8 +21,13 @@ from rbtools.api.resource.base import (
 from rbtools.api.resource.mixins import DiffUploaderMixin, GetPatchMixin
 
 if TYPE_CHECKING:
-    from rbtools.api.request import QueryArgs
-    from rbtools.api.resource.base import ResourceExtraDataField
+    from typing_extensions import Unpack
+
+    from rbtools.api.request import HttpRequest, QueryArgs
+    from rbtools.api.resource.base import (
+        BaseGetListParams,
+        ResourceExtraDataField,
+    )
     from rbtools.api.resource.diff_commit import DiffCommitListResource
     from rbtools.api.resource.draft_diff_commit import \
         DraftDiffCommitListResource
@@ -121,8 +125,8 @@ class DiffItemResource(GetPatchMixin, ItemResource):
             raise TypeError(
                 f'parent_diff must be bytes, not {type(cumulative_diff)}')
 
-        request = HttpRequest(self._links['self']['href'],
-                              method='PUT')
+        request = self._make_httprequest(url=self._links['self']['href'],
+                                         method='PUT')
 
         request.add_field('finalize_commit_series', '1')
         request.add_file('cumulative_diff', 'cumulative_diff',
@@ -137,7 +141,7 @@ class DiffItemResource(GetPatchMixin, ItemResource):
     @api_stub
     def get_commits(
         self,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetListParams],
     ) -> DiffCommitListResource:
         """Get the commits for the diff.
 
@@ -161,7 +165,7 @@ class DiffItemResource(GetPatchMixin, ItemResource):
     @api_stub
     def get_draft_commits(
         self,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetListParams],
     ) -> DraftDiffCommitListResource:
         """Get the commits for the diff when the diff is a draft.
 
@@ -185,7 +189,7 @@ class DiffItemResource(GetPatchMixin, ItemResource):
     @api_stub
     def get_draft_files(
         self,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetListParams],
     ) -> FileDiffListResource:
         """Get the files for the diff when the diff is a draft.
 
@@ -209,7 +213,7 @@ class DiffItemResource(GetPatchMixin, ItemResource):
     @api_stub
     def get_files(
         self,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetListParams],
     ) -> FileDiffListResource:
         """Get the files for the diff.
 
@@ -298,7 +302,8 @@ class DiffListResource(DiffUploaderMixin,
             DiffItemResource:
             The newly-created diff.
         """
-        request = HttpRequest(self._url, method='POST', query_args=kwargs)
+        request = self._make_httprequest(url=self._url, method='POST',
+                                         query_args=kwargs)
 
         if base_commit_id:
             request.add_field('base_commit_id', base_commit_id)

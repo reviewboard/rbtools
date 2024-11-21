@@ -9,26 +9,23 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from rbtools.api.request import HttpRequest
 from rbtools.api.resource.base import request_method
 
 if TYPE_CHECKING:
-    from rbtools.api.request import QueryArgs
+    from rbtools.api.request import HttpRequest, QueryArgs
+    from rbtools.api.resource.base import Resource
+
+    MixinParent = Resource
+else:
+    MixinParent = object
 
 
-class AttachmentUploadMixin:
+class AttachmentUploadMixin(MixinParent):
     """A mixin for resources that implement an upload_attachment method.
 
     Version Added:
         6.0
     """
-
-    ######################
-    # Instance variables #
-    ######################
-
-    #: The URL for the resource.
-    _url: str
 
     @request_method
     def upload_attachment(
@@ -61,8 +58,8 @@ class AttachmentUploadMixin:
             FileAttachmentItemResource:
             The newly-created file attachment.
         """
-        assert self._url is not None
-        request = HttpRequest(self._url, method='POST', query_args=kwargs)
+        request = self._make_httprequest(url=self._url, method='POST',
+                                         query_args=kwargs)
         request.add_file('path', filename, content)
 
         if caption:
@@ -74,15 +71,8 @@ class AttachmentUploadMixin:
         return request
 
 
-class DiffUploaderMixin:
+class DiffUploaderMixin(MixinParent):
     """A mixin for uploading diffs to a resource."""
-
-    ######################
-    # Instance variables #
-    ######################
-
-    #: The URL for the resource.
-    _url: str
 
     def prepare_upload_diff_request(
         self,
@@ -117,7 +107,8 @@ class DiffUploaderMixin:
             rbtools.api.request.HttpRequest:
             The API request.
         """
-        request = HttpRequest(self._url, method='POST', query_args=kwargs)
+        request = self._make_httprequest(url=self._url, method='POST',
+                                         query_args=kwargs)
         request.add_file('path', 'diff', diff)
 
         if parent_diff:
@@ -132,19 +123,12 @@ class DiffUploaderMixin:
         return request
 
 
-class GetPatchMixin:
+class GetPatchMixin(MixinParent):
     """Mixin for resources that implement a get_patch method.
 
     Version Added:
         4.2
     """
-
-    ######################
-    # Instance variables #
-    ######################
-
-    #: The URL for the resource.
-    _url: str
 
     @request_method
     def get_patch(
@@ -162,24 +146,17 @@ class GetPatchMixin:
             A resource containing the patch. The patch data will be in the
             ``data`` attribute.
         """
-        return HttpRequest(self._url, query_args=kwargs, headers={
-            'Accept': 'text/x-patch',
-        })
+        return self._make_httprequest(url=self._url,
+                                      query_args=kwargs,
+                                      headers={'Accept': 'text/x-patch'})
 
 
-class ScreenshotUploadMixin:
+class ScreenshotUploadMixin(MixinParent):
     """Mixin for resources that implement an upload_screenshot method.
 
     Version Added:
         6.0
     """
-
-    ######################
-    # Instance variables #
-    ######################
-
-    #: The URL for the resource.
-    _url: str
 
     @request_method
     def upload_screenshot(
@@ -212,7 +189,8 @@ class ScreenshotUploadMixin:
             rbtools.api.resource.DraftScreenshotItemResource:
             The newly-created screenshot.
         """
-        request = HttpRequest(self._url, method='POST', query_args=kwargs)
+        request = self._make_httprequest(url=self._url, method='POST',
+                                         query_args=kwargs)
         request.add_file('path', filename, content)
 
         if caption:

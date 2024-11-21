@@ -7,9 +7,10 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import ClassVar, TYPE_CHECKING
 
 from rbtools.api.resource.base import (
+    BaseGetListParams,
     ItemResource,
     ListResource,
     api_stub,
@@ -18,8 +19,15 @@ from rbtools.api.resource.base import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from typing_extensions import Unpack
+
     from rbtools.api.request import HttpRequest, QueryArgs
-    from rbtools.api.resource.base import ResourceExtraDataField
+    from rbtools.api.resource.base import (
+        BaseGetParams,
+        ResourceExtraDataField,
+    )
     from rbtools.api.resource.file_diff import FileDiffItemResource
 
 
@@ -82,7 +90,7 @@ class DiffFileAttachmentItemResource(ItemResource):
     @api_stub
     def get_added_in_filediff(
         self,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetParams],
     ) -> FileDiffItemResource:
         """Get the file diff that this attachment was added in.
 
@@ -104,6 +112,23 @@ class DiffFileAttachmentItemResource(ItemResource):
         raise NotImplementedError
 
 
+class DiffFileAttachmentGetListParams(BaseGetListParams, total=False):
+    """Params for the diff file attachment list GET operation.
+
+    Version Added:
+        6.0
+    """
+
+    #: Return only file attachments with the given mimetype.
+    mimetype: str
+
+    #: Filter file attachments with the given path in the repository.
+    repository_file_path: str
+
+    #: Filter file attachments with the given revision in the repository.
+    repository_revision: str
+
+
 @resource_mimetype('application/vnd.reviewboard.org.diff-file-attachments')
 class DiffFileAttachmentListResource(
     ListResource[DiffFileAttachmentItemResource]):
@@ -112,6 +137,12 @@ class DiffFileAttachmentListResource(
     Version Added:
         5.0
     """
+
+    _httprequest_params_name_map: ClassVar[Mapping[str, str]] = {
+        'repository_file_path': 'repository-file-path',
+        'repository_revision': 'repository-revision',
+        **ListResource._httprequest_params_name_map,
+    }
 
     @request_method_returns[DiffFileAttachmentItemResource]()
     def upload_attachment(

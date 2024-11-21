@@ -8,12 +8,13 @@ Version Added:
 from __future__ import annotations
 
 from collections import defaultdict, deque
-from typing import Literal, Optional, TYPE_CHECKING, Union, cast
+from typing import ClassVar, Literal, Optional, TYPE_CHECKING, Union, cast
 from urllib.parse import urljoin
 
 from typing_extensions import Self
 
 from rbtools.api.resource.base import (
+    BaseGetListParams,
     ItemResource,
     ListResource,
     api_stub,
@@ -24,8 +25,13 @@ from rbtools.api.resource.base import (
 from rbtools.utils.graphs import path_exists
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from typing_extensions import Unpack
+
     from rbtools.api.request import HttpRequest, QueryArgs
     from rbtools.api.resource.base import (
+        BaseGetParams,
         ResourceExtraDataField,
         ResourceLinkField,
         ResourceListField,
@@ -320,7 +326,7 @@ class ReviewRequestItemResource(ItemResource):
     @api_stub
     def get_diffs(
         self,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetListParams],
     ) -> DiffListResource:
         """Get the diff list for the review request.
 
@@ -344,7 +350,7 @@ class ReviewRequestItemResource(ItemResource):
     @api_stub
     def get_file_attachments(
         self,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetListParams],
     ) -> FileAttachmentListResource:
         """Get the file attachment list for the review request.
 
@@ -368,7 +374,7 @@ class ReviewRequestItemResource(ItemResource):
     @api_stub
     def get_latest_diff(
         self,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetParams],
     ) -> DiffItemResource:
         """Get the most recent diff list for the review request.
 
@@ -392,7 +398,7 @@ class ReviewRequestItemResource(ItemResource):
     @api_stub
     def get_screenshots(
         self,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetListParams],
     ) -> ScreenshotListResource:
         """Get the screenshot list for the review request.
 
@@ -423,6 +429,150 @@ class ReviewRequestItemResource(ItemResource):
     # TODO get_submitter stub
 
 
+class ReviewRequestGetListParams(BaseGetListParams, total=False):
+    """Params for the review request list GET operation.
+
+    Version Added:
+        6.0
+    """
+
+    #: The branch field on a review request to filter by.
+    branch: str
+
+    #: The change number the review requests must have set.
+    #:
+    #: This will only return one review request per repository, and only works
+    #: for repository types that support server-side changesets. This is
+    #: deprecated in favor of the ``commit_id`` parameter.
+    changenum: int
+
+    #: The commit that review requests must have set.
+    #:
+    #: This will only return one review request per repository.
+    commit_id: str
+
+    #: The username that the review requests must be owned by.
+    from_user: str
+
+    #: Return results with exactly the provided number of dropped issues.
+    issue_dropped_count: int
+
+    #: Return results with more than the provided number of dropped issues.
+    issue_dropped_count_gt: int
+
+    #: Return results with at least the provided number of dropped issues.
+    issue_dropped_count_gte: int
+
+    #: Return results with less than the provided number of dropped issues.
+    issue_dropped_count_lt: int
+
+    #: Return results with at most than the provided number of dropped issues.
+    issue_dropped_count_lte: int
+
+    #: Return results with exactly the provided number of open issues.
+    issue_open_count: int
+
+    #: Return results with more than the provided number of open issues.
+    issue_open_count_gt: int
+
+    #: Return results with at least the provided number of open issues.
+    issue_open_count_gte: int
+
+    #: Return results with less than the provided number of open issues.
+    issue_open_count_lt: int
+
+    #: Return results with at most than the provided number of open issues.
+    issue_open_count_lte: int
+
+    #: Return results with exactly the provided number of resolved issues.
+    issue_resolved_count: int
+
+    #: Return results with more than the provided number of resolved issues.
+    issue_resolved_count_gt: int
+
+    #: Return results with at least the provided number of resolved issues.
+    issue_resolved_count_gte: int
+
+    #: Return results with less than the provided number of resolved issues.
+    issue_resolved_count_lt: int
+
+    #: Return results with at most than the provided number of resolved issues.
+    issue_resolved_count_lte: int
+
+    #: The earliest date-time the review requests are last updated.
+    #:
+    #: This is compared against the review request's ``last_updated`` field. It
+    #: should be sent in ISO-8601 format.
+    last_updated_from: str
+
+    #: The latest date-time the review requests are last updated.
+    #:
+    #: This is compared against the review request's ``last_updated`` field. It
+    #: should be sent in ISO-8601 format.
+    last_updated_to: str
+
+    #: The ID of the repository that review requests must be on.
+    repository: int
+
+    #: Return review requests with at least one Ship It!.
+    #:
+    #: This is deprecated in favor of the more specific ship-it count
+    #: parameters.
+    ship_it: bool
+
+    #: Return results with exactly the provided number of ship-its.
+    ship_it_count: int
+
+    #: Return results with more than the provided number of ship-its.
+    ship_it_count_gt: int
+
+    #: Return results with at least the provided number of ship-its.
+    ship_it_count_gte: int
+
+    #: Return results with less than the provided number of ship-its.
+    ship_it_count_lt: int
+
+    #: Return results with at most the provided number of ship-its.
+    ship_it_count_lte: int
+
+    #: Return all unpublished review requests.
+    #:
+    #: If the requesting user is an admin or hase the
+    #: ``reviews.can_submit_as_another_user`` permission, unpublished review
+    #: requests will also be returned.
+    show_all_unpublished: bool
+
+    #: The status of review requests to filter.
+    status: Literal['all', 'discarded', 'pending', 'submitted']
+
+    #: The earliest date-time the review requests are added.
+    #:
+    #: This is compared against the review request's ``time_added`` field. It
+    #: should be sent in ISO-8601 format.
+    time_added_from: str
+
+    #: The latest date-time the review requests are added.
+    #:
+    #: This is compared against the review request's ``time_added`` field. It
+    #: should be sent in ISO-8601 format.
+    time_added_to: str
+
+    #: A comma-separated list of review group names to filter by.
+    to_groups: str
+
+    #: A comma-separated list of usernames who are in assigned groups.
+    to_user_groups: str
+
+    #: A comma-separated list of usernames who are assigned.
+    #:
+    #: These users must be in the user list either directly or as a group
+    #: member.
+    to_users: str
+
+    #: A comma-separated list of usernames who are directly assigned.
+    to_users_directly: str
+
+
 @resource_mimetype('application/vnd.reviewboard.org.review-requests')
 class ReviewRequestListResource(ListResource[ReviewRequestItemResource]):
     """List resource for review requests.
@@ -430,3 +580,39 @@ class ReviewRequestListResource(ListResource[ReviewRequestItemResource]):
     Version Added:
         6.0
     """
+
+    _httprequest_params_name_map: ClassVar[Mapping[str, str]] = {
+        'commit_id': 'commit-id',
+        'from_user': 'from-user',
+        'issue_dropped_count': 'issue-dropped-count',
+        'issue_dropped_count_gt': 'issue-dropped-count-gt',
+        'issue_dropped_count_gte': 'issue-dropped-count-gte',
+        'issue_dropped_count_lt': 'issue-dropped-count-lt',
+        'issue_dropped_count_lte': 'issue-dropped-count-lte',
+        'issue_open_count': 'issue-open-count',
+        'issue_open_count_gt': 'issue-open-count-gt',
+        'issue_open_count_gte': 'issue-open-count-gte',
+        'issue_open_count_lt': 'issue-open-count-lt',
+        'issue_open_count_lte': 'issue-open-count-lte',
+        'issue_resolved_count': 'issue-resolved-count',
+        'issue_resolved_count_gt': 'issue-resolved-count-gt',
+        'issue_resolved_count_gte': 'issue-resolved-count-gte',
+        'issue_resolved_count_lt': 'issue-resolved-count-lt',
+        'issue_resolved_count_lte': 'issue-resolved-count-lte',
+        'last_updated_from': 'last-updated-from',
+        'last_updated_to': 'last-updated-to',
+        'ship_it': 'ship-it',
+        'ship_it_count': 'ship-it-count',
+        'ship_it_count_gt': 'ship-it-count-gt',
+        'ship_it_count_gte': 'ship-it-count-gte',
+        'ship_it_count_lt': 'ship-it-count-lt',
+        'ship_it_count_lte': 'ship-it-count-lte',
+        'show_all_unpublished': 'show-all-unpublished',
+        'time_added_from': 'time-added-from',
+        'time_added_to': 'time-added-to',
+        'to_groups': 'to-groups',
+        'to_user_groups': 'to-user-groups',
+        'to_users': 'to-users',
+        'to_users_directly': 'to-users-directly',
+        **ListResource._httprequest_params_name_map,
+    }

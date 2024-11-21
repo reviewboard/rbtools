@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
 
-from rbtools.api.request import HttpRequest
 from rbtools.api.resource.base import (
     ItemResource,
     request_method,
@@ -17,7 +16,7 @@ from rbtools.api.resource.base import (
 )
 
 if TYPE_CHECKING:
-    from rbtools.api.request import QueryArgs
+    from rbtools.api.request import HttpRequest, QueryArgs
 
 
 @resource_mimetype('application/vnd.reviewboard.org.commit-validation')
@@ -69,7 +68,8 @@ class ValidateDiffCommitResource(ItemResource):
         """
         assert self._url is not None
 
-        request = HttpRequest(self._url, method='POST', query_args=kwargs)
+        request = self._make_httprequest(url=self._url, method='POST',
+                                         query_args=kwargs)
         request.add_file('diff', 'diff', diff)
         request.add_field('repository', repository)
         request.add_field('commit_id', commit_id)

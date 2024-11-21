@@ -15,7 +15,6 @@ from packaging.version import parse as parse_version
 from typelets.json import JSONDict
 
 from rbtools.api.cache import MINIMUM_VERSION
-from rbtools.api.request import HttpRequest
 from rbtools.api.resource.base import (
     ItemResource,
     RequestMethodResult,
@@ -28,9 +27,13 @@ from rbtools.api.resource.base import (
 )
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing_extensions import Self, Unpack
 
-    from rbtools.api.request import QueryArgs
+    from rbtools.api.request import HttpRequest, QueryArgs
+    from rbtools.api.resource.base import (
+        BaseGetListParams,
+        BaseGetParams,
+    )
     from rbtools.api.resource.diff import (
         DiffItemResource,
         DiffListResource,
@@ -40,6 +43,7 @@ if TYPE_CHECKING:
         DiffCommitListResource,
     )
     from rbtools.api.resource.diff_file_attachment import (
+        DiffFileAttachmentGetListParams,
         DiffFileAttachmentItemResource,
         DiffFileAttachmentListResource,
     )
@@ -52,6 +56,7 @@ if TYPE_CHECKING:
         FileDiffListResource,
     )
     from rbtools.api.resource.review_request import (
+        ReviewRequestGetListParams,
         ReviewRequestItemResource,
         ReviewRequestListResource,
     )
@@ -192,7 +197,7 @@ class RootResource(ItemResource):
 
         url = self._TEMPLATE_PARAM_RE.sub(get_template_value, url_template)
 
-        return HttpRequest(url, query_args=kwargs)
+        return self._make_httprequest(url=url, query_args=kwargs)
 
     @api_stub
     def get_commit(
@@ -201,7 +206,7 @@ class RootResource(ItemResource):
         review_request_id: int,
         diff_revision: int,
         commit_id: int,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetParams],
     ) -> DiffCommitItemResource:
         """Get a diff commit item resource.
 
@@ -237,7 +242,7 @@ class RootResource(ItemResource):
     @api_stub
     def get_commit_validation(
         self,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetParams],
     ) -> ValidateDiffCommitResource:
         """Get the diff commit validation resource.
 
@@ -264,7 +269,7 @@ class RootResource(ItemResource):
         *,
         review_request_id: int,
         diff_revision: int,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetParams],
     ) -> DiffItemResource:
         """Get a diff item resource.
 
@@ -294,7 +299,7 @@ class RootResource(ItemResource):
     @api_stub
     def get_diff_validation(
         self,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetParams],
     ) -> ValidateDiffResource:
         """Get the diff validation resource.
 
@@ -320,7 +325,7 @@ class RootResource(ItemResource):
         self,
         *,
         review_request_id: int,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetListParams],
     ) -> DiffListResource:
         """Get a diff list resource.
 
@@ -351,7 +356,7 @@ class RootResource(ItemResource):
         review_request_id: int,
         diff_revision: int,
         commit_id: int,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetParams],
     ) -> DiffCommitItemResource:
         """Get a diff commit item resource.
 
@@ -387,7 +392,7 @@ class RootResource(ItemResource):
         *,
         review_request_id: int,
         diff_revision: int,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetListParams],
     ) -> DiffCommitListResource:
         """Get the diff commits list.
 
@@ -419,7 +424,7 @@ class RootResource(ItemResource):
         self,
         *,
         repository_id: int,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetParams],
     ) -> DiffFileAttachmentItemResource:
         """Get a diff file attachment item resource.
 
@@ -451,7 +456,7 @@ class RootResource(ItemResource):
         self,
         *,
         repository_id: int,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[DiffFileAttachmentGetListParams],
     ) -> DiffFileAttachmentListResource:
         """Get a diff file attachments list resource.
 
@@ -482,7 +487,7 @@ class RootResource(ItemResource):
         review_request_id: int,
         diff_revision: int,
         filediff_id: int,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetParams],
     ) -> FileDiffItemResource:
         """Get a file diff item resource.
 
@@ -521,7 +526,7 @@ class RootResource(ItemResource):
         *,
         review_request_id: int,
         diff_revision: int,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetListParams],
     ) -> FileDiffListResource:
         """Get the file diffs for a diff revision.
 
@@ -557,7 +562,7 @@ class RootResource(ItemResource):
         *,
         review_request_id: int,
         file_attachment_id: int,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetParams],
     ) -> FileAttachmentItemResource:
         """Get a file attachment item resource.
 
@@ -592,7 +597,7 @@ class RootResource(ItemResource):
         self,
         *,
         review_request_id: int,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetListParams],
     ) -> FileAttachmentListResource:
         """Get a file attachment list resource.
 
@@ -626,7 +631,7 @@ class RootResource(ItemResource):
         review_request_id: int,
         diff_revision: int,
         filediff_id: int,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetParams],
     ) -> FileDiffItemResource:
         """Get a file diff item resource.
 
@@ -662,7 +667,7 @@ class RootResource(ItemResource):
         *,
         review_request_id: int,
         diff_revision: int,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetListParams],
     ) -> FileDiffListResource:
         """Get the file diffs for a diff revision.
 
@@ -694,7 +699,7 @@ class RootResource(ItemResource):
         self,
         *,
         review_request_id: int,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetParams],
     ) -> ReviewRequestItemResource:
         """Get a review request item resource.
 
@@ -721,7 +726,7 @@ class RootResource(ItemResource):
     @api_stub
     def get_review_requests(
         self,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[ReviewRequestGetListParams],
     ) -> ReviewRequestListResource:
         """Get the review request list resource.
 
@@ -748,7 +753,7 @@ class RootResource(ItemResource):
         *,
         review_request_id: int,
         file_attachment_id: int,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetParams],
     ) -> FileAttachmentItemResource:
         """Get a file attachment item resource.
 
@@ -780,7 +785,7 @@ class RootResource(ItemResource):
         self,
         *,
         review_request_id: int,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetListParams],
     ) -> FileAttachmentListResource:
         """Get a file attachment list resource.
 
@@ -807,7 +812,7 @@ class RootResource(ItemResource):
     @api_stub
     def get_root(
         self,
-        **kwargs,
+        **kwargs: Unpack[BaseGetParams],
     ) -> RootResource:
         """Get the root resource.
 
@@ -834,7 +839,7 @@ class RootResource(ItemResource):
         *,
         review_request_id: int,
         screenshot_id: int,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetParams],
     ) -> ScreenshotItemResource:
         """Get a screenshot list resource.
 
@@ -866,7 +871,7 @@ class RootResource(ItemResource):
         self,
         *,
         review_request_id: int,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetListParams],
     ) -> ScreenshotListResource:
         """Get a screenshot list resource.
 

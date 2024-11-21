@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from typing import Literal, Optional, TYPE_CHECKING
 
-from rbtools.api.request import HttpRequest
 from rbtools.api.resource.base import (
     ItemResource,
     ListResource,
@@ -20,8 +19,13 @@ from rbtools.api.resource.base import (
 from rbtools.api.resource.mixins import GetPatchMixin
 
 if TYPE_CHECKING:
-    from rbtools.api.request import QueryArgs
-    from rbtools.api.resource.base import ResourceExtraDataField
+    from typing_extensions import Unpack
+
+    from rbtools.api.request import HttpRequest, QueryArgs
+    from rbtools.api.resource.base import (
+        BaseGetParams,
+        ResourceExtraDataField,
+    )
     from rbtools.api.resource.file_attachment import FileAttachmentItemResource
 
 
@@ -93,14 +97,17 @@ class FileDiffItemResource(GetPatchMixin, ItemResource):
             rbtools.api.errors.ServerInterfaceError:
                 An error occurred while communicating with the server.
         """
-        return HttpRequest(self._url, query_args=kwargs, headers={
-            'Accept': 'application/vnd.reviewboard.org.diff.data+json',
-        })
+        return self._make_httprequest(
+            url=self._url,
+            query_args=kwargs,
+            headers={
+                'Accept': 'application/vnd.reviewboard.org.diff.data+json',
+            })
 
     @api_stub
     def get_dest_attachment(
         self,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetParams],
     ) -> FileAttachmentItemResource:
         """Get the file attachment for the modified file.
 
@@ -127,7 +134,7 @@ class FileDiffItemResource(GetPatchMixin, ItemResource):
     @api_stub
     def get_source_attachment(
         self,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetParams],
     ) -> FileAttachmentItemResource:
         """Get the file attachment for the original file.
 

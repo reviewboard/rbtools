@@ -53,6 +53,8 @@ from rbtools.utils.encoding import force_bytes, force_unicode
 from rbtools.utils.filesystem import get_home_path
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from rbtools.config import RBToolsConfig
 
 
@@ -122,7 +124,7 @@ class HttpRequest:
     #: HTTP headers to provide when making the request.
     #:
     #: Type: dict
-    headers: dict[str, str]
+    headers: Mapping[str, str]
 
     #: The URL to request.
     #:
@@ -133,8 +135,8 @@ class HttpRequest:
         self,
         url: str,
         method: str = 'GET',
-        query_args: Optional[dict[str, QueryArgs]] = None,
-        headers: Optional[dict[str, str]] = None,
+        query_args: Optional[Mapping[str, QueryArgs]] = None,
+        headers: Optional[Mapping[str, str]] = None,
     ) -> None:
         """Initialize the HTTP request.
 

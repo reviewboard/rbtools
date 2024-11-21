@@ -10,7 +10,6 @@ from __future__ import annotations
 import logging
 from typing import Optional, TYPE_CHECKING
 
-from rbtools.api.request import HttpRequest
 from rbtools.api.resource.base import (
     ListResource,
     request_method_returns,
@@ -20,8 +19,11 @@ from rbtools.api.resource.base import (
 from rbtools.api.resource.base_diff_commit import BaseDiffCommitItemResource
 
 if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
+    from rbtools.api.resource.base import BaseGetListParams
     from rbtools.api.resource.file_diff import FileDiffListResource
-    from rbtools.api.request import QueryArgs
+    from rbtools.api.request import HttpRequest, QueryArgs
 
 
 logger = logging.getLogger(__name__)
@@ -38,7 +40,7 @@ class DraftDiffCommitItemResource(BaseDiffCommitItemResource):
     @api_stub
     def get_draft_files(
         self,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetListParams],
     ) -> FileDiffListResource:
         """Get the files for this commit.
 
@@ -133,7 +135,8 @@ class DraftDiffCommitListResource(ListResource[DraftDiffCommitItemResource]):
             rbtools.api.errors.APIError:
                 An error occurred while uploading the commit.
         """
-        request = HttpRequest(self._url, method='POST', query_args=kwargs)
+        request = self._make_httprequest(url=self._url, method='POST',
+                                         query_args=kwargs)
 
         request.add_file('diff', 'diff', diff)
         request.add_field('commit_id', commit_id)

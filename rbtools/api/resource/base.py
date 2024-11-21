@@ -10,7 +10,7 @@ from __future__ import annotations
 import copy
 import json
 import logging
-from collections.abc import Iterator, Mapping, MutableMapping
+from collections.abc import MutableMapping
 from functools import update_wrapper, wraps
 from typing import (Any, Callable, ClassVar, Final, Generic, Literal,
                     NoReturn, Optional, TYPE_CHECKING, TypeVar, Union, cast,
@@ -18,12 +18,14 @@ from typing import (Any, Callable, ClassVar, Final, Generic, Literal,
 from urllib.parse import urljoin
 
 from typelets.json import JSONDict, JSONValue
-from typing_extensions import NotRequired, ParamSpec, Self, TypedDict
+from typing_extensions import NotRequired, ParamSpec, Self, TypedDict, Unpack
 
 from rbtools.api.request import HttpRequest, QueryArgs
 from rbtools.api.utils import rem_mime_format
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator, Mapping
+
     from rbtools.api.transport import Transport
 
 
@@ -330,9 +332,10 @@ def _create(
         rbtools.api.errors.ServerInterfaceError:
             An error occurred while communicating with the server.
     """
-    request = HttpRequest(resource._links['create']['href'],
-                          method='POST',
-                          query_args=query_args)
+    request = resource._make_httprequest(
+        url=resource._links['create']['href'],
+        method='POST',
+        query_args=query_args)
 
     field_data = kwargs
 
@@ -374,8 +377,10 @@ def _delete(
         rbtools.api.errors.ServerInterfaceError:
             An error occurred while communicating with the server.
     """
-    return HttpRequest(resource._links['delete']['href'], method='DELETE',
-                       query_args=kwargs)
+    return resource._make_httprequest(
+        url=resource._links['delete']['href'],
+        method='DELETE',
+        query_args=kwargs)
 
 
 @request_method
@@ -407,7 +412,9 @@ def _get_self(
         rbtools.api.errors.ServerInterfaceError:
             An error occurred while communicating with the server.
     """
-    return HttpRequest(resource._links['self']['href'], query_args=kwargs)
+    return resource._make_httprequest(
+        url=resource._links['self']['href'],
+        query_args=kwargs)
 
 
 @request_method
@@ -460,8 +467,10 @@ def _update(
         rbtools.api.errors.ServerInterfaceError:
             An error occurred while communicating with the server.
     """
-    request = HttpRequest(resource._links['update']['href'], method='PUT',
-                          query_args=query_args)
+    request = resource._make_httprequest(
+        url=resource._links['update']['href'],
+        method='PUT',
+        query_args=query_args)
 
     field_data = kwargs
 
@@ -538,6 +547,51 @@ class ExpandInfo(TypedDict):
     list_url: NotRequired[Optional[str]]
 
 
+class BaseGetParams(TypedDict, total=False):
+    """Base class for parameters for GET requests.
+
+    This has the basic fields that are supported by all resource endpoints.
+
+    Version Added:
+        6.0
+    """
+
+    #: A comma-separated list of links to expand within the returned payload.
+    expand: str
+
+    #: A comma-separated list of fields to limit the payload to.
+    only_fields: str
+
+    #: A comma-separated list of links to limit the payload to.
+    only_links: str
+
+
+class BaseGetListParams(BaseGetParams, total=False):
+    """Base class for parameters for GET requests on lists.
+
+    Version Added:
+        6.0
+    """
+
+    #: If specified, return only the counts.
+    #:
+    #: Making a request with this will return a :py:class:`CountResource`
+    #: instead of a list.
+    counts_only: bool
+
+    #: The maximum number of results to return in the request.
+    #:
+    #: By default, this is 25. There is a hard limit of 200; if you need more
+    #: than 200 results, you will need to make more than one request.
+    max_results: int
+
+    #: The 0-based index of the first result in the list.
+    #:
+    #: To page through results, the start index should be set to the previous
+    #: start index plus the number of previous results.
+    start: int
+
+
 class Resource:
     """Defines common functionality for Item and List Resources.
 
@@ -561,6 +615,18 @@ class Resource:
     #:     6.0:
     #:     Changed the type from a list to a set.
     _excluded_attrs: ClassVar[set[str]] = set()
+
+    #: A mapping for rewriting HTTP query parameters.
+    #:
+    #: The Review Board Web API uses hyphens for many parameters, but that
+    #: doesn't work well when trying to pass those via Python method kwargs.
+    #:
+    #: Version Added:
+    #:     6.0
+    _httprequest_params_name_map: ClassVar[Mapping[str, str]] = {
+        'only_fields': 'only-fields',
+        'only_links': 'only-links',
+    }
 
     ######################
     # Instance variables #
@@ -693,6 +759,49 @@ class Resource:
                 elif is_api_stub(stub := getattr(self, attr_name)):
                     replace_api_stub(self, attr_name, stub, link_method)
 
+    def _make_httprequest(
+        self,
+        *,
+        url: str,
+        method: str = 'GET',
+        query_args: Optional[Mapping[Any, Any]] = None,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> HttpRequest:
+        """Create an HTTP request.
+
+        This will handle renaming any query arguments.
+
+        Version Added:
+            6.0
+
+        Args:
+            url (str):
+                The URL to request.
+
+            method (str, optional):
+                The HTTP method to send to the server.
+
+            query_args (dict, optional):
+                Any query arguments to add to the URL.
+
+            headers (dict, optional):
+                Any HTTP headers to provide in the request.
+
+        Returns:
+            rbtools.api.request.HttpRequest:
+            The HTTP request object.
+        """
+        if query_args:
+            def rewrite_query_arg(key: str) -> str:
+                return self._httprequest_params_name_map.get(key, key)
+
+            query_args = {
+                rewrite_query_arg(key): value
+                for key, value in query_args.items()
+            }
+
+        return HttpRequest(url, method, query_args, headers)
+
     def _wrap_field(
         self,
         field_payload: Any,
@@ -817,7 +926,7 @@ class Resource:
             rbtools.api.request.HttpRequest:
             The HTTP request.
         """
-        return HttpRequest(url, query_args=kwargs)
+        return self._make_httprequest(url=url, query_args=kwargs)
 
     @property
     def rsp(self) -> JSONDict:
@@ -833,7 +942,7 @@ class Resource:
     def get_self(
         self,
         *args,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetParams],
     ) -> Self:
         """Get the resource's 'self' link.
 
@@ -1200,7 +1309,8 @@ class ResourceLinkField(ResourceDictField, Generic[_TResource]):
             rbtools.api.request.HttpRequest:
             The HTTP request.
         """
-        return HttpRequest(self._fields['href'], query_args=query_args)
+        return self._resource._make_httprequest(
+            url=self._fields['href'], query_args=query_args)
 
 
 class ResourceExtraDataField(ResourceDictField):
@@ -1697,7 +1807,7 @@ class CountResource(ItemResource):
         # to any value as true.
         kwargs.update({'counts_only': False})
 
-        return HttpRequest(self._url, query_args=kwargs)
+        return self._make_httprequest(url=self._url, query_args=kwargs)
 
 
 TItemResource = TypeVar('TItemResource', bound=ItemResource)
@@ -1718,6 +1828,12 @@ class ListResource(Generic[TItemResource], Resource):
     resources 'get_next()' or 'get_prev()' should be used to grab
     additional pages of items.
     """
+
+    _httprequest_params_name_map: ClassVar[Mapping[str, str]] = {
+        'counts_only': 'counts-only',
+        'max_results': 'max-results',
+        **Resource._httprequest_params_name_map,
+    }
 
     ######################
     # Instance variables #
@@ -1848,7 +1964,7 @@ class ListResource(Generic[TItemResource], Resource):
     @request_method
     def get_next(
         self,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetListParams],
     ) -> HttpRequest:
         """Return the next page of results.
 
@@ -1867,12 +1983,13 @@ class ListResource(Generic[TItemResource], Resource):
         if 'next' not in self._links:
             raise StopIteration()
 
-        return HttpRequest(self._links['next']['href'], query_args=kwargs)
+        return self._make_httprequest(url=self._links['next']['href'],
+                                      query_args=kwargs)
 
     @request_method
     def get_prev(
         self,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetListParams],
     ) -> HttpRequest:
         """Return the previous page of results.
 
@@ -1891,13 +2008,14 @@ class ListResource(Generic[TItemResource], Resource):
         if 'prev' not in self._links:
             raise StopIteration()
 
-        return HttpRequest(self._links['prev']['href'], query_args=kwargs)
+        return self._make_httprequest(url=self._links['prev']['href'],
+                                      query_args=kwargs)
 
     @request_method
     def get_item(
         self,
         pk: int,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[BaseGetParams],
     ) -> HttpRequest:
         """Retrieve the item resource with the corresponding primary key.
 
@@ -1912,8 +2030,8 @@ class ListResource(Generic[TItemResource], Resource):
             rbtools.api.request.HttpRequest:
             The HTTP request.
         """
-        return HttpRequest(urljoin(self._url, f'{pk}/'),
-                           query_args=kwargs)
+        return self._make_httprequest(url=urljoin(self._url, f'{pk}/'),
+                                      query_args=kwargs)
 
     @property
     def all_pages(self) -> Iterator[Self]:
