@@ -13,6 +13,7 @@ from typing import ClassVar, Optional, TYPE_CHECKING, cast
 
 from packaging.version import parse as parse_version
 from typelets.json import JSONDict
+from typing_extensions import Unpack
 
 from rbtools.api.cache import MINIMUM_VERSION
 from rbtools.api.resource.base import (
@@ -38,6 +39,7 @@ if TYPE_CHECKING:
         UserGetListParams,
         UserGetParams,
     )
+    from rbtools.api.resource.base_review_group import ReviewGroupGetListParams
     from rbtools.api.resource.default_reviewer import (
         DefaultReviewerGetListParams,
         DefaultReviewerItemResource,
@@ -77,8 +79,28 @@ if TYPE_CHECKING:
         FileDiffListResource,
     )
     from rbtools.api.resource.last_update import LastUpdateResource
+    from rbtools.api.resource.repository import (
+        RepositoryGetListParams,
+        RepositoryItemResource,
+        RepositoryListResource,
+    )
+    from rbtools.api.resource.repository_branch import (
+        RepositoryBranchListResource,
+    )
+    from rbtools.api.resource.repository_commit import (
+        RepositoryCommitGetListParams,
+        RepositoryCommitListResource,
+    )
+    from rbtools.api.resource.repository_group import (
+        RepositoryGroupItemResource,
+        RepositoryGroupListResource,
+    )
+    from rbtools.api.resource.repository_info import RepositoryInfoResource
+    from rbtools.api.resource.repository_user import (
+        RepositoryUserItemResource,
+        RepositoryUserListResource,
+    )
     from rbtools.api.resource.review_group import (
-        ReviewGroupGetListParams,
         ReviewGroupItemResource,
         ReviewGroupListResource,
     )
@@ -248,6 +270,38 @@ class RootResource(ItemResource):
         return self._make_httprequest(url=url, query_args=kwargs)
 
     @api_stub
+    def get_branches(
+        self,
+        *,
+        repository_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> RepositoryBranchListResource:
+        """Get the repository branches resource.
+
+        This method exists for compatibility with old versions of Review Board.
+        :py:meth:`get_repository_branches` should be used instead.
+
+        Args:
+            repository_id (int):
+                The ID of the repository to fetch commits for.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.RepositoryBranchListResource:
+            The repository branches.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
     def get_change(
         self,
         *,
@@ -345,6 +399,38 @@ class RootResource(ItemResource):
         Returns:
             rbtools.api.resource.DiffItemResource:
             The diff commit item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_commits(
+        self,
+        *,
+        repository_id: int,
+        **kwargs: Unpack[RepositoryCommitGetListParams],
+    ) -> RepositoryCommitListResource:
+        """Get the repository commits resource.
+
+        This method exists for compatibility with old versions of Review Board.
+        :py:meth:`get_repository_commits` should be used instead.
+
+        Args:
+            repository_id (int):
+                The ID of the repository to fetch commits for.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.RepositoryCommitListResource:
+            The repository commits.
 
         Raises:
             rbtools.api.errors.APIError:
@@ -1053,6 +1139,268 @@ class RootResource(ItemResource):
         Returns:
             rbtools.api.resource.LastUpdateResource:
             The last update resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_repository(
+        self,
+        *,
+        repository_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> RepositoryItemResource:
+        """Get a repository item resource.
+
+        Args:
+            repository_id (int):
+                The ID of the repository.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.RepositoryItemResource:
+            The repository item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_repositories(
+        self,
+        **kwargs: Unpack[RepositoryGetListParams],
+    ) -> RepositoryListResource:
+        """Get a repository list resource.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.RepositoryListResource:
+            The repository list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_repository_branches(
+        self,
+        *,
+        repository_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> RepositoryBranchListResource:
+        """Get the repository branches resource.
+
+        Args:
+            repository_id (int):
+                The ID of the repository to fetch commits for.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.RepositoryBranchListResource:
+            The repository branches.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_repository_commits(
+        self,
+        *,
+        repository_id: int,
+        **kwargs: Unpack[RepositoryCommitGetListParams],
+    ) -> RepositoryCommitListResource:
+        """Get the repository commits resource.
+
+        Args:
+            repository_id (int):
+                The ID of the repository to fetch commits for.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.RepositoryCommitListResource:
+            The repository commits.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_repository_group(
+        self,
+        *,
+        repository_id: int,
+        group_name: str,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> RepositoryGroupItemResource:
+        """Get a repository group item resource.
+
+        Args:
+            repository_id (int):
+                The ID of the repository to fetch groups for.
+
+            group_name (str):
+                The name of the group to fetch.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.RepositoryGroupItemResource:
+            The repository group item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_repository_groups(
+        self,
+        *,
+        repository_id: int,
+        **kwargs: Unpack[ReviewGroupGetListParams],
+    ) -> RepositoryGroupListResource:
+        """Get a repository group list resource.
+
+        Args:
+            repository_id (int):
+                The ID of the repository to fetch groups for.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.RepositoryGroupListResource:
+            The repository group list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_repository_info(
+        self,
+        *,
+        repository_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> RepositoryInfoResource:
+        """Get the repository info resource.
+
+        Args:
+            repository_id (int):
+                The ID of the repository to fetch commits for.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.RepositoryInfoResource:
+            The repository commits.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_repository_user(
+        self,
+        *,
+        repository_id: int,
+        **kwargs: Unpack[UserGetParams],
+    ) -> RepositoryUserItemResource:
+        """Get a repository user item resource.
+
+        Args:
+            repository_id (int):
+                The ID of the repository to fetch users for.
+
+            username (str):
+                The username to fetch.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.RepositoryUserItemResource:
+            The repo
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    def get_repository_users(
+        self,
+        *,
+        repository_id: int,
+        **kwargs: Unpack[UserGetListParams],
+    ) -> RepositoryUserListResource:
+        """Get a repository user list resource.
+
+        Args:
+            repository_id (int):
+                The ID of the repository to fetch users for.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.RepositoryUserListResource:
+            The repository user list resource.
 
         Raises:
             rbtools.api.errors.APIError:

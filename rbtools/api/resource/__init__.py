@@ -61,6 +61,25 @@ from rbtools.api.resource.mixins import (
     DiffUploaderMixin,
     GetPatchMixin,
 )
+from rbtools.api.resource.repository import (
+    RepositoryItemResource,
+    RepositoryListResource,
+)
+from rbtools.api.resource.repository_branch import (
+    RepositoryBranchListResource,
+)
+from rbtools.api.resource.repository_commit import (
+    RepositoryCommitListResource,
+)
+from rbtools.api.resource.repository_info import RepositoryInfoResource
+from rbtools.api.resource.repository_group import (
+    RepositoryGroupItemResource,
+    RepositoryGroupListResource,
+)
+from .repository_user import (
+    RepositoryUserItemResource,
+    RepositoryUserListResource,
+)
 from rbtools.api.resource.review_group import (
     ReviewGroupItemResource,
     ReviewGroupListResource,
@@ -113,6 +132,7 @@ __all__ = [
     'DiffCommitItemResource',
     'DiffCommitListResource',
     'DiffContextResource',
+    'DiffFileAttachmentItemResource',
     'DiffFileAttachmentListResource',
     'DiffItemResource',
     'DiffListResource',
@@ -121,7 +141,6 @@ __all__ = [
     'DraftDiffCommitItemResource',
     'DraftDiffCommitListResource',
     'DraftDiffResource',
-    'DiffFileAttachmentItemResource',
     'DraftFileAttachmentItemResource',
     'DraftFileAttachmentListResource',
     'DraftScreenshotItemResource',
@@ -131,13 +150,22 @@ __all__ = [
     'FileAttachmentItemResource',
     'FileAttachmentListResource',
     'FileDiffItemResource',
-    'FileDiffResource',
     'FileDiffListResource',
+    'FileDiffResource',
     'GetPatchMixin',
     'ItemResource',
     'LastUpdateResource',
     'ListResource',
     'RESOURCE_MAP',
+    'RepositoryBranchListResource',
+    'RepositoryCommitListResource',
+    'RepositoryGroupItemResource',
+    'RepositoryGroupListResource',
+    'RepositoryInfoResource',
+    'RepositoryItemResource',
+    'RepositoryListResource',
+    'RepositoryUserItemResource',
+    'RepositoryUserListResource',
     'Resource',
     'ResourceDictField',
     'ResourceExtraDataField',
@@ -147,10 +175,10 @@ __all__ = [
     'ReviewGroupListResource',
     'ReviewGroupUserItemResource',
     'ReviewGroupUserListResource',
-    'ReviewRequestItemResource',
-    'ReviewRequestResource',
     'ReviewRequestDraftResource',
+    'ReviewRequestItemResource',
     'ReviewRequestListResource',
+    'ReviewRequestResource',
     'RootResource',
     'ScreenshotItemResource',
     'ScreenshotListResource',

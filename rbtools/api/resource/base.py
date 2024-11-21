@@ -243,10 +243,12 @@ def _preprocess_fields(
 
 
 def _create_resource_for_field(
+    *,
     parent_resource: Resource,
     field_payload: JSONDict,
     mimetype: Optional[str],
     url: str,
+    force_resource_type: Optional[type[Resource]] = None,
 ) -> Resource:
     """Create a resource instance based on field data.
 
@@ -256,8 +258,10 @@ def _create_resource_for_field(
 
     Version Changed:
         6.0:
-        * Removed ``item_mimetype`` parameter.
+        * Added the ``force_resource_type`` parameter.
+        * Removed the ``item_mimetype`` parameter.
         * Made ``url`` parameter required.
+        * Made arguments keyword-only.
 
     Args:
         parent_resource (Resource):
@@ -271,6 +275,12 @@ def _create_resource_for_field(
 
         url (str, optional):
             The URL of the resource, if one is available.
+
+        force_resource_type (type, optional):
+            The resource class to instantiate.
+
+            Version Added:
+                6.0
     """
     # We need to import this here to avoid circular imports.
     from rbtools.api.factory import create_resource
@@ -279,7 +289,8 @@ def _create_resource_for_field(
                            payload=field_payload,
                            url=url,
                            mime_type=mimetype,
-                           guess_token=False)
+                           guess_token=False,
+                           force_resource_type=force_resource_type)
 
 
 @request_method
@@ -815,12 +826,18 @@ class Resource:
         field_mimetype: Optional[str] = None,
         list_item_mimetype: Optional[str] = None,
         force_resource: bool = False,
+        *,
+        force_resource_type: Optional[type[Resource]] = None,
     ) -> Any:
         """Wrap the value of a field in a resource or field object.
 
         This determines a suitable wrapper for a field, turning it into
         a resource or a wrapper with utility methods that can be used to
         interact with the field or perform additional queries.
+
+        Version Changed:
+            6.0:
+            Added the ``force_resource_type`` argument.
 
         Args:
             field_payload (object):
@@ -851,6 +868,12 @@ class Resource:
                 Force the return of a resource, even a generic one, instead
                 of a field wrapper.
 
+            force_resource_type (type, optional):
+                The resource class to instantiate.
+
+                Version Added:
+                    6.0
+
         Returns:
             object:
             A wrapper, or the field payload. This may be one of:
@@ -875,10 +898,12 @@ class Resource:
                     except KeyError:
                         field_url = ''
 
-                return _create_resource_for_field(parent_resource=self,
-                                                  field_payload=field_payload,
-                                                  mimetype=field_mimetype,
-                                                  url=field_url)
+                return _create_resource_for_field(
+                    parent_resource=self,
+                    field_payload=field_payload,
+                    mimetype=field_mimetype,
+                    url=field_url,
+                    force_resource_type=force_resource_type)
             elif field_name == 'extra_data':
                 # If this is an extra_data field, we'll return a special
                 # ExtraDataField.
@@ -1840,6 +1865,14 @@ class ListResource(Generic[TItemResource], Resource):
         **Resource._httprequest_params_name_map,
     }
 
+    #: A resource type to force for individual items.
+    #:
+    #: For most resources, this is unnecessary because MIME type matching will
+    #: instantiate the correct item resource subclass. In cases where items do
+    #: not have their own endpoint and therefore have no MIME type, setting
+    #: this will ensure that the returned items are the correct item type.
+    _item_resource_type: ClassVar[Optional[type[Resource]]] = None
+
     ######################
     # Instance variables #
     ######################
@@ -1954,7 +1987,8 @@ class ListResource(Generic[TItemResource], Resource):
         """
         return self._wrap_field(self._item_list[index],
                                 field_mimetype=self._item_mime_type,
-                                force_resource=True)
+                                force_resource=True,
+                                force_resource_type=self._item_resource_type)
 
     def __iter__(self) -> Iterator[Any]:
         """Iterate through the items.

@@ -32,8 +32,13 @@ def create_resource(
     mime_type: Optional[str] = None,
     item_mime_type: Optional[str] = None,
     guess_token: bool = True,
+    force_resource_type: Optional[type[Resource]] = None,
 ) -> Resource:
     """Construct and return a resource object.
+
+    Version Changed:
+        6.0:
+        * Added the ``force_resource_type`` argument.
 
     Args:
         transport (rbtools.api.transport.Transport):
@@ -61,6 +66,12 @@ def create_resource(
             This is important for constructing item resources from a resource
             list.
 
+        force_resource_type (type, optional):
+            The resource class to instantiate.
+
+            Version Added:
+                6.0
+
     Returns:
         rbtools.api.resource.Resource:
         The resource instance.
@@ -77,7 +88,9 @@ def create_resource(
     resource_class: type[Resource]
 
     # Select the base class for the resource.
-    if 'count' in payload:
+    if force_resource_type is not None:
+        resource_class = force_resource_type
+    elif 'count' in payload:
         resource_class = CountResource
     elif mime_type and rem_mime_format(mime_type) in RESOURCE_MAP:
         resource_class = RESOURCE_MAP[rem_mime_format(mime_type)]

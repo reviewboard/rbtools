@@ -26,12 +26,14 @@ if TYPE_CHECKING:
     from rbtools.api.request import HttpRequest, QueryArgs
     from rbtools.api.resource.base import (
         BaseGetListParams,
+        BaseGetParams,
         ResourceExtraDataField,
     )
     from rbtools.api.resource.diff_commit import DiffCommitListResource
     from rbtools.api.resource.draft_diff_commit import \
         DraftDiffCommitListResource
     from rbtools.api.resource.file_diff import FileDiffListResource
+    from rbtools.api.resource.repository import RepositoryItemResource
 
 
 @resource_mimetype('application/vnd.reviewboard.org.diff')
@@ -234,7 +236,29 @@ class DiffItemResource(GetPatchMixin, ItemResource):
         """
         raise NotImplementedError
 
-    # TODO get_repository stub
+    @api_stub
+    def get_repository(
+        self,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> RepositoryItemResource:
+        """Get the repository for this diff.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.RepositoryItemResource:
+            The repository item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
 
 
 @resource_mimetype('application/vnd.reviewboard.org.diffs')
