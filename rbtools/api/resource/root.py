@@ -53,6 +53,11 @@ if TYPE_CHECKING:
         DiffItemResource,
         DiffListResource,
     )
+    from rbtools.api.resource.diff_comment import (
+        DiffCommentGetListParams,
+        DiffCommentItemResource,
+        DiffCommentListResource,
+    )
     from rbtools.api.resource.diff_commit import (
         DiffCommitItemResource,
         DiffCommitListResource,
@@ -74,9 +79,17 @@ if TYPE_CHECKING:
         FileAttachmentItemResource,
         FileAttachmentListResource,
     )
+    from rbtools.api.resource.file_attachment_comment import (
+        FileAttachmentCommentItemResource,
+        FileAttachmentCommentListResource,
+    )
     from rbtools.api.resource.file_diff import (
         FileDiffItemResource,
         FileDiffListResource,
+    )
+    from rbtools.api.resource.general_comment import (
+        GeneralCommentItemResource,
+        GeneralCommentListResource,
     )
     from rbtools.api.resource.last_update import LastUpdateResource
     from rbtools.api.resource.repository import (
@@ -100,6 +113,10 @@ if TYPE_CHECKING:
         RepositoryUserItemResource,
         RepositoryUserListResource,
     )
+    from rbtools.api.resource.review import (
+        ReviewItemResource,
+        ReviewListResource,
+    )
     from rbtools.api.resource.review_group import (
         ReviewGroupItemResource,
         ReviewGroupListResource,
@@ -107,6 +124,10 @@ if TYPE_CHECKING:
     from rbtools.api.resource.review_group_user import (
         ReviewGroupUserItemResource,
         ReviewGroupUserListResource,
+    )
+    from rbtools.api.resource.review_reply import (
+        ReviewReplyItemResource,
+        ReviewReplyListResource,
     )
     from rbtools.api.resource.review_request import (
         ReviewRequestGetListParams,
@@ -119,6 +140,10 @@ if TYPE_CHECKING:
     from rbtools.api.resource.screenshot import (
         ScreenshotItemResource,
         ScreenshotListResource,
+    )
+    from rbtools.api.resource.screenshot_comment import (
+        ScreenshotCommentItemResource,
+        ScreenshotCommentListResource,
     )
     from rbtools.api.resource.status_update import (
         StatusUpdateGetListParams,
@@ -278,8 +303,9 @@ class RootResource(ItemResource):
     ) -> RepositoryBranchListResource:
         """Get the repository branches resource.
 
-        This method exists for compatibility with old versions of Review Board.
-        :py:meth:`get_repository_branches` should be used instead.
+        This method exists for compatibility with versions of Review Board
+        prior to 5.0.2. :py:meth:`get_repository_branches` should be used
+        instead.
 
         Args:
             repository_id (int):
@@ -311,8 +337,8 @@ class RootResource(ItemResource):
     ) -> ChangeItemResource:
         """Get a change description item resource.
 
-        This method is for compatibility with older versions of Review Board.
-        :py:meth:`get_review_request_change` should be used instead.
+        This method is for compatibility with versions of Review Board prior to
+        5.0.2. :py:meth:`get_review_request_change` should be used instead.
 
         Args:
             review_request_id (int):
@@ -346,8 +372,8 @@ class RootResource(ItemResource):
     ) -> ChangeListResource:
         """Get a change description list resource.
 
-        This method is for compatibility with older versions of Review Board.
-        :py:meth:`get_review_request_changes` should be used instead.
+        This method is for compatibility with versions of Review Board prior to
+        5.0.2. :py:meth:`get_review_request_changes` should be used instead.
 
         Args:
             review_request_id (int):
@@ -380,8 +406,8 @@ class RootResource(ItemResource):
     ) -> DiffCommitItemResource:
         """Get a diff commit item resource.
 
-        This method exists for compatibility with older versions of Review
-        Board. :py:meth:`get_diff_commit` should be used instead.
+        This method exists for compatibility with versions of Review Board
+        prior to 5.0.2. :py:meth:`get_diff_commit` should be used instead.
 
         Args:
             review_request_id (int):
@@ -418,8 +444,9 @@ class RootResource(ItemResource):
     ) -> RepositoryCommitListResource:
         """Get the repository commits resource.
 
-        This method exists for compatibility with old versions of Review Board.
-        :py:meth:`get_repository_commits` should be used instead.
+        This method exists for compatibility with versions of Review Board
+        prior to 5.0.2. :py:meth:`get_repository_commits` should be used
+        instead.
 
         Args:
             repository_id (int):
@@ -541,6 +568,83 @@ class RootResource(ItemResource):
         Returns:
             rbtools.api.resource.DiffItemResource:
             The diff item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_diff_comment(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        comment_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> DiffCommentItemResource:
+        """Get a reply diff comment item resource.
+
+        This method is for compatibility with versions of Review Board prior to
+        5.0.2. :py:meth:`get_review_reply_diff_comment` should be used instead.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The review ID.
+
+            comment_id (int):
+                The comment ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.DiffCommentItemResource:
+            The diff comment item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_diff_comments(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        **kwargs: Unpack[DiffCommentGetListParams],
+    ) -> DiffCommentListResource:
+        """Get a reply diff comment list resource.
+
+        This method is for compatibility with versions of Review Board prior to
+        5.0.2. :py:meth:`get_review_reply_diff_comments` should be used
+        instead.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The review ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.DiffCommentListResource:
+            The diff comment list resource.
 
         Raises:
             rbtools.api.errors.APIError:
@@ -773,8 +877,8 @@ class RootResource(ItemResource):
     ) -> ReviewRequestDraftResource:
         """Get a review request draft.
 
-        This method is for compatibility with older versions of Review Board.
-        :py:meth:`get_review_request_draft` should be used instead.
+        This method is for compatibility with versions of Review Board prior to
+        5.0.2. :py:meth:`get_review_request_draft` should be used instead.
 
         Args:
             review_request_id (int):
@@ -861,8 +965,8 @@ class RootResource(ItemResource):
     ) -> FileDiffItemResource:
         """Get a file diff item resource.
 
-        This method is for compatibility with older versions of Review Board.
-        :py:meth:`get_file_diff` should be used instead.
+        This method is for compatibility with versions of Review Board prior to
+        5.0.2. :py:meth:`get_file_diff` should be used instead.
 
         Args:
             review_request_id (int):
@@ -900,8 +1004,8 @@ class RootResource(ItemResource):
     ) -> FileDiffListResource:
         """Get the file diffs for a diff revision.
 
-        This method is for compatibility with older versions of Review Board.
-        :py:meth:`get_file_diffs` should be used instead.
+        This method is for compatibility with versions of Review Board prior to
+        5.0.2. :py:meth:`get_file_diffs` should be used instead.
 
         Args:
             review_request_id (int):
@@ -936,8 +1040,9 @@ class RootResource(ItemResource):
     ) -> FileAttachmentItemResource:
         """Get a file attachment item resource.
 
-        This method is for compatibility with older versions of Review Board.
-        :py:meth:`get_review_request_file_attachment` should be used instead.
+        This method is for compatibility with versions of Review Board prior to
+        5.0.2. :py:meth:`get_review_request_file_attachment` should be used
+        instead.
 
         Args:
             review_request_id (int):
@@ -971,8 +1076,9 @@ class RootResource(ItemResource):
     ) -> FileAttachmentListResource:
         """Get a file attachment list resource.
 
-        This method is for compatibility with older versions of Review Board.
-        :py:meth:`get_review_request_file_attachments` should be used instead.
+        This method is for compatibility with versions of Review Board prior to
+        5.0.2. :py:meth:`get_review_request_file_attachments` should be used
+        instead.
 
         Args:
             review_request_id (int):
@@ -984,6 +1090,76 @@ class RootResource(ItemResource):
         Returns:
             rbtools.api.resource.FileAttachmentListResource:
             The file attachments list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_file_attachment_comment(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        comment_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> FileAttachmentCommentItemResource:
+        """Get a file attachment comment item resource.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The review ID.
+
+            comment_id (int):
+                The comment ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.FileAttachmentCommentItemResource:
+            The file attachment comment item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_file_attachment_comments(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> FileAttachmentCommentListResource:
+        """Get a file attachment comment list resource.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The review ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.FileAttachmentCommentListResource:
+            The file attachment comment list resource.
 
         Raises:
             rbtools.api.errors.APIError:
@@ -1065,6 +1241,119 @@ class RootResource(ItemResource):
         raise NotImplementedError
 
     @api_stub
+    def get_file_diff_comments(
+        self,
+        review_request_id: int,
+        diff_revision: int,
+        filediff_id: int,
+        **kwargs: Unpack[DiffCommentGetListParams],
+    ) -> DiffCommentListResource:
+        """Get the comments for a file diff.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            diff_revision (int):
+                The diff revision.
+
+            filediff_id (int):
+                The ID of the file diff to fetch comments for.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.DiffCommentListResource:
+            The comments on this file diff.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_general_comment(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        comment_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> GeneralCommentItemResource:
+        """Get a general comment item resource.
+
+        This method is for compatibility with versions of Review Board prior to
+        5.0.2. :py:meth:`get_review_general_comment` should be used instead.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The review ID.
+
+            comment_id (int):
+                The comment ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.GeneralCommentItemResource:
+            The general comment item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_general_comments(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> GeneralCommentListResource:
+        """Get a general comment list resource.
+
+        This method is for compatibility with versions of Review Board prior
+        to 5.0.2. :py:meth:`get_review_general_comments` should be used
+        instead.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The review ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.GeneralCommentListResource:
+            The general comment list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
     def get_group(
         self,
         *,
@@ -1126,8 +1415,9 @@ class RootResource(ItemResource):
     ) -> LastUpdateResource:
         """Get the last update resource for a review request.
 
-        This method is for compatibility with older versions of Review Board.
-        :py:meth:`get_review_request_last_update` should be used instead.
+        This method is for compatibility with versions of Review Board prior to
+        5.0.2. :py:meth:`get_review_request_last_update` should be used
+        instead.
 
         Args:
             review_request_id (int):
@@ -1139,6 +1429,118 @@ class RootResource(ItemResource):
         Returns:
             rbtools.api.resource.LastUpdateResource:
             The last update resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_reply(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        reply_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> ReviewReplyItemResource:
+        """Get a review reply item resource.
+
+        This method is for compatibility with versions of Review Board prior to
+        5.0.2. :py:meth:`get_review_reply` should be used instead.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The ID of the review being replied to.
+
+            reply_id (int):
+                The ID of the reply.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ReviewReplyItemResource:
+            The review reply item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_replies(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> ReviewReplyListResource:
+        """Get a review reply list resource.
+
+        This method is for compatibility with versions of Review Board prior to
+        5.0.2. :py:meth:`get_review_replies` should be used instead.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The ID of the review being replied to.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ReviewReplyListResource:
+            The review reply list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_reply_draft(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> ReviewReplyItemResource:
+        """Get a review reply draft item resource, if present.
+
+        This method is for compatibility with versions of Review Board prior to
+        5.0.2. :py:meth:`get_review_reply_draft` should be used instead.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The ID of the review being replied to.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ReviewReplyItemResource:
+            The review reply draft item resource.
 
         Raises:
             rbtools.api.errors.APIError:
@@ -1412,6 +1814,237 @@ class RootResource(ItemResource):
         raise NotImplementedError
 
     @api_stub
+    def get_review(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> ReviewItemResource:
+        """Get a review item resource.
+
+        Args:
+            review_request_id (int):
+                The ID of the review request.
+
+            review_id (int):
+                The ID of the review.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ReviewItemResource:
+            The review item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_reviews(
+        self,
+        *,
+        review_request_id: int,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> ReviewListResource:
+        """Get a review list resource.
+
+        Args:
+            review_request_id (int):
+                The ID of the review request.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ReviewListResource:
+            The review list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_draft(
+        self,
+        *,
+        review_request_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> ReviewItemResource:
+        """Get a review draft item resource.
+
+        Args:
+            review_request_id (int):
+                The ID of the review request.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ReviewItemResource:
+            The review item resource for the user's draft, if any.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_diff_comment(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        comment_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> DiffCommentItemResource:
+        """Get a diff comment item resource.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The review ID.
+
+            comment_id (int):
+                The comment ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.DiffCommentItemResource:
+            The diff comment item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_diff_comments(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        **kwargs: Unpack[DiffCommentGetListParams],
+    ) -> DiffCommentListResource:
+        """Get a diff comment list resource.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The review ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.DiffCommentListResource:
+            The diff comment list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_general_comment(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        comment_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> GeneralCommentItemResource:
+        """Get a general comment item resource.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The review ID.
+
+            comment_id (int):
+                The comment ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.GeneralCommentItemResource:
+            The general comment item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_general_comments(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> GeneralCommentListResource:
+        """Get a general comment list resource.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The review ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.GeneralCommentListResource:
+            The general comment list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
     def get_review_group_user(
         self,
         *,
@@ -1463,6 +2096,421 @@ class RootResource(ItemResource):
         Returns:
             rbtools.api.resource.ReviewGroupUserListResource:
             The review group user list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_reply(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        reply_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> ReviewReplyItemResource:
+        """Get a review reply item resource.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The ID of the review being replied to.
+
+            reply_id (int):
+                The ID of the reply.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ReviewReplyItemResource:
+            The review reply item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_replies(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> ReviewReplyListResource:
+        """Get a review reply list resource.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The ID of the review being replied to.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ReviewReplyListResource:
+            The review reply list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_reply_draft(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> ReviewReplyItemResource:
+        """Get a review reply draft item resource, if present.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The ID of the review being replied to.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ReviewReplyItemResource:
+            The review reply draft item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_reply_diff_comment(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        reply_id: int,
+        comment_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> DiffCommentItemResource:
+        """Get a reply diff comment item resource.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The review ID.
+
+            reply_id (int):
+                The reply ID.
+
+            comment_id (int):
+                The comment ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.DiffCommentItemResource:
+            The diff comment item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_reply_diff_comments(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        reply_id: int,
+        **kwargs: Unpack[DiffCommentGetListParams],
+    ) -> DiffCommentListResource:
+        """Get a reply diff comment list resource.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The review ID.
+
+            reply_id (int):
+                The reply ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.DiffCommentListResource:
+            The diff comment list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_reply_file_attachment_comment(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        reply_id: int,
+        comment_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> FileAttachmentCommentItemResource:
+        """Get a reply file attachment comment item resource.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The review ID.
+
+            reply_id (int):
+                The review reply ID.
+
+            comment_id (int):
+                The comment ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.FileAttachmentCommentItemResource:
+            The file attachment comment item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_reply_file_attachment_comments(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        reply_id: int,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> FileAttachmentCommentListResource:
+        """Get a reply file attachment comment list resource.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The review ID.
+
+            reply_id (int):
+                The review reply ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.FileAttachmentCommentListResource:
+            The file attachment comment list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_reply_general_comment(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        reply_id: int,
+        comment_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> GeneralCommentItemResource:
+        """Get a reply general comment item resource.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The review ID.
+
+            reply_id (int):
+                The reply ID.
+
+            comment_id (int):
+                The comment ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.GeneralCommentItemResource:
+            The general comment item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_reply_general_comments(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        reply_id: int,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> GeneralCommentListResource:
+        """Get a reply general comment list resource.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The review ID.
+
+            reply_id (int):
+                The reply ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.GeneralCommentListResource:
+            The general comment list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_reply_screenshot_comment(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        reply_id: int,
+        comment_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> ScreenshotCommentItemResource:
+        """Get a reply screenshot comment item resource.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The review ID.
+
+            reply_id (int):
+                The reply ID.
+
+            comment_id (int):
+                The comment ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ScreenshotCommentItemResource:
+            The screenshot comment item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_review_reply_screenshot_comments(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        reply_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> ScreenshotCommentListResource:
+        """Get a reply screenshot comment list resource.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The review ID.
+
+            reply_id (int):
+                The reply ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ScreenshotCommentListResource:
+            The screenshot comment list resource.
 
         Raises:
             rbtools.api.errors.APIError:
@@ -1680,6 +2728,39 @@ class RootResource(ItemResource):
         raise NotImplementedError
 
     @api_stub
+    def get_review_request_file_attachment_comments(
+        self,
+        *,
+        review_request_id: int,
+        file_attachment_id: int,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> FileAttachmentCommentListResource:
+        """Get the comments on a specific file attachment.
+
+        Args:
+            review_request_id (int):
+                The ID of the review request.
+
+            file_attachment_id (int):
+                The ID of the file attachment.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.FileAttachmentCommentListResource:
+            The file attachment comment list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
     def get_review_request_last_update(
         self,
         *,
@@ -1857,6 +2938,81 @@ class RootResource(ItemResource):
         raise NotImplementedError
 
     @api_stub
+    def get_screenshot_comment(
+        self,
+        *,
+        review_request_id: int,
+        review_id: int,
+        comment_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> ScreenshotCommentItemResource:
+        """Get the screenshot comments in a review.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            review_id (int):
+                The review ID.
+
+            comment_id (int):
+                The comment ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ScreenshotCommentItemResource:
+            The screenshot comment item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_screenshot_comments(
+        self,
+        *,
+        review_request_id: int,
+        screenshot_id: int,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> ScreenshotCommentListResource:
+        """Get the comments on a screenshot.
+
+        This is not a list analog to :py:meth:`get_screenshot_comment`
+        due to a bug in Review Board's URI templates. If for some reason you
+        really need to get the screenshot comments on a review, fetch the
+        review first and then get the screenshot comments from that.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            screenshot_id (int):
+                The screenshot ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ScreenshotCommentListResource:
+            The screenshot comment item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
     def get_status_update(
         self,
         *,
@@ -1866,8 +3022,9 @@ class RootResource(ItemResource):
     ) -> StatusUpdateItemResource:
         """Get a status update item resource.
 
-        This method is for compatibility with older versions of Review Board.
-        :py:meth:`get_review_request_status_update` should be used instead.
+        This method is for compatibility with versions of Review Board prior to
+        5.0.2. :py:meth:`get_review_request_status_update` should be used
+        instead.
 
         Args:
             review_request_id (int):
@@ -1901,8 +3058,9 @@ class RootResource(ItemResource):
     ) -> StatusUpdateListResource:
         """Get a status update list resource.
 
-        This method is for compatibility with older versions of Review Board.
-        :py:meth:`get_review_request_status_updates` should be used instead.
+        This method is for compatibility with versions of Review Board prior to
+        5.0.2. :py:meth:`get_review_request_status_updates` should be used
+        instead.
 
         Args:
             review_request_id (int):

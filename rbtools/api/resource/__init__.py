@@ -23,11 +23,15 @@ from rbtools.api.resource.diff import (
     DiffItemResource,
     DiffListResource,
 )
-from rbtools.api.resource.diff_context import DiffContextResource
+from rbtools.api.resource.diff_comment import (
+    DiffCommentItemResource,
+    DiffCommentListResource,
+)
 from rbtools.api.resource.diff_commit import (
     DiffCommitItemResource,
     DiffCommitListResource,
 )
+from rbtools.api.resource.diff_context import DiffContextResource
 from rbtools.api.resource.diff_file_attachment import (
     DiffFileAttachmentItemResource,
     DiffFileAttachmentListResource,
@@ -52,9 +56,17 @@ from rbtools.api.resource.file_attachment import (
     FileAttachmentItemResource,
     FileAttachmentListResource,
 )
+from rbtools.api.resource.file_attachment_comment import (
+    FileAttachmentCommentItemResource,
+    FileAttachmentCommentListResource,
+)
 from rbtools.api.resource.file_diff import (
     FileDiffItemResource,
     FileDiffListResource,
+)
+from rbtools.api.resource.general_comment import (
+    GeneralCommentItemResource,
+    GeneralCommentListResource,
 )
 from rbtools.api.resource.last_update import LastUpdateResource
 from rbtools.api.resource.mixins import (
@@ -80,6 +92,7 @@ from .repository_user import (
     RepositoryUserItemResource,
     RepositoryUserListResource,
 )
+from rbtools.api.resource.review import ReviewItemResource, ReviewListResource
 from rbtools.api.resource.review_group import (
     ReviewGroupItemResource,
     ReviewGroupListResource,
@@ -87,6 +100,10 @@ from rbtools.api.resource.review_group import (
 from rbtools.api.resource.review_group_user import (
     ReviewGroupUserItemResource,
     ReviewGroupUserListResource,
+)
+from rbtools.api.resource.review_reply import (
+    ReviewReplyItemResource,
+    ReviewReplyListResource,
 )
 from rbtools.api.resource.review_request import (
     ReviewRequestItemResource,
@@ -99,6 +116,10 @@ from rbtools.api.resource.root import RootResource
 from rbtools.api.resource.screenshot import (
     ScreenshotItemResource,
     ScreenshotListResource,
+)
+from rbtools.api.resource.screenshot_comment import (
+    ScreenshotCommentItemResource,
+    ScreenshotCommentListResource,
 )
 from rbtools.api.resource.status_update import (
     StatusUpdateItemResource,
@@ -131,6 +152,8 @@ __all__ = [
     'DefaultReviewerListResource',
     'DiffCommitItemResource',
     'DiffCommitListResource',
+    'DiffCommentItemResource',
+    'DiffCommentListResource',
     'DiffContextResource',
     'DiffFileAttachmentItemResource',
     'DiffFileAttachmentListResource',
@@ -147,11 +170,15 @@ __all__ = [
     'DraftScreenshotListResource',
     'ExtensionItemResource',
     'ExtensionListResource',
+    'FileAttachmentCommentItemResource',
+    'FileAttachmentCommentListResource',
     'FileAttachmentItemResource',
     'FileAttachmentListResource',
     'FileDiffItemResource',
     'FileDiffListResource',
     'FileDiffResource',
+    'GeneralCommentItemResource',
+    'GeneralCommentListResource',
     'GetPatchMixin',
     'ItemResource',
     'LastUpdateResource',
@@ -171,15 +198,21 @@ __all__ = [
     'ResourceExtraDataField',
     'ResourceLinkField',
     'ResourceListField',
+    'ReviewItemResource',
+    'ReviewListResource',
     'ReviewGroupItemResource',
     'ReviewGroupListResource',
     'ReviewGroupUserItemResource',
     'ReviewGroupUserListResource',
+    'ReviewReplyItemResource',
+    'ReviewReplyListResource',
     'ReviewRequestDraftResource',
     'ReviewRequestItemResource',
     'ReviewRequestListResource',
     'ReviewRequestResource',
     'RootResource',
+    'ScreenshotCommentItemResource',
+    'ScreenshotCommentListResource',
     'ScreenshotItemResource',
     'ScreenshotListResource',
     'StatusUpdateItemResource',

@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     from rbtools.api.resource.file_attachment import FileAttachmentListResource
     from rbtools.api.resource.last_update import LastUpdateResource
     from rbtools.api.resource.repository import RepositoryItemResource
+    from rbtools.api.resource.review import ReviewListResource
     from rbtools.api.resource.screenshot import ScreenshotListResource
     from rbtools.api.resource.status_update import (
         StatusUpdateGetListParams,
@@ -501,6 +502,30 @@ class ReviewRequestItemResource(BaseReviewRequestItemResource):
         raise NotImplementedError
 
     @api_stub
+    def get_reviews(
+        self,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> ReviewListResource:
+        """Get the reviews for this review request.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ReviewListResource:
+            The review list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
     def get_screenshots(
         self,
         **kwargs: Unpack[BaseGetListParams],
@@ -547,8 +572,6 @@ class ReviewRequestItemResource(BaseReviewRequestItemResource):
                 An error occurred while communicating with the server.
         """
         raise NotImplementedError
-
-    # TODO get_reviews stub
 
 
 class ReviewRequestGetListParams(BaseGetListParams, total=False):

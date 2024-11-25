@@ -24,6 +24,7 @@ if TYPE_CHECKING:
         ResourceExtraDataField,
     )
     from rbtools.api.resource.change import ChangeItemResource
+    from rbtools.api.resource.review import ReviewItemResource
 
 
 @resource_mimetype('application/vnd.reviewboard.org.status-update')
@@ -93,7 +94,29 @@ class StatusUpdateItemResource(ItemResource):
         """
         raise NotImplementedError
 
-    # TODO get_review stub
+    @api_stub
+    def get_review(
+        self,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> ReviewItemResource:
+        """Get the review associated with this status update.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ReviewItemResource:
+            The review item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
 
 
 class StatusUpdateGetListParams(BaseGetListParams, total=False):

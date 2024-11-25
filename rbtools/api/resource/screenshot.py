@@ -7,12 +7,22 @@ Version Added:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from rbtools.api.resource.base import (
     ItemResource,
     ListResource,
+    api_stub,
     resource_mimetype,
 )
 from rbtools.api.resource.mixins import ScreenshotUploadMixin
+
+if TYPE_CHECKING:
+    from typing_extensions import Unpack
+
+    from rbtools.api.resource.base import BaseGetListParams
+    from rbtools.api.resource.screenshot_comment import \
+        ScreenshotCommentListResource
 
 
 @resource_mimetype('application/vnd.reviewboard.org.screenshot')
@@ -59,7 +69,29 @@ class ScreenshotItemResource(ItemResource):
     #: This is deprecated in favor of the ``absolute_url`` attribute.
     url: str
 
-    # TODO get_screenshot_comments stub
+    @api_stub
+    def get_screenshot_comments(
+        self,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> ScreenshotCommentListResource:
+        """Get the comments on the screenshot.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ScreenshotCommentListResource:
+            The screenshot comment list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
 
 
 @resource_mimetype('application/vnd.reviewboard.org.screenshots')

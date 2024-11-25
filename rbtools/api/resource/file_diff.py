@@ -26,6 +26,10 @@ if TYPE_CHECKING:
         BaseGetParams,
         ResourceExtraDataField,
     )
+    from rbtools.api.resource.diff_comment import (
+        DiffCommentGetListParams,
+        DiffCommentListResource,
+    )
     from rbtools.api.resource.file_attachment import FileAttachmentItemResource
 
 
@@ -132,6 +136,30 @@ class FileDiffItemResource(GetPatchMixin, ItemResource):
         raise NotImplementedError
 
     @api_stub
+    def get_diff_comments(
+        self,
+        **kwargs: Unpack[DiffCommentGetListParams],
+    ) -> DiffCommentListResource:
+        """Get the comments for this file diff.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.DiffCommentListResource:
+            The comments on this file diff.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
     def get_source_attachment(
         self,
         **kwargs: Unpack[BaseGetParams],
@@ -158,7 +186,6 @@ class FileDiffItemResource(GetPatchMixin, ItemResource):
         """
         raise NotImplementedError
 
-    # TODO get_diff_comments stub
     # TODO get_original_file stub
     # TODO get_patched_file stub
 
