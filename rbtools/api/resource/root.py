@@ -92,6 +92,15 @@ if TYPE_CHECKING:
         GeneralCommentListResource,
     )
     from rbtools.api.resource.last_update import LastUpdateResource
+    from rbtools.api.resource.oauth_application import (
+        OAuthApplicationGetListParams,
+        OAuthApplicationItemResource,
+        OAuthApplicationListResource,
+    )
+    from rbtools.api.resource.oauth_token import (
+        OAuthTokenItemResource,
+        OAuthTokenListResource,
+    )
     from rbtools.api.resource.repository import (
         RepositoryGetListParams,
         RepositoryItemResource,
@@ -145,6 +154,7 @@ if TYPE_CHECKING:
         ScreenshotCommentItemResource,
         ScreenshotCommentListResource,
     )
+    from rbtools.api.resource.server_info import ServerInfoResource
     from rbtools.api.resource.status_update import (
         StatusUpdateGetListParams,
         StatusUpdateItemResource,
@@ -163,6 +173,19 @@ if TYPE_CHECKING:
         ValidateDiffCommitResource,
     )
     from rbtools.api.resource.validation import ValidationResource
+    from rbtools.api.resource.watched import WatchedResource
+    from rbtools.api.resource.watched_review_group import (
+        WatchedReviewGroupItemResource,
+        WatchedReviewGroupListResource,
+    )
+    from rbtools.api.resource.watched_review_request import (
+        WatchedReviewRequestItemResource,
+        WatchedReviewRequestListResource,
+    )
+    from rbtools.api.resource.webhook import (
+        WebHookItemResource,
+        WebHookListResource,
+    )
     from rbtools.api.transport import Transport
 
 
@@ -1407,6 +1430,30 @@ class RootResource(ItemResource):
         raise NotImplementedError
 
     @api_stub
+    def get_info(
+        self,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> ServerInfoResource:
+        """Get the server info resource.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ServerInfoResource:
+            The server info resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
     def get_last_update(
         self,
         *,
@@ -1429,6 +1476,112 @@ class RootResource(ItemResource):
         Returns:
             rbtools.api.resource.LastUpdateResource:
             The last update resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_oauth_app(
+        self,
+        *,
+        app_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> OAuthApplicationItemResource:
+        """Get an OAuth2 application item resource.
+
+        Args:
+            app_id (int):
+                The application ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.OAuthApplicationItemResource:
+            The application item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_oauth_apps(
+        self,
+        **kwargs: Unpack[OAuthApplicationGetListParams],
+    ) -> OAuthApplicationListResource:
+        """Get the OAuth2 application list resource.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.OAuthApplicationListResource:
+            The application list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_oauth_token(
+        self,
+        *,
+        oauth_token_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> OAuthTokenItemResource:
+        """Get an OAuth2 token item resource.
+
+        Args:
+            oauth_token_id (int):
+                The ID of the OAuth token.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.OAuthTokenItemResource:
+            The token item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_oauth_tokens(
+        self,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> OAuthTokenListResource:
+        """Get the OAuth2 token list resource.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.OAuthTokenListResource:
+            The token list resource.
 
         Raises:
             rbtools.api.errors.APIError:
@@ -3211,6 +3364,212 @@ class RootResource(ItemResource):
         Returns:
             rbtools.api.resource.ValidationResource:
             The validation list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_watched(
+        self,
+        *,
+        username: str,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> WatchedResource:
+        """Get the watched resource.
+
+        Args:
+            username (str):
+                The name of the user to get the watched resource for.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.WatchedResource:
+            The watched resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_watched_review_group(
+        self,
+        *,
+        username: str,
+        watched_obj_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> WatchedReviewGroupItemResource:
+        """Get a watched review group item resource.
+
+        Args:
+            username (str):
+                The username for the user.
+
+            watched_obj_id (int):
+                The ID of the watched review group.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.WatchedReviewGroupItemResource:
+            The watched review group item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_watched_review_groups(
+        self,
+        *,
+        username: str,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> WatchedReviewGroupListResource:
+        """Get a watched review group list resource.
+
+        Args:
+            username (str):
+                The username for the user.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.WatchedReviewGroupListResource:
+            The watched review group list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_watched_review_request(
+        self,
+        *,
+        username: str,
+        watched_obj_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> WatchedReviewRequestItemResource:
+        """Get a watched review request item resource.
+
+        Args:
+            username (str):
+                The username for the user.
+
+            watched_obj_id (int):
+                The ID of the watched review request.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.WatchedReviewRequestItemResource:
+            The watched review request item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_watched_review_requests(
+        self,
+        *,
+        username: str,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> WatchedReviewRequestListResource:
+        """Get a watched review request list resource.
+
+        Args:
+            username (str):
+                The username for the user.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.WatchedReviewRequestListResource:
+            The watched review request list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_webhook(
+        self,
+        *,
+        webhook_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> WebHookItemResource:
+        """Get a WebHook item resource.
+
+        Args:
+            webhook_id (int):
+                The ID of the WebHook.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.WebHookItemResource:
+            The WebHook item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_webhooks(
+        self,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> WebHookListResource:
+        """Get the WebHook list resource.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.WebHookListResource:
+            The WebHook list resource.
 
         Raises:
             rbtools.api.errors.APIError:

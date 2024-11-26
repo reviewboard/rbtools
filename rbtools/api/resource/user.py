@@ -8,11 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from rbtools.api.resource.base import (
-    BaseGetListParams,
-    api_stub,
-    resource_mimetype,
-)
+from rbtools.api.resource.base import api_stub, resource_mimetype
 from rbtools.api.resource.base_user import (
     BaseUserItemResource,
     BaseUserListResource,
@@ -21,8 +17,10 @@ from rbtools.api.resource.base_user import (
 if TYPE_CHECKING:
     from typing_extensions import Unpack
 
+    from rbtools.api.resource.base import BaseGetListParams, BaseGetParams
     from rbtools.api.resource.user_file_attachment import \
         UserFileAttachmentListResource
+    from rbtools.api.resource.watched import WatchedResource
 
 
 @resource_mimetype('application/vnd.reviewboard.org.user')
@@ -57,10 +55,33 @@ class UserItemResource(BaseUserItemResource):
         """
         ...
 
+    @api_stub
+    def get_watched(
+        self,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> WatchedResource:
+        """Get the watched resource.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.WatchedResource:
+            The watched resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
     # TODO get_api_tokens stub
     # TODO get_archived_review_requests stub
     # TODO get_muted_review_requests stub
-    # TODO get_watched stub
 
 
 @resource_mimetype('application/vnd.reviewboard.org.users')

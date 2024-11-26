@@ -73,6 +73,14 @@ from rbtools.api.resource.mixins import (
     DiffUploaderMixin,
     GetPatchMixin,
 )
+from rbtools.api.resource.oauth_application import (
+    OAuthApplicationItemResource,
+    OAuthApplicationListResource,
+)
+from rbtools.api.resource.oauth_token import (
+    OAuthTokenItemResource,
+    OAuthTokenListResource,
+)
 from rbtools.api.resource.repository import (
     RepositoryItemResource,
     RepositoryListResource,
@@ -121,6 +129,7 @@ from rbtools.api.resource.screenshot_comment import (
     ScreenshotCommentItemResource,
     ScreenshotCommentListResource,
 )
+from rbtools.api.resource.server_info import ServerInfoResource
 from rbtools.api.resource.status_update import (
     StatusUpdateItemResource,
     StatusUpdateListResource,
@@ -135,6 +144,19 @@ from rbtools.api.resource.validate_diff_commit import (
     ValidateDiffCommitResource,
 )
 from rbtools.api.resource.validation import ValidationResource
+from rbtools.api.resource.watched import WatchedResource
+from .watched_review_group import (
+    WatchedReviewGroupItemResource,
+    WatchedReviewGroupListResource,
+)
+from rbtools.api.resource.watched_review_request import (
+    WatchedReviewRequestItemResource,
+    WatchedReviewRequestListResource,
+)
+from rbtools.api.resource.webhook import (
+    WebHookItemResource,
+    WebHookListResource,
+)
 
 
 # Compatibility names for renamed resource subclasses.
@@ -183,6 +205,10 @@ __all__ = [
     'ItemResource',
     'LastUpdateResource',
     'ListResource',
+    'OAuthApplicationItemResource',
+    'OAuthApplicationListResource',
+    'OAuthTokenItemResource',
+    'OAuthTokenListResource',
     'RESOURCE_MAP',
     'RepositoryBranchListResource',
     'RepositoryCommitListResource',
@@ -215,6 +241,7 @@ __all__ = [
     'ScreenshotCommentListResource',
     'ScreenshotItemResource',
     'ScreenshotListResource',
+    'ServerInfoResource',
     'StatusUpdateItemResource',
     'StatusUpdateListResource',
     'UserFileAttachmentItemResource',
@@ -224,5 +251,12 @@ __all__ = [
     'ValidateDiffCommitResource',
     'ValidateDiffResource',
     'ValidationResource',
+    'WatchedResource',
+    'WatchedReviewGroupItemResource',
+    'WatchedReviewGroupListResource',
+    'WatchedReviewRequestItemResource',
+    'WatchedReviewRequestListResource',
+    'WebHookItemResource',
+    'WebHookListResource',
     'resource_mimetype',
 ]
