@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from rbtools.api.resource.api_token import (
+    APITokenItemResource,
+    APITokenListResource,
+)
 from rbtools.api.resource.base import (
     CountResource,
     ItemResource,
@@ -68,6 +72,14 @@ from rbtools.api.resource.general_comment import (
     GeneralCommentItemResource,
     GeneralCommentListResource,
 )
+from rbtools.api.resource.hosting_service import (
+    HostingServiceItemResource,
+    HostingServiceListResource,
+)
+from rbtools.api.resource.hosting_service_account import (
+    HostingServiceAccountItemResource,
+    HostingServiceAccountListResource,
+)
 from rbtools.api.resource.last_update import LastUpdateResource
 from rbtools.api.resource.mixins import (
     DiffUploaderMixin,
@@ -80,6 +92,11 @@ from rbtools.api.resource.oauth_application import (
 from rbtools.api.resource.oauth_token import (
     OAuthTokenItemResource,
     OAuthTokenListResource,
+)
+from rbtools.api.resource.plain_text import PlainTextResource
+from rbtools.api.resource.remote_repository import (
+    RemoteRepositoryItemResource,
+    RemoteRepositoryListResource,
 )
 from rbtools.api.resource.repository import (
     RepositoryItemResource,
@@ -129,7 +146,9 @@ from rbtools.api.resource.screenshot_comment import (
     ScreenshotCommentItemResource,
     ScreenshotCommentListResource,
 )
+from rbtools.api.resource.search import SearchResource
 from rbtools.api.resource.server_info import ServerInfoResource
+from rbtools.api.resource.session import SessionResource
 from rbtools.api.resource.status_update import (
     StatusUpdateItemResource,
     StatusUpdateListResource,
@@ -167,6 +186,8 @@ ReviewRequestResource = ReviewRequestItemResource
 
 
 __all__ = [
+    'APITokenItemResource',
+    'APITokenListResource',
     'ChangeItemResource',
     'ChangeListResource',
     'CountResource',
@@ -202,6 +223,10 @@ __all__ = [
     'GeneralCommentItemResource',
     'GeneralCommentListResource',
     'GetPatchMixin',
+    'HostingServiceAccountItemResource',
+    'HostingServiceAccountListResource',
+    'HostingServiceItemResource',
+    'HostingServiceListResource',
     'ItemResource',
     'LastUpdateResource',
     'ListResource',
@@ -209,7 +234,10 @@ __all__ = [
     'OAuthApplicationListResource',
     'OAuthTokenItemResource',
     'OAuthTokenListResource',
+    'PlainTextResource',
     'RESOURCE_MAP',
+    'RemoteRepositoryItemResource',
+    'RemoteRepositoryListResource',
     'RepositoryBranchListResource',
     'RepositoryCommitListResource',
     'RepositoryGroupItemResource',
@@ -241,7 +269,9 @@ __all__ = [
     'ScreenshotCommentListResource',
     'ScreenshotItemResource',
     'ScreenshotListResource',
+    'SearchResource',
     'ServerInfoResource',
+    'SessionResource',
     'StatusUpdateItemResource',
     'StatusUpdateListResource',
     'UserFileAttachmentItemResource',

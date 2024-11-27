@@ -31,6 +31,10 @@ if TYPE_CHECKING:
     from typing_extensions import Self, Unpack
 
     from rbtools.api.request import HttpRequest, QueryArgs
+    from rbtools.api.resource.api_token import (
+        APITokenItemResource,
+        APITokenListResource,
+    )
     from rbtools.api.resource.base import (
         BaseGetListParams,
         BaseGetParams,
@@ -91,6 +95,15 @@ if TYPE_CHECKING:
         GeneralCommentItemResource,
         GeneralCommentListResource,
     )
+    from rbtools.api.resource.hosting_service import (
+        HostingServiceItemResource,
+        HostingServiceListResource,
+    )
+    from rbtools.api.resource.hosting_service_account import (
+        HostingServiceAccountGetListParams,
+        HostingServiceAccountItemResource,
+        HostingServiceAccountListResource,
+    )
     from rbtools.api.resource.last_update import LastUpdateResource
     from rbtools.api.resource.oauth_application import (
         OAuthApplicationGetListParams,
@@ -100,6 +113,12 @@ if TYPE_CHECKING:
     from rbtools.api.resource.oauth_token import (
         OAuthTokenItemResource,
         OAuthTokenListResource,
+    )
+    from rbtools.api.resource.plain_text import PlainTextResource
+    from rbtools.api.resource.remote_repository import (
+        RemoteRepositoryGetListParams,
+        RemoteRepositoryItemResource,
+        RemoteRepositoryListResource,
     )
     from rbtools.api.resource.repository import (
         RepositoryGetListParams,
@@ -154,7 +173,9 @@ if TYPE_CHECKING:
         ScreenshotCommentItemResource,
         ScreenshotCommentListResource,
     )
+    from rbtools.api.resource.search import SearchGetParams, SearchResource
     from rbtools.api.resource.server_info import ServerInfoResource
+    from rbtools.api.resource.session import SessionResource
     from rbtools.api.resource.status_update import (
         StatusUpdateGetListParams,
         StatusUpdateItemResource,
@@ -316,6 +337,68 @@ class RootResource(ItemResource):
         url = self._TEMPLATE_PARAM_RE.sub(get_template_value, url_template)
 
         return self._make_httprequest(url=url, query_args=kwargs)
+
+    @api_stub
+    def get_api_token(
+        self,
+        *,
+        username: str,
+        api_token_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> APITokenItemResource:
+        """Get an API token item resource.
+
+        Args:
+            username (str):
+                The name of the user to get the API token for.
+
+            api_token_id (int):
+                The ID of the API token to get.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.APITokenItemResource:
+            The API token item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_api_tokens(
+        self,
+        *,
+        username: str,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> APITokenListResource:
+        """Get an API token list resource.
+
+        Args:
+            username (str):
+                The name of the user to get the API token list for.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.APITokenListResource:
+            The API token list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
 
     @api_stub
     def get_branches(
@@ -1300,6 +1383,80 @@ class RootResource(ItemResource):
         raise NotImplementedError
 
     @api_stub
+    def get_file_diff_original_file(
+        self,
+        *,
+        review_request_id: int,
+        diff_revision: int,
+        filediff_id: int,
+        **kwargs: QueryArgs,
+    ) -> PlainTextResource:
+        """Get the original version of a file from a diff.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            diff_revision (int):
+                The diff revision.
+
+            filediff_id (int):
+                The file diff ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.PlainTextResource:
+            The original file.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_file_diff_patched_file(
+        self,
+        *,
+        review_request_id: int,
+        diff_revision: int,
+        filediff_id: int,
+        **kwargs: QueryArgs,
+    ) -> PlainTextResource:
+        """Get the patched version of a file from a diff.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            diff_revision (int):
+                The diff revision.
+
+            filediff_id (int):
+                The file diff ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.PlainTextResource:
+            The patched file.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
     def get_general_comment(
         self,
         *,
@@ -1419,6 +1576,112 @@ class RootResource(ItemResource):
         Returns:
             rbtools.api.resource.ReviewGroupListResource:
             The review group list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_hosting_service(
+        self,
+        *,
+        hosting_service_id: str,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> HostingServiceItemResource:
+        """Get a hosting service item resource.
+
+        Args:
+            hosting_service_id (str):
+                The ID of the hosting service.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.HostingServiceItemResource:
+            The hosting service item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_hosting_services(
+        self,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> HostingServiceListResource:
+        """Get the hosting service list resource.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.HostingServiceListResource:
+            The hosting service list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_hosting_service_account(
+        self,
+        *,
+        account_id: int,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> HostingServiceAccountItemResource:
+        """Get a hosting service account item resource.
+
+        Args:
+            account_id (int):
+                The ID of the hosting service account.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.HostingServiceAccountItemResource:
+            The hosting service account item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_hosting_service_accounts(
+        self,
+        **kwargs: Unpack[HostingServiceAccountGetListParams],
+    ) -> HostingServiceAccountListResource:
+        """Get the hosting service account list resource.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.HostingServiceAccountListResource:
+            The hosting service account list resource.
 
         Raises:
             rbtools.api.errors.APIError:
@@ -1558,6 +1821,148 @@ class RootResource(ItemResource):
         Returns:
             rbtools.api.resource.OAuthTokenItemResource:
             The token item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_original_file(
+        self,
+        *,
+        review_request_id: int,
+        diff_revision: int,
+        filediff_id: int,
+        **kwargs: QueryArgs,
+    ) -> PlainTextResource:
+        """Get the original version of a file.
+
+        This method is for compatibility with versions of Review Board prior to
+        5.0.2. :py:meth:`get_file_diff_original_file` should be used instead.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            diff_revision (int):
+                The diff revision.
+
+            filediff_id (int):
+                The file diff ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.PlainTextResource:
+            The original file.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_patched_file(
+        self,
+        *,
+        review_request_id: int,
+        diff_revision: int,
+        filediff_id: int,
+        **kwargs: QueryArgs,
+    ) -> PlainTextResource:
+        """Get the patched version of a file.
+
+        This method is for compatibility with versions of Review Board prior to
+        5.0.2. :py:meth:`get_file_diff_patched_file` should be used instead.
+
+        Args:
+            review_request_id (int):
+                The review request ID.
+
+            diff_revision (int):
+                The diff revision.
+
+            filediff_id (int):
+                The file diff ID.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.PlainTextResource:
+            The patched file.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_remote_repository(
+        self,
+        *,
+        account_id: int,
+        repository_id: str,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> RemoteRepositoryItemResource:
+        """Get a remote repository item resource.
+
+        Args:
+            account_id (int):
+                The ID of the hosting service account.
+
+            repository_id (str):
+                The ID of the remote repository.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.RemoteRepositoryItemResource:
+            The remote repository item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_remote_repositories(
+        self,
+        *,
+        account_id: int,
+        **kwargs: Unpack[RemoteRepositoryGetListParams],
+    ) -> RemoteRepositoryListResource:
+        """Get a remote repository list resource.
+
+        Args:
+            account_id (int):
+                The ID of the hosting service account.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.RemoteRepositoryListResource:
+            The remote repository list resource.
 
         Raises:
             rbtools.api.errors.APIError:
@@ -3155,6 +3560,54 @@ class RootResource(ItemResource):
         Returns:
             rbtools.api.resource.ScreenshotCommentListResource:
             The screenshot comment item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_search(
+        self,
+        **kwargs: Unpack[SearchGetParams],
+    ) -> SearchResource:
+        """Get the search resource.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.SearchResource:
+            The search results.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_session(
+        self,
+        **kwargs: Unpack[BaseGetParams],
+    ) -> SessionResource:
+        """Get the session resource.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.SessionResource:
+            The session resource.
 
         Raises:
             rbtools.api.errors.APIError:

@@ -31,6 +31,7 @@ if TYPE_CHECKING:
         DiffCommentListResource,
     )
     from rbtools.api.resource.file_attachment import FileAttachmentItemResource
+    from rbtools.api.resource.plain_text import PlainTextResource
 
 
 @resource_mimetype('application/vnd.reviewboard.org.file')
@@ -160,6 +161,54 @@ class FileDiffItemResource(GetPatchMixin, ItemResource):
         raise NotImplementedError
 
     @api_stub
+    def get_original_file(
+        self,
+        **kwargs: QueryArgs,
+    ) -> PlainTextResource:
+        """Get the original version of the file.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.PlainTextResource:
+            The original file.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_patched_file(
+        self,
+        **kwargs: QueryArgs,
+    ) -> PlainTextResource:
+        """Get the patched version of the file.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.PlainTextResource:
+            The patched file.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
     def get_source_attachment(
         self,
         **kwargs: Unpack[BaseGetParams],
@@ -185,9 +234,6 @@ class FileDiffItemResource(GetPatchMixin, ItemResource):
                 An error occurred while communicating with the server.
         """
         raise NotImplementedError
-
-    # TODO get_original_file stub
-    # TODO get_patched_file stub
 
 
 @resource_mimetype('application/vnd.reviewboard.org.files')

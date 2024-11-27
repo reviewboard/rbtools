@@ -17,6 +17,7 @@ from rbtools.api.resource.base_user import (
 if TYPE_CHECKING:
     from typing_extensions import Unpack
 
+    from rbtools.api.resource.api_token import APITokenListResource
     from rbtools.api.resource.base import BaseGetListParams, BaseGetParams
     from rbtools.api.resource.user_file_attachment import \
         UserFileAttachmentListResource
@@ -30,6 +31,30 @@ class UserItemResource(BaseUserItemResource):
     Version Added:
         6.0
     """
+
+    @api_stub
+    def get_api_tokens(
+        self,
+        **kwargs: Unpack[BaseGetListParams],
+    ) -> APITokenListResource:
+        """Get an API token list resource.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.APITokenListResource:
+            The API token list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
 
     @api_stub
     def get_user_file_attachments(
@@ -79,7 +104,6 @@ class UserItemResource(BaseUserItemResource):
         """
         raise NotImplementedError
 
-    # TODO get_api_tokens stub
     # TODO get_archived_review_requests stub
     # TODO get_muted_review_requests stub
 
