@@ -16,6 +16,10 @@ from typelets.json import JSONDict
 from typing_extensions import Unpack
 
 from rbtools.api.cache import MINIMUM_VERSION
+from rbtools.api.resource.archived_review_request import (
+    ArchivedReviewRequestItemResource,
+    ArchivedReviewRequestListResource,
+)
 from rbtools.api.resource.base import (
     ItemResource,
     RequestMethodResult,
@@ -25,6 +29,10 @@ from rbtools.api.resource.base import (
     replace_api_stub,
     request_method,
     resource_mimetype,
+)
+from rbtools.api.resource.muted_review_request import (
+    MutedReviewRequestItemResource,
+    MutedReviewRequestListResource,
 )
 
 if TYPE_CHECKING:
@@ -292,19 +300,16 @@ class RootResource(ItemResource):
             # bugs before this version). Disable caching.
             transport.disable_cache()
 
-    @request_method
-    def _get_template_request(
+    def _make_url_from_template(
         self,
         url_template: str,
         values: Optional[dict[str, str]] = None,
         **kwargs: QueryArgs,
-    ) -> HttpRequest:
-        """Generate an HttpRequest from a uri-template.
+    ) -> str:
+        """Create a URL from a template.
 
-        This will replace each '{variable}' in the template with the
-        value from kwargs['variable'], or if it does not exist, the
-        value from values['variable']. The resulting url is used to
-        create an HttpRequest.
+        Version Added:
+            6.0
 
         Args:
             url_template (str):
@@ -313,12 +318,12 @@ class RootResource(ItemResource):
             values (dict, optional):
                 The values to use for replacing template variables.
 
-            **kwargs (dict of rbtools.api.request.QueryArgs):
+            **kwargs (rbtools.api.request.QueryArgs):
                 Query arguments to include with the request.
 
         Returns:
-            rbtools.api.resource.Resource:
-            The resource at the given URL.
+            str:
+            The URL with the values filled in.
         """
         if values is None:
             values = {}
@@ -334,9 +339,225 @@ class RootResource(ItemResource):
                 raise ValueError(
                     f'Template was not provided a value for "{key}"')
 
-        url = self._TEMPLATE_PARAM_RE.sub(get_template_value, url_template)
+        return self._TEMPLATE_PARAM_RE.sub(get_template_value, url_template)
+
+    @request_method
+    def _get_template_request(
+        self,
+        url_template: str,
+        values: Optional[dict[str, str]] = None,
+        **kwargs: QueryArgs,
+    ) -> HttpRequest:
+        """Generate an HttpRequest from a URI template.
+
+        This will replace each ``{variable}`` in the template with the
+        value from ``kwargs['variable']``, or if it does not exist, the
+        value from ``values['variable']``. The resulting URL is used to
+        create an ``HttpRequest``.
+
+        Args:
+            url_template (str):
+                The URL template.
+
+            values (dict, optional):
+                The values to use for replacing template variables.
+
+            **kwargs (dict of rbtools.api.request.QueryArgs):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.Resource:
+            The resource at the given URL.
+        """
+        url = self._make_url_from_template(url_template, values, **kwargs)
 
         return self._make_httprequest(url=url, query_args=kwargs)
+
+    def get_archived_review_request(
+        self,
+        *,
+        username: str,
+        review_request_id: int,
+        **kwargs: QueryArgs,
+    ) -> ArchivedReviewRequestItemResource:
+        """Get an archived review request item resource.
+
+        Args:
+            username (str):
+                The name of the user to get the archived review request item
+                for.
+
+            review_request_id (int):
+                The review request
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ArchivedReviewRequestItemResource:
+            The archived review request item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        uri_templates = cast(dict[str, str], self._payload['uri_templates'])
+
+        url = self._make_url_from_template(
+            uri_templates['archived_review_request'],
+            values={
+                'review_request_id': f'{review_request_id}',
+                'username': username,
+            })
+
+        return ArchivedReviewRequestItemResource(
+            transport=self._transport,
+            payload={
+                'archived_review_request': {},
+            },
+            url=url,
+            token='archived_review_request',
+        )
+
+    def get_archived_review_requests(
+        self,
+        *,
+        username: str,
+        **kwargs: QueryArgs,
+    ) -> ArchivedReviewRequestListResource:
+        """Get an archived review requests list resource.
+
+        Args:
+            username (str):
+                The name of the user to get the archived review requests list
+                for.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ArchivedReviewRequestListResource:
+            The archived review request list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        uri_templates = cast(dict[str, str], self._payload['uri_templates'])
+
+        url = self._make_url_from_template(
+            uri_templates['archived_review_requests'],
+            values={
+                'username': username,
+            })
+
+        return ArchivedReviewRequestListResource(
+            transport=self._transport,
+            payload={
+                'archived_review_requests': [],
+            },
+            url=url,
+            token='archived_review_requests',
+        )
+
+    def get_muted_review_request(
+        self,
+        *,
+        username: str,
+        review_request_id: int,
+        **kwargs: QueryArgs,
+    ) -> MutedReviewRequestItemResource:
+        """Get a muted review request item resource.
+
+        Args:
+            username (str):
+                The name of the user to get the muted review request item
+                for.
+
+            review_request_id (int):
+                The review request.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.MutedReviewRequestItemResource:
+            The muted review request item resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        uri_templates = cast(dict[str, str], self._payload['uri_templates'])
+
+        url = self._make_url_from_template(
+            uri_templates['muted_review_request'],
+            values={
+                'review_request_id': f'{review_request_id}',
+                'username': username,
+            })
+
+        return MutedReviewRequestItemResource(
+            transport=self._transport,
+            payload={
+                'muted_review_request': {},
+            },
+            url=url,
+            token='muted_review_request',
+        )
+
+    def get_muted_review_requests(
+        self,
+        *,
+        username: str,
+        **kwargs: QueryArgs,
+    ) -> MutedReviewRequestListResource:
+        """Get a muted review requests list resource.
+
+        Args:
+            username (str):
+                The name of the user to get the muted review requests list
+                for.
+
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.MutedReviewRequestListResource:
+            The muted review request list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        uri_templates = cast(dict[str, str], self._payload['uri_templates'])
+
+        url = self._make_url_from_template(
+            uri_templates['muted_review_requests'],
+            values={
+                'username': username,
+            })
+
+        return MutedReviewRequestListResource(
+            transport=self._transport,
+            payload={
+                'muted_review_requests': [],
+            },
+            url=url,
+            token='muted_review_requests',
+        )
 
     @api_stub
     def get_api_token(

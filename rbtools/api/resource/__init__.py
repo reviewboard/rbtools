@@ -6,6 +6,10 @@ from rbtools.api.resource.api_token import (
     APITokenItemResource,
     APITokenListResource,
 )
+from rbtools.api.resource.archived_review_request import (
+    ArchivedReviewRequestItemResource,
+    ArchivedReviewRequestListResource,
+)
 from rbtools.api.resource.base import (
     CountResource,
     ItemResource,
@@ -84,6 +88,10 @@ from rbtools.api.resource.last_update import LastUpdateResource
 from rbtools.api.resource.mixins import (
     DiffUploaderMixin,
     GetPatchMixin,
+)
+from rbtools.api.resource.muted_review_request import (
+    MutedReviewRequestItemResource,
+    MutedReviewRequestListResource,
 )
 from rbtools.api.resource.oauth_application import (
     OAuthApplicationItemResource,
@@ -188,6 +196,8 @@ ReviewRequestResource = ReviewRequestItemResource
 __all__ = [
     'APITokenItemResource',
     'APITokenListResource',
+    'ArchivedReviewRequestItemResource',
+    'ArchivedReviewRequestListResource',
     'ChangeItemResource',
     'ChangeListResource',
     'CountResource',
@@ -230,6 +240,8 @@ __all__ = [
     'ItemResource',
     'LastUpdateResource',
     'ListResource',
+    'MutedReviewRequestItemResource',
+    'MutedReviewRequestListResource',
     'OAuthApplicationItemResource',
     'OAuthApplicationListResource',
     'OAuthTokenItemResource',
