@@ -66,6 +66,7 @@ if TYPE_CHECKING:
         DiffListResource,
     )
     from rbtools.api.resource.diff_comment import (
+        AllDiffCommentsGetListParams,
         DiffCommentGetListParams,
         DiffCommentItemResource,
         DiffCommentListResource,
@@ -92,6 +93,7 @@ if TYPE_CHECKING:
         FileAttachmentListResource,
     )
     from rbtools.api.resource.file_attachment_comment import (
+        AllFileAttachmentCommentsGetListParams,
         FileAttachmentCommentItemResource,
         FileAttachmentCommentListResource,
     )
@@ -100,6 +102,7 @@ if TYPE_CHECKING:
         FileDiffListResource,
     )
     from rbtools.api.resource.general_comment import (
+        AllGeneralCommentsGetListParams,
         GeneralCommentItemResource,
         GeneralCommentListResource,
     )
@@ -150,6 +153,7 @@ if TYPE_CHECKING:
         RepositoryUserListResource,
     )
     from rbtools.api.resource.review import (
+        AllReviewsGetListParams,
         ReviewItemResource,
         ReviewListResource,
     )
@@ -558,6 +562,102 @@ class RootResource(ItemResource):
             url=url,
             token='muted_review_requests',
         )
+
+    @api_stub
+    def get_all_diff_comments(
+        self,
+        **kwargs: Unpack[AllDiffCommentsGetListParams],
+    ) -> DiffCommentListResource:
+        """Get the root diff comment list resource.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.DiffCommentListResource:
+            The diff comment list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_all_file_attachment_comments(
+        self,
+        **kwargs: Unpack[AllFileAttachmentCommentsGetListParams],
+    ) -> FileAttachmentCommentListResource:
+        """Get the root file attachment comment list resource.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.FileAttachmentCommentListResource:
+            The file attachment comment list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_all_general_comments(
+        self,
+        **kwargs: Unpack[AllGeneralCommentsGetListParams],
+    ) -> GeneralCommentListResource:
+        """Get the root general comment list resource.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.GeneralCommentListResource:
+            The general comment list resource.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
+
+    @api_stub
+    def get_all_reviews(
+        self,
+        **kwargs: Unpack[AllReviewsGetListParams],
+    ) -> ReviewListResource:
+        """Get the root review list resource.
+
+        Args:
+            **kwargs (dict):
+                Query arguments to include with the request.
+
+        Returns:
+            rbtools.api.resource.ReviewListResource:
+            The review list.
+
+        Raises:
+            rbtools.api.errors.APIError:
+                The Review Board API returned an error.
+
+            rbtools.api.errors.ServerInterfaceError:
+                An error occurred while communicating with the server.
+        """
+        raise NotImplementedError
 
     @api_stub
     def get_api_token(

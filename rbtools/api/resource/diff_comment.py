@@ -120,6 +120,41 @@ class DiffCommentGetListParams(BaseGetListParams, total=False):
     order_by: str
 
 
+class AllDiffCommentsGetListParams(DiffCommentGetListParams, total=False):
+    """Params for the all diff comments list resource GET operation.
+
+    Version Added:
+        6.0
+    """
+
+    #: The file diff ID that the diff comments must be on.
+    file_diff_id: int
+
+    #: Whether to return diff comments that are replies.
+    is_reply: bool
+
+    #: The earliest date/time the comment could be last updated.
+    #:
+    #: This is compared against the comment's ``timestamp`` field. This must be
+    #: a valid ISO-8601 date/time format.
+    last_updated_from: str
+
+    #: The latest date/time the review could be last updated.
+    #:
+    #: This is compared against the comment's ``timestamp`` field. This must be
+    #: a valid ISO-8601 date/time format.
+    last_updated_to: str
+
+    #: The ID of the review that diff comments must belong to.
+    review_id: str
+
+    #: The ID of the review request that diff comments must belong to.
+    review_request_id: str
+
+    #: The username of the user that the reviews must be owned by.
+    user: str
+
+
 @resource_mimetype('application/vnd.reviewboard.org.file-diff-diff-comments')
 @resource_mimetype('application/vnd.reviewboard.org.review-diff-comments')
 @resource_mimetype(
@@ -133,6 +168,11 @@ class DiffCommentListResource(ListResource[DiffCommentItemResource]):
 
     _httprequest_params_name_map: ClassVar[Mapping[str, str]] = {
         'interdiff_revision': 'interdiff-revision',
+        'is_reply': 'is-reply',
+        'last_updated_from': 'last-updated-from',
+        'last_updated_to': 'last-updated-to',
         'order_by': 'order-by',
+        'review_id': 'review-id',
+        'review_request_id': 'review-request-id',
         **ListResource._httprequest_params_name_map,
     }
