@@ -12,11 +12,12 @@ import stat
 import subprocess
 import sys
 from fnmatch import fnmatch
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, TYPE_CHECKING, Tuple, Union
 
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
                                             SCMClientDiffResult,
+                                            SCMClientPatcher,
                                             SCMClientRevisionSpec)
 from rbtools.clients.errors import (AmendError,
                                     EmptyChangeError,
@@ -29,7 +30,15 @@ from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install
 from rbtools.utils.encoding import force_unicode
 from rbtools.utils.filesystem import make_empty_files, make_tempfile
-from rbtools.utils.process import execute
+from rbtools.utils.process import (RunProcessError,
+                                   execute,
+                                   run_process)
+
+if TYPE_CHECKING:
+    from rbtools.diffs.patches import Patch
+
+
+logger = logging.getLogger(__name__)
 
 
 class P4Wrapper(object):
@@ -435,6 +444,83 @@ class P4Wrapper(object):
         return keyvals
 
 
+class PerforcePatcher(SCMClientPatcher):
+    """A patcher that applies Perforce patches to a tree.
+
+    This applies patches using the standard :command:`patch` command, but
+    taking care to specially-handle added and deleted empty files.
+
+    Version Added:
+        5.1
+    """
+
+    ADDED_FILES_RE = re.compile(
+        br'^==== //(\S+)#\d+ ==A== \S+ ====$',
+        re.M)
+    DELETED_FILES_RE = re.compile(
+        br'^==== //(\S+)#\d+ ==D== \S+ ====$',
+        re.M)
+
+    def apply_patch_for_empty_files(
+        self,
+        patch: Patch,
+    ) -> bool:
+        """Return whether any empty files in the patch are applied.
+
+        Args:
+            patch (rbtools.diffs.patches.Patch):
+                The opened patch to check and possibly apply.
+
+        Returns:
+            ``True`` if there are empty files in the patch. ``False`` if there
+            were no empty files, or if an error occurred while applying the
+            patch.
+        """
+        patched_empty_files: bool = False
+
+        scmclient = self.scmclient
+        patch_content = patch.content
+
+        if self.revert:
+            added_files_re = self.DELETED_FILES_RE
+            deleted_files_re = self.ADDED_FILES_RE
+        else:
+            added_files_re = self.ADDED_FILES_RE
+            deleted_files_re = self.DELETED_FILES_RE
+
+        # Prepend the root of the Perforce client to each file name.
+        p4_info = scmclient.p4.info()
+        client_root = p4_info.get('Client root')
+        added_files = [
+            f'{client_root}/{filename.decode("utf-8")}'
+            for filename in added_files_re.findall(patch_content)
+        ]
+        deleted_files = [
+            f'{client_root}/{filename.decode("utf-8")}'
+            for filename in deleted_files_re.findall(patch_content)
+        ]
+
+        if added_files:
+            make_empty_files(added_files)
+
+            try:
+                run_process(['p4', 'add'] + added_files)
+                patched_empty_files = True
+            except RunProcessError:
+                logger.error('Unable to execute "p4 add" on: %s',
+                             ', '.join(added_files))
+
+        if deleted_files:
+            try:
+                run_process(['p4', 'delete'] + deleted_files)
+                patched_empty_files = True
+            except RunProcessError:
+                logger.error('Unable to execute "p4 delete" on: %s',
+                             ', '.join(deleted_files))
+
+        return patched_empty_files
+
+
 class PerforceClient(BaseSCMClient):
     """A client for Perforce.
 
@@ -446,6 +532,8 @@ class PerforceClient(BaseSCMClient):
     name = 'Perforce'
     server_tool_names = 'Perforce'
     server_tool_ids = ['perforce']
+
+    patcher_cls = PerforcePatcher
 
     requires_diff_tool = True
 
@@ -464,11 +552,6 @@ class PerforceClient(BaseSCMClient):
     REVISION_PENDING_CLN_PREFIX = '--rbtools-pending-cln:'
     REVISION_DEFAULT_CLN = 'default'
 
-    ADDED_FILES_RE = re.compile(r'^==== //depot/(\S+)#\d+ ==A== \S+ ====$',
-                                re.M)
-    DELETED_FILES_RE = re.compile(r'^==== //depot/(\S+)#\d+ ==D== \S+ ====$',
-                                  re.M)
-
     def __init__(self, p4_class=P4Wrapper, **kwargs):
         """Initialize the client.
 
@@ -482,6 +565,18 @@ class PerforceClient(BaseSCMClient):
         super(PerforceClient, self).__init__(**kwargs)
         self.p4 = p4_class(self.options)
         self._p4_info = None
+
+    def supports_empty_files(self) -> bool:
+        """Return whether the Review Board server supports empty files.
+
+        Returns:
+            bool:
+            ``True`` if the Review Board server can support showing empty
+            files. ``False`` if it cannot.
+        """
+        return (self.capabilities is not None and
+                self.capabilities.has_capability('scmtools', 'perforce',
+                                                 'empty_files'))
 
     def check_dependencies(self) -> None:
         """Check whether all base dependencies are available.
@@ -2171,62 +2266,6 @@ class PerforceClient(BaseSCMClient):
         else:
             return ''
 
-    def apply_patch_for_empty_files(self, patch, p_num, revert=False):
-        """Return whether any empty files in the patch are applied.
-
-        Args:
-            patch (bytes):
-                The contents of the patch.
-
-            p_num (unicode):
-                The prefix level of the diff.
-
-            revert (bool, optional):
-                Whether the patch should be reverted rather than applied.
-
-        Returns:
-            ``True`` if there are empty files in the patch. ``False`` if there
-            were no empty files, or if an error occurred while applying the
-            patch.
-        """
-        patched_empty_files = False
-
-        if revert:
-            added_files = self.DELETED_FILES_RE.findall(patch)
-            deleted_files = self.ADDED_FILES_RE.findall(patch)
-        else:
-            added_files = self.ADDED_FILES_RE.findall(patch)
-            deleted_files = self.DELETED_FILES_RE.findall(patch)
-
-        # Prepend the root of the Perforce client to each file name.
-        p4_info = self.p4.info()
-        client_root = p4_info.get('Client root')
-        added_files = ['%s/%s' % (client_root, f) for f in added_files]
-        deleted_files = ['%s/%s' % (client_root, f) for f in deleted_files]
-
-        if added_files:
-            make_empty_files(added_files)
-            result = execute(['p4', 'add'] + added_files, ignore_errors=True,
-                             none_on_ignored_error=True)
-
-            if result is None:
-                logging.error('Unable to execute "p4 add" on: %s',
-                              ', '.join(added_files))
-            else:
-                patched_empty_files = True
-
-        if deleted_files:
-            result = execute(['p4', 'delete'] + deleted_files,
-                             ignore_errors=True, none_on_ignored_error=True)
-
-            if result is None:
-                logging.error('Unable to execute "p4 delete" on: %s',
-                              ', '.join(deleted_files))
-            else:
-                patched_empty_files = True
-
-        return patched_empty_files
-
     def _supports_moves(self):
         """Return whether the Review Board server supports moved files.
 
@@ -2237,18 +2276,6 @@ class PerforceClient(BaseSCMClient):
         return (self.capabilities and
                 self.capabilities.has_capability('scmtools', 'perforce',
                                                  'moved_files'))
-
-    def _supports_empty_files(self):
-        """Return whether the Review Board server supports empty files.
-
-        Returns:
-            bool:
-            ``True`` if the Review Board server can support showing empty
-            files.
-        """
-        return (self.capabilities and
-                self.capabilities.has_capability('scmtools', 'perforce',
-                                                 'empty_files'))
 
     def _should_exclude_file(self, local_file, depot_file, exclude_patterns):
         """Determine if a file should be excluded from a diff.

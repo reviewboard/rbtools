@@ -74,7 +74,7 @@ call :BuildInstaller || goto :Abort
 
 echo Done.
 
-goto :EOF
+exit /B 0
 
 
 ::-------------------------------------------------------------------------
@@ -105,7 +105,7 @@ if not exist "%_dep_path%" (
         echo Downloaded to %_PYTHON_INSTALLER%
     )
 
-    echo Running the installer [%_arch%]...
+    echo Running the installer [%_arch%]..
     "%_PYTHON_INSTALLER%" /quiet ^
         AssociateFiles=0 Include_doc=0 Include_debug=0 Include_launcher=0 ^
         Include_tcltk=0 Include_test=0 InstallAllUsers=0 ^
@@ -114,16 +114,20 @@ if not exist "%_dep_path%" (
         TargetDir="%_dep_path%-temp"
     if %errorlevel% neq 0 exit /b 1
 
+    echo Copying installer to deps path (%_dep_path%)
     xcopy /EYI "%_dep_path%-temp" "%_dep_path%"
     if %errorlevel% neq 0 exit /b 1
 
     :: Remove the old install from the temp directory, and clean up the
     :: registry files so future installs aren't impacted.
+    echo Uninstalling the temporary Python installer...
     "%_PYTHON_INSTALLER%" /quiet /uninstall
     if %errorlevel% neq 0 exit /b 1
+
+    echo Python installer is complete.
 )
 
-goto :EOF
+exit /B 0
 
 
 ::-------------------------------------------------------------------------
@@ -140,7 +144,7 @@ echo == Creating build directory ==
 call :DeleteIfExists "%BUILD_ROOT%"
 xcopy /EYI "%PYTHON_X64_DEP%" "%BUNDLED_PYTHON_X64_DIR%" >NUL
 
-goto :EOF
+exit /B 0
 
 
 ::-------------------------------------------------------------------------
@@ -157,25 +161,31 @@ echo --------------------------- [Install log] ---------------------------
 pushd %TREE_ROOT%
 
 :: Install packages for 64-bit packages.
+echo Ensuring pip...
 "%BUNDLED_PYTHON_X64%" -m ensurepip --upgrade
 
 if ERRORLEVEL 1 (
+    echo Installation failed.
     popd
     exit /B 1
 )
 
-"%BUNDLED_PYTHON_X64%" -m pip install -U pip setuptools
+echo Installing the latest Python packaging dependencies...
+"%BUNDLED_PYTHON_X64%" -m pip install -U pip build setuptools
 
 if ERRORLEVEL 1 (
+    echo Installation failed.
     popd
     exit /B 1
 )
+
+echo Python packaging dependencies installed.
 
 popd
 
 echo ---------------------------------------------------------------------
 
-goto :EOF
+exit /B 0
 
 
 ::-------------------------------------------------------------------------
@@ -192,9 +202,10 @@ echo --------------------------- [Install log] ---------------------------
 pushd %TREE_ROOT%
 
 :: Build for 64-bit Python.
-"%BUNDLED_PYTHON_X64%" setup.py release install >NUL
+"%BUNDLED_PYTHON_X64%" -m pip install . >NUL
 
 if ERRORLEVEL 1 (
+    echo Failed to install the local RBTools tree.
     popd
     exit /B 1
 )
@@ -203,7 +214,7 @@ popd
 
 echo ---------------------------------------------------------------------
 
-goto :EOF
+exit /B 0
 
 
 ::-------------------------------------------------------------------------
@@ -222,7 +233,7 @@ call :DeleteIfExists "%BUNDLED_PYTHON_X64_DIR%\%PYTHON_X64_FILENAME%"
 
 echo == Files removed ==
 
-goto :EOF
+exit /B 0
 
 
 ::-------------------------------------------------------------------------
@@ -232,6 +243,8 @@ goto :EOF
 setlocal
 
 call :GetRBToolsVersion
+if ERRORLEVEL 1 exit /B 1
+
 set _rbtools_version=%_return1%
 
 set _wix_path=%CD%\wix
@@ -260,7 +273,7 @@ copy "%BUILD_STAGE%\RBTools-%_rbtools_version%*.exe" "%BUILD_DEST%" >NUL
 
 echo Installers published to %BUILD_DEST%
 
-goto :EOF
+exit /B 0
 
 
 ::-------------------------------------------------------------------------
@@ -273,12 +286,21 @@ setlocal
 
 set _version_file=%BUILD_STAGE%\VERSION
 
-"%BUNDLED_PYTHON_X64%" scripts/get-version.py > "%_version_file%"
+echo Determining RBTools version
+
+"%BUNDLED_PYTHON_X64%" "%CD%\scripts\get-version.py" > "%_version_file%"
+
+if ERRORLEVEL 1 (
+    echo Failed to determine version.
+    exit /B 1
+)
+
 set /P _version= < "%_version_file%"
 del "%_version_file%"
+echo Discovered version to be %_version%
 
 endlocal & set _return1=%_version%
-goto :EOF
+exit /B 0
 
 
 ::-------------------------------------------------------------------------
@@ -317,7 +339,7 @@ if not exist %MSBUILDPATH% (
 )
 
 endlocal & set MSBUILD=%MSBUILDPATH%
-goto :EOF
+exit /B 0
 
 
 ::-------------------------------------------------------------------------
@@ -336,7 +358,7 @@ if not exist "%_dest%" (
 
 call :VerifyMD5 "%_dest%" %_expected_hash% || exit /B 1
 
-goto :EOF
+exit /B 0
 
 
 ::-------------------------------------------------------------------------
@@ -354,7 +376,7 @@ curl "%_url%" -o "%_dest%" || exit /B 1
 
 echo Downloaded %_url%
 
-goto :EOF
+exit /B 0
 
 
 ::-------------------------------------------------------------------------
@@ -383,7 +405,7 @@ PowerShell -NoProfile -Command ^
 
 echo Hash verified.
 
-goto :EOF
+exit /B 0
 
 
 ::-------------------------------------------------------------------------
@@ -399,7 +421,7 @@ if exist "%_path%" (
     rmdir /S /Q "%_path%" 2>NUL
 )
 
-goto :EOF
+exit /B 0
 
 
 ::-------------------------------------------------------------------------

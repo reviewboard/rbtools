@@ -10,8 +10,10 @@ import time
 import unittest
 from random import randint
 from textwrap import dedent
+from typing import Optional
 
 import kgb
+from rbtools.diffs.errors import ApplyPatchError
 
 import rbtools.helpers
 from rbtools.clients import RepositoryInfo
@@ -24,7 +26,7 @@ from rbtools.clients.tests import (FOO, FOO1, FOO2, FOO3, FOO4, FOO5, FOO6,
                                    SCMClientTestCase)
 from rbtools.config.loader import load_config
 from rbtools.deprecation import RemovedInRBTools50Warning
-from rbtools.diffs.patches import PatchAuthor
+from rbtools.diffs.patches import Patch, PatchAuthor
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import (is_exe_in_path,
                                       make_tempdir)
@@ -39,6 +41,90 @@ hgext_path = os.path.abspath(os.path.join(rbtools.helpers.__file__, '..',
 
 class MercurialTestCase(SCMClientTestCase):
     """Base class for all Mercurial unit tests."""
+
+    TESTSERVER = 'http://127.0.0.1:8080'
+
+    CLONE_HGRC = dedent("""
+        [ui]
+        username = test user <user at example.com>
+
+        [paths]
+        default = %(hg_dir)s
+        cloned = %(clone_dir)s
+
+        [reviewboard]
+        url = %(test_server)s
+
+        [diff]
+        git = true
+    """).rstrip()
+
+    scmclient_cls = MercurialClient
+    populate_default_clone: bool = True
+
+    #: The path to the source test repository directory.
+    hg_dir: str
+
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The path to the Mercurial clone directory for a test.
+    clone_dir: Optional[str]
+
+    @classmethod
+    def setup_checkout(
+        cls,
+        checkout_dir: str,
+    ) -> Optional[str]:
+        """Populate a Mercurial clone.
+
+        This will create a clone of the sample Mercurial repository stored in
+        the :file:`testdata` directory.
+
+        Args:
+            checkout_dir (str):
+                The top-level directory in which the clone will be placed.
+
+        Returns:
+            str:
+            The main clone directory, or ``None`` if :command:`hg` isn't
+            in the path.
+        """
+        if cls.populate_default_clone:
+            client = MercurialClient()
+
+            if not client.has_dependencies():
+                return None
+
+            cls.hg_dir = os.path.join(cls.testdata_dir, 'hg-repo')
+            cls.run_hg(['clone', '--stream', cls.hg_dir, checkout_dir])
+
+            return checkout_dir
+        else:
+            return super().setup_checkout(checkout_dir)
+
+    def setUp(self) -> None:
+        """Set up state for a unit test.
+
+        This will write a Mercurial configuration file suitable for unit tests
+        to the clone directory, if set.
+        """
+        super().setUp()
+
+        self.clone_dir = self.checkout_dir
+
+        if self.clone_dir is not None:
+            self.clone_hgrc_path = os.path.join(self.clone_dir, '.hg', 'hgrc')
+
+            with open(self.clone_hgrc_path, 'w') as fp:
+                fp.write(self.CLONE_HGRC % {
+                    'hg_dir': self.hg_dir,
+                    'clone_dir': self.clone_dir,
+                    'test_server': self.TESTSERVER,
+                })
+        else:
+            self.clone_dir = None
 
     @classmethod
     def run_hg(
@@ -120,73 +206,43 @@ class MercurialTestCase(SCMClientTestCase):
         if tag:
             self.run_hg(['tag', tag])
 
+    def hg_get_num_commits(self) -> int:
+        """Return the number of commits in the repository.
+
+        Returns:
+            int:
+            The number of commits.
+        """
+        return len(
+            self.run_hg(['log', '--template', 'X\\n'])
+            .stdout
+            .readlines()
+        )
+
+    def _hg_get_tip(self) -> str:
+        """Return the revision at the tip of the branch.
+
+        Returns:
+            str:
+            The tip revision.
+        """
+        # This is currently the most cross-Mercurial way of getting a
+        # full ID.
+        cmdline = ['identify', '--debug']
+
+        return (
+            self.run_hg(cmdline)
+            .stdout
+            .read()
+            .split()[0]
+        )
+
 
 class MercurialClientTests(MercurialTestCase):
     """Unit tests for MercurialClient."""
 
-    scmclient_cls = MercurialClient
-
-    TESTSERVER = 'http://127.0.0.1:8080'
-    CLONE_HGRC = dedent("""
-        [ui]
-        username = test user <user at example.com>
-
-        [paths]
-        default = %(hg_dir)s
-        cloned = %(clone_dir)s
-
-        [reviewboard]
-        url = %(test_server)s
-
-        [diff]
-        git = true
-    """).rstrip()
-
     AUTHOR = PatchAuthor(full_name='name',
                          email='email')
-
-    @classmethod
-    def setup_checkout(cls, checkout_dir):
-        """Populate a Mercurial clone.
-
-        This will create a clone of the sample Mercurial repository stored in
-        the :file:`testdata` directory.
-
-        Args:
-            checkout_dir (unicode):
-                The top-level directory in which the clone will be placed.
-
-        Returns:
-            str:
-            The main clone directory, or ``None`` if :command:`hg` isn't
-            in the path.
-        """
-        client = MercurialClient()
-
-        if not client.has_dependencies():
-            return None
-
-        cls.hg_dir = os.path.join(cls.testdata_dir, 'hg-repo')
-        cls.run_hg(['clone', '--stream', cls.hg_dir, checkout_dir])
-
-        return checkout_dir
-
-    def setUp(self):
-        super(MercurialClientTests, self).setUp()
-
-        self.clone_dir = self.checkout_dir
-
-        if self.clone_dir is not None:
-            self.clone_hgrc_path = os.path.join(self.clone_dir, '.hg', 'hgrc')
-
-            with open(self.clone_hgrc_path, 'w') as fp:
-                fp.write(self.CLONE_HGRC % {
-                    'hg_dir': self.hg_dir,
-                    'clone_dir': self.clone_dir,
-                    'test_server': self.TESTSERVER,
-                })
-        else:
-            self.clone_dir = None
 
     def test_check_dependencies_with_found(self):
         """Testing MercurialClient.check_dependencies with hg found"""
@@ -1647,12 +1703,15 @@ class MercurialClientTests(MercurialTestCase):
         self.spy_on(run_process_exec,
                     op=kgb.SpyOpReturn((0, b'test', b'')))
 
-        result = client.apply_patch(patch_file='test.diff')
+        result = client.apply_patch(patch_file='test.diff',
+                                    p=None,
+                                    base_path='',
+                                    base_dir='')
 
         self.assertSpyCalledWith(
             run_process_exec,
             [
-                'hg', 'patch', '--no-commit', 'test.diff',
+                'hg', 'import', '--no-commit', '--partial', 'test.diff',
                 '--config', 'extensions.rbtoolsnormalize=%s' % hgext_path,
             ])
 
@@ -1669,13 +1728,16 @@ class MercurialClientTests(MercurialTestCase):
                     op=kgb.SpyOpReturn((0, b'test', b'')))
 
         result = client.apply_patch(patch_file='test.diff',
-                                    p='1')
+                                    p='1',
+                                    base_path='',
+                                    base_dir='')
 
         self.assertSpyCalledWith(
             run_process_exec,
             [
-                'hg', 'patch', '--no-commit', '-p', '1', 'test.diff',
-                '--config', 'extensions.rbtoolsnormalize=%s' % hgext_path,
+                'hg', 'import', '--no-commit', '--partial', '-p', '1',
+                'test.diff', '--config',
+                'extensions.rbtoolsnormalize=%s' % hgext_path,
             ])
 
         self.assertTrue(result.applied)
@@ -1687,15 +1749,22 @@ class MercurialClientTests(MercurialTestCase):
         """Testing MercurialClient.apply_patch with error"""
         client = self.build_client()
 
+        # Make sure we call this first, since we don't want the repository
+        # lookups to fail in apply_patch() due to our spy.
+        client.get_repository_info()
+
         self.spy_on(run_process_exec,
                     op=kgb.SpyOpReturn((1, b'bad', b'')))
 
-        result = client.apply_patch(patch_file='test.diff')
+        result = client.apply_patch(patch_file='test.diff',
+                                    p=None,
+                                    base_path='',
+                                    base_dir='')
 
         self.assertSpyCalledWith(
             run_process_exec,
             [
-                'hg', 'patch', '--no-commit', 'test.diff',
+                'hg', 'import', '--no-commit', '--partial', 'test.diff',
                 '--config', 'extensions.rbtoolsnormalize=%s' % hgext_path,
             ],
             redirect_stderr=True)
@@ -1771,31 +1840,13 @@ class MercurialClientTests(MercurialTestCase):
                 filename='unknown',
                 revision='1')
 
-    def _hg_get_tip(self) -> str:
-        """Return the revision at the tip of the branch.
-
-        Returns:
-            str:
-            The tip revision.
-        """
-        # This is currently the most cross-Mercurial way of getting a
-        # full ID.
-        cmdline = ['identify', '--debug']
-
-        return (
-            self.run_hg(cmdline)
-            .stdout
-            .read()
-            .split()[0]
-        )
-
 
 class MercurialSubversionClientTests(MercurialTestCase):
     """Unit tests for hgsubversion."""
 
-    TESTSERVER = 'http://127.0.0.1:8080'
-
     SVNSERVE_MAX_RETRIES = 12
+
+    populate_default_clone = False
 
     _svnserve_pid = None
     _svn_temp_base_path = None
@@ -1832,7 +1883,7 @@ class MercurialSubversionClientTests(MercurialTestCase):
                 cls._skip_reason = \
                     'hgsubversion is not available or cannot be used.'
 
-        super(MercurialSubversionClientTests, cls).setUpClass()
+        super().setUpClass()
 
         # Don't do any of the following expensive stuff if we know we're just
         # going to skip all the tests.
@@ -2062,3 +2113,708 @@ class MercurialSubversionClientTests(MercurialTestCase):
                 'diff': '',
                 'parent_diff': None,
             })
+
+
+class MercurialPatcherTests(MercurialTestCase):
+    """Unit tests for MercurialPatcher.
+
+    Version Added:
+        5.1
+    """
+
+    def test_patch_git(self) -> None:
+        """Testing MercurialPatcher.patch with Git-style diff"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
+
+        tip = self._hg_get_tip()
+
+        self.spy_on(run_process_exec)
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=(
+                    b'# HG changeset patch\n'
+                    b'# Node ID 001a1c12e834183a95634690eb8ab65ca2711094\n'
+                    b'# Parent  %(base_commit_id)s\n'
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -6,7 +6,4 @@\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                    % {
+                        b'base_commit_id': tip.encode('utf-8'),
+                    }
+                )),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        with open('foo.txt', 'rb') as fp:
+            self.assertEqual(fp.read(), FOO1)
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            ['hg', 'import', '--no-commit', '--partial', tempfiles[0],
+             '--config', f'extensions.rbtoolsnormalize={hgext_path}'])
+
+        # There should not be a new commit, but should have pending changes.
+        self.assertEqual(self._hg_get_tip(), f'{tip}+')
+
+    def test_patch_hg(self) -> None:
+        """Testing MercurialPatcher.patch with Hg-style diff"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
+
+        tip = self._hg_get_tip()
+
+        self.spy_on(run_process_exec)
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=(
+                    b'# HG changeset patch\n'
+                    b'# Node ID 001a1c12e834183a95634690eb8ab65ca2711094\n'
+                    b'# Parent  %(base_commit_id)s\n'
+                    b'diff -r %(base_commit_id)s -r 001a1c12e834 foo.txt\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -6,7 +6,4 @@\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                    % {
+                        b'base_commit_id': tip.encode('utf-8'),
+                    }
+                )),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        with open('foo.txt', 'rb') as fp:
+            self.assertEqual(fp.read(), FOO1)
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            ['hg', 'import', '--no-commit', '--partial', tempfiles[0],
+             '--config', f'extensions.rbtoolsnormalize={hgext_path}'])
+
+        # There should not be a new commit, but should have pending changes.
+        self.assertEqual(self._hg_get_tip(), f'{tip}+')
+
+    def test_patch_git_with_prefix_level(self) -> None:
+        """Testing MercurialPatcher.patch with Git-style diff and
+        Patch.prefix_level=
+        """
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
+
+        tip = self._hg_get_tip()
+
+        self.spy_on(run_process_exec)
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(
+                    prefix_level=3,
+                    content=(
+                        b'# HG changeset patch\n'
+                        b'# Node ID 001a1c12e834183a95634690eb8ab65ca2711094\n'
+                        b'# Parent  %(base_commit_id)s\n'
+                        b'diff --git a/b/c/foo.txt b/b/c/foo.txt\n'
+                        b'--- a/b/c/foo.txt\n'
+                        b'+++ b/b/c/foo.txt\n'
+                        b'@@ -6,7 +6,4 @@\n'
+                        b' inferretque deos Latio, genus unde Latinum,\n'
+                        b' Albanique patres, atque altae moenia Romae.\n'
+                        b' Musa, mihi causas memora, quo numine laeso,\n'
+                        b'-quidve dolens, regina deum tot volvere casus\n'
+                        b'-insignem pietate virum, tot adire labores\n'
+                        b'-impulerit. Tantaene animis caelestibus irae?\n'
+                        b' \n'
+                        % {
+                            b'base_commit_id': tip.encode('utf-8'),
+                        }
+                    )),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        with open('foo.txt', 'rb') as fp:
+            self.assertEqual(fp.read(), FOO1)
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            ['hg', 'import', '--no-commit', '--partial', '-p', '3',
+             tempfiles[0], '--config',
+             f'extensions.rbtoolsnormalize={hgext_path}'])
+
+        # There should not be a new commit, but should have pending changes.
+        self.assertEqual(self._hg_get_tip(), f'{tip}+')
+
+    def test_patch_hg_with_prefix_level(self) -> None:
+        """Testing MercurialPatcher.patch with Hg-style diff and
+        Patch.prefix_level=
+        """
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
+
+        tip = self._hg_get_tip()
+
+        self.spy_on(run_process_exec)
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(
+                    prefix_level=3,
+                    content=(
+                        b'# HG changeset patch\n'
+                        b'# Node ID 001a1c12e834183a95634690eb8ab65ca2711094\n'
+                        b'# Parent  %(base_commit_id)s\n'
+                        b'diff -r %(base_commit_id)s -r 001a1c12e834'
+                        b' b/c/foo.txt\n'
+                        b'--- a/b/c/foo.txt\n'
+                        b'+++ b/b/c/foo.txt\n'
+                        b'@@ -6,7 +6,4 @@\n'
+                        b' inferretque deos Latio, genus unde Latinum,\n'
+                        b' Albanique patres, atque altae moenia Romae.\n'
+                        b' Musa, mihi causas memora, quo numine laeso,\n'
+                        b'-quidve dolens, regina deum tot volvere casus\n'
+                        b'-insignem pietate virum, tot adire labores\n'
+                        b'-impulerit. Tantaene animis caelestibus irae?\n'
+                        b' \n'
+                        % {
+                            b'base_commit_id': tip.encode('utf-8'),
+                        }
+                    )),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        with open('foo.txt', 'rb') as fp:
+            self.assertEqual(fp.read(), FOO1)
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            ['hg', 'import', '--no-commit', '--partial', '-p', '3',
+             tempfiles[0], '--config',
+             f'extensions.rbtoolsnormalize={hgext_path}'])
+
+        # There should not be a new commit, but should have pending changes.
+        self.assertEqual(self._hg_get_tip(), f'{tip}+')
+
+    def test_patch_with_revert(self) -> None:
+        """Testing MercurialPatcher.patch with revert=True"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        tip = self._hg_get_tip()
+
+        self.spy_on(run_process_exec)
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            revert=True,
+            patches=[
+                Patch(content=(
+                    b'# HG changeset patch\n'
+                    b'# Node ID 001a1c12e834183a95634690eb8ab65ca2711094\n'
+                    b'# Parent  %(base_commit_id)s\n'
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -6,7 +6,4 @@\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                    % {
+                        b'base_commit_id': tip.encode('utf-8'),
+                    }
+                )),
+            ])
+
+        message = 'Mercurial does not support reverting patches.'
+
+        with self.assertRaisesMessage(ApplyPatchError, message):
+            list(patcher.patch())
+
+        self.assertSpyNotCalled(run_process_exec)
+
+        # There should not be a new commit.
+        self.assertEqual(self._hg_get_tip(), tip)
+
+    def test_patch_with_commit(self) -> None:
+        """Testing MercurialPatcher.patch with committing"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
+
+        tip = self._hg_get_tip()
+        num_commits = self.hg_get_num_commits()
+
+        self.spy_on(run_process_exec)
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=(
+                    b'# HG changeset patch\n'
+                    b'# Node ID 001a1c12e834183a95634690eb8ab65ca2711094\n'
+                    b'# Parent  %(base_commit_id)s\n'
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -6,7 +6,4 @@\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                    % {
+                        b'base_commit_id': tip.encode('utf-8'),
+                    }
+                )),
+            ])
+        patcher.prepare_for_commit(
+            default_author=PatchAuthor(full_name='Test User',
+                                       email='test@example.com'),
+            default_message='Test message')
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        with open('foo.txt', 'rb') as fp:
+            self.assertEqual(fp.read(), FOO1)
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            ['hg', 'import', '--no-commit', '--partial', tempfiles[0],
+             '--config', f'extensions.rbtoolsnormalize={hgext_path}'])
+
+        # There should be a new commit.
+        self.assertEqual(self.hg_get_num_commits(), num_commits + 1)
+
+    def test_patch_with_multiple_patches(self) -> None:
+        """Testing MercurialPatcher.patch with multiple patches"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(2)
+
+        commit1 = self._hg_get_tip()
+        commit2 = b'61ee8b5601a84d5154387578466c8998848ba089'
+        commit3 = b'b9af6489f6f2004ad11b82c6057f7007e3c35372'
+
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': ([
+                    'hg', 'import', '--no-commit', '--partial', tempfiles[0],
+                    tempfiles[1], '--config',
+                    f'extensions.rbtoolsnormalize={hgext_path}',
+                ],)
+            },
+        ]))
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=(
+                    b'# HG changeset patch\n'
+                    b'# Node ID %(commit_id)s\n'
+                    b'# Parent  %(base_commit_id)s\n'
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -6,7 +6,4 @@\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                    % {
+                        b'base_commit_id': commit1.encode('utf-8'),
+                        b'commit_id': commit2,
+                    }
+                )),
+                Patch(content=(
+                    b'# HG changeset patch\n'
+                    b'# Node ID %(commit_id)s\n'
+                    b'# Parent  %(base_commit_id)s\n'
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -1,4 +1,6 @@\n'
+                    b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b' Italiam, fato profugus, Laviniaque venit\n'
+                    b' litora, multum ille et terris iactatus et alto\n'
+                    b' vi superum saevae memorem Iunonis ob iram;\n'
+                    % {
+                        b'base_commit_id': commit2,
+                        b'commit_id': commit3,
+                    }
+                )),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNone(result.patch)
+
+        with open('foo.txt', 'rb') as fp:
+            self.assertEqual(fp.read(), FOO2)
+
+        self.assertSpyCallCount(run_process_exec, 1)
+
+        run_process_exec.unspy()
+
+        # There should not be a new commit.
+        self.assertEqual(self._hg_get_tip(), f'{commit1}+')
+
+    def test_patch_with_multiple_patches_and_commit(self) -> None:
+        """Testing MercurialPatcher.patch with multiple patches"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(2)
+
+        num_commits = self.hg_get_num_commits()
+        commit1 = self._hg_get_tip()
+        commit2 = b'61ee8b5601a84d5154387578466c8998848ba089'
+        commit3 = b'b9af6489f6f2004ad11b82c6057f7007e3c35372'
+
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': ([
+                    'hg', 'import', '--no-commit', '--partial', tempfiles[0],
+                    '--config', f'extensions.rbtoolsnormalize={hgext_path}',
+                ],)
+            },
+            {
+                'args': ([
+                    'hg', 'commit', '-m', '[1/2] Test message',
+                    '-u', 'Test User <test@example.com>',
+                    '--config', f'extensions.rbtoolsnormalize={hgext_path}',
+                ],)
+            },
+            {
+                'args': ([
+                    'hg', 'import', '--no-commit', '--partial', tempfiles[1],
+                    '--config', f'extensions.rbtoolsnormalize={hgext_path}',
+                ],)
+            },
+            {
+                'args': ([
+                    'hg', 'commit', '-m', '[2/2] Test message',
+                    '-u', 'Test User <test@example.com>',
+                    '--config', f'extensions.rbtoolsnormalize={hgext_path}',
+                ],)
+            },
+        ]))
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=(
+                    b'# HG changeset patch\n'
+                    b'# Node ID %(commit_id)s\n'
+                    b'# Parent  %(base_commit_id)s\n'
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -6,7 +6,4 @@\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                    % {
+                        b'base_commit_id': commit1.encode('utf-8'),
+                        b'commit_id': commit2,
+                    }
+                )),
+                Patch(content=(
+                    b'# HG changeset patch\n'
+                    b'# Node ID %(commit_id)s\n'
+                    b'# Parent  %(base_commit_id)s\n'
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -1,4 +1,6 @@\n'
+                    b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b' Italiam, fato profugus, Laviniaque venit\n'
+                    b' litora, multum ille et terris iactatus et alto\n'
+                    b' vi superum saevae memorem Iunonis ob iram;\n'
+                    % {
+                        b'base_commit_id': commit2,
+                        b'commit_id': commit3,
+                    }
+                )),
+            ])
+        patcher.prepare_for_commit(
+            default_author=PatchAuthor(full_name='Test User',
+                                       email='test@example.com'),
+            default_message='Test message')
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 2)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        result = results[1]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        with open('foo.txt', 'rb') as fp:
+            self.assertEqual(fp.read(), FOO2)
+
+        self.assertSpyCallCount(run_process_exec, 4)
+
+        run_process_exec.unspy()
+
+        # There should be a new commit.
+        self.assertEqual(self.hg_get_num_commits(), num_commits + 2)
+
+    def test_patch_git_with_conflicts(self) -> None:
+        """Testing MercurialPatcher.patch with Git-style diff and conflicts"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
+
+        tip = self._hg_get_tip()
+
+        self.spy_on(run_process_exec)
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=(
+                    b'# HG changeset patch\n'
+                    b'# Node ID 001a1c12e834183a95634690eb8ab65ca2711094\n'
+                    b'# Parent  %(base_commit_id)s\n'
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -6,7 +6,4 @@\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere CASUS\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                    % {
+                        b'base_commit_id': tip.encode('utf-8'),
+                    }
+                )),
+            ])
+
+        message = (
+            'Could not apply patch 1 of 1. The patch may be invalid, or '
+            'there may be conflicts that could not be resolved.'
+        )
+
+        with self.assertRaisesMessage(ApplyPatchError, message) as ctx:
+            list(patcher.patch())
+
+        result = ctx.exception.failed_patch_result
+        self.assertFalse(result.success)
+        self.assertFalse(result.applied)
+        self.assertTrue(result.has_conflicts)
+        self.assertIsNotNone(result.patch)
+        self.assertEqual(result.conflicting_files, ['foo.txt'])
+        self.assertEqual(
+            result.patch_output,
+            b'applying %s\n'
+            b'patching file foo.txt\n'
+            b'Hunk #1 FAILED at 5\n'
+            b'1 out of 1 hunks FAILED -- saving rejects to file foo.txt.rej\n'
+            b'patch applied partially\n'
+            b'(fix the .rej files and run `hg commit --amend`)\n'
+            % tempfiles[0].encode('utf-8'))
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            ['hg', 'import', '--no-commit', '--partial', tempfiles[0],
+             '--config', f'extensions.rbtoolsnormalize={hgext_path}'])
+
+        # There should not be a new commit.
+        self.assertEqual(self._hg_get_tip(), tip)
+
+    def test_patch_hg_with_conflicts(self) -> None:
+        """Testing MercurialPatcher.patch with Hg-style diff and conflicts"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
+
+        tip = self._hg_get_tip()
+
+        self.spy_on(run_process_exec)
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=(
+                    b'# HG changeset patch\n'
+                    b'# Node ID 001a1c12e834183a95634690eb8ab65ca2711094\n'
+                    b'# Parent  %(base_commit_id)s\n'
+                    b'diff -r %(base_commit_id)s -r 001a1c12e834 foo.txt\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -6,7 +6,4 @@\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere CASUS\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                    % {
+                        b'base_commit_id': tip.encode('utf-8'),
+                    }
+                )),
+            ])
+
+        message = (
+            'Could not apply patch 1 of 1. The patch may be invalid, or '
+            'there may be conflicts that could not be resolved.'
+        )
+
+        with self.assertRaisesMessage(ApplyPatchError, message) as ctx:
+            list(patcher.patch())
+
+        result = ctx.exception.failed_patch_result
+        self.assertFalse(result.success)
+        self.assertFalse(result.applied)
+        self.assertTrue(result.has_conflicts)
+        self.assertIsNotNone(result.patch)
+        self.assertEqual(result.conflicting_files, ['foo.txt'])
+        self.assertEqual(
+            result.patch_output,
+            b'applying %s\n'
+            b'patching file foo.txt\n'
+            b'Hunk #1 FAILED at 5\n'
+            b'1 out of 1 hunks FAILED -- saving rejects to file foo.txt.rej\n'
+            b'patch applied partially\n'
+            b'(fix the .rej files and run `hg commit --amend`)\n'
+            % tempfiles[0].encode('utf-8'))
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            ['hg', 'import', '--no-commit', '--partial', tempfiles[0],
+             '--config', f'extensions.rbtoolsnormalize={hgext_path}'])
+
+        # There should not be a new commit.
+        self.assertEqual(self._hg_get_tip(), tip)
+
+    # NOTE: There's a test for Git-style but not Hg-style because Hg-style
+    #       diffs don't convey added/deleted files.
+    def test_patch_git_with_empty_files(self) -> None:
+        """Testing MercurialPatcher.patch with Git-style diff and empty files
+        """
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
+
+        self.hg_add_file_commit(filename='empty1',
+                                data=b'',
+                                msg='Add an empty file.')
+
+        tip = self._hg_get_tip()
+
+        self.spy_on(run_process_exec)
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=(
+                    b'# HG changeset patch\n'
+                    b'# Node ID 001a1c12e834183a95634690eb8ab65ca2711094\n'
+                    b'# Parent  %(base_commit_id)s\n'
+                    b'diff --git a/empty1 b/empty1\n'
+                    b'deleted file mode 100644\n'
+                    b'diff --git a/newfile b/newfile\n'
+                    b'new file mode 100644\n'
+                    % {
+                        b'base_commit_id': tip.encode('utf-8'),
+                    }
+                )),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        self.assertFalse(os.path.exists('empty1'))
+        self.assertTrue(os.path.exists('newfile'))
+
+        with open('newfile', 'rb') as fp:
+            self.assertEqual(fp.read(), b'')
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            ['hg', 'import', '--no-commit', '--partial', tempfiles[0],
+             '--config', f'extensions.rbtoolsnormalize={hgext_path}'])
+
+        # There should not be a new commit, but should have pending changes.
+        self.assertEqual(self._hg_get_tip(), f'{tip}+')

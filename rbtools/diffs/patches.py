@@ -186,7 +186,7 @@ class Patch:
         content: Optional[bytes] = None,
         message: Optional[str] = None,
         path: Optional[Path] = None,
-        prefix_level: Optional[int] = 0,
+        prefix_level: Optional[int] = None,
     ) -> None:
         """Initialize the patch.
 

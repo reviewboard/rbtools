@@ -10,6 +10,10 @@ def setup(app):
     app.add_crossref_type(directivename='rbtcommand',
                           rolename='rbtcommand',
                           indextemplate='pair: %s; RBTools command')
+    app.add_crossref_type(
+        directivename=str('rbtconfig'),
+        rolename=str('rbtconfig'),
+        indextemplate=str('pair: %s; .reviewboardrc setting'))
 
 
 def bug_role(role, rawtext, text, linenum, inliner, options={}, content=[]):

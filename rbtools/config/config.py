@@ -456,6 +456,21 @@ class RBToolsConfig(ConfigData):
     #:     0.7.5
     EXT_AUTH_COOKIES: Optional[str] = None
 
+    #: Whether to enable strict domain matching for cookies.
+    #:
+    #: By default, cookies that match both a domain and a parent domain
+    #: (e.g., ``subdomain.example.com`` and ``example.com``) will both be
+    #: sent in requests.
+    #:
+    #: Strict domains can be enabled if there's a risk of conflict between
+    #: cookies on a domain and a parent domain.
+    #:
+    #: This is off by default for backwards-compatibility.
+    #:
+    #: Version Added:
+    #:     5.1
+    COOKIES_STRICT_DOMAIN_MATCH: bool = False
+
     #: Whether to default to using web-based login for authentication.
     #:
     #: If this is set, web-based login will be used instead of prompting

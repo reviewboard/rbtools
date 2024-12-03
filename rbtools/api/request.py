@@ -1,3 +1,5 @@
+"""Support for forming requests to a Review Board server."""
+
 from __future__ import annotations
 
 import base64
@@ -11,10 +13,14 @@ import sys
 from collections import OrderedDict
 from http.client import (HTTPMessage, HTTPResponse, HTTPSConnection,
                          NOT_MODIFIED)
-from http.cookiejar import Cookie, CookieJar, MozillaCookieJar
+from http.cookiejar import (Cookie,
+                            CookieJar,
+                            DefaultCookiePolicy,
+                            MozillaCookieJar)
 from io import BytesIO
 from json import loads as json_loads
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import (Any, Callable, Dict, List, Optional, TYPE_CHECKING,
+                    Tuple, Union)
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import (
@@ -41,10 +47,14 @@ from rbtools.api.errors import (APIError,
                                 ServerInterfaceError,
                                 ServerInterfaceSSLError,
                                 create_api_error)
+from rbtools.config import load_config
 from rbtools.deprecation import (RemovedInRBTools50Warning,
                                  RemovedInRBTools60Warning)
 from rbtools.utils.encoding import force_bytes, force_unicode
 from rbtools.utils.filesystem import get_home_path
+
+if TYPE_CHECKING:
+    from rbtools.config import RBToolsConfig
 
 
 RBTOOLS_COOKIE_FILE = '.rbtools-cookies'
@@ -55,6 +65,46 @@ RB_COOKIE_NAME = 'rbsessionid'
 AuthCallback: TypeAlias = Callable[..., Tuple[str, str]]
 OTPCallback: TypeAlias = Callable[[str, str], str]
 QueryArgs: TypeAlias = Union[bool, int, float, bytes, str]
+
+
+def _normalize_url_parts(
+    url: str,
+    *,
+    host_header: Optional[str] = '',
+) -> tuple[str, str]:
+    """Return a normalized domain from a URL.
+
+    This will strip any port number and ensure any dotless domain has a
+    ``.local`` prefix. The result will be lowercased and returned, along
+    with the path.
+
+    Version Added:
+        5.1
+
+    Args:
+        url (str):
+            The URL containing the domain.
+
+        host_header (str, optional):
+            The optional value from a :mailheader:`Host` header in a HTTP
+            response.
+
+    Returns:
+        str:
+        The normalized domain.
+    """
+    parts = urlparse(url)
+    domain = parts[1] or host_header or ''
+
+    # Remove any port.
+    domain = domain.partition(':')[0]
+
+    # Append ".local" if there are no dots in the domain (e.g., "localhost").
+    # This is required by RFC 2109.
+    if '.' not in domain:
+        domain += '.local'
+
+    return domain.lower(), parts[2]
 
 
 class HttpRequest:
@@ -878,8 +928,85 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
         return self.parent.open(request, timeout=request.timeout)
 
 
-def create_cookie_jar(
+class CookiePolicy(DefaultCookiePolicy):
+    """A cookie policy for cookie storage and retrieval.
+
+    By default, this uses the default cookie policy imposed by Python, which is
+    very lax with domain lookup. If there's a cookie for
+    ``subdomain.example.com`` and an identical cookie for ``example.com``, both
+    cookies will be returned when accessing ``subdomain.example.com``.
+
+    Strict cookie behavior can be enabled by setting
+    ``COOKIES_STRICT_DOMAIN_MATCH = True`` in :file:`.reviewboardrc`.
+
+    Version Added:
+        5.1
+    """
+
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The loaded RBTools configuration.
+    config: RBToolsConfig
+
+    def __init__(
+        self,
+        *,
+        config: RBToolsConfig,
+        **kwargs,
+    ) -> None:
+        """Initialize the cookie policy.
+
+        Args:
+            config (rbtools.config.config.RBToolsConfig):
+                The loaded RBTools configuration.
+
+            **kwargs (dict):
+                Keyword arguments for the parent constructor.
+        """
+        self.config = config
+
+        super().__init__(**kwargs)
+
+    def domain_return_ok(
+        self,
+        domain: str,
+        request: URLRequest,
+    ) -> bool:
+        """Return whether a domain for a stored cookie should be used.
+
+        This will check if a stored cookie is considered valid for an HTTP
+        request to a server based on a domain check. The behavior depends on
+        the ``COOKIES_STRICT_DOMAIN_MATCH`` setting.
+
+        Args:
+            domain (str):
+                The domain of the stored cookie.
+
+            request (urllib.request.Request):
+                The HTTP request to be sent to the server.
+
+        Returns:
+            bool:
+            ``True`` if the cookie's domain is a match and should be a
+            candidate for the request. ``False`` if it should not be included.
+        """
+        if self.config.COOKIES_STRICT_DOMAIN_MATCH:
+            url_domain = _normalize_url_parts(
+                request.get_full_url(),
+                host_header=request.get_header('Host'))[0]
+
+            if not domain.startswith('.') and domain != url_domain:
+                return False
+
+        return super().domain_return_ok(domain, request)
+
+
+def _create_cookie_jar(
+    *,
     cookie_file: Optional[str] = None,
+    config: RBToolsConfig,
 ) -> Tuple[MozillaCookieJar, str]:
     """Return a cookie jar backed by cookie_file
 
@@ -890,14 +1017,26 @@ def create_cookie_jar(
     In the case where we default cookie_file, and it does not exist,
     we will attempt to copy the .post-review-cookies.txt file.
 
+    Version Changed:
+        5.1:
+        * Added the required ``config`` argument.
+        * Made ``cookie_file`` keyword-only.
+        * Renamed this from ``create_cookie_jar()` to make it clear this
+          function is private.
+
     Args:
         cookie_file (str, optional):
             The filename to use for cookies.
 
+        config (rbtools.config.config.RBToolsConfig):
+            The loaded RBTools configuration.
+
+            Version Added:
+                5.1
+
     Returns:
         tuple:
         A two-tuple containing:
-
 
         Tuple:
             0 (http.cookiejar.MozillaCookieJar):
@@ -929,7 +1068,11 @@ def create_cookie_jar(
             logging.warning('There was an error while creating a '
                             'cookie file: %s', e)
 
-    return MozillaCookieJar(cookie_file), cookie_file
+    return (
+        MozillaCookieJar(filename=cookie_file,
+                         policy=CookiePolicy(config=config)),
+        cookie_file,
+    )
 
 
 class ReviewBoardServer:
@@ -948,6 +1091,12 @@ class ReviewBoardServer:
     ######################
     # Instance variables #
     ######################
+
+    #: The loaded RBTools configuration.
+    #:
+    #: Version Added:
+    #:     5.1
+    config: RBToolsConfig
 
     #: The path to the file for storing authentication cookies.
     #:
@@ -982,8 +1131,14 @@ class ReviewBoardServer:
         client_key: Optional[str] = None,
         client_cert: Optional[str] = None,
         proxy_authorization: Optional[str] = None,
+        *,
+        config: Optional[RBToolsConfig] = None,
     ) -> None:
         """Initialize the server object.
+
+        Version Changed:
+            5.1:
+            Added the ``config`` argument.
 
         Args:
             url (str):
@@ -1041,44 +1196,65 @@ class ReviewBoardServer:
 
             proxy_authorization (str, optional):
                 A string to use for the ``Proxy-Authorization`` header.
+
+            config (rbtools.config.RBToolsConfig, optional):
+                The loaded RBTools configuration.
+
+                If not provided, the configuration will be loaded.
+
+                Version Added:
+                    5.1
         """
+        # Normalize the URLs and compute the API URL.
         if not url.endswith('/'):
             url += '/'
 
-        self.url = url + 'api/'
+        api_url = url + 'api/'
+        self.url = api_url
 
+        domain, path = _normalize_url_parts(url)
+        self.domain = domain
+
+        # Load the configuration, if not already provided.
+        if config is None:
+            config = load_config()
+
+        self.config = config
+
+        # Compute a user agent.
+        if not agent:
+            agent = RBTOOLS_USER_AGENT
+
+        self.agent = agent
+
+        # Load and construct any cookies.
         self.save_cookies = save_cookies
         self.ext_auth_cookies = ext_auth_cookies
 
-        if self.save_cookies:
-            self.cookie_jar, self.cookie_file = create_cookie_jar(
-                cookie_file=cookie_file)
+        cookie_jar: Optional[CookieJar]
+
+        if save_cookies:
+            cookie_jar, self.cookie_file = _create_cookie_jar(
+                cookie_file=cookie_file,
+                config=config)
 
             try:
-                self.cookie_jar.load(ignore_expires=True)
+                cookie_jar.load(ignore_expires=True)
             except IOError:
                 pass
         else:
-            self.cookie_jar = CookieJar()
+            cookie_jar = CookieJar()
             self.cookie_file = None
 
         if self.ext_auth_cookies:
             try:
-                assert isinstance(self.cookie_jar, MozillaCookieJar)
-                self.cookie_jar.load(ext_auth_cookies, ignore_expires=True)
+                assert isinstance(cookie_jar, MozillaCookieJar)
+                cookie_jar.load(ext_auth_cookies, ignore_expires=True)
             except IOError as e:
                 logging.critical('There was an error while loading a '
                                  'cookie file: %s', e)
-                pass
 
-        # Get the cookie domain from the url. If the domain
-        # does not contain a '.' (e.g. 'localhost'), we assume
-        # it is a local domain and suffix it (See RFC 2109).
-        parsed_url = urlparse(url)
-        self.domain = parsed_url[1].partition(':')[0]  # Remove Port.
-
-        if self.domain.count('.') < 1:
-            self.domain = '%s.local' % self.domain
+        self.cookie_jar = cookie_jar
 
         if session:
             cookie = Cookie(
@@ -1087,10 +1263,10 @@ class ReviewBoardServer:
                 value=session,
                 port=None,
                 port_specified=False,
-                domain=self.domain,
+                domain=domain,
                 domain_specified=True,
                 domain_initial_dot=True,
-                path=parsed_url[2],
+                path=path,
                 path_specified=True,
                 secure=False,
                 expires=None,
@@ -1098,34 +1274,36 @@ class ReviewBoardServer:
                 comment=None,
                 comment_url=None,
                 rest={'HttpOnly': ''})
-            self.cookie_jar.set_cookie(cookie)
+            cookie_jar.set_cookie(cookie)
 
-            if self.save_cookies:
-                assert isinstance(self.cookie_jar, MozillaCookieJar)
-                self.cookie_jar.save()
+            if save_cookies:
+                assert isinstance(cookie_jar, MozillaCookieJar)
+                cookie_jar.save()
 
         if username:
             # If the username parameter is given, we have to clear the session
             # cookie manually or it will override the username:password
             # combination retrieved from the authentication callback.
             try:
-                self.cookie_jar.clear(self.domain, parsed_url[2],
-                                      RB_COOKIE_NAME)
+                cookie_jar.clear(domain=domain,
+                                 path=path,
+                                 name=RB_COOKIE_NAME)
             except KeyError:
                 pass
 
-        # Set up the HTTP libraries to support all of the features we need.
-        password_mgr = ReviewBoardHTTPPasswordMgr(self.url,
-                                                  username,
-                                                  password,
-                                                  api_token,
-                                                  auth_callback,
-                                                  otp_token_callback)
-        self.preset_auth_handler = PresetHTTPAuthHandler(self.url,
-                                                         password_mgr)
+        # Configure our custom authentication handler for urllib.
+        password_mgr = ReviewBoardHTTPPasswordMgr(
+            reviewboard_url=api_url,
+            rb_user=username,
+            rb_pass=password,
+            api_token=api_token,
+            auth_callback=auth_callback,
+            otp_token_callback=otp_token_callback)
+        self.preset_auth_handler = PresetHTTPAuthHandler(
+            url=api_url,
+            password_mgr=password_mgr)
 
-        handlers: List[BaseHandler] = []
-
+        # Determine our SSL behavior and load any requested certs.
         if verify_ssl:
             context = ssl.create_default_context(
                 cafile=ca_certs or certifi.where())
@@ -1135,26 +1313,24 @@ class ReviewBoardServer:
         if client_cert and client_key:
             context.load_cert_chain(client_cert, client_key)
 
-        handlers.append(RBToolsHTTPSHandler(context=context))
+        # Set default headers and install urllib handlers.
+        handlers: List[BaseHandler] = [
+            RBToolsHTTPSHandler(context=context),
+        ]
 
         if disable_proxy:
             handlers.append(ProxyHandler({}))
 
         handlers += [
-            HTTPCookieProcessor(self.cookie_jar),
+            HTTPCookieProcessor(cookie_jar),
             ReviewBoardHTTPBasicAuthHandler(password_mgr),
             HTTPDigestAuthHandler(password_mgr),
             self.preset_auth_handler,
             ReviewBoardHTTPErrorProcessor(),
         ]
 
-        if agent:
-            self.agent = agent
-        else:
-            self.agent = RBTOOLS_USER_AGENT
-
         opener = build_opener(*handlers)
-        headers = [(str('User-agent'), str(self.agent))]
+        headers = [(str('User-agent'), str(agent))]
 
         if proxy_authorization:
             headers.append((str('Proxy-Authorization'),

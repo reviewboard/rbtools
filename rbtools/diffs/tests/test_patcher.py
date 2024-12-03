@@ -181,7 +181,7 @@ class PatcherTests(kgb.SpyAgency, TestCase):
                 'bugs_closed': ['123', '456'],
                 'submitter': {
                     'email': 'default@example.com',
-                    'full_name': 'Default Author',
+                    'fullname': 'Default Author',
                 },
             },
             url='https://reviews.example.com/api/review-requests/123/')
@@ -261,7 +261,7 @@ class PatcherTests(kgb.SpyAgency, TestCase):
                 'bugs_closed': ['123', '456'],
                 'submitter': {
                     'email': 'default@example.com',
-                    'full_name': 'Default Author',
+                    'fullname': 'Default Author',
                 },
             },
             url='https://reviews.example.com/api/review-requests/123/')
@@ -1287,3 +1287,209 @@ class PatcherTests(kgb.SpyAgency, TestCase):
 
         with open(test_file1, 'r') as fp:
             self.assertEqual(fp.read(), '3\n')
+
+    def test_parse_patch_output_with_empty(self) -> None:
+        """Testing Patcher.parse_patch_output with empty output"""
+        patcher = Patcher(patches=[])
+
+        self.assertEqual(
+            patcher.parse_patch_output(b''),
+            {
+                'conflicting_files': [],
+                'fatal_error': None,
+                'has_empty_files': False,
+                'has_partial_applied_files': False,
+                'patched_files': [],
+            })
+
+    def test_parse_patch_output_with_success(self) -> None:
+        """Testing Patcher.parse_patch_output with successful patches"""
+        patcher = Patcher(patches=[])
+
+        self.assertEqual(
+            patcher.parse_patch_output(
+                b'patching file foo.c\n'
+                b'patching file subdir/bar.txt\n'
+            ),
+            {
+                'conflicting_files': [],
+                'fatal_error': None,
+                'has_empty_files': False,
+                'has_partial_applied_files': False,
+                'patched_files': [
+                    'foo.c',
+                    'subdir/bar.txt',
+                ],
+            })
+
+    def test_parse_patch_output_gnu_with_fatal_error(self) -> None:
+        """Testing Patcher.parse_patch_output with GNU patch and fatal error"""
+        patcher = Patcher(patches=[])
+
+        self.assertEqual(
+            patcher.parse_patch_output(
+                b'patch: **** something bad happened\n'
+                b'oh no.\n'
+            ),
+            {
+                'conflicting_files': [],
+                'fatal_error': (
+                    'patch: **** something bad happened\n'
+                    'oh no.'
+                ),
+                'has_empty_files': False,
+                'has_partial_applied_files': False,
+                'patched_files': [],
+            })
+
+    def test_parse_patch_output_bsd_with_fatal_error(self) -> None:
+        """Testing Patcher.parse_patch_output with BSD patch and fatal error"""
+        patcher = Patcher(patches=[])
+
+        self.assertEqual(
+            patcher.parse_patch_output(
+                b"I can't seem to find a patch in there anywhere.\n"
+                b"oh no.\n"
+            ),
+            {
+                'conflicting_files': [],
+                'fatal_error': (
+                    "I can't seem to find a patch in there anywhere.\n"
+                    "oh no."
+                ),
+                'has_empty_files': True,
+                'has_partial_applied_files': False,
+                'patched_files': [],
+            })
+
+    def test_parse_patch_output_gnu_with_empty_files(self) -> None:
+        """Testing Patcher.parse_patch_output with GNU patch and possible
+        empty files
+        """
+        patcher = Patcher(patches=[])
+
+        self.assertEqual(
+            patcher.parse_patch_output(
+                b'patch: **** Only garbage was found in the patch input.'
+            ),
+            {
+                'conflicting_files': [],
+                'fatal_error': (
+                    'patch: **** Only garbage was found in the patch input.'
+                ),
+                'has_empty_files': True,
+                'has_partial_applied_files': False,
+                'patched_files': [],
+            })
+
+    def test_parse_patch_output_bsd_with_empty_files(self) -> None:
+        """Testing Patcher.parse_patch_output with BSD patch and possible
+        empty files
+        """
+        patcher = Patcher(patches=[])
+
+        self.assertEqual(
+            patcher.parse_patch_output(
+                b"I can't seem to find a patch in there anywhere."
+            ),
+            {
+                'conflicting_files': [],
+                'fatal_error': (
+                    "I can't seem to find a patch in there anywhere."
+                ),
+                'has_empty_files': True,
+                'has_partial_applied_files': False,
+                'patched_files': [],
+            })
+
+    def test_parse_patch_output_gnu_with_conflicts(self) -> None:
+        """Testing Patcher.parse_patch_output with GNU patch and conflicts"""
+        patcher = Patcher(patches=[])
+
+        self.assertEqual(
+            patcher.parse_patch_output(
+                b'patching file subdir/bar.txt\n'
+                b'2 out of 2 hunks failed--saving rejects to'
+                b' subdir/bar.txt.rej\n'
+            ),
+            {
+                'conflicting_files': [
+                    'subdir/bar.txt',
+                ],
+                'fatal_error': None,
+                'has_empty_files': False,
+                'has_partial_applied_files': False,
+                'patched_files': [
+                    'subdir/bar.txt',
+                ],
+            })
+
+    def test_parse_patch_output_bsd_with_conflicts(self) -> None:
+        """Testing Patcher.parse_patch_output with BSD patch and conflicts"""
+        patcher = Patcher(patches=[])
+
+        self.assertEqual(
+            patcher.parse_patch_output(
+                b'patching file subdir/bar.txt\n'
+                b'2 out of 2 hunks FAILED -- saving rejects to file'
+                b' subdir/bar.txt.rej\n'
+            ),
+            {
+                'conflicting_files': [
+                    'subdir/bar.txt',
+                ],
+                'fatal_error': None,
+                'has_empty_files': False,
+                'has_partial_applied_files': False,
+                'patched_files': [
+                    'subdir/bar.txt',
+                ],
+            })
+
+    def test_parse_patch_output_gnu_with_conflicts_partial(self) -> None:
+        """Testing Patcher.parse_patch_output with GNU patch and conflicts
+        and patches partially applied
+        """
+        patcher = Patcher(patches=[])
+
+        self.assertEqual(
+            patcher.parse_patch_output(
+                b'patching file subdir/bar.txt\n'
+                b'1 out of 2 hunks failed--saving rejects to'
+                b' subdir/bar.txt.rej\n'
+            ),
+            {
+                'conflicting_files': [
+                    'subdir/bar.txt',
+                ],
+                'fatal_error': None,
+                'has_empty_files': False,
+                'has_partial_applied_files': True,
+                'patched_files': [
+                    'subdir/bar.txt',
+                ],
+            })
+
+    def test_parse_patch_output_bsd_with_conflicts_partial(self) -> None:
+        """Testing Patcher.parse_patch_output with BSD patch and conflicts
+        and patches partially applied
+        """
+        patcher = Patcher(patches=[])
+
+        self.assertEqual(
+            patcher.parse_patch_output(
+                b'patching file subdir/bar.txt\n'
+                b'1 out of 2 hunks FAILED -- saving rejects to file'
+                b' subdir/bar.txt.rej\n'
+            ),
+            {
+                'conflicting_files': [
+                    'subdir/bar.txt',
+                ],
+                'fatal_error': None,
+                'has_empty_files': False,
+                'has_partial_applied_files': True,
+                'patched_files': [
+                    'subdir/bar.txt',
+                ],
+            })

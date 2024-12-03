@@ -1384,25 +1384,28 @@ class BaseCommand:
             rbtools.api.client.RBClient:
             The new API client.
         """
+        options = self.options
+
         return RBClient(
             server_url,
-            username=self.options.username,
-            password=self.options.password,
-            api_token=self.options.api_token,
+            username=options.username,
+            password=options.password,
+            api_token=options.api_token,
             auth_callback=self.credentials_prompt,
             otp_token_callback=self.otp_token_prompt,
-            disable_proxy=not self.options.enable_proxy,
-            verify_ssl=not self.options.disable_ssl_verification,
-            allow_caching=not self.options.disable_cache,
-            cache_location=self.options.cache_location,
-            in_memory_cache=self.options.in_memory_cache,
-            save_cookies=self.options.save_cookies,
-            ext_auth_cookies=self.options.ext_auth_cookies,
-            ca_certs=self.options.ca_certs,
-            client_key=self.options.client_key,
-            client_cert=self.options.client_cert,
-            proxy_authorization=self.options.proxy_authorization,
-            transport_cls=self.transport_cls)
+            disable_proxy=not options.enable_proxy,
+            verify_ssl=not options.disable_ssl_verification,
+            allow_caching=not options.disable_cache,
+            cache_location=options.cache_location,
+            in_memory_cache=options.in_memory_cache,
+            save_cookies=options.save_cookies,
+            ext_auth_cookies=options.ext_auth_cookies,
+            ca_certs=options.ca_certs,
+            client_key=options.client_key,
+            client_cert=options.client_cert,
+            proxy_authorization=options.proxy_authorization,
+            transport_cls=self.transport_cls,
+            config=self.config)
 
     def get_api(
         self,

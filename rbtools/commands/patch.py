@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
 from gettext import gettext as _, ngettext
 from typing import (Any, BinaryIO, Dict, Optional, Sequence, TYPE_CHECKING,
@@ -13,12 +12,10 @@ from typing_extensions import TypedDict
 
 from rbtools.api.errors import APIError
 from rbtools.api.resource import DiffResource, DraftDiffResource
-from rbtools.clients.errors import CreateCommitError
 from rbtools.commands.base import BaseCommand, CommandError, Option
+from rbtools.diffs.errors import ApplyPatchError
 from rbtools.diffs.patches import Patch, PatchAuthor
-from rbtools.utils.commands import extract_commit_message
 from rbtools.utils.encoding import force_unicode
-from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.review_request import parse_review_request_url
 
 if TYPE_CHECKING:
@@ -207,6 +204,8 @@ class PatchCommand(BaseCommand):
             raise CommandError(
                 _('The specified diff revision does not exist.'))
 
+        diff_revision = diff.revision
+
         # Begin to gather results.
         patches: list[PendingPatchInfo] = []
 
@@ -295,7 +294,7 @@ class PatchCommand(BaseCommand):
 
         return patches
 
-    def apply_patch(
+    def _legacy_apply_patch(
         self,
         *,
         diff_file_path: str,
@@ -482,8 +481,6 @@ class PatchCommand(BaseCommand):
         diff_revision = options.diff_revision
         tool = self.tool
 
-        assert tool is not None
-
         if revert:
             if patch_stdout:
                 raise CommandError(
@@ -493,6 +490,13 @@ class PatchCommand(BaseCommand):
                 raise CommandError(
                     _('--write and --revert cannot both be used.'))
 
+            assert tool is not None
+
+            if not tool.supports_patch_revert:
+                raise CommandError(
+                    _('The %s backend does not support reverting patches.')
+                    % tool.name)
+
         if patch_stdout and patch_outfile:
             raise CommandError(
                 _('--print and --write cannot both be used.'))
@@ -501,13 +505,10 @@ class PatchCommand(BaseCommand):
             raise CommandError(
                 _('--print and --json cannot both be used.'))
 
-        if revert and not tool.supports_patch_revert:
-            raise CommandError(
-                _('The %s backend does not support reverting patches.')
-                % tool.name)
-
         if not patch_stdout and not patch_outfile:
             # Check if the working directory is clean.
+            assert tool is not None
+
             try:
                 if tool.has_pending_changes():
                     message = 'Working directory is not clean.'
@@ -698,19 +699,21 @@ class PatchCommand(BaseCommand):
             patch = pending_patch['patch']
 
             with patch.open():
-                fp.write(patch.content)
+                content = patch.content
+                fp.write(content)
 
-            fp.write(b'\n')
+                if not content.endswith(b'\n'):
+                    fp.write(b'\n')
 
     def _apply_patches(
         self,
-        patches: Sequence[PendingPatchInfo],
+        pending_patches: Sequence[PendingPatchInfo],
     ) -> None:
         """Apply a list of patches to the tree.
 
         Args:
-            patches (list of PendingPatchInfo):
-                The list of patches to apply.
+            pending_patches (list of PendingPatchInfo):
+                The list of pending patches to apply.
 
         Raises:
             rbtools.command.CommandError:
@@ -723,19 +726,7 @@ class PatchCommand(BaseCommand):
         squash = options.squash
         revert = options.revert_patch
         commit_no_edit = options.commit_no_edit
-        will_commit = options.commit or commit_no_edit
-        total_patches = len(patches)
-
-        # Check if we're planning to commit and have any patch without
-        # metadata, in which case we'll need to fetch metadata from the
-        # review request so we can generate a commit message.
-        needs_review_request_metadata = will_commit and (
-            squash or total_patches == 1 or
-            any(
-                not patch_data['has_metadata']
-                for patch_data in patches
-            )
-        )
+        total_patches = len(pending_patches)
 
         # Fetch the review request to use as a description and for URLs in
         # JSON metadata. We only want to fetch this once.
@@ -752,15 +743,8 @@ class PatchCommand(BaseCommand):
                     'error': e,
                 })
 
-        if needs_review_request_metadata:
-            default_author = review_request.get_submitter()
-            default_commit_message = extract_commit_message(review_request)
-        else:
-            default_author = None
-            default_commit_message = None
-
         # Display a summary of what's about to be applied.
-        diff_revision = patches[0]['diff_revision']
+        diff_revision = pending_patches[0]['diff_revision']
 
         if revert:
             summary = ngettext(
@@ -777,91 +761,110 @@ class PatchCommand(BaseCommand):
                  '%(review_request_id)s (diff revision %(diff_revision)s)'),
                 total_patches)
 
-        logger.info(
-            summary,
-            {
-                'num': total_patches,
-                'review_request_id': self._review_request_id,
-                'diff_revision': diff_revision,
-            })
+        self.stdout.write(summary % {
+            'num': total_patches,
+            'review_request_id': self._review_request_id,
+            'diff_revision': diff_revision,
+        })
         self.json.add('review_request_id', review_request.id)
         self.json.add('review_request_url', review_request.absolute_url)
         self.json.add('diff_revision', diff_revision)
         self.json.add('total_patches', total_patches)
 
-        author: Optional[PatchAuthor]
-        message: Optional[str]
+        patch_num: int = 0
 
-        # Start applying all the patches.
-        for patch_num, pending_patch in enumerate(patches, start=1):
-            patch = pending_patch['patch']
+        patcher = tool.get_patcher(
+            patches=[
+                pending_patch['patch']
+                for pending_patch in pending_patches
+            ],
+            repository_info=self.repository_info,
+            revert=revert,
+            squash=squash)
 
-            with patch.open():
-                success = self.apply_patch(
-                    diff_file_path=str(patch.path),
-                    base_dir=patch.base_dir or '',
-                    patch_num=patch_num,
-                    total_patches=total_patches,
-                    revert=revert)
+        try:
+            if (options.commit or commit_no_edit) and patcher.can_commit:
+                patcher.prepare_for_commit(
+                    review_request=review_request,
+                    run_commit_editor=not commit_no_edit)
 
-            if not success:
-                if revert:
-                    error = _('Could not apply patch %(num)d of %(total)d')
+            # Start applying all the patches.
+            for patch_result in patcher.patch():
+                patch_range = patch_result.patch_range
+
+                if patch_range is not None:
+                    patch_num = patch_range[0]
                 else:
-                    error = _('Could not revert patch %(num)d of %(total)d')
+                    # This is an older implementation. We'll have to assume
+                    # 1 higher than the previous patch.
+                    #
+                    # TODO [DEPRECATED]: This can go away with RBTools 7.
+                    patch_num += 1
 
-                self.json.add('failed_patch_num', patch_num)
+                if patch_result.patch_output:
+                    self.stdout.new_line()
 
-                raise CommandError(error % {
-                    'num': patch_num,
-                    'total': total_patches,
-                })
-
-            # If the user wants to commit, then we'll be committing every
-            # patch individually, unless the user wants to squash commits in
-            # which case we'll only do this on the final commit.
-            if will_commit and (not squash or patch_num == total_patches):
-                if (not pending_patch['has_metadata'] and
-                    not squash and
-                    total_patches > 1):
-                    # We are patching a commit so we already have the metadata
-                    # required without making additional HTTP requests.
-                    message = patch.message
-                    author = patch.author
-
-                    assert author is not None
-                    assert message is not None
-                else:
-                    # We'll build this based on the summary/description from
-                    # the review request and the patch number.
-                    message = default_commit_message
-                    author = default_author
-
-                    assert message is not None
-                    assert author is not None
-
-                    if total_patches > 1:
-                        # Record the patch number to help differentiate, in
-                        # case we only have review request information and
-                        # not commit messages. In practice, this shouldn't
-                        # happen, as we should always have commit messages,
-                        # but it's a decent safeguard.
-                        message = '[%s/%s] %s' % (patch_num,
-                                                  total_patches,
-                                                  message)
+                    patch_output = patch_result.patch_output.strip()
+                    self.stdout_bytes.write(patch_output)
+                    self.stdout.new_line()
+                    self.stdout.new_line()
 
                 if revert:
-                    # Make it clear that this commit is reverting a prior
-                    # patch, so it's easy to identify.
-                    message = '[Revert] %s' % message
+                    self.stdout.write(
+                        f'Reverted patch {patch_num} / {total_patches}')
+                else:
+                    self.stdout.write(
+                        f'Applied patch {patch_num} / {total_patches}')
+        except ApplyPatchError as e:
+            failed_patch_result = e.failed_patch_result
 
-                try:
-                    tool.create_commit(
-                        message=message,
-                        author=author,
-                        run_editor=not commit_no_edit)
-                except CreateCommitError as e:
-                    raise CommandError(str(e))
-                except NotImplementedError:
-                    raise CommandError('--commit is not supported with %s'
-                                       % tool.name)
+            self.stdout.write(str(e))
+            self.json.add('failed_patch_num', patch_num)
+
+            if failed_patch_result is None:
+                # We'll claim this is the first patch, for compatibility.
+                self.json.add_error(str(e))
+            else:
+                patch_range = failed_patch_result.patch_range
+
+                if patch_range is not None:
+                    patch_num = patch_range[0]
+                else:
+                    # This is an older implementation. We'll have to assume
+                    # 1 higher than the previous patch.
+                    #
+                    # TODO [DEPRECATED]: This can go away with RBTools 7.
+                    patch_num += 1
+
+                if failed_patch_result.patch_output:
+                    self.stdout.new_line()
+
+                    patch_output = failed_patch_result.patch_output.strip()
+                    self.stdout_bytes.write(patch_output)
+                    self.stdout.new_line()
+                    self.stdout.new_line()
+
+                if failed_patch_result.has_conflicts:
+                    if failed_patch_result.conflicting_files:
+                        self.stdout.new_line()
+                        self.stdout.write('Conflicting files:')
+                        self.stdout.new_line()
+
+                        for filename in failed_patch_result.conflicting_files:
+                            filename = force_unicode(filename)
+                            self.stdout.write('    %s' % filename)
+                            self.json.append('conflicting_files', filename)
+
+                    self.stdout.new_line()
+
+                self.json.add_error(str(e))
+
+            if revert:
+                error = _('Could not revert patch %(num)d of %(total)d')
+            else:
+                error = _('Could not apply patch %(num)d of %(total)d')
+
+            raise CommandError(error % {
+                'num': patch_num,
+                'total': total_patches,
+            })

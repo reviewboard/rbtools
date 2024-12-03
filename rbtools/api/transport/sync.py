@@ -1,5 +1,9 @@
+"""Transport for synchronous API access."""
+
+from __future__ import annotations
+
 import logging
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, TYPE_CHECKING
 
 from rbtools.api.decode import decode_response
 from rbtools.api.factory import create_resource
@@ -9,6 +13,9 @@ from rbtools.api.request import (AuthCallback,
                                  ReviewBoardServer)
 from rbtools.api.resource import Resource, RootResource
 from rbtools.api.transport import Transport
+
+if TYPE_CHECKING:
+    from rbtools.config import RBToolsConfig
 
 
 logger = logging.getLogger(__name__)
@@ -50,6 +57,7 @@ class SyncTransport(Transport):
         client_cert: Optional[str] = None,
         proxy_authorization: Optional[str] = None,
         *args,
+        config: Optional[RBToolsConfig] = None,
         **kwargs,
     ) -> None:
         """Initialize the transport.
@@ -150,7 +158,8 @@ class SyncTransport(Transport):
             ca_certs=ca_certs,
             client_key=client_key,
             client_cert=client_cert,
-            proxy_authorization=proxy_authorization)
+            proxy_authorization=proxy_authorization,
+            config=config)
 
         # Default to enabling the cache. This is safe for all versions of
         # Review Board >= 2.0.14. Caching will be automatically disabled if

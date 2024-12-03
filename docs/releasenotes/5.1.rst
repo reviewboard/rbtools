@@ -1,0 +1,190 @@
+.. default-intersphinx:: rbt5.x rb-latest
+
+
+=========================
+RBTools 5.1 Release Notes
+=========================
+
+**Release date:** December 2, 2024
+
+
+Installation
+============
+
+Follow our :ref:`installation guide <rbtools-installation>` to install RBTools.
+
+To learn more, see:
+
+* `Documentation <https://www.reviewboard.org/docs/rbtools/5.x/>`_
+* `RBTools on PyPI <https://pypi.org/project/rbtools/>`_
+* `RBTools on GitHub <https://github.com/reviewboard/rbtools/>`_
+
+
+Compatibility
+=============
+
+* RBTools supports Python 3.8 through 3.12.
+
+* Added a dependency on :pypi:`puremagic`.
+
+
+New Features
+============
+
+Modern Patching
+---------------
+
+We've completely redone the way we apply patches in :rbtcommand:`rbt land`
+and :rbtcommand:`rbt patch`, opening the doors for new features and wider
+compatibility.
+
+Today, this offers:
+
+* Better patch error reporting and conflict handling.
+* Improved compatibility with GNU Patch, Apple Patch, and BSD Patch.
+* Ability to patch and land multiple commits at once using Mercurial.
+
+
+TREES Configuration
+-------------------
+
+RBTools used to include an undocumented :ref:`.reviewboardrc
+<rbtools-reviewboardrc>` option called ``TREES``, which let users map
+repository paths to Review Board server URLs. We deprecated this in RBTools 3
+and removed it in RBTools 4.
+
+But now, :rbtconfig:`TREES` is back and better than ever! You can now
+set *any* configuration options you'd normally set :file:`.reviewboardrc`,
+not just the Review Board server URL.
+
+Local checkout/clone paths are also now supported as keys.
+
+For example:
+
+.. code-block:: python
+
+   TREES = {
+       'https://svn.example.com/': {
+           'REVIEWBOARD_URL': 'https://reviews.example.com',
+       },
+       '/home/user/dev': {
+           'MARKDOWN': False,
+           'TRACKING_BRANCH': 'origin/rewrite',
+       }
+   }
+
+
+Fallback Mimetype Detection
+---------------------------
+
+When uploading binary files for review, we try to determine the type of file
+by using the :command:`file` command. This is available on most systems, but
+not all.
+
+Now systems without :command:`file` will fall back to an alternate method of
+detection, ensuring binary files work for all environments.
+
+
+New Cookie Settings
+-------------------
+
+If you're using multiple Review Board servers on the same domain, it can be
+possible for session cookies (needed for authentication) to conflict with each
+other. For example, cookies sent from ``rb.example.com`` would be used on
+``staging.rb.example.com``, and this may not be what you want.
+
+You can now enable strict-domain cookies by enabling
+:rbtconfig:`COOKIES_STRICT_DOMAIN_MATCH` in :ref:`.reviewboardrc
+<rbtools-reviewboardrc>`.
+
+For example:
+
+.. code-block:: python
+
+   COOKIES_STRICT_DOMAIN_MATCH = True
+
+For compatibility reasons, this is off by default.
+
+
+Bug Fixes
+=========
+
+rbt patch / rbt land
+--------------------
+
+* Fixed a crash when applying patches on Subversion repositories.
+
+
+rbt post
+--------
+
+* Fixed crashes on some systems when trying to determine binary file
+  mimetypes.
+
+* Fixed crashes that could occur looking up TFS-backed Git repositories and
+  ClearCase repositories on older versions of Review Board when
+  `Power Pack`_ isn't installed.
+
+* Fixed a crash when uploading binary files.
+
+  When iterating on a branch involving binary files, it was possible to hit a
+  case where we would try to upload the source file associated with a parent
+  diff and hit a conflict.
+
+.. _Power Pack: https://www.reviewboard.org/powerpack/
+
+
+rbt status-update
+-----------------
+
+* Fixed mismatches between the documentation and command behavior.
+
+  The documentation stated that ``body_top`` and ``body_bottom`` content
+  should be set inside a ``review`` key when calling
+  :rbtcommand:`rbt status-update set`. However, the command checked in a
+  ``reviews`` key.
+
+  We've changed this command to check ``review``, as shown in the
+  documentation. The undocumented legacy behavior will continue to work.
+
+* Added missing support for setting ``issue_opened`` on General Comments.
+
+  This was supported for all other comment types, but was missing for
+  General Comments.
+
+
+RBTools API Changes
+===================
+
+* Added new Patcher support, consisting of:
+
+  * :py:class:`rbtools.diffs.patcher.Patcher`
+  * :py:class:`rbtools.diffs.patches.Patch`
+  * :py:class:`rbtools.clients.base.scmclient.SCMClientPatcher`
+  * :py:attr:`rbtools.clients.base.scmclient.BaseSCMClient.patcher_cls`
+
+
+New Deprecations
+----------------
+
+Old imports and behavior will still work with a deprecation notice until
+RBTools 7.
+
+* :py:class:`rbtools.clients.base.patch.PatchAuthor`:
+
+  * This has been moved to :py:mod:`rbtools.diffs.patches`.
+  * Renamed the ``fullname`` constructor argument to ``full_name``.
+  * All arguments are now keyword-only arguments.
+
+* :py:class:`rbtools.clients.base.patch.PatchResult`:
+
+  * This has been moved to :py:mod:`rbtools.diffs.patches`.
+  * All arguments are now keyword-only arguments.
+
+
+Contributors
+============
+
+* Christian Hammond
+* David Trowbridge
+* Michelle Aubin
