@@ -83,13 +83,15 @@ RBTools Configuration
    rbtools.config.loader
 
 
-Diff Generation/Processing
---------------------------
+Diff Generation/Processing/Patching
+-----------------------------------
 
 .. autosummary::
    :toctree: python
 
    rbtools.diffs
+   rbtools.diffs.patches
+   rbtools.diffs.patcher
    rbtools.diffs.tools
    rbtools.diffs.tools.backends
    rbtools.diffs.tools.backends.gnu
