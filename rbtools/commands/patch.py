@@ -86,6 +86,7 @@ class PatchCommand(BaseCommand):
                dest='px',
                metavar='NUM',
                default=None,
+               type=int,
                help="Strips the given number of paths from filenames in the "
                     "diff. Equivalent to patch's `-p` argument."),
         Option('--print',
@@ -174,6 +175,9 @@ class PatchCommand(BaseCommand):
                 * One or more requested commit IDs could not be found.
         """
         patch_prefix_level: Optional[int] = self.options.px
+
+        assert (patch_prefix_level is None or
+                isinstance(patch_prefix_level, int))
 
         # Sanity-check the arguments, making sure that the options provided
         # are compatible with each other and with the Review Board server.

@@ -1,0 +1,38 @@
+.. default-intersphinx:: rbt5.x rb-latest
+
+
+===========================
+RBTools 5.1.1 Release Notes
+===========================
+
+**Release date:** December 3, 2024
+
+
+Installation
+============
+
+Follow our :ref:`installation guide <rbtools-installation>` to install RBTools.
+
+To learn more, see:
+
+* `Documentation <https://www.reviewboard.org/docs/rbtools/5.x/>`_
+* `RBTools on PyPI <https://pypi.org/project/rbtools/>`_
+* `RBTools on GitHub <https://github.com/reviewboard/rbtools/>`_
+
+
+Bug Fixes
+=========
+
+rbt patch
+---------
+
+* Fixed a remaining bug with :option:`rbt patch --px` and Subversion
+  leading to a crash.
+
+
+Contributors
+============
+
+* Christian Hammond
+* David Trowbridge
+* Michelle Aubin
