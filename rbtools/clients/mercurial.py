@@ -802,7 +802,7 @@ class MercurialClient(BaseSCMClient):
             raise InvalidRevisionSpecError(
                 '"%s" does not appear to be a valid revision' % revision)
         else:
-            return identify.split()[0]
+            return identify.split()[-1]
 
     def _calculate_hgsubversion_repository_info(
         self,
