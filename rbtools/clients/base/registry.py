@@ -215,6 +215,7 @@ class SCMClientRegistry:
             ('rbtools.clients.clearcase', 'ClearCaseClient'),
             ('rbtools.clients.cvs', 'CVSClient'),
             ('rbtools.clients.git', 'GitClient'),
+            ('rbtools.clients.jujutsu', 'JujutsuClient'),
             ('rbtools.clients.mercurial', 'MercurialClient'),
             ('rbtools.clients.perforce', 'PerforceClient'),
             ('rbtools.clients.plastic', 'PlasticClient'),

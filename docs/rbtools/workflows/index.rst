@@ -13,6 +13,7 @@ RBTools Workflows
    sos
    git
    clearcase
+   jujutsu
    perforce
 
 

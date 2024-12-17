@@ -284,6 +284,26 @@ Example:
 This can also be provided by passing :option:`--include` to most commands.
 
 
+.. rbtconfig:: JJ_COMMITS_USE_GIT_SHA
+
+**Commands:** :rbtcommand:`rbt post`
+
+**Type:** Boolean
+
+**Default:** ``False``
+
+By default, the Jujutsu integration in RBTools will use Jujutsu change IDs for
+commits. Depending on your environment, this may not be desirable--for example,
+your Git server may reject any pushes for commits that have not been marked as
+"Ship it!" in Review Board. This can be changed to send the Git hash instead.
+
+Example:
+
+.. code-block:: python
+
+   JJ_COMMITS_USE_GIT_SHA = True
+
+
 .. rbtconfig:: LAND_DELETE_BRANCH
 
 LAND_DELETE_BRANCH
@@ -492,6 +512,7 @@ Valid repository types include:
 * ``clearcase``
 * ``cvs``
 * ``git``
+* ``jujutsu``
 * ``mercurial``
 * ``perforce``
 * ``plastic``

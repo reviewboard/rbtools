@@ -4,6 +4,8 @@ Version Added:
     4.0
 """
 
+from __future__ import annotations
+
 import re
 import sys
 
@@ -23,6 +25,7 @@ from rbtools.clients.clearcase import ClearCaseClient
 from rbtools.clients.cvs import CVSClient
 from rbtools.clients.errors import SCMClientNotFoundError
 from rbtools.clients.git import GitClient
+from rbtools.clients.jujutsu import JujutsuClient
 from rbtools.clients.mercurial import MercurialClient
 from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.plastic import PlasticClient
@@ -43,7 +46,7 @@ class MySCMClient2(BaseSCMClient):
 class SCMClientRegistryTests(kgb.SpyAgency, TestCase):
     """Unit tests for SCMClientRegistry."""
 
-    def test_init(self):
+    def test_init(self) -> None:
         """Testing SCMClientRegistry.__init__"""
         registry = SCMClientRegistry()
 
@@ -51,7 +54,7 @@ class SCMClientRegistryTests(kgb.SpyAgency, TestCase):
         self.assertFalse(registry._builtin_loaded)
         self.assertFalse(registry._entrypoints_loaded)
 
-    def test_iter(self):
+    def test_iter(self) -> None:
         """Testing SCMClientRegistry.__iter__"""
         registry = SCMClientRegistry()
 
@@ -71,6 +74,7 @@ class SCMClientRegistryTests(kgb.SpyAgency, TestCase):
                 ClearCaseClient,
                 CVSClient,
                 GitClient,
+                JujutsuClient,
                 MercurialClient,
                 PerforceClient,
                 PlasticClient,
@@ -84,7 +88,7 @@ class SCMClientRegistryTests(kgb.SpyAgency, TestCase):
         self.assertTrue(registry._builtin_loaded)
         self.assertTrue(registry._entrypoints_loaded)
 
-    def test_get_with_builtin(self):
+    def test_get_with_builtin(self) -> None:
         """Testing SCMClientRegistry.get with built-in SCMClient"""
         registry = SCMClientRegistry()
 
@@ -92,7 +96,7 @@ class SCMClientRegistryTests(kgb.SpyAgency, TestCase):
         self.assertTrue(registry._builtin_loaded)
         self.assertFalse(registry._entrypoints_loaded)
 
-    def test_get_with_entrypoint(self):
+    def test_get_with_entrypoint(self) -> None:
         """Testing SCMClientRegistry.get with entry point SCMClient"""
         registry = SCMClientRegistry()
 
@@ -106,7 +110,7 @@ class SCMClientRegistryTests(kgb.SpyAgency, TestCase):
         self.assertTrue(registry._builtin_loaded)
         self.assertTrue(registry._entrypoints_loaded)
 
-    def test_get_with_entrypoint_and_missing(self):
+    def test_get_with_entrypoint_and_missing(self) -> None:
         """Testing SCMClientRegistry.get with entry point SCMClient missing"""
         registry = SCMClientRegistry()
 
@@ -127,7 +131,7 @@ class SCMClientRegistryTests(kgb.SpyAgency, TestCase):
         self.assertTrue(registry._builtin_loaded)
         self.assertTrue(registry._entrypoints_loaded)
 
-    def test_register(self):
+    def test_register(self) -> None:
         """Testing SCMClientRegistry.register"""
         registry = SCMClientRegistry()
         registry.register(MySCMClient1)
@@ -143,6 +147,7 @@ class SCMClientRegistryTests(kgb.SpyAgency, TestCase):
                 ClearCaseClient,
                 CVSClient,
                 GitClient,
+                JujutsuClient,
                 MercurialClient,
                 PerforceClient,
                 PlasticClient,
@@ -152,7 +157,7 @@ class SCMClientRegistryTests(kgb.SpyAgency, TestCase):
                 MySCMClient1,
             ])
 
-    def test_register_with_already_registered(self):
+    def test_register_with_already_registered(self) -> None:
         """Testing SCMClientRegistry.register with class already registered"""
         registry = SCMClientRegistry()
 
@@ -165,7 +170,7 @@ class SCMClientRegistryTests(kgb.SpyAgency, TestCase):
         self.assertFalse(registry._entrypoints_loaded)
         self.assertNotIn(MySCMClient1, registry)
 
-    def test_register_with_id_already_used(self):
+    def test_register_with_id_already_used(self) -> None:
         """Testing SCMClientRegistry.register with ID already used"""
         class MyGitClient(BaseSCMClient):
             scmclient_id = 'git'
@@ -184,7 +189,7 @@ class SCMClientRegistryTests(kgb.SpyAgency, TestCase):
         self.assertFalse(registry._entrypoints_loaded)
         self.assertNotIn(MySCMClient1, registry)
 
-    def _add_fake_entrypoints(self, entrypoints):
+    def _add_fake_entrypoints(self, entrypoints) -> None:
         self.spy_on(entry_points, op=kgb.SpyOpMatchAny([
             {
                 'args': (),

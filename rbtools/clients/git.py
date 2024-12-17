@@ -2265,3 +2265,14 @@ class GitClient(BaseSCMClient):
                 .read())
         except Exception as e:
             raise SCMError(e)
+
+    def supports_empty_files(self) -> bool:
+        """Return whether the RB server supports added/deleted empty files.
+
+        Returns:
+            bool:
+            ``True`` if the Review Board server supports showing empty files.
+        """
+        return (self.capabilities is not None and
+                self.capabilities.has_capability('scmtools', 'git',
+                                                 'empty_files'))

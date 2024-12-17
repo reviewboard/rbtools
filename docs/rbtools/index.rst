@@ -148,6 +148,7 @@ common workflows to help you get started:
 * :ref:`rbtools-workflow-sos`
 * :ref:`rbtools-workflow-git`
 * :ref:`rbtools-workflow-clearcase`
+* :ref:`rbtools-workflow-jujutsu`
 * :ref:`rbtools-workflow-perforce`
 * :ref:`Working with Team Foundation Server <rbtools-tfs>`
 

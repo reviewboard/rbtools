@@ -142,6 +142,7 @@ the review request, you can include them on the command line, like so:
 
 .. _DVCS:
 .. _rbt-post-git:
+.. _rbt-post-jujutsu:
 .. _rbt-post-mercurial:
 
 Distributed Version Control Systems
@@ -194,17 +195,24 @@ If you want to upload a diff of everything between ``topicA`` and ``topicB``,
 you would need to tell :command:`rbt post` to also generate a parent diff
 between ``master`` and ``topicA``.
 
-This is done by using the :option:`--parent` parameter with the branch name.
-For example, in this case you would simply do:
+This is done by passing the two revisions as arguments. For example, in this
+case you would simply do:
 
 .. code-block:: console
 
-    $ rbt post --parent=topicA
+    $ rbt post topicA topicB
 
 That would generate a parent diff between ``master`` and ``topicA``, and
 a normal diff of your changes between ``topicA`` and ``topicB``. The changes
 in the parent diff won't appear as changed lines in the diff viewer, meaning
 that users will only see changes made between ``topicB`` and ``topicA``.
+
+You can also use native revision syntax for your particular version control
+system. For example, with Git, this command is equivalent:
+
+.. code-block:: console
+
+    $ rbt post topicA..topicB
 
 
 Tracking Branches
