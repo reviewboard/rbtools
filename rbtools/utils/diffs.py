@@ -5,7 +5,10 @@ from __future__ import annotations
 import fnmatch
 import os
 import sys
-from typing import Iterable, Iterator, List, Optional, Pattern
+from typing import Iterable, Iterator, List, Optional, Pattern, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 def filename_match_any_patterns(
@@ -164,7 +167,7 @@ def normalize_patterns(
 def remove_filenames_matching_patterns(
     filenames: Iterable[str],
     *,
-    patterns: List[str],
+    patterns: Sequence[str],
     base_dir: str,
 ) -> Iterator[str]:
     """Return an iterable of all filenames that do not match any patterns.

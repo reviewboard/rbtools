@@ -6,21 +6,21 @@ import logging
 import os
 import re
 import sys
-from typing import Dict, Iterator, List, Optional, TYPE_CHECKING, cast
+from gettext import gettext as _
+from typing import TYPE_CHECKING
 
 from rbtools.clients import RepositoryInfo
-from rbtools.clients.base.scmclient import (BaseSCMClient,
-                                            SCMClientDiffResult,
-                                            SCMClientPatcher,
-                                            SCMClientRevisionSpec)
-from rbtools.clients.errors import (AmendError,
-                                    CreateCommitError,
-                                    MergeError,
-                                    PushError,
-                                    InvalidRevisionSpecError,
-                                    TooManyRevisionsError,
-                                    SCMClientDependencyError,
-                                    SCMError)
+from rbtools.clients.base.scmclient import BaseSCMClient, SCMClientPatcher
+from rbtools.clients.errors import (
+    AmendError,
+    CreateCommitError,
+    MergeError,
+    PushError,
+    InvalidRevisionSpecError,
+    TooManyRevisionsError,
+    SCMClientDependencyError,
+    SCMError,
+)
 from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.svn import SVNClient, SVNRepositoryInfo
 from rbtools.diffs.patches import PatchResult
@@ -35,12 +35,23 @@ from rbtools.utils.process import (RunProcessError,
                                    run_process)
 
 if TYPE_CHECKING:
-    from rbtools.diffs.patches import Patch
+    from collections.abc import Iterator, Mapping, Sequence
+    from typing import ClassVar
+
+    from rbtools.diffs.patches import Patch, PatchAuthor
+    from rbtools.clients.base.scmclient import (
+        SCMClientCommitHistoryItem,
+        SCMClientDiffResult,
+        SCMClientRevisionSpec,
+    )
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_git_candidates(
     target_platform: str = sys.platform,
-) -> List[str]:
+) -> Sequence[str]:
     """Return candidate names for the git command line tool.
 
     Results may vary based on platform.
@@ -88,9 +99,10 @@ class GitPatcher(SCMClientPatcher['GitClient']):
         patch: Patch,
         patch_num: int,
     ) -> PatchResult:
-        """Internal function to apply a single patch.
+        """Apply a single patch.
 
-        This will take a single patch and apply it using Git.
+        This is an internal method that will take a single patch and apply it
+        using Git.
 
         Args:
             patch (rbtools.diffs.patches.Patch):
@@ -164,7 +176,12 @@ class GitClient(BaseSCMClient):
     # name. We therefore only include it when we know the server can use
     # server_tool_ids instead.
     server_tool_names = 'Git,Perforce,Subversion'
-    server_tool_ids = ['git', 'perforce', 'subversion', 'tfs_git']
+    server_tool_ids = [
+        'git',
+        'perforce',
+        'subversion',
+        'tfs_git',
+    ]
 
     patcher_cls = GitPatcher
 
@@ -182,27 +199,57 @@ class GitClient(BaseSCMClient):
     can_push_upstream = True
     can_squash_merges = True
 
-    TYPE_GIT = 0
-    TYPE_GIT_SVN = 1
-    TYPE_GIT_P4 = 2
+    TYPE_GIT: ClassVar[int] = 0
+    TYPE_GIT_SVN: ClassVar[int] = 1
+    TYPE_GIT_P4: ClassVar[int] = 2
 
-    _NUL = '\x00'
-    _FIELD_SEP = '\x1f'
+    _NUL: ClassVar[str] = '\x00'
+    _FIELD_SEP: ClassVar[str] = '\x1f'
 
-    def __init__(self, **kwargs):
+    ######################
+    # Instance variables #
+    ######################
+
+    #: Whether the repository is a bare git repository.
+    bare: bool
+
+    #: The git executable to use.
+    _git: str
+
+    #: The path to the .git directory.
+    _git_dir: str | None
+
+    #: The top-level directory of the git checkout.
+    _git_toplevel: str | None
+
+    #: The remote info for git-svn repositories.
+    _git_svn_remote_info: Mapping[str, str] | None
+
+    #: Whether the git version is at least 1.8.0.
+    _git_version_at_least_180: bool
+
+    #: The name of the current branch HEAD.
+    _head_ref: str
+
+    #: The repository type.
+    #:
+    #: This will be one of TYPE_GIT, TYPE_GIT_SVN, or TYPE_GIT_P4.
+    _type: int | None
+
+    def __init__(self, **kwargs) -> None:
         """Initialize the client.
 
         Args:
             **kwargs (dict):
                 Keyword arguments to pass through to the superclass.
         """
-        super(GitClient, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Store the 'correct' way to invoke git, just plain old 'git' by
         # default.
         self._git = ''
         self._git_toplevel = None
-        self._git_svn_remote_info: Optional[Dict[str, str]] = None
+        self._git_svn_remote_info = None
         self._type = None
 
     @property
@@ -229,7 +276,7 @@ class GitClient(BaseSCMClient):
                 git = 'git'
                 self._git = git
 
-        return cast(str, git)
+        return git
 
     def check_dependencies(self) -> None:
         """Check whether all dependencies for the client are available.
@@ -253,7 +300,7 @@ class GitClient(BaseSCMClient):
 
         raise SCMClientDependencyError(missing_exes=[tuple(candidates)])
 
-    def _supports_git_config_flag(self):
+    def _supports_git_config_flag(self) -> bool:
         """Return whether the installed version of git supports the -c flag.
 
         This will execute ``git --version`` on the first call and cache the
@@ -264,7 +311,7 @@ class GitClient(BaseSCMClient):
             ``True`` if the user's installed git supports ``-c``.
         """
         if not hasattr(self, '_git_version_at_least_180'):
-            self._git_version_least_180 = False
+            self._git_version_at_least_180 = False
 
             version_str = (
                 self._run_git(['version'],
@@ -288,7 +335,7 @@ class GitClient(BaseSCMClient):
 
     def parse_revision_spec(
         self,
-        revisions: List[str] = [],
+        revisions: (Sequence[str] | None) = None,
     ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
@@ -329,6 +376,9 @@ class GitClient(BaseSCMClient):
             rbtools.clients.errors.TooManyRevisionsError:
                 The specified revisions list contained too many revisions.
         """
+        if revisions is None:
+            revisions = []
+
         n_revs = len(revisions)
         result: SCMClientRevisionSpec
 
@@ -356,12 +406,12 @@ class GitClient(BaseSCMClient):
             # dirty working directory.
             if (self.has_pending_changes() and
                 not self.config.get('SUPPRESS_CLIENT_WARNINGS', False)):
-                logging.warning('Your working directory is not clean. Any '
-                                'changes which have not been committed '
-                                'to a branch will not be included in your '
-                                'review request.')
+                logger.warning('Your working directory is not clean. Any '
+                               'changes which have not been committed '
+                               'to a branch will not be included in your '
+                               'review request.')
 
-        elif n_revs == 1 or n_revs == 2:
+        elif n_revs in {1, 2}:
             # Let `git rev-parse` sort things out.
             parsed = self._rev_parse(revisions)
 
@@ -371,7 +421,7 @@ class GitClient(BaseSCMClient):
             if n_parsed_revs == 1:
                 # Single revision. Extract the parent of that revision to use
                 # as the base.
-                parent = self._rev_parse('%s^' % parsed[0])[0]
+                parent = self._rev_parse(f'{parsed[0]}^')[0]
                 result = {
                     'base': parent,
                     'tip': parsed[0],
@@ -405,9 +455,11 @@ class GitClient(BaseSCMClient):
                         .strip()
                     )
                 except RunProcessError:
-                    raise SCMError('Error retrieving the merge base for '
-                                   'Git revisions %s and %s'
-                                   % (parsed[0], parsed[1]))
+                    raise SCMError(
+                        _(
+                            'Error retrieving the merge base for Git '
+                            'revisions {base} and {tip}',
+                        ).format(base=parsed[0], tip=parsed[1]))
 
                 result = {
                     'base': merge_base,
@@ -415,7 +467,7 @@ class GitClient(BaseSCMClient):
                 }
             else:
                 raise InvalidRevisionSpecError(
-                    'Unexpected result while parsing revision spec')
+                    _('Unexpected result while parsing revision spec'))
 
             parent_branch = self._get_parent_branch()
             remote = self._find_remote(parent_branch)
@@ -432,7 +484,7 @@ class GitClient(BaseSCMClient):
 
         return result
 
-    def get_local_path(self) -> Optional[str]:
+    def get_local_path(self) -> str | None:
         """Return the local path to the working tree.
 
         Returns:
@@ -446,8 +498,9 @@ class GitClient(BaseSCMClient):
 
         # NOTE: This can be removed once check_dependencies() is mandatory.
         if not self.has_dependencies(expect_checked=True):
-            logging.debug('Unable to execute "git --help" or "git.cmd '
-                          '--help": skipping Git')
+            logger.debug('Unable to execute "git --help" or "git.cmd '
+                         '--help": skipping Git')
+
             return None
 
         git_dir = self._get_git_dir()
@@ -458,7 +511,7 @@ class GitClient(BaseSCMClient):
 
         # Sometimes core.bare is not set, and generates an error, so ignore
         # errors. Valid values are 'true' or '1'.
-        self.bare = self._get_git_config('core.bare') in ('true', '1')
+        self.bare = self._get_git_config('core.bare') in {'true', '1'}
 
         # Running in directories other than the top level of
         # of a work-tree would result in broken diffs on the server.
@@ -485,7 +538,7 @@ class GitClient(BaseSCMClient):
 
         return git_toplevel
 
-    def get_repository_info(self) -> Optional[RepositoryInfo]:
+    def get_repository_info(self) -> RepositoryInfo | None:
         """Return repository information for the current working tree.
 
         Returns:
@@ -574,11 +627,12 @@ class GitClient(BaseSCMClient):
                     )
 
                     if version < (1, 5, 4):
-                        raise SCMError('Your installation of git-svn must be '
-                                       'upgraded to version 1.5.4 or later.')
+                        raise SCMError(_(
+                            'Your installation of git-svn must be upgraded '
+                            'to version 1.5.4 or later.'))
 
         # Okay, maybe Perforce (git-p4).
-        git_p4_ref: Optional[str]
+        git_p4_ref: str | None
 
         try:
             git_p4_ref = (
@@ -622,8 +676,9 @@ class GitClient(BaseSCMClient):
             try:
                 url = self._get_origin(upstream_branch)
             except SCMError:
-                raise SCMError('Could not determine remote URL for upstream '
-                               'branch %s' % upstream_branch)
+                raise SCMError(
+                    _('Could not determine remote URL for upstream branch {}')
+                    .format(upstream_branch))
 
             if url:
                 url = url.rstrip('/')
@@ -639,14 +694,14 @@ class GitClient(BaseSCMClient):
                                   local_path=self._git_toplevel)
         return None
 
-    def _get_git_dir(self):
+    def _get_git_dir(self) -> str | None:
         """Return the current git directory.
 
         This will return the :file:`.git` directory corresponding to the full
         checkout, traversing up in the case of worktrees.
 
         Returns:
-            unicode:
+            str:
             The path to the :file:`.git` directory for the repository.
         """
         try:
@@ -669,39 +724,49 @@ class GitClient(BaseSCMClient):
             with open(os.path.join(git_dir, 'commondir')) as f:
                 common_dir = f.read().strip()
                 git_dir = os.path.abspath(os.path.join(git_dir, common_dir))
-        except IOError:
+        except OSError:
             pass
 
         return git_dir
 
-    def _strip_heads_prefix(self, ref):
+    def _strip_heads_prefix(
+        self,
+        ref: str,
+    ) -> str:
         """Strip the heads prefix off of a reference name.
 
         Args:
-            ref (unicode):
+            ref (str):
                 The full name of a branch.
 
         Returns:
-            unicode:
+            str:
             The bare name of the branch without the ``refs/heads/`` prefix.
         """
         return re.sub(r'^refs/heads/', '', ref)
 
-    def _get_origin(self, upstream_branch):
+    def _get_origin(
+        self,
+        upstream_branch: str,
+    ) -> str | None:
         """Return the remote URL for the given upstream branch.
 
         Args:
-            upstream_branch (unicode):
+            upstream_branch (str):
                 The name of the upstream branch.
 
         Returns:
             str:
             The remote URL, or ``None`` if it could not be found.
         """
-        return self._get_git_config(
-            'remote.%s.url' % upstream_branch.split('/')[0])
+        local_name = upstream_branch.split('/')[0]
 
-    def scan_for_server(self, repository_info):
+        return self._get_git_config(f'remote.{local_name}.url')
+
+    def scan_for_server(
+        self,
+        repository_info: RepositoryInfo,
+    ) -> str | None:
         """Find the Review Board server matching this repository.
 
         Args:
@@ -725,7 +790,10 @@ class GitClient(BaseSCMClient):
         else:
             return None
 
-    def get_raw_commit_message(self, revisions):
+    def get_raw_commit_message(
+        self,
+        revisions: dict[str, str],
+    ) -> str:
         """Extract the commit message based on the provided revision range.
 
         Args:
@@ -748,7 +816,7 @@ class GitClient(BaseSCMClient):
                     'log',
                     '--reverse',
                     '--pretty=format:%s%n%n%b',
-                    '^%s' % base,
+                    f'^{base}',
                     tip,
                 ],
                 ignore_errors=True)
@@ -757,12 +825,16 @@ class GitClient(BaseSCMClient):
             .strip()
         )
 
-    def _get_parent_branch(self):
+    def _get_parent_branch(self) -> str:
         """Return the parent branch.
 
         Returns:
             str:
             The name of the current parent branch.
+
+        Raises:
+            ValueError:
+                The repository type was unknown.
         """
         assert self._git_dir
 
@@ -779,8 +851,9 @@ class GitClient(BaseSCMClient):
             if svn_remote_info:
                 return svn_remote_info['ref']
             else:
-                logging.warning('Failed to determine SVN tracking branch. '
-                                'Defaulting to "master"\n')
+                logger.warning('Failed to determine SVN tracking branch. '
+                               'Defaulting to "master"\n')
+
                 return 'master'
         elif self._type == self.TYPE_GIT_P4:
             return 'p4/master'
@@ -788,11 +861,11 @@ class GitClient(BaseSCMClient):
             if self._head_ref:
                 short_head = self._strip_heads_prefix(self._head_ref)
                 merge = self._strip_heads_prefix(
-                    self._get_git_config('branch.%s.merge' % short_head) or '')
+                    self._get_git_config(f'branch.{short_head}.merge') or '')
                 remote = self._get_remote(short_head)
 
                 if remote and remote != '.' and merge:
-                    return '%s/%s' % (remote, merge)
+                    return f'{remote}/{merge}'
 
             # As of Git 2.28, users can configure a default main branch name.
             # In most cases, this will be handled by the _get_remote call
@@ -806,23 +879,27 @@ class GitClient(BaseSCMClient):
                 os.path.exists(os.path.join(self._git_dir, 'refs',
                                             'remotes', 'origin',
                                             default_branch))):
-                return 'origin/%s' % default_branch
+                return f'origin/{default_branch}'
 
             # Finally, just fall back to the old standard.
             return 'origin/master'
         else:
-            raise ValueError('Unknown git client type %s' % self._type)
+            raise ValueError(
+                _('Unknown git client type {}').format(self._type))
 
-    def get_head_ref(self):
+    def get_head_ref(self) -> str:
         """Return the HEAD reference.
 
         Returns:
-            unicode:
+            str:
             The name of the HEAD reference.
         """
         return self._head_ref or 'HEAD'
 
-    def _rev_parse(self, revisions):
+    def _rev_parse(
+        self,
+        revisions: str | Sequence[str],
+    ) -> Sequence[str]:
         """Parse a git symbolic reference.
 
         Args:
@@ -835,14 +912,14 @@ class GitClient(BaseSCMClient):
             A list of the parsed revision data. This can be either 1, 2, or 3
             elements long, depending on the exact string provided.
         """
-        if not isinstance(revisions, list):
+        if isinstance(revisions, str):
             revisions = [revisions]
 
         try:
             # Note that we're using splitlines() instead of readlines() in
             # order to keep line endings off.
             return (
-                self._run_git(['rev-parse'] + revisions)
+                self._run_git(['rev-parse', *revisions])
                 .stdout
                 .read()
                 .splitlines()
@@ -858,22 +935,22 @@ class GitClient(BaseSCMClient):
         """Return the youngest ancestor of ``local_branch`` on ``remote``.
 
         Args:
-            local_branch (unicode):
+            local_branch (str):
                 The commit whose ancestor we are trying to find.
 
-            remote (unicode):
+            remote (str):
                 This is most commonly ``origin``, but can be changed via
                 configuration or command line options. This represents the
                 remote which is configured in Review Board.
 
         Returns:
-            unicode:
+            str:
             The youngest ancestor of local_branch that is also contained in
             the remote repository (where youngest means the commit that can
             be reached from local_branch by following the least number of
             parent links).
         """
-        exclude_option = '--remotes=%s' % remote
+        exclude_option = f'--remotes={remote}'
 
         if self._type == self.TYPE_GIT_SVN:
             svn_remote_info = self._get_svn_remote()
@@ -884,7 +961,7 @@ class GitClient(BaseSCMClient):
                 # directly.
                 exclude_option = remote
 
-        local_commits: List[str]
+        local_commits: list[str]
 
         try:
             # Note that we're using splitlines() instead of readlines() in
@@ -907,13 +984,13 @@ class GitClient(BaseSCMClient):
         local_commit = local_commits[-1]
 
         try:
-            youngest_remote_commit = self._rev_parse('%s^' % local_commit)[0]
+            youngest_remote_commit = self._rev_parse(f'{local_commit}^')[0]
         except IndexError:
             # This was the last commit in the repository.
             youngest_remote_commit = local_commit
 
-        logging.debug('Found youngest remote git commit %s',
-                      youngest_remote_commit)
+        logger.debug('Found youngest remote git commit %s',
+                     youngest_remote_commit)
 
         return youngest_remote_commit
 
@@ -921,10 +998,10 @@ class GitClient(BaseSCMClient):
         self,
         revisions: SCMClientRevisionSpec,
         *,
-        include_files: List[str] = [],
-        exclude_patterns: List[str] = [],
+        include_files: (Sequence[str] | None) = None,
+        exclude_patterns: (Sequence[str] | None) = None,
         no_renames: bool = False,
-        repository_info: Optional[RepositoryInfo] = None,
+        repository_info: (RepositoryInfo | None) = None,
         with_parent_diff: bool = True,
         **kwargs,
     ) -> SCMClientDiffResult:
@@ -945,15 +1022,19 @@ class GitClient(BaseSCMClient):
                 A dictionary of revisions, as returned by
                 :py:meth:`parse_revision_spec`.
 
-            include_files (list of unicode, optional):
+            include_files (list of str, optional):
                 A list of files to whitelist during the diff generation.
 
-            exclude_patterns (list of unicode, optional):
+            exclude_patterns (list of str, optional):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
 
             no_renames (bool, optional):
                 Whether to avoid rename detection.
+
+            repository_info (rbtools.clients.base.repository.RepositoryInfo,
+                             optional):
+                The repository info.
 
             with_parent_diff (bool, optional):
                 Whether or not to compute a parent diff.
@@ -966,6 +1047,12 @@ class GitClient(BaseSCMClient):
             A dictionary containing keys documented in
             :py:class:`~rbtools.clients.base.scmclient.SCMClientDiffResult`.
         """
+        if include_files is None:
+            include_files = []
+
+        if exclude_patterns is None:
+            exclude_patterns = []
+
         git_find_renames_threshold = \
             getattr(self.options, 'git_find_renames_threshold', None)
         git_toplevel = self._git_toplevel
@@ -976,25 +1063,32 @@ class GitClient(BaseSCMClient):
                                               base_dir=git_toplevel,
                                               cwd=os.getcwd())
 
-        try:
-            merge_base = revisions['parent_base']
-        except KeyError:
-            merge_base = revisions['base']
+        merge_base = revisions.get('parent_base', revisions['base'])
+        assert isinstance(merge_base, str)
+
+        base = revisions['base']
+        assert isinstance(base, str)
+
+        tip = revisions['tip']
+        assert isinstance(tip, str)
 
         diff_lines = self.make_diff(
             merge_base,
-            revisions['base'],
-            revisions['tip'],
+            base,
+            tip,
             include_files,
             exclude_patterns,
             no_renames,
             find_renames_threshold=git_find_renames_threshold)
 
         if 'parent_base' in revisions and with_parent_diff:
+            parent_base = revisions['parent_base']
+            assert isinstance(parent_base, str)
+
             parent_diff_lines = self.make_diff(
                 merge_base,
-                revisions['parent_base'],
-                revisions['base'],
+                parent_base,
+                base,
                 include_files,
                 exclude_patterns,
                 no_renames,
@@ -1005,6 +1099,8 @@ class GitClient(BaseSCMClient):
             parent_diff_lines = None
             base_commit_id = revisions['base']
 
+        assert isinstance(base_commit_id, str)
+
         return {
             'diff': diff_lines,
             'parent_diff': parent_diff_lines,
@@ -1012,32 +1108,40 @@ class GitClient(BaseSCMClient):
             'base_commit_id': base_commit_id,
         }
 
-    def make_diff(self, merge_base, base, tip, include_files,
-                  exclude_patterns, no_renames, find_renames_threshold):
+    def make_diff(
+        self,
+        merge_base: str,
+        base: str,
+        tip: str,
+        include_files: Sequence[str],
+        exclude_patterns: Sequence[str],
+        no_renames: bool,
+        find_renames_threshold: str | None,
+    ) -> bytes | None:
         """Perform a diff on a particular branch range.
 
         Args:
-            merge_base (unicode):
+            merge_base (str):
                 The ID of the merge base commit. This is only used when
                 creating diffs with git-svn or git-p4 clones.
 
-            base (unicode):
+            base (str):
                 The ID of the base commit for the diff.
 
-            tip (unicode):
+            tip (str):
                 The ID of the tip commit for the diff.
 
-            include_files (list of unicode):
+            include_files (list of str):
                 A list of files to whitelist during the diff generation.
 
-            exclude_patterns (list of unicode):
+            exclude_patterns (list of str):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
 
-            no_renames (bool, optional):
+            no_renames (bool):
                 Whether to skip rename detection.
 
-            find_renames_threshold (unicode, optional):
+            find_renames_threshold (str):
                 The threshold to pass to ``--find-renames``, if any.
 
         Returns:
@@ -1050,17 +1154,17 @@ class GitClient(BaseSCMClient):
         assert isinstance(base, str)
         assert isinstance(tip, str)
 
-        rev_range = '%s..%s' % (base, tip)
+        rev_range = f'{base}..{tip}'
 
         if include_files:
-            include_files = ['--'] + include_files
+            include_files = ['--', *include_files]
 
-        git_args: List[str] = []
+        git_args: list[str] = []
 
         if self._supports_git_config_flag():
             git_args += ['-c', 'core.quotepath=false']
 
-        if self._type in (self.TYPE_GIT_SVN, self.TYPE_GIT_P4):
+        if self._type in {self.TYPE_GIT_SVN, self.TYPE_GIT_P4}:
             diff_cmd_params = ['--no-color', '--no-prefix', '-r', '-u']
         elif self._type == self.TYPE_GIT:
             diff_cmd_params = ['--no-color', '--full-index',
@@ -1074,14 +1178,15 @@ class GitClient(BaseSCMClient):
                 self.capabilities.has_capability('diffs', 'moved_files')):
 
                 if find_renames_threshold is not None:
-                    diff_cmd_params.append('--find-renames=%s'
-                                           % find_renames_threshold)
+                    diff_cmd_params.append(
+                        f'--find-renames={find_renames_threshold}')
                 else:
                     diff_cmd_params.append('--find-renames')
             else:
                 diff_cmd_params.append('--no-renames')
         else:
-            raise ValueError('Unknown git client type %s' % self._type)
+            raise ValueError(
+                _('Unknown git client type {}').format(self._type))
 
         # By default, don't allow using external diff commands. This prevents
         # things from breaking horribly if someone configures a graphical diff
@@ -1090,15 +1195,15 @@ class GitClient(BaseSCMClient):
         if not self.config.get('GIT_USE_EXT_DIFF', False):
             diff_cmd_params.append('--no-ext-diff')
 
-        diff_cmd = git_args + ['diff'] + diff_cmd_params
+        diff_cmd = [*git_args, 'diff', *diff_cmd_params]
 
         if exclude_patterns:
             # If we have specified files to exclude, we will get a list of all
             # changed files and run `git diff` on each un-excluded file
             # individually.
-            changed_files_cmd = git_args + ['diff-tree'] + diff_cmd_params
+            changed_files_cmd = [*git_args, 'diff-tree', *diff_cmd_params]
 
-            if self._type in (self.TYPE_GIT_SVN, self.TYPE_GIT_P4):
+            if self._type in {self.TYPE_GIT_SVN, self.TYPE_GIT_P4}:
                 # We don't want to send -u along to git diff-tree because it
                 # will generate diff information along with the list of
                 # changed files.
@@ -1108,7 +1213,7 @@ class GitClient(BaseSCMClient):
 
             changed_files: Iterator[str] = (
                 self._run_git(
-                    changed_files_cmd + [rev_range] + include_files,
+                    [*changed_files_cmd, rev_range, *include_files],
                     ignore_errors=True,
                     log_debug_output_on_error=False)
                 .stdout
@@ -1125,11 +1230,11 @@ class GitClient(BaseSCMClient):
                 patterns=exclude_patterns,
                 base_dir=git_toplevel)
 
-            diff_lines: List[bytes] = []
+            diff_lines: list[bytes] = []
 
             for filename in changed_files:
                 lines = (
-                    self._run_git(diff_cmd + [rev_range, '--', filename],
+                    self._run_git([*diff_cmd, rev_range, '--', filename],
                                   ignore_errors=True,
                                   log_debug_output_on_error=False)
                     .stdout_bytes
@@ -1137,7 +1242,7 @@ class GitClient(BaseSCMClient):
                 )
 
                 if not lines:
-                    logging.error(
+                    logger.error(
                         'Could not get diff for all files (git-diff failed '
                         'for "%s"). Refusing to return a partial diff.',
                         filename)
@@ -1148,7 +1253,7 @@ class GitClient(BaseSCMClient):
                 diff_lines += lines
         else:
             diff_lines = (
-                self._run_git(diff_cmd + [rev_range] + include_files,
+                self._run_git([*diff_cmd, rev_range, *include_files],
                               ignore_errors=True,
                               log_debug_output_on_error=False)
                 .stdout_bytes
@@ -1162,7 +1267,11 @@ class GitClient(BaseSCMClient):
         else:
             return b''.join(diff_lines)
 
-    def make_svn_diff(self, merge_base, diff_lines):
+    def make_svn_diff(
+        self,
+        merge_base: str,
+        diff_lines: Sequence[bytes],
+    ) -> bytes | None:
         """Format a git-svn diff to apply correctly against an SVN repository.
 
         This reformats the diff from a git-svn clone to look like it came from
@@ -1173,7 +1282,7 @@ class GitClient(BaseSCMClient):
         have problems natively with these anyway).
 
         Args:
-            merge_base (unicode):
+            merge_base (str):
                 The ID of the merge base commit. This is only used when
                 creating diffs with :command:`git svn` or :command:`git p4`
                 clones.
@@ -1271,7 +1380,11 @@ class GitClient(BaseSCMClient):
 
         return diff_data
 
-    def make_perforce_diff(self, merge_base, diff_lines):
+    def make_perforce_diff(
+        self,
+        merge_base: str,
+        diff_lines: Sequence[bytes],
+    ) -> bytes:
         """Format a git-p4 diff to apply correctly against a P4 repository.
 
         This reformats the diff from a :command:`git p4` clone to look like it
@@ -1279,7 +1392,7 @@ class GitClient(BaseSCMClient):
         PerforceTool in Review Board can properly parse the diff.
 
         Args:
-            merge_base (unicode):
+            merge_base (str):
                 The ID of the merge base commit. This is only used when
                 creating diffs with :command:`git svn` or
                 :command:`git p4` clones.
@@ -1461,7 +1574,7 @@ class GitClient(BaseSCMClient):
 
         return diff_data
 
-    def has_pending_changes(self):
+    def has_pending_changes(self) -> bool:
         """Check if there are changes waiting to be committed.
 
         Returns:
@@ -1483,11 +1596,15 @@ class GitClient(BaseSCMClient):
         except RunProcessError:
             return False
 
-    def amend_commit_description(self, message, revisions):
+    def amend_commit_description(
+        self,
+        message: str,
+        revisions: SCMClientRevisionSpec,
+    ) -> None:
         """Update a commit message to the given string.
 
         Args:
-            message (unicode):
+            message (str):
                 The commit message to use when amending the commit.
 
             revisions (dict):
@@ -1502,21 +1619,33 @@ class GitClient(BaseSCMClient):
                 if there's an error invoking git.
         """
         if revisions and revisions['tip']:
-            commit_ids = self._rev_parse(['HEAD', revisions['tip']])
+            tip = revisions['tip']
+            assert isinstance(tip, str)
+
+            commit_ids = self._rev_parse(['HEAD', tip])
             head_id = commit_ids[0].strip()
             revision_id = commit_ids[1].strip()
 
             if head_id != revision_id:
-                raise AmendError('Commit "%s" is not the latest commit, '
-                                 'and thus cannot be modified' % revision_id)
+                raise AmendError(
+                    _(
+                        'Commit "{}" is not the latest commit, and thus '
+                        'cannot be modified',
+                    ).format(revision_id))
 
         try:
             self._run_git(['commit', '--amend', '-m', message])
         except RunProcessError as e:
             raise AmendError(str(e))
 
-    def create_commit(self, message, author, run_editor,
-                      files=[], all_files=False):
+    def create_commit(
+        self,
+        message: str,
+        author: PatchAuthor,
+        run_editor: bool,
+        files: (Sequence[str] | None) = None,
+        all_files: bool = False,
+    ) -> None:
         """Commit the given modified files.
 
         This is expected to be called after applying a patch. This commits the
@@ -1524,18 +1653,17 @@ class GitClient(BaseSCMClient):
         message in :envvar:`$EDITOR` to allow the user to update it.
 
         Args:
-            message (unicode):
+            message (str):
                 The commit message to use.
 
-            author (object):
-                The author of the commit. This is expected to have ``fullname``
-                and ``email`` attributes.
+            author (rbtools.diffs.patches.PatchAuthor):
+                The author of the commit.
 
             run_editor (bool):
                 Whether to run the user's editor on the commit message before
                 committing.
 
-            files (list of unicode, optional):
+            files (list of str, optional):
                 The list of filenames to commit.
 
             all_files (bool, optional):
@@ -1547,11 +1675,14 @@ class GitClient(BaseSCMClient):
                 The commit message could not be created. It may have been
                 aborted by the user.
         """
+        if files is None:
+            files = []
+
         try:
             if all_files:
                 self._run_git(['add', '--all', ':/'])
             elif files:
-                self._run_git(['add'] + files)
+                self._run_git(['add', *files])
         except RunProcessError as e:
             raise CreateCommitError(str(e))
 
@@ -1565,33 +1696,37 @@ class GitClient(BaseSCMClient):
             modified_message = message
 
         if not modified_message.strip():
-            raise CreateCommitError(
+            raise CreateCommitError(_(
                 "A commit message wasn't provided. The patched files are in "
                 "your tree and are staged for commit, but haven't been "
-                "committed. Run `git commit` to commit them.")
+                "committed. Run `git commit` to commit them."))
 
         cmd = ['commit', '-m', modified_message]
 
         try:
-            cmd += ['--author', '%s <%s>' % (author.fullname, author.email)]
+            cmd += ['--author', f'{author.full_name} <{author.email}>']
         except AttributeError:
             # Users who have marked their profile as private won't include the
-            # fullname or email fields in the API payload. Just commit as the
+            # full name or email fields in the API payload. Just commit as the
             # user running RBTools.
-            logging.warning('The author has marked their Review Board profile '
-                            'information as private. Committing without '
-                            'author attribution.')
+            logger.warning('The author has marked their Review Board profile '
+                           'information as private. Committing without '
+                           'author attribution.')
 
         try:
             self._run_git(cmd)
         except RunProcessError as e:
             raise CreateCommitError(str(e))
 
-    def delete_branch(self, branch_name, merged_only=True):
+    def delete_branch(
+        self,
+        branch_name: str,
+        merged_only: bool = True,
+    ) -> None:
         """Delete the specified branch.
 
         Args:
-            branch_name (unicode):
+            branch_name (str):
                 The name of the branch to delete.
 
             merged_only (bool, optional):
@@ -1612,23 +1747,31 @@ class GitClient(BaseSCMClient):
         except RunProcessError as e:
             raise SCMError(str(e))
 
-    def merge(self, target, destination, message, author, squash=False,
-              run_editor=False, close_branch=False, **kwargs):
+    def merge(
+        self,
+        target: str,
+        destination: str,
+        message: str,
+        author: PatchAuthor,
+        squash: bool = False,
+        run_editor: bool = False,
+        close_branch: bool = False,
+        **kwargs,
+    ) -> None:
         """Merge the target branch with destination branch.
 
         Args:
-            target (unicode):
+            target (str):
                 The name of the branch to merge.
 
-            destination (unicode):
+            destination (str):
                 The name of the branch to merge into.
 
-            message (unicode):
+            message (str):
                 The commit message to use.
 
-            author (object):
-                The author of the commit. This is expected to have ``fullname``
-                and ``email`` attributes.
+            author (rbotols.diffs.patches.PatchAuthor):
+                The author of the commit.
 
             squash (bool, optional):
                 Whether to squash the commits or do a plain merge.
@@ -1652,13 +1795,12 @@ class GitClient(BaseSCMClient):
                           redirect_stderr=True)
         except RunProcessError as e:
             raise MergeError(
-                'Could not checkout to branch "%(destination)s".\n'
-                '\n'
-                '%(output)s'
-                % {
-                    'destination': destination,
-                    'output': e.result.stdout.read(),
-                })
+                _(
+                    'Could not checkout to branch "{destination}"\n'
+                    '\n'
+                    '{output}',
+                ).format(destination=destination,
+                         output=e.result.stdout.read()))
 
         if squash:
             method = '--squash'
@@ -1670,14 +1812,15 @@ class GitClient(BaseSCMClient):
                           redirect_stderr=True)
         except RunProcessError as e:
             raise MergeError(
-                'Could not merge branch "%(target)s" into "%(destination)s".\n'
-                '\n'
-                '%(output)s'
-                % {
-                    'destination': destination,
-                    'output': e.result.stdout.read(),
-                    'target': target,
-                })
+                _(
+                    'Could not merge branch "{target}" into '
+                    '"{destination}".\n'
+                    '\n'
+                    '{output}',
+                ).format(
+                    target=target,
+                    destination=destination,
+                    output=e.result.stdout.read()))
 
         try:
             self.create_commit(message, author, run_editor)
@@ -1687,11 +1830,14 @@ class GitClient(BaseSCMClient):
         except (CreateCommitError, SCMError) as e:
             raise MergeError(str(e))
 
-    def push_upstream(self, local_branch):
+    def push_upstream(
+        self,
+        local_branch: str,
+    ) -> None:
         """Push the current branch to upstream.
 
         Args:
-            local_branch (unicode):
+            local_branch (str):
                 The name of the branch to push.
 
         Raises:
@@ -1701,28 +1847,30 @@ class GitClient(BaseSCMClient):
         remote = self._get_remote(local_branch)
 
         if remote is None:
-            raise PushError('Could not determine remote for branch "%s".'
-                            % local_branch)
+            raise PushError(
+                _('Could not determine remote for branch "{}".')
+                .format(local_branch))
 
         try:
             self._run_git(['pull', '--rebase', remote, local_branch])
         except RunProcessError:
-            raise PushError('Could not pull changes from upstream.')
+            raise PushError(_('Could not pull changes from upstream.'))
 
         try:
             self._run_git(['push', remote, local_branch])
         except RunProcessError:
-            raise PushError('Could not push branch "%s" to upstream.'
-                            % local_branch)
+            raise PushError(
+                _('Could not push branch "{}" to upstream.')
+                .format(local_branch))
 
-    def get_current_branch(self):
+    def get_current_branch(self) -> str | None:
         """Return the name of the current branch.
 
         Returns:
-            unicode:
+            str:
             The name of the directory corresponding to the root of the current
             working directory (whether a plain checkout or a git worktree). If
-            no repository can be found, this will return None.
+            no repository can be found, this will return ``None``.
         """
         try:
             return (
@@ -1738,7 +1886,7 @@ class GitClient(BaseSCMClient):
         self,
         key: str,
         global_config: bool = False,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Return the value of a Git configuration key.
 
         The value will be stripped, if found.
@@ -1759,7 +1907,7 @@ class GitClient(BaseSCMClient):
             rbtools.clients.errors.SCMError:
                 There was a fatal error retrieving Git configuration.
         """
-        cmdline: List[str] = ['config']
+        cmdline: list[str] = ['config']
 
         if global_config:
             cmdline.append('--global')
@@ -1783,7 +1931,7 @@ class GitClient(BaseSCMClient):
 
     def _run_git(
         self,
-        git_args: List[str],
+        git_args: Sequence[str],
         **kwargs,
     ) -> RunProcessResult:
         """Execute a git command within the clone directory.
@@ -1792,7 +1940,7 @@ class GitClient(BaseSCMClient):
             git_args (list of str):
                 A list of additional arguments to add to the Git command line.
 
-            *kwargs (dict):
+            **kwargs (dict):
                 Keyword arguments to pass through to
                 :py:func:`rbtools.utils.process.run_process.`.
 
@@ -1800,11 +1948,11 @@ class GitClient(BaseSCMClient):
             rbtools.utils.process.RunProcessResult:
             The value returned by :py:func:`rbtools.utils.process.run_process`.
         """
-        return self._run_process([self.git] + git_args, **kwargs)
+        return self._run_process([self.git, *git_args], **kwargs)
 
     def _run_process(
         self,
-        cmdline: List[str],
+        cmdline: Sequence[str],
         **kwargs,
     ) -> RunProcessResult:
         """Execute a command within the clone directory.
@@ -1813,7 +1961,7 @@ class GitClient(BaseSCMClient):
             cmdline (list of str):
                 The full command line to run.
 
-            *kwargs (dict):
+            **kwargs (dict):
                 Keyword arguments to pass through to
                 :py:func:`rbtools.utils.process.run_process.`.
 
@@ -1825,7 +1973,10 @@ class GitClient(BaseSCMClient):
                            cwd=self._git_toplevel,
                            **kwargs)
 
-    def get_commit_history(self, revisions):
+    def get_commit_history(
+        self,
+        revisions: SCMClientRevisionSpec,
+    ) -> Sequence[SCMClientCommitHistoryItem] | None:
         """Return the commit history specified by the revisions.
 
         Args:
@@ -1834,36 +1985,8 @@ class GitClient(BaseSCMClient):
                 by :py:meth:`parse_revision_spec`.
 
         Returns:
-            list of dict:
-            The list of history entries, in order. The dictionaries have the
-            following keys:
-
-            ``commit_id``:
-                The unique identifier of the commit.
-
-            ``parent_id``:
-                The unique identifier of the parent commit.
-
-            ``author_name``:
-                The name of the commit's author.
-
-            ``author_email``:
-                The e-mail address of the commit's author.
-
-            ``author_date``:
-                The date the commit was authored.
-
-            ``committer_name``:
-                The committer's name.
-
-            ``committer_email``:
-                The e-mail address of the committer.
-
-            ``committer_date``:
-                The date the commit was committed.
-
-            ``commit_message``:
-                The commit's message.
+            list of rbtools.clients.base.scmclient.SCMClientCommitHistoryItem:
+            The list of history entries, in order.
 
         Raises:
             rbtools.clients.errors.SCMError:
@@ -1889,7 +2012,7 @@ class GitClient(BaseSCMClient):
 
         # 0x1f is the ASCII field separator. It is a non-printable character
         # that should not appear in any field in `git log`.
-        log_format = '%x1f'.join(log_fields.values())
+        log_format = self._FIELD_SEP.join(log_fields.values())
 
         log_entries = (
             self._run_git(
@@ -1897,9 +2020,9 @@ class GitClient(BaseSCMClient):
                     'log',
                     '-z',
                     '--reverse',
-                    '--pretty=format:%s' % log_format,
+                    f'--pretty=format:{log_format}',
                     '--date=iso8601-strict',
-                    '%s..%s' % (base, tip),
+                    f'{base}..{tip}',
                 ],
                 ignore_errors=True)
             .stdout
@@ -1919,38 +2042,41 @@ class GitClient(BaseSCMClient):
             parents = entry['parent_id'].split()
 
             if len(parents) > 1:
-                raise SCMError(
+                raise SCMError(_(
                     'The Git SCMClient only supports posting commit histories '
-                    'that are entirely linear.')
+                    'that are entirely linear.'))
             elif len(parents) == 0:
-                raise SCMError(
+                raise SCMError(_(
                     'The Git SCMClient only supports posting commits that '
-                    'have exactly one parent.')
+                    'have exactly one parent.'))
 
             history.append(entry)
 
         return history
 
-    def _get_remote(self, local_branch):
+    def _get_remote(
+        self,
+        local_branch: str,
+    ) -> str | None:
         """Return the remote for a given branch.
 
         Args:
-            local_branch (unicode):
+            local_branch (str):
                 The name of the local branch.
 
         Returns:
-            unicode:
+            str:
             The name of the remote corresponding to the local branch. May
             return None if there is no remote.
         """
-        remote = self._get_git_config('branch.%s.remote' % local_branch)
+        remote = self._get_git_config(f'branch.{local_branch}.remote')
 
         if remote:
             return remote.strip()
 
         return None
 
-    def _get_svn_remote(self) -> Dict[str, str]:
+    def _get_svn_remote(self) -> Mapping[str, str]:
         """Return information on the SVN remote.
 
         This will include the remote branch name corresponding to the SVN clone
@@ -2000,18 +2126,21 @@ class GitClient(BaseSCMClient):
 
         return svn_remote_info
 
-    def _find_remote(self, local_or_remote_branch):
+    def _find_remote(
+        self,
+        local_or_remote_branch: str,
+    ) -> str:
         """Find the remote given a branch name.
 
         This takes in a branch name which can be either a local or remote
         branch, and attempts to determine the name of the remote.
 
         Args:
-            local_or_remote_branch (unicode):
+            local_or_remote_branch (str):
                 The name of a branch to find the remote for.
 
         Returns:
-            unicode:
+            str:
             The name of the remote for the given branch. Returns ``origin`` if
             no associated remote can be found.
 
@@ -2059,13 +2188,14 @@ class GitClient(BaseSCMClient):
             if 'origin' in all_remotes:
                 return 'origin'
             else:
-                logging.warning('Could not determine specific upstream remote '
-                                'to use for diffs. We recommend setting '
-                                'TRACKING_BRANCH in reviewboardrc to your '
-                                'nearest upstream remote branch.')
+                logger.warning('Could not determine specific upstream remote '
+                               'to use for diffs. We recommend setting '
+                               'TRACKING_BRANCH in reviewboardrc to your '
+                               'nearest upstream remote branch.')
+
                 return all_remotes[0]
         else:
-            raise SCMError('This clone has no configured remotes.')
+            raise SCMError(_('This clone has no configured remotes.'))
 
     def get_file_content(
         self,

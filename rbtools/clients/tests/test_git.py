@@ -1,9 +1,11 @@
 """Unit tests for GitClient."""
 
+from __future__ import annotations
+
 import os
 import re
 import unittest
-from typing import List, Optional
+from typing import ClassVar, Optional, TYPE_CHECKING
 
 import kgb
 
@@ -24,20 +26,28 @@ from rbtools.utils.process import (RunProcessResult,
                                    run_process,
                                    run_process_exec)
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
-class BaseGitClientTests(SCMClientTestCase):
+
+class BaseGitClientTests(SCMClientTestCase[GitClient]):
     """Base class for unit tests for GitClient.
 
     Version Added:
         4.0
     """
 
+    #: The SCMClient class to instantiate.
     scmclient_cls = GitClient
 
-    _git: str = ''
+    #: The git executable to use.
+    _git: ClassVar[str] = ''
 
     #: The top-level Git directory.
-    git_dir: str
+    git_dir: ClassVar[str]
+
+    #: The clone directory.
+    clone_dir: ClassVar[str]
 
     @classmethod
     def setup_checkout(
@@ -76,7 +86,7 @@ class BaseGitClientTests(SCMClientTestCase):
     @classmethod
     def _run_git(
         cls,
-        command: List[str],
+        command: Sequence[str],
     ) -> RunProcessResult:
         """Run git with the provided arguments.
 
@@ -89,7 +99,7 @@ class BaseGitClientTests(SCMClientTestCase):
             The result of the :py:func:`~rbtools.utils.process.run_process`
             call.
         """
-        return run_process([cls._git] + command)
+        return run_process([cls._git, *command])
 
     @classmethod
     def _git_add_file_commit(
@@ -116,7 +126,8 @@ class BaseGitClientTests(SCMClientTestCase):
         cls._run_git(['add', filename])
         cls._run_git(['commit', '-m', msg])
 
-    def setUp(self):
+    def setUp(self) -> None:
+        """Set up the test case."""
         super().setUp()
 
         self.set_user_home(os.path.join(self.testdata_dir, 'homedir'))
@@ -155,9 +166,18 @@ class BaseGitClientTests(SCMClientTestCase):
 class GitClientTests(BaseGitClientTests):
     """Unit tests for GitClient."""
 
-    TESTSERVER = 'http://127.0.0.1:8080'
-    AUTHOR = PatchAuthor(full_name='name',
-                         email='email')
+    TESTSERVER: ClassVar[str] = 'http://127.0.0.1:8080'
+    AUTHOR: ClassVar[PatchAuthor] = PatchAuthor(full_name='name',
+                                                email='email')
+
+    #: The directory with the child git clone.
+    child_clone_dir: ClassVar[str]
+
+    #: The directory with the grandchild git clone.
+    grandchild_clone_dir: ClassVar[str]
+
+    #: The directory with the original git clone
+    orig_clone_dir: ClassVar[str]
 
     @classmethod
     def setup_checkout(
@@ -198,7 +218,7 @@ class GitClientTests(BaseGitClientTests):
 
         return orig_clone_dir
 
-    def test_check_dependencies_with_git_found(self):
+    def test_check_dependencies_with_git_found(self) -> None:
         """Testing GitClient.check_dependencies with git found"""
         self.spy_on(check_install, op=kgb.SpyOpMatchAny([
             {
@@ -219,7 +239,7 @@ class GitClientTests(BaseGitClientTests):
 
         self.assertEqual(client.git, 'git')
 
-    def test_check_dependencies_with_gitcmd_found_on_windows(self):
+    def test_check_dependencies_with_gitcmd_found_on_windows(self) -> None:
         """Testing GitClient.check_dependencies with git.cmd found on Windows
         """
         self.spy_on(
@@ -246,7 +266,7 @@ class GitClientTests(BaseGitClientTests):
 
         self.assertEqual(client.git, 'git.cmd')
 
-    def test_check_dependencies_with_missing(self):
+    def test_check_dependencies_with_missing(self) -> None:
         """Testing GitClient.check_dependencies with dependencies
         missing
         """
@@ -262,7 +282,7 @@ class GitClientTests(BaseGitClientTests):
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['git', '--help'])
 
-    def test_check_dependencies_with_missing_on_windows(self):
+    def test_check_dependencies_with_missing_on_windows(self) -> None:
         """Testing GitClient.check_dependencies with dependencies
         missing on Windows
         """
@@ -283,7 +303,7 @@ class GitClientTests(BaseGitClientTests):
         self.assertSpyCalledWith(check_install, ['git', '--help'])
         self.assertSpyCalledWith(check_install, ['git.cmd', '--help'])
 
-    def test_git_with_deps_missing(self):
+    def test_git_with_deps_missing(self) -> None:
         """Testing GitClient.git with dependencies missing"""
         self.spy_on(check_install, op=kgb.SpyOpReturn(False))
         self.spy_on(RemovedInRBTools50Warning.warn)
@@ -302,7 +322,7 @@ class GitClientTests(BaseGitClientTests):
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['git', '--help'])
 
-    def test_git_with_deps_not_checked(self):
+    def test_git_with_deps_not_checked(self) -> None:
         """Testing GitClient.git with dependencies not
         checked
         """
@@ -325,7 +345,7 @@ class GitClientTests(BaseGitClientTests):
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['git', '--help'])
 
-    def test_get_local_path_with_deps_missing(self):
+    def test_get_local_path_with_deps_missing(self) -> None:
         """Testing GitClient.get_local_path with dependencies missing"""
         self.spy_on(check_install, op=kgb.SpyOpReturn(False))
         self.spy_on(RemovedInRBTools50Warning.warn)
@@ -349,7 +369,7 @@ class GitClientTests(BaseGitClientTests):
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['git', '--help'])
 
-    def test_get_local_path_with_deps_not_checked(self):
+    def test_get_local_path_with_deps_not_checked(self) -> None:
         """Testing GitClient.get_local_path with dependencies not
         checked
         """
@@ -366,9 +386,9 @@ class GitClientTests(BaseGitClientTests):
             'RBTools 5.0.'
         )
 
-        with self.assertLogs(level='DEBUG') as ctx:
-            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
-                client.get_local_path()
+        with self.assertLogs(level='DEBUG') as ctx, \
+             self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+            client.get_local_path()
 
         self.assertEqual(
             ctx.records[0].msg,
@@ -377,16 +397,19 @@ class GitClientTests(BaseGitClientTests):
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['git', '--help'])
 
-    def test_get_repository_info_simple(self):
+    def test_get_repository_info_simple(self) -> None:
         """Testing GitClient get_repository_info, simple case"""
         client = self.build_client()
         ri = client.get_repository_info()
+        assert ri is not None
+        assert isinstance(ri.path, str)
+        assert ri.base_path is not None
 
         self.assertIsInstance(ri, RepositoryInfo)
         self.assertEqual(ri.base_path, '')
         self.assertEqual(ri.path.rstrip('/.git'), self.git_dir)
 
-    def test_get_repository_info_with_deps_missing(self):
+    def test_get_repository_info_with_deps_missing(self) -> None:
         """Testing GitClient.get_repository_info with dependencies
         missing
         """
@@ -411,7 +434,7 @@ class GitClientTests(BaseGitClientTests):
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['git', '--help'])
 
-    def test_get_repository_info_with_deps_not_checked(self):
+    def test_get_repository_info_with_deps_not_checked(self) -> None:
         """Testing GitClient.get_repository_info with dependencies
         not checked
         """
@@ -428,9 +451,9 @@ class GitClientTests(BaseGitClientTests):
             'RBTools 5.0.'
         )
 
-        with self.assertLogs(level='DEBUG') as ctx:
-            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
-                client.get_repository_info()
+        with self.assertLogs(level='DEBUG') as ctx, \
+             self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+            client.get_repository_info()
 
         self.assertEqual(
             ctx.records[0].msg,
@@ -439,24 +462,26 @@ class GitClientTests(BaseGitClientTests):
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['git', '--help'])
 
-    def test_scan_for_server_simple(self):
+    def test_scan_for_server_simple(self) -> None:
         """Testing GitClient scan_for_server, simple case"""
         client = self.build_client()
         ri = client.get_repository_info()
+        assert ri is not None
 
         server = client.scan_for_server(ri)
         self.assertIsNone(server)
 
-    def test_scan_for_server_property(self):
+    def test_scan_for_server_property(self) -> None:
         """Testing GitClient scan_for_server using repo property"""
         client = self.build_client()
 
         self._run_git(['config', 'reviewboard.url', self.TESTSERVER])
         ri = client.get_repository_info()
+        assert ri is not None
 
         self.assertEqual(client.scan_for_server(ri), self.TESTSERVER)
 
-    def test_diff(self):
+    def test_diff(self) -> None:
         """Testing GitClient.diff"""
         client = self.build_client(needs_diff=True)
         client.get_repository_info()
@@ -491,7 +516,7 @@ class GitClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_with_multiple_commits(self):
+    def test_diff_with_multiple_commits(self) -> None:
         """Testing GitClient.diff with multiple commits"""
         client = self.build_client(needs_diff=True)
         client.get_repository_info()
@@ -536,7 +561,7 @@ class GitClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_with_exclude_patterns(self):
+    def test_diff_with_exclude_patterns(self) -> None:
         """Testing GitClient.diff with file exclusion"""
         client = self.build_client(needs_diff=True)
         client.get_repository_info()
@@ -572,7 +597,7 @@ class GitClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_exclude_in_subdir(self):
+    def test_diff_exclude_in_subdir(self) -> None:
         """Testing GitClient.diff with file exclusion in a subdir"""
         client = self.build_client(needs_diff=True)
         base_commit_id = self._git_get_head()
@@ -611,7 +636,7 @@ class GitClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_with_exclude_patterns_root_pattern_in_subdir(self):
+    def test_diff_with_exclude_patterns_root_pattern_in_subdir(self) -> None:
         """Testing GitClient.diff with file exclusion in the repo root"""
         client = self.build_client(needs_diff=True)
         base_commit_id = self._git_get_head()
@@ -651,7 +676,7 @@ class GitClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_with_branch_diverge(self):
+    def test_diff_with_branch_diverge(self) -> None:
         """Testing GitClient.diff with divergent branches"""
         client = self.build_client(needs_diff=True)
 
@@ -726,7 +751,7 @@ class GitClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_with_tracking_branch_no_origin(self):
+    def test_diff_with_tracking_branch_no_origin(self) -> None:
         """Testing GitClient.diff with a tracking branch, but no origin remote
         """
         client = self.build_client(needs_diff=True)
@@ -767,7 +792,7 @@ class GitClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_with_tracking_branch_local(self):
+    def test_diff_with_tracking_branch_local(self) -> None:
         """Testing GitClient.diff with a local tracking branch"""
         client = self.build_client(needs_diff=True)
 
@@ -813,7 +838,7 @@ class GitClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_with_tracking_branch_option(self):
+    def test_diff_with_tracking_branch_option(self) -> None:
         """Testing GitClient.diff with option override for tracking branch"""
         client = self.build_client(
             needs_diff=True,
@@ -857,7 +882,7 @@ class GitClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_with_tracking_branch_slash(self):
+    def test_diff_with_tracking_branch_slash(self) -> None:
         """Testing GitClient.diff with tracking branch that has slash in its
         name
         """
@@ -895,7 +920,7 @@ class GitClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_parse_revision_spec_no_args(self):
+    def test_parse_revision_spec_no_args(self) -> None:
         """Testing GitClient.parse_revision_spec with no specified revisions"""
         client = self.build_client()
 
@@ -913,7 +938,7 @@ class GitClientTests(BaseGitClientTests):
                 'tip': tip_commit_id,
             })
 
-    def test_parse_revision_spec_no_args_parent(self):
+    def test_parse_revision_spec_no_args_parent(self) -> None:
         """Testing GitClient.parse_revision_spec with no specified revisions
         and a parent diff
         """
@@ -946,7 +971,7 @@ class GitClientTests(BaseGitClientTests):
                 'tip': tip_commit_id,
             })
 
-    def test_parse_revision_spec_one_arg(self):
+    def test_parse_revision_spec_one_arg(self) -> None:
         """Testing GitClient.parse_revision_spec with one specified revision"""
         client = self.build_client()
 
@@ -964,7 +989,7 @@ class GitClientTests(BaseGitClientTests):
                 'tip': tip_commit_id,
             })
 
-    def test_parse_revision_spec_one_arg_parent(self):
+    def test_parse_revision_spec_one_arg_parent(self) -> None:
         """Testing GitClient.parse_revision_spec with one specified revision
         and a parent diff
         """
@@ -987,7 +1012,7 @@ class GitClientTests(BaseGitClientTests):
                 'tip': tip_commit_id,
             })
 
-    def test_parse_revision_spec_two_args(self):
+    def test_parse_revision_spec_two_args(self) -> None:
         """Testing GitClient.parse_revision_spec with two specified
         revisions
         """
@@ -1007,7 +1032,7 @@ class GitClientTests(BaseGitClientTests):
                 'tip': tip_commit_id,
             })
 
-    def test_parse_revision_spec_one_arg_two_revs(self):
+    def test_parse_revision_spec_one_arg_two_revs(self) -> None:
         """Testing GitClient.parse_revision_spec with diff-since syntax"""
         client = self.build_client()
 
@@ -1025,7 +1050,7 @@ class GitClientTests(BaseGitClientTests):
                 'tip': tip_commit_id,
             })
 
-    def test_parse_revision_spec_one_arg_since_merge(self):
+    def test_parse_revision_spec_one_arg_since_merge(self) -> None:
         """Testing GitClient.parse_revision_spec with diff-since-merge
         syntax
         """
@@ -1045,14 +1070,14 @@ class GitClientTests(BaseGitClientTests):
                 'tip': tip_commit_id,
             })
 
-    def test_parse_revision_spec_with_too_many_revisions(self):
+    def test_parse_revision_spec_with_too_many_revisions(self) -> None:
         """Testing GitClient.parse_revision_spec with too many revisions"""
         client = self.build_client()
 
         with self.assertRaises(TooManyRevisionsError):
-            client.parse_revision_spec([1, 2, 3])
+            client.parse_revision_spec(['1', '2', '3'])
 
-    def test_parse_revision_spec_with_diff_finding_parent(self):
+    def test_parse_revision_spec_with_diff_finding_parent(self) -> None:
         """Testing GitClient.parse_revision_spec with target branch off a
         tracking branch not aligned with the remote
         """
@@ -1098,7 +1123,9 @@ class GitClientTests(BaseGitClientTests):
                 'tip': tip_commit_id,
             })
 
-    def test_parse_revision_spec_with_diff_finding_parent_case_one(self):
+    def test_parse_revision_spec_with_diff_finding_parent_case_one(
+        self,
+    ) -> None:
         """Testing GitClient.parse_revision_spec with target branch off a
         tracking branch aligned with the remote
         """
@@ -1144,7 +1171,9 @@ class GitClientTests(BaseGitClientTests):
                 'tip': tip_commit_id,
             })
 
-    def test_parse_revision_spec_with_diff_finding_parent_case_two(self):
+    def test_parse_revision_spec_with_diff_finding_parent_case_two(
+        self,
+    ) -> None:
         """Testing GitClient.parse_revision_spec with target branch off
         a tracking branch with changes since the remote
         """
@@ -1187,7 +1216,9 @@ class GitClientTests(BaseGitClientTests):
                 'tip': tip_commit_id,
             })
 
-    def test_parse_revision_spec_with_diff_finding_parent_case_three(self):
+    def test_parse_revision_spec_with_diff_finding_parent_case_three(
+        self,
+    ) -> None:
         """Testing GitClient.parse_revision_spec with target branch off a
         branch not properly tracking the remote
         """
@@ -1225,7 +1256,9 @@ class GitClientTests(BaseGitClientTests):
                 'tip': tip_commit_id,
             })
 
-    def test_parse_revision_spec_with__diff_finding_parent_case_four(self):
+    def test_parse_revision_spec_with__diff_finding_parent_case_four(
+        self,
+    ) -> None:
         """Testing GitClient.parse_revision_spec with a target branch that
         merged a tracking branch off another tracking branch
         """
@@ -1268,7 +1301,9 @@ class GitClientTests(BaseGitClientTests):
                 'tip': tip_commit_id,
             })
 
-    def test_parse_revision_spec_with_diff_finding_parent_case_five(self):
+    def test_parse_revision_spec_with_diff_finding_parent_case_five(
+        self,
+    ) -> None:
         """Testing GitClient.parse_revision_spec with a target branch posted
         off a tracking branch that merged another tracking branch
         """
@@ -1315,7 +1350,9 @@ class GitClientTests(BaseGitClientTests):
                 'tip': tip_commit_id,
             })
 
-    def test_parse_revision_spec_with_diff_finding_parent_case_six(self):
+    def test_parse_revision_spec_with_diff_finding_parent_case_six(
+        self,
+    ) -> None:
         """Testing GitClient.parse_revision_spec with a target branch posted
         off a remote branch without any tracking branches
         """
@@ -1353,7 +1390,9 @@ class GitClientTests(BaseGitClientTests):
                 'tip': tip_commit_id,
             })
 
-    def test_parse_revision_spec_with_diff_finding_parent_case_seven(self):
+    def test_parse_revision_spec_with_diff_finding_parent_case_seven(
+        self,
+    ) -> None:
         """Testing GitClient.parse_revision_spec with a target branch posted
         off a remote branch that is aligned to the same commit as another
         remote branch
@@ -1412,7 +1451,9 @@ class GitClientTests(BaseGitClientTests):
                 'tip': tip_commit_id,
             })
 
-    def test_parse_revision_spec_with_diff_finding_parent_case_eight(self):
+    def test_parse_revision_spec_with_diff_finding_parent_case_eight(
+        self,
+    ) -> None:
         """Testing GitClient.parse_revision_spec with a target branch not
         up-to-date with a remote branch
         """
@@ -1471,7 +1512,9 @@ class GitClientTests(BaseGitClientTests):
                 'tip': tip_commit_id,
             })
 
-    def test_parse_revision_spec_with_diff_finding_parent_case_nine(self):
+    def test_parse_revision_spec_with_diff_finding_parent_case_nine(
+        self,
+    ) -> None:
         """Testing GitClient.parse_revision_spec with a target branch that has
         branches from different remotes in its path
         """
@@ -1528,7 +1571,7 @@ class GitClientTests(BaseGitClientTests):
                 'tip': tip_commit_id,
             })
 
-    def test_get_raw_commit_message(self):
+    def test_get_raw_commit_message(self) -> None:
         """Testing GitClient.get_raw_commit_message"""
         client = self.build_client()
 
@@ -1539,7 +1582,7 @@ class GitClientTests(BaseGitClientTests):
         self.assertEqual(client.get_raw_commit_message(revisions),
                          'Commit 2')
 
-    def test_push_upstream_pull_exception(self):
+    def test_push_upstream_pull_exception(self) -> None:
         """Testing GitClient.push_upstream with an invalid remote branch"""
         client = self.build_client()
 
@@ -1550,7 +1593,7 @@ class GitClientTests(BaseGitClientTests):
                                       '"non-existent-branch".'):
             client.push_upstream('non-existent-branch')
 
-    def test_push_upstream_no_push_exception(self):
+    def test_push_upstream_no_push_exception(self) -> None:
         """Testing GitClient.push_upstream with 'git push' disabled"""
         client = self.build_client()
 
@@ -1562,7 +1605,7 @@ class GitClientTests(BaseGitClientTests):
                                       'upstream.'):
             client.push_upstream('master')
 
-    def test_merge_invalid_destination(self):
+    def test_merge_invalid_destination(self) -> None:
         """Testing GitClient.merge with an invalid destination branch"""
         client = self.build_client()
 
@@ -1579,7 +1622,7 @@ class GitClientTests(BaseGitClientTests):
         else:
             self.fail('Expected MergeError')
 
-    def test_merge_invalid_target(self):
+    def test_merge_invalid_target(self) -> None:
         """Testing GitClient.merge with an invalid target branch"""
         client = self.build_client()
 
@@ -1596,7 +1639,7 @@ class GitClientTests(BaseGitClientTests):
         else:
             self.fail('Expected MergeError')
 
-    def test_merge_with_squash(self):
+    def test_merge_with_squash(self) -> None:
         """Testing GitClient.merge with squash set to True"""
         client = self.build_client()
         client.get_repository_info()
@@ -1623,7 +1666,7 @@ class GitClientTests(BaseGitClientTests):
             run_process_exec.calls[-2],
             ['git', 'merge', 'new-branch', '--squash', '--no-commit'])
 
-    def test_merge_without_squash(self):
+    def test_merge_without_squash(self) -> None:
         """Testing GitClient.merge with squash set to False"""
         client = self.build_client()
         client.get_repository_info()
@@ -1650,7 +1693,7 @@ class GitClientTests(BaseGitClientTests):
             run_process_exec.calls[-2],
             ['git', 'merge', 'new-branch', '--no-ff', '--no-commit'])
 
-    def test_create_commit_with_run_editor_true(self):
+    def test_create_commit_with_run_editor_true(self) -> None:
         """Testing GitClient.create_commit with run_editor set to True"""
         client = self.build_client()
 
@@ -1669,7 +1712,7 @@ class GitClientTests(BaseGitClientTests):
             ['git', 'commit', '-m', 'TEST COMMIT MESSAGE.',
              '--author', 'name <email>'])
 
-    def test_create_commit_with_run_editor_false(self):
+    def test_create_commit_with_run_editor_false(self) -> None:
         """Testing GitClient.create_commit with run_editor set to False"""
         client = self.build_client()
 
@@ -1688,7 +1731,7 @@ class GitClientTests(BaseGitClientTests):
             ['git', 'commit', '-m', 'Test commit message.',
              '--author', 'name <email>'])
 
-    def test_create_commit_with_all_files_true(self):
+    def test_create_commit_with_all_files_true(self) -> None:
         """Testing GitClient.create_commit with all_files set to True"""
         client = self.build_client()
 
@@ -1710,7 +1753,7 @@ class GitClientTests(BaseGitClientTests):
             run_process_exec,
             ['git', 'commit', '-m', 'message', '--author', 'name <email>'])
 
-    def test_create_commit_with_all_files_false(self):
+    def test_create_commit_with_all_files_false(self) -> None:
         """Testing GitClient.create_commit with all_files set to False"""
         client = self.build_client()
 
@@ -1732,7 +1775,7 @@ class GitClientTests(BaseGitClientTests):
             run_process_exec,
             ['git', 'commit', '-m', 'message', '--author', 'name <email>'])
 
-    def test_create_commit_with_empty_commit_message(self):
+    def test_create_commit_with_empty_commit_message(self) -> None:
         """Testing GitClient.create_commit with empty commit message"""
         client = self.build_client()
 
@@ -1751,7 +1794,7 @@ class GitClientTests(BaseGitClientTests):
                                  run_editor=True,
                                  files=['foo.txt'])
 
-    def test_create_commit_without_author(self):
+    def test_create_commit_without_author(self) -> None:
         """Testing GitClient.create_commit without author information"""
         client = self.build_client()
 
@@ -1769,7 +1812,7 @@ class GitClientTests(BaseGitClientTests):
             run_process_exec,
             ['git', 'commit', '-m', 'TEST COMMIT MESSAGE.'])
 
-    def test_delete_branch_with_merged_only(self):
+    def test_delete_branch_with_merged_only(self) -> None:
         """Testing GitClient.delete_branch with merged_only set to True"""
         client = self.build_client()
 
@@ -1783,7 +1826,7 @@ class GitClientTests(BaseGitClientTests):
             run_process_exec,
             ['git', 'branch', '-d', 'new-branch'])
 
-    def test_delete_branch_without_merged_only(self):
+    def test_delete_branch_without_merged_only(self) -> None:
         """Testing GitClient.delete_branch with merged_only set to False"""
         client = self.build_client()
 
@@ -1797,7 +1840,7 @@ class GitClientTests(BaseGitClientTests):
             run_process_exec,
             ['git', 'branch', '-D', 'new-branch'])
 
-    def test_get_parent_branch_with_non_master_default(self):
+    def test_get_parent_branch_with_non_master_default(self) -> None:
         """Testing GitClient._get_parent_branch with a non-master default
         branch
         """
@@ -1925,18 +1968,18 @@ class GitPerforceClientTests(BaseGitClientTests):
 
         return os.path.realpath(p4_clone_dir)
 
-    def test_get_repository_info(self):
+    def test_get_repository_info(self) -> None:
         """Testing GitClient.get_repository_info with git-p4"""
         client = self.build_client()
         repository_info = client.get_repository_info()
+        assert repository_info is not None
 
-        self.assertIsNotNone(repository_info)
         self.assertEqual(repository_info.path, 'example.com:1666')
         self.assertEqual(repository_info.base_path, '')
         self.assertEqual(repository_info.local_path, self.checkout_dir)
         self.assertEqual(client._type, client.TYPE_GIT_P4)
 
-    def test_diff(self):
+    def test_diff(self) -> None:
         """Testing GitClient.diff with git-p4"""
         client = self.build_client(needs_diff=True)
         client.get_repository_info()
@@ -1994,7 +2037,7 @@ class GitPerforceClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_with_spaces_in_filename(self):
+    def test_diff_with_spaces_in_filename(self) -> None:
         """Testing GitClient.diff with git-p4 with spaces in filename"""
         client = self.build_client(needs_diff=True)
         client.get_repository_info()
@@ -2040,7 +2083,7 @@ class GitPerforceClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_with_rename(self):
+    def test_diff_with_rename(self) -> None:
         """Testing GitClient.diff with renamed file"""
         client = self.build_client(needs_diff=True)
         client.get_repository_info()
@@ -2069,7 +2112,7 @@ class GitPerforceClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_with_rename_and_changes(self):
+    def test_diff_with_rename_and_changes(self) -> None:
         """Testing GitClient.diff with renamed file and changes"""
         client = self.build_client(needs_diff=True)
         client.get_repository_info()
@@ -2111,7 +2154,7 @@ class GitPerforceClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_with_deletes(self):
+    def test_diff_with_deletes(self) -> None:
         """Testing GitClient.diff with deleted files"""
         client = self.build_client(needs_diff=True)
         client.get_repository_info()
@@ -2152,7 +2195,7 @@ class GitPerforceClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_with_multiple_commits(self):
+    def test_diff_with_multiple_commits(self) -> None:
         """Testing GitClient.diff with git-p4 and multiple commits"""
         client = self.build_client(needs_diff=True)
         client.get_repository_info()
@@ -2194,7 +2237,7 @@ class GitPerforceClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_with_exclude_patterns(self):
+    def test_diff_with_exclude_patterns(self) -> None:
         """Testing GitClient.diff with git-p4 and file exclusion"""
         client = self.build_client(needs_diff=True)
         client.get_repository_info()
@@ -2227,7 +2270,7 @@ class GitPerforceClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_exclude_in_subdir(self):
+    def test_diff_exclude_in_subdir(self) -> None:
         """Testing GitClient simple diff with file exclusion in a subdir"""
         client = self.build_client(needs_diff=True)
         base_commit_id = self._git_get_head()
@@ -2263,7 +2306,7 @@ class GitPerforceClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_with_exclude_patterns_root_pattern_in_subdir(self):
+    def test_diff_with_exclude_patterns_root_pattern_in_subdir(self) -> None:
         """Testing GitClient diff with file exclusion in the repo root"""
         client = self.build_client(needs_diff=True)
         base_commit_id = self._git_get_head()
@@ -2308,6 +2351,9 @@ class GitSubversionClientTests(BaseGitClientTests):
         4.0
     """
 
+    #: The path to the upstream SVN repository.
+    svn_repo_path: ClassVar[str]
+
     @classmethod
     def setup_checkout(
         cls,
@@ -2334,26 +2380,26 @@ class GitSubversionClientTests(BaseGitClientTests):
 
         svn_clone_dir = os.path.join(clone_dir, 'svn-clone')
 
-        cls.svn_repo_path = 'file://%s' % os.path.join(cls.testdata_dir,
-                                                       'svn-repo')
+        svn_repo_dir = os.path.join(cls.testdata_dir, 'svn-repo')
+        cls.svn_repo_path = f'file://{svn_repo_dir}'
 
         cls._run_git(['svn', 'clone', cls.svn_repo_path, svn_clone_dir])
         os.chdir(svn_clone_dir)
 
         return os.path.realpath(svn_clone_dir)
 
-    def test_get_repository_info(self):
+    def test_get_repository_info(self) -> None:
         """Testing GitClient.get_repository_info with git-svn"""
         client = self.build_client()
         repository_info = client.get_repository_info()
+        assert repository_info is not None
 
-        self.assertIsNotNone(repository_info)
         self.assertEqual(repository_info.path, self.svn_repo_path)
         self.assertEqual(repository_info.base_path, '/')
         self.assertEqual(repository_info.local_path, self.checkout_dir)
         self.assertEqual(client._type, client.TYPE_GIT_SVN)
 
-    def test_parse_revision_spec_no_args(self):
+    def test_parse_revision_spec_no_args(self) -> None:
         """Testing GitClient.parse_revision_spec with git-svn and no
         specified revisions
         """
@@ -2373,7 +2419,7 @@ class GitSubversionClientTests(BaseGitClientTests):
                 'tip': tip_commit_id,
             })
 
-    def test_diff(self):
+    def test_diff(self) -> None:
         """Testing GitClient.diff with git-svn"""
         client = self.build_client(needs_diff=True)
         client.get_repository_info()
@@ -2431,7 +2477,7 @@ class GitSubversionClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_with_spaces_in_filename(self):
+    def test_diff_with_spaces_in_filename(self) -> None:
         """Testing GitClient.diff with git-svn with spaces in filename"""
         client = self.build_client(needs_diff=True)
 
@@ -2474,7 +2520,7 @@ class GitSubversionClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_with_deletes(self):
+    def test_diff_with_deletes(self) -> None:
         """Testing GitClient.diff with git-svn and deleted files"""
         client = self.build_client(needs_diff=True)
 
@@ -2515,7 +2561,7 @@ class GitSubversionClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_with_multiple_commits(self):
+    def test_diff_with_multiple_commits(self) -> None:
         """Testing GitClient.diff with git-svn and multiple commits"""
         client = self.build_client(needs_diff=True)
 
@@ -2558,7 +2604,7 @@ class GitSubversionClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_with_exclude_patterns(self):
+    def test_diff_with_exclude_patterns(self) -> None:
         """Testing GitClient.diff with git-svn and file exclusion"""
         client = self.build_client(needs_diff=True)
         base_commit_id = self._git_get_head()
@@ -2679,7 +2725,7 @@ class GitPatcherTests(BaseGitClientTests):
         self.assertEqual(self._git_get_head(), head)
 
     def test_patch_with_commit(self) -> None:
-        """Testing GitPatcher.patch with commiting"""
+        """Testing GitPatcher.patch with committing"""
         client = self.build_client()
 
         # Refresh state so that indexes will be looked up. For some reason,

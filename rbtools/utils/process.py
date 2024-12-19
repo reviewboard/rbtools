@@ -1,13 +1,19 @@
 """Utilities for running processes."""
 
+from __future__ import annotations
+
 import io
 import logging
 import os
 import subprocess
-from typing import Any, AnyStr, Dict, List, Optional, Tuple, Union
+from typing import (Any, AnyStr, Dict, List, Optional, Tuple, TYPE_CHECKING,
+                    Union)
 
 from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.encoding import force_unicode
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 logger = logging.getLogger(__name__)
@@ -187,7 +193,7 @@ class RunProcessError(Exception):
 
 
 def run_process(
-    command: Union[AnyStr, List[AnyStr]],
+    command: Union[AnyStr, Sequence[AnyStr]],
     *,
     cwd: Optional[str] = None,
     env: Optional[Dict[str, str]] = None,
@@ -423,7 +429,7 @@ def run_process(
 
 
 def run_process_exec(
-    command: Union[AnyStr, List[AnyStr]],
+    command: Union[AnyStr, Sequence[AnyStr]],
     cwd: Optional[str],
     env: Dict[str, str],
     needs_stdout: bool,
@@ -507,7 +513,7 @@ def run_process_exec(
 
 
 def execute(
-    command: Union[AnyStr, List[AnyStr]],
+    command: Union[AnyStr, Sequence[AnyStr]],
     env: Optional[Dict[str, str]] = None,
     cwd: Optional[str] = None,
     split_lines: bool = False,
