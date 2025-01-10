@@ -11,8 +11,10 @@ import subprocess
 from typing import Optional
 
 import puremagic
+from housekeeping import deprecate_non_keyword_only_args
 from typing_extensions import TypedDict
 
+from rbtools.deprecation import RemovedInRBTools70Warning
 from rbtools.utils.filesystem import is_exe_in_path
 
 
@@ -112,6 +114,7 @@ DEFAULT_MIMETYPE = 'application/octet-stream'
 _has_file_exe = None
 
 
+@deprecate_non_keyword_only_args(RemovedInRBTools70Warning)
 def guess_mimetype(
     *,
     data: bytes,
@@ -154,8 +157,8 @@ def guess_mimetype(
         assert p.stdin is not None
         assert p.stdout is not None
 
-        # Write the content of the file in 4k chunks until the ``file`` utility has
-        # enough data to make a determination.
+        # Write the content of the file in 4k chunks until the ``file``
+        # utility has enough data to make a determination.
         for i in range(0, len(data), 4096):
             try:
                 p.stdin.write(data[i:i + 4096])

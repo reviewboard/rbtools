@@ -1763,7 +1763,7 @@ class Post(BaseCommand):
                         source_filename, source_revision, e)
                     continue
 
-                source_mimetype = guess_mimetype(source_file_content)
+                source_mimetype = guess_mimetype(data=source_file_content)
 
                 if mimetype != source_mimetype:
                     logger.debug('Skipping %s (%s): MIME type of source '
