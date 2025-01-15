@@ -792,9 +792,9 @@ class MercurialClient(BaseSCMClient):
             str:
             The global revision ID of the commit.
         """
-        # --debug ensures that we get the full ID.
         identify = self._execute(
-            [self._exe, 'identify', '--debug', '-i', '--hidden', '-r',
+            [self._exe, 'identify', '-i', '--hidden',
+             '--template', '{node}', '-r',
              str(revision)],
             ignore_errors=True, none_on_ignored_error=True)
 
