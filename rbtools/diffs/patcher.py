@@ -89,7 +89,7 @@ class ParsedPatchOutput(TypedDict):
 
     #: A list of filenames for files patched or attempted to be patched.
     #:
-    #: This may include files that had conflicts and coud not be fully
+    #: This may include files that had conflicts and could not be fully
     #: patched.
     patched_files: list[str]
 
@@ -213,7 +213,7 @@ class Patcher:
                 If not provided, this will patch in the current directory
                 by default.
 
-            repository (rbtools.clients.base.repository.RepositoryInfo):
+            repository_info (rbtools.clients.base.repository.RepositoryInfo):
                 Information on the current source code repository.
 
                 This may be needed in order to apply patches correctly to
@@ -371,7 +371,7 @@ class Patcher:
         self.run_commit_editor = run_commit_editor
 
     def patch(self) -> Iterator[PatchResult]:
-        """Applies the patches to the tree.
+        """Apply the patches to the tree.
 
         This is the primary method used to apply the patches. It will handle
         applying the patches, returning results, and raising exceptions on
@@ -385,7 +385,7 @@ class Patcher:
             successfully or with normal patch failures.
 
         Raises:
-            rbtools.diffs.errors.ApplyPatchResult:
+            rbtools.diffs.errors.ApplyPatchError:
                 There was an error attempting to apply a patch.
 
                 This won't be raised simply for conflicts or normal patch
@@ -442,9 +442,10 @@ class Patcher:
         self._patched = True
 
     def apply_patches(self) -> Iterator[PatchResult]:
-        """Internal function to apply the patches.
+        """Apply the patches.
 
-        This will handle applying all patches provided to the patcher.
+        This is an internal function that will handle applying all patches
+        provided to the patcher.
 
         Subclasses should override this if providing batch-patching logic.
         They would also be responsible for handling commits, if requested
@@ -520,11 +521,11 @@ class Patcher:
         patch: Patch,
         patch_num: int,
     ) -> PatchResult:
-        """Internal function to apply a single patch.
+        """Apply a single patch.
 
-        This will take a single patch and apply it. It may be applied to
-        files that already contain other modifications or have had other
-        patches applied to it.
+        This is an internal method that will take a single patch and apply it.
+        It may be applied to files that already contain other modifications or
+        have had other patches applied to it.
 
         Subclasses that can apply patches one-by-one may override this to
         apply patches using SCM-specific methods.
@@ -751,7 +752,7 @@ class Patcher:
         patch_result: PatchResult,
         run_commit_editor: bool,
     ) -> None:
-        """Internal method to create a commit based on a patch result.
+        """Create a commit based on a patch result.
 
         Subclasses must implement this and set :py:attr:`can_commit` if
         it supports creating commits based on changes in the working tree.

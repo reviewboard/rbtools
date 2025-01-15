@@ -276,6 +276,12 @@ class SCMClientPatcher(Generic[TSCMClient], Patcher):
     # Instance variables #
     ######################
 
+    #: Whether the patcher can create commits.
+    can_commit: bool
+
+    #: Whether the patcher can create or delete empty files.
+    can_patch_empty_files: bool
+
     #: The SCMClient that owns the patcher.
     scmclient: TSCMClient
 
@@ -290,6 +296,9 @@ class SCMClientPatcher(Generic[TSCMClient], Patcher):
         Args:
             scmclient (BaseSCMClient):
                 The SCMClient object.
+
+            **kwargs (PatcherKwargs):
+                Keyword arguments for the patcher.
         """
         super().__init__(**kwargs)
 
@@ -306,7 +315,7 @@ class SCMClientPatcher(Generic[TSCMClient], Patcher):
         patch_result: PatchResult,
         run_commit_editor: bool,
     ) -> None:
-        """Internal method to create a commit based on a patch result.
+        """Create a commit based on a patch result.
 
         This will invoke the SCMClient's logic for committing files from
         a patch.
@@ -355,7 +364,7 @@ class _LegacyPatcher(SCMClientPatcher['BaseSCMClient']):
         patch: Patch,
         patch_num: int,
     ) -> PatchResult:
-        """Internal function to apply a single patch.
+        """Apply a single patch.
 
         This will take a single patch and apply it using the SCMClient's
         legacy patching methods.
