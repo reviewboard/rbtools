@@ -1635,7 +1635,6 @@ class BaseSCMClient:
     def amend_commit_description(
         self,
         message: str,
-        *,
         revisions: Optional[SCMClientRevisionSpec] = None,
     ) -> None:
         """Update a commit message to the given string.
