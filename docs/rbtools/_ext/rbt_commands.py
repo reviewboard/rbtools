@@ -79,10 +79,8 @@ class CommandDirective(Directive):
 
         name = make_command_section_ref_id(cmd_class.name)
 
-        env.temp_data.update({
-            'rbt-command:class': cmd_class,
-            'rbt-command:doc-prefix': name,
-        })
+        env.temp_data['rbt-command:class'] = cmd_class
+        env.temp_data['rbt-command:doc-prefix'] = name
 
         target_node = nodes.target('', '', ids=[name], names=[name])
         doc.note_explicit_target(target_node)
@@ -424,10 +422,8 @@ class SubCommandDirective(Directive):
         name = make_command_section_ref_id(command_cls.name,
                                            subcommand_name)
 
-        env.temp_data.update({
-            'rbt-subcommand:class': subcommand_cls,
-            'rbt-subcommand:doc-prefix': name,
-        })
+        env.temp_data['rbt-subcommand:class'] = subcommand_cls
+        env.temp_data['rbt-subcommand:doc-prefix'] = name
 
         # Set up the initial target for this subcommand.
         target_node = nodes.target('', '',
