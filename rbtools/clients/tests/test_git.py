@@ -2785,7 +2785,7 @@ class GitPatcherTests(BaseGitClientTests):
         self.assertEqual(self._git_get_num_commits(), num_commits)
 
     def test_patch_with_multiple_patches_and_commit(self) -> None:
-        """Testing GitPatcher.patch with multiple patches"""
+        """Testing GitPatcher.patch with multiple patches and committing"""
         client = self.build_client()
 
         # Refresh state so that indexes will be looked up. For some reason,
@@ -2845,7 +2845,7 @@ class GitPatcherTests(BaseGitClientTests):
         with open('foo.txt', 'rb') as fp:
             self.assertEqual(fp.read(), FOO2)
 
-        # There should not be a new commit. HEAD won't change.
+        # There should be two new commits.
         self.assertEqual(self._git_get_num_commits(), num_commits + 2)
 
     def test_patch_with_revert(self) -> None:
@@ -2997,5 +2997,5 @@ class GitPatcherTests(BaseGitClientTests):
                 b'Musa, mihi causas memora, quo numine laeso,\n'
                 b'\n')
 
-        # There should not be a new commit. HEAD won't change.
+        # There should be two new commits.
         self.assertEqual(self._git_get_num_commits(), num_commits + 2)
