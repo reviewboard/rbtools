@@ -357,9 +357,14 @@ class Patcher:
                 # commit messages in any typical flow, but it's a decent
                 # safeguard.
                 for patch_num, patch in patches_to_prepare:
-                    patch.author = default_author
-                    patch.message = \
-                        f'[{patch_num}/{total_patches}] {default_message}'
+                    if not patch.author or squash:
+                        patch.author = default_author
+
+                    if squash:
+                        patch.message = default_message
+                    elif not patch.message:
+                        patch.message = \
+                            f'[{patch_num}/{total_patches}] {default_message}'
 
             if self.revert:
                 # Make it clear that this commit is reverting a prior patch,

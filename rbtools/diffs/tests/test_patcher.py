@@ -158,12 +158,12 @@ class PatcherTests(kgb.SpyAgency, TestCase):
         self.assertEqual(patch.message, patch2_message)
 
         patch = patcher.patches[2]
-        self.assertEqual(patch.author, default_author)
+        self.assertEqual(patch.author, patch3_author)
         self.assertEqual(patch.message, f'[3/5] {default_message}')
 
         patch = patcher.patches[3]
         self.assertEqual(patch.author, default_author)
-        self.assertEqual(patch.message, f'[4/5] {default_message}')
+        self.assertEqual(patch.message, patch4_message)
 
         patch = patcher.patches[4]
         self.assertEqual(patch.author, default_author)
@@ -236,12 +236,12 @@ class PatcherTests(kgb.SpyAgency, TestCase):
         self.assertEqual(patch.message, patch2_message)
 
         patch = patcher.patches[2]
-        self.assertEqual(patch.author, default_author)
+        self.assertEqual(patch.author, patch3_author)
         self.assertEqual(patch.message, f'[3/5] {default_message}')
 
         patch = patcher.patches[3]
         self.assertEqual(patch.author, default_author)
-        self.assertEqual(patch.message, f'[4/5] {default_message}')
+        self.assertEqual(patch.message, patch4_message)
 
         patch = patcher.patches[4]
         self.assertEqual(patch.author, default_author)
@@ -316,12 +316,12 @@ class PatcherTests(kgb.SpyAgency, TestCase):
         self.assertEqual(patch.message, patch2_message)
 
         patch = patcher.patches[2]
-        self.assertEqual(patch.author, default_author)
+        self.assertEqual(patch.author, patch3_author)
         self.assertEqual(patch.message, f'[3/5] {default_message}')
 
         patch = patcher.patches[3]
         self.assertEqual(patch.author, default_author)
-        self.assertEqual(patch.message, f'[4/5] {default_message}')
+        self.assertEqual(patch.message, patch4_message)
 
         patch = patcher.patches[4]
         self.assertEqual(patch.author, default_author)
@@ -403,23 +403,23 @@ class PatcherTests(kgb.SpyAgency, TestCase):
 
         patch = patcher.patches[0]
         self.assertEqual(patch.author, default_author)
-        self.assertEqual(patch.message, f'[1/5] {default_message}')
+        self.assertEqual(patch.message, default_message)
 
         patch = patcher.patches[1]
         self.assertEqual(patch.author, default_author)
-        self.assertEqual(patch.message, f'[2/5] {default_message}')
+        self.assertEqual(patch.message, default_message)
 
         patch = patcher.patches[2]
         self.assertEqual(patch.author, default_author)
-        self.assertEqual(patch.message, f'[3/5] {default_message}')
+        self.assertEqual(patch.message, default_message)
 
         patch = patcher.patches[3]
         self.assertEqual(patch.author, default_author)
-        self.assertEqual(patch.message, f'[4/5] {default_message}')
+        self.assertEqual(patch.message, default_message)
 
         patch = patcher.patches[4]
         self.assertEqual(patch.author, default_author)
-        self.assertEqual(patch.message, f'[5/5] {default_message}')
+        self.assertEqual(patch.message, default_message)
 
     def test_prepare_for_commit_with_revert(self) -> None:
         """Testing Patcher.prepare_for_commit with revert=True"""
@@ -429,24 +429,22 @@ class PatcherTests(kgb.SpyAgency, TestCase):
                               email='test2@example.com')
         author3 = PatchAuthor(full_name='Test User 3',
                               email='test3@example.com')
-        author4 = PatchAuthor(full_name='Test User 4',
+        author5 = PatchAuthor(full_name='Test User 4',
                               email='test4@example.com')
+
+        message1 = 'Commit message for patch 1.'
+        message2 = 'Commit message for patch 2.'
+        message4 = 'Commit message for patch 4.'
 
         default_message = 'Default message.'
 
         patcher = CommitPatcher(
             patches=[
-                Patch(content=b'patch1',
-                      message='Commit message for patch 1.'),
-                Patch(content=b'patch2',
-                      author=author2,
-                      message='Commit message for patch 2.'),
-                Patch(content=b'patch3',
-                      author=author3),
-                Patch(content=b'patch4',
-                      message='Commit message for patch 4.'),
-                Patch(content=b'patch5',
-                      author=author4),
+                Patch(content=b'patch1', message=message1),
+                Patch(content=b'patch2', author=author2, message=message2),
+                Patch(content=b'patch3', author=author3),
+                Patch(content=b'patch4', message=message4),
+                Patch(content=b'patch5', author=author5),
             ],
             revert=True)
 
@@ -458,25 +456,24 @@ class PatcherTests(kgb.SpyAgency, TestCase):
 
         patch = patcher.patches[0]
         self.assertEqual(patch.author, default_author)
-        self.assertEqual(patch.message, f'[Revert] [1/5] {default_message}')
+        self.assertEqual(patch.message, f'[Revert] {message1}')
 
         # This is the only commit with no missing metadata (it has both an
         # author and a message), so it gets to retain its information.
         patch = patcher.patches[1]
         self.assertEqual(patch.author, author2)
-        self.assertEqual(patch.message,
-                         '[Revert] Commit message for patch 2.')
+        self.assertEqual(patch.message, f'[Revert] {message2}')
 
         patch = patcher.patches[2]
-        self.assertEqual(patch.author, default_author)
+        self.assertEqual(patch.author, author3)
         self.assertEqual(patch.message, f'[Revert] [3/5] {default_message}')
 
         patch = patcher.patches[3]
         self.assertEqual(patch.author, default_author)
-        self.assertEqual(patch.message, f'[Revert] [4/5] {default_message}')
+        self.assertEqual(patch.message, f'[Revert] {message4}')
 
         patch = patcher.patches[4]
-        self.assertEqual(patch.author, default_author)
+        self.assertEqual(patch.author, author5)
         self.assertEqual(patch.message, f'[Revert] [5/5] {default_message}')
 
     def test_prepare_for_commit_without_defaults(self) -> None:

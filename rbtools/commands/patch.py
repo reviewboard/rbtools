@@ -264,7 +264,7 @@ class PatchCommand(BaseCommand):
                         _('The following commit IDs could not be found: %s')
                         % ', '.join(sorted(commit_ids - found_commit_ids)))
 
-            for patch_num, commit in enumerate(commits, start=1):
+            for commit in commits:
                 try:
                     diff_content = commit.get_patch().data
                 except APIError:
