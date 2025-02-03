@@ -3,6 +3,7 @@
 import textwrap
 
 from rbtools.clients import load_scmclients
+from rbtools.clients.errors import SCMClientDependencyError
 from rbtools.commands.base import BaseCommand
 
 
@@ -35,6 +36,11 @@ class ListRepoTypes(BaseCommand):
         self.json.add('repository_types', [])
 
         for name, tool in SCMCLIENTS.items():
+            try:
+                tool.setup()
+            except SCMClientDependencyError:
+                continue
+
             has_repository_info = tool.get_repository_info() is not None
 
             self.json.append('repository_types', {
