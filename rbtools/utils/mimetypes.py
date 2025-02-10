@@ -139,7 +139,10 @@ def guess_mimetype(
         _has_file_exe = is_exe_in_path('file')
 
     if not _has_file_exe:
-        types = puremagic.magic_string(data)
+        try:
+            types = puremagic.magic_string(data)
+        except puremagic.PureError:
+            return DEFAULT_MIMETYPE
 
         if len(types) > 0:
             return types[0].mime_type

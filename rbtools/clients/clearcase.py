@@ -399,7 +399,7 @@ class ClearCaseClient(BaseSCMClient):
     # Pack were failing when we tried to make a query that included the
     # VersionVault name. We therefore only include it when we know the server
     # can use server_tool_ids instead.
-    server_tool_names = 'ClearCase'
+    server_tool_names = 'ClearCase,VersionVault / ClearCase'
     server_tool_ids = ['clearcase', 'versionvault']
 
     requires_diff_tool = True
