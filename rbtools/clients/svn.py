@@ -72,6 +72,7 @@ class SVNPatcher(SCMClientPatcher['SVNClient']):
         self,
         *,
         patch: Patch,
+        base_dir: Optional[str] = None,
     ) -> Optional[int]:
         """Return the default path prefix strip level for a patch.
 
@@ -80,29 +81,40 @@ class SVNPatcher(SCMClientPatcher['SVNClient']):
 
         For Subversion, we always strip off any leading ``/``.
 
+        Version Changed:
+            5.0.2:
+            * Added the ``base_dir`` argument and changed to prefer that
+              if present.
+
         Args:
             patch (rbtools.diffs.patches.Patch):
                 The path to generate a default prefix strip level for.
+
+            base_dir (str, optional):
+                The base directory to use when computing the prefix level,
+                if available.
+
+                Version Added:
+                    5.0.2
 
         Returns:
             int:
             The prefix strip level, or ``None`` if a clear one could not be
             determined.
         """
-        repository_info = self.repository_info
+        if (not base_dir and
+            (repository_info := self.repository_info) is not None):
+            base_dir = repository_info.base_path
 
-        if repository_info is not None:
-            base_path = repository_info.base_path
-
-            if base_path == '/':
-                # We always need to strip off the leading forward slash.
-                return 1
-            elif base_path:
-                # We strip all leading directories from base_path. The last
-                # directory will not be suffixed with a slash.
-                return base_path.count('/') + 1
-
-        return None
+        if base_dir == '/':
+            # We always need to strip off the leading forward slash.
+            return 1
+        elif base_dir:
+            # We strip all leading directories from base_dir. The last
+            # directory will not be suffixed with a slash.
+            return base_dir.count('/') + 1
+        else:
+            return None
 
     def apply_single_patch(
         self,
@@ -110,7 +122,7 @@ class SVNPatcher(SCMClientPatcher['SVNClient']):
         patch: Patch,
         patch_num: int,
     ) -> PatchResult:
-        """Internal function to apply a single patch.
+        """Apply a single patch.
 
         This will take a single patch and apply it using Subversion.
 
@@ -140,19 +152,43 @@ class SVNPatcher(SCMClientPatcher['SVNClient']):
         repository_info = self.repository_info
 
         if repository_info is not None:
-            base_path = repository_info.base_path or ''
+            checkout_base_dir = repository_info.base_path or ''
         else:
-            base_path = ''
+            checkout_base_dir = ''
 
         patch_file = str(patch.path)
-        base_dir = patch.base_dir
+        patch_base_dir = patch.base_dir
 
-        if base_dir and not base_dir.startswith(base_path):
-            # The patch was created in either a higher level directory or a
-            # directory not under this one. We should exclude files from the
-            # patch that are not under this directory.
-            excluded, empty = self._exclude_files_not_in_tree(patch_file,
-                                                              base_path)
+        in_subdir = (patch_base_dir and
+                     checkout_base_dir != patch_base_dir and
+                     checkout_base_dir.startswith(patch_base_dir))
+
+        prefix_level = patch.prefix_level
+
+        if prefix_level is None:
+            # If we're in a subdirectory of where the patch was created, we
+            # want to use the checkout directory to compute the prefix level.
+            # If there's no overlap (or if the checkout and patch base
+            # directories match), we use the patch basedir to compute the
+            # prefix level and we hope that things apply cleanly.
+            if in_subdir:
+                base_dir = checkout_base_dir
+            else:
+                base_dir = patch_base_dir
+
+            prefix_level = self.get_default_prefix_level(
+                patch=patch, base_dir=base_dir)
+
+            # Set this back so we can refer to it later when handling empty
+            # files.
+            patch.prefix_level = prefix_level
+
+        if in_subdir:
+            # The patch was created in a higher-level directory. Log a warning
+            # and filter out any files which are not present in the current
+            # directory.
+            excluded, empty = self._exclude_files_not_in_tree(
+                patch_file, checkout_base_dir)
 
             if excluded:
                 logger.warning(
@@ -161,22 +197,13 @@ class SVNPatcher(SCMClientPatcher['SVNClient']):
                     'not under the current directory have been '
                     'excluded. To apply all files in this '
                     'patch, apply this patch from the %s directory.',
-                    base_dir)
+                    patch_base_dir)
 
                 if empty:
                     logger.warning('All files were excluded from the patch.')
 
         # Build the command line.
         cmd: list[str] = ['patch']
-
-        prefix_level = patch.prefix_level
-
-        if prefix_level is None:
-            prefix_level = self.get_default_prefix_level(patch=patch)
-
-            # Set this back so we can refer to it later when handling empty
-            # files.
-            patch.prefix_level = prefix_level
 
         if prefix_level is not None and prefix_level >= 0:
             cmd.append(f'--strip={prefix_level}')
@@ -338,27 +365,26 @@ class SVNPatcher(SCMClientPatcher['SVNClient']):
 
         filtered_patch_name = make_tempfile()
 
-        with open(filtered_patch_name, 'wb') as filtered_patch:
-            with open(patch_file, 'rb') as original_patch:
-                include_file = True
+        with open(filtered_patch_name, 'wb') as filtered_patch, \
+             open(patch_file, 'rb') as original_patch:
+            include_file = True
 
-                INDEX_FILE_RE = SVNClient.INDEX_FILE_RE
+            INDEX_FILE_RE = SVNClient.INDEX_FILE_RE
 
-                for line in original_patch.readlines():
-                    m = INDEX_FILE_RE.match(line)
+            for line in original_patch.readlines():
+                m = INDEX_FILE_RE.match(line)
 
-                    if m:
-                        filename = m.group(1).decode('utf-8')
+                if m:
+                    filename = m.group(1).decode('utf-8')
+                    include_file = filename.startswith(base_path)
 
-                        include_file = filename.startswith(base_path)
+                    if not include_file:
+                        excluded_files = True
+                    else:
+                        empty_patch = False
 
-                        if not include_file:
-                            excluded_files = True
-                        else:
-                            empty_patch = False
-
-                    if include_file:
-                        filtered_patch.write(line)
+                if include_file:
+                    filtered_patch.write(line)
 
         os.rename(filtered_patch_name, patch_file)
 
