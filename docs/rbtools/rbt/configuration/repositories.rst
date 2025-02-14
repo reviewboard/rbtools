@@ -9,28 +9,13 @@ a Review Board server with a repository. The ideal setup is to configure
 a repository to point to a Review Board server, so that users can use
 :command:`rbt` out of the box, but there are other methods available.
 
-All repository types support a :file:`.reviewboardrc` file, which is the
-recommended way to configure your repository. Through here, you can specify
-the URL to your Review Board server, the repository name, and provide some
-helpful defaults.
-
-Alternatively, some types of repositories can have special metadata associated
-that point to your server, but those don't support some of the more advanced
-features of :file:`.reviewboardrc`.
-
-
-.. _rbtools-reviewboardrc:
 
 .reviewboardrc
 --------------
 
-The :file:`.reviewboardrc` file is a generic place for configuring a
-repository. This must be in a directory in the user's checkout path to work.
-It must parse as a valid Python file, or you'll see an error when using
-:command:`rbt`.
-
-This is the recommended way of configuring your repository to talk to
-Review Board.
+The recommended way of configuring RBTools to talk to Review Board is to add a
+:ref:`.reviewboardrc <rbtools-reviewboardrc>` file to the repository root (or
+to whichever directory people tend to check out).
 
 You can generate this file automatically, starting with RBTools 0.5.3,
 by typing:
@@ -54,6 +39,49 @@ The main configuration settings you'll want to set are:
 * :rbtconfig:`REPOSITORY_TYPE`
 * :rbtconfig:`REVIEWBOARD_URL`
 * :rbtconfig:`TRACKING_BRANCH` (if using Git)
+
+
+Alternative Methods
+-------------------
+
+If for some reason you can't add a :file:`.reviewboardrc` file to your
+repository, there are a few other ways you can configure RBTools to know what
+Review Board server to use:
+
+* You can use the :rbtconfig:`TREES` setting in a per-user
+  :file:`.reviewboardrc` file to define :rbtconfig:`REVIEWBOARD_URL`.
+
+* For Git repositories, you can set a ``reviewboard.url`` setting in your
+  :file:`.git/config` file. Note that this file is local to each user's clone,
+  so users will have to set it up individually.
+
+* For Mercurial repositories, you can set a ``reviewboard.url`` setting in your
+  :file:`.hgrc` file. Note that this file is local to each user's clone, so
+  users will have to set it up individually.
+
+* For Perforce repositories, you can create a ``reviewboard.url`` counter in
+  the Perforce server. For example:
+
+  .. code-block:: console
+
+      $ p4 counter reviewboard.url https://reviewboard.example.com
+
+* For Subversion repositories, you can create a ``reviewboard:url`` prop on the
+  server.
+
+  .. code-block:: console
+
+      $ svn propset reviewboard:rurl https://reviewboard.example.com .
+
+.. note::
+
+    The repository-specific methods listed above are limited to only setting
+    the server URL. Creating a :file:`.reviewboardrc` file is a much better
+    option, and allows you to configure all of the values listed below.
+
+
+Repository-Specific Configuration Keys
+--------------------------------------
 
 
 .. rbtconfig:: BASEDIR
@@ -194,27 +222,6 @@ Example:
     DEPENDS_ON = '42,43'
 
 This can also be provided by using :option:`rbt post --depends-on`.
-
-
-.. rbtconfig:: ENABLE_PROXY
-
-ENABLE_PROXY
-~~~~~~~~~~~~
-
-**Type:** Boolean
-
-**Default:** ``True``
-
-By default, any configured HTTP/HTTPS proxy will be used for requests. If
-your server is within your own network, you may want to turn this off.
-
-Example:
-
-.. code-block:: python
-
-    ENABLE_PROXY = False
-
-This can also be disabled by passing :option:`--disable-proxy` to any command.
 
 
 .. rbtconfig:: EXCLUDE_PATTERNS
@@ -656,58 +663,3 @@ Example:
 
 When using :command:`rbt login`, this can be enabled by passing
 :option:`--web`.
-
-
-Git Properties
---------------
-
-Repository information can be set in a ``reviewboard.url`` property on
-the Git tree. Users may need to do this themselves on their own Git
-tree, so in some cases, it may be ideal to use dotfiles instead.
-
-To set the property on a Git tree, type:
-
-.. code-block:: console
-
-    $ git config reviewboard.url http://reviewboard.example.com
-
-
-Perforce Counters
------------------
-
-Repository information can be set on Perforce servers by using
-``reviewboard.url`` Perforce counters. How this works varies between versions
-of Perforce.
-
-Perforce version 2008.1 and up support strings in counters, so you can simply
-do:
-
-.. code-block:: console
-
-    $ p4 counter reviewboard.url http://reviewboard.example.com
-
-Older versions of Perforce support only numeric counters, so you must encode
-the server as part of the counter name. As ``/`` characters aren't supported
-in counter names, they must be replaced by ``|`` characters. ``|`` is a
-special character in shells, so you'll need need to escape these using ``\|``.
-For example:
-
-.. code-block:: console
-
-    $ p4 counter reviewboard.url.http:\|\|reviewboard.example.com 1
-
-
-Subversion Properties
----------------------
-
-Repository information can be set in a ``reviewboard:url`` property on
-a directory. This is usually done on whatever directory or directories
-are common as base checkout paths. This usually means something like
-:file:`/trunk` or :file:`/trunk/myproject`. If the directory is in the
-user's checkout, it will be faster to find the property.
-
-To set the property on a directory, type:
-
-.. code-block:: console
-
-    $ svn propset reviewboard:url http://reviewboard.example.com .

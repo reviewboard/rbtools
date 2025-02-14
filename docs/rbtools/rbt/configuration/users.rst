@@ -9,19 +9,22 @@ provide your own defaults for nearly all RBTools command options, and can
 define custom aliases to improve your workflows.
 
 Like with :ref:`repository configuration <rbtools-repo-config>`, these
-settings are stored in a :file:`.reviewboardrc` file. These can go in the
-repository's own version of the file, if these options should apply to all
-users by default. Otherwise, they can go in the :file:`.reviewboardrc` in your
-home directory.
+settings are stored in a :file:`.reviewboardrc` file. The settings listed in
+this file are oriented towards user preferences, and should most likely be set
+in a :ref:`.reviewboardrc <rbtools-reviewboardrc>` file in your home directory,
+but these can also be used in repository-specific configurations, if you want
+to set behavior for all users.
 
-On Linux and MacOS X, this file can be found in your home directory.
+The user configuration file from your home directory is loaded last, so any
+settings in a repository-specific file will override them. If you need to
+override repository settings for yourself, you have two options:
 
-On Windows, it's in :file:`$USERPROFILE\\Local Settings\\Application Data`.
+1. Set :envvar:`$RBTOOLS_CONFIG_PATH` to a list of paths (separated by colons
+   for Linux and Mac OS, or semicolons for Windows). Files in this path are
+   loaded with the highest priority.
 
-If you need to override repository-wide settings for yourself, you can set
-:envvar:`$RBTOOLS_CONFIG_PATH` to a list of paths, separated by colons (Linux,
-Mac OS X) or semicolons (Windows).  These paths are searched first for
-:file:`.reviewboardrc` files.
+2. Use :rbtconfig:`TREES` to specify overrides based on filesystem or
+   repository path.
 
 
 Custom Option Defaults
@@ -38,11 +41,13 @@ by setting:
 
     OPEN_BROWSER = True
 
+
 Or, you can disable usage of your HTTP proxy on any command by setting:
 
 .. code-block:: python
 
     ENABLE_PROXY = False
+
 
 The following options might be useful to set in your own
 :file:`.reviewboardrc` file. This can also contain anything normally found in
@@ -182,6 +187,27 @@ Example:
 
 This can also be disabled by passing :option:`--disable-ssl-verification` to
 any command.
+
+
+.. rbtconfig:: ENABLE_PROXY
+
+ENABLE_PROXY
+~~~~~~~~~~~~
+
+**Type:** Boolean
+
+**Default:** ``True``
+
+By default, any configured HTTP/HTTPS proxy will be used for requests. If
+your server is within your own network, you may want to turn this off.
+
+Example:
+
+.. code-block:: python
+
+    ENABLE_PROXY = False
+
+This can also be disabled by passing :option:`--disable-proxy` to any command.
 
 
 .. rbtconfig:: EXT_AUTH_COOKIES
@@ -610,88 +636,6 @@ experience:
 
       Added support for :envvar:`RBTOOLS_EDITOR`.
 
-
-.. _rbtools-aliases:
-
-Aliases
-=======
-
-:command:`rbt` can be configured to add command aliases. The ``ALIASES`` value
-in :file:`.reviewboardrc` can be added to allow for command aliasing. It is a
-dictionary where the keys are the alias names and the value is the command
-that will be executed.
-
-Aliases will only be executed when an :command:`rbt` command is executed that
-:command:`rbt` does not recognize and when ``rbt-<commandname>`` does not exist
-in the path. Aliases are case-sensitive.
-
-For example, consider the following aliases:
-
-.. code-block:: python
-
-    ALIASES = {
-        'post-this': 'post HEAD',
-        'push': '!git push && rbt close $1'
-    }
-
-
-The following commands are equivalent:
-
-.. code-block:: console
-
-    $ rbt post-this
-    $ rbt post HEAD
-
-As are the following:
-
-.. code-block:: console
-
-    $ rbt push 3351
-    $ git push && rbt close 3351
-
-
-Types of Aliases
-----------------
-
-There are two types of aliases: aliases for other :command:`rbt` commands and
-system aliases.
-
-
-Aliases For Other :command:`rbt` Commands
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-These aliases allow short forms for frequently used :command:`rbt` commands
-with parameter substitution. An alias of the form ``cmd`` is equivalent to
-calling ``rbt cmd``. This will launch another instance of :command:`rbt` and
-therefore can be used to reference other aliases or commands of the form
-``rbt-<commandname>``.
-
-
-System Command Aliases
-~~~~~~~~~~~~~~~~~~~~~~
-
-System aliases are aliases that begin with ``!``. These aliases are more
-flexible because they are executed by the shell. However, since they are more
-powerful it is possible to write an alias that will *destroy data*. Everything
-after the ``!`` will be passed to the shell for execution after going through
-parameter substitution.
-
-
-Positional Parameter Substitution
----------------------------------
-
-Aliases in :command:`rbt` supports inserting bash-like variables representing
-positional arguments into aliases. Positional variables take the form ``$1``
-(which corresponds to the first argument), ``$2`` (which corresponds to the
-second argument), etc., and ``$*`` (which corresponds to *all* arguments).
-
-If a positional variable is specified and not enough arguments were specified,
-it will be replaced with an empty argument.
-
-If no parameter substitution is performed, all supplied arguments will be
-appended to the command when it is executed. Non-numeric variables are not
-replaced in the parameter and, if the alias is a system command alias, will be
-handled by the shell.
 
 
 Special Files

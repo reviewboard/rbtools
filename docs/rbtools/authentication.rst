@@ -46,3 +46,9 @@ you can store it in your personal :file:`.reviewboardrc` file.
 In :file:`.reviewboardrc`::
 
     API_TOKEN = "<token>"
+
+.. warning::
+
+   We recommend that you provide your credentials only on demand, rather
+   than setting this in a file. However, this can be useful for specialized
+   automation in a locked-down environment.

@@ -114,26 +114,26 @@ We'll walk you through getting RBTools ready to use with Review Board.
 
    Steps are provided all major operating systems and Linux distributions.
 
-2. :ref:`Authenticate with Review Board <rbtools-authentication>`.
+2. Configure RBTools.
 
-3. :ref:`Configure RBTools for your repositories <rbtools-repo-config>`.
+   There are two main pieces to configuration for RBTools. This is done through
+   :ref:`rbtools-reviewboardrc` files.
 
-   RBTools configuration lives in a :file:`.reviewboardrc` file, which is
-   usually stored in your source code repository, so everyone can share the
-   same configuration.
+   a. :ref:`Configure RBTools for your repositories <rbtools-repo-config>`.
 
-   This is the first step to allow any of your developers to easily post
-   changes using RBTools.
+      RBTools needs some configuration to interact with your repositories (and
+      to know where to find your Review Board server).
 
-4. Optionally, customize your RBTools experience:
+   b. Optionally customize RBTools behavior for yourself:
 
-   * :ref:`Configure options and environment variables <rbtools-user-config>`
-   * :ref:`Creating custom command aliases <rbtools-aliases>`
-   * :ref:`Enable shell integration and auto-completion
-     <rbt-setup-completion>`
+      * :ref:`Configure options and environment variables <rbtools-user-config>`
+      * :ref:`Create custom command aliases <rbtools-aliases>`
+      * :ref:`Enable shell integration and auto-completion
+        <rbt-setup-completion>`
 
-   These can also live in a separate :file:`.reviewboardrc` in your home
-   directory, letting you make your RBTools experience your own.
+3. Start posting your code to Review Board!
+
+   Use :ref:`rbt post <rbt-post>` to create your first review request.
 
 
 .. _rbtools-workflows-summary:
@@ -144,16 +144,19 @@ Common RBTools Workflows
 Every source code management system is different. We have guides on the most
 common workflows to help you get started:
 
+* :ref:`Options for authentication with Review Board <rbtools-authentication>`
 * :ref:`rbtools-workflow-sos`
 * :ref:`rbtools-workflow-git`
 * :ref:`rbtools-workflow-versionvault`
 * :ref:`rbtools-workflow-perforce`
+* :ref:`Working with Team Foundation Server <rbtools-tfs>`
 
 
 .. toctree::
    :hidden:
 
    installation
+   authentication
    rbt/index
    workflows/index
    api/index
