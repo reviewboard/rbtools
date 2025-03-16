@@ -989,7 +989,16 @@ class BaseCommand:
         # repository path, as well as all remote paths for the repository. If
         # one is found, we want to merge that into the config dictionary and
         # restart the entire initialization process.
-        if 'TREES' in self.config:
+        if trees := self.config.get('TREES'):
+            # If we haven't attempted to initialize a client yet (either
+            # through _init_server_url or with needs_scm_client), try one last
+            # time. People who are using TREES often are using repository paths
+            # as the keys, which means we need a repository.
+            if repository_info is None and tool is None:
+                repository_info, tool = self.initialize_scm_tool(
+                    client_name=getattr(self.options, 'repository_type', None),
+                    tool_required=False)
+
             paths: list[str] = []
 
             if repository_info is not None:
@@ -1002,8 +1011,6 @@ class BaseCommand:
                     paths.append(repository_info.path)
             else:
                 paths.append(os.getcwd())
-
-            trees = self.config['TREES']
 
             if not isinstance(trees, dict):
                 raise CommandError(
@@ -1168,8 +1175,14 @@ class BaseCommand:
     def initialize_scm_tool(
         self,
         client_name: Optional[str] = None,
-    ) -> tuple[RepositoryInfo, BaseSCMClient]:
+        *,
+        tool_required: bool = True,
+    ) -> tuple[Optional[RepositoryInfo], Optional[BaseSCMClient]]:
         """Initialize the SCM tool for the current working directory.
+
+        Version Changed:
+            5.0.3:
+            Added the ``tool_required`` argument.
 
         Version Changed:
             5.0:
@@ -1180,6 +1193,12 @@ class BaseCommand:
                 A specific client name, which can come from the configuration.
                 This can be used to disambiguate if there are nested
                 repositories, or to speed up detection.
+
+            tool_required (bool, optional):
+                Whether a tool is required to be found or not.
+
+                Version Added:
+                    5.0.3
 
         Returns:
             tuple:
@@ -1196,6 +1215,9 @@ class BaseCommand:
             self.config,
             self.options,
             client_name=client_name)
+
+        if tool is None and not tool_required:
+            return repository_info, None
 
         try:
             tool.check_options()

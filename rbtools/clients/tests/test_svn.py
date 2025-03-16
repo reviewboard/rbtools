@@ -7,14 +7,13 @@ import os
 import re
 import sys
 import unittest
-from typing import List
+from typing import Sequence, TYPE_CHECKING
 from urllib.request import urlopen
 
 import kgb
 
 from rbtools.api.client import RBClient
 from rbtools.api.tests.base import MockResponse
-from rbtools.clients.base.scmclient import SCMClientDiffResult
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     SCMError,
@@ -31,13 +30,16 @@ from rbtools.utils.process import (RunProcessResult,
                                    run_process_exec)
 from rbtools.utils.repository import get_repository_resource
 
+if TYPE_CHECKING:
+    from rbtools.clients.base.scmclient import SCMClientDiffResult
+
 
 _MATCH_URL_BASE = 'http://localhost:8080/api/repositories/'
 _MATCH_URL_TOOL = 'tool=Subversion'
 _MATCH_URL_FIELDS = 'only-fields=id%2Cname%2Cmirror_path%2Cpath'
 
 
-class SVNRepositoryMatchTests(SCMClientTestCase):
+class SVNRepositoryMatchTests(SCMClientTestCase[SVNClient]):
     """Unit tests for rbtools.clients.svn.SVNRepositoryInfo."""
 
     payloads = {
@@ -380,7 +382,7 @@ class SVNRepositoryMatchTests(SCMClientTestCase):
             '/')
 
 
-class BaseSVNClientTests(SCMClientTestCase):
+class BaseSVNClientTests(SCMClientTestCase[SVNClient]):
     """Base class for SVN client test.
 
     Version Added:
@@ -458,7 +460,7 @@ class BaseSVNClientTests(SCMClientTestCase):
     @classmethod
     def _run_svn(
         cls,
-        command: List[str],
+        command: Sequence[str],
     ) -> RunProcessResult:
         """Run svn with the provided arguments.
 
@@ -471,7 +473,7 @@ class BaseSVNClientTests(SCMClientTestCase):
             The result of the :py:func:`~rbtools.utils.process.run_process`
             call.
         """
-        return run_process(['svn'] + command)
+        return run_process(['svn', *command])
 
     def _svn_add_file(self, filename, data, changelist=None):
         """Add a file to the test repo."""
@@ -2588,3 +2590,155 @@ class SVNPatcherTests(BaseSVNClientTests):
                 make_tempfile.calls[0].return_value,
             ],
             redirect_stderr=True)
+
+    def test_patch_with_no_basedir_overlap(self) -> None:
+        """Testing SVNPatcher.patch with no overlap in patch and checkout
+        base directories
+        """
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        self.spy_on(run_process_exec)
+        self.spy_on(make_tempfile)
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(
+                    base_dir='/trunk',
+                    content=(
+                        b'Index: /trunk/\xc3\xa2.txt\n'
+                        b'================================================'
+                        b'===================\n'
+                        b'--- /trunk/\xc3\xa2.txt\t(revision 5)\n'
+                        b'+++ /trunk/\xc3\xa2.txt\t(working copy)\n'
+                        b'@@ -1,2 +1,3 @@\n'
+                        b' This file has a non-utf8 filename.\n'
+                        b' It also contains a non-utf8 character: \xc3\xa9.\n'
+                        b'+And this! \xf0\x9f\xa5\xb9\n'
+                        b'Index: /trunk/foo.txt\n'
+                        b'================================================'
+                        b'===================\n'
+                        b'--- /trunk/foo.txt\t(revision 5)\n'
+                        b'+++ /trunk/foo.txt\t(working copy)\n'
+                        b'@@ -6,6 +6,6 @@\n'
+                        b' dum conderet urbem,\n'
+                        b' inferretque deos Latio, genus unde Latinum,\n'
+                        b' Albanique patres, atque altae moenia Romae.\n'
+                        b'-Albanique patres, atque altae moenia Romae.\n'
+                        b'+Albanique patres, atque altae moenia Romae!\n'
+                        b' Musa, mihi causas memora, quo numine laeso,\n'
+                        b'\n'
+                    )),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+        self.assertEqual(
+            result.patch_output,
+            b'U         \xc3\xa2.txt\n'
+            b'U         foo.txt\n')
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            [
+                'svn', '--non-interactive', 'patch', '--strip=2',
+                make_tempfile.calls[0].return_value,
+            ],
+            redirect_stderr=True)
+
+        with open('foo.txt', 'rb') as fp:
+            self.assertEqual(
+                fp.read(),
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'Italiam, fato profugus, Laviniaque venit\n'
+                b'litora, multum ille et terris iactatus et alto\n'
+                b'vi superum saevae memorem Iunonis ob iram;\n'
+                b'dum conderet urbem,\n'
+                b'inferretque deos Latio, genus unde Latinum,\n'
+                b'Albanique patres, atque altae moenia Romae.\n'
+                b'Albanique patres, atque altae moenia Romae!\n'
+                b'Musa, mihi causas memora, quo numine laeso,\n'
+                b'\n')
+
+    def test_patch_in_subdirectory(self) -> None:
+        """Testing SVNPatcher.patch when checkout is a subdirectory of patch
+        base directory
+        """
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        assert repository_info is not None
+
+        repository_info.base_path = '/trunk'
+
+        self.spy_on(run_process_exec)
+        self.spy_on(make_tempfile)
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(
+                    base_dir='/',
+                    content=(
+                        b'Index: /\xc3\xa2.txt\n'
+                        b'================================================'
+                        b'===================\n'
+                        b'--- /trunk/\xc3\xa2.txt\t(revision 5)\n'
+                        b'+++ /trunk/\xc3\xa2.txt\t(working copy)\n'
+                        b'@@ -1,2 +1,3 @@\n'
+                        b' This file has a non-utf8 filename.\n'
+                        b' It also contains a non-utf8 character: \xc3\xa9.\n'
+                        b'+And this! \xf0\x9f\xa5\xb9\n'
+                        b'Index: /trunk/foo.txt\n'
+                        b'================================================'
+                        b'===================\n'
+                        b'--- /trunk/foo.txt\t(revision 5)\n'
+                        b'+++ /trunk/foo.txt\t(working copy)\n'
+                        b'@@ -6,6 +6,6 @@\n'
+                        b' dum conderet urbem,\n'
+                        b' inferretque deos Latio, genus unde Latinum,\n'
+                        b' Albanique patres, atque altae moenia Romae.\n'
+                        b'-Albanique patres, atque altae moenia Romae.\n'
+                        b'+Albanique patres, atque altae moenia Romae!\n'
+                        b' Musa, mihi causas memora, quo numine laeso,\n'
+                        b'\n'
+                    )),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+        self.assertEqual(
+            result.patch_output,
+            b'U         foo.txt\n')
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            [
+                'svn', '--non-interactive', 'patch', '--strip=2',
+                make_tempfile.calls[0].return_value,
+            ],
+            redirect_stderr=True)
+
+        with open('foo.txt', 'rb') as fp:
+            self.assertEqual(
+                fp.read(),
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'ARMA virumque cano, Troiae qui primus ab oris\n'
+                b'Italiam, fato profugus, Laviniaque venit\n'
+                b'litora, multum ille et terris iactatus et alto\n'
+                b'vi superum saevae memorem Iunonis ob iram;\n'
+                b'dum conderet urbem,\n'
+                b'inferretque deos Latio, genus unde Latinum,\n'
+                b'Albanique patres, atque altae moenia Romae.\n'
+                b'Albanique patres, atque altae moenia Romae!\n'
+                b'Musa, mihi causas memora, quo numine laeso,\n'
+                b'\n')

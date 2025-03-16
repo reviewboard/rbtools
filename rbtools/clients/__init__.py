@@ -113,7 +113,7 @@ def scan_usable_client(
     config: RBToolsConfig,
     options: argparse.Namespace,
     client_name: Optional[str] = None,
-) -> tuple[RepositoryInfo, BaseSCMClient]:
+) -> tuple[Optional[RepositoryInfo], Optional[BaseSCMClient]]:
     """Scan for a usable SCMClient.
 
     Args:
