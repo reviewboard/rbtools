@@ -9,7 +9,10 @@ from __future__ import annotations
 from typing import List, Optional, TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
-    from rbtools.api.resource import ItemResource
+    from rbtools.api.resource import (
+        RepositoryInfoResource,
+        RepositoryItemResource
+    )
 
 
 class RepositoryInfo:
@@ -159,8 +162,8 @@ class RepositoryInfo:
 
     def update_from_remote(
         self,
-        repository: ItemResource,
-        info: Optional[ItemResource],
+        repository: RepositoryItemResource,
+        info: RepositoryInfoResource | None,
     ) -> None:
         """Update the info from a remote repository.
 
@@ -169,10 +172,10 @@ class RepositoryInfo:
         By default, this simply sets the path based on the ``repository``.
 
         Args:
-            repository (rbtools.api.resource.ItemResource):
+            repository (rbtools.api.resource.RepositoryItemResource):
                 The repository resource.
 
-            info (rbtools.api.resource.ItemResource, unused):
+            info (rbtools.api.resource.RepositoryInfoResource, unused):
                 The repository info resource.
 
                 This is not used by default, but is available to callers.

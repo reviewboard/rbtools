@@ -4,10 +4,9 @@ import os
 
 from kgb import SpyAgency
 
-from rbtools.api.resource import ItemResource
+from rbtools.api.resource import RepositoryItemResource
 from rbtools.commands.setup_repo import SetupRepo
 from rbtools.testing import CommandTestsMixin, TestCase
-from rbtools.testing.transport import TestTransport
 from rbtools.utils.console import confirm_select, get_input
 
 
@@ -36,7 +35,7 @@ class SetupRepoTest(CommandTestsMixin, TestCase):
             api_root=api_root)
 
         self.assertSpyCalled(setup._display_rb_repositories)
-        self.assertIsInstance(output, ItemResource)
+        self.assertIsInstance(output, RepositoryItemResource)
 
     def test_prompt_rb_repository_no_repos_found(self):
         """Testing SetupRepo.prompt_rb_repository without matching repository

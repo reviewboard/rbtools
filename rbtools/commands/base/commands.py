@@ -42,7 +42,10 @@ from rbtools.utils.filesystem import cleanup_tempfiles, get_home_path
 from rbtools.utils.repository import get_repository_resource
 
 if TYPE_CHECKING:
-    from rbtools.api.resource import Resource, RootResource
+    from rbtools.api.resource import (
+        RepositoryItemResource,
+        RootResource,
+    )
     from rbtools.api.transport import Transport
     from rbtools.clients.base.repository import RepositoryInfo
     from rbtools.clients.base.scmclient import BaseSCMClient
@@ -280,7 +283,7 @@ class BaseCommand:
     #:
     #: This will be set when the command is run if both :py:attr:`needs_api`
     #: and :py:attr:`needs_repository` are ``True``.
-    repository: Optional[Resource]
+    repository: Optional[RepositoryItemResource]
 
     #: Information on the local repository.
     #:

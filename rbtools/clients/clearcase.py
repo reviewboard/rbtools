@@ -37,7 +37,11 @@ else:
     import os.path as cpath
 
 if TYPE_CHECKING:
-    from rbtools.api.resource import ItemResource, ListResource
+    from rbtools.api.resource import (
+        RepositoryInfoResource,
+        RepositoryItemResource,
+        RepositoryListResource,
+    )
 
     _HostProperties: TypeAlias = Optional[Dict[str, str]]
     _ExtendedPath: TypeAlias = str
@@ -592,19 +596,24 @@ class ClearCaseClient(BaseSCMClient):
 
     def find_matching_server_repository(
         self,
-        repositories: ListResource,
-    ) -> tuple[Optional[ItemResource], Optional[ItemResource]]:
+        repositories: RepositoryListResource,
+    ) -> tuple[RepositoryItemResource | None, RepositoryInfoResource | None]:
         """Find a match for the repository on the server.
 
         Args:
-            repositories (rbtools.api.resource.ListResource):
+            repositories (rbtools.api.resource.RepositoryListResource):
                 The fetched repositories.
 
         Returns:
             tuple:
-            A 2-tuple of :py:class:`~rbtools.api.resource.ItemResource`. The
-            first item is the matching repository, and the second is the
-            repository info resource.
+            A 2-tuple of:
+
+            Tuple:
+                0 (rbtools.api.resource.RepositoryItemResource):
+                    The matching repository.
+
+                1 (rbtools.api.resource.RepositoryInfoResource):
+                    The repository info resource.
         """
         vobtag = self._get_vobtag()
         uuid = self._get_vob_uuid(vobtag)
@@ -2473,16 +2482,16 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
 
     def update_from_remote(
         self,
-        repository: ItemResource,
-        info: ItemResource,
+        repository: RepositoryItemResource,
+        info: RepositoryInfoResource,
     ) -> None:
         """Update the info from a remote repository.
 
         Args:
-            repository (rbtools.api.resource.ItemResource):
+            repository (rbtools.api.resource.RepositoryItemResource):
                 The repository resource.
 
-            info (rbtools.api.resource.ItemResource):
+            info (rbtools.api.resource.RepositoryInfoResource):
                 The repository info resource.
         """
         path = cast(str, info['repopath'])

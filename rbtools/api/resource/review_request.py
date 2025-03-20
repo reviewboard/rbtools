@@ -210,7 +210,7 @@ class ReviewRequestItemResource(BaseReviewRequestItemResource):
                 Query arguments to include with the request.
 
         Returns:
-            rbtools.api.resource.ItemResource:
+            rbtools.api.resource.ReviewRequestDraftResource:
             The review request draft.
         """
         request = self.get_draft(internal=True)

@@ -26,9 +26,11 @@ from rbtools.diffs.tools.registry import diff_tools_registry
 
 if TYPE_CHECKING:
     from rbtools.api.capabilities import Capabilities
-    from rbtools.api.resource import (ItemResource,
-                                      ListResource,
-                                      ReviewRequestItemResource)
+    from rbtools.api.resource import (
+        RepositoryInfoResource,
+        RepositoryItemResource,
+        RepositoryListResource,
+        ReviewRequestItemResource)
     from rbtools.clients.base.repository import RepositoryInfo
     from rbtools.config import RBToolsConfig
     from rbtools.diffs.tools.base import BaseDiffTool
@@ -985,15 +987,15 @@ class BaseSCMClient:
 
     def find_matching_server_repository(
         self,
-        repositories: ListResource,
-    ) -> Tuple[Optional[ItemResource], Optional[ItemResource]]:
+        repositories: RepositoryListResource,
+    ) -> tuple[RepositoryItemResource | None, RepositoryInfoResource | None]:
         """Find a match for the repository on the server.
 
         Version Added:
             3.0
 
         Args:
-            repositories (rbtools.api.resource.ListResource):
+            repositories (rbtools.api.resource.RepositoryListResource):
                 The fetched repositories.
 
         Returns:
@@ -1001,12 +1003,12 @@ class BaseSCMClient:
             A 2-tuple of matching repository information:
 
             Tuple:
-                0 (rbtools.api.resource.ItemResource):
+                0 (rbtools.api.resource.RepositoryItemResource):
                     The matching repository resource, if found.
 
                     If not found, this will be ``None``.
 
-                1 (rbtools.api.resource.ItemResource):
+                1 (rbtools.api.resource.RepositoryInfoResource):
                     The matching repository information resource, if found.
 
                     If not found, this will be ``None``.

@@ -15,7 +15,6 @@ from typing import Iterator, Optional, Sequence, TYPE_CHECKING
 
 from typing_extensions import NotRequired, TypedDict
 
-from rbtools.api.resource import ReviewRequestItemResource
 from rbtools.diffs.errors import ApplyPatchError
 from rbtools.diffs.patches import PatchAuthor, PatchResult
 from rbtools.utils.commands import extract_commit_message
@@ -24,6 +23,7 @@ from rbtools.utils.filesystem import chdir
 from rbtools.utils.process import run_process
 
 if TYPE_CHECKING:
+    from rbtools.api.resource import ReviewRequestItemResource
     from rbtools.clients.base.repository import RepositoryInfo
     from rbtools.diffs.patches import Patch
 

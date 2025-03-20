@@ -8,7 +8,12 @@ from rbtools.api.errors import APIError
 
 if TYPE_CHECKING:
     from rbtools.api.capabilities import Capabilities
-    from rbtools.api.resource import ItemResource, RootResource
+    from rbtools.api.resource import (
+        RepositoryInfoResource,
+        RepositoryItemResource,
+        RootResource,
+    )
+    from rbtools.api.resource.repository import RepositoryGetListParams
     from rbtools.clients.base.repository import RepositoryInfo
     from rbtools.clients.base.scmclient import BaseSCMClient
 
@@ -19,7 +24,7 @@ def get_repository_resource(
     repository_name: Optional[str] = None,
     repository_paths: Optional[Union[str, list[str]]] = None,
     capabilities: Optional[Capabilities] = None,
-) -> tuple[Optional[ItemResource], Optional[ItemResource]]:
+) -> tuple[RepositoryItemResource | None, RepositoryInfoResource | None]:
     """Return the API resource for the matching repository on the server.
 
     Version Added:
@@ -46,12 +51,19 @@ def get_repository_resource(
             The capabilities fetched from the server.
 
     Returns:
-        tuple of rbtools.api.resource.ItemResource:
-        A 2-tuple of :py:class:`~rbtools.api.resource.ItemResource`. The first
-        item is the matching repository, and the second is the repository info
-        resource.
+        tuple:
+        A 2-tuple of:
+
+        Tuple:
+            0 (rbtools.api.resource.RepositoryItemResource):
+                The matching repository.
+
+            1 (rbtools.api.resource.RepositoryInfoResource):
+                The repository info resource.
     """
-    def _get_info(repository):
+    def _get_info(
+        repository: RepositoryItemResource,
+    ) -> RepositoryInfoResource | None:
         # Many repository types don't implement the repository info
         # endpoint. In those cases we just want to return None.
         try:
@@ -62,7 +74,7 @@ def get_repository_resource(
 
         return None
 
-    query = {
+    query: RepositoryGetListParams = {
         'only_fields': 'id,name,mirror_path,path',
         'only_links': 'info,diff_file_attachments',
     }
@@ -83,6 +95,8 @@ def get_repository_resource(
 
     repositories = api_root.get_repositories(**query)
 
+    assert repositories.total_results is not None
+
     # Ideally filtering based on name or path returned us a single result. In
     # that case we can shortcut everything else.
     if repositories.total_results == 1:
@@ -99,6 +113,8 @@ def get_repository_resource(
         all_repositories = api_root.get_repositories(**query)
     else:
         all_repositories = repositories
+
+    assert all_repositories.total_results is not None
 
     if all_repositories.total_results > 0 and tool:
         repository, info = tool.find_matching_server_repository(

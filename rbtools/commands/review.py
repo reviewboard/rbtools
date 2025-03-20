@@ -4,7 +4,10 @@ Version Added:
     3.0
 """
 
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING
 
 from rbtools.api.errors import APIError
 from rbtools.commands.base import (BaseCommand,
@@ -15,7 +18,11 @@ from rbtools.commands.base import (BaseCommand,
                                    OptionGroup)
 
 
-logger = logging.getLogger(__file__)
+if TYPE_CHECKING:
+    from rbtools.api.resource import ReviewItemResource
+
+
+logger = logging.getLogger(__name__)
 
 
 class ReviewSubCommand(BaseSubCommand):
@@ -29,11 +36,11 @@ class ReviewSubCommand(BaseSubCommand):
     #:     bool
     create_review_if_missing = True
 
-    def get_review_draft(self):
+    def get_review_draft(self) -> ReviewItemResource:
         """Return the review draft, creating if desired.
 
         Returrns:
-            rbtools.api.resource.ItemResource:
+            rbtools.api.resource.ReviewItemResource:
             The review draft resource.
         """
         options = self.options

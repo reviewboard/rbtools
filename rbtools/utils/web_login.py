@@ -23,7 +23,7 @@ from rbtools.api.request import RBTOOLS_USER_AGENT
 from rbtools.utils.browser import open_browser as open_browser_func
 
 if TYPE_CHECKING:
-    from rbtools.api.resource import ItemResource
+    from rbtools.api.resource import ServerInfoResource
 
 
 logger = logging.getLogger(__name__)
@@ -569,7 +569,7 @@ def _WebLoginHandler_factory(
 
 def is_web_login_enabled(
     *,
-    server_info: ItemResource,
+    server_info: ServerInfoResource,
     capabilities: Optional[Capabilities],
 ) -> bool:
     """Return whether client web login is enabled on a Review Board server.
@@ -578,7 +578,7 @@ def is_web_login_enabled(
         5.0
 
     Args:
-        server_info (rbtools.api.resource.ItemResource):
+        server_info (rbtools.api.resource.ServerInfoResource):
             The server info resource for the Review Board server.
 
         capabilities (rbtools.api.capabilities.Capabilities):

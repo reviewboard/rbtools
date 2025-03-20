@@ -13,7 +13,7 @@ from rbtools.utils.console import confirm, confirm_select
 from rbtools.utils.repository import get_repository_resource
 
 if TYPE_CHECKING:
-    from rbtools.api.resource import ItemResource, RootResource
+    from rbtools.api.resource import RepositoryItemResource, RootResource
 
 
 class SetupRepo(BaseCommand):
@@ -50,7 +50,7 @@ class SetupRepo(BaseCommand):
         server_tool_names: Optional[str],
         repository_paths: Optional[Union[str, list[str]]],
         api_root: RootResource,
-    ) -> Optional[ItemResource]:
+    ) -> RepositoryItemResource | None:
         """Interactively prompt to select a matching repository.
 
         The user is prompted to choose a matching repository found on the
@@ -71,7 +71,7 @@ class SetupRepo(BaseCommand):
                 The root resource for the Review Board server.
 
         Returns:
-            rbtools.api.resource.ItemResource:
+            rbtools.api.resource.RepositoryItemResource:
             The selected repository resource.
         """
         # Go through each matching repo and prompt for a selection. If a

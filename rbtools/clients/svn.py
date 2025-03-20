@@ -14,7 +14,6 @@ from typing import Dict, Iterator, List, Optional, TYPE_CHECKING, Tuple, cast
 from urllib.parse import unquote
 
 from rbtools.api.errors import APIError
-from rbtools.api.resource import ListResource
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
                                             SCMClientDiffResult,
@@ -42,6 +41,11 @@ from rbtools.utils.streams import BufferedIterator
 
 if TYPE_CHECKING:
     from rbtools.diffs.patches import Patch
+    from rbtools.api.resource import (
+        RepositoryInfoResource,
+        RepositoryItemResource,
+        RepositoryListResource,
+    )
 
 
 logger = logging.getLogger(__name__)
@@ -566,19 +570,28 @@ class SVNClient(BaseSCMClient):
 
     def find_matching_server_repository(
         self,
-        repositories: ListResource,
-    ) -> Tuple[Optional[ItemResource], Optional[ItemResource]]:
+        repositories: RepositoryListResource,
+    ) -> tuple[RepositoryItemResource | None, RepositoryInfoResource | None]:
         """Find a match for the repository on the server.
 
         Args:
-            repositories (rbtools.api.resource.ListResource):
+            repositories (rbtools.api.resource.RepositoryListResource):
                 The fetched repositories.
 
         Returns:
             tuple:
-            A 2-tuple of :py:class:`~rbtools.api.resource.ItemResource`. The
-            first item is the matching repository, and the second is the
-            repository info resource.
+            A 2-tuple of:
+
+            Tuple:
+                0 (rbtools.api.resource.RepositoryItemResource):
+                    The matching repository resource, if found.
+
+                    If not found, this will be ``None``.
+
+                1 (rbtools.api.resource.RepositoryInfoResource):
+                    The matching repository information resource, if found.
+
+                    If not found, this will be ``None``.
         """
         repository_url = getattr(self.options, 'repository_url', None)
         info = self.svn_info(path=repository_url,
@@ -1763,16 +1776,16 @@ class SVNRepositoryInfo(RepositoryInfo):
 
     def update_from_remote(
         self,
-        repository: ItemResource,
-        info: ItemResource,
+        repository: RepositoryItemResource,
+        info: RepositoryInfoResource,
     ) -> None:
         """Update the info from a remote repository.
 
         Args:
-            repository (rbtools.api.resource.ItemResource):
+            repository (rbtools.api.resource.RepositoryItemResource):
                 The repository resource.
 
-            info (rbtools.api.resource.ItemResource):
+            info (rbtools.api.resource.RepositoryInfoResource):
                 The repository info resource.
         """
         url = cast(str, info['url'])
