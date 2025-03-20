@@ -373,9 +373,12 @@ class SyncTransport(Transport):
         else:
             payload = decode_response(rsp.read(), mime_type)
 
-            return create_resource(self, payload, request.url,
-                                   mime_type=mime_type,
-                                   item_mime_type=item_content_type)
+            return create_resource(
+                transport=self,
+                payload=payload,
+                url=request.url,
+                mime_type=mime_type,
+                item_mime_type=item_content_type)
 
     def enable_cache(
         self,

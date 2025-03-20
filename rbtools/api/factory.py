@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
+from housekeeping import deprecate_non_keyword_only_args
+
 from rbtools.api.resource import (CountResource,
                                   ItemResource,
                                   ListResource,
                                   Resource,
                                   RESOURCE_MAP)
 from rbtools.api.utils import rem_mime_format
+from rbtools.deprecation import RemovedInRBTools80Warning
 
 if TYPE_CHECKING:
     from typelets.json import JSONDict
@@ -25,7 +28,9 @@ SPECIAL_KEYS = {
 }
 
 
+@deprecate_non_keyword_only_args(RemovedInRBTools80Warning)
 def create_resource(
+    *,
     transport: Transport,
     payload: JSONDict,
     url: str,
@@ -39,6 +44,7 @@ def create_resource(
     Version Changed:
         6.0:
         * Added the ``force_resource_type`` argument.
+        * Made all arguments keyword-only.
 
     Args:
         transport (rbtools.api.transport.Transport):

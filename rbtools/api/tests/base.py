@@ -2,19 +2,24 @@
 
 from __future__ import annotations
 
-from typing import Dict, Optional, Union
+from typing import TYPE_CHECKING
 
 from rbtools.api.transport import Transport
 from rbtools.testing import TestCase
 
+if TYPE_CHECKING:
+    from typing import Final, Optional, Union
 
-class MockResponse(object):
+    from typelets.json import JSONDict
+
+
+class MockResponse:
     """A mock up for a response from urllib2."""
 
     def __init__(
         self,
         code: int,
-        headers: Dict[str, str],
+        headers: dict[str, str],
         body: Union[bytes, str],
     ) -> None:
         """Create a new MockResponse."""
@@ -31,7 +36,7 @@ class MockResponse(object):
             if 'Content-Type' not in self.headers:
                 self.headers['Content-Type'] = 'text/plain'
 
-    def info(self) -> Dict[str, str]:
+    def info(self) -> dict[str, str]:
         """Return the HTTP response headers."""
         return self.headers
 
@@ -52,7 +57,8 @@ class MockResponse(object):
 class MockTransport(Transport):
     """Mock transport which returns HttpRequests without executing them"""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize the transport."""
         pass
 
     def enable_cache(
@@ -88,9 +94,11 @@ class MockTransport(Transport):
 
 
 class TestWithPayloads(TestCase):
+    """Test class that defines API payloads."""
+
     transport = MockTransport()
 
-    item_payload = {
+    item_payload: Final[JSONDict] = {
         'resource_token': {
             'field1': 1,
             'field2': 2,
@@ -148,7 +156,7 @@ class TestWithPayloads(TestCase):
         'stat': 'ok',
     }
 
-    list_payload = {
+    list_payload: Final[JSONDict] = {
         'resource_token': [
             {
                 'field1': 1,
@@ -195,7 +203,7 @@ class TestWithPayloads(TestCase):
         'stat': 'ok',
     }
 
-    list_payload_no_repos = {
+    list_payload_no_repos: Final[JSONDict] = {
         'resource_token': [],
         'links': {
             'self': {
@@ -215,12 +223,12 @@ class TestWithPayloads(TestCase):
         'stat': 'ok',
     }
 
-    count_payload = {
+    count_payload: Final[JSONDict] = {
         'count': 10,
         'stat': 'ok',
     }
 
-    root_payload = {
+    root_payload: Final[JSONDict] = {
         'uri_templates': {
             'reviews': ('http://localhost:8080/api/review-requests/'
                         '{review_request_id}/reviews/'),
@@ -237,7 +245,7 @@ class TestWithPayloads(TestCase):
             'repositories': {
                 'href': 'http://localhost:8080/api/repositories/',
                 'method': 'GET',
-            }
+            },
         },
         'stat': 'ok',
     }

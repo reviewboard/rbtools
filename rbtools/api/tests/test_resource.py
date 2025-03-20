@@ -1,7 +1,8 @@
 """Unit tests for rbtools.api.resource."""
 
+from __future__ import annotations
+
 import copy
-import re
 
 from rbtools.api.factory import create_resource
 from rbtools.api.request import HttpRequest
@@ -18,8 +19,8 @@ from rbtools.api.resource.base import _EXTRA_DATA_DOCS_URL
 from rbtools.api.tests.base import TestWithPayloads
 
 
-class ExpandedItemResource(ItemResource):
-    pass
+class _ExpandedItemResource(ItemResource):
+    """Resource definition for an expanded item."""
 
 
 class ItemResourceTests(TestWithPayloads):
@@ -117,26 +118,34 @@ class ItemResourceTests(TestWithPayloads):
         'stat': 'ok',
     }
 
-    def setUp(self):
-        super(ItemResourceTests, self).setUp()
+    def setUp(self) -> None:
+        """Set up the test case."""
+        super().setUp()
 
-        RESOURCE_MAP['application/vnd.test.item'] = ExpandedItemResource
+        RESOURCE_MAP['application/vnd.test.item'] = _ExpandedItemResource
 
-    def tearDown(self):
-        super(ItemResourceTests, self).tearDown()
+    def tearDown(self) -> None:
+        """Tear down the test case."""
+        super().tearDown()
 
         RESOURCE_MAP.pop('application/vnd.test.item', None)
 
-    def test_item_resource_fields(self):
+    def test_item_resource_fields(self) -> None:
         """Testing item resource fields"""
-        r = create_resource(self.transport, self.item_payload, '')
+        r = create_resource(
+            transport=self.transport,
+            payload=self.item_payload,
+            url='')
         for field in self.item_payload['resource_token']:
             self.assertTrue(field in r)
             self.assertTrue(hasattr(r, field))
 
-    def test_item_resource_links(self):
+    def test_item_resource_links(self) -> None:
         """Testing item resource link generation"""
-        r = create_resource(self.transport, self.item_payload, '')
+        r = create_resource(
+            transport=self.transport,
+            payload=self.item_payload,
+            url='')
 
         self.assertTrue(hasattr(r, 'get_self'))
         self.assertTrue(callable(r.get_self))
@@ -180,7 +189,7 @@ class ItemResourceTests(TestWithPayloads):
                             payload=self.expanded_item_payload,
                             url='')
 
-        self.assertIsInstance(r['item1'], ExpandedItemResource)
+        self.assertIsInstance(r['item1'], _ExpandedItemResource)
         self.assertIsInstance(r['item2'], ResourceDictField)
         self.assertIsInstance(r['other-item'], ResourceDictField)
 
@@ -193,7 +202,7 @@ class ItemResourceTests(TestWithPayloads):
                             url='')
 
         self.assertIsInstance(r['list1'], ResourceListField)
-        self.assertIsInstance(r['list1'][0], ExpandedItemResource)
+        self.assertIsInstance(r['list1'][0], _ExpandedItemResource)
         self.assertIsInstance(r['list2'], ResourceListField)
         self.assertIsInstance(r['list2'][0], ResourceDictField)
         self.assertIsInstance(r['other-list'], ResourceListField)
@@ -207,7 +216,7 @@ class ItemResourceTests(TestWithPayloads):
                             url='')
         items = dict(r.iteritems())
 
-        self.assertIsInstance(items['item1'], ExpandedItemResource)
+        self.assertIsInstance(items['item1'], _ExpandedItemResource)
         self.assertIsInstance(items['item2'], ResourceDictField)
         self.assertIsInstance(items['other-item'], ResourceDictField)
 
@@ -220,7 +229,7 @@ class ItemResourceTests(TestWithPayloads):
         items = dict(r.iteritems())
 
         self.assertIsInstance(items['list1'], ResourceListField)
-        self.assertIsInstance(items['list1'][0], ExpandedItemResource)
+        self.assertIsInstance(items['list1'][0], _ExpandedItemResource)
         self.assertIsInstance(items['list2'], ResourceListField)
         self.assertIsInstance(items['list2'][0], ResourceDictField)
         self.assertIsInstance(items['other-list'], ResourceListField)
@@ -388,9 +397,12 @@ class ListResourceTests(TestWithPayloads):
                 )
             })
 
-    def test_list_resource_list(self):
+    def test_list_resource_list(self) -> None:
         """Testing list resource lists"""
-        r = create_resource(self.transport, self.list_payload, '')
+        r = create_resource(
+            transport=self.transport,
+            payload=self.list_payload,
+            url='')
         self.assertEqual(r.num_items, len(self.list_payload['resource_token']))
         self.assertEqual(r.total_results, self.list_payload['total_results'])
 
@@ -405,12 +417,18 @@ class ListResourceTests(TestWithPayloads):
         payload = copy.deepcopy(self.list_payload)
         del payload['total_results']
 
-        r = create_resource(self.transport, payload, '')
+        r = create_resource(
+            transport=self.transport,
+            payload=payload,
+            url='')
         self.assertIsNone(r.total_results)
 
-    def test_list_resource_links(self):
+    def test_list_resource_links(self) -> None:
         """Testing link resource link generation"""
-        r = create_resource(self.transport, self.list_payload, '')
+        r = create_resource(
+            transport=self.transport,
+            payload=self.list_payload,
+            url='')
 
         self.assertTrue(hasattr(r, 'get_self'))
         self.assertTrue(callable(r.get_self))
@@ -439,12 +457,12 @@ class ListResourceTests(TestWithPayloads):
         self.assertFalse(hasattr(r, 'update'))
         self.assertFalse(hasattr(r, 'delete'))
 
-    def test_root_resource_templates(self):
+    def test_root_resource_templates(self) -> None:
         """Testing generation of methods for the root resource uri templates"""
         r = create_resource(
-            self.transport,
-            self.root_payload,
-            '',
+            transport=self.transport,
+            payload=self.root_payload,
+            url='',
             mime_type='application/vnd.reviewboard.org.root+json')
 
         for template_name in self.root_payload['uri_templates']:
@@ -454,7 +472,10 @@ class ListResourceTests(TestWithPayloads):
 
     def test_link_field(self):
         """Testing access of a link field"""
-        r = create_resource(self.transport, self.item_payload, '')
+        r = create_resource(
+            transport=self.transport,
+            payload=self.item_payload,
+            url='')
 
         field = r.link_field
         self.assertTrue(isinstance(field, ResourceLinkField))
@@ -679,56 +700,82 @@ class ResourceExtraDataFieldTests(TestWithPayloads):
 
 
 class ResourceFactoryTests(TestWithPayloads):
-    def test_token_guessing(self):
+    """Unit tests for the resource factory."""
+
+    def test_token_guessing(self) -> None:
         """Testing guessing the resource's token"""
-        r = create_resource(self.transport, self.item_payload, '')
+        r = create_resource(
+            transport=self.transport,
+            payload=self.item_payload,
+            url='')
         self.assertTrue('resource_token' not in r._fields)
 
         for field in self.item_payload['resource_token']:
             self.assertTrue(field in r)
 
-        r = create_resource(self.transport, self.count_payload, '')
+        r = create_resource(
+            transport=self.transport,
+            payload=self.count_payload,
+            url='')
         self.assertTrue('count' in r)
 
-    def test_no_token_guessing(self):
+    def test_no_token_guessing(self) -> None:
         """Testing constructing without guessing the resource token"""
-        r = create_resource(self.transport, self.item_payload, '',
-                            guess_token=False)
+        r = create_resource(
+            transport=self.transport,
+            payload=self.item_payload,
+            url='',
+            guess_token=False)
         self.assertTrue('resource_token' in r)
         self.assertTrue('field1' not in r)
         self.assertTrue('field1' in r.resource_token)
 
-        r = create_resource(self.transport, self.list_payload, '',
-                            guess_token=False)
+        r = create_resource(
+            transport=self.transport,
+            payload=self.list_payload,
+            url='',
+            guess_token=False)
         self.assertTrue('resource_token' in r)
 
-    def test_item_construction(self):
+    def test_item_construction(self) -> None:
         """Testing constructing an item resource"""
-        r = create_resource(self.transport, self.item_payload, '')
+        r = create_resource(
+            transport=self.transport,
+            payload=self.item_payload,
+            url='')
         self.assertTrue(isinstance(r, ItemResource))
         self.assertEqual(r.field1,
                          self.item_payload['resource_token']['field1'])
         self.assertEqual(r.field2,
                          self.item_payload['resource_token']['field2'])
 
-    def test_list_construction(self):
+    def test_list_construction(self) -> None:
         """Testing constructing a list resource"""
-        r = create_resource(self.transport, self.list_payload, '')
+        r = create_resource(
+            transport=self.transport,
+            payload=self.list_payload,
+            url='')
         self.assertTrue(isinstance(r, ListResource))
 
-    def test_count_construction(self):
+    def test_count_construction(self) -> None:
         """Testing constructing a count resource"""
-        r = create_resource(self.transport, self.count_payload, '')
+        r = create_resource(
+            transport=self.transport,
+            payload=self.count_payload,
+            url='')
         self.assertTrue(isinstance(r, CountResource))
         self.assertEqual(r.count, self.count_payload['count'])
 
-    def test_resource_specific_base_class(self):
+    def test_resource_specific_base_class(self) -> None:
         """Testing constructing a resource with a specific base class"""
-        r = create_resource(self.transport, self.root_payload, '')
+        r = create_resource(
+            transport=self.transport,
+            payload=self.root_payload,
+            url='')
         self.assertFalse(isinstance(r, RootResource))
         r = create_resource(
-            self.transport,
-            self.root_payload,
-            '',
+            transport=self.transport,
+            payload=self.root_payload,
+            url='',
             mime_type='application/vnd.reviewboard.org.root+json')
         self.assertTrue(isinstance(r, RootResource))
