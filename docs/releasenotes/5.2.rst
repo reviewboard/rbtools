@@ -1,0 +1,72 @@
+.. default-intersphinx:: rbt5.x rb-latest
+
+=========================
+RBTools 5.2 Release Notes
+=========================
+
+**Release date:** March 24, 2025
+
+
+Installation
+============
+
+Follow our :ref:`installation guide <rbtools-installation>` to install RBTools.
+
+To learn more, see:
+
+* `Documentation <https://www.reviewboard.org/docs/rbtools/5.x/>`_
+* `RBTools on PyPI <https://pypi.org/project/rbtools/>`_
+* `RBTools on GitHub <https://github.com/reviewboard/rbtools/>`_
+
+
+Bug Fixes
+=========
+
+rbt patch
+---------
+
+* Fixed running :option`rbt patch --print` when the Review Board server URL is
+  defined via the :rbtconfig:`TREES` setting.
+
+* Fixed patching on SVN repositories when the working directory has no overlap
+  with the patch's base directory.
+
+  :rbtcommand:`rbt patch` attempted to be smart about applying patches when the
+  current working directory was different from the working directory that the
+  Review Request was originally created from. Unfortunately, this broke
+  applying patches across different branches. This has been fixed to skip any
+  filtering when there is no overlap between the patch's base directory and the
+  current working directory.
+
+
+rbt post
+--------
+
+* Fixed MIME type guessing when :command:`file` was not available.
+
+  RBTools 5.1 added a fallback method for detecting the MIME type of binary
+  files included in diffs for when the :command:`file` command is not present.
+  This had a couple issues that could cause crashes in some situations.
+
+
+IBM ClearCase / HCL DevOps Code ClearCase
+-----------------------------------------
+
+* Fixed repository matching when posting against Review Board servers older
+  than 7.0.1.
+
+
+Mercurial
+---------
+
+* Fixed file revision parsing to avoid unwanted debug output from the
+  :command:`hg` command.
+
+
+Contributors
+============
+
+* André Klitzing
+* Christian Hammond
+* David Trowbridge
+* Michelle Aubin

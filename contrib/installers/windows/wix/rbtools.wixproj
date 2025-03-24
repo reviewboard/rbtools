@@ -63,6 +63,6 @@
 
  <!-- Sign the installer -->
  <Target Name="SignMsi">
-  <Exec Command='"$(SignToolPath)" sign /fd SHA256 /sha1 $(CertificateThumbprint) /t $(TimestampUrl) "%(SignMsi.FullPath)"' />
+  <Exec Command='"$(SignToolPath)" sign /debug /fd SHA256 /sha1 $(CertificateThumbprint) /t $(TimestampUrl) "%(SignMsi.FullPath)"' />
  </Target>
 </Project>

@@ -1,5 +1,10 @@
-About RBTools
-=============
+RBTools - Command Line Tools for Review Board
+=============================================
+
+[![Latest Release](https://img.shields.io/pypi/v/RBTools)](https://pypi.org/project/RBTools)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![Review Board](https://img.shields.io/badge/Review%20Board-d0e6ff?label=reviewed%20with)](https://www.reviewboard.org)
+[![Python](https://img.shields.io/pypi/pyversions/RBTools)](https://pypi.org/project/RBTools)
 
 RBTools is a set of command line tools and a rich Python API for use with
 [Review Board](https://www.reviewboard.org/).
@@ -55,10 +60,20 @@ Getting Support
 We can help you get going with Review Board and RBTools, and diagnose any
 issues that may come up.
 
-If you're using RBTools in production, we offer [support
-contracts](https://www.reviewboard.org/support/), covering all Beanbag
-products. This helps fund the development of Review Board, RBTools, and our
-other open source projects.
+We provide more [dedicated, private
+support](https://www.reviewboard.org/support/) for your organization through a
+support contract, offering:
+
+* Same-day responses (generally within a few hours, if not sooner)
+* Confidential communications
+* Installation/upgrade assistance
+* Emergency database repair
+* Video/chat meetings (by appointment)
+* Priority fixes for urgent bugs
+* Backports of urgent fixes to older releases (when possible)
+
+Support contracts fund the development of Review Board, RBTools, and our other
+open source projects.
 
 For basic questions, there's a public community support
 [discussion list](http://groups.google.com/group/reviewboard/). We generally
@@ -111,7 +126,7 @@ $ pip install -r dev-requirements.txt
 Running the test suite is easy. Simply run:
 
 ```console
-$ ./tests/runtests.py
+$ pytest
 ```
 
 from the top of the source tree. You can also run a particular set of tests.
