@@ -25,7 +25,7 @@ Bug Fixes
 rbt patch
 ---------
 
-* Fixed running :option`rbt patch --print` when the Review Board server URL is
+* Fixed running :option:`rbt patch --print` when the Review Board server URL is
   defined via the :rbtconfig:`TREES` setting.
 
 * Fixed patching on SVN repositories when the working directory has no overlap
