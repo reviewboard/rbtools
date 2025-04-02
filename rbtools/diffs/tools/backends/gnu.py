@@ -282,7 +282,13 @@ class GNUDiffTool(BaseDiffTool):
             )
 
             # Visual Studio 2022 ships a copy of GNU Diff for it's git implementation. Try looking for it.
-            yield r'C:\Program Files\Microsoft Visual Studio\2022\Professional\Common7\IDE\CommonExtensions\Microsoft\TeamFoundation\Team Explorer\Git\usr\bin\diff.exe'
+            for edition in ('Community', 'Professional'):
+                yield os.path.join(
+                    r'C:\Program Files\Microsoft Visual Studio\2022',
+                    edition,
+                    r'Common7\IDE\CommonExtensions\Microsoft\TeamFoundation'
+                    r'\Team Explorer\Git\usr\bin\diff.exe'
+                )
 
             # Unity ships GNU diff (or it does at the time of this writing).
             # Try it.
