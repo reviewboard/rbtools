@@ -1214,7 +1214,8 @@ class BaseCommand:
         repository_info, tool = scan_usable_client(
             self.config,
             self.options,
-            client_name=client_name)
+            client_name=client_name,
+            tool_required=tool_required)
 
         if tool is None and not tool_required:
             return repository_info, None
