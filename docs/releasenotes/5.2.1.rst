@@ -1,0 +1,41 @@
+.. default-intersphinx:: rbt5.x rb-latest
+
+===========================
+RBTools 5.2.1 Release Notes
+===========================
+
+**Release date:** TBD
+
+
+Installation
+============
+
+Follow our :ref:`installation guide <rbtools-installation>` to install RBTools.
+
+To learn more, see:
+
+* `Documentation <https://www.reviewboard.org/docs/rbtools/5.x/>`_
+* `RBTools on PyPI <https://pypi.org/project/rbtools/>`_
+* `RBTools on GitHub <https://github.com/reviewboard/rbtools/>`_
+
+
+Bug Fixes
+=========
+
+* Fixed issues when running certain commands outside of a source tree with the
+  :rbtconfig:`TREES` setting.
+
+  Some commands, such as :rbtcommand:`rbt patch --print` or
+  :rbtcommand:`rbt api-get`, can be run outside of a source tree, because they
+  do not interact with the repository at all. RBTools 5.2 contained a regression
+  when using these commands with the :rbtconfig:`TREES` setting, causing these
+  commands to error out with a message about not being able to find the
+  repository.
+
+
+Contributors
+============
+
+* Christian Hammond
+* David Trowbridge
+* Michelle Aubin

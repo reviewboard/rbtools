@@ -113,8 +113,14 @@ def scan_usable_client(
     config: RBToolsConfig,
     options: argparse.Namespace,
     client_name: Optional[str] = None,
+    *,
+    tool_required: bool = True,
 ) -> tuple[Optional[RepositoryInfo], Optional[BaseSCMClient]]:
     """Scan for a usable SCMClient.
+
+    Version Changed:
+        5.2.1:
+        Added the ``tool_required`` argument.
 
     Args:
         config (dict):
@@ -123,10 +129,16 @@ def scan_usable_client(
         options (argparse.Namespace):
             The parsed command line arguments.
 
-        client_name (unicode, optional):
+        client_name (str, optional):
             A specific client name, which can come from the configuration. This
             can be used to disambiguate if there are nested repositories, or to
             speed up detection.
+
+        tool_required (bool, optional):
+            Whether a usable client is required.
+
+            Version Added:
+                5.2.1
 
     Returns:
         tuple:
@@ -165,6 +177,9 @@ def scan_usable_client(
 
         assert scmclient is not None
     else:
+        if not tool_required:
+            return None, None
+
         dep_errors = scan_result.dependency_errors
 
         if client_name:
