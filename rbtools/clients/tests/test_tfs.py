@@ -372,6 +372,37 @@ class TFExeWrapperTests(SCMClientTestCase):
         with self.assertRaisesMessage(InvalidRevisionSpecError, message):
             wrapper.parse_revision_spec([])
 
+    def test_parse_revision_spec_with_windows_line_endings(self):
+        """Testing TFExeWrapper.parse_revision_spec with windows line endings
+        """
+        cwd = os.getcwd()
+
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': ([
+                    'tf', 'vc', 'history', '/stopafter:1',
+                    '/recursive', '/format:detailed', '/version:Lrev',
+                    cwd, '/noprompt',
+                ],),
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'Changeset: 123\r\n',
+                    b'',
+                )),
+            },
+        ]))
+
+        wrapper = TFExeWrapper()
+
+        self.assertEqual(
+            wrapper.parse_revision_spec(['Lrev']),
+            {
+                'base': '122',
+                'tip': '123',
+            })
+
+        self.assertSpyCallCount(run_process_exec, 1)
+
     def test_diff_with_add(self):
         """Testing TFExeWrapper.diff with chg=Add"""
         client = self.build_client(needs_diff=True,

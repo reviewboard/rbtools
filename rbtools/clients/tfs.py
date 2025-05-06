@@ -335,7 +335,7 @@ class TFExeWrapper(BaseTFWrapper):
             .read()
         )
 
-        m = re.search(br'^Changeset: (\d+)$', data, re.MULTILINE)
+        m = re.search(br'^Changeset: (\d+)\r?$', data, re.MULTILINE)
 
         if not m:
             logging.debug('Failed to parse output from "tf vc history":\n%s',
