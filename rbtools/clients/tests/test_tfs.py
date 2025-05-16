@@ -1,5 +1,7 @@
 """Unit tests for TFSClient."""
 
+from __future__ import annotations
+
 import argparse
 import os
 import re
@@ -137,14 +139,52 @@ class TFExeWrapperTests(SCMClientTestCase):
             ),
         }
 
-    def test_check_dependencies_with_found(self):
-        """Testing TFExeWrapper.check_dependencies with tf.exe found"""
+    def test_check_dependencies_with_found_15(self) -> None:
+        """Testing TFExeWrapper.check_dependencies with tf.exe v15 found"""
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchAny([
             {
                 'args': (['tf', 'vc', 'help'],),
                 'op': kgb.SpyOpReturn((
                     0,
                     b'Version Control Tool, Version 15\n',
+                    b'',
+                )),
+            },
+        ]))
+
+        wrapper = TFExeWrapper()
+        wrapper.check_dependencies()
+
+        self.assertSpyCallCount(run_process_exec, 1)
+
+    def test_check_dependencies_with_found_15_minor(self) -> None:
+        """Testing TFExeWrapper.check_dependencies with tf.exe v15 and
+        a minor version specifier found
+        """
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchAny([
+            {
+                'args': (['tf', 'vc', 'help'],),
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'Version Control Tool, Version 15.1232\n',
+                    b'',
+                )),
+            },
+        ]))
+
+        wrapper = TFExeWrapper()
+        wrapper.check_dependencies()
+
+        self.assertSpyCallCount(run_process_exec, 1)
+
+    def test_check_dependencies_with_found_17(self) -> None:
+        """Testing TFExeWrapper.check_dependencies with tf.exe v17 found"""
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchAny([
+            {
+                'args': (['tf', 'vc', 'help'],),
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'Version Control Tool, Version 17\n',
                     b'',
                 )),
             },
