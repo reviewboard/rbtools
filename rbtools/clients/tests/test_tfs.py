@@ -1,5 +1,7 @@
 """Unit tests for TFSClient."""
 
+from __future__ import annotations
+
 import argparse
 import os
 import re
@@ -137,14 +139,52 @@ class TFExeWrapperTests(SCMClientTestCase):
             ),
         }
 
-    def test_check_dependencies_with_found(self):
-        """Testing TFExeWrapper.check_dependencies with tf.exe found"""
+    def test_check_dependencies_with_found_15(self) -> None:
+        """Testing TFExeWrapper.check_dependencies with tf.exe v15 found"""
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchAny([
             {
                 'args': (['tf', 'vc', 'help'],),
                 'op': kgb.SpyOpReturn((
                     0,
                     b'Version Control Tool, Version 15\n',
+                    b'',
+                )),
+            },
+        ]))
+
+        wrapper = TFExeWrapper()
+        wrapper.check_dependencies()
+
+        self.assertSpyCallCount(run_process_exec, 1)
+
+    def test_check_dependencies_with_found_15_minor(self) -> None:
+        """Testing TFExeWrapper.check_dependencies with tf.exe v15 and
+        a minor version specifier found
+        """
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchAny([
+            {
+                'args': (['tf', 'vc', 'help'],),
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'Version Control Tool, Version 15.1232\n',
+                    b'',
+                )),
+            },
+        ]))
+
+        wrapper = TFExeWrapper()
+        wrapper.check_dependencies()
+
+        self.assertSpyCallCount(run_process_exec, 1)
+
+    def test_check_dependencies_with_found_17(self) -> None:
+        """Testing TFExeWrapper.check_dependencies with tf.exe v17 found"""
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchAny([
+            {
+                'args': (['tf', 'vc', 'help'],),
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'Version Control Tool, Version 17\n',
                     b'',
                 )),
             },
@@ -371,6 +411,37 @@ class TFExeWrapperTests(SCMClientTestCase):
 
         with self.assertRaisesMessage(InvalidRevisionSpecError, message):
             wrapper.parse_revision_spec([])
+
+    def test_parse_revision_spec_with_windows_line_endings(self):
+        """Testing TFExeWrapper.parse_revision_spec with windows line endings
+        """
+        cwd = os.getcwd()
+
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': ([
+                    'tf', 'vc', 'history', '/stopafter:1',
+                    '/recursive', '/format:detailed', '/version:Lrev',
+                    cwd, '/noprompt',
+                ],),
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'Changeset: 123\r\n',
+                    b'',
+                )),
+            },
+        ]))
+
+        wrapper = TFExeWrapper()
+
+        self.assertEqual(
+            wrapper.parse_revision_spec(['Lrev']),
+            {
+                'base': '122',
+                'tip': '123',
+            })
+
+        self.assertSpyCallCount(run_process_exec, 1)
 
     def test_diff_with_add(self):
         """Testing TFExeWrapper.diff with chg=Add"""

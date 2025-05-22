@@ -162,7 +162,7 @@ class BaseTFWrapper:
 
 
 class TFExeWrapper(BaseTFWrapper):
-    """Implementation wrapper for using VS2017's tf.exe."""
+    """Implementation wrapper for using VS2017+ tf.exe."""
 
     REVISION_WORKING_COPY = '--rbtools-working-copy'
 
@@ -186,10 +186,18 @@ class TFExeWrapper(BaseTFWrapper):
         except Exception:
             tf_vc_output = b''
 
-        # VS2015 has a tf.exe but it's not good enough.
-        if (not tf_vc_output or
-            b'Version Control Tool, Version 15' not in tf_vc_output):
-            raise SCMClientDependencyError(missing_exes=['tf'])
+        # We want tf.exe from VS2017 or higher, which corresponds to TFVC
+        # version 15 or higher.
+        if tf_vc_output:
+            match = re.search(br'Version\s+(\d+)', tf_vc_output)
+
+            if match:
+                major_version = int(match.group(1))
+
+                if major_version >= 15:
+                    return
+
+        raise SCMClientDependencyError(missing_exes=['tf'])
 
     def get_local_path(self) -> Optional[str]:
         """Return the local path to the working tree.
@@ -335,7 +343,7 @@ class TFExeWrapper(BaseTFWrapper):
             .read()
         )
 
-        m = re.search(br'^Changeset: (\d+)$', data, re.MULTILINE)
+        m = re.search(br'^Changeset: (\d+)\r?$', data, re.MULTILINE)
 
         if not m:
             logging.debug('Failed to parse output from "tf vc history":\n%s',

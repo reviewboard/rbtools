@@ -9,33 +9,33 @@ you're using, there are different requirements for TFS. The table below
 summarizes the three different methods and the different features which are
 available under each.
 
-Note that if you're running VS2017, the only option available is the built-in
-tf.exe method.
+Note that if you're running VS2017 or higher, the only option available is the
+built-in :command:`tf.exe` method.
 
-+---------------------------+---------------+------------------+--------------------------+
-|                           | VS2017 tf.exe | rb-tfs adaptor   | Team Explorer Everywhere |
-+===========================+===============+==================+==========================+
-| OS support                | Windows       | All              | All                      |
-+---------------------------+---------------+------------------+--------------------------+
-| Visual Studio versions    | 2017          | 2010, 2013, 2015 | 2010, 2013, 2015         |
-+---------------------------+---------------+------------------+--------------------------+
-| Posting pending changes   | Yes           | Yes              | Yes                      |
-+---------------------------+---------------+------------------+--------------------------+
-| Posting committed changes | No            | Yes              | No                       |
-+---------------------------+---------------+------------------+--------------------------+
-| Posting shelvesets        | No            | Yes              | No                       |
-+---------------------------+---------------+------------------+--------------------------+
++---------------------------+----------------+------------------+--------------------------+
+|                           | VS2017+ tf.exe | rb-tfs adaptor   | Team Explorer Everywhere |
++===========================+================+==================+==========================+
+| OS support                | Windows        | All              | All                      |
++---------------------------+----------------+------------------+--------------------------+
+| Visual Studio versions    | 2017+          | 2010, 2013, 2015 | 2010, 2013, 2015         |
++---------------------------+----------------+------------------+--------------------------+
+| Posting pending changes   | Yes            | Yes              | Yes                      |
++---------------------------+----------------+------------------+--------------------------+
+| Posting committed changes | No             | Yes              | No                       |
++---------------------------+----------------+------------------+--------------------------+
+| Posting shelvesets        | No             | Yes              | No                       |
++---------------------------+----------------+------------------+--------------------------+
 
 
-VS2017 tf.exe
+VS2017+ tf.exe
 -------------
 
-Visual Studio 2017 includes a command-line tool, :command:`tf.exe`, which
-includes enough support for RBTools to post pending changes to Review Board.
-Committed changes can be posted, but only through the web UI, and shelvesets
-are not supported.
+Visual Studio 2017 and higher include a command-line tool, :command:`tf.exe`,
+which includes enough support for RBTools to post pending changes to Review
+Board. Committed changes can be posted, but only through the web UI, and
+shelvesets are not supported.
 
-Due to changes in Microsoft's data storage formats, if you're using VS2017, the
+Due to changes in Microsoft's data storage formats, if you're using VS2017+, the
 other options (the rb-tfs adaptor and Team Explorer Everywhere) will not work.
 
 This method requires GNU diff but no other installation.
@@ -66,4 +66,4 @@ might use this, the :ref:`rb-tfs` adaptor is faster and supports more features.
 Team Explorer Everywhere works with Visual Studio 2010 through 2015.
 
 .. _`Team Explorer Everywhere`:
-   https://www.visualstudio.com/en-us/products/team-explorer-everywhere-vs.aspx
+   https://github.com/microsoft/team-explorer-everywhere
