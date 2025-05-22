@@ -5,12 +5,18 @@ from __future__ import annotations
 import os
 import ssl
 import sys
-from typing import Dict, List, Optional, Set, Type
+from gettext import gettext as _
+from typing import TYPE_CHECKING
 
 from rbtools.utils.encoding import force_unicode
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
-HTTP_STATUS_CODES: Dict[int, str] = {
+    from typelets.json import JSONDict
+
+
+HTTP_STATUS_CODES: Mapping[int, str] = {
     100: 'Continue',
     101: 'Switching Protocols',
     102: 'Processing',
@@ -84,7 +90,7 @@ HTTP_STATUS_CODES: Dict[int, str] = {
 }
 
 
-API_ERROR_CODES: Dict[int, str] = {
+API_ERROR_CODES: Mapping[int, str] = {
     0: 'No Error',
     1: 'Service Not Configured',
     100: 'Does Not Exist',
@@ -171,10 +177,10 @@ class APIError(Exception):
 
     def __init__(
         self,
-        http_status: Optional[int] = None,
-        error_code: Optional[int] = None,
-        rsp: Optional[Dict] = None,
-        message: Optional[str] = None,
+        http_status: (int | None) = None,
+        error_code: (int | None) = None,
+        rsp: (JSONDict | None) = None,
+        message: (str | None) = None,
         *args,
         **kwargs,
     ) -> None:
@@ -219,7 +225,7 @@ class APIError(Exception):
 
         if rsp and not message:
             try:
-                message = rsp['err']['msg']
+                message = rsp['err']['msg']  # type:ignore
             except KeyError:
                 message = None
 
@@ -248,21 +254,21 @@ class APIError(Exception):
 
         if error_code is not None:
             error_name = API_ERROR_CODES.get(error_code)
-            details = 'API Error %s' % error_code
+            details = f'API Error {error_code}'
 
             if error_name:
-                details = '%s: %s' % (details, error_name)
+                details = f'{details}: {error_name}'
         elif http_status is not None:
             http_status_name = HTTP_STATUS_CODES.get(http_status)
-            details = 'HTTP %s' % http_status
+            details = f'HTTP {http_status}'
 
             if http_status_name:
-                details = '%s: %s' % (details, http_status_name)
+                details = f'{details}: {http_status_name}'
 
         message = self.message
 
         if details:
-            message = '%s (%s)' % (message, details)
+            message = f'{message} ({details})'
 
         return message
 
@@ -288,14 +294,18 @@ class BadRequestError(APIError):
             str:
             The error message.
         """
-        lines = [super(BadRequestError, self).__str__()]
+        lines = [super().__str__()]
 
         if self.rsp and 'fields' in self.rsp:
             lines.append('')
 
-            for field, error in sorted(self.rsp['fields'].items(),
+            fields = self.rsp['fields']
+            assert isinstance(fields, dict)
+
+            for field, error in sorted(fields.items(),
                                        key=lambda pair: pair[0]):
-                lines.append('    %s: %s' % (field, '; '.join(error)))
+                error_text = '; '.join(error)
+                lines.append(f'    {field}: {error_text}')
 
         return '\n'.join(lines)
 
@@ -388,7 +398,7 @@ class ServerInterfaceSSLError(ServerInterfaceError):
             ssl_context (ssl.SSLContext):
                 The original SSL context.
         """
-        messages: List[str] = []
+        messages: list[str] = []
         needs_cert_file: bool = False
         needs_root_certs_command: bool = False
 
@@ -398,95 +408,94 @@ class ServerInterfaceSSLError(ServerInterfaceError):
             if error_code == 10:
                 # Expired or revoked certificate
                 messages.append(
-                    'The SSL certificate used for "%(host)s" has expired or '
-                    'has been revoked. Contact your Review Board '
-                    'administrator for further assistance.'
-                    % {
-                        'host': host,
-                    }
+                    _(
+                        'The SSL certificate used for "{host}" has expired or '
+                        'has been revoked. Contact your Review Board '
+                        'administrator for further assistance.'
+                    ).format(host=host)
                 )
             elif error_code == 18:
                 # Self-signed certificate
                 needs_cert_file = True
                 needs_root_certs_command = True
                 messages.append(
-                    'The SSL certificate used for "%(host)s" is self-signed '
-                    'and cannot currently be verified by RBTools.'
-                    % {
-                        'host': host,
-                    }
+                    _(
+                        'The SSL certificate used for "{host}" is self-signed '
+                        'and cannot currently be verified by RBTools.'
+                    ).format(host=host)
                 )
             elif error_code == 19:
                 # Untrusted root certificate
                 needs_cert_file = True
                 needs_root_certs_command = True
                 messages.append(
-                    'The SSL certificate used for "%(host)s" has an '
-                    'untrusted or self-signed root certificate that cannot '
-                    'currently be verified by RBTools.'
-                    % {
-                        'host': host,
-                    }
+                    _(
+                        'The SSL certificate used for "{host}" has an '
+                        'untrusted or self-signed root certificate that '
+                        'cannot currently be verified by RBTools.'
+                    ).format(host=host)
                 )
             elif error_code == 20:
                 # Unable to get local issuer certificate
                 needs_cert_file = True
                 needs_root_certs_command = True
                 messages.append(
-                    'The SSL certificate used for "%(host)s" has an '
-                    'untrusted or self-signed certificate in the chain that '
-                    'cannot currently be verified by RBTools.'
-                    % {
-                        'host': host,
-                    }
+                    _(
+                        'The SSL certificate used for "{host}" has an '
+                        'untrusted or self-signed certificate in the chain '
+                        'that cannot currently be verified by RBTools.'
+                    ).format(host=host)
                 )
             elif error_code == 62:
                 # Hostname mismatch, certificate is not valid for '<domain>'
                 messages.append(
-                    'The SSL certificate is not valid for "%(host)s". '
-                    'Make sure you are connecting to the correct host. '
-                    'Contact your Review Board administrator for further '
-                    'assistance.'
-                    % {
-                        'host': host,
-                    }
+                    _(
+                        'The SSL certificate is not valid for "{host}". '
+                        'Make sure you are connecting to the correct host. '
+                        'Contact your Review Board administrator for further '
+                        'assistance.'
+                    ).format(host=host)
                 )
         else:
             reason = getattr(ssl_error, 'reason', None)
 
             if reason == 'SSLV3_ALERT_HANDSHAKE_FAILURE':
                 messages.append(
-                    'The server on "%(host)s" is using a TLS protocol or '
-                    'cipher suite that your version of Python does not '
-                    'support. You may need to upgrade Python, or contact '
-                    'your Review Board administrator for further assistance.'
-                    % {
-                        'host': host,
-                    }
+                    _(
+                        'The server on "{host}" is using a TLS protocol or '
+                        'cipher suite that your version of Python does not '
+                        'support. You may need to upgrade Python, or contact '
+                        'your Review Board administrator for further '
+                        'assistance.'
+                    ).format(host=host)
                 )
 
         if not messages:
             # SSL errors are a bit of a mess. Try a few things.
+            details = (
+                ssl_error.strerror or
+                '; '.join(
+                    str(_arg)
+                    for _arg in ssl_error.args
+                ) or
+                str(ssl_error)
+            )
             messages.append(
-                'An expected SSL error occurred when communicating with '
-                '"%(host)s": %(details)s'
-                % {
-                    'details': (
-                        ssl_error.strerror or
-                        '; '.join(
-                            str(_arg)
-                            for _arg in ssl_error.args
-                        ) or
-                        str(ssl_error)
-                    ),
-                    'host': host,
-                })
+                _(
+                    'An expected SSL error occurred when communicating with '
+                    '"{host}": {details}'
+                ).format(
+                    host=host,
+                    details=details,
+                )
+            )
 
         if needs_cert_file:
             messages += [
-                'Make sure any necessary certificates in the chain are '
-                'placed in one of the following locations:',
-
+                _(
+                    'Make sure any necessary certificates in the chain are '
+                    'placed in one of the following locations:'
+                ),
                 '\n'.join(
                     f'    * {_path}'
                     for _path in self._get_ssl_cert_paths()
@@ -495,13 +504,11 @@ class ServerInterfaceSSLError(ServerInterfaceError):
 
         if needs_root_certs_command:
             messages += [
-                'You may need to update your root SSL certificates for '
-                'RBTools by running:',
-
-                '    %(python)s -m pip install -U certifi'
-                % {
-                    'python': sys.executable,
-                }
+                _(
+                    'You may need to update your root SSL certificates for '
+                    'RBTools by running:'
+                ),
+                f'    {sys.executable} -m pip install -U certifi',
             ]
 
         super().__init__('\n\n'.join(messages))
@@ -511,7 +518,7 @@ class ServerInterfaceSSLError(ServerInterfaceError):
         self.ssl_error = ssl_error
         self.ssl_context = ssl_context
 
-    def _get_ssl_cert_paths(self) -> List[str]:
+    def _get_ssl_cert_paths(self) -> Sequence[str]:
         """Return a list of paths where SSL certificates could be placed.
 
         This will check all the default verify paths known to Python, as well
@@ -522,7 +529,7 @@ class ServerInterfaceSSLError(ServerInterfaceError):
             The list of SSL certificate paths.
         """
         default_paths = ssl.get_default_verify_paths()
-        paths: Set[str] = set()
+        paths: set[str] = set()
 
         if default_paths.cafile:
             paths.add(default_paths.cafile)
@@ -550,7 +557,7 @@ class ServerInterfaceSSLError(ServerInterfaceError):
         return sorted(paths)
 
 
-API_ERROR_TYPE: Dict[int, Type[APIError]] = {
+API_ERROR_TYPE: Mapping[int, type[APIError]] = {
     400: BadRequestError,
     401: AuthorizationError,
 }

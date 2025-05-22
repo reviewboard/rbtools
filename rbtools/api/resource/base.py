@@ -12,9 +12,8 @@ import json
 import logging
 from collections.abc import MutableMapping
 from functools import update_wrapper, wraps
-from typing import (Any, Callable, ClassVar, Final, Generic, Literal,
-                    NoReturn, Optional, TYPE_CHECKING, TypeVar, Union, cast,
-                    overload)
+from typing import (Any, Callable, Generic, Literal, TYPE_CHECKING, TypeVar,
+                    Union, cast, overload)
 from urllib.parse import urljoin
 
 from typelets.json import JSONDict, JSONValue
@@ -25,6 +24,7 @@ from rbtools.api.utils import rem_mime_format
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Mapping
+    from typing import ClassVar, Final, NoReturn
 
     from rbtools.api.transport import Transport
 
@@ -183,7 +183,7 @@ def replace_api_stub(
 
 def _preprocess_fields(
     fields: JSONDict,
-) -> Iterator[tuple[str, Union[str, bytes]]]:
+) -> Iterator[tuple[str, str | bytes]]:
     """Pre-process request fields.
 
     Any ``extra_data_json`` (JSON Merge Patch) or ``extra_data_json_patch``
@@ -246,9 +246,9 @@ def _create_resource_for_field(
     *,
     parent_resource: Resource,
     field_payload: JSONDict,
-    mimetype: Optional[str],
+    mimetype: str | None,
     url: str,
-    force_resource_type: Optional[type[Resource]] = None,
+    force_resource_type: (type[Resource] | None) = None,
 ) -> Resource:
     """Create a resource instance based on field data.
 
@@ -296,8 +296,8 @@ def _create_resource_for_field(
 @request_method
 def _create(
     resource: Resource,
-    data: Optional[dict[str, Any]] = None,
-    query_args: Optional[dict[str, QueryArgs]] = None,
+    data: (dict[str, Any] | None) = None,
+    query_args: (dict[str, QueryArgs] | None) = None,
     *args,
     **kwargs,
 ) -> HttpRequest:
@@ -431,8 +431,8 @@ def _get_self(
 @request_method
 def _update(
     resource: Resource,
-    data: Optional[dict[str, Any]] = None,
-    query_args: Optional[dict[str, QueryArgs]] = None,
+    data: (dict[str, Any] | None) = None,
+    query_args: (dict[str, QueryArgs] | None) = None,
     *args,
     **kwargs,
 ) -> HttpRequest:
@@ -501,7 +501,7 @@ def _update(
 # with a None for the method will be ignored.
 SPECIAL_LINKS: Mapping[
     str,
-    tuple[str, Optional[Callable[..., RequestMethodResult]]]
+    tuple[str, Callable[..., RequestMethodResult] | None]
 ] = {
     'create': ('create', _create),
     'delete': ('delete', _delete),
@@ -555,7 +555,7 @@ class ExpandInfo(TypedDict):
     list_mimetype: NotRequired[str]
 
     #: The URL to an expanded list resource, if any.
-    list_url: NotRequired[Optional[str]]
+    list_url: NotRequired[str | None]
 
 
 class BaseGetParams(TypedDict, total=False):
@@ -658,7 +658,7 @@ class Resource:
     #: The key within the request payload for the resource data.
     #:
     #: If this is ``None``, the payload contains the resource data directly.
-    _token: Optional[str]
+    _token: str | None
 
     #: The API transport.
     _transport: Transport
@@ -671,7 +671,7 @@ class Resource:
         transport: Transport,
         payload: JSONDict,
         url: str,
-        token: Optional[str] = None,
+        token: (str | None) = None,
         **kwargs,
     ) -> None:
         """Initialize the resource.
@@ -780,8 +780,8 @@ class Resource:
         *,
         url: str,
         method: str = 'GET',
-        query_args: Optional[Mapping[Any, Any]] = None,
-        headers: Optional[Mapping[str, str]] = None,
+        query_args: (Mapping[Any, Any] | None) = None,
+        headers: (Mapping[str, str] | None) = None,
     ) -> HttpRequest:
         """Create an HTTP request.
 
@@ -821,13 +821,13 @@ class Resource:
     def _wrap_field(
         self,
         field_payload: Any,
-        field_name: Optional[str] = None,
-        field_url: Optional[str] = None,
-        field_mimetype: Optional[str] = None,
-        list_item_mimetype: Optional[str] = None,
+        field_name: (str | None) = None,
+        field_url: (str | None) = None,
+        field_mimetype: (str | None) = None,
+        list_item_mimetype: (str | None) = None,
         force_resource: bool = False,
         *,
-        force_resource_type: Optional[type[Resource]] = None,
+        force_resource_type: (type[Resource] | None) = None,
     ) -> Any:
         """Wrap the value of a field in a resource or field object.
 
@@ -1365,7 +1365,7 @@ class ResourceExtraDataField(ResourceDictField):
     def _wrap_field(
         self,
         field_name: str,
-    ) -> Union[JSONValue, ResourceExtraDataField]:
+    ) -> JSONValue | ResourceExtraDataField:
         """Conditionally return a wrapped version of a field's value.
 
         This will wrap dictionaries in another
@@ -1429,13 +1429,13 @@ class ResourceListField(Generic[_TListValue], list[_TListValue]):
     _resource: Resource
 
     #: The MIME type of items in the list.
-    _item_mimetype: Optional[str]
+    _item_mimetype: str | None
 
     def __init__(
         self,
         resource: Resource,
         list_field: list[_TListValue],
-        item_mimetype: Optional[str] = None,
+        item_mimetype: (str | None) = None,
     ) -> None:
         """Initialize the field.
 
@@ -1522,7 +1522,7 @@ class ItemResource(Resource):
         transport: Transport,
         payload: JSONDict,
         url: str,
-        token: Optional[str] = None,
+        token: (str | None) = None,
         **kwargs,
     ) -> None:
         """Initialize the resource.
@@ -1715,8 +1715,8 @@ class ItemResource(Resource):
     @overload
     def update(
         self,
-        data: Optional[dict[str, Any]] = None,
-        query_args: Optional[dict[str, QueryArgs]] = None,
+        data: (Mapping[str, Any] | None) = None,
+        query_args: (Mapping[str, QueryArgs] | None) = None,
         *args,
         internal: Literal[False] = False,
         **kwargs,
@@ -1726,8 +1726,8 @@ class ItemResource(Resource):
     @overload
     def update(
         self,
-        data: Optional[dict[str, Any]] = None,
-        query_args: Optional[dict[str, QueryArgs]] = None,
+        data: (Mapping[str, Any] | None) = None,
+        query_args: (Mapping[str, QueryArgs] | None) = None,
         *args,
         internal: Literal[True],
         **kwargs,
@@ -1737,11 +1737,11 @@ class ItemResource(Resource):
     @api_stub
     def update(
         self,
-        data: Optional[dict[str, Any]] = None,
-        query_args: Optional[dict[str, QueryArgs]] = None,
+        data: (Mapping[str, Any] | None) = None,
+        query_args: (Mapping[str, QueryArgs] | None) = None,
         *args,
         **kwargs,
-    ) -> Union[Self, HttpRequest]:
+    ) -> Self | HttpRequest:
         """Update the resource.
 
         Any ``extra_data_json`` (JSON Merge Patch) or ``extra_data_json_patch``
@@ -1871,7 +1871,7 @@ class ListResource(Generic[TItemResource], Resource):
     #: instantiate the correct item resource subclass. In cases where items do
     #: not have their own endpoint and therefore have no MIME type, setting
     #: this will ensure that the returned items are the correct item type.
-    _item_resource_type: ClassVar[Optional[type[Resource]]] = None
+    _item_resource_type: ClassVar[type[Resource] | None] = None
 
     ######################
     # Instance variables #
@@ -1891,21 +1891,21 @@ class ListResource(Generic[TItemResource], Resource):
     #:
     #: Type:
     #:     int
-    total_results: Optional[int]
+    total_results: int | None
 
     #: The raw items in the list payload.
     _item_list: list[JSONValue]
 
     #: The MIME type of items in the list.
-    _item_mime_type: Optional[str]
+    _item_mime_type: str | None
 
     def __init__(
         self,
         transport: Transport,
         payload: JSONDict,
         url: str,
-        token: Optional[str] = None,
-        item_mime_type: Optional[str] = None,
+        token: (str | None) = None,
+        item_mime_type: (str | None) = None,
         **kwargs,
     ) -> None:
         """Initialize the resource.
@@ -2111,8 +2111,8 @@ class ListResource(Generic[TItemResource], Resource):
     @overload
     def create(
         self,
-        data: Optional[dict[str, Any]] = None,
-        query_args: Optional[dict[str, QueryArgs]] = None,
+        data: (dict[str, Any] | None) = None,
+        query_args: (dict[str, QueryArgs] | None) = None,
         *args,
         internal: Literal[False] = False,
         **kwargs,
@@ -2122,8 +2122,8 @@ class ListResource(Generic[TItemResource], Resource):
     @overload
     def create(
         self,
-        data: Optional[dict[str, Any]] = None,
-        query_args: Optional[dict[str, QueryArgs]] = None,
+        data: (dict[str, Any] | None) = None,
+        query_args: (dict[str, QueryArgs] | None) = None,
         *args,
         internal: Literal[True],
         **kwargs,
@@ -2133,11 +2133,11 @@ class ListResource(Generic[TItemResource], Resource):
     @api_stub
     def create(
         self,
-        data: Optional[dict[str, Any]] = None,
-        query_args: Optional[dict[str, QueryArgs]] = None,
+        data: (dict[str, Any] | None) = None,
+        query_args: (dict[str, QueryArgs] | None) = None,
         *args,
         **kwargs,
-    ) -> Union[TItemResource, HttpRequest]:
+    ) -> TItemResource | HttpRequest:
         """Create an item resource.
 
         Any ``extra_data_json`` (JSON Merge Patch) or ``extra_data_json_patch``

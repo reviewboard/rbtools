@@ -6,7 +6,7 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import ClassVar, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rbtools.api.resource.base import (
     BaseGetListParams,
@@ -17,6 +17,7 @@ from rbtools.api.resource.base import (
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+    from typing import ClassVar
 
 
 @resource_mimetype('application/vnd.reviewboard.org.remote-repository')
@@ -38,7 +39,7 @@ class RemoteRepositoryItemResource(ItemResource):
     id: str
 
     #: A secondary path that can be used to reach the repository.
-    mirror_path: Optional[str]
+    mirror_path: str | None
 
     #: The name of the repository.
     name: str

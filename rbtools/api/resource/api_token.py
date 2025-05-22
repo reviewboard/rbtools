@@ -6,7 +6,7 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rbtools.api.resource.base import (
     ItemResource,
@@ -47,7 +47,7 @@ class APITokenItemResource(ItemResource):
     #:
     #: This is in ISO-8601 format. The token will be invalid and unusable for
     #: authentication after this point.
-    expires: Optional[str]
+    expires: str | None
 
     #: Extra data as part of the token.
     extra_data: ResourceExtraDataField
@@ -56,7 +56,7 @@ class APITokenItemResource(ItemResource):
     id: int
 
     #: The date and time at which the token became invalid, in ISO-8601 format.
-    invalid_date: Optional[str]
+    invalid_date: str | None
 
     #: A message explaining why the token is no longer valid.
     invalid_reason: str
@@ -67,7 +67,7 @@ class APITokenItemResource(ItemResource):
     #: The date and time the token was last used, in ISO-8601 format.
     #:
     #: If the token has never been used, this will be ``None``.
-    last_used: Optional[str]
+    last_used: str | None
 
     #: A user-provided note about the token.
     note: str

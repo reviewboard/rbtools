@@ -8,11 +8,10 @@ Version Added:
 from __future__ import annotations
 
 from collections import defaultdict, deque
-from typing import (ClassVar, Literal, Optional, TYPE_CHECKING, Union, cast,
-                    overload)
+from typing import TYPE_CHECKING, cast, overload
 from urllib.parse import urljoin
 
-from typing_extensions import Self, Unpack
+from typing_extensions import Self
 
 from rbtools.api.resource.base import (
     BaseGetListParams,
@@ -30,6 +29,7 @@ from rbtools.utils.graphs import path_exists
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+    from typing import ClassVar, Literal
 
     from typing_extensions import Unpack
 
@@ -73,7 +73,7 @@ class ReviewRequestItemResource(BaseReviewRequestItemResource):
     ######################
 
     #: The reason why the review request was not approved.
-    approval_failure: Optional[str]
+    approval_failure: str | None
 
     #: Whether the review request has been approved by reviewers.
     #:
@@ -90,7 +90,7 @@ class ReviewRequestItemResource(BaseReviewRequestItemResource):
     #: These are server-side repository-specific change numbers, and are not
     #: supported by all types of repositories. This is deprecated in favor of
     #: the ``commit_id`` field.
-    changenum: Optional[int]
+    changenum: int | None
 
     #: The text describing the closing of the review request.
     close_description: str
@@ -120,7 +120,7 @@ class ReviewRequestItemResource(BaseReviewRequestItemResource):
     issue_verifying_count: int
 
     #: The most recent diff.
-    latest_diff: Optional[ResourceLinkField[DiffItemResource]]
+    latest_diff: ResourceLinkField[DiffItemResource] | None
 
     #: Whether or not the review request is currently visible to other users.
     public: bool
@@ -129,9 +129,7 @@ class ReviewRequestItemResource(BaseReviewRequestItemResource):
     ship_it_count: int
 
     #: The current status of the review request.
-    status: Union[Literal['discarded'],
-                  Literal['pending'],
-                  Literal['submitted']]
+    status: Literal['discarded', 'pending', 'submitted']
 
     #: The date and time that the review request was added.
     time_added: str
@@ -172,8 +170,8 @@ class ReviewRequestItemResource(BaseReviewRequestItemResource):
     @request_method_returns[Self]()
     def submit(
         self,
-        description: Optional[str] = None,
-        changenum: Optional[str] = None,
+        description: (str | None) = None,
+        changenum: (str | None) = None,
     ) -> HttpRequest:
         """Submit a review request.
 
@@ -388,7 +386,7 @@ class ReviewRequestItemResource(BaseReviewRequestItemResource):
     def get_draft(
         self,
         **kwargs: Unpack[BaseGetParams],
-    ) -> Union[HttpRequest, ReviewRequestDraftResource]:
+    ) -> HttpRequest | ReviewRequestDraftResource:
         """Get the review request draft.
 
         Args:

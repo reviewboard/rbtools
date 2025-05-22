@@ -7,7 +7,7 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rbtools.api.resource.base import (
     ItemResource,
@@ -34,9 +34,9 @@ class ValidateDiffCommitResource(ItemResource):
         diff: bytes,
         commit_id: str,
         parent_id: str,
-        parent_diff: Optional[bytes] = None,
-        base_commit_id: Optional[str] = None,
-        validation_info: Optional[str] = None,
+        parent_diff: (bytes | None) = None,
+        base_commit_id: (str | None) = None,
+        validation_info: (str | None) = None,
         **kwargs: QueryArgs,
     ) -> HttpRequest:
         """Validate the diff for a commit.

@@ -7,7 +7,7 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Literal, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rbtools.api.resource.base import (
     ItemResource,
@@ -19,6 +19,8 @@ from rbtools.api.resource.base import (
 from rbtools.api.resource.mixins import GetPatchMixin
 
 if TYPE_CHECKING:
+    from typing import Literal
+
     from typing_extensions import Unpack
 
     from rbtools.api.request import HttpRequest, QueryArgs
@@ -55,12 +57,12 @@ class FileDiffItemResource(GetPatchMixin, ItemResource):
     #: Additional information of the destination file.
     #:
     #: This is parsed from the diff, but is usually not used for anything.
-    dest_detail: Optional[str]
+    dest_detail: str | None
 
     #: The new name of the patched file.
     #:
     #: This may be the same as the source file.
-    dest_file: Optional[str]
+    dest_file: str | None
 
     #: The encoding of the original and patched file, if available.
     encoding: str

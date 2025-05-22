@@ -6,7 +6,7 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import ClassVar, Generic, Optional
+from typing import Generic, TYPE_CHECKING
 
 from rbtools.api.resource.base import (
     BaseGetListParams,
@@ -15,6 +15,10 @@ from rbtools.api.resource.base import (
     ListResource,
     TItemResource,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from typing import ClassVar
 
 
 class UserGetParams(BaseGetParams, total=False):
@@ -38,7 +42,7 @@ class BaseUserItemResource(ItemResource):
         6.0
     """
 
-    _httprequest_params_name_map: ClassVar[dict[str, str]] = {
+    _httprequest_params_name_map: ClassVar[Mapping[str, str]] = {
         'render_avatars_at': 'render-avatars-at',
         **ItemResource._httprequest_params_name_map,
     }
@@ -52,10 +56,10 @@ class BaseUserItemResource(ItemResource):
     #: This is only present if the resource was fetched with
     #: ``?render-avatars-at=`` (for GET requests) or
     #: ``render-avatars-at=`` (for POST requests).
-    avatar_html: Optional[str]
+    avatar_html: str | None
 
     #: The URL for an avatar representing the user, if available.
-    avatar_url: Optional[str]
+    avatar_url: str | None
 
     #: The URLs for an avatar representing the user.
     #:
@@ -65,13 +69,13 @@ class BaseUserItemResource(ItemResource):
     avatar_urls: dict[str, str]
 
     #: The user's e-mail address.
-    email: Optional[str]
+    email: str | None
 
     #: The user's first name.
-    first_name: Optional[str]
+    first_name: str | None
 
     #: The user's full name (first and last).
-    fullname: Optional[str]
+    fullname: str | None
 
     #: The numeric ID of the user.
     id: int
@@ -82,7 +86,7 @@ class BaseUserItemResource(ItemResource):
     is_active: bool
 
     #: The user's last name.
-    last_name: Optional[str]
+    last_name: str | None
 
     #: The URL to the user's page on the site.
     url: str
@@ -129,7 +133,7 @@ class BaseUserListResource(Generic[TItemResource],
         6.0
     """
 
-    _httprequest_params_name_map: ClassVar[dict[str, str]] = {
+    _httprequest_params_name_map: ClassVar[Mapping[str, str]] = {
         'render_avatars_at': 'render-avatars-at',
         **ListResource._httprequest_params_name_map,
     }

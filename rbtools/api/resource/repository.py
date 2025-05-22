@@ -6,7 +6,7 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import ClassVar, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rbtools.api.resource.base import (
     BaseGetListParams,
@@ -18,6 +18,7 @@ from rbtools.api.resource.base import (
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+    from typing import ClassVar
 
     from typing_extensions import Unpack
 
@@ -102,7 +103,7 @@ class RepositoryItemResource(ItemResource):
     #:
     #: This will only be present when interacting with the API as an admin
     #: user.
-    visible: Optional[bool]
+    visible: bool | None
 
     @api_stub
     def get_branches(

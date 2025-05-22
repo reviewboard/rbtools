@@ -19,7 +19,7 @@ from http.cookiejar import (Cookie,
                             MozillaCookieJar)
 from io import BytesIO
 from json import loads as json_loads
-from typing import Any, Callable, Optional, TYPE_CHECKING, Union
+from typing import Callable, TYPE_CHECKING, Union
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import (
@@ -51,6 +51,7 @@ from rbtools.utils.filesystem import get_home_path
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+    from typing import Any
 
     from rbtools.config import RBToolsConfig
 
@@ -68,7 +69,7 @@ QueryArgs: TypeAlias = Union[bool, int, float, bytes, str]
 def _normalize_url_parts(
     url: str,
     *,
-    host_header: Optional[str] = '',
+    host_header: (str | None) = '',
 ) -> tuple[str, str]:
     """Return a normalized domain from a URL.
 
@@ -152,8 +153,8 @@ class HttpRequest:
         self,
         url: str,
         method: str = 'GET',
-        query_args: Optional[Mapping[str, QueryArgs]] = None,
-        headers: Optional[Mapping[str, str]] = None,
+        query_args: (Mapping[str, QueryArgs] | None) = None,
+        headers: (Mapping[str, str] | None) = None,
     ) -> None:
         """Initialize the HTTP request.
 
@@ -219,7 +220,7 @@ class HttpRequest:
 
     def encode_url_value(
         self,
-        key: Union[bytes, str],
+        key: bytes | str,
         value: QueryArgs,
     ) -> str:
         """Encode the given value for inclusion in a URL.
@@ -280,8 +281,8 @@ class HttpRequest:
 
     def add_field(
         self,
-        name: Union[bytes, str],
-        value: Union[bytes, str],
+        name: bytes | str,
+        value: bytes | str,
     ) -> None:
         """Add a form-data field for the request.
 
@@ -314,10 +315,10 @@ class HttpRequest:
 
     def add_file(
         self,
-        name: Union[bytes, str],
-        filename: Union[bytes, str],
-        content: Union[bytes, str],
-        mimetype: Optional[Union[bytes, str]] = None,
+        name: bytes | str,
+        filename: bytes | str,
+        content: bytes | str,
+        mimetype: (bytes | str | None) = None,
     ) -> None:
         """Add an uploaded file for the request.
 
@@ -348,7 +349,7 @@ class HttpRequest:
 
     def encode_multipart_formdata(
         self,
-    ) -> tuple[Optional[str], Optional[bytes]]:
+    ) -> tuple[str | None, bytes | None]:
         """Encode the request into a multi-part form-data payload.
 
         Returns:
@@ -512,8 +513,8 @@ class Request(URLRequest):
     def __init__(
         self,
         url: str,
-        body: Optional[bytes] = b'',
-        headers: Optional[dict[str, str]] = None,
+        body: (bytes | None) = b'',
+        headers: (dict[str, str] | None) = None,
         method: str = 'PUT',
     ) -> None:
         """Initialize the request.
@@ -570,11 +571,11 @@ class ReviewBoardHTTPPasswordMgr(HTTPPasswordMgr):
     def __init__(
         self,
         reviewboard_url: str,
-        rb_user: Optional[str] = None,
-        rb_pass: Optional[str] = None,
-        api_token: Optional[str] = None,
-        auth_callback: Optional[AuthCallback] = None,
-        otp_token_callback: Optional[OTPCallback] = None,
+        rb_user: (str | None) = None,
+        rb_pass: (str | None) = None,
+        api_token: (str | None) = None,
+        auth_callback: (AuthCallback | None) = None,
+        otp_token_callback: (OTPCallback | None) = None,
     ) -> None:
         """Initialize the password manager.
 
@@ -611,7 +612,7 @@ class ReviewBoardHTTPPasswordMgr(HTTPPasswordMgr):
         self,
         realm: str,
         uri: str,
-    ) -> tuple[Optional[str], Optional[str]]:
+    ) -> tuple[str | None, str | None]:
         """Return the username and password for the given realm.
 
         Args:
@@ -651,7 +652,7 @@ class ReviewBoardHTTPPasswordMgr(HTTPPasswordMgr):
         self,
         uri: str,
         method: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Return the two-factor authentication code.
 
         Args:
@@ -699,9 +700,9 @@ class PresetHTTPAuthHandler(BaseHandler):
     def reset(
         self,
         *,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        api_token: Optional[str] = None,
+        username: (str | None) = None,
+        password: (str | None) = None,
+        api_token: (str | None) = None,
     ) -> None:
         """Reset the stored authentication credentials.
 
@@ -798,9 +799,9 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
         HTTPBasicAuthHandler.__init__(self, *args, **kwargs)
 
         self._tried_login: bool = False
-        self._otp_token_method: Optional[str] = None
+        self._otp_token_method: (str | None) = None
         self._otp_token_attempts: int = 0
-        self._last_otp_token: Optional[str] = None
+        self._last_otp_token: (str | None) = None
 
     def http_error_auth_reqed(
         self,
@@ -861,7 +862,7 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
         host: str,
         request: URLRequest,
         realm: str,
-    ) -> Optional[HTTPResponse]:
+    ) -> HTTPResponse | None:
         """Attempt another HTTP Basic Auth request.
 
         This will determine if another request should be made (based on
@@ -1027,7 +1028,7 @@ class CookiePolicy(DefaultCookiePolicy):
 
 def _create_cookie_jar(
     *,
-    cookie_file: Optional[str] = None,
+    cookie_file: (str | None) = None,
     config: RBToolsConfig,
 ) -> tuple[MozillaCookieJar, str]:
     """Return a cookie jar backed by cookie_file
@@ -1124,7 +1125,7 @@ class ReviewBoardServer:
     #:
     #: Type:
     #:     str
-    cookie_file: Optional[str]
+    cookie_file: str | None
 
     #: The cookie jar object for managing authentication cookies.
     #:
@@ -1132,29 +1133,29 @@ class ReviewBoardServer:
     #:     http.cookiejar.CookieJar
     cookie_jar: CookieJar
 
-    _cache: Optional[APICache] = None
+    _cache: (APICache | None) = None
 
     def __init__(
         self,
         url: str,
-        cookie_file: Optional[str] = None,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        api_token: Optional[str] = None,
-        agent: Optional[str] = None,
-        session: Optional[str] = None,
+        cookie_file: (str | None) = None,
+        username: (str | None) = None,
+        password: (str | None) = None,
+        api_token: (str | None) = None,
+        agent: (str | None) = None,
+        session: (str | None) = None,
         disable_proxy: bool = False,
-        auth_callback: Optional[AuthCallback] = None,
-        otp_token_callback: Optional[OTPCallback] = None,
+        auth_callback: (AuthCallback | None) = None,
+        otp_token_callback: (OTPCallback | None) = None,
         verify_ssl: bool = True,
         save_cookies: bool = True,
-        ext_auth_cookies: Optional[str] = None,
-        ca_certs: Optional[str] = None,
-        client_key: Optional[str] = None,
-        client_cert: Optional[str] = None,
-        proxy_authorization: Optional[str] = None,
+        ext_auth_cookies: (str | None) = None,
+        ca_certs: (str | None) = None,
+        client_key: (str | None) = None,
+        client_cert: (str | None) = None,
+        proxy_authorization: (str | None) = None,
         *,
-        config: Optional[RBToolsConfig] = None,
+        config: (RBToolsConfig | None) = None,
     ) -> None:
         """Initialize the server object.
 
@@ -1253,7 +1254,7 @@ class ReviewBoardServer:
         self.save_cookies = save_cookies
         self.ext_auth_cookies = ext_auth_cookies
 
-        cookie_jar: Optional[CookieJar]
+        cookie_jar: CookieJar | None
 
         if save_cookies:
             cookie_jar, self.cookie_file = _create_cookie_jar(
@@ -1366,7 +1367,7 @@ class ReviewBoardServer:
 
     def enable_cache(
         self,
-        cache_location: Optional[str] = None,
+        cache_location: (str | None) = None,
         in_memory: bool = False,
     ) -> None:
         """Enable caching for all future HTTP requests.
@@ -1403,9 +1404,9 @@ class ReviewBoardServer:
     def login(
         self,
         *,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        api_token: Optional[str] = None,
+        username: (str | None) = None,
+        password: (str | None) = None,
+        api_token: (str | None) = None,
     ) -> None:
         """Log in to the Review Board server.
 
@@ -1454,7 +1455,7 @@ class ReviewBoardServer:
     def process_error(
         self,
         http_status: int,
-        data: Union[str, bytes],
+        data: str | bytes,
     ) -> None:
         """Process an error, raising an APIError with the information.
 
@@ -1489,7 +1490,7 @@ class ReviewBoardServer:
     def make_request(
         self,
         request: HttpRequest,
-    ) -> Optional[Union[HTTPResponse, CachedHTTPResponse, LiveHTTPResponse]]:
+    ) -> HTTPResponse | CachedHTTPResponse | LiveHTTPResponse | None:
         """Perform an http request.
 
         Args:

@@ -6,7 +6,7 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import ClassVar, Generic, Optional, TYPE_CHECKING
+from typing import Generic, TYPE_CHECKING
 
 from rbtools.api.resource.base import (
     BaseGetListParams,
@@ -17,6 +17,7 @@ from rbtools.api.resource.base import (
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+    from typing import ClassVar
 
     from rbtools.api.resource.base import ResourceExtraDataField
 
@@ -39,7 +40,7 @@ class BaseReviewGroupItemResource(ItemResource):
     display_name: str
 
     #: Extra data as part of the review group.
-    extra_data: Optional[ResourceExtraDataField]
+    extra_data: ResourceExtraDataField | None
 
     #: The numeric ID of the review group.
     id: int

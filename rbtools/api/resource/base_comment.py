@@ -6,11 +6,13 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Literal, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rbtools.api.resource.base import ItemResource, TextType, api_stub
 
 if TYPE_CHECKING:
+    from typing import Literal
+
     from typing_extensions import Unpack
 
     from rbtools.api.resource.base import ResourceExtraDataField
@@ -39,13 +41,13 @@ class BaseCommentItemResource(ItemResource):
     issue_opened: bool
 
     #: The status of the issue.
-    issue_status: Optional[Literal[
+    issue_status: Literal[
         'dropped',
         'open',
         'resolved',
         'verifying-dropped',
         'verifying-resolved',
-    ]]
+    ] | None
 
     #: Whether or not the comment is part of a public review.
     public: bool

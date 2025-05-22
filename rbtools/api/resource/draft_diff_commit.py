@@ -8,7 +8,7 @@ Version Added:
 from __future__ import annotations
 
 import logging
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rbtools.api.resource.base import (
     ListResource,
@@ -84,10 +84,10 @@ class DraftDiffCommitListResource(ListResource[DraftDiffCommitItemResource]):
         author_email: str,
         author_date: str,
         commit_message: str,
-        committer_name: Optional[str] = None,
-        committer_email: Optional[str] = None,
-        committer_date: Optional[str] = None,
-        parent_diff: Optional[bytes] = None,
+        committer_name: (str | None) = None,
+        committer_email: (str | None) = None,
+        committer_date: (str | None) = None,
+        parent_diff: (bytes | None) = None,
         **kwargs: QueryArgs,
     ) -> HttpRequest:
         """Upload a commit.

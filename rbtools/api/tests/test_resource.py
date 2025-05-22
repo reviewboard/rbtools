@@ -136,7 +136,7 @@ class ItemResourceTests(TestWithPayloads):
             transport=self.transport,
             payload=self.item_payload,
             url='')
-        for field in self.item_payload['resource_token']:
+        for field in self.item_payload['resource_token']:  # type:ignore
             self.assertTrue(field in r)
             self.assertTrue(hasattr(r, field))
 
@@ -181,7 +181,7 @@ class ItemResourceTests(TestWithPayloads):
 
         self.assertFalse(hasattr(r, 'create'))
 
-    def test_getattr_with_expanded_item_resource(self):
+    def test_getattr_with_expanded_item_resource(self) -> None:
         """Testing ItemResource.__getattr__ with field as expanded item
         resource
         """
@@ -193,7 +193,7 @@ class ItemResourceTests(TestWithPayloads):
         self.assertIsInstance(r['item2'], ResourceDictField)
         self.assertIsInstance(r['other-item'], ResourceDictField)
 
-    def test_getattr_with_expanded_list_resource(self):
+    def test_getattr_with_expanded_list_resource(self) -> None:
         """Testing ItemResource.__getattr__ with field as expanded list
         resource
         """
@@ -208,7 +208,7 @@ class ItemResourceTests(TestWithPayloads):
         self.assertIsInstance(r['other-list'], ResourceListField)
         self.assertIsInstance(r['other-list'][0], ResourceDictField)
 
-    def test_iteritems_with_expanded_item_resource(self):
+    def test_iteritems_with_expanded_item_resource(self) -> None:
         """Testing ItemResource.iteritems with field as expanded item resource
         """
         r = create_resource(transport=self.transport,
@@ -220,7 +220,7 @@ class ItemResourceTests(TestWithPayloads):
         self.assertIsInstance(items['item2'], ResourceDictField)
         self.assertIsInstance(items['other-item'], ResourceDictField)
 
-    def test_iteritems_with_expanded_list_resource(self):
+    def test_iteritems_with_expanded_list_resource(self) -> None:
         """Testing ItemResource.iteritems with field as expanded list resource
         """
         r = create_resource(transport=self.transport,
@@ -235,7 +235,7 @@ class ItemResourceTests(TestWithPayloads):
         self.assertIsInstance(items['other-list'], ResourceListField)
         self.assertIsInstance(items['other-list'][0], ResourceDictField)
 
-    def test_update_with_extra_data(self):
+    def test_update_with_extra_data(self) -> None:
         """Testing ItemResource.update with extra_data__<field>="""
         r = create_resource(transport=self.transport,
                             payload=self.item_payload,
@@ -252,7 +252,7 @@ class ItemResourceTests(TestWithPayloads):
                 b'extra_data.key3': b'123',
             })
 
-    def test_update_with_extra_data_json(self):
+    def test_update_with_extra_data_json(self) -> None:
         """Testing ItemResource.update with extra_data_json="""
         r = create_resource(transport=self.transport,
                             payload=self.item_payload,
@@ -285,7 +285,7 @@ class ItemResourceTests(TestWithPayloads):
                 )
             })
 
-    def test_update_with_extra_data_json_patch(self):
+    def test_update_with_extra_data_json_patch(self) -> None:
         """Testing ItemResource.update with extra_data_json_patch="""
         r = create_resource(transport=self.transport,
                             payload=self.item_payload,
@@ -318,7 +318,7 @@ class ItemResourceTests(TestWithPayloads):
 class ListResourceTests(TestWithPayloads):
     """Unit tests for rbtools.api.resource.ListResource."""
 
-    def test_create_with_extra_data(self):
+    def test_create_with_extra_data(self) -> None:
         """Testing ListResource.create with extra_data__<field>="""
         r = create_resource(transport=self.transport,
                             payload=self.list_payload,
@@ -335,7 +335,7 @@ class ListResourceTests(TestWithPayloads):
                 b'extra_data.key3': b'123',
             })
 
-    def test_create_with_extra_data_json(self):
+    def test_create_with_extra_data_json(self) -> None:
         """Testing ItemResource.create with extra_data_json="""
         r = create_resource(transport=self.transport,
                             payload=self.list_payload,
@@ -368,7 +368,7 @@ class ListResourceTests(TestWithPayloads):
                 )
             })
 
-    def test_create_with_extra_data_json_patch(self):
+    def test_create_with_extra_data_json_patch(self) -> None:
         """Testing ItemResource.create with extra_data_json_patch="""
         r = create_resource(transport=self.transport,
                             payload=self.list_payload,
@@ -380,7 +380,7 @@ class ListResourceTests(TestWithPayloads):
                 'value': {
                     'array': [1, 2, 3],
                 },
-            }
+            },
         ])
 
         self.assertEqual(
@@ -470,7 +470,7 @@ class ListResourceTests(TestWithPayloads):
             self.assertTrue(hasattr(r, method_name))
             self.assertTrue(callable(getattr(r, method_name)))
 
-    def test_link_field(self):
+    def test_link_field(self) -> None:
         """Testing access of a link field"""
         r = create_resource(
             transport=self.transport,
@@ -490,7 +490,7 @@ class ListResourceTests(TestWithPayloads):
 class ResourceFieldDictTests(TestWithPayloads):
     """Unit tests for ResourceDictField."""
 
-    def test_getattr(self):
+    def test_getattr(self) -> None:
         """Testing ResourceDictField.__getattr__"""
         r = create_resource(transport=self.transport,
                             payload=self.item_payload,
@@ -502,7 +502,7 @@ class ResourceFieldDictTests(TestWithPayloads):
             field.nested1,
             self.item_payload['resource_token']['nested_field']['nested1'])
 
-    def test_getattr_with_invalid_key(self):
+    def test_getattr_with_invalid_key(self) -> None:
         """Testing ResourceDictField.__getattr__ with invalid key"""
         r = create_resource(transport=self.transport,
                             payload=self.item_payload,
@@ -519,7 +519,7 @@ class ResourceFieldDictTests(TestWithPayloads):
         with self.assertRaisesMessage(AttributeError, message):
             field.nestedX
 
-    def test_getitem(self):
+    def test_getitem(self) -> None:
         """Testing ResourceDictField.__getitem__"""
         r = create_resource(transport=self.transport,
                             payload=self.item_payload,
@@ -531,7 +531,7 @@ class ResourceFieldDictTests(TestWithPayloads):
             field['nested1'],
             self.item_payload['resource_token']['nested_field']['nested1'])
 
-    def test_getitem_with_invalid_key(self):
+    def test_getitem_with_invalid_key(self) -> None:
         """Testing ResourceDictField.__getitem__ with invalid key"""
         r = create_resource(transport=self.transport,
                             payload=self.item_payload,
@@ -548,7 +548,7 @@ class ResourceFieldDictTests(TestWithPayloads):
         with self.assertRaisesMessage(KeyError, message):
             field['nestedX']
 
-    def test_fields(self):
+    def test_fields(self) -> None:
         """Testing ResourceDictField.fields"""
         r = create_resource(transport=self.transport,
                             payload=self.item_payload,
@@ -558,7 +558,7 @@ class ResourceFieldDictTests(TestWithPayloads):
             set(r.nested_field.fields()),
             set(self.item_payload['resource_token']['nested_field']))
 
-    def test_setitem(self):
+    def test_setitem(self) -> None:
         """Testing ResourceDictField.__setitem__"""
         r = create_resource(transport=self.transport,
                             payload=self.item_payload,
@@ -573,7 +573,7 @@ class ResourceFieldDictTests(TestWithPayloads):
         with self.assertRaisesMessage(AttributeError, message):
             r.nested_field['new'] = {}
 
-    def test_setdefault(self):
+    def test_setdefault(self) -> None:
         """Testing ResourceDictField.setdefault"""
         r = create_resource(transport=self.transport,
                             payload=self.item_payload,
@@ -588,7 +588,7 @@ class ResourceFieldDictTests(TestWithPayloads):
         with self.assertRaisesMessage(AttributeError, message):
             r.nested_field.setdefault('new', {})
 
-    def test_update(self):
+    def test_update(self) -> None:
         """Testing ResourceDictField.update"""
         r = create_resource(transport=self.transport,
                             payload=self.item_payload,
@@ -605,7 +605,7 @@ class ResourceFieldDictTests(TestWithPayloads):
                 'new': {},
             })
 
-    def test_pop(self):
+    def test_pop(self) -> None:
         """Testing ResourceDictField.pop"""
         r = create_resource(transport=self.transport,
                             payload=self.item_payload,
@@ -620,7 +620,7 @@ class ResourceFieldDictTests(TestWithPayloads):
         with self.assertRaisesMessage(AttributeError, message):
             r.nested_field.pop('nested1')
 
-    def test_popitem(self):
+    def test_popitem(self) -> None:
         """Testing ResourceDictField.popitem"""
         r = create_resource(transport=self.transport,
                             payload=self.item_payload,
@@ -635,7 +635,7 @@ class ResourceFieldDictTests(TestWithPayloads):
         with self.assertRaisesMessage(AttributeError, message):
             r.nested_field.popitem()
 
-    def test_clear(self):
+    def test_clear(self) -> None:
         """Testing ResourceDictField.clear"""
         r = create_resource(transport=self.transport,
                             payload=self.item_payload,
@@ -654,7 +654,7 @@ class ResourceFieldDictTests(TestWithPayloads):
 class ResourceExtraDataFieldTests(TestWithPayloads):
     """Unit tests for ResourceExtraDataField."""
 
-    def test_wrapped_fields(self):
+    def test_wrapped_fields(self) -> None:
         """Testing ResourceExtraDataField field wrapping"""
         r = create_resource(transport=self.transport,
                             payload=self.item_payload,
@@ -666,7 +666,7 @@ class ResourceExtraDataFieldTests(TestWithPayloads):
         self.assertIs(type(r.extra_data['links']['test']),
                       ResourceExtraDataField)
 
-    def test_copy(self):
+    def test_copy(self) -> None:
         """Testing ResourceExtraDataField.copy"""
         r = create_resource(transport=self.transport,
                             payload=self.item_payload,
@@ -678,21 +678,20 @@ class ResourceExtraDataFieldTests(TestWithPayloads):
         self.assertIs(type(extra_data['links']), dict)
         self.assertIs(type(extra_data['links']['test']), dict)
 
-    def test_setitem(self):
+    def test_setitem(self) -> None:
         """Testing ResourceExtraDataField.__setitem__"""
         r = create_resource(transport=self.transport,
                             payload=self.item_payload,
                             url='')
 
         message = (
-            'extra_data attributes cannot be modified directly on this '
-            'dictionary. To make a mutable copy of this and all its contents, '
-            'call .copy(). To set or change extra_data state, issue a '
-            '.update(extra_data_json={...}) for a JSON Merge Patch request or '
-            '.update(extra_data_json_patch=[...]) for a JSON Patch request '
-            'on the parent resource. See %s for the format for these '
-            'operations.'
-            % _EXTRA_DATA_DOCS_URL
+            f'extra_data attributes cannot be modified directly on this '
+            f'dictionary. To make a mutable copy of this and all its '
+            f'contents, call .copy(). To set or change extra_data state, '
+            f'issue a .update(extra_data_json={{...}}) for a JSON Merge Patch '
+            f'request or .update(extra_data_json_patch=[...]) for a JSON '
+            f'Patch request on the parent resource. See '
+            f'{_EXTRA_DATA_DOCS_URL} for the format for these operations.'
         )
 
         with self.assertRaisesMessage(AttributeError, message):

@@ -1,16 +1,21 @@
 """API payload decoders."""
 
+from __future__ import annotations
+
 import json
-from typing import Dict, Union
+from typing import TYPE_CHECKING
 
 from rbtools.api.utils import parse_mimetype
 from rbtools.utils.encoding import force_unicode
 
+if TYPE_CHECKING:
+    from typelets.json import JSONDict
+
 
 def DefaultDecoder(
-    payload: Union[bytes, str],
-) -> Dict:
-    """Default decoder for API payloads.
+    payload: bytes | str,
+) -> JSONDict:
+    """Decode API payloads with no supported type.
 
     The default decoder is used when a decoder is not found in the
     DECODER_MAP. This will stick the body of the response into the
@@ -32,8 +37,8 @@ def DefaultDecoder(
 
 
 def JsonDecoder(
-    payload: Union[bytes, str],
-) -> Dict:
+    payload: bytes | str,
+) -> JSONDict:
     """Decode an application/json-encoded API response.
 
     Args:
@@ -56,17 +61,19 @@ DECODER_MAP = {
 
 
 def decode_response(
-    payload: Union[bytes, str],
+    payload: bytes | str,
     mime_type: str,
-) -> Dict:
+) -> JSONDict:
     """Decode a Web API response.
 
     The body of a Web API response will be decoded into a dictionary,
     according to the provided mime_type.
     """
     mime = parse_mimetype(mime_type)
+    main_type = mime['main_type']
+    mime_format = mime['format']
 
-    format = '%s/%s' % (mime['main_type'], mime['format'])
-    decoder = DECODER_MAP.get(format, DefaultDecoder)
+    api_format = f'{main_type}/{mime_format}'
+    decoder = DECODER_MAP.get(api_format, DefaultDecoder)
 
     return decoder(payload)

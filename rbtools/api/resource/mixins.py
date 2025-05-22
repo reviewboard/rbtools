@@ -7,7 +7,7 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rbtools.api.resource.base import request_method
 
@@ -32,8 +32,8 @@ class AttachmentUploadMixin(MixinParent):
         self,
         filename: str,
         content: bytes,
-        caption: Optional[str] = None,
-        attachment_history: Optional[str] = None,
+        caption: (str | None) = None,
+        attachment_history: (str | None) = None,
         **kwargs: QueryArgs,
     ) -> HttpRequest:
         """Upload a new attachment.
@@ -77,9 +77,9 @@ class DiffUploaderMixin(MixinParent):
     def prepare_upload_diff_request(
         self,
         diff: bytes,
-        parent_diff: Optional[bytes] = None,
-        base_dir: Optional[str] = None,
-        base_commit_id: Optional[str] = None,
+        parent_diff: (bytes | None) = None,
+        base_dir: (str | None) = None,
+        base_commit_id: (str | None) = None,
         **kwargs: QueryArgs,
     ) -> HttpRequest:
         """Create a request that can be used to upload a diff.
@@ -163,7 +163,7 @@ class ScreenshotUploadMixin(MixinParent):
         self,
         filename: str,
         content: bytes,
-        caption: Optional[str] = None,
+        caption: (str | None) = None,
         **kwargs: QueryArgs,
     ) -> HttpRequest:
         """Upload a new screenshot.

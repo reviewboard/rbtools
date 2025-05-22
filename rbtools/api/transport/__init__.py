@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from typing import Any, Callable
+
     from rbtools.api.resource import Resource, RootResource
 
 
@@ -119,9 +121,9 @@ class Transport:
 
     def login(
         self,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        api_token: Optional[str] = None,
+        username: (str | None) = None,
+        password: (str | None) = None,
+        api_token: (str | None) = None,
         *args,
         **kwargs,
     ) -> None:
@@ -185,7 +187,7 @@ class Transport:
 
     def enable_cache(
         self,
-        cache_location: Optional[str] = None,
+        cache_location: (str | None) = None,
         in_memory: bool = False,
     ) -> None:
         """Enable caching for all future HTTP requests.

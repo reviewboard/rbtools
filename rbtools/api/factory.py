@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from housekeeping import deprecate_non_keyword_only_args
 
@@ -34,10 +34,10 @@ def create_resource(
     transport: Transport,
     payload: JSONDict,
     url: str,
-    mime_type: Optional[str] = None,
-    item_mime_type: Optional[str] = None,
+    mime_type: (str | None) = None,
+    item_mime_type: (str | None) = None,
     guess_token: bool = True,
-    force_resource_type: Optional[type[Resource]] = None,
+    force_resource_type: (type[Resource] | None) = None,
 ) -> Resource:
     """Construct and return a resource object.
 

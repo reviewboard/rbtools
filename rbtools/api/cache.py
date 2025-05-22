@@ -10,13 +10,17 @@ import logging
 import os
 import sqlite3
 import threading
-from email.message import Message
-from http.client import HTTPResponse
-from typing import Dict, List, MutableMapping, Optional, Union
+from typing import TYPE_CHECKING
 from urllib.request import urlopen, Request
 
 from rbtools.api.errors import CacheError
 from rbtools.utils.appdirs import user_cache_dir
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, MutableMapping
+    from email.message import Message
+    from http.client import HTTPResponse
+    from typing import Any
 
 
 #: The minimum version of Review Board to allow HTTP caching.
@@ -36,8 +40,8 @@ class CacheEntry:
     def __init__(
         self,
         url: str,
-        vary_headers: Dict[str, str],
-        max_age: int,
+        vary_headers: Mapping[str, str],
+        max_age: int | None,
         etag: str,
         local_date: datetime.datetime,
         last_modified: str,
@@ -230,7 +234,7 @@ class APICache:
     def __init__(
         self,
         create_db_in_memory: bool = False,
-        db_location: Optional[str] = None,
+        db_location: (str | None) = None,
     ) -> None:
         """Create a new instance of the APICache
 
@@ -311,7 +315,7 @@ class APICache:
     def make_request(
         self,
         request: Request,
-    ) -> Union[LiveHTTPResponse, CachedHTTPResponse]:
+    ) -> LiveHTTPResponse | CachedHTTPResponse:
         """Perform the specified request.
 
         If there is an up-to-date cached entry in our store, a CachedResponse
@@ -422,7 +426,7 @@ class APICache:
         self,
         request_headers: MutableMapping[str, str],
         response_headers: Message,
-    ) -> Optional[Dict]:
+    ) -> dict[str, Any] | None:
         """Get the caching info for the response to the given request.
 
         Args:
@@ -437,7 +441,7 @@ class APICache:
             The information to use for the cache entry. May be ``None`` if the
             response cannot be cached.
         """
-        max_age: Optional[int] = None
+        max_age: (int | None) = None
         no_cache = False
 
         expires = response_headers.get('Expires')
@@ -578,7 +582,7 @@ class APICache:
     def _get_entry(
         self,
         request: Request,
-    ) -> Optional[CacheEntry]:
+    ) -> CacheEntry | None:
         """Find an entry in the API cache store that matches the request.
 
         Args:
@@ -767,7 +771,7 @@ class APICache:
     def _split_csv(
         self,
         csvline: str,
-    ) -> List[str]:
+    ) -> list[str]:
         """Split a line of comma-separated values into a list.
 
         Args:

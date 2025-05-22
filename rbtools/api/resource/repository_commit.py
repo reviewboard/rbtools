@@ -6,7 +6,7 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import ClassVar, Optional
+from typing import TYPE_CHECKING
 
 from rbtools.api.resource.base import (
     BaseGetParams,
@@ -15,6 +15,9 @@ from rbtools.api.resource.base import (
     ListResource,
     resource_mimetype,
 )
+
+if TYPE_CHECKING:
+    from typing import ClassVar
 
 
 class RepositoryCommitItemResource(ItemResource):
@@ -82,5 +85,5 @@ class RepositoryCommitListResource(ListResource[RepositoryCommitItemResource]):
     #:
     #: This is necessary because individual commits don't have their own
     #: endpoint or MIME type.
-    _item_resource_type: ClassVar[Optional[type[Resource]]] = \
+    _item_resource_type: ClassVar[type[Resource] | None] = \
         RepositoryCommitItemResource

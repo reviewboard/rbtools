@@ -8,7 +8,7 @@ from rbtools.api.transport import Transport
 from rbtools.testing import TestCase
 
 if TYPE_CHECKING:
-    from typing import Final, Optional, Union
+    from typing import Final
 
     from typelets.json import JSONDict
 
@@ -20,7 +20,7 @@ class MockResponse:
         self,
         code: int,
         headers: dict[str, str],
-        body: Union[bytes, str],
+        body: bytes | str,
     ) -> None:
         """Create a new MockResponse."""
         if isinstance(body, str):
@@ -63,7 +63,7 @@ class MockTransport(Transport):
 
     def enable_cache(
         self,
-        cache_location: Optional[str] = None,
+        cache_location: (str | None) = None,
         in_memory: bool = False,
     ) -> None:
         """Enable caching for all future HTTP requests.

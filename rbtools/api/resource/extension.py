@@ -6,13 +6,16 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import ClassVar, Optional
+from typing import TYPE_CHECKING
 
 from rbtools.api.resource.base import (
     ItemResource,
     ListResource,
     resource_mimetype,
 )
+
+if TYPE_CHECKING:
+    from typing import ClassVar
 
 
 @resource_mimetype('application/vnd.reviewboard.org.extension')
@@ -35,10 +38,10 @@ class ExtensionItemResource(ItemResource):
     ######################
 
     #: The author of the extension
-    author: Optional[str]
+    author: str | None
 
     #: The author's website.
-    author_url: Optional[str]
+    author_url: str | None
 
     #: Whether or not the extension can be disabled.
     can_disable: bool
@@ -56,7 +59,7 @@ class ExtensionItemResource(ItemResource):
     installed: bool
 
     #: Any errors captured while attempting to load the extension.
-    load_error: Optional[str]
+    load_error: str | None
 
     #: Whether or not the extension is currently loadable.
     #:
@@ -68,7 +71,7 @@ class ExtensionItemResource(ItemResource):
     name: str
 
     #: A summary of the extension's functionality.
-    summary: Optional[str]
+    summary: str | None
 
     #: The installed version of the extension.
     version: str

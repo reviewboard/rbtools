@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import ClassVar, Optional, TYPE_CHECKING, cast
+from typing import Optional, TYPE_CHECKING, cast
 
 from packaging.version import parse as parse_version
 from typelets.json import JSONDict
@@ -36,6 +36,9 @@ from rbtools.api.resource.muted_review_request import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from typing import ClassVar
+
     from typing_extensions import Self, Unpack
 
     from rbtools.api.request import HttpRequest, QueryArgs
@@ -309,7 +312,7 @@ class RootResource(ItemResource):
     def _make_url_from_template(
         self,
         url_template: str,
-        values: Optional[dict[str, str]] = None,
+        values: (Mapping[str, str] | None) = None,
         **kwargs: QueryArgs,
     ) -> str:
         """Create a URL from a template.
@@ -351,7 +354,7 @@ class RootResource(ItemResource):
     def _get_template_request(
         self,
         url_template: str,
-        values: Optional[dict[str, str]] = None,
+        values: (Mapping[str, str] | None) = None,
         **kwargs: QueryArgs,
     ) -> HttpRequest:
         """Generate an HttpRequest from a URI template.

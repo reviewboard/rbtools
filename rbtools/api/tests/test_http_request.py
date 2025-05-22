@@ -1,5 +1,7 @@
 """Unit tests for rbtools.api.request.HttpRequest."""
 
+from __future__ import annotations
+
 from urllib.parse import parse_qsl, urlparse
 
 from kgb import SpyAgency
@@ -11,7 +13,7 @@ from rbtools.testing import TestCase
 class HttpRequestTests(SpyAgency, TestCase):
     """Unit tests for rbtools.api.request.HttpRequest."""
 
-    def test_defaults(self):
+    def test_defaults(self) -> None:
         """Testing HttpRequest default attribute values"""
         request = HttpRequest('/')
         self.assertEqual(request.url, '/')
@@ -21,7 +23,7 @@ class HttpRequestTests(SpyAgency, TestCase):
         self.assertIsNone(content_type)
         self.assertIsNone(content)
 
-    def test_url_includes_normalized_query_args(self):
+    def test_url_includes_normalized_query_args(self) -> None:
         """Testing HttpRequest.url includes normalized query arguments"""
         request = HttpRequest(
             url='/',
@@ -32,7 +34,7 @@ class HttpRequestTests(SpyAgency, TestCase):
 
         self.assertEqual(request.url, '/?a-b=c&d-e=f')
 
-    def test_headers_normalized(self):
+    def test_headers_normalized(self) -> None:
         """Testing HttpRequest.headers uses native string types"""
         request = HttpRequest(
             url='/',
@@ -47,16 +49,16 @@ class HttpRequestTests(SpyAgency, TestCase):
         self.assertIs(type(request.headers[keys[0]]), str)
         self.assertIs(type(request.headers[keys[1]]), str)
 
-    def test_method_normalized(self):
+    def test_method_normalized(self) -> None:
         """Testing HttpRequest.method uses native string types"""
         request = HttpRequest(url='/')
-        request.method = b'GET'
+        request.method = b'GET'  # type:ignore
         self.assertIs(type(request.method), str)
 
         request.method = 'POST'
         self.assertIs(type(request.method), str)
 
-    def test_encode_multipart_formdata(self):
+    def test_encode_multipart_formdata(self) -> None:
         """Testing HttpRequest.encode_multipart_formdata"""
         request = HttpRequest(url='/',
                               method='POST')
@@ -99,7 +101,7 @@ class HttpRequestTests(SpyAgency, TestCase):
             b'\r\n'
             b'--BOUNDARY--\r\n\r\n')
 
-    def test_encode_multipart_formdata_normalizes_string_types(self):
+    def test_encode_multipart_formdata_normalizes_string_types(self) -> None:
         """Testing HttpRequest.encode_multipart_formdata normalizes
         Unicode and byte strings
         """
@@ -136,7 +138,7 @@ class HttpRequestTests(SpyAgency, TestCase):
             b'\r\n'
             b'--BOUNDARY--\r\n\r\n')
 
-    def test_encode_query_args(self):
+    def test_encode_query_args(self) -> None:
         """Testing the encoding of query arguments"""
         request = HttpRequest(
             url='/',
@@ -167,7 +169,7 @@ class HttpRequestTests(SpyAgency, TestCase):
             self.assertIsInstance(key, str)
             self.assertIsInstance(value, str)
 
-    def test_encode_query_args_invalid(self):
+    def test_encode_query_args_invalid(self) -> None:
         """Testing the encoding of query arguments with invalid keys and
         values
         """
@@ -175,7 +177,7 @@ class HttpRequestTests(SpyAgency, TestCase):
             HttpRequest(
                 url='/',
                 method='GET',
-                query_args={
+                query_args={  # type:ignore
                     1: 'value',
                 })
 
@@ -183,7 +185,7 @@ class HttpRequestTests(SpyAgency, TestCase):
             HttpRequest(
                 url='/',
                 method='GET',
-                query_args={
+                query_args={  # type:ignore
                     1.2: 'value',
                 })
 
@@ -191,7 +193,7 @@ class HttpRequestTests(SpyAgency, TestCase):
             HttpRequest(
                 url='/',
                 method='GET',
-                query_args={
+                query_args={  # type:ignore
                     True: 'value',
                 })
 
@@ -199,7 +201,7 @@ class HttpRequestTests(SpyAgency, TestCase):
             HttpRequest(
                 url='/',
                 method='GET',
-                query_args={
+                query_args={  # type:ignore
                     'key': {'adsf': 'jkl;'},
                 })
 
@@ -207,6 +209,6 @@ class HttpRequestTests(SpyAgency, TestCase):
             HttpRequest(
                 url='/',
                 method='GET',
-                query_args={
+                query_args={  # type:ignore
                     'key': ['a', 'b', 'c'],
                 })

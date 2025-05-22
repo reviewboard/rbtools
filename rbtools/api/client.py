@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from rbtools.api.transport.sync import SyncTransport
@@ -48,7 +48,7 @@ class RBClient:
     #:     5.0
     #:
     #: Type: str
-    user_agent: Optional[str]
+    user_agent: str | None
 
     def __init__(
         self,
@@ -119,7 +119,7 @@ class RBClient:
         path: str,
         *args,
         **kwargs,
-    ) -> Optional[Resource]:
+    ) -> Resource | None:
         """Return the API resource at the given path.
 
         Args:
@@ -154,7 +154,7 @@ class RBClient:
         url: str,
         *args,
         **kwargs,
-    ) -> Optional[Resource]:
+    ) -> Resource | None:
         """Return the API resource at the given URL.
 
         Args:

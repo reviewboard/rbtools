@@ -6,7 +6,6 @@ import os
 import ssl
 import sys
 from ssl import SSLCertVerificationError, SSLContext, SSLError
-from typing import Optional
 
 import kgb
 
@@ -20,35 +19,35 @@ from rbtools.testing import TestCase
 class APIErrorTests(TestCase):
     """Unit tests for rbtools.api.errors.APIError."""
 
-    def test_str_with_http_status(self):
+    def test_str_with_http_status(self) -> None:
         """Testing APIError.__str__ with http_status"""
         self.assertEqual(
             str(APIError(http_status=500)),
             'An error occurred when communicating with Review Board. '
             '(HTTP 500: Internal Server Error)')
 
-    def test_str_with_http_status_unknown(self):
+    def test_str_with_http_status_unknown(self) -> None:
         """Testing APIError.__str__ with unknown http_status"""
         self.assertEqual(
             str(APIError(http_status=900)),
             'An error occurred when communicating with Review Board. '
             '(HTTP 900)')
 
-    def test_str_with_error_code(self):
+    def test_str_with_error_code(self) -> None:
         """Testing APIError.__str__ with error_code"""
         self.assertEqual(
             str(APIError(error_code=105)),
             'An error occurred when communicating with Review Board. '
             '(API Error 105: Invalid Form Data)')
 
-    def test_str_with_error_code_unknown(self):
+    def test_str_with_error_code_unknown(self) -> None:
         """Testing APIError.__str__ with unknown error_code"""
         self.assertEqual(
             str(APIError(error_code=12345)),
             'An error occurred when communicating with Review Board. '
             '(API Error 12345)')
 
-    def test_str_with_http_status_and_error_code(self):
+    def test_str_with_http_status_and_error_code(self) -> None:
         """Testing APIError.__str__ with http_status and error_code"""
         self.assertEqual(
             str(APIError(http_status=400,
@@ -56,7 +55,7 @@ class APIErrorTests(TestCase):
             'An error occurred when communicating with Review Board. '
             '(API Error 106: Missing Attribute)')
 
-    def test_str_with_rsp(self):
+    def test_str_with_rsp(self) -> None:
         """Testing APIError.__str__ with rsp error message"""
         self.assertEqual(
             str(APIError(rsp={
@@ -66,7 +65,7 @@ class APIErrorTests(TestCase):
             })),
             'Bad things happened.')
 
-    def test_str_with_rsp_and_error_code(self):
+    def test_str_with_rsp_and_error_code(self) -> None:
         """Testing APIError.__str__ with rsp error message and error_code"""
         self.assertEqual(
             str(APIError(
@@ -79,7 +78,7 @@ class APIErrorTests(TestCase):
                 })),
             'Bad things happened. (API Error 106: Missing Attribute)')
 
-    def test_str_with_rsp_and_http_status(self):
+    def test_str_with_rsp_and_http_status(self) -> None:
         """Testing APIError.__str__ with rsp error message and http_status"""
         self.assertEqual(
             str(APIError(
@@ -91,7 +90,7 @@ class APIErrorTests(TestCase):
                 })),
             'Bad things happened. (HTTP 400: Bad Request)')
 
-    def test_str_with_no_details(self):
+    def test_str_with_no_details(self) -> None:
         """Testing APIError.__str__ without any details"""
         self.assertEqual(
             str(APIError()),
@@ -101,13 +100,13 @@ class APIErrorTests(TestCase):
 class AuthorizationErrorTests(TestCase):
     """Unit tests for rbtools.api.errors.AuthorizationError."""
 
-    def test_str_with_message(self):
+    def test_str_with_message(self) -> None:
         """Testing AuthorizationError.__str__ with explicit error message"""
         self.assertEqual(
             str(AuthorizationError(message='Oh no.')),
             'Oh no.')
 
-    def test_str_with_details(self):
+    def test_str_with_details(self) -> None:
         """Testing AuthorizationError.__str__ without explicit error message,
         with HTTP details
         """
@@ -117,7 +116,7 @@ class AuthorizationErrorTests(TestCase):
             'Error authenticating to Review Board. (API Error 104: '
             'Login Failed)')
 
-    def test_str_without_message_or_details(self):
+    def test_str_without_message_or_details(self) -> None:
         """Testing AuthorizationError.__str__ without explicit error message
         or HTTP details
         """
@@ -129,20 +128,20 @@ class AuthorizationErrorTests(TestCase):
 class BadRequestErrorTests(TestCase):
     """Unit tests for rbtools.api.errors.BadRequestError."""
 
-    def test_str(self):
+    def test_str(self) -> None:
         """Testing BadRequestError.__str__"""
         self.assertEqual(
             str(BadRequestError()),
             'Missing or invalid data was sent to Review Board.')
 
-    def test_str_with_error_code(self):
+    def test_str_with_error_code(self) -> None:
         """Testing BadRequestError.__str__"""
         self.assertEqual(
             str(BadRequestError(error_code=200)),
             'Missing or invalid data was sent to Review Board. '
             '(API Error 200: Unspecified Diff Revision)')
 
-    def test_str_with_rsp_error_message(self):
+    def test_str_with_rsp_error_message(self) -> None:
         """Testing BadRequestError.__str__ with rsp error message"""
         self.assertEqual(
             str(BadRequestError(
@@ -155,7 +154,7 @@ class BadRequestErrorTests(TestCase):
             'Diff revision not specified. (API Error 200: Unspecified Diff '
             'Revision)')
 
-    def test_str_with_message(self):
+    def test_str_with_message(self) -> None:
         """Testing BadRequestError.__str__ with message"""
         self.assertEqual(
             str(BadRequestError(
@@ -164,7 +163,7 @@ class BadRequestErrorTests(TestCase):
             'Diff revision not specified. (API Error 200: Unspecified Diff '
             'Revision)')
 
-    def test_str_with_message_with_fields(self):
+    def test_str_with_message_with_fields(self) -> None:
         """Testing BadRequestError.__str__ with fields"""
         self.assertEqual(
             str(BadRequestError(
@@ -196,16 +195,18 @@ class ServerInterfaceSSLErrorTests(kgb.SpyAgency, TestCase):
     # Instance variables #
     ######################
 
-    ssl_context: Optional[SSLContext]
+    ssl_context: SSLContext | None
 
     @classmethod
     def setUpClass(cls) -> None:
+        """Set up the test case class."""
         super().setUpClass()
 
         cls.ssl_context = ssl.create_default_context()
 
     @classmethod
     def tearDownClass(cls) -> None:
+        """Tear down the test case class."""
         cls.ssl_context = None
 
         super().tearDownClass()
@@ -256,24 +257,23 @@ class ServerInterfaceSSLErrorTests(kgb.SpyAgency, TestCase):
             verify_message='self-signed certificate',
             shows_cert_paths=True,
             expected_message=(
-                'The SSL certificate used for "self-signed.badssl.com" is '
-                'self-signed and cannot currently be verified by RBTools.\n'
-                '\n'
-                'Make sure any necessary certificates in the chain are '
-                'placed in one of the following locations:\n'
-                '\n'
-                '    * /path/to/cafile.pem\n'
-                '    * /path/to/capath\n'
-                '    * /path/to/env/cafile.pem\n'
-                '    * /path/to/env/capath\n'
-                '    * /path/to/openssl/cafile.pem\n'
-                '    * /path/to/openssl/capath\n'
-                '\n'
-                'You may need to update your root SSL certificates for '
-                'RBTools by running:\n'
-                '\n'
-                '    %s -m pip install -U certifi'
-                % sys.executable
+                f'The SSL certificate used for "self-signed.badssl.com" is '
+                f'self-signed and cannot currently be verified by RBTools.\n'
+                f'\n'
+                f'Make sure any necessary certificates in the chain are '
+                f'placed in one of the following locations:\n'
+                f'\n'
+                f'    * /path/to/cafile.pem\n'
+                f'    * /path/to/capath\n'
+                f'    * /path/to/env/cafile.pem\n'
+                f'    * /path/to/env/capath\n'
+                f'    * /path/to/openssl/cafile.pem\n'
+                f'    * /path/to/openssl/capath\n'
+                f'\n'
+                f'You may need to update your root SSL certificates for '
+                f'RBTools by running:\n'
+                f'\n'
+                f'    {sys.executable} -m pip install -U certifi'
             ))
 
     def test_with_untrusted_root_cert(self) -> None:
@@ -284,25 +284,24 @@ class ServerInterfaceSSLErrorTests(kgb.SpyAgency, TestCase):
             verify_message='self-signed certificate in certificate chain',
             shows_cert_paths=True,
             expected_message=(
-                'The SSL certificate used for "untrusted-root.badssl.com" has '
-                'an untrusted or self-signed root certificate that cannot '
-                'currently be verified by RBTools.\n'
-                '\n'
-                'Make sure any necessary certificates in the chain are '
-                'placed in one of the following locations:\n'
-                '\n'
-                '    * /path/to/cafile.pem\n'
-                '    * /path/to/capath\n'
-                '    * /path/to/env/cafile.pem\n'
-                '    * /path/to/env/capath\n'
-                '    * /path/to/openssl/cafile.pem\n'
-                '    * /path/to/openssl/capath\n'
-                '\n'
-                'You may need to update your root SSL certificates for '
-                'RBTools by running:\n'
-                '\n'
-                '    %s -m pip install -U certifi'
-                % sys.executable
+                f'The SSL certificate used for "untrusted-root.badssl.com" '
+                f'has an untrusted or self-signed root certificate that '
+                f'cannot currently be verified by RBTools.\n'
+                f'\n'
+                f'Make sure any necessary certificates in the chain are '
+                f'placed in one of the following locations:\n'
+                f'\n'
+                f'    * /path/to/cafile.pem\n'
+                f'    * /path/to/capath\n'
+                f'    * /path/to/env/cafile.pem\n'
+                f'    * /path/to/env/capath\n'
+                f'    * /path/to/openssl/cafile.pem\n'
+                f'    * /path/to/openssl/capath\n'
+                f'\n'
+                f'You may need to update your root SSL certificates for '
+                f'RBTools by running:\n'
+                f'\n'
+                f'    {sys.executable} -m pip install -U certifi'
             ))
 
     def test_with_no_local_issue_cert(self) -> None:
@@ -313,25 +312,24 @@ class ServerInterfaceSSLErrorTests(kgb.SpyAgency, TestCase):
             verify_message='unable to get local issuer certificate',
             shows_cert_paths=True,
             expected_message=(
-                'The SSL certificate used for "incomplete-chain.badssl.com" '
-                'has an untrusted or self-signed certificate in the chain '
-                'that cannot currently be verified by RBTools.\n'
-                '\n'
-                'Make sure any necessary certificates in the chain are '
-                'placed in one of the following locations:\n'
-                '\n'
-                '    * /path/to/cafile.pem\n'
-                '    * /path/to/capath\n'
-                '    * /path/to/env/cafile.pem\n'
-                '    * /path/to/env/capath\n'
-                '    * /path/to/openssl/cafile.pem\n'
-                '    * /path/to/openssl/capath\n'
-                '\n'
-                'You may need to update your root SSL certificates for '
-                'RBTools by running:\n'
-                '\n'
-                '    %s -m pip install -U certifi'
-                % sys.executable
+                f'The SSL certificate used for "incomplete-chain.badssl.com" '
+                f'has an untrusted or self-signed certificate in the chain '
+                f'that cannot currently be verified by RBTools.\n'
+                f'\n'
+                f'Make sure any necessary certificates in the chain are '
+                f'placed in one of the following locations:\n'
+                f'\n'
+                f'    * /path/to/cafile.pem\n'
+                f'    * /path/to/capath\n'
+                f'    * /path/to/env/cafile.pem\n'
+                f'    * /path/to/env/capath\n'
+                f'    * /path/to/openssl/cafile.pem\n'
+                f'    * /path/to/openssl/capath\n'
+                f'\n'
+                f'You may need to update your root SSL certificates for '
+                f'RBTools by running:\n'
+                f'\n'
+                f'    {sys.executable} -m pip install -U certifi'
             ))
 
     def test_with_hostname_mismatch(self) -> None:

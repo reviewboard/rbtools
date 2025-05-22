@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rbtools.api.decode import decode_response
 from rbtools.api.factory import create_resource
@@ -14,6 +14,8 @@ from rbtools.api.request import (AuthCallback,
 from rbtools.api.transport import Transport
 
 if TYPE_CHECKING:
+    from typing import Any, Callable
+
     from rbtools.api.resource import Resource, RootResource
     from rbtools.config import RBToolsConfig
 
@@ -39,26 +41,26 @@ class SyncTransport(Transport):
         self,
         url: str,
         *args,
-        cookie_file: Optional[str] = None,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        api_token: Optional[str] = None,
-        agent: Optional[str] = None,
-        session: Optional[str] = None,
+        cookie_file: (str | None) = None,
+        username: (str | None) = None,
+        password: (str | None) = None,
+        api_token: (str | None) = None,
+        agent: (str | None) = None,
+        session: (str | None) = None,
         disable_proxy: bool = False,
-        auth_callback: Optional[AuthCallback] = None,
-        otp_token_callback: Optional[OTPCallback] = None,
+        auth_callback: (AuthCallback | None) = None,
+        otp_token_callback: (OTPCallback | None) = None,
         verify_ssl: bool = True,
         allow_caching: bool = True,
-        cache_location: Optional[str] = None,
+        cache_location: (str | None) = None,
         in_memory_cache: bool = False,
         save_cookies: bool = True,
-        ext_auth_cookies: Optional[str] = None,
-        ca_certs: Optional[str] = None,
-        client_key: Optional[str] = None,
-        client_cert: Optional[str] = None,
-        proxy_authorization: Optional[str] = None,
-        config: Optional[RBToolsConfig] = None,
+        ext_auth_cookies: (str | None) = None,
+        ca_certs: (str | None) = None,
+        client_key: (str | None) = None,
+        client_cert: (str | None) = None,
+        proxy_authorization: (str | None) = None,
+        config: (RBToolsConfig | None) = None,
         **kwargs,
     ) -> None:
         """Initialize the transport.
@@ -267,9 +269,9 @@ class SyncTransport(Transport):
 
     def login(
         self,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        api_token: Optional[str] = None,
+        username: (str | None) = None,
+        password: (str | None) = None,
+        api_token: (str | None) = None,
         *args,
         **kwargs,
     ) -> None:
@@ -346,7 +348,7 @@ class SyncTransport(Transport):
     def _execute_request(
         self,
         request: HttpRequest,
-    ) -> Optional[Resource]:
+    ) -> Resource | None:
         """Execute an HTTPRequest and construct a resource from the payload.
 
         Args:
@@ -382,7 +384,7 @@ class SyncTransport(Transport):
 
     def enable_cache(
         self,
-        cache_location: Optional[str] = None,
+        cache_location: (str | None) = None,
         in_memory: bool = False,
     ) -> None:
         """Enable caching for all future HTTP requests.

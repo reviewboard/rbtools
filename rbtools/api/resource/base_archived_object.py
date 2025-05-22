@@ -10,7 +10,7 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Generic, Optional, TYPE_CHECKING
+from typing import Generic, TYPE_CHECKING
 
 from rbtools.api.resource.base import (
     ItemResource,
@@ -37,7 +37,7 @@ class BaseArchivedObjectItemResource(ItemResource):
         transport: Transport,
         payload: JSONDict,
         url: str,
-        token: Optional[str] = None,
+        token: (str | None) = None,
         **kwargs,
     ) -> None:
         """Initialize the resource.
@@ -90,8 +90,8 @@ class BaseArchivedObjectListResource(Generic[TItemResource],
         transport: Transport,
         payload: JSONDict,
         url: str,
-        token: Optional[str] = None,
-        item_mime_type: Optional[str] = None,
+        token: (str | None) = None,
+        item_mime_type: (str | None) = None,
         **kwargs,
     ) -> None:
         """Initialize the resource.

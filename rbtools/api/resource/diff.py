@@ -7,7 +7,7 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from typing_extensions import Self
 
@@ -92,7 +92,7 @@ class DiffItemResource(GetPatchMixin, ItemResource):
         self,
         cumulative_diff: bytes,
         validation_info: str,
-        parent_diff: Optional[bytes] = None,
+        parent_diff: (bytes | None) = None,
     ) -> HttpRequest:
         """Finalize a commit series.
 
@@ -274,9 +274,9 @@ class DiffListResource(DiffUploaderMixin, ListResource[DiffItemResource]):
     def upload_diff(
         self,
         diff: bytes,
-        parent_diff: Optional[bytes] = None,
-        base_dir: Optional[str] = None,
-        base_commit_id: Optional[str] = None,
+        parent_diff: (bytes | None) = None,
+        base_dir: (str | None) = None,
+        base_commit_id: (str | None) = None,
         **kwargs: QueryArgs,
     ) -> HttpRequest:
         """Upload a diff to the resource.
@@ -314,7 +314,7 @@ class DiffListResource(DiffUploaderMixin, ListResource[DiffItemResource]):
     @request_method_returns[DiffItemResource]()
     def create_empty(
         self,
-        base_commit_id: Optional[str] = None,
+        base_commit_id: (str | None) = None,
         **kwargs: QueryArgs,
     ) -> HttpRequest:
         """Create an empty DiffSet that commits can be added to.
