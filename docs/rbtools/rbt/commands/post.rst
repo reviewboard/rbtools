@@ -315,13 +315,13 @@ Multiple files can be posted by adding additional file/revision pairs:
 
 .. _rbt-post-sos:
 
-Cliosoft SOS
+Keysight SOS
 ------------
 
 .. versionadded:: 3.1
 
 :command:`rbt post` provides support for posting changes using
-`Cliosoft SOS`_ 7.20 or higher. It supports posting changelists (recommended)
+`Keysight SOS`_ 7.20 or higher. It supports posting changelists (recommended)
 or selections.
 
 See :ref:`rbtools-workflow-sos` for a detailed guide.
@@ -374,7 +374,7 @@ with this. Examples include:
    $ rbt post -r 123 "select:-scm -sor -sunm"
 
 
-.. _Cliosoft SOS: https://www.cliosoft.com/products/sos/
+.. _Keysight SOS: https://www.keysight.com/ca/en/products/software/pathwave-design-software/design-data-and-ip-management/design-data-management-sos.html
 
 
 .. index:: post-commit review

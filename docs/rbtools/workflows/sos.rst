@@ -1,10 +1,10 @@
 .. _rbtools-workflow-sos:
 
 ===============================
-Using RBTools With Cliosoft SOS
+Using RBTools With Keysight SOS
 ===============================
 
-This guide covers how you can use RBTools to post changes to `Cliosoft SOS`_
+This guide covers how you can use RBTools to post changes to `Keysight SOS`_
 7.20 or higher. We'll cover posting both selections and changelists (new in SOS
 7.20) for review.
 
@@ -36,7 +36,7 @@ We'll go over these concepts and then
    Changes that are already committed cannot currently be posted for review.
 
 
-.. _Cliosoft SOS: https://www.cliosoft.com/products/sos/
+.. _Keysight SOS: https://www.keysight.com/ca/en/products/software/pathwave-design-software/design-data-and-ip-management/design-data-management-sos.html
 
 
 .. _rbtools-workflow-sos-step1:
