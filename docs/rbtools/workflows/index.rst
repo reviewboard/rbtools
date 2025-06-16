@@ -12,7 +12,7 @@ RBTools Workflows
 
    sos
    git
-   versionvault
+   clearcase
    perforce
 
 

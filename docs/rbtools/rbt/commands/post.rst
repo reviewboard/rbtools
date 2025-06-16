@@ -225,17 +225,21 @@ which specifies the remote branch name. For example:
 
 .. _rbt-post-clearcase:
 
-ClearCase and VersionVault
---------------------------
+ClearCase
+---------
 
 .. versionchanged:: 3.0
-   As of Version 3.0, RBTools supports both the legacy "ClearCase" repository
-   type, as well as the new "VersionVault" type which is a part of `Power
-   Pack`_. VersionVault can be used with both IBM ClearCase as well as HCL
-   VersionVault, and is the recommended implementation to use.
+   As of Version 3.0, RBTools supports both the legacy "ClearCase (legacy)"
+   repository type, as well as the modern "ClearCase" type which is a part of
+   `Power Pack`_.
+
+   The modern type can be used with both IBM ClearCase as well as HCL
+   ClearCase, and is the recommended implementation to use. Note that in
+   Power Pack 5.3 and lower, the modern repository type is listed as
+   "VersionVault / ClearCase" and the legacy type is "ClearCase".
 
 :command:`rbt post` provides support for posting changes using IBM ClearCase or
-HCL VersionVault repositories. There are several different modes which can be
+HCL ClearCase repositories. There are several different modes which can be
 used depending on how you've organized your repository. Changes must be posted
 from within a snapshot or dynamic view.
 
@@ -301,10 +305,10 @@ Multiple files can be posted by adding additional file/revision pairs:
 .. note::
 
    There are two ways that ClearCase repositories may be configured on the
-   Review Board server. If the repository is using the community-driven
-   ClearCase backed, review requests may only contain changes from a single
-   VOB. If the repository uses the newer VersionVault backend, changes may span
-   across multiple VOBs.
+   Review Board server. If the repository is using the legacy, community-driven
+   ClearCase backend, review requests may only contain changes from a single
+   VOB. If the repository uses the modern Power Pack-based backend, changes
+   may span across multiple VOBs.
 
 .. _`Power Pack`: https://www.reviewboard.org/powerpack
 

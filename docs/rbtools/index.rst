@@ -146,7 +146,7 @@ common workflows to help you get started:
 
 * :ref:`rbtools-workflow-sos`
 * :ref:`rbtools-workflow-git`
-* :ref:`rbtools-workflow-versionvault`
+* :ref:`rbtools-workflow-clearcase`
 * :ref:`rbtools-workflow-perforce`
 
 

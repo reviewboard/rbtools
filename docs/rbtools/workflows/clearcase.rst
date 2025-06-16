@@ -1,33 +1,35 @@
+.. _rbtools-workflow-clearcase:
 .. _rbtools-workflow-versionvault:
 
-=====================================================
-Using RBTools with HCL VersionVault and IBM ClearCase
-=====================================================
+==================================================
+Using RBTools with HCL ClearCase and IBM ClearCase
+==================================================
 
-This guide covers the various ways to use RBTools with `HCL VersionVault`_ or
+This guide covers the various ways to use RBTools with `HCL ClearCase`_ or
 `IBM ClearCase`_. You can post changes using both Base ClearCase or UCM
 workflows.
 
 A typical workflow looks like this:
 
 1. :ref:`Create your change for the review request
-   <rbtools-workflow-versionvault-step1>`
+   <rbtools-workflow-clearcase-step1>`
 
-2. :ref:`Post your change for review <rbtools-workflow-versionvault-step2>`
+2. :ref:`Post your change for review <rbtools-workflow-clearcase-step2>`
 
 3. :ref:`Make changes based on feedback and re-port for review
-   <rbtools-workflow-versionvault-step3>`
+   <rbtools-workflow-clearcase-step3>`
 
 4. :ref:`Finish your code by checking in or delivering your activity
-   <rbtools-workflow-versionvault-step4>`
+   <rbtools-workflow-clearcase-step4>`
 
-5. :ref:`Close your review request <rbtools-workflow-versionvault-step5>`
-
-
-.. _HCL VersionVault: https://www.hcltechsw.com/versionvault
-.. _IBM ClearCase: https://www.ibm.com/products/rational-clearcase
+5. :ref:`Close your review request <rbtools-workflow-clearcase-step5>`
 
 
+.. _HCL ClearCase: https://www.hcl-software.com/devops-code-clearcase
+.. _IBM ClearCase: https://www.ibm.com/products/devops-code-clearcase
+
+
+.. _rbtools-workflow-clearcase-step1:
 .. _rbtools-workflow-versionvault-step1:
 
 Step 1: Create your change
@@ -37,6 +39,7 @@ You'll be able to post a branch, label, activity, baseline, or stream
 representing the change you want to review.
 
 
+.. _rbtools-workflow-clearcase-step2:
 .. _rbtools-workflow-versionvault-step2:
 
 Step 2: Posting changes for review
@@ -145,6 +148,7 @@ Once you're done filling out fields on the review request, click
 :guilabel:`Publish` to send it out for review.
 
 
+.. _rbtools-workflow-clearcase-step3:
 .. _rbtools-workflow-versionvault-step3:
 
 Step 3: Update from reviewer feedback and re-post
@@ -181,6 +185,7 @@ Got some reviewer feedback to incorporate into your change? Easy.
    accepted.
 
 
+.. _rbtools-workflow-clearcase-step4:
 .. _rbtools-workflow-versionvault-step4:
 
 Step 4: Finish your code
@@ -191,6 +196,7 @@ change. This could involve checking in any checked-out files, or delivering
 your current UCM activity.
 
 
+.. _rbtools-workflow-clearcase-step5:
 .. _rbtools-workflow-versionvault-step5:
 
 Step 5: Close your review request
@@ -209,6 +215,7 @@ this in one of two ways:
    :ref:`documentation <rbt-close>`).
 
 
+.. _rbtools-workflow-clearcase-example:
 .. _rbtools-workflow-versionvault-example:
 
 Putting it all together

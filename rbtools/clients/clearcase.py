@@ -391,7 +391,7 @@ class ClearCaseClient(BaseSCMClient):
     """
 
     scmclient_id = 'clearcase'
-    name = 'VersionVault / ClearCase'
+    name = 'ClearCase'
 
     # Review Board versions that use the old names-based repositories/?tool=
     # API parameter also have a bug where a missing name could cause a
