@@ -1,4 +1,4 @@
-"""A client for Team Foundation Server."""
+"""A client for Azure DevOps / Team Foundation Server TFVC repositories."""
 
 from __future__ import annotations
 
@@ -1324,10 +1324,10 @@ class TFHelperWrapper(BaseTFWrapper):
 
 
 class TFSClient(BaseSCMClient):
-    """A client for Team Foundation Server."""
+    """A client for Azure DevOps / Team Foundation Server TFVC repositories."""
 
     scmclient_id = 'tfs'
-    name = 'Team Foundation Server'
+    name = 'Azure DevOps / TFS (TFVC)'
     server_tool_names = 'Team Foundation Server'
     server_tool_ids = ['tfs']
 

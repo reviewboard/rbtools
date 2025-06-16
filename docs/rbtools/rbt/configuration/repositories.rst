@@ -490,7 +490,7 @@ Valid repository types include:
 * ``plastic``
 * ``sos``
 * ``svn``
-* ``tfs``
+* ``tfs`` (TFVC repositories on Azure DevOps / TFS)
 
 Example:
 

@@ -745,17 +745,17 @@ class BaseCommand:
 
     tfs_options = OptionGroup(
         name='TFS Options',
-        description='Team Foundation Server specific options for '
-                    'communicating with the TFS server.',
+        description='Azure DevOps / Team Foundation Server specific '
+                    'options.',
         option_list=[
             Option('--tfs-login',
                    dest='tfs_login',
                    default=None,
                    metavar='TFS_LOGIN',
-                   help='Logs in to TFS as a specific user (ie.'
-                        'user@domain,password). Visit https://msdn.microsoft.'
-                        'com/en-us/library/hh190725.aspx to learn about '
-                        'saving credentials for reuse.'),
+                   help='Logs in to Azure DevOps Server / TFS as a specific '
+                        'user (ie. user@domain,password). Visit https://msdn.'
+                        'microsoft.com/en-us/library/hh190725.aspx to learn '
+                        'about saving credentials for reuse.'),
             Option('--tf-cmd',
                    dest='tf_cmd',
                    default=None,

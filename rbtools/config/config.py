@@ -674,7 +674,7 @@ class RBToolsConfig(ConfigData):
     SVN_PROMPT_PASSWORD: bool = False
 
     #######################################################################
-    # Team Foundation Server support
+    # Azure DevOps / Team Foundation Server TFVC support
     #######################################################################
 
     #: The full path to the :command:`tf` command.
