@@ -1,6 +1,6 @@
 """A client for Keysight SOS (formerly Cliosoft SOS).
 
-`Keysight SOS https://www.keysight.com/ca/en/products/software/pathwave-design-software/design-data-and-ip-management/design-data-management-sos.html`_
+`Keysight SOS <https://www.keysight.com/ca/en/products/software/pathwave-design-software/design-data-and-ip-management/design-data-management-sos.html>`__
 is an Enterprise SCM focused on hardware design and configuration management.
 
 Version Added:
@@ -219,7 +219,7 @@ class SOSChangeList(object):
 class SOSClient(BaseSCMClient):
     """A client for Keysight SOS.
 
-    `Keysight SOS https://www.keysight.com/ca/en/products/software/pathwave-design-software/design-data-and-ip-management/design-data-management-sos.html`_
+    `Keysight SOS <https://www.keysight.com/ca/en/products/software/pathwave-design-software/design-data-and-ip-management/design-data-management-sos.html>`__
     is an Enterprise SCM focused on hardware design and configuration
     management.
 

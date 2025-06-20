@@ -26,3 +26,5 @@ __all__ = (
     'load_config',
     'parse_config_file',
 )
+
+__autodoc_excludes__ = __all__

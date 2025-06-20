@@ -262,3 +262,13 @@ def command_exists(
     """
     return (find_entry_point_for_command(cmd_name) is not None or
             is_exe_in_path(f'rbt-{cmd_name}'))
+
+
+__autodoc_excludes__ = (
+    'BaseSubCommand',
+    'JSONOutput',
+    'Option',
+    'OptionGroup',
+    'Output',
+    'OutputWrapper',
+)

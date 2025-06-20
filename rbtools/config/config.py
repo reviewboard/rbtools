@@ -605,7 +605,7 @@ class RBToolsConfig(ConfigData):
     #: The value of the Branch field on a review request.
     #:
     #: This will update the field when posting a change for review using
-    #: :rbt-command:`post`.
+    #: :rbtcommand:`post`.
     #:
     #: Other commands may use it to inspect client-side defaults, but it's
     #: recommended to inspect the review request where possible.
@@ -614,7 +614,7 @@ class RBToolsConfig(ConfigData):
     #: A comma-separated list of review request IDs to depend on.
     #:
     #: This will update the field when posting a change for review using
-    #: :rbt-command:`post`.
+    #: :rbtcommand:`post`.
     #:
     #: Other commands may use it to inspect client-side defaults, but it's
     #: recommended to inspect the review request where possible.
@@ -635,7 +635,7 @@ class RBToolsConfig(ConfigData):
     #: A comma-separated list of group names to list as reviewers.
     #:
     #: This will update the field when posting a change for review using
-    #: :rbt-command:`post`.
+    #: :rbtcommand:`post`.
     #:
     #: Other commands may use it to inspect client-side defaults, but it's
     #: recommended to inspect the review request where possible.
@@ -644,7 +644,7 @@ class RBToolsConfig(ConfigData):
     #: A comma-separated list of usernames to list as reviewers.
     #:
     #: This will update the field when posting a change for review using
-    #: :rbt-command:`post`.
+    #: :rbtcommand:`post`.
     #:
     #: Other commands may use it to inspect client-side defaults, but it's
     #: recommended to inspect the review request where possible.
@@ -754,7 +754,7 @@ class RBToolsConfig(ConfigData):
 
     #: Whether to stamp the commit message with the review request URL.
     #:
-    #: This is used by :rbt-command:`post` to perform the stamping once
+    #: This is used by :rbtcommand:`post` to perform the stamping once
     #: posted.
     #:
     #: Version Added:

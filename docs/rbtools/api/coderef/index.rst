@@ -123,7 +123,6 @@ Base Command Support
 .. autosummary::
    :toctree: python
 
-   rbtools.commands
    rbtools.commands.base
    rbtools.commands.base.commands
    rbtools.commands.base.errors

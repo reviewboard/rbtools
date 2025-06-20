@@ -33,7 +33,7 @@ built-in :command:`tf.exe` method.
 
 
 VS2017+ tf.exe
--------------
+--------------
 
 Visual Studio 2017 and higher include a command-line tool, :command:`tf.exe`,
 which includes enough support for RBTools to post pending changes to Review

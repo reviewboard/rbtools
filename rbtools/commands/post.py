@@ -7,10 +7,10 @@ import os
 import re
 import sys
 from collections import namedtuple
-from typing import Iterable, Optional, TYPE_CHECKING
+from typing import Iterable, NamedTuple, Optional, TYPE_CHECKING, TypedDict
 
 from tqdm import tqdm
-from typing_extensions import TypeVar
+from typing_extensions import NotRequired, TypeVar
 
 from rbtools.api.errors import APIError
 from rbtools.api.resource.file_diff import FileDiffItemResource
@@ -33,6 +33,10 @@ from rbtools.utils.review_request import (get_draft_or_current_value,
 from rbtools.utils.users import get_user
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from typelets.json import JSONDict
+
     from rbtools.api.resource import (
         DiffFileAttachmentListResource,
         DraftDiffCommitItemResource,
@@ -47,122 +51,116 @@ _T = TypeVar('_T')
 logger = logging.getLogger(__name__)
 
 
-#: A squashed diff that may be the product of one or more revisions.
-#:
-#: Version Changed:
-#:     3.1:
-#:     Added ``review_request_extra_data``.
-#:
-#: Attributes:
-#:     diff (bytes):
-#:         The contents of the diff.
-#:
-#:     parent_diff (bytes):
-#:         The contents of the parent diff.
-#:
-#:     base_commit_id (unicode):
-#:         The ID of the commit that the diff and parent diff are relative to.
-#:         This is required for SCMs like Mercurial that do not use blob IDs
-#:         for files.
-#:
-#:     base_dir (unicode):
-#:         The directory that the diff is relative to.
-#:
-#:     commit_id (unicode):
-#:         The ID of the commit the diff corresponds to (if applicable).
-#:
-#:     changenum (unicode):
-#:         For SCMs such as Perforce, this is the change number that the diff
-#:         corresponds to. This is ``None`` for other SCMs.
-#:
-#:     review_request_extra_data (dict):
-#:         State to store in a review request's ``extra_data`` field.
-#:
-#:         Version Added:
-#:             3.1
-SquashedDiff = namedtuple(
-    'SquashedDiff', (
-        'diff',
-        'parent_diff',
-        'base_commit_id',
-        'base_dir',
-        'commit_id',
-        'changenum',
-        'review_request_extra_data',
-    ))
+class SquashedDiff(NamedTuple):
+    """A squashed diff that may be the product of one or more revisions.
+
+    Version Changed:
+        3.1:
+        Added ``review_request_extra_data``.
+    """
+
+    #: The contents of the diff.
+    diff: bytes
+
+    #: The contents of the parent diff.
+    parent_diff: bytes
+
+    #: The ID of the commit that the diff and parent diff are relative to.
+    #:
+    #: This is required for SCMs like Mercurial that do not use blob IDs for
+    #: files.
+    base_commit_id: str
+
+    #: The directory that the diff is relative to.
+    base_dir: str
+
+    #: The ID of the commit the diff corresponds to (if applicable).
+    commit_id: str
+
+    #: The change number that the diff corresponds to.
+    #:
+    #: This is used for SCMs such as Perforce that use change numbers. For
+    #: others, this will be ``None``.
+    changenum: str | None
+
+    #: State to store in the review request's ``extra_data`` field.
+    #:
+    #: Version Added:
+    #:     3.1
+    review_request_extra_data: JSONDict
 
 
-#: A series of diffs that each correspond to a single revision.
-#:
-#: Version Changed:
-#:     3.1:
-#:     Added ``review_request_extra_data``.
-#:
-#: Attributes:
-#:     entries (list of dict):
-#:         A list of the history entries. Each of these is a dict with the
-#:         following keys:
-#:
-#:         ``commit_id`` (:py:class:`unicode`):
-#:             The unique identifier for the commit. For an SCM like Git, this
-#:             is a SHA-1 hash.
-#:
-#:         ``parent_id`` (:py:class:`unicode`):
-#:             The unique identifier of the parent commit.
-#:
-#:         ``diff`` (:py:class:`bytes`):
-#:             The contents of the diff.
-#:
-#:         ``commit_message`` (:py:class:`unicode`):
-#:             The message associated with the commit.
-#:
-#:         ``author_name`` (:py:class:`unicode`):
-#:             The name of the author.
-#:
-#:         ``author_email`` (:py:class:`unicode`):
-#:             The e-mail address of the author.
-#:
-#:         ``author_date`` (:py:class:`unicode`):
-#:             The date and time the commit was authored in ISO 8601 format.
-#:
-#:         ``committer_name`` (:py:class:`unicode`):
-#:             The name of the committer (if applicable).
-#:
-#:         ``committer_email`` (:py:class:`unicode`):
-#:             The e-mail address of the committer (if applicable).
-#:
-#:         ``committer_date`` (:py:class:`unicode`):
-#:             The date and time the commit was committed in ISO 8601 format
-#:             (if applicable).
-#:
-#:     parent_diff (bytes):
-#:             The contents of the parent diff.
-#:
-#:     base_commit_id (unicode):
-#:         The ID of the commit that the diff and parent diff are relative to.
-#:         This is required for SCMs like Mercurial that do not use blob IDs
-#:         for files.
-#:
-#:     validation_info (list of unicode):
-#:         Validation metadata from the commit validation resource.
-#:
-#:     cumulative_diff (bytes):
-#:         The cumulative diff of the entire history.
-#:
-#:     review_request_extra_data (dict):
-#:         State to store in a review request's ``extra_data`` field.
-#:
-#:         Version Added:
-#:             3.1
-DiffHistory = namedtuple(
-    'History', (
-        'entries',
-        'parent_diff',
-        'base_commit_id',
-        'validation_info',
-        'cumulative_diff',
-        'review_request_extra_data',
-    ))
+class DiffHistoryEntry(TypedDict):
+    """An entry in the list of history entries.
+
+    Version Added:
+        6.0
+    """
+
+    #: The date and time the commit was authored, in ISO-8601 format.
+    author_date: str
+
+    #: The e-mail address of the commit author.
+    author_email: str
+
+    #: The name of the commit author.
+    author_name: str
+
+    #: The unique identifier for the commit.
+    #:
+    #: For SCMs like Git, this is a SHA-1 hash.
+    commit_id: str
+
+    #: The message associated with the commit.
+    commit_message: str
+
+    #: The date and time the commit was created, in ISO-8601 format.
+    committer_date: NotRequired[str]
+
+    #: The e-mail address of the committer.
+    committer_email: NotRequired[str]
+
+    #: The name of the committer.
+    committer_name: NotRequired[str]
+
+    #: The contents of the diff.
+    diff: bytes
+
+    #: The unique identifier of the parent commit.
+    parent_id: str
+
+
+class DiffHistory(NamedTuple):
+    """A series of diffs that each correspond to a single revision.
+
+    Version Changed:
+        3.1:
+        Added ``review_request_extra_data``.
+    """
+
+    #: A list of the history entries.
+    entries: Sequence[DiffHistoryEntry]
+
+    #: The contents of the parent diff.
+    parent_diff: bytes
+
+    #: The ID of the commit that the diff and parent diff are relative to.
+    #:
+    #: This is required for SCMs like Mercurial that do not use blob IDs for
+    #: files.
+    base_commit_id: str
+
+    #: Validation metadata from the commit validation resource.
+    validation_info: Sequence[str]
+
+    #: The cumulative diff of the entire history.
+    cumulative_diff: bytes
+
+    #: State to store in the review request's ``extra_data`` field.
+    #:
+    #: Version Added:
+    #:     3.1
+    review_request_extra_data: JSONDict
 
 
 class Post(BaseCommand):

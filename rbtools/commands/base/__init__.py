@@ -40,3 +40,5 @@ __all__ = [
     'OptionGroup',
     'ParseError',
 ]
+
+__autodoc_excludes__ = __all__

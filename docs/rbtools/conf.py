@@ -58,7 +58,9 @@ extensions = [
 templates_path = ['_templates']
 
 # The suffix of source filenames.
-source_suffix = '.rst'
+source_suffix = {
+    '.rst': 'restructuredtext',
+}
 
 # The encoding of source files.
 #source_encoding = 'utf-8'
@@ -230,7 +232,10 @@ latex_documents = [
 #latex_use_modindex = True
 
 
-suppress_warnings = ['ref.option']
+suppress_warnings = [
+    'autosummary.import_cycle',
+    'ref.option',
+]
 
 
 # Determine the branch or tag used for code references.
