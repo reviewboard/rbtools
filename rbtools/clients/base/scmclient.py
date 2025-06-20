@@ -1720,3 +1720,15 @@ class BaseSCMClient:
             The size of the file, in bytes.
         """
         raise NotImplementedError
+
+    def get_current_bookmark(self) -> str:
+        """Return the current bookmark of this repository.
+
+        This must be implemented for any tool which has
+        :py:attr:`can_bookmark`.
+
+        Returns:
+            str:
+            The name of the currently checked-out bookmark.
+        """
+        raise NotImplementedError
