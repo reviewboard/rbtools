@@ -14,20 +14,27 @@ from rbtools.utils.web_login import WebLoginManager, is_web_login_enabled
 if TYPE_CHECKING:
     from rbtools.api.capabilities import Capabilities
     from rbtools.api.client import RBClient
-    from rbtools.api.resource import Resource, RootResource
+    from rbtools.api.resource import (
+        RootResource,
+        SessionResource,
+        UserItemResource,
+    )
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_authenticated_session(
     api_client: RBClient,
     api_root: RootResource,
     auth_required: bool = False,
-    session: Optional[Resource] = None,
+    session: Optional[SessionResource] = None,
     num_retries: int = 3,
     via_web: Optional[bool] = None,
     open_browser: bool = False,
     enable_logging: bool = False,
     capabilities: Optional[Capabilities] = None,
-) -> Optional[Resource]:
+) -> Optional[SessionResource]:
     """Return an authenticated session.
 
     None will be returned if the user is not authenticated, unless the
@@ -52,7 +59,7 @@ def get_authenticated_session(
             will be prompted to log in if they are not currently
             authenticated.
 
-        session (rbtools.api.resource.Resource, optional):
+        session (rbtools.api.resource.SessionResource, optional):
             The current session, if available.
 
         num_retries (int, optional):
@@ -84,7 +91,7 @@ def get_authenticated_session(
                 5.0
 
     Returns:
-        rbtools.api.resource.Resource:
+        rbtools.api.resource.SessionResource:
         The authenticated session resource or ``None`` if the user is not
         authenticated.
     """
@@ -117,14 +124,14 @@ def get_authenticated_session(
             if login_successful:
                 return api_root.get_session(expand='user')
             else:
-                logging.error('Web-based login failed.')
+                logger.error('Web-based login failed.')
                 raise AuthorizationError()
 
         if via_web and not web_login_enabled:
-            logging.debug('Web-based login requires at least Review Board '
-                          '5.0.5 and for the ``client_web_login`` site '
-                          'configuration setting to be set to ``True``. '
-                          'Falling back to username and password prompt.')
+            logger.debug('Web-based login requires at least Review Board '
+                         '5.0.5 and for the ``client_web_login`` site '
+                         'configuration setting to be set to ``True``. '
+                         'Falling back to username and password prompt.')
 
         # Interactive prompts don't work correctly when input doesn't come
         # from a terminal. This could seem to be a rare case not worth
@@ -158,8 +165,8 @@ def get_authenticated_session(
 
             raise AuthorizationError(message=' '.join(message_parts))
 
-        logging.info('Please log in to the Review Board server at %s',
-                     api_client.domain)
+        logger.info('Please log in to the Review Board server at %s',
+                    api_client.domain)
 
         for i in range(num_retries + 1):
             username = get_input('Username: ', require=True)
@@ -175,14 +182,35 @@ def get_authenticated_session(
                 if i == num_retries:
                     raise
 
-                logging.error('The username or password was incorrect. '
-                              'Please try again.')
+                logger.error('The username or password was incorrect. '
+                             'Please try again.')
 
     return session
 
 
-def get_user(api_client, api_root, auth_required=False):
-    """Return the user resource for the current session."""
+def get_user(
+    api_client: RBClient,
+    api_root: RootResource,
+    auth_required: bool = False,
+) -> UserItemResource | None:
+    """Return the user resource for the current session.
+
+    Args:
+        api_client (rbtools.api.client.RBClient):
+            The API client of the command that is getting the user.
+
+        api_root (rbtools.api.resource.RootResource):
+            The root resource for the Review Board server.
+
+        auth_required (bool, optional):
+            Whether to require authenticating the user. If ``True``, the user
+            will be prompted to log in if they are not currently authenticated.
+
+    Returns:
+        rbtools.api.resource.UserItemResource:
+        The authenticated session resource or ``None`` if the user is not
+        authenticated.
+    """
     session = get_authenticated_session(api_client, api_root, auth_required)
 
     if session:
@@ -191,8 +219,29 @@ def get_user(api_client, api_root, auth_required=False):
     return None
 
 
-def get_username(api_client, api_root, auth_required=False):
-    """Return the username for the current session."""
+def get_username(
+    api_client: RBClient,
+    api_root: RootResource,
+    auth_required: bool = False,
+) -> str | None:
+    """Return the username for the current session.
+
+    Args:
+        api_client (rbtools.api.client.RBClient):
+            The API client of the command that is getting the username.
+
+        api_root (rbtools.api.resource.RootResource):
+            The root resource for the Review Board server.
+
+        auth_required (bool, optional):
+            Whether to require authenticating the user. If ``True``, the user
+            will be prompted to log in if they are not currently authenticated.
+
+    Returns:
+        str:
+        The username of the authenticated user, or ``None`` if the user is not
+        authenticated.
+    """
     user = get_user(api_client, api_root, auth_required)
 
     if user:
