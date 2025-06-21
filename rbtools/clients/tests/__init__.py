@@ -21,13 +21,13 @@ from rbtools.testing import TestCase
 from rbtools.utils.filesystem import make_tempdir
 
 
-_TestSCMClientType = TypeVar('_TestSCMClientType',
-                             bound=BaseSCMClient,
-                             covariant=True)
+_TestSCMClientType_co = TypeVar('_TestSCMClientType_co',
+                                bound=Optional[BaseSCMClient],
+                                covariant=True)
 _TestSCMClientOptions: TypeAlias = Dict[str, Any]
 
 
-class SCMClientTestCase(Generic[_TestSCMClientType],
+class SCMClientTestCase(Generic[_TestSCMClientType_co],
                         kgb.SpyAgency,
                         TestCase):
     """Base class for RBTools SCM client unit tests.
@@ -77,7 +77,7 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
     #:
     #: Type:
     #:     type
-    scmclient_cls: Optional[Type[_TestSCMClientType]] = None
+    scmclient_cls: (type[_TestSCMClientType_co] | None) = None
 
     #: Custom default options for SCMClients.
     #:
@@ -203,7 +203,7 @@ class SCMClientTestCase(Generic[_TestSCMClientType],
         allow_dep_checks: bool = True,
         skip_if_deps_missing: bool = True,
         needs_diff: bool = False,
-    ) -> _TestSCMClientType:
+    ) -> _TestSCMClientType_co:
         """Build a client for testing.
 
         This gives the test a lot of control over the setup of the client
