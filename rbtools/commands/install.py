@@ -197,8 +197,7 @@ class Install(BaseCommand):
         try:
             response = urlopen(url)
 
-            total_bytes = int(
-                response.info().getheader('Content-Length').strip())
+            total_bytes = int(response.headers['Content-Length'].strip())
             read_bytes = 0
             bar_format = '{desc} {bar} {percentage:3.0f}% [{remaining}]'
 
