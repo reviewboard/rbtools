@@ -147,7 +147,7 @@ common workflows to help you get started:
 * :ref:`Options for authentication with Review Board <rbtools-authentication>`
 * :ref:`rbtools-workflow-sos`
 * :ref:`rbtools-workflow-git`
-* :ref:`rbtools-workflow-versionvault`
+* :ref:`rbtools-workflow-clearcase`
 * :ref:`rbtools-workflow-perforce`
 * :ref:`Working with Team Foundation Server <rbtools-tfs>`
 

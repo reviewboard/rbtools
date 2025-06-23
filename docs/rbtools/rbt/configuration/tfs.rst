@@ -1,13 +1,18 @@
 .. _rbtools-tfs:
 
-====================================
-Team Foundation Server Configuration
-====================================
+===================================================
+Azure DevOps / Team Foundation Server Configuration
+===================================================
 
-Depending on what version of Visual Studio (or other development environment)
-you're using, there are different requirements for TFS. The table below
-summarizes the three different methods and the different features which are
-available under each.
+RBTools supports posting changes against TFVC repositories hosted on Azure
+DevOps Server / Team Foundation Server and Azure DevOps Services. Depending
+on what version of Visual Studio (or other development environment) you're
+using, there are different requirements for supporting Azure DevOps / Team
+Foundation Server TFVC repositories. These aren't needed when working with
+Git repositories hosted on Azure DevOps / TFS.
+
+The table below summarizes the three different methods and the different
+features which are available under each.
 
 Note that if you're running VS2017 or higher, the only option available is the
 built-in :command:`tf.exe` method.

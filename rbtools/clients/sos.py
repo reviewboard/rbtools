@@ -1,7 +1,7 @@
-"""A client for Cliosoft SOS.
+"""A client for Keysight SOS (formerly Cliosoft SOS).
 
-`Cliosoft SOS <https://www.cliosoft.com/products/sos/>`_ is an Enterprise
-SCM focused on hardware design and configuration management.
+`Keysight SOS https://www.keysight.com/ca/en/products/software/pathwave-design-software/design-data-and-ip-management/design-data-management-sos.html`_
+is an Enterprise SCM focused on hardware design and configuration management.
 
 Version Added:
     3.1
@@ -217,10 +217,11 @@ class SOSChangeList(object):
 
 
 class SOSClient(BaseSCMClient):
-    """A client for Cliosoft SOS.
+    """A client for Keysight SOS.
 
-    `Cliosoft SOS <https://www.cliosoft.com/products/sos/>`_ is an Enterprise
-    SCM focused on hardware design and configuration management.
+    `Keysight SOS https://www.keysight.com/ca/en/products/software/pathwave-design-software/design-data-and-ip-management/design-data-management-sos.html`_
+    is an Enterprise SCM focused on hardware design and configuration
+    management.
 
     This implementation makes use of :command:`soscmd` to fetch information on
     repositories and generate suitable diffs.
@@ -230,12 +231,16 @@ class SOSClient(BaseSCMClient):
 
     This implementation is expected to be used with SOS 7.20 or higher.
 
+    Version Changed:
+        5.2.3:
+        Changed the ``name`` from ``Cliosoft SOS`` to ``Keysight SOS``.
+
     Version Added:
         3.1
     """
 
     scmclient_id = 'sos'
-    name = 'Cliosoft SOS'
+    name = 'Keysight SOS'
 
     requires_diff_tool = True
 

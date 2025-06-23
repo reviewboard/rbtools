@@ -46,6 +46,7 @@ extensions = [
     'sphinx.ext.linkcode',
     'sphinx_tabs.tabs',
     'beanbag_docutils.sphinx.ext.autodoc_utils',
+    'beanbag_docutils.sphinx.ext.collect_files',
     'beanbag_docutils.sphinx.ext.extlinks',
     'beanbag_docutils.sphinx.ext.http_role',
     'beanbag_docutils.sphinx.ext.ref_utils',
@@ -296,3 +297,8 @@ def linkcode_resolve(domain, info):
                                    github_org_id='reviewboard',
                                    github_repo_id='rbtools',
                                    branch=git_branch)
+
+
+collect_file_patterns = [
+    'redirects.json',
+]
