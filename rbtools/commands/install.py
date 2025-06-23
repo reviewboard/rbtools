@@ -14,7 +14,7 @@ import tqdm
 from rbtools.commands.base import BaseCommand, CommandError
 from rbtools.utils.appdirs import user_data_dir
 from rbtools.utils.checks import check_install
-from rbtools.utils.process import execute
+from rbtools.utils.process import run_process
 
 
 class Install(BaseCommand):
@@ -85,22 +85,21 @@ class Install(BaseCommand):
             rbtools.commands.CommandError:
                 The authenticity of the file could not be verified.
         """
-        if check_install('gpg'):
-            execute(['gpg', '--recv-keys', '4ED1F993'])
+        if check_install(['gpg']):
+            run_process(['gpg', '--recv-keys', '4ED1F993'])
             sig_filename = self.download_file('%s.asc' % url)
 
             try:
-                retcode, output, errors = execute(
+                result = run_process(
                     ['gpg', '--verify', sig_filename, zip_filename],
-                    with_errors=False, ignore_errors=True,
-                    return_error_code=True, return_errors=True)
+                    ignore_errors=True)
 
-                if retcode == 0:
+                if result.exit_code == 0:
                     logging.debug('Verified file signature')
                 else:
                     raise CommandError(
                         'Unable to verify authenticity of file downloaded '
-                        'from %s:\n%s' % (url, errors))
+                        'from %s:\n%s' % (url, result.stderr.read()))
             finally:
                 os.unlink(sig_filename)
         else:

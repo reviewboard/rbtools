@@ -1,6 +1,9 @@
 """Tests for RBTools help command and rbt command help options."""
 
+from __future__ import annotations
+
 import sys
+from typing import TYPE_CHECKING
 
 import kgb
 
@@ -8,7 +11,10 @@ from rbtools import get_version_string
 from rbtools.commands import main as rbt_main
 from rbtools.commands.base.output import JSONOutput
 from rbtools.testing import TestCase
-from rbtools.utils.process import execute
+from rbtools.utils.process import run_process
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 _rbt_path = rbt_main.__file__
@@ -64,15 +70,20 @@ class MainCommandTests(TestCase):
         self._check_version_output('--version')
         self._check_version_output('-v')
 
-    def _check_help_output(self, args, subcommand, invalid=False):
+    def _check_help_output(
+        self,
+        args: Sequence[str],
+        subcommand: str,
+        invalid: bool = False,
+    ) -> None:
         """Check if a specific rbt command's output exists in test output.
 
         Args:
-            args (list of unicode):
+            args (list of str):
                 The ``rbt`` command arguments.
 
-            subcommand (unicode)
-                The unicode string of the rbt command type.
+            subcommand (str):
+                The rbt subcommand to run.
 
             invalid (bool, optional):
                 If ``True``, check if output matches what is expected after
@@ -82,28 +93,33 @@ class MainCommandTests(TestCase):
         output = self._run_rbt(*args)
 
         if invalid:
-            self.assertIn('No help found for %s' % subcommand, output)
+            self.assertIn(f'No help found for {subcommand}', output)
         else:
-            self.assertIn('usage: rbt %s [options]' % subcommand, output)
+            self.assertIn(f'usage: rbt {subcommand} [options]', output)
 
-    def _check_version_output(self, version_arg):
+    def _check_version_output(
+        self,
+        version_arg: str,
+    ) -> None:
         """Check if RBTools reports the correct version information.
 
         Args:
-            version_arg (unicode):
+            version_arg (str):
                 The version flag to pass to ``rbt``.
         """
         output = self._run_rbt(version_arg)
 
+        rbt_version = get_version_string()
+        python_version = '.'.join(
+            f'{n}'
+            for n in sys.version_info[:3]
+        )
+
         self.assertEqual(
             output,
-            'RBTools %s (Python %d.%d.%d)\n'
-            % (get_version_string(),
-               sys.version_info[:3][0],
-               sys.version_info[:3][1],
-               sys.version_info[:3][2]))
+            f'RBTools {rbt_version} (Python {python_version})\n')
 
-    def _run_rbt(self, *args):
+    def _run_rbt(self, *args) -> str:
         """Run rbt with the current Python and provided arguments.
 
         This will ensure the correct version of ``rbt`` is being run and with
@@ -114,15 +130,14 @@ class MainCommandTests(TestCase):
                 The command line arguments to pass to ``rbt``.
 
         Returns:
-            unicode:
-            The resulting output from the command.
+            str:
+            The output from the process.
         """
-        return execute([
-            sys.executable,
-            '-W',
-            'ignore',
-            _rbt_path,
-        ] + list(args))
+        return (
+            run_process([sys.executable, '-W', 'ignore', _rbt_path, *args])
+            .stdout
+            .read()
+        )
 
 
 class JSONOutputTests(kgb.SpyAgency, TestCase):

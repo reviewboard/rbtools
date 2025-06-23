@@ -14,7 +14,7 @@ from rbtools.utils.commands import (build_rbtools_cmd_argv,
 from rbtools.utils.console import confirm
 from rbtools.utils.errors import MatchReviewRequestsError
 from rbtools.utils.graphs import toposort
-from rbtools.utils.process import execute
+from rbtools.utils.process import run_process
 from rbtools.utils.review_request import (get_draft_or_current_value,
                                           get_revisions,
                                           guess_existing_review_request,
@@ -155,12 +155,12 @@ class Land(BaseCommand):
 
         patch_command.append(str(review_request_id))
 
-        rc, output = execute(patch_command, ignore_errors=True,
-                             return_error_code=True)
+        result = run_process(patch_command, ignore_errors=True)
 
-        if rc:
-            raise CommandError('Failed to execute "rbt patch":\n%s'
-                               % output)
+        if result.exit_code != 0:
+            raise CommandError(
+                f'Failed to execute "rbt patch":\n{result.stderr.read()}'
+            )
 
     def can_land(self, review_request):
         """Determine if the review request is land-able.

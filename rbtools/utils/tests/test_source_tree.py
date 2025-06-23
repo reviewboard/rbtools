@@ -14,7 +14,7 @@ from rbtools.clients.svn import SVNClient
 from rbtools.testing import TestCase
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempdir
-from rbtools.utils.process import execute
+from rbtools.utils.process import run_process
 from rbtools.utils.source_tree import scan_scmclients_for_path
 
 
@@ -26,7 +26,7 @@ class ScanSCMClientsForPathTests(kgb.SpyAgency, TestCase):
         tempdir = make_tempdir()
         git_dir = os.path.realpath(os.path.join(tempdir, 'my-repo.git'))
 
-        execute(['git', 'init', git_dir])
+        run_process(['git', 'init', git_dir])
 
         scan_result = scan_scmclients_for_path(
             path=git_dir,
@@ -80,8 +80,8 @@ class ScanSCMClientsForPathTests(kgb.SpyAgency, TestCase):
         hg_dir = os.path.realpath(os.path.join(tempdir, 'hg-repo'))
         git_dir = os.path.join(hg_dir, 'git-repo')
 
-        execute(['hg', 'init', hg_dir])
-        execute(['git', 'init', git_dir])
+        run_process(['hg', 'init', hg_dir])
+        run_process(['git', 'init', git_dir])
 
         scan_result = scan_scmclients_for_path(
             path=git_dir,
@@ -122,8 +122,8 @@ class ScanSCMClientsForPathTests(kgb.SpyAgency, TestCase):
         hg_dir = os.path.realpath(os.path.join(tempdir, 'hg-repo'))
         git_dir = os.path.join(hg_dir, 'git-repo')
 
-        execute(['hg', 'init', hg_dir])
-        execute(['git', 'init', git_dir])
+        run_process(['hg', 'init', hg_dir])
+        run_process(['git', 'init', git_dir])
 
         scan_result = scan_scmclients_for_path(
             path=git_dir,
@@ -160,8 +160,8 @@ class ScanSCMClientsForPathTests(kgb.SpyAgency, TestCase):
         hg_dir = os.path.realpath(os.path.join(tempdir, 'hg-repo'))
         git_dir = os.path.join(hg_dir, 'git-repo')
 
-        execute(['hg', 'init', hg_dir])
-        execute(['git', 'init', git_dir])
+        run_process(['hg', 'init', hg_dir])
+        run_process(['git', 'init', git_dir])
 
         scan_result = scan_scmclients_for_path(
             path=git_dir,
@@ -184,7 +184,7 @@ class ScanSCMClientsForPathTests(kgb.SpyAgency, TestCase):
         tempdir = make_tempdir()
         git_dir = os.path.realpath(os.path.join(tempdir, 'git-repo'))
 
-        execute(['git', 'init', git_dir])
+        run_process(['git', 'init', git_dir])
 
         self.spy_on(MercurialClient.is_remote_only,
                     owner=MercurialClient,
@@ -223,7 +223,7 @@ class ScanSCMClientsForPathTests(kgb.SpyAgency, TestCase):
         tempdir = make_tempdir()
         git_dir = os.path.realpath(os.path.join(tempdir, 'git-repo'))
 
-        execute(['git', 'init', git_dir])
+        run_process(['git', 'init', git_dir])
 
         self.spy_on(MercurialClient.is_remote_only,
                     owner=MercurialClient,
@@ -270,7 +270,7 @@ class ScanSCMClientsForPathTests(kgb.SpyAgency, TestCase):
 
         e = Exception('oh no')
 
-        execute(['git', 'init', git_dir])
+        run_process(['git', 'init', git_dir])
 
         self.spy_on(MercurialClient.__init__,
                     owner=MercurialClient,
@@ -316,7 +316,7 @@ class ScanSCMClientsForPathTests(kgb.SpyAgency, TestCase):
 
         e = Exception('oh no')
 
-        execute(['git', 'init', git_dir])
+        run_process(['git', 'init', git_dir])
 
         self.spy_on(MercurialClient.is_remote_only,
                     owner=MercurialClient,
@@ -362,7 +362,7 @@ class ScanSCMClientsForPathTests(kgb.SpyAgency, TestCase):
 
         e = Exception('oh no')
 
-        execute(['git', 'init', git_dir])
+        run_process(['git', 'init', git_dir])
 
         self.spy_on(MercurialClient.get_local_path,
                     owner=MercurialClient,
@@ -408,7 +408,7 @@ class ScanSCMClientsForPathTests(kgb.SpyAgency, TestCase):
 
         e = Exception('oh no')
 
-        execute(['git', 'init', git_dir])
+        run_process(['git', 'init', git_dir])
 
         self.spy_on(GitClient.get_repository_info,
                     owner=GitClient,
@@ -441,7 +441,7 @@ class ScanSCMClientsForPathTests(kgb.SpyAgency, TestCase):
         tempdir = make_tempdir()
         git_dir = os.path.realpath(os.path.join(tempdir, 'git-repo'))
 
-        execute(['git', 'init', git_dir])
+        run_process(['git', 'init', git_dir])
 
         # Make sure all dep checks fail.
         self.spy_on(check_install, op=kgb.SpyOpReturn(False))
