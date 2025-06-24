@@ -34,13 +34,16 @@ from rbtools.utils.console import edit_file
 from rbtools.utils.encoding import force_unicode
 from rbtools.utils.errors import EditorError
 from rbtools.utils.filesystem import make_tempfile
-from rbtools.utils.process import execute
+from rbtools.utils.process import RunProcessError, run_process
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
     from urllib.parse import SplitResult
 
+    from typing_extensions import Unpack
+
     from rbtools.diffs.patches import Patch
+    from rbtools.utils.process import RunProcessKwargs, RunProcessResult
 
 
 logger = logging.getLogger(__name__)
@@ -223,16 +226,15 @@ class MercurialPatcher(SCMClientPatcher):
 
         cmd += filenames
 
-        rc, patch_output = scmclient._execute(cmd,
-                                              with_errors=True,
-                                              return_error_code=True,
-                                              ignore_errors=True,
-                                              results_unicode=False)
+        result = scmclient._execute(cmd, ignore_errors=True,
+                                    redirect_stderr=True)
+
+        patch_output = result.stdout_bytes.read()
 
         conflicting_files: list[str] = []
         applied: bool
 
-        if rc == 0:
+        if result.exit_code == 0:
             applied = True
         else:
             parsed_output = self.parse_patch_output(patch_output)
@@ -410,12 +412,11 @@ class MercurialClient(BaseSCMClient):
             # Note that this cannot use self._execute, as this property is
             # accessed by that function, and we don't want to infinitely
             # recurse.
-            result = execute(
+            result = run_process(
                 [self._exe, 'parents', '--hidden', '-r', '0'],
-                ignore_errors=True,
-                with_errors=False,
-                none_on_ignored_error=True)
-            self._hidden_changesets_supported = result is not None
+                ignore_errors=True)
+
+            self._hidden_changesets_supported = not result.ignored_error
 
         return self._hidden_changesets_supported
 
@@ -447,8 +448,11 @@ class MercurialClient(BaseSCMClient):
             return
 
         if 'extensions.hgsubversion' in self.hgrc:
-            svn_info = execute([self._exe, 'svn', 'info'],
-                               ignore_errors=True)
+            svn_info = (
+                run_process([self._exe, 'svn', 'info'], ignore_errors=True)
+                .stdout
+                .read()
+            )
         else:
             svn_info = None
 
@@ -502,20 +506,20 @@ class MercurialClient(BaseSCMClient):
         }
         log_format = self._FIELD_SEP_ESC.join(log_fields.values())
 
-        log_entries = self._execute(
-            [
-                self._exe,
-                'log',
-                '--template',
-                f'{log_format}{self._RECORD_SEP_ESC}',
-                '-r',
-                '%(base)s::%(tip)s and not %(base)s' % revisions,
-            ],
-            ignore_errors=True,
-            none_on_ignored_error=True,
-            results_unicode=True)
-
-        if not log_entries:
+        try:
+            log_entries = (
+                self._execute([
+                    self._exe,
+                    'log',
+                    '--template',
+                    f'{log_format}{self._RECORD_SEP_ESC}',
+                    '-r',
+                    '{base}::{tip} and not {base}'.format(**revisions),
+                ])
+                .stdout
+                .read()
+            )
+        except RunProcessError:
             return None
 
         history = []
@@ -730,9 +734,13 @@ class MercurialClient(BaseSCMClient):
             # One revision: Use the given revision for tip, and find its parent
             # for base.
             tip = self._identify_revision(revisions[0])
-            base = self._execute(
-                [self._exe, 'parents', '--hidden', '-r', tip,
-                 '--template', '{node}']).split()[0]
+            base = (
+                self._execute([self._exe, 'parents', '--hidden', '-r', tip,
+                              '--template', '{node}'])
+                .stdout
+                .read()
+                .split()[0]
+            )
 
             if len(base) != 40:
                 raise InvalidRevisionSpecError(
@@ -765,14 +773,19 @@ class MercurialClient(BaseSCMClient):
             if not outgoing:
                 return result
 
-            parent_base = self._execute(
-                [self._exe, 'parents', '--hidden', '-r', outgoing[0][1],
-                 '--template', '{node}']).split()
+            parent_base = (
+                self._execute([self._exe, 'parents', '--hidden', '-r',
+                               outgoing[0][1], '--template', '{node}'])
+                .stdout
+                .read()
+                .split()
+            )
 
             if len(parent_base) == 0:
-                raise Exception(
+                raise Exception(_(
                     'Could not find parent base revision. Ensure upstream '
-                    'repository is not empty.')
+                    'repository is not empty.'
+                ))
 
             result['parent_base'] = parent_base[0]
 
@@ -799,17 +812,22 @@ class MercurialClient(BaseSCMClient):
             str:
             The global revision ID of the commit.
         """
-        identify = self._execute(
-            [self._exe, 'identify', '-i', '--hidden',
-             '--template', '{node}', '-r',
-             str(revision)],
-            ignore_errors=True, none_on_ignored_error=True)
+        try:
+            identify = (
+                self._execute([
+                    self._exe, 'identify', '-i', '--hidden', '--template',
+                    '{node}', '-r', str(revision),
+                ])
+                .stdout
+                .read()
+            )
 
-        if identify is None:
-            raise InvalidRevisionSpecError(
-                '"%s" does not appear to be a valid revision' % revision)
-        else:
             return identify.split()[0]
+        except RunProcessError:
+            raise InvalidRevisionSpecError(
+                _('"{revision}" does not appear to be a valid revision')
+                .format(revision=revision)
+            )
 
     def _calculate_hgsubversion_repository_info(
         self,
@@ -854,10 +872,13 @@ class MercurialClient(BaseSCMClient):
 
     def _load_hgrc(self) -> None:
         """Load the hgrc file."""
-        for line in execute([self._exe, 'showconfig'],
-                            env=self._hg_env,
-                            with_errors=False,
-                            split_lines=True):
+        hgrc_lines = (
+            run_process([self._exe, 'showconfig'], env=self._hg_env)
+            .stdout
+            .readlines()
+        )
+
+        for line in hgrc_lines:
             line = line.split('=', 1)
 
             if len(line) == 2:
@@ -887,12 +908,11 @@ class MercurialClient(BaseSCMClient):
             :py:class:`MercurialRefType`.
         """
         # Check for any bookmarks matching ref.
-        rc, output = self._execute([self._exe, 'log', '-ql1', '-r',
-                                    'bookmark(%s)' % ref],
-                                   ignore_errors=True,
-                                   return_error_code=True)
+        result = self._execute(
+            [self._exe, 'log', '-ql1', '-r', f'bookmark({ref})'],
+            ignore_errors=True)
 
-        if rc == 0:
+        if result.exit_code == 0:
             return MercurialRefType.BOOKMARK
 
         # Check for any bookmarks matching ref.
@@ -900,26 +920,30 @@ class MercurialClient(BaseSCMClient):
         # Ideally, we'd use the same sort of log call we'd use for bookmarks
         # and tags, but it works differently for branches, and will
         # incorrectly match tags.
-        branches = self._execute([self._exe, 'branches', '-q']).split()
+        branches = (
+            self._execute([self._exe, 'branches', '-q'])
+            .stdout
+            .read()
+            .split()
+        )
 
         if ref in branches:
             return MercurialRefType.BRANCH
 
         # Check for any tags matching ref.
-        rc, output = self._execute([self._exe, 'log', '-ql1', '-r',
-                                    'tag(%s)' % ref],
-                                   ignore_errors=True,
-                                   return_error_code=True)
+        result = self._execute(
+            [self._exe, 'log', '-ql1', '-r', f'tag({ref})'],
+            ignore_errors=True)
 
-        if rc == 0:
+        if result.exit_code == 0:
             return MercurialRefType.TAG
 
         # Now just check that it exists at all. We'll assume it's a revision.
-        rc, output = self._execute([self._exe, 'identify', '-r', ref],
-                                   ignore_errors=True,
-                                   return_error_code=True)
+        result = self._execute(
+            [self._exe, 'identify', '-r', ref],
+            ignore_errors=True)
 
-        if rc == 0:
+        if result.exit_code == 0:
             return MercurialRefType.REVISION
 
         return MercurialRefType.UNKNOWN
@@ -945,10 +969,14 @@ class MercurialClient(BaseSCMClient):
         rev2 = revisions['tip']
 
         delim = str(uuid.uuid1())
-        descs = self._execute(
-            [self._exe, 'log', '--hidden', '-r', f'{rev1}::{rev2}',
-             '--template', '{desc}%s' % delim],
-            env=self._hg_env)
+        descs = (
+            self._execute(
+                [self._exe, 'log', '--hidden', '-r', f'{rev1}::{rev2}',
+                 '--template', f'{{desc}}{delim}'],
+                env=self._hg_env)
+            .stdout
+            .read()
+        )
 
         # This initial element in the base changeset, which we don't
         # care about. The last element is always empty due to the string
@@ -1036,10 +1064,14 @@ class MercurialClient(BaseSCMClient):
         match = re.match(r'^[a-z|A-Z|0-9]*$', base_commit_id)
 
         if not match:
-            base_commit_id = self._execute(
-                [self._exe, 'log', '-r', base_commit_id,
-                 '--template', '{node}'],
-                env=self._hg_env, results_unicode=False)
+            base_commit_id = (
+                self._execute(
+                    [self._exe, 'log', '-r', base_commit_id,
+                     '--template', '{node}'],
+                    env=self._hg_env)
+                .stdout
+                .read()
+            )
 
         return {
             'diff': diff,
@@ -1075,11 +1107,15 @@ class MercurialClient(BaseSCMClient):
             bytes:
             The normalized diff content.
         """
-        diff = self._execute(
-            [self._exe, 'diff'] + diff_args + ['-r', parent_id, '-r', node_id],
-            env=self._hg_env,
-            log_output_on_error=False,
-            results_unicode=False)
+        diff = (
+            self._execute(
+                [self._exe, 'diff', *diff_args, '-r', parent_id, '-r',
+                 node_id],
+                env=self._hg_env,
+                log_debug_output_on_error=False)
+            .stdout_bytes
+            .read()
+        )
 
         return self._normalize_diff(diff,
                                     node_id=node_id,
@@ -1142,12 +1178,14 @@ class MercurialClient(BaseSCMClient):
             set of str:
             A set of filenames in the changeset.
         """
-        cmd = [self._exe, 'locate', '-r', rev]
-
-        files = self._execute(cmd,
-                              env=self._hg_env,
-                              ignore_errors=True,
-                              none_on_ignored_error=True)
+        files = (
+            self._execute(
+                [self._exe, 'locate', '-r', rev],
+                env=self._hg_env,
+                ignore_errors=True)
+            .stdout
+            .read()
+        )
 
         if files:
             files = files.replace('\\', '/')  # workaround for issue 3894
@@ -1167,11 +1205,16 @@ class MercurialClient(BaseSCMClient):
             str:
             The branch branch for the hgsubversion checkout.
         """
+        if tracking := getattr(self.options, 'tracking', None):
+            return tracking
+
         return (
-            getattr(self.options, 'tracking', None) or
-            self._execute([
-                self._exe, 'parent', '--svn', '--template', '{node}\n',
-            ]).strip())
+            self._execute(
+                [self._exe, 'parent', '--svn', '--template', '{node}\n'])
+            .stdout
+            .read()
+            .strip()
+        )
 
     def _get_remote_branch(self) -> str:
         """Return the remote branch associated with this repository.
@@ -1380,7 +1423,12 @@ class MercurialClient(BaseSCMClient):
             str:
             The name of the currently checked-out branch.
         """
-        return self._execute([self._exe, 'branch'], env=self._hg_env).strip()
+        return (
+            self._execute([self._exe, 'branch'], env=self._hg_env)
+            .stdout
+            .read()
+            .strip()
+        )
 
     def _get_bottom_and_top_outgoing_revs_for_remote(
         self,
@@ -1447,9 +1495,11 @@ class MercurialClient(BaseSCMClient):
 
         # We must handle the special case where there are no outgoing commits
         # as mercurial has a non-zero return value in this case.
-        raw_outgoing = self._execute(args,
-                                     env=self._hg_env,
-                                     extra_ignore_errors=(1,))
+        raw_outgoing = (
+            self._execute(args, env=self._hg_env, ignore_errors=(1,))
+            .stdout
+            .read()
+        )
 
         for line in raw_outgoing.splitlines():
             if not line:
@@ -1498,9 +1548,14 @@ class MercurialClient(BaseSCMClient):
         bottom_rev = min(revs)
 
         for rev, node, branch in reversed(outgoing_changesets):
-            parents = self._execute(
-                [self._exe, 'log', '-r', str(rev), '--template', '{parents}'],
-                env=self._hg_env)
+            parents = (
+                self._execute(
+                    [self._exe, 'log', '-r', str(rev), '--template',
+                     '{parents}'],
+                    env=self._hg_env)
+                .stdout
+                .read()
+            )
             parents = re.split(r':[^\s]+\s*', parents)
             parents = [int(p) for p in parents if p != '']
 
@@ -1544,22 +1599,19 @@ class MercurialClient(BaseSCMClient):
     def _execute(
         self,
         cmd: list[str],
-        with_errors: bool = False,
         *args,
-        **kwargs,
-    ) -> Any:
+        **kwargs: Unpack[RunProcessKwargs],
+    ) -> RunProcessResult:
         """Execute an hg command.
+
+        Version Changed:
+            6.0:
+            Changed to use :py:func:`rbtools.utils.process.run_process` and
+            removed the ``with_errors`` argument.
 
         Args:
             cmd (list of str):
                 A command line to execute.
-
-            with_errors (bool, optional):
-                Whether to combine the output and error streams of the command
-                together into a single return value.
-
-                Unlike in :py:`rbtools.utils.process.execute`, this defaults
-                to ``False``.
 
             *args (list):
                 Additional arguments to pass to
@@ -1588,7 +1640,7 @@ class MercurialClient(BaseSCMClient):
             f'extensions.rbtoolsnormalize={self._hgext_path}',
         ]
 
-        return execute(cmd, with_errors=with_errors, *args, **kwargs)
+        return run_process(cmd, *args, **kwargs)
 
     def has_pending_changes(self) -> bool:
         """Check if there are changes waiting to be committed.
@@ -1598,8 +1650,14 @@ class MercurialClient(BaseSCMClient):
             ``True`` if the working directory has been modified, otherwise
             returns ``False``.
         """
-        status = self._execute([self._exe, 'status', '--modified', '--added',
-                                '--removed', '--deleted'])
+        status = (
+            self._execute(
+                [self._exe, 'status', '--modified', '--added', '--removed',
+                 '--deleted'])
+            .stdout
+            .read()
+        )
+
         return status != ''
 
     def supports_empty_files(self) -> bool:
@@ -1620,8 +1678,12 @@ class MercurialClient(BaseSCMClient):
             str:
             A string with the name of the current bookmark.
         """
-        return self._execute([self._exe, 'id', '-B'],
-                             ignore_errors=True).strip()
+        return (
+            self._execute([self._exe, 'id', '-B'], ignore_errors=True)
+            .stdout
+            .read()
+            .strip()
+        )
 
     def get_file_content(
         self,
@@ -1646,11 +1708,15 @@ class MercurialClient(BaseSCMClient):
             The read file.
         """
         try:
-            return self._execute(
-                [self._exe, 'cat', '-r', revision, filename],
-                env=self._hg_env,
-                log_output_on_error=False,
-                results_unicode=False)
+            return (
+                self._execute(
+                    [self._exe, 'cat', '-r', revision, filename],
+                    env=self._hg_env,
+                    log_debug_output_on_error=False,
+                )
+                .stdout_bytes
+                .read()
+            )
         except Exception as e:
             raise SCMError(e)
 
@@ -1677,12 +1743,15 @@ class MercurialClient(BaseSCMClient):
             The size of the file, in bytes.
         """
         try:
-            result = self._execute(
-                [self._exe, 'files', '--template', '{size}', '-r', revision,
-                 filename],
-                env=self._hg_env,
-                log_output_on_error=False)
-
-            return int(result)
+            return int(
+                self._execute(
+                    [self._exe, 'files', '--template', '{size}', '-r',
+                     revision, filename],
+                    env=self._hg_env,
+                    log_debug_output_on_error=False,
+                )
+                .stdout
+                .read()
+            )
         except Exception as e:
             raise SCMError(e)

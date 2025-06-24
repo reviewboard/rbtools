@@ -7,13 +7,15 @@ import logging
 import os
 import subprocess
 from typing import (Any, AnyStr, Dict, List, Optional, Tuple, TYPE_CHECKING,
-                    Union)
+                    TypedDict, Union)
 
 from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.encoding import force_unicode
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from typing_extensions import NotRequired
 
 
 logger = logging.getLogger(__name__)
@@ -192,16 +194,33 @@ class RunProcessError(Exception):
         self.result = result
 
 
+class RunProcessKwargs(TypedDict):
+    """Keyword argument types for :py:func:`run_process`
+
+    Version Added:
+        6.0
+    """
+
+    cwd: NotRequired[str | None]
+    env: NotRequired[dict[str, str] | None]
+    encoding: NotRequired[str]
+    needs_stdout: NotRequired[bool]
+    needs_stderr: NotRequired[bool]
+    redirect_stderr: NotRequired[bool]
+    ignore_errors: NotRequired[bool | tuple[int, ...]]
+    log_debug_output_on_error: NotRequired[bool]
+
+
 def run_process(
-    command: Union[AnyStr, Sequence[AnyStr]],
+    command: AnyStr | Sequence[AnyStr],
     *,
-    cwd: Optional[str] = None,
-    env: Optional[Dict[str, str]] = None,
+    cwd: (str | None) = None,
+    env: (dict[str, str] | None) = None,
     encoding: str = 'utf-8',
     needs_stdout: bool = True,
     needs_stderr: bool = True,
     redirect_stderr: bool = False,
-    ignore_errors: Union[bool, Tuple[int, ...]] = False,
+    ignore_errors: (bool | tuple[int, ...]) = False,
     log_debug_output_on_error: bool = True,
 ) -> RunProcessResult:
     """Run a command and return the results.

@@ -427,8 +427,7 @@ class MercurialClientTests(MercurialTestCase):
             env={
                 'HGPLAIN': '1',
             },
-            log_output_on_error=False,
-            results_unicode=False)
+            log_debug_output_on_error=False)
 
         self.assertIsInstance(result, dict)
         self.assertEqual(result, {
@@ -484,8 +483,7 @@ class MercurialClientTests(MercurialTestCase):
             env={
                 'HGPLAIN': '1',
             },
-            log_output_on_error=False,
-            results_unicode=False)
+            log_debug_output_on_error=False)
 
         self.assertEqual(result, {
             'base_commit_id': base_commit_id,
@@ -546,8 +544,7 @@ class MercurialClientTests(MercurialTestCase):
             env={
                 'HGPLAIN': '1',
             },
-            log_output_on_error=False,
-            results_unicode=False)
+            log_debug_output_on_error=False)
 
         self.assertEqual(result, {
             'base_commit_id': base_commit_id,
@@ -602,8 +599,7 @@ class MercurialClientTests(MercurialTestCase):
             env={
                 'HGPLAIN': '1',
             },
-            log_output_on_error=False,
-            results_unicode=False)
+            log_debug_output_on_error=False)
 
         self.assertEqual(result, {
             'base_commit_id': base_commit_id,
@@ -661,8 +657,7 @@ class MercurialClientTests(MercurialTestCase):
             env={
                 'HGPLAIN': '1',
             },
-            log_output_on_error=False,
-            results_unicode=False)
+            log_debug_output_on_error=False)
         self.assertSpyCalledWith(
             spy,
             ['hg', 'diff', '--hidden', '--nodates', '-g',
@@ -670,8 +665,7 @@ class MercurialClientTests(MercurialTestCase):
             env={
                 'HGPLAIN': '1',
             },
-            log_output_on_error=False,
-            results_unicode=False)
+            log_debug_output_on_error=False)
 
         self.assertEqual(result, {
             'base_commit_id': base_commit_id,
@@ -730,8 +724,7 @@ class MercurialClientTests(MercurialTestCase):
             env={
                 'HGPLAIN': '1',
             },
-            log_output_on_error=False,
-            results_unicode=False)
+            log_debug_output_on_error=False)
 
         self.assertEqual(len(spy.calls), 1)
         self.assertEqual(result, {
@@ -791,8 +784,7 @@ class MercurialClientTests(MercurialTestCase):
             env={
                 'HGPLAIN': '1',
             },
-            log_output_on_error=False,
-            results_unicode=False)
+            log_debug_output_on_error=False)
         self.assertSpyCalledWith(
             spy,
             ['hg', 'diff', '--hidden', '--nodates', '-g',
@@ -800,8 +792,7 @@ class MercurialClientTests(MercurialTestCase):
             env={
                 'HGPLAIN': '1',
             },
-            log_output_on_error=False,
-            results_unicode=False)
+            log_debug_output_on_error=False)
 
         self.assertEqual(result, {
             'base_commit_id': base_commit_id,
@@ -894,8 +885,7 @@ class MercurialClientTests(MercurialTestCase):
             env={
                 'HGPLAIN': '1',
             },
-            log_output_on_error=False,
-            results_unicode=False)
+            log_debug_output_on_error=False)
         self.assertSpyCalledWith(
             spy,
             ['hg', 'diff', '--hidden', '--nodates', '-g',
@@ -903,8 +893,7 @@ class MercurialClientTests(MercurialTestCase):
             env={
                 'HGPLAIN': '1',
             },
-            log_output_on_error=False,
-            results_unicode=False)
+            log_debug_output_on_error=False)
 
         self.assertEqual(result, {
             'base_commit_id': base_commit_id,
@@ -999,8 +988,7 @@ class MercurialClientTests(MercurialTestCase):
             env={
                 'HGPLAIN': '1',
             },
-            log_output_on_error=False,
-            results_unicode=False)
+            log_debug_output_on_error=False)
         self.assertSpyCalledWith(
             spy,
             ['hg', 'diff', '--hidden', '--nodates', '-g',
@@ -1008,8 +996,7 @@ class MercurialClientTests(MercurialTestCase):
             env={
                 'HGPLAIN': '1',
             },
-            log_output_on_error=False,
-            results_unicode=False)
+            log_debug_output_on_error=False)
 
         self.assertEqual(result, {
             'base_commit_id': base_commit_id,
@@ -1748,8 +1735,7 @@ class MercurialClientTests(MercurialTestCase):
             [
                 'hg', 'import', '--no-commit', '--partial', 'test.diff',
                 '--config', 'extensions.rbtoolsnormalize=%s' % hgext_path,
-            ],
-            redirect_stderr=True)
+            ])
 
         self.assertFalse(result.applied)
         self.assertFalse(result.has_conflicts)
