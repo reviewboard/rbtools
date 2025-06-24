@@ -13,7 +13,7 @@ from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.encoding import force_unicode
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
     from typing_extensions import NotRequired
 
@@ -209,19 +209,22 @@ class RunProcessKwargs(TypedDict):
     redirect_stderr: NotRequired[bool]
     ignore_errors: NotRequired[bool | tuple[int, ...]]
     log_debug_output_on_error: NotRequired[bool]
+    input_string: NotRequired[str | bytes | None]
 
 
 def run_process(
     command: AnyStr | Sequence[AnyStr],
     *,
     cwd: (str | None) = None,
-    env: (dict[str, str] | None) = None,
+    env: (Mapping[str, str] | None) = None,
     encoding: str = 'utf-8',
     needs_stdout: bool = True,
     needs_stderr: bool = True,
     redirect_stderr: bool = False,
     ignore_errors: (bool | tuple[int, ...]) = False,
     log_debug_output_on_error: bool = True,
+    input_string: (str | bytes | None) = None,
+    timeout: (int | None) = None,
 ) -> RunProcessResult:
     """Run a command and return the results.
 
@@ -238,6 +241,10 @@ def run_process(
 
     Note that unit tests should not spy on this function. Instead, spy on
     :py:func:`run_process_exec`.
+
+    Version Changed:
+        6.0:
+        Added the ``input_string`` and ``timeout`` arguments.
 
     Version Added:
         4.0
@@ -325,6 +332,18 @@ def run_process(
 
             The default is ``True``.
 
+        input_string (str or bytes, optional):
+            The data to pass to the command's standard input.
+
+            Version Added:
+                6.0
+
+        timeout (int, optional):
+            The timeout to set on the execution.
+
+            Version Added:
+                6.0
+
     Returns:
         RunProcessResult:
         The result of running the process, if no errors in execution were
@@ -386,9 +405,12 @@ def run_process(
             command,
             cwd=cwd,
             env=new_env,
+            input_string=input_string,
             needs_stdout=needs_stdout,
             needs_stderr=needs_stderr,
-            redirect_stderr=redirect_stderr)
+            redirect_stderr=redirect_stderr,
+            timeout=timeout,
+        )
     except FileNotFoundError:
         logger.debug('Command not found (%s)',
                      command_str)
@@ -448,14 +470,16 @@ def run_process(
 
 
 def run_process_exec(
-    command: Union[AnyStr, Sequence[AnyStr]],
-    cwd: Optional[str],
-    env: Dict[str, str],
+    command: AnyStr | Sequence[AnyStr],
+    cwd: str | None,
+    env: Mapping[str, str],
     needs_stdout: bool,
     needs_stderr: bool,
     redirect_stderr: bool,
-) -> Tuple[int, Optional[bytes], Optional[bytes]]:
-    """Executes a command for run_process, returning results.
+    input_string: str | bytes | None,
+    timeout: int | None,
+) -> tuple[int, bytes | None, bytes | None]:
+    """Execute a command for run_process, returning results.
 
     This normally wraps :py:func:`subprocess.run`, returning results for use
     in :py:func:`run_process`.
@@ -464,6 +488,10 @@ def run_process_exec(
     spying on :py:func:`run_process` itself. This will ensure the most
     accurate test results. :py:func:`run_process` will sanity-check the
     results to ensure they match the input parameters.
+
+    Version Changed:
+        6.0:
+        Added the ``input_string`` and ``timeout`` arguments.
 
     Version Added:
         4.0
@@ -478,15 +506,27 @@ def run_process_exec(
         env (dict, optional):
             Environment variables to pass to the called executable.
 
-        needs_stdout (bool, optional):
+        needs_stdout (bool):
             Whether the caller needs standard output captured.
 
-        needs_stderr (bool, optional):
+        needs_stderr (bool):
             Whether the caller needs standard error output captured.
 
-        redirect_stderr (bool, optional):
+        redirect_stderr (bool):
             Whether to redirect stderr output to stdout, combining the results
             into one.
+
+        input_string (str or bytes):
+            The data to pass to the command's standard input.
+
+            Version Added:
+                6.0
+
+        timeout (int):
+            The timeout to set on the execution.
+
+            Version Added:
+                6.0
 
     Returns:
         tuple:
@@ -519,14 +559,20 @@ def run_process_exec(
     else:
         stderr = subprocess.DEVNULL
 
+    if isinstance(input_string, str):
+        input_string = input_string.encode()
+
     # Run the process.
     result = subprocess.run(
         command,
+        input=input_string,
         stdin=subprocess.PIPE,
         stdout=stdout,
         stderr=stderr,
         env=env,
-        cwd=cwd)
+        cwd=cwd,
+        check=False,
+        timeout=timeout)
 
     return result.returncode, result.stdout, result.stderr
 

@@ -12,7 +12,7 @@ import stat
 import subprocess
 import sys
 from fnmatch import fnmatch
-from typing import List, Optional, TYPE_CHECKING, Tuple, Union
+from typing import List, Optional, TYPE_CHECKING, Tuple, Union, overload
 
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
@@ -31,14 +31,16 @@ from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install
 from rbtools.utils.encoding import force_unicode
 from rbtools.utils.filesystem import make_empty_files, make_tempfile
-from rbtools.utils.process import (RunProcessError,
-                                   execute,
-                                   run_process)
+from rbtools.utils.process import RunProcessError, run_process
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
+    from typing import Any, Literal
+
+    from typing_extensions import Unpack
 
     from rbtools.diffs.patches import Patch
+    from rbtools.utils.process import RunProcessKwargs, RunProcessResult
 
 
 logger = logging.getLogger(__name__)
@@ -95,10 +97,34 @@ class P4Wrapper(object):
             dict:
             The parsed Perforce counters.
         """
-        lines = self.run_p4(['counters'], split_lines=True)
+        lines = (
+            self.run_p4(['counters'])
+            .stdout
+            .readlines()
+        )
         return self._parse_keyval_lines(lines, self.COUNTERS_RE)
 
-    def change(self, changenum, marshalled=True):
+    @overload
+    def change(
+        self,
+        changenum: int,
+        marshalled: Literal[True] = True,
+    ) -> Sequence[Mapping[str, Any]]:
+        ...
+
+    @overload
+    def change(
+        self,
+        changenum: int,
+        marshalled: Literal[False],
+    ) -> str:
+        ...
+
+    def change(
+        self,
+        changenum: int,
+        marshalled: bool = True,
+    ) -> Sequence[Mapping[str, Any]] | str:
         """Return the contents of a p4 change description.
 
         Args:
@@ -113,9 +139,15 @@ class P4Wrapper(object):
             The contents of the change description, either as a unicode
             object or a list depending on the value of ``marshalled``.
         """
-        return self.run_p4(['change', '-o', str(changenum)],
-                           none_on_ignored_error=True,
-                           marshalled=marshalled)
+        if marshalled:
+            return self.run_p4(['change', '-o', str(changenum)],
+                               marshalled=True)
+        else:
+            return (
+                self.run_p4(['change', '-o', str(changenum)])
+                .stdout
+                .read()
+            )
 
     def modify_change(
         self,
@@ -126,22 +158,28 @@ class P4Wrapper(object):
         """Modify a change description.
 
         Args:
-            new_change_spec (unicode):
+            new_change_spec (str):
                 The new changeset description. This must contain the changelist
                 number.
+
+            changenum (str, optional):
+                The change number to modify.
         """
-        args: List[str] = ['change', '-i']
+        args: list[str] = ['change', '-i']
 
         if changenum is not None:
             args.append(changenum)
 
-        self.run_p4(args, input_string=new_change_spec)
+        self.run_p4(args, input_string=new_change_spec, timeout=30)
 
-    def files(self, path):
+    def files(
+        self,
+        path: str,
+    ) -> Sequence[Mapping[str, Any]]:
         """Return the opened files within the given path.
 
         Args:
-            path (unicode):
+            path (str):
                 The Perforce path to check. This can be a mix of file paths
                 (``//...``) and revisions (``...@X``).
 
@@ -151,11 +189,14 @@ class P4Wrapper(object):
         """
         return self.run_p4(['files', path], marshalled=True)
 
-    def filelog(self, path):
+    def filelog(
+        self,
+        path: str,
+    ) -> Sequence[Mapping[str, Any]]:
         """Return a list of all the changed files within the given path.
 
         Args:
-            path (unicode):
+            path (str):
                 The Perforce path to check. This is expected to be a path with
                 two revision markers (``//...@X,Y``).
 
@@ -165,14 +206,18 @@ class P4Wrapper(object):
         """
         return self.run_p4(['filelog', path], marshalled=True)
 
-    def fstat(self, depot_path, fields=[]):
+    def fstat(
+        self,
+        depot_path: str,
+        fields: (Sequence[str] | None) = None,
+    ) -> Mapping[str, str]:
         """Run p4 fstat on a given depot path.
 
         Args:
-            depot_path (unicode):
+            depot_path (str):
                 The file path to stat.
 
-            fields (list of unicode, optional):
+            fields (list of str, optional):
                 The fields to fetch.
 
         Returns:
@@ -183,13 +228,19 @@ class P4Wrapper(object):
 
         if fields:
             args += ['-T', ','.join(fields)]
+        else:
+            fields = []
 
         if 'fileSize' in fields:
             args.append('-Ol')
 
         args.append(depot_path)
 
-        lines = self.run_p4(args, split_lines=True)
+        lines = (
+            self.run_p4(args)
+            .stdout
+            .readlines()
+        )
         stat_info = {}
 
         for line in lines:
@@ -208,13 +259,18 @@ class P4Wrapper(object):
             dict:
                 The parsed output from :command:`p4 info`.
         """
-        lines = self.run_p4(['info'],
-                            ignore_errors=True,
-                            split_lines=True)
+        lines = (
+            self.run_p4(['info'], ignore_errors=True)
+            .stdout
+            .readlines()
+        )
 
         return self._parse_keyval_lines(lines)
 
-    def opened(self, changenum):
+    def opened(
+        self,
+        changenum: int,
+    ) -> Sequence[Mapping[str, Any]]:
         """Return the list of opened files in the given changeset.
 
         Args:
@@ -228,19 +284,23 @@ class P4Wrapper(object):
         return self.run_p4(['opened', '-c', str(changenum)],
                            marshalled=True)
 
-    def print_file(self, depot_path, out_file=None):
+    def print_file(
+        self,
+        depot_path: str,
+        out_file: (str | None) = None,
+    ) -> str:
         """Print the contents of the given file.
 
         Args:
-            depot_path (unicode):
+            depot_path (str):
                 A Perforce path, including filename and revision.
 
-            out_files (unicode, optional):
+            out_file (str, optional):
                 A filename to write to. If not specified, the data will be
                 returned.
 
         Returns:
-            unicode:
+            str:
             The output of the print operation.
         """
         cmd = ['print']
@@ -250,13 +310,20 @@ class P4Wrapper(object):
 
         cmd += ['-q', depot_path]
 
-        return self.run_p4(cmd)
+        return (
+            self.run_p4(cmd)
+            .stdout
+            .read()
+        )
 
-    def where(self, depot_path):
+    def where(
+        self,
+        depot_path: str,
+    ) -> Sequence[Mapping[str, Any]]:
         """Return the local path for a depot path.
 
         Args:
-            depot_path (unicode):
+            depot_path (str):
                 A Perforce path to a file in the depot.
 
         Returns:
@@ -266,13 +333,41 @@ class P4Wrapper(object):
         """
         return self.run_p4(['where', depot_path], marshalled=True)
 
-    def run_p4(self, p4_args, marshalled=False, ignore_errors=False,
-               input_string=None, *args, **kwargs):
+    @overload
+    def run_p4(
+        self,
+        p4_args: Sequence[str],
+        *args,
+        marshalled: Literal[True],
+        **kwargs: Unpack[RunProcessKwargs],
+    ) -> Sequence[Mapping[str, Any]]:
+        ...
+
+    @overload
+    def run_p4(
+        self,
+        p4_args: Sequence[str],
+        *args,
+        marshalled: Literal[False] = False,
+        **kwargs: Unpack[RunProcessKwargs],
+    ) -> RunProcessResult:
+        ...
+
+    def run_p4(
+        self,
+        p4_args: Sequence[str],
+        *args,
+        marshalled: bool = False,
+        **kwargs: Unpack[RunProcessKwargs],
+    ) -> Sequence[Mapping[str, Any]] | RunProcessResult:
         """Invoke p4.
 
-        In the current implementation, the arguments 'marshalled' and
-        'input_string' cannot be used together, i.e. this command doesn't
-        allow inputting and outputting at the same time.
+        Version Changed:
+            6.0:
+            Updated to use :py:func:`~rbtools.utils.process.run_process`
+            instead of :py:func:`rbtools.utils.execute`. This means in cases
+            where ``marshalled`` is ``False``, this method now returns a
+            :py:class:`~rbtools.utils.process.RunProcessResult`.
 
         Args:
             p4_args (list):
@@ -281,13 +376,6 @@ class P4Wrapper(object):
             marshalled (bool, optional):
                 Whether to return the data in marshalled format. This will
                 return a more computer-readable version.
-
-            ignore_errors (bool, optional):
-                Whether to ignore return codes that typically indicate error
-                conditions.
-
-            input_string (unicode, optional):
-                A string to pass to :command:`p4` on stdin.
 
             *args (list):
                 Additional arguments to pass through to
@@ -303,11 +391,8 @@ class P4Wrapper(object):
             If passing ``marshalled=True``, then this will be a list of
             dictionaries containing results from the command.
 
-            If passing ``input_string``, this will always return ``None``.
-
             In all other cases, this will return the result of
-            :py:func:`~rbtools.utils.process.execute`, depending on the
-            arguments provided.
+            :py:class:`~rbtools.utils.process.RunProcessResult`.
 
         Raises:
             rbtools.clients.errors.SCMError:
@@ -332,15 +417,13 @@ class P4Wrapper(object):
 
         if marshalled:
             logging.debug('Running: %s', subprocess.list2cmdline(cmd))
-            p = subprocess.Popen(cmd,
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE)
+            p = run_process(cmd)
             result = []
             has_error = False
 
             while 1:
                 try:
-                    decoded_data = marshal.load(p.stdout)
+                    decoded_data = marshal.load(p.stdout_bytes)
                 except EOFError:
                     break
                 else:
@@ -375,8 +458,6 @@ class P4Wrapper(object):
                     if data.get('code') == 'error':
                         has_error = True
 
-            rc = p.wait()
-
             try:
                 stderr = p.stderr.read()
             except Exception as e:
@@ -385,7 +466,8 @@ class P4Wrapper(object):
             logging.debug('Command results = %r; stderr=%r',
                           result, stderr)
 
-            if not ignore_errors and (rc or has_error):
+            if (not kwargs.get('ignore_errors', False) and
+                (p.exit_code != 0 or has_error)):
                 for record in result:
                     if 'data' in record:
                         print(record['data'])
@@ -395,30 +477,8 @@ class P4Wrapper(object):
                     % (subprocess.list2cmdline(cmd), result, stderr))
 
             return result
-        elif input_string is not None:
-            if not isinstance(input_string, bytes):
-                input_string = input_string.encode('utf8')
-
-            p = subprocess.Popen(cmd, stdin=subprocess.PIPE,
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE)
-
-            try:
-                stdout, stderr = p.communicate(input_string, timeout=30)
-            except subprocess.TimeoutExpired:
-                p.kill()
-                stdout, stderr = p.communicate()
-
-            if not ignore_errors and p.returncode != 0:
-                raise SCMError('Failed to execute command: %s; stdout=%r; '
-                               'stderr=%r'
-                               % (cmd, stdout, stderr))
-
-            return None
         else:
-            result = execute(cmd, ignore_errors=ignore_errors, *args, **kwargs)
-
-        return result
+            return run_process(cmd, *args, **kwargs)
 
     def _parse_keyval_lines(self, lines, regex=KEYVAL_RE):
         """Parse a set of key:value lines into a dictionary.
@@ -906,6 +966,7 @@ class PerforceClient(BaseSCMClient):
             return 'pending'
         else:
             change = self.p4.change(changelist)
+
             if len(change) == 1 and 'Status' in change[0]:
                 return change[0]['Status']
 

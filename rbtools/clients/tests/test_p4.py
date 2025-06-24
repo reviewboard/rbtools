@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import time
+from subprocess import list2cmdline
 
 import kgb
 
@@ -18,7 +19,7 @@ from rbtools.diffs.patches import Patch
 from rbtools.testing import TestCase
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempfile
-from rbtools.utils.process import run_process_exec
+from rbtools.utils.process import RunProcessResult, run_process_exec
 
 
 SAMPLE_CHANGEDESC_TEMPLATE_BASIC = (
@@ -104,15 +105,18 @@ class P4WrapperTests(TestCase):
 
     def test_counters(self):
         """Testing P4Wrapper.counters"""
-        class TestWrapper(P4Wrapper):
+        class _TestWrapper(P4Wrapper):
             def run_p4(self, cmd, *args, **kwargs):
-                return [
-                    'a = 1\n',
-                    'b = 2\n',
-                    'c = 3\n',
-                ]
+                return RunProcessResult(
+                    command=list2cmdline(cmd),
+                    stdout=(
+                        b'a = 1\n'
+                        b'b = 2\n'
+                        b'c = 3\n'
+                    )
+                )
 
-        p4 = TestWrapper(None)
+        p4 = _TestWrapper(None)
         info = p4.counters()
 
         self.assertEqual(
@@ -125,17 +129,20 @@ class P4WrapperTests(TestCase):
 
     def test_info(self):
         """Testing P4Wrapper.info"""
-        class TestWrapper(P4Wrapper):
+        class _TestWrapper(P4Wrapper):
             def run_p4(self, cmd, *args, **kwargs):
-                return [
-                    'User name: myuser\n',
-                    'Client name: myclient\n',
-                    'Client host: myclient.example.com\n',
-                    'Client root: /path/to/client\n',
-                    'Server uptime: 111:43:38\n',
-                ]
+                return RunProcessResult(
+                    command=list2cmdline(cmd),
+                    stdout=(
+                        b'User name: myuser\n'
+                        b'Client name: myclient\n'
+                        b'Client host: myclient.example.com\n'
+                        b'Client root: /path/to/client\n'
+                        b'Server uptime: 111:43:38\n'
+                    )
+                )
 
-        p4 = TestWrapper(None)
+        p4 = _TestWrapper(None)
         info = p4.info()
 
         self.assertEqual(
@@ -149,7 +156,7 @@ class P4WrapperTests(TestCase):
             })
 
 
-class PerforceSCMClientTestCase(SCMClientTestCase):
+class PerforceSCMClientTestCase(SCMClientTestCase[PerforceClient]):
     scmclient_cls = PerforceClient
 
     default_scmclient_options = {
