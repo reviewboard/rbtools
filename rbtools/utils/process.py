@@ -9,7 +9,7 @@ import subprocess
 from typing import (Any, AnyStr, Dict, List, Optional, Tuple, TYPE_CHECKING,
                     TypedDict, Union)
 
-from rbtools.deprecation import RemovedInRBTools50Warning
+from rbtools.deprecation import RemovedInRBTools80Warning
 from rbtools.utils.encoding import force_unicode
 
 if TYPE_CHECKING:
@@ -666,16 +666,10 @@ def execute(
     stdout: io.IOBase
     stderr: io.IOBase
 
-    # We eventually want to unconditionally warn, but this has side effects
-    # right now for tests checking other deprecation warnings for code that
-    # eventually calls execute(). Short-term, we'll lock this behind an
-    # environment variable to help with our development and debugging, and
-    # make it mandatory later.
-    if os.environ.get('RBTOOLS_WARN_EXECUTE_DEPRECATED') == '1':
-        RemovedInRBTools50Warning.warn(
-            'execute() is deprecated and will be removed in RBTools 5.0. '
-            'Callers should use rbtools.utils.process.run_process() instead, '
-            'which is future-proof and has better type safety.')
+    RemovedInRBTools80Warning.warn(
+        'execute() is deprecated and will be removed in RBTools 8.0. '
+        'Callers should use rbtools.utils.process.run_process() instead, '
+        'which is future-proof and has better type safety.')
 
     assert not (with_errors and return_errors)
 

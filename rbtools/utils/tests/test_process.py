@@ -1,11 +1,14 @@
 """Unit tests for rbtools.utils.process."""
 
+from __future__ import annotations
+
 import os
 import re
 import sys
 from typing import Any, List
 
 import rbtools.testing
+from rbtools.deprecation import RemovedInRBTools80Warning
 from rbtools.testing import TestCase
 from rbtools.utils.process import (RunProcessError,
                                    RunProcessResult,
@@ -489,8 +492,15 @@ class RunProcessTests(TestCase):
 class ExecuteTests(TestCase):
     """Unit tests for execute."""
 
-    def test_execute(self):
+    def test_execute(self) -> None:
         """Testing execute"""
-        self.assertTrue(
-            re.match('.*?%d.%d.%d' % sys.version_info[:3],
-                     execute([sys.executable, '-V'])))
+        message = re.escape(
+            'execute() is deprecated and will be removed in RBTools 8.0. '
+            'Callers should use rbtools.utils.process.run_process() instead, '
+            'which is future-proof and has better type safety.'
+        )
+
+        with self.assertWarnsRegex(RemovedInRBTools80Warning, message):
+            self.assertTrue(
+                re.match('.*?%d.%d.%d' % sys.version_info[:3],
+                         execute([sys.executable, '-V'])))
