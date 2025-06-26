@@ -18,6 +18,9 @@ Top-Level Modules
 Review Board API
 ================
 
+Base Support
+------------
+
 .. autosummary::
    :toctree: python
 
@@ -30,10 +33,89 @@ Review Board API
    rbtools.api.errors
    rbtools.api.factory
    rbtools.api.request
-   rbtools.api.resource
    rbtools.api.transport
    rbtools.api.transport.sync
    rbtools.api.utils
+
+
+Resource Base Classes
+---------------------
+
+.. autosummary::
+   :toctree: python
+
+   rbtools.api.resource
+   rbtools.api.resource.base
+   rbtools.api.resource.base_archived_object
+   rbtools.api.resource.base_comment
+   rbtools.api.resource.base_diff_commit
+   rbtools.api.resource.base_review_group
+   rbtools.api.resource.base_review_request
+   rbtools.api.resource.base_review
+   rbtools.api.resource.base_user
+   rbtools.api.resource.mixins
+
+
+Resources
+---------
+
+.. autosummary::
+   :toctree: python
+
+   rbtools.api.resource.api_token
+   rbtools.api.resource.archived_review_request
+   rbtools.api.resource.change
+   rbtools.api.resource.default_reviewer
+   rbtools.api.resource.diff_comment
+   rbtools.api.resource.diff_commit
+   rbtools.api.resource.diff_context
+   rbtools.api.resource.diff_file_attachment
+   rbtools.api.resource.diff
+   rbtools.api.resource.draft_diff_commit
+   rbtools.api.resource.draft_file_attachment
+   rbtools.api.resource.draft_screenshot
+   rbtools.api.resource.extension
+   rbtools.api.resource.file_attachment_comment
+   rbtools.api.resource.file_attachment
+   rbtools.api.resource.file_diff
+   rbtools.api.resource.general_comment
+   rbtools.api.resource.hosting_service_account
+   rbtools.api.resource.hosting_service
+   rbtools.api.resource.last_update
+   rbtools.api.resource.muted_review_request
+   rbtools.api.resource.oauth_application
+   rbtools.api.resource.oauth_token
+   rbtools.api.resource.plain_text
+   rbtools.api.resource.remote_repository
+   rbtools.api.resource.repository_branch
+   rbtools.api.resource.repository_commit
+   rbtools.api.resource.repository_group
+   rbtools.api.resource.repository_info
+   rbtools.api.resource.repository_user
+   rbtools.api.resource.repository
+   rbtools.api.resource.review_group_user
+   rbtools.api.resource.review_group
+   rbtools.api.resource.review_reply
+   rbtools.api.resource.review_request_draft
+   rbtools.api.resource.review_request
+   rbtools.api.resource.review
+   rbtools.api.resource.root
+   rbtools.api.resource.screenshot_comment
+   rbtools.api.resource.screenshot
+   rbtools.api.resource.search
+   rbtools.api.resource.server_info
+   rbtools.api.resource.session
+   rbtools.api.resource.status_update
+   rbtools.api.resource.user_file_attachment
+   rbtools.api.resource.user
+   rbtools.api.resource.validate_diff_commit
+   rbtools.api.resource.validate_diff
+   rbtools.api.resource.validation
+   rbtools.api.resource.watched_review_group
+   rbtools.api.resource.watched_review_request
+   rbtools.api.resource.watched
+   rbtools.api.resource.webhook
+
 
 
 Source Code Management Clients

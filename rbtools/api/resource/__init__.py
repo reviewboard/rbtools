@@ -302,3 +302,6 @@ __all__ = [
     'WebHookListResource',
     'resource_mimetype',
 ]
+
+
+__autodoc_excludes__ = __all__
