@@ -290,6 +290,19 @@ extlinks = {
 
 
 autosummary_generate = True
+autodoc_default_options = {
+    'exclude-members': ', '.join([
+        '__closed__',
+        '__extra_items__',
+        '__mutable_keys__',
+        '__optional_keys__',
+        '__orig_bases__',
+        '__parameters__',
+        '__readonly_keys__',
+        '__required_keys__',
+        '__total__',
+    ]),
+}
 
 sphinx_tabs_valid_builders = ['html', 'json', 'pickle']
 sphinx_tabs_disable_tab_closing = True
