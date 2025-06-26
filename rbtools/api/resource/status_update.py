@@ -31,6 +31,9 @@ if TYPE_CHECKING:
 class StatusUpdateItemResource(ItemResource):
     """Item resource for status updates.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-status-update-resource`.
+
     Version Added:
         6.0
     """
@@ -139,6 +142,9 @@ class StatusUpdateGetListParams(BaseGetListParams, total=False):
 @resource_mimetype('application/vnd.reviewboard.org.status-updates')
 class StatusUpdateListResource(ListResource[StatusUpdateItemResource]):
     """List resource for status updates.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-status-update-list-resource`.
 
     Version Added:
         6.0

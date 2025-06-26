@@ -1,4 +1,4 @@
-"""Resource definitions for the RBTools Python API.
+"""Resource base classes for the RBTools Python API.
 
 Version Added:
     6.0:

@@ -32,6 +32,9 @@ if TYPE_CHECKING:
 class FileAttachmentItemResource(ItemResource):
     """Item resource for file attachments.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-file-attachment-resource`.
+
     Version Added:
         6.0
     """
@@ -109,4 +112,8 @@ class FileAttachmentItemResource(ItemResource):
 @resource_mimetype('application/vnd.reviewboard.org.file-attachments')
 class FileAttachmentListResource(AttachmentUploadMixin,
                                  ListResource[FileAttachmentItemResource]):
-    """List resource for file attachments."""
+    """List resource for file attachments.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-file-attachment-list-resource`.
+    """

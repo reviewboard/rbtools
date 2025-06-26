@@ -15,6 +15,9 @@ from rbtools.api.resource.base import ItemResource, resource_mimetype
 class LastUpdateResource(ItemResource):
     """Review request last update resource.
 
+    This corresponds to Review Board`s
+    :ref:`rb:webapi2.0-review-request-last-update-resource`.
+
     Version Added:
         6.0
     """

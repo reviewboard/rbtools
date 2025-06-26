@@ -17,6 +17,9 @@ from rbtools.api.resource.base import (
 class WatchedReviewRequestItemResource(ItemResource):
     """Item resource for watched review requests.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-watched-review-request-resource`.
+
     Version Added:
         6.0
     """
@@ -26,6 +29,9 @@ class WatchedReviewRequestItemResource(ItemResource):
 class WatchedReviewRequestListResource(
     ListResource[WatchedReviewRequestItemResource]):
     """List resource for watched review requests.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-watched-review-request-list-resource`.
 
     Version Added:
         6.0

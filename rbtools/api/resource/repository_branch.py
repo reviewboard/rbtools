@@ -58,6 +58,9 @@ class RepositoryBranchListResource(
     ListResource[RepositoryBranchItemResource]):
     """List resource for repository branches.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-repository-branches-resource`.
+
     Version Added:
         6.0
     """

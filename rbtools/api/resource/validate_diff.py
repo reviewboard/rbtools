@@ -22,7 +22,11 @@ if TYPE_CHECKING:
 
 @resource_mimetype('application/vnd.reviewboard.org.diff-validation')
 class ValidateDiffResource(DiffUploaderMixin, ItemResource):
-    """Singleton resource for diff validation."""
+    """Singleton resource for diff validation.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-validate-diff-resource`.
+    """
 
     @request_method
     def validate_diff(

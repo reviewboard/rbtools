@@ -26,6 +26,9 @@ if TYPE_CHECKING:
 class ReviewGroupItemResource(BaseReviewGroupItemResource):
     """Item resource for review groups.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-review-group-resource`.
+
     Version Added:
         6.0
     """
@@ -59,6 +62,9 @@ class ReviewGroupItemResource(BaseReviewGroupItemResource):
 class ReviewGroupListResource(
     BaseReviewGroupListResource[ReviewGroupItemResource]):
     """List resource for review groups.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-review-group-list-resource`.
 
     Version Added:
         6.0

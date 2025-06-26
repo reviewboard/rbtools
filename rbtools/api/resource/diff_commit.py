@@ -24,7 +24,11 @@ if TYPE_CHECKING:
 
 @resource_mimetype('application/vnd.reviewboard.org.commit')
 class DiffCommitItemResource(BaseDiffCommitItemResource):
-    """Item resource for diff commits."""
+    """Item resource for diff commits.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-diff-commit-resource`.
+    """
 
     @api_stub
     def get_files(
@@ -55,6 +59,9 @@ class DiffCommitItemResource(BaseDiffCommitItemResource):
 class DiffCommitListResource(GetPatchMixin,
                              ListResource[DiffCommitItemResource]):
     """List resource for diff commits.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-diff-commit-list-resource`.
 
     Version Added:
         6.0

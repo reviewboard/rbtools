@@ -21,6 +21,9 @@ if TYPE_CHECKING:
 class ReviewReplyItemResource(BaseReviewItemResource):
     """Item resource for review replies.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-review-reply-resource`.
+
     Version Added:
         6.0
     """
@@ -29,6 +32,9 @@ class ReviewReplyItemResource(BaseReviewItemResource):
 @resource_mimetype('application/vnd.reviewboard.org.review-replies')
 class ReviewReplyListResource(ListResource[ReviewReplyItemResource]):
     """List resource for review replies.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-review-reply-list-resource`.
 
     Version Added:
         6.0

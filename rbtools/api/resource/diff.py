@@ -40,6 +40,8 @@ if TYPE_CHECKING:
 class DiffItemResource(GetPatchMixin, ItemResource):
     """Item resource for diffs.
 
+    This corresponds to Review Board's :ref:`rb:webapi2.0-diff-resource`.
+
     Version Changed:
         6.0:
         Renamed from DiffResource.
@@ -263,7 +265,10 @@ class DiffItemResource(GetPatchMixin, ItemResource):
 
 @resource_mimetype('application/vnd.reviewboard.org.diffs')
 class DiffListResource(DiffUploaderMixin, ListResource[DiffItemResource]):
-    """List resource for diffs."""
+    """List resource for diffs.
+
+    This corresponds to Review Board's :ref:`rb:webapi2.0-diff-list-resource`.
+    """
 
     @request_method_returns[DiffItemResource]()
     def upload_diff(

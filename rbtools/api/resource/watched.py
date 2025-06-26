@@ -28,6 +28,8 @@ if TYPE_CHECKING:
 class WatchedResource(ItemResource):
     """The watched list resource.
 
+    This corresponds to Review Board's :ref:`rb:webapi2.0-watched-resource`.
+
     Version Added:
         6.0
     """

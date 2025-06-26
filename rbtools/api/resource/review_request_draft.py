@@ -35,6 +35,9 @@ if TYPE_CHECKING:
 class ReviewRequestDraftResource(BaseReviewRequestItemResource):
     """Resource for review request drafts.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-review-request-draft-resource`.
+
     Version Added:
         6.0
     """

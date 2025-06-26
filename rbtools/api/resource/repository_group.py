@@ -17,6 +17,9 @@ from rbtools.api.resource.base_review_group import (
 class RepositoryGroupItemResource(BaseReviewGroupItemResource):
     """Item resource for repository groups.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-repository-group-resource`.
+
     Version Added:
         6.0
     """
@@ -26,6 +29,9 @@ class RepositoryGroupItemResource(BaseReviewGroupItemResource):
 class RepositoryGroupListResource(
     BaseReviewGroupListResource[RepositoryGroupItemResource]):
     """List resource for repository groups.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-repository-group-list-resource`.
 
     Version Added:
         6.0

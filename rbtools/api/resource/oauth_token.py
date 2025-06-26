@@ -17,6 +17,9 @@ from rbtools.api.resource.base import (
 class OAuthTokenItemResource(ItemResource):
     """Item resource for OAuth2 tokens.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-oauth-token-resource`.
+
     Version Added:
         6.0
     """
@@ -43,6 +46,9 @@ class OAuthTokenItemResource(ItemResource):
 @resource_mimetype('application/vnd.reviewboard.org.oauth-tokens')
 class OAuthTokenListResource(ListResource[OAuthTokenItemResource]):
     """List resource for OAuth2 tokens.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-oauth-token-list-resource`.
 
     Version Added:
         6.0

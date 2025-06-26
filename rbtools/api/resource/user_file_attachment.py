@@ -23,6 +23,9 @@ if TYPE_CHECKING:
 class UserFileAttachmentItemResource(ItemResource):
     """Item resource for file attachments.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-user-file-attachment-resource`.
+
     Version Added:
         6.0
     """
@@ -64,6 +67,9 @@ class UserFileAttachmentListResource(
     AttachmentUploadMixin,
     ListResource[UserFileAttachmentItemResource]):
     """List resource for user file attachments.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-user-file-attachment-list-resource`.
 
     Version Added:
         6.0

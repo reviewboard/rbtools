@@ -227,13 +227,15 @@ logger = logging.getLogger(__name__)
 
 @resource_mimetype('application/vnd.reviewboard.org.root')
 class RootResource(ItemResource):
-    """The Root resource specific base class.
+    """The Root resource.
 
     Provides additional methods for fetching any resource directly
     using the uri templates. A method of the form "get_<uri-template-name>"
     is called to retrieve the HttpRequest corresponding to the
     resource. Template replacement values should be passed in as a
     dictionary to the values parameter.
+
+    This corresponds to Review Board's :ref:`rb:webapi2.0-root-resource`.
     """
 
     #: Capabilities for the Review Board server.

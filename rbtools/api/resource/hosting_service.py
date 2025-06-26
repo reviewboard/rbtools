@@ -33,6 +33,9 @@ if TYPE_CHECKING:
 class HostingServiceItemResource(ItemResource):
     """Item resource for hosting services.
 
+    This corresponds to Review Board`s
+    :ref:`rb:webapi2.0-hosting-service-resource`.
+
     Version Added:
         6.0
     """
@@ -134,7 +137,10 @@ class HostingServiceItemResource(ItemResource):
 
 @resource_mimetype('application/vnd.reviewboard.org.hosting-services')
 class HostingServiceListResource(ListResource[HostingServiceItemResource]):
-    """Item resource for hosting services.
+    """List resource for hosting services.
+
+    This corresponds to Review Board`s
+    :ref:`rb:webapi2.0-hosting-service-list-resource`.
 
     Version Added:
         6.0

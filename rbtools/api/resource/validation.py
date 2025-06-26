@@ -25,6 +25,8 @@ if TYPE_CHECKING:
 class ValidationResource(ItemResource):
     """The validation list resource.
 
+    This corresponds to Review Board's :ref:`rb:webapi2.0-validation-resource`.
+
     Version Added:
         6.0
     """

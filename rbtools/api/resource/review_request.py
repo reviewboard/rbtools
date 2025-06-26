@@ -60,6 +60,9 @@ if TYPE_CHECKING:
 class ReviewRequestItemResource(BaseReviewRequestItemResource):
     """Item resource for review requests.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-review-request-resource`.
+
     Version Changed:
         6.0:
         Renamed from ReviewRequestResource.
@@ -721,6 +724,9 @@ class ReviewRequestGetListParams(BaseGetListParams, total=False):
 @resource_mimetype('application/vnd.reviewboard.org.review-requests')
 class ReviewRequestListResource(ListResource[ReviewRequestItemResource]):
     """List resource for review requests.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-review-request-list-resource`.
 
     Version Added:
         6.0

@@ -46,6 +46,8 @@ class SearchGetParams(TypedDict, total=False):
 class SearchResource(ItemResource):
     """Resource for performing searches.
 
+    This corresponds to Review Board's :ref:`rb:webapi2.0-search-resource`.
+
     Version Added:
         6.0
     """

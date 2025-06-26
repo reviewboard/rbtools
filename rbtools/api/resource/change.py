@@ -63,6 +63,8 @@ class ChangedField(TypedDict):
 class ChangeItemResource(ItemResource):
     """Item resource for review request changes.
 
+    This corresponds to Review Board's :ref:`rb:webapi2.0-change-resource`.
+
     Version Added:
         6.0
     """
@@ -90,6 +92,9 @@ class ChangeItemResource(ItemResource):
 @resource_mimetype('application/vnd.reviewboard.org.review-request-changes')
 class ChangeListResource(ListResource[ChangeItemResource]):
     """List resource for review request changes.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-change-list-resource`.
 
     Version Added:
         6.0

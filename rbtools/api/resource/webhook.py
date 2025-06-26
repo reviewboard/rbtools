@@ -27,6 +27,8 @@ if TYPE_CHECKING:
 class WebHookItemResource(ItemResource):
     """Item resource for WebHooks.
 
+    This corresponds to Review Board's :ref:`rb:webapi2.0-web-hook-resource`.
+
     Version Added:
         6.0
     """
@@ -77,7 +79,10 @@ class WebHookItemResource(ItemResource):
 
 @resource_mimetype('application/vnd.reviewboard.org.webhooks')
 class WebHookListResource(ListResource[WebHookItemResource]):
-    """List resource for WebHooks
+    """List resource for WebHooks.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-web-hook-list-resource`.
 
     Version Added:
         6.0

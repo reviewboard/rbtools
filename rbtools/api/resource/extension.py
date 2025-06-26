@@ -19,6 +19,8 @@ from rbtools.api.resource.base import (
 class ExtensionItemResource(ItemResource):
     """Item resource for extensions.
 
+    This corresponds to Review Board's :ref:`rb:webapi2.0-extension-resource`.
+
     Version Added:
         6.0
     """
@@ -75,6 +77,9 @@ class ExtensionItemResource(ItemResource):
 @resource_mimetype('application/vnd.reviewboard.org.extensions')
 class ExtensionListResource(ListResource[ExtensionItemResource]):
     """List resource for extensions.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-extension-list-resource`.
 
     Version Added:
         6.0

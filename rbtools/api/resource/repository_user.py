@@ -17,6 +17,9 @@ from rbtools.api.resource.base_user import (
 class RepositoryUserItemResource(BaseUserItemResource):
     """Item resource for repository users.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-repository-user-resource`.
+
     Version Added:
         6.0
     """
@@ -26,6 +29,9 @@ class RepositoryUserItemResource(BaseUserItemResource):
 class RepositoryUserListResource(
     BaseUserListResource[RepositoryUserItemResource]):
     """List resource for repository users.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-repository-user-list-resource`.
 
     Version Added:
         6.0

@@ -19,6 +19,9 @@ from rbtools.api.resource.mixins import ScreenshotUploadMixin
 class DraftScreenshotItemResource(ItemResource):
     """Item resource for draft screenshots.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-draft-screenshot-resource`
+
     Version Added:
         6.0
     """
@@ -63,4 +66,8 @@ class DraftScreenshotItemResource(ItemResource):
 @resource_mimetype('application/vnd.reviewboard.org.draft-screenshots')
 class DraftScreenshotListResource(ScreenshotUploadMixin,
                                   ListResource[DraftScreenshotItemResource]):
-    """List resource for draft screenshots."""
+    """List resource for draft screenshots.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-draft-screenshot-list-resource`
+    """

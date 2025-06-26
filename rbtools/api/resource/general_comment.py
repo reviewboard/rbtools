@@ -22,6 +22,10 @@ from rbtools.api.resource.base_comment import BaseCommentItemResource
 class GeneralCommentItemResource(BaseCommentItemResource):
     """Item resource for general comments.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-review-general-comment-resource` and
+    :ref:`rb:webapi2.0-review-reply-general-comment-resource`.
+
     Version Added:
         6.0
     """
@@ -64,6 +68,10 @@ class AllGeneralCommentsGetListParams(BaseGetListParams, total=False):
     'application/vnd.reviewboard.org.review-reply-general-comments')
 class GeneralCommentListResource(ListResource[BaseCommentItemResource]):
     """List resource for general comments.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-review-general-comment-list-resource`. and
+    :ref:`rb:webapi2.0-review-reply-general-comment-list-resource`.
 
     Version Added:
         6.0

@@ -30,6 +30,9 @@ if TYPE_CHECKING:
 class HostingServiceAccountItemResource(ItemResource):
     """Item resource for hosting service accounts.
 
+    This corresponds to Review Board`s
+    :ref:`rb:webapi2.0-hosting-service-account-resource`.
+
     Version Added:
         6.0
     """
@@ -90,6 +93,9 @@ class HostingServiceAccountGetListParams(BaseGetListParams, total=False):
 class HostingServiceAccountListResource(
     ListResource[HostingServiceItemResource]):
     """List resource for hosting service accounts.
+
+    This corresponds to Review Board`s
+    :ref:`rb:webapi2.0-hosting-service-account-list-resource`.
 
     Version Added:
         6.0

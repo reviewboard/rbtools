@@ -25,6 +25,9 @@ class ArchivedReviewRequestItemResource(BaseArchivedObjectItemResource):
     This cannot be used to get any information about the archived item, but
     using the :py:meth:`delete` method can un-archive a review request.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-archived-review-request-resource`.
+
     Version Added:
         6.0
     """
@@ -37,6 +40,9 @@ class ArchivedReviewRequestListResource(
 
     This cannot be used to get a list of the archived items, but using the
     :py:meth:`create` method can archive a review request.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-archived-review-request-list-resource`.
 
     Version Added:
         6.0

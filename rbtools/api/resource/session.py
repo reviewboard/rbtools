@@ -21,6 +21,9 @@ if TYPE_CHECKING:
 class SessionResource(ItemResource):
     """Resource for the session.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-session-resource`.
+
     Version Added:
         6.0
     """

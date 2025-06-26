@@ -35,6 +35,9 @@ if TYPE_CHECKING:
 class DiffFileAttachmentItemResource(ItemResource):
     """Item resource for diff file attachments.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-diff-file-attachment-resource`.
+
     Version Added:
         6.0
     """
@@ -133,6 +136,9 @@ class DiffFileAttachmentGetListParams(BaseGetListParams, total=False):
 class DiffFileAttachmentListResource(
     ListResource[DiffFileAttachmentItemResource]):
     """List resource for diff file attachments.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-diff-file-attachment-list-resource`.
 
     Version Added:
         5.0

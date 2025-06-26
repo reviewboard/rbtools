@@ -24,6 +24,8 @@ if TYPE_CHECKING:
 class APITokenItemResource(ItemResource):
     """Item resource for API tokens.
 
+    This corresponds to Review Board's :ref:`rb:webapi2.0-api-token-resource`.
+
     Version Added:
         6.0
     """
@@ -89,6 +91,9 @@ class APITokenItemResource(ItemResource):
 @resource_mimetype('application/vnd.reviewboard.org.api-tokens')
 class APITokenListResource(ListResource[APITokenItemResource]):
     """List resource for API tokens.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-api-token-list-resource`.
 
     Version Added:
         6.0

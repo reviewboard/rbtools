@@ -14,6 +14,10 @@ from rbtools.api.resource.base_comment import BaseCommentItemResource
 class ScreenshotCommentItemResource(BaseCommentItemResource):
     """Item resource for screenshot comments.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-review-screenshot-comment-resource` and
+    :ref:`rb:webapi2.0-review-reply-screenshot-comment-resource`.
+
     Version Added:
         6.0
     """
@@ -23,6 +27,10 @@ class ScreenshotCommentItemResource(BaseCommentItemResource):
 class ScreenshotCommentListResource(
     ListResource[ScreenshotCommentItemResource]):
     """List resource for screenshot comments.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-review-screenshot-comment-list-resource` and
+    :ref:`rb:webapi2.0-review-reply-screenshot-comment-list-resource`.
 
     Version Added:
         6.0

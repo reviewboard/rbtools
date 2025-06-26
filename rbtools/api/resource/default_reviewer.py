@@ -25,6 +25,9 @@ if TYPE_CHECKING:
 class DefaultReviewerItemResource(ItemResource):
     """Item resource for default reviewers.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-default-reviewer-resource`.
+
     Version Added:
         6.0
     """
@@ -74,6 +77,9 @@ class DefaultReviewerGetListParams(BaseGetListParams, total=False):
 @resource_mimetype('application/vnd.reviewboard.org.default-reviewers')
 class DefaultReviewerListResource(ListResource[DefaultReviewerItemResource]):
     """List resource for default reviewers.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-default-reviewer-list-resource`.
 
     Version Added:
         6.0

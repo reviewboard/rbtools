@@ -24,6 +24,9 @@ if TYPE_CHECKING:
 class DraftFileAttachmentItemResource(ItemResource):
     """Item resource for draft file attachments.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-draft-file-attachment-resource`.
+
     Version Added:
         6.0
     """
@@ -78,4 +81,8 @@ class DraftFileAttachmentItemResource(ItemResource):
 class DraftFileAttachmentListResource(
     AttachmentUploadMixin,
     ListResource[DraftFileAttachmentItemResource]):
-    """List resource for draft file attachments."""
+    """List resource for draft file attachments.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-draft-file-attachment-list-resource`.
+    """

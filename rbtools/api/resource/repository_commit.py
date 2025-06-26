@@ -71,6 +71,9 @@ class RepositoryCommitGetListParams(BaseGetParams, total=False):
 class RepositoryCommitListResource(ListResource[RepositoryCommitItemResource]):
     """Resource for the repository commits API.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-repository-commits-resource`.
+
     Version Added:
         6.0
     """

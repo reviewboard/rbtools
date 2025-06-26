@@ -33,6 +33,9 @@ logger = logging.getLogger(__name__)
 class DraftDiffCommitItemResource(BaseDiffCommitItemResource):
     """Item resource for draft diff commits.
 
+    This corresponds to Review Board's
+    :ref:`webapi2.0-draft-diff-commit-resource`.
+
     Version Added:
         4.2
     """
@@ -64,7 +67,11 @@ class DraftDiffCommitItemResource(BaseDiffCommitItemResource):
 
 @resource_mimetype('application/vnd.reviewboard.org.draft-commits')
 class DraftDiffCommitListResource(ListResource[DraftDiffCommitItemResource]):
-    """List resource for draft diff commits."""
+    """List resource for draft diff commits.
+
+    This corresponds to Review Board's
+    :ref:`webapi2.0-draft-diff-commit-list-resource`.
+    """
 
     @request_method_returns[DraftDiffCommitItemResource]()
     def upload_commit(

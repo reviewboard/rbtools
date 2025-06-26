@@ -27,6 +27,8 @@ if TYPE_CHECKING:
 class ReviewItemResource(BaseReviewItemResource):
     """Item resource for reviews.
 
+    This corresponds to Review Board's :ref:`rb:webapi2.0-review-resource`.
+
     Version Added:
         6.0
     """
@@ -94,6 +96,9 @@ class AllReviewsGetListParams(BaseGetListParams, total=False):
 @resource_mimetype('application/vnd.reviewboard.org.reviews')
 class ReviewListResource(ListResource[ReviewItemResource]):
     """List resource for reviews.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-review-list-resource`.
 
     Version Added:
         6.0

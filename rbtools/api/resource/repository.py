@@ -47,6 +47,9 @@ if TYPE_CHECKING:
 class RepositoryItemResource(ItemResource):
     """Item resource for repositories.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-repository-resource`.
+
     Version Added:
         6.0
     """
@@ -286,6 +289,9 @@ class RepositoryGetListParams(BaseGetListParams, total=False):
 @resource_mimetype('application/vnd.reviewboard.org.repositories')
 class RepositoryListResource(ListResource[RepositoryItemResource]):
     """List resource for repositories.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-repository-list-resource`.
 
     Version Added:
         6.0

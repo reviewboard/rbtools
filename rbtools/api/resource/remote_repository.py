@@ -23,6 +23,9 @@ if TYPE_CHECKING:
 class RemoteRepositoryItemResource(ItemResource):
     """Item resource for remote repositories.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-remote-repository-resource`.
+
     Version Added:
         6.0
     """
@@ -80,6 +83,9 @@ class RemoteRepositoryGetListParams(BaseGetListParams, total=False):
 @resource_mimetype('application/vnd.reviewboard.org.remote-repositories')
 class RemoteRepositoryListResource(ListResource[RemoteRepositoryItemResource]):
     """List resource for remote repositories.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-remote-repository-list-resource`.
 
     Version Added:
         6.0

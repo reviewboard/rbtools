@@ -33,6 +33,8 @@ if TYPE_CHECKING:
 class UserItemResource(BaseUserItemResource):
     """Item resource for users.
 
+    This corresponds to Review Board's :ref:`rb:webapi2.0-user-resource`.
+
     Version Added:
         6.0
     """
@@ -177,6 +179,8 @@ class UserItemResource(BaseUserItemResource):
 @resource_mimetype('application/vnd.reviewboard.org.users')
 class UserListResource(BaseUserListResource[UserItemResource]):
     """List resource for users.
+
+    This corresponds to Review Board's :ref:`rb:webapi2.0-user-list-resource`.
 
     Version Added:
         6.0

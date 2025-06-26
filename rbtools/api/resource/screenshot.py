@@ -29,6 +29,9 @@ if TYPE_CHECKING:
 class ScreenshotItemResource(ItemResource):
     """Item resource for screenshots.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-screenshot-resource`.
+
     Version Added:
         6.0
     """
@@ -97,4 +100,8 @@ class ScreenshotItemResource(ItemResource):
 @resource_mimetype('application/vnd.reviewboard.org.screenshots')
 class ScreenshotListResource(ScreenshotUploadMixin,
                              ListResource[ScreenshotItemResource]):
-    """List resource for screenshots."""
+    """List resource for screenshots.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-screenshot-list-resource`.
+    """

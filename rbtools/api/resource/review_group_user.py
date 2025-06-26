@@ -17,6 +17,9 @@ from rbtools.api.resource.base_user import (
 class ReviewGroupUserItemResource(BaseUserItemResource):
     """Item resource for review group users.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-review-group-user-resource`.
+
     Version Added:
         6.0
     """
@@ -26,6 +29,9 @@ class ReviewGroupUserItemResource(BaseUserItemResource):
 class ReviewGroupUserListResource(
     BaseUserListResource[ReviewGroupUserItemResource]):
     """List resource for review group users.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-review-group-user-list-resource`.
 
     Version Added:
         6.0

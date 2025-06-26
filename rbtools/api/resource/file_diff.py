@@ -38,6 +38,8 @@ if TYPE_CHECKING:
 class FileDiffItemResource(GetPatchMixin, ItemResource):
     """Item resource for file diffs.
 
+    This corresponds to Review Board's :ref:`rb:webapi2.0-file-diff-resource`.
+
     Version Changed:
         6.0:
         Renamed from FileDiffResource.
@@ -239,6 +241,9 @@ class FileDiffItemResource(GetPatchMixin, ItemResource):
 @resource_mimetype('application/vnd.reviewboard.org.files')
 class FileDiffListResource(ListResource[FileDiffItemResource]):
     """List resource for file diffs.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-file-diff-list-resource`.
 
     Version Added:
         6.0

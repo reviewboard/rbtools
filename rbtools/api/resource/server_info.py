@@ -13,6 +13,9 @@ from rbtools.api.resource.base import ItemResource, resource_mimetype
 class ServerInfoResource(ItemResource):
     """Server info resource.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-server-info-resource`.
+
     Version Added:
         6.0
     """

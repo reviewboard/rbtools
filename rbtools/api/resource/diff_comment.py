@@ -30,6 +30,10 @@ if TYPE_CHECKING:
 class DiffCommentItemResource(BaseCommentItemResource):
     """Item resource for diff comments.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-review-diff-comment-resource` and
+    :ref:`rb:webapi2.0-review-reply-diff-comment-resource`.
+
     Version Added:
         6.0
     """
@@ -161,6 +165,10 @@ class AllDiffCommentsGetListParams(DiffCommentGetListParams, total=False):
     'application/vnd.reviewboard.org.review-reply-diff-comments')
 class DiffCommentListResource(ListResource[DiffCommentItemResource]):
     """List resource for diff comments.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-review-diff-comment-list-resource` and
+    :ref:`rb:webapi2.0-review-reply-diff-comment-list-resource`.
 
     Version Added:
         6.0

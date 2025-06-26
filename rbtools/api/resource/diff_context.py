@@ -60,6 +60,9 @@ class DiffContextGetParams(BaseGetParams, total=False):
 class DiffContextResource(ItemResource):
     """Diff context resource.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-diff-context-resource`.
+
     Version Added:
         6.0
     """

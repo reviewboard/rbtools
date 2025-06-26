@@ -29,6 +29,9 @@ if TYPE_CHECKING:
 class FileAttachmentCommentItemResource(BaseCommentItemResource):
     """Item resource for file attachment comments.
 
+    This corresponds to Review Board's
+    :ref:`webapi2.0-review-file-attachment-comment-resource`.
+
     Version Added:
         6.0
     """
@@ -140,6 +143,9 @@ class AllFileAttachmentCommentsGetListParams(BaseGetListParams, total=False):
 class FileAttachmentCommentListResource(
     ListResource[FileAttachmentCommentItemResource]):
     """List resource for file attachment comments.
+
+    This corresponds to Review Board's
+    :ref:`webapi2.0-review-file-attachment-comment-list-resource`.
 
     Version Added:
         6.0

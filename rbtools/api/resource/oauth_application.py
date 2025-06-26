@@ -28,6 +28,9 @@ if TYPE_CHECKING:
 class OAuthApplicationItemResource(ItemResource):
     """Item resource for OAuth2 applications.
 
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-oauth-application-resource`.
+
     Version Added:
         6.0
     """
@@ -128,6 +131,9 @@ class OAuthApplicationGetListParams(BaseGetListParams, total=False):
 @resource_mimetype('application/vnd.reviewboard.org.oauth-apps')
 class OAuthApplicationListResource(ListResource[OAuthApplicationItemResource]):
     """List resource for OAuth2 applications.
+
+    This corresponds to Review Board's
+    :ref:`rb:webapi2.0-oauth-application-list-resource`.
 
     Version Added:
         6.0
