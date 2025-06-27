@@ -14,7 +14,6 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError)
 from rbtools.clients.perforce import PerforceClient, P4Wrapper
 from rbtools.clients.tests import FOO1, SCMClientTestCase
-from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.diffs.patches import Patch
 from rbtools.testing import TestCase
 from rbtools.utils.checks import check_install
@@ -233,11 +232,10 @@ class PerforceClientTests(PerforceSCMClientTestCase):
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['p4', 'help'])
 
-    def test_get_local_path_with_deps_missing(self):
+    def test_get_local_path_with_deps_missing(self) -> None:
         """Testing PerforceClient.get_local_path with dependencies missing"""
         check_install.unspy()
         self.spy_on(check_install, op=kgb.SpyOpReturn(False))
-        self.spy_on(RemovedInRBTools50Warning.warn)
 
         client = self.build_client(setup=False)
 
@@ -252,12 +250,11 @@ class PerforceClientTests(PerforceSCMClientTestCase):
 
         self.assertEqual(ctx.records[0].msg,
                          'Unable to execute "p4 help": skipping Perforce')
-        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
 
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['p4', 'help'])
 
-    def test_get_local_path_with_deps_not_checked(self):
+    def test_get_local_path_with_deps_not_checked(self) -> None:
         """Testing PerforceClient.get_local_path with dependencies not
         checked
         """
@@ -271,19 +268,11 @@ class PerforceClientTests(PerforceSCMClientTestCase):
         message = re.escape(
             'Either PerforceClient.setup() or '
             'PerforceClient.has_dependencies() must be called before other '
-            'functions are used. This will be required starting in '
-            'RBTools 5.0.'
+            'functions are used.'
         )
 
-        with self.assertLogs(level='DEBUG') as ctx:
-            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
-                client.get_local_path()
-
-        self.assertEqual(ctx.records[0].msg,
-                         'Unable to execute "p4 help": skipping Perforce')
-
-        self.assertSpyCallCount(check_install, 1)
-        self.assertSpyCalledWith(check_install, ['p4', 'help'])
+        with self.assertRaisesRegex(SCMError, message):
+            client.get_local_path()
 
     def test_scan_for_server_with_reviewboard_url(self):
         """Testing PerforceClient.scan_for_server with reviewboard.url"""

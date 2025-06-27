@@ -1,5 +1,7 @@
 """Unit tests for CVSClient."""
 
+from __future__ import annotations
+
 import os
 import re
 from typing import Optional
@@ -8,14 +10,13 @@ import kgb
 
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.cvs import CVSClient
-from rbtools.clients.errors import SCMClientDependencyError
+from rbtools.clients.errors import SCMClientDependencyError, SCMError
 from rbtools.clients.tests import SCMClientTestCase
-from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.checks import check_install
 from rbtools.utils.process import run_process
 
 
-class CVSClientTests(SCMClientTestCase):
+class CVSClientTests(SCMClientTestCase[CVSClient]):
     """Unit tests for CVSClient."""
 
     scmclient_cls = CVSClient
@@ -85,7 +86,6 @@ class CVSClientTests(SCMClientTestCase):
     def test_get_local_path_with_deps_missing(self):
         """Testing CVSClient.get_local_path with dependencies missing"""
         self.spy_on(check_install, op=kgb.SpyOpReturn(False))
-        self.spy_on(RemovedInRBTools50Warning.warn)
 
         client = self.build_client(setup=False)
 
@@ -100,12 +100,11 @@ class CVSClientTests(SCMClientTestCase):
 
         self.assertEqual(ctx.records[0].msg,
                          'Unable to execute "cvs": skipping CVS')
-        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
 
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['cvs'])
 
-    def test_get_local_path_with_deps_not_checked(self):
+    def test_get_local_path_with_deps_not_checked(self) -> None:
         """Testing CVSClient.get_local_path with dependencies not checked"""
         # A False value is used just to ensure get_local_path() bails early,
         # and to minimize side-effects.
@@ -114,19 +113,11 @@ class CVSClientTests(SCMClientTestCase):
         client = self.build_client(setup=False)
         message = re.escape(
             'Either CVSClient.setup() or CVSClient.has_dependencies() must '
-            'be called before other functions are used. This will be '
-            'required starting in RBTools 5.0.'
+            'be called before other functions are used.'
         )
 
-        with self.assertLogs(level='DEBUG') as ctx:
-            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
-                client.get_local_path()
-
-        self.assertEqual(ctx.records[0].msg,
-                         'Unable to execute "cvs": skipping CVS')
-
-        self.assertSpyCallCount(check_install, 1)
-        self.assertSpyCalledWith(check_install, ['cvs'])
+        with self.assertRaisesRegex(SCMError, message):
+            client.get_local_path()
 
     def test_get_repository_info_with_found(self):
         """Testing CVSClient.get_repository_info with repository found"""
@@ -153,10 +144,9 @@ class CVSClientTests(SCMClientTestCase):
 
         self.assertIsNone(repository_info)
 
-    def test_get_repository_info_with_deps_missing(self):
+    def test_get_repository_info_with_deps_missing(self) -> None:
         """Testing CVSClient.get_repository_info with dependencies missing"""
         self.spy_on(check_install, op=kgb.SpyOpReturn(False))
-        self.spy_on(RemovedInRBTools50Warning.warn)
 
         client = self.build_client(setup=False)
 
@@ -171,12 +161,11 @@ class CVSClientTests(SCMClientTestCase):
 
         self.assertEqual(ctx.records[0].msg,
                          'Unable to execute "cvs": skipping CVS')
-        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
 
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['cvs'])
 
-    def test_get_repository_info_with_deps_not_checked(self):
+    def test_get_repository_info_with_deps_not_checked(self) -> None:
         """Testing CVSClient.get_repository_info with dependencies not checked
         """
         # A False value is used just to ensure get_repository_info() bails
@@ -187,19 +176,11 @@ class CVSClientTests(SCMClientTestCase):
 
         message = re.escape(
             'Either CVSClient.setup() or CVSClient.has_dependencies() must '
-            'be called before other functions are used. This will be '
-            'required starting in RBTools 5.0.'
+            'be called before other functions are used.'
         )
 
-        with self.assertLogs(level='DEBUG') as ctx:
-            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
-                client.get_repository_info()
-
-        self.assertEqual(ctx.records[0].msg,
-                         'Unable to execute "cvs": skipping CVS')
-
-        self.assertSpyCallCount(check_install, 1)
-        self.assertSpyCalledWith(check_install, ['cvs'])
+        with self.assertRaisesRegex(SCMError, message):
+            client.get_repository_info()
 
     def test_diff(self):
         """Testing CVSClient.diff"""

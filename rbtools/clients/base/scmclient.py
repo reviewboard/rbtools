@@ -17,8 +17,7 @@ from typing_extensions import NotRequired, TypedDict, Unpack, final
 
 from rbtools.clients.errors import (SCMClientDependencyError,
                                     SCMError)
-from rbtools.deprecation import (RemovedInRBTools50Warning,
-                                 RemovedInRBTools70Warning)
+from rbtools.deprecation import RemovedInRBTools70Warning
 from rbtools.diffs.errors import ApplyPatchError
 from rbtools.diffs.patcher import Patcher
 from rbtools.diffs.patches import Patch
@@ -776,17 +775,21 @@ class BaseSCMClient:
             bool:
             ``True`` if dependencies are all available. ``False`` if one or
             more are not.
+
+        Raises:
+            rbtools.clients.errors.SCMError:
+                The method was called without having previously checked for
+                dependencies.
         """
         if self._has_deps is None:
             if expect_checked:
-                RemovedInRBTools50Warning.warn(
-                    'Either %(cls_name)s.setup() or '
-                    '%(cls_name)s.has_dependencies() must be called before '
-                    'other functions are used. This will be required '
-                    'starting in RBTools 5.0.'
-                    % {
-                        'cls_name': type(self).__name__,
-                    })
+                cls_name = type(self).__name__
+
+                raise SCMError(
+                    f'Either {cls_name}.setup() or {cls_name}.'
+                    f'has_dependencies() must be called before '
+                    f'other functions are used.'
+                )
 
             try:
                 self.setup()

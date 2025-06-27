@@ -19,7 +19,6 @@ from rbtools.clients.tfs import (BaseTFWrapper,
                                  TFExeWrapper,
                                  TFHelperWrapper,
                                  TFSClient)
-from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import chdir, make_tempdir
 from rbtools.utils.process import run_process_exec
@@ -2217,12 +2216,11 @@ class TFSClientTests(SCMClientTestCase):
         # This should be the fallback.
         self.assertIsInstance(client.tf_wrapper, TEEWrapper)
 
-    def test_tf_wrapper_with_deps_missing(self):
+    def test_tf_wrapper_with_deps_missing(self) -> None:
         """Testing TFSClient.get_local_path with dependencies missing"""
         self.spy_on(BaseTFWrapper.check_dependencies,
                     owner=BaseTFWrapper,
                     op=kgb.SpyOpRaise(SCMClientDependencyError()))
-        self.spy_on(RemovedInRBTools50Warning.warn)
 
         client = self.build_client(setup=False)
 
@@ -2231,9 +2229,8 @@ class TFSClientTests(SCMClientTestCase):
         self.assertFalse(client.has_dependencies())
 
         self.assertIsInstance(client.tf_wrapper, TEEWrapper)
-        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
 
-    def test_tf_wrapper_with_deps_not_checked(self):
+    def test_tf_wrapper_with_deps_not_checked(self) -> None:
         """Testing TFSClient.get_local_path with dependencies not checked"""
         self.spy_on(BaseTFWrapper.check_dependencies,
                     owner=BaseTFWrapper,
@@ -2243,9 +2240,8 @@ class TFSClientTests(SCMClientTestCase):
 
         message = re.escape(
             'Either TFSClient.setup() or TFSClient.has_dependencies() must '
-            'be called before other functions are used. This will be '
-            'required starting in RBTools 5.0.'
+            'be called before other functions are used.'
         )
 
-        with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+        with self.assertRaisesRegex(SCMError, message):
             client.tf_wrapper

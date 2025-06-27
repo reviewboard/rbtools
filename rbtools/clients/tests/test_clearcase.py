@@ -10,7 +10,6 @@ import kgb
 from rbtools.clients.clearcase import ClearCaseClient, ClearCaseRepositoryInfo
 from rbtools.clients.errors import SCMClientDependencyError, SCMError
 from rbtools.clients.tests import SCMClientTestCase
-from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.checks import check_install
 from rbtools.utils.process import run_process_exec
 
@@ -441,7 +440,6 @@ class ClearCaseClientTests(SCMClientTestCase):
     def test_host_properties_with_deps_missing(self) -> None:
         """Testing ClearCaseClient.host_properties with dependencies missing"""
         self.spy_on(check_install, op=kgb.SpyOpReturn(False))
-        self.spy_on(RemovedInRBTools50Warning.warn)
 
         client = self.build_client(setup=False)
 
@@ -457,7 +455,6 @@ class ClearCaseClientTests(SCMClientTestCase):
         self.assertEqual(
             ctx.records[0].msg,
             'Unable to execute "cleartool help": skipping ClearCase')
-        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
 
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['cleartool', 'help'])
@@ -475,24 +472,15 @@ class ClearCaseClientTests(SCMClientTestCase):
         message = re.escape(
             'Either ClearCaseClient.setup() or '
             'ClearCaseClient.has_dependencies() must be called before other '
-            'functions are used. This will be required starting in '
-            'RBTools 5.0.')
+            'functions are used.'
+        )
 
-        with self.assertLogs(level='DEBUG') as ctx:
-            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
-                client.host_properties
-
-        self.assertEqual(
-            ctx.records[0].msg,
-            'Unable to execute "cleartool help": skipping ClearCase')
-
-        self.assertSpyCallCount(check_install, 1)
-        self.assertSpyCalledWith(check_install, ['cleartool', 'help'])
+        with self.assertRaisesRegex(SCMError, message):
+            client.host_properties
 
     def test_get_local_path_with_deps_missing(self) -> None:
         """Testing ClearCaseClient.get_local_path with dependencies missing"""
         self.spy_on(check_install, op=kgb.SpyOpReturn(False))
-        self.spy_on(RemovedInRBTools50Warning.warn)
 
         client = self.build_client(setup=False)
 
@@ -508,7 +496,6 @@ class ClearCaseClientTests(SCMClientTestCase):
         self.assertEqual(
             ctx.records[0].msg,
             'Unable to execute "cleartool help": skipping ClearCase')
-        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
 
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['cleartool', 'help'])
@@ -526,26 +513,17 @@ class ClearCaseClientTests(SCMClientTestCase):
         message = re.escape(
             'Either ClearCaseClient.setup() or '
             'ClearCaseClient.has_dependencies() must be called before other '
-            'functions are used. This will be required starting in '
-            'RBTools 5.0.')
+            'functions are used.'
+        )
 
-        with self.assertLogs(level='DEBUG') as ctx:
-            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
-                client.get_local_path()
-
-        self.assertEqual(
-            ctx.records[0].msg,
-            'Unable to execute "cleartool help": skipping ClearCase')
-
-        self.assertSpyCallCount(check_install, 1)
-        self.assertSpyCalledWith(check_install, ['cleartool', 'help'])
+        with self.assertRaisesRegex(SCMError, message):
+            client.get_local_path()
 
     def test_get_repository_info_with_deps_missing(self) -> None:
         """Testing ClearCaseClient.get_repository_info with dependencies
         missing
         """
         self.spy_on(check_install, op=kgb.SpyOpReturn(False))
-        self.spy_on(RemovedInRBTools50Warning.warn)
 
         client = self.build_client(setup=False)
 
@@ -578,19 +556,11 @@ class ClearCaseClientTests(SCMClientTestCase):
         message = re.escape(
             'Either ClearCaseClient.setup() or '
             'ClearCaseClient.has_dependencies() must be called before other '
-            'functions are used. This will be required starting in '
-            'RBTools 5.0.')
+            'functions are used.'
+        )
 
-        with self.assertLogs(level='DEBUG') as ctx:
-            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
-                client.get_repository_info()
-
-        self.assertEqual(
-            ctx.records[0].msg,
-            'Unable to execute "cleartool help": skipping ClearCase')
-
-        self.assertSpyCallCount(check_install, 1)
-        self.assertSpyCalledWith(check_install, ['cleartool', 'help'])
+        with self.assertRaisesRegex(SCMError, message):
+            client.get_repository_info()
 
     def test_get_local_path_outside_view(self) -> None:
         """Testing ClearCaseClient.get_local_path outside of view"""

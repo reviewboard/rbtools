@@ -10,9 +10,8 @@ import kgb
 
 from rbtools.clients import BaseSCMClient
 from rbtools.clients.base.scmclient import _LegacyPatcher, SCMClientPatcher
-from rbtools.clients.errors import SCMClientDependencyError
-from rbtools.deprecation import (RemovedInRBTools50Warning,
-                                 RemovedInRBTools70Warning)
+from rbtools.clients.errors import SCMClientDependencyError, SCMError
+from rbtools.deprecation import RemovedInRBTools70Warning
 from rbtools.diffs.errors import ApplyPatchError
 from rbtools.diffs.patches import PatchResult
 from rbtools.diffs.tools.backends.gnu import GNUDiffTool
@@ -121,7 +120,9 @@ class BaseSCMClientTests(kgb.SpyAgency, TestCase):
         self.assertSpyCallCount(client.check_dependencies, 1)
         self.assertSpyCallCount(client.setup, 1)
 
-    def test_has_dependencies_with_expect_checked_and_not_checked(self):
+    def test_has_dependencies_with_expect_checked_and_not_checked(
+        self,
+    ) -> None:
         """Testing BaseSCMClient.has_dependencies with expect_checked=True and
         not checked
         """
@@ -129,11 +130,10 @@ class BaseSCMClientTests(kgb.SpyAgency, TestCase):
 
         message = re.escape(
             'Either MySCMClient.setup() or MySCMClient.has_dependencies() '
-            'must be called before other functions are used. This will be '
-            'required starting in RBTools 5.0.'
+            'must be called before other functions are used.'
         )
 
-        with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+        with self.assertRaisesRegex(SCMError, message):
             self.assertTrue(client.has_dependencies(expect_checked=True))
 
     def test_has_dependencies_with_expect_checked_and_checked(self):

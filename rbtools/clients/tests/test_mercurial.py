@@ -25,7 +25,6 @@ from rbtools.clients.mercurial import MercurialClient, MercurialRefType
 from rbtools.clients.tests import (FOO, FOO1, FOO2, FOO3, FOO4, FOO5, FOO6,
                                    SCMClientTestCase)
 from rbtools.config.loader import load_config
-from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.diffs.patches import Patch, PatchAuthor
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import (is_exe_in_path,
@@ -275,10 +274,9 @@ class MercurialClientTests(MercurialTestCase):
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['hg', '--help'])
 
-    def test_get_local_path_with_deps_missing(self):
+    def test_get_local_path_with_deps_missing(self) -> None:
         """Testing MercurialClient.get_local_path with dependencies missing"""
         self.spy_on(check_install, op=kgb.SpyOpReturn(False))
-        self.spy_on(RemovedInRBTools50Warning.warn)
 
         client = self.build_client(setup=False)
 
@@ -293,12 +291,11 @@ class MercurialClientTests(MercurialTestCase):
 
         self.assertEqual(ctx.records[0].msg,
                          'Unable to execute "hg --help": skipping Mercurial')
-        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
 
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['hg', '--help'])
 
-    def test_get_local_path_with_deps_not_checked(self):
+    def test_get_local_path_with_deps_not_checked(self) -> None:
         """Testing MercurialClient.get_local_path with dependencies not
         checked
         """
@@ -311,19 +308,11 @@ class MercurialClientTests(MercurialTestCase):
         message = re.escape(
             'Either MercurialClient.setup() or '
             'MercurialClient.has_dependencies() must be called before other '
-            'functions are used. This will be required starting in '
-            'RBTools 5.0.'
+            'functions are used.'
         )
 
-        with self.assertLogs(level='DEBUG') as ctx:
-            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
-                client.get_local_path()
-
-        self.assertEqual(ctx.records[0].msg,
-                         'Unable to execute "hg --help": skipping Mercurial')
-
-        self.assertSpyCallCount(check_install, 1)
-        self.assertSpyCalledWith(check_install, ['hg', '--help'])
+        with self.assertRaisesRegex(SCMError, message):
+            client.get_local_path()
 
     def test_get_repository_info(self):
         """Testing MercurialClient.get_repository_info"""
@@ -340,12 +329,11 @@ class MercurialClientTests(MercurialTestCase):
 
         self.assertEqual(self.hg_dir, hgpath)
 
-    def test_get_repository_info_with_deps_missing(self):
+    def test_get_repository_info_with_deps_missing(self) -> None:
         """Testing MercurialClient.get_repository_info with dependencies
         missing
         """
         self.spy_on(check_install, op=kgb.SpyOpReturn(False))
-        self.spy_on(RemovedInRBTools50Warning.warn)
 
         client = self.build_client(setup=False)
 
@@ -364,7 +352,7 @@ class MercurialClientTests(MercurialTestCase):
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['hg', '--help'])
 
-    def test_get_repository_info_with_deps_not_checked(self):
+    def test_get_repository_info_with_deps_not_checked(self) -> None:
         """Testing MercurialClient.get_repository_info with dependencies
         not checked
         """
@@ -377,19 +365,11 @@ class MercurialClientTests(MercurialTestCase):
         message = re.escape(
             'Either MercurialClient.setup() or '
             'MercurialClient.has_dependencies() must be called before other '
-            'functions are used. This will be required starting in '
-            'RBTools 5.0.'
+            'functions are used.'
         )
 
-        with self.assertLogs(level='DEBUG') as ctx:
-            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
-                client.get_repository_info()
-
-        self.assertEqual(ctx.records[0].msg,
-                         'Unable to execute "hg --help": skipping Mercurial')
-
-        self.assertSpyCallCount(check_install, 1)
-        self.assertSpyCalledWith(check_install, ['hg', '--help'])
+        with self.assertRaisesRegex(SCMError, message):
+            client.get_repository_info()
 
     def test_scan_for_server(self):
         """Testing MercurialClient.scan_for_server"""

@@ -18,7 +18,6 @@ from rbtools.clients.errors import (CreateCommitError,
                                     TooManyRevisionsError)
 from rbtools.clients.git import GitClient, get_git_candidates
 from rbtools.clients.tests import FOO1, FOO2, FOO3, FOO4, SCMClientTestCase
-from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.diffs.patches import Patch, PatchAuthor
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import is_exe_in_path
@@ -306,7 +305,6 @@ class GitClientTests(BaseGitClientTests):
     def test_git_with_deps_missing(self) -> None:
         """Testing GitClient.git with dependencies missing"""
         self.spy_on(check_install, op=kgb.SpyOpReturn(False))
-        self.spy_on(RemovedInRBTools50Warning.warn)
 
         client = self.build_client(setup=False)
 
@@ -316,8 +314,6 @@ class GitClientTests(BaseGitClientTests):
 
         # This will fall back to "git" even if dependencies are missing.
         self.assertEqual(client.git, 'git')
-
-        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
 
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['git', '--help'])
@@ -335,20 +331,15 @@ class GitClientTests(BaseGitClientTests):
         message = re.escape(
             'Either GitClient.setup() or '
             'GitClient.has_dependencies() must be called before other '
-            'functions are used. This will be required starting in '
-            'RBTools 5.0.'
+            'functions are used.'
         )
 
-        with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+        with self.assertRaisesRegex(SCMError, message):
             client.git
-
-        self.assertSpyCallCount(check_install, 1)
-        self.assertSpyCalledWith(check_install, ['git', '--help'])
 
     def test_get_local_path_with_deps_missing(self) -> None:
         """Testing GitClient.get_local_path with dependencies missing"""
         self.spy_on(check_install, op=kgb.SpyOpReturn(False))
-        self.spy_on(RemovedInRBTools50Warning.warn)
 
         client = self.build_client(setup=False)
 
@@ -364,7 +355,6 @@ class GitClientTests(BaseGitClientTests):
         self.assertEqual(
             ctx.records[0].msg,
             'Unable to execute "git --help" or "git.cmd --help": skipping Git')
-        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
 
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['git', '--help'])
@@ -382,20 +372,11 @@ class GitClientTests(BaseGitClientTests):
         message = re.escape(
             'Either GitClient.setup() or '
             'GitClient.has_dependencies() must be called before other '
-            'functions are used. This will be required starting in '
-            'RBTools 5.0.'
+            'functions are used.'
         )
 
-        with self.assertLogs(level='DEBUG') as ctx, \
-             self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+        with self.assertRaisesRegex(SCMError, message):
             client.get_local_path()
-
-        self.assertEqual(
-            ctx.records[0].msg,
-            'Unable to execute "git --help" or "git.cmd --help": skipping Git')
-
-        self.assertSpyCallCount(check_install, 1)
-        self.assertSpyCalledWith(check_install, ['git', '--help'])
 
     def test_get_repository_info_simple(self) -> None:
         """Testing GitClient get_repository_info, simple case"""
@@ -414,7 +395,6 @@ class GitClientTests(BaseGitClientTests):
         missing
         """
         self.spy_on(check_install, op=kgb.SpyOpReturn(False))
-        self.spy_on(RemovedInRBTools50Warning.warn)
 
         client = self.build_client(setup=False)
 
@@ -447,20 +427,11 @@ class GitClientTests(BaseGitClientTests):
         message = re.escape(
             'Either GitClient.setup() or '
             'GitClient.has_dependencies() must be called before other '
-            'functions are used. This will be required starting in '
-            'RBTools 5.0.'
+            'functions are used.'
         )
 
-        with self.assertLogs(level='DEBUG') as ctx, \
-             self.assertWarnsRegex(RemovedInRBTools50Warning, message):
+        with self.assertRaisesRegex(SCMError, message):
             client.get_repository_info()
-
-        self.assertEqual(
-            ctx.records[0].msg,
-            'Unable to execute "git --help" or "git.cmd --help": skipping Git')
-
-        self.assertSpyCallCount(check_install, 1)
-        self.assertSpyCalledWith(check_install, ['git', '--help'])
 
     def test_scan_for_server_simple(self) -> None:
         """Testing GitClient scan_for_server, simple case"""

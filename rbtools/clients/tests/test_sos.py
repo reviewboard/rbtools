@@ -4,6 +4,8 @@ Version Added:
     3.1
 """
 
+from __future__ import annotations
+
 import os
 import re
 from typing import Any, Dict, List
@@ -14,16 +16,16 @@ from rbtools.api.resource import ReviewRequestItemResource
 from rbtools.api.tests.base import MockTransport
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
+                                    SCMError,
                                     TooManyRevisionsError)
 from rbtools.clients.tests import SCMClientTestCase
 from rbtools.clients.sos import SOSClient
-from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempdir
 from rbtools.utils.process import run_process_exec
 
 
-class BaseSOSTestCase(SCMClientTestCase):
+class BaseSOSTestCase(SCMClientTestCase[SOSClient]):
     """Base class for SOS unit tests.
 
     This provides an initial SOS client setup, as well as convenience
@@ -574,11 +576,10 @@ class SOSClientTests(BaseSOSTestCase):
 
         self.assertEqual(client.get_local_path(), self.workarea_dir)
 
-    def test_get_local_path_with_deps_missing(self):
+    def test_get_local_path_with_deps_missing(self) -> None:
         """Testing SOSClient.get_local_path with dependencies missing"""
         check_install.unspy()
         self.spy_on(check_install, op=kgb.SpyOpReturn(False))
-        self.spy_on(RemovedInRBTools50Warning.warn)
 
         client = self.build_client(setup=False)
 
@@ -593,12 +594,11 @@ class SOSClientTests(BaseSOSTestCase):
 
         self.assertEqual(ctx.records[0].msg,
                          'Unable to execute "soscmd version"; skipping SOS')
-        self.assertSpyNotCalled(RemovedInRBTools50Warning.warn)
 
         self.assertSpyCallCount(check_install, 1)
         self.assertSpyCalledWith(check_install, ['soscmd', 'version'])
 
-    def test_get_local_path_with_deps_not_checked(self):
+    def test_get_local_path_with_deps_not_checked(self) -> None:
         """Testing MercurialClient.get_local_path with dependencies not
         checked
         """
@@ -611,19 +611,11 @@ class SOSClientTests(BaseSOSTestCase):
 
         message = re.escape(
             'Either SOSClient.setup() or SOSClient.has_dependencies() must '
-            'be called before other functions are used. This will be '
-            'required starting in RBTools 5.0.'
+            'be called before other functions are used.'
         )
 
-        with self.assertLogs(level='DEBUG') as ctx:
-            with self.assertWarnsRegex(RemovedInRBTools50Warning, message):
-                client.get_local_path()
-
-        self.assertEqual(ctx.records[0].msg,
-                         'Unable to execute "soscmd version"; skipping SOS')
-
-        self.assertSpyCallCount(check_install, 1)
-        self.assertSpyCalledWith(check_install, ['soscmd', 'version'])
+        with self.assertRaisesRegex(SCMError, message):
+            client.get_local_path()
 
     def test_get_repository_info(self):
         """Testing SOSClient.get_repository_info"""
