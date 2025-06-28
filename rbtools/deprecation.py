@@ -5,6 +5,8 @@ releases, and may be removed at any point. The base objects are considered
 stable.
 """
 
+from __future__ import annotations
+
 from housekeeping import (BasePendingRemovalWarning,
                           BaseRemovedInWarning)
 
@@ -30,28 +32,6 @@ class BaseRemovedInRBToolsVersionWarning(BaseRemovedInWarning):
     product = 'RBTools'
 
 
-class RemovedInRBTools50Warning(BaseRemovedInRBToolsVersionWarning):
-    """Deprecations for features removed in RBTools 5.0.
-
-    Note that this class will itself be removed in RBTools 5.0. If you need to
-    check against RBTools deprecation warnings, please see
-    :py:class:`BaseRemovedInRBToolsVersionWarning`.
-    """
-
-    version = '5.0'
-
-
-class RemovedInRBTools60Warning(BaseRemovedInRBToolsVersionWarning):
-    """Deprecations for features removed in RBTools 6.0.
-
-    Note that this class will itself be removed in RBTools 6.0. If you need to
-    check against RBTools deprecation warnings, please see
-    :py:class:`BaseRemovedInRBToolsVersionWarning`.
-    """
-
-    version = '6.0'
-
-
 class RemovedInRBTools70Warning(BaseRemovedInRBToolsVersionWarning):
     """Deprecations for features removed in RBTools 7.0.
 
@@ -74,4 +54,4 @@ class RemovedInRBTools80Warning(BaseRemovedInRBToolsVersionWarning):
     version = '8.0'
 
 
-RemovedInNextRBToolsVersionWarning = RemovedInRBTools60Warning
+RemovedInNextRBToolsVersionWarning = RemovedInRBTools70Warning
