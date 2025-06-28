@@ -27,7 +27,6 @@ from rbtools.clients.errors import (CreateCommitError,
                                     SCMError,
                                     TooManyRevisionsError)
 from rbtools.clients.svn import SVNClient
-from rbtools.deprecation import RemovedInRBTools60Warning
 from rbtools.diffs.errors import ApplyPatchError
 from rbtools.diffs.patches import PatchAuthor, PatchResult
 from rbtools.utils.checks import check_install
@@ -338,7 +337,6 @@ class MercurialClient(BaseSCMClient):
     #: to exist will be used, falling back to ``default`` (the last member.)
     _remote_path_candidates: list[str]
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools60Warning)
     def __init__(
         self,
         *,

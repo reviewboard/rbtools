@@ -8,14 +8,7 @@ import shutil
 import sys
 import tempfile
 from contextlib import contextmanager
-from typing import Generator, Iterable, Optional, Sequence, TYPE_CHECKING
-
-from housekeeping import func_moved
-
-from rbtools.deprecation import RemovedInRBTools60Warning
-
-if TYPE_CHECKING:
-    from rbtools.config import RBToolsConfig
+from typing import Generator, Iterable, Optional, Sequence
 
 
 _iter_exes_in_path_cache: dict[str, bool] = {}
@@ -259,85 +252,6 @@ def get_home_path() -> str:
         return os.environ['APPDATA']
     else:
         return ''
-
-
-@func_moved(RemovedInRBTools60Warning,
-            'rbtools.config.loader.get_config_paths')
-def get_config_paths() -> Sequence[str]:
-    """Return the paths to each :file:`.reviewboardrc` influencing the cwd.
-
-    A list of paths to :file:`.reviewboardrc` files will be returned, where
-    each subsequent list entry should have lower precedence than the previous.
-    i.e. configuration found in files further up the list will take precedence.
-
-    Configuration in the paths set in :envvar:`$RBTOOLS_CONFIG_PATH` will take
-    precedence over files found in the current working directory or its
-    parents.
-
-    Deprecated:
-        5.0:
-        This has been replaced with
-        :py:func:`rbtools.config.loader.get_config_paths`, and will be removed
-        in RBTools 6.
-    """
-    from rbtools.config.loader import get_config_paths as _get_config_paths
-
-    return _get_config_paths()
-
-
-@func_moved(RemovedInRBTools60Warning,
-            'rbtools.config.loader.parse_config_file')
-def parse_config_file(
-    filename: str,
-) -> RBToolsConfig:
-    """Parse a .reviewboardrc file.
-
-    Returns a dictionary containing the configuration from the file.
-
-    Deprecated:
-        5.0:
-        This has been replaced with
-        :py:func:`rbtools.config.loader.parse_config_file`, and will be removed
-        in RBTools 6.
-
-    Args:
-        filename (str):
-            The full path to a :file:`.reviewboardrc` file.
-
-    Returns:
-        dict:
-        The loaded configuration data.
-
-    Raises:
-        SyntaxError:
-            There was a syntax error in the configuration file.
-    """
-    from rbtools.config.loader import parse_config_file as _parse_config_file
-
-    return _parse_config_file(filename)
-
-
-@func_moved(RemovedInRBTools60Warning,
-            'rbtools.config.loader.load_config')
-def load_config() -> RBToolsConfig:
-    """Load configuration from .reviewboardrc files.
-
-    This will read all of the :file:`.reviewboardrc` files influencing the
-    cwd and return a dictionary containing the configuration.
-
-    Deprecated:
-        5.0:
-        This has been replaced with
-        :py:func:`rbtools.config.loader.load_config`, and will be removed in
-        RBTools 6.
-
-    Returns:
-        dict:
-        The loaded configuration data.
-    """
-    from rbtools.config.loader import load_config as _load_config
-
-    return _load_config()
 
 
 @contextmanager

@@ -37,7 +37,6 @@ from urllib.request import (
     urlopen)
 
 import certifi
-from housekeeping import deprecate_non_keyword_only_args
 from typing_extensions import TypeAlias
 
 from rbtools import get_package_version
@@ -47,8 +46,7 @@ from rbtools.api.errors import (APIError,
                                 ServerInterfaceSSLError,
                                 create_api_error)
 from rbtools.config import load_config
-from rbtools.deprecation import (RemovedInRBTools50Warning,
-                                 RemovedInRBTools60Warning)
+from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.encoding import force_bytes, force_unicode
 from rbtools.utils.filesystem import get_home_path
 
@@ -676,7 +674,6 @@ class PresetHTTPAuthHandler(BaseHandler):
         self.password_mgr = password_mgr
         self.used = False
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools60Warning)
     def reset(
         self,
         *,
@@ -1381,7 +1378,6 @@ class ReviewBoardServer:
             self._cache = None
             self._urlopen = urlopen
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools60Warning)
     def login(
         self,
         *,

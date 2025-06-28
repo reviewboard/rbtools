@@ -7,18 +7,17 @@ import re
 from collections import OrderedDict
 from difflib import SequenceMatcher
 from itertools import islice
-from typing import Callable, Optional, TYPE_CHECKING
-
-from housekeeping import deprecate_non_keyword_only_args
+from typing import Callable, TYPE_CHECKING
 
 from rbtools.api.errors import APIError
 from rbtools.api.resource import ListResource
 from rbtools.clients.errors import InvalidRevisionSpecError
-from rbtools.deprecation import RemovedInRBTools60Warning
 from rbtools.utils.errors import MatchReviewRequestsError
 from rbtools.utils.users import get_user
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from rbtools.api.client import RBClient
     from rbtools.api.resource import ReviewRequestItemResource, RootResource
     from rbtools.clients.base.scmclient import (BaseSCMClient,
@@ -147,14 +146,13 @@ def get_pending_review_requests(api_root,
         **get_kwargs)
 
 
-@deprecate_non_keyword_only_args(RemovedInRBTools60Warning)
 def find_review_request_by_change_id(
     *,
     api_client: RBClient,
     api_root: RootResource,
     revisions: SCMClientRevisionSpec,
-    repository_id: Optional[int] = None,
-) -> Optional[ReviewRequestItemResource]:
+    repository_id: (int | None) = None,
+) -> ReviewRequestItemResource | None:
     """Ask Review Board for the review request ID for the tip revision.
 
     Note that this function calls the Review Board API with the ``only_fields``
@@ -455,21 +453,19 @@ def find_review_request_matches(review_requests,
     }
 
 
-@deprecate_non_keyword_only_args(RemovedInRBTools60Warning)
 def guess_existing_review_request(
     *,
     api_root: RootResource,
-    api_client: Optional[RBClient] = None,
     tool: BaseSCMClient,
     revisions: SCMClientRevisionSpec,
-    is_fuzzy_match_func: Optional[
-        Callable[[ReviewRequestItemResource], bool]] = None,
-    no_commit_error: Optional[Callable[[], None]] = None,
+    is_fuzzy_match_func: (
+        Callable[[ReviewRequestItemResource], bool] | None) = None,
+    no_commit_error: (Callable[[], None] | None) = None,
     submit_as: str,
-    additional_fields: Optional[list[str]] = None,
-    repository_id: Optional[int] = None,
-    commit_id: Optional[str] = None,
-) -> Optional[ReviewRequestItemResource]:
+    additional_fields: (Sequence[str] | None) = None,
+    repository_id: (int | None) = None,
+    commit_id: (str | None) = None,
+) -> ReviewRequestItemResource | None:
     """Try to guess the existing review request ID if it is available.
 
     The existing review request is guessed by comparing the existing
@@ -566,11 +562,6 @@ def guess_existing_review_request(
     assert tool is not None
     assert revisions is not None
     assert api_root is not None
-
-    if api_client is not None:
-        RemovedInRBTools60Warning.warn(
-            'The api_client argument to guess_existing_review_request is '
-            'deprecated and will be removed in RBTools 6.0.')
 
     # Fetch the pending review requests for this repository. These will be
     # the candidates for matching.
