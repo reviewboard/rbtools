@@ -1777,7 +1777,7 @@ class Post(BaseCommand):
             self.diff_file_attachments_resource.upload_attachment(
                 filename=os.path.basename(filename),
                 content=file_content,
-                filediff_id=file.id)
+                filediff_id=str(file.id))
 
             if source_file_content is not None:
                 assert source_filename is not None
@@ -1788,7 +1788,7 @@ class Post(BaseCommand):
                     self.diff_file_attachments_resource.upload_attachment(
                         filename=os.path.basename(source_filename),
                         content=source_file_content,
-                        filediff_id=file.id,
+                        filediff_id=str(file.id),
                         source_file=True)
                 except APIError as e:
                     if e.http_status == 409 and e.error_code == 111:
@@ -1799,7 +1799,10 @@ class Post(BaseCommand):
                     else:
                         raise e
 
-    def _validate_squashed_diff(self, squashed_diff):
+    def _validate_squashed_diff(
+        self,
+        squashed_diff: SquashedDiff,
+    ) -> None:
         """Validate the diff to ensure that it can be parsed and files exist.
 
         Args:
@@ -1810,6 +1813,11 @@ class Post(BaseCommand):
             rbtools.api.errors.APIError:
                 An error occurred during validation.
         """
+        assert self.api_root is not None
+        assert self.capabilities is not None
+        assert self.repository is not None
+        assert self.tool is not None
+
         # Review Board 2.0.14+ (with the diffs.validation.base_commit_ids
         # capability) is required to successfully validate against hosting
         # services that need a base_commit_id. This is basically due to
@@ -1841,13 +1849,16 @@ class Post(BaseCommand):
                     squashed_diff.base_commit_id
 
             validator.validate_diff(
-                self.repository.id,
+                str(self.repository.id),
                 squashed_diff.diff,
                 parent_diff=squashed_diff.parent_diff,
                 base_dir=squashed_diff.base_dir,
                 **validate_kwargs)
 
-    def _validate_diff_history(self, diff_history):
+    def _validate_diff_history(
+        self,
+        diff_history: DiffHistory,
+    ) -> DiffHistory:
         """Validate the diffs.
 
         This will ensure that the diffs can be parsed and that all files
@@ -1865,6 +1876,11 @@ class Post(BaseCommand):
             rbtools.api.errors.APIError:
                 An error occurred during validation.
         """
+        assert self.api_root is not None
+        assert self.capabilities is not None
+        assert self.repository is not None
+        assert self.tool is not None
+
         validator = self.api_root.get_commit_validation()
         validation_info = None
         validation_info_list = [None]
@@ -1872,7 +1888,7 @@ class Post(BaseCommand):
         for history_entry in self._show_progress(iterable=diff_history.entries,
                                                  desc='Validating commits...'):
             validation_rsp = validator.validate_commit(
-                repository=self.repository.id,
+                repository=str(self.repository.id),
                 diff=history_entry['diff'],
                 commit_id=history_entry['commit_id'],
                 parent_id=history_entry['parent_id'],

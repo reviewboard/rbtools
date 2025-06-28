@@ -37,7 +37,7 @@ from urllib.request import (
     urlopen)
 
 import certifi
-from typing_extensions import TypeAlias
+from typing_extensions import Never, TypeAlias
 
 from rbtools import get_package_version
 from rbtools.api.cache import APICache, CachedHTTPResponse, LiveHTTPResponse
@@ -46,7 +46,6 @@ from rbtools.api.errors import (APIError,
                                 ServerInterfaceSSLError,
                                 create_api_error)
 from rbtools.config import load_config
-from rbtools.deprecation import RemovedInRBTools50Warning
 from rbtools.utils.encoding import force_bytes, force_unicode
 from rbtools.utils.filesystem import get_home_path
 
@@ -104,6 +103,26 @@ def _normalize_url_parts(
         domain += '.local'
 
     return domain.lower(), parts[2]
+
+
+def _assert_never_message(
+    value: Never,
+    message: str,
+) -> Never:
+    """Raise a ValueError for an unexpected type.
+
+    This is used as a type guard for code that would otherwise be flagged as
+    unreachable based on the type hints, but that we still want to check at
+    runtime.
+
+    Version Added:
+        6.0
+
+    Raises:
+        ValueError:
+        The error with the given message.
+    """
+    raise ValueError(message)
 
 
 class HttpRequest:
@@ -231,10 +250,11 @@ class HttpRequest:
         elif isinstance(value, (bytes, str)):
             value = force_unicode(value)
         else:
-            raise ValueError(
-                'Could not encode value %r for key %s: expected int, float, '
-                'bool, or string type; got %s instead'
-                % (key, value, type(value).__name__)
+            _assert_never_message(
+                value,
+                f'Could not encode value {value!r} for key {key}s: expected '
+                f'int, float, ' 'bool, or string type; got '
+                f'{type(value).__name__} instead'
             )
 
         assert isinstance(value, str)
@@ -266,9 +286,14 @@ class HttpRequest:
         """Add a form-data field for the request.
 
         Version Changed:
+            6.0:
+            Values of types other than bytes or str will now raise a
+            :py:class:`ValueError`.
+
+        Version Changed:
             4.0:
             Values of types other than bytes or str are now deprecated, and
-            will be removed in 5.0.
+            will be removed in 6.0.
 
         Args:
             name (bytes or str):
@@ -276,17 +301,14 @@ class HttpRequest:
 
             value (bytes or str):
                 The value to send for the field.
-
-                For backwards-compatibility, other values will be converted to
-                strings. This will be removed in 5.0.
         """
         if not isinstance(value, (bytes, str)):
-            RemovedInRBTools50Warning.warn(
-                'A value of type %s was passed to HttpRequest.add_field. In '
-                'RBTools 5.0, only values of bytes or str types will be '
-                'accepted.'
-                % type(value))
-            value = str(value)
+            _assert_never_message(
+                value,
+                f'A value of type {type(value)} was passed to '
+                f'HttpRequest.add_field. Only values of bytes or str types '
+                f'are allowed.'
+            )
 
         self._fields[force_bytes(name)] = force_bytes(value)
 
