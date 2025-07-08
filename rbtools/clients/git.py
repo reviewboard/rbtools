@@ -1119,7 +1119,7 @@ class GitClient(BaseSCMClient):
             # of the line is the name of the file that has changed.
             changed_files = remove_filenames_matching_patterns(
                 filenames=(
-                    filename.split()[-1]
+                    filename.split('\t', 1)[1].rstrip('\n')
                     for filename in changed_files
                 ),
                 patterns=exclude_patterns,
