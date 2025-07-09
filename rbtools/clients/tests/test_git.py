@@ -568,6 +568,45 @@ class GitClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
+    def test_diff_with_exclude_patterns_spaces_in_filename(self) -> None:
+        """Testing GitClient.diff with file exclusion and spaces in filename"""
+        client = self.build_client(needs_diff=True)
+        client.get_repository_info()
+        base_commit_id = self._git_get_head()
+
+        self._git_add_file_commit('included file.txt', FOO1, 'commit 1')
+        self._git_add_file_commit('excluded file.txt', FOO2, 'commit 2')
+        commit_id = self._git_get_head()
+
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions, include_files=[],
+                        exclude_patterns=['excluded file.txt']),
+            {
+                'commit_id': commit_id,
+                'base_commit_id': base_commit_id,
+                'diff': (
+                    b'diff --git a/included file.txt b/included file.txt\n'
+                    b'new file mode 100644\nindex '
+                    b'0000000000000000000000000000000000000000..'
+                    b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb\n'
+                    b'--- /dev/null\n'
+                    b'+++ b/included file.txt\t\n'
+                    b'@@ -0,0 +1,9 @@\n'
+                    b'+ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+Italiam, fato profugus, Laviniaque venit\n'
+                    b'+litora, multum ille et terris iactatus et alto\n'
+                    b'+vi superum saevae memorem Iunonis ob iram;\n'
+                    b'+multa quoque et bello passus, dum conderet urbem,\n'
+                    b'+inferretque deos Latio, genus unde Latinum,\n'
+                    b'+Albanique patres, atque altae moenia Romae.\n'
+                    b'+Musa, mihi causas memora, quo numine laeso,\n'
+                    b'+\n'
+                ),
+                'parent_diff': None,
+            })
+
     def test_diff_exclude_in_subdir(self) -> None:
         """Testing GitClient.diff with file exclusion in a subdir"""
         client = self.build_client(needs_diff=True)
