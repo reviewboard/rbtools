@@ -29,7 +29,7 @@ from rbtools.deprecation import RemovedInRBTools80Warning
 from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempfile
-from rbtools.utils.process import execute
+from rbtools.utils.process import run_process
 
 # This specific import is necessary to handle the paths when running on cygwin.
 if sys.platform.startswith(('cygwin', 'win')):
@@ -187,11 +187,14 @@ class _GetElementsFromLabelThread(threading.Thread):
                  f'"{CLEARCASE_PN}"'),
             ]
 
-        output = execute(command,
-                         extra_ignore_errors=(1,),
-                         with_errors=False,
-                         split_lines=True,
-                         env=env)
+        output = (
+            run_process(command,
+                        ignore_errors=(1,),
+                        redirect_stderr=True,
+                        env=env)
+            .stdout
+            .readlines()
+        )
 
         for line in output:
             # Skip any empty lines.
@@ -276,9 +279,14 @@ class _ChangesetEntry:
             str
         """
         if self._vob_oid is None:
-            self._vob_oid = execute(
-                ['cleartool', 'describe', '-fmt', '%On',
-                 'vob:%s' % (self.new_path or self.old_path)])
+            self._vob_oid = (
+                run_process([
+                    'cleartool', 'describe', '-fmt', '%On',
+                    f'vob:{self.new_path or self.old_path}',
+                ])
+                .stdout
+                .read()
+            )
 
         return self._vob_oid
 
@@ -291,8 +299,12 @@ class _ChangesetEntry:
         """
         if self._old_oid is None:
             if self.old_path:
-                self._old_oid = execute(['cleartool', 'describe', '-fmt',
-                                         '%On', self.old_path])
+                self._old_oid = (
+                    run_process(['cleartool', 'describe', '-fmt', '%On',
+                                 self.old_path])
+                    .stdout
+                    .read()
+                )
             else:
                 self._old_oid = '0'
 
@@ -307,8 +319,12 @@ class _ChangesetEntry:
         """
         if self._old_name is None and self.old_path:
             self._old_name = os.path.relpath(
-                execute(['cleartool', 'describe', '-fmt', '%En',
-                         self.old_path]),
+                (
+                    run_process(['cleartool', 'describe', '-fmt', '%En',
+                                 self.old_path])
+                    .stdout
+                    .read()
+                ),
                 self.root_path)
 
         return self._old_name
@@ -321,9 +337,12 @@ class _ChangesetEntry:
             str
         """
         if self._old_version is None and self.old_path:
-            self._old_version = execute(
-                ['cleartool', 'describe', '-fmt', '%Vn',
-                 f'oid:{self.old_oid}@vobuuid:{self.vob_oid}'])
+            self._old_version = (
+                run_process(['cleartool', 'describe', '-fmt', '%Vn',
+                             f'oid:{self.old_oid}@vobuuid:{self.vob_oid}'])
+                .stdout
+                .read()
+            )
 
         return self._old_version
 
@@ -336,8 +355,12 @@ class _ChangesetEntry:
         """
         if self._new_oid is None:
             if self.new_path:
-                self._new_oid = execute(['cleartool', 'describe', '-fmt',
-                                         '%On', self.new_path])
+                self._new_oid = (
+                    run_process(['cleartool', 'describe', '-fmt', '%On',
+                                 self.new_path])
+                    .stdout
+                    .read()
+                )
             else:
                 self._new_oid = '0'
 
@@ -352,8 +375,12 @@ class _ChangesetEntry:
         """
         if self._new_name is None and self.new_path:
             self._new_name = os.path.relpath(
-                execute(['cleartool', 'describe', '-fmt', '%En',
-                         self.new_path]),
+                (
+                    run_process(['cleartool', 'describe', '-fmt', '%En',
+                                 self.new_path])
+                    .stdout
+                    .read()
+                ),
                 self.root_path)
 
         return self._new_name
@@ -366,11 +393,15 @@ class _ChangesetEntry:
             str
         """
         if self._new_version is None and self.new_path:
-            self._new_version = execute(
-                ['cleartool', 'describe', '-fmt', '%Vn',
-                 f'oid:{self.new_oid}@vobuuid:{self.vob_oid}'],
-                ignore_errors=True,
-                with_errors=True)
+            self._new_version = (
+                run_process(
+                    ['cleartool', 'describe', '-fmt', '%Vn',
+                     f'oid:{self.new_oid}@vobuuid:{self.vob_oid}'],
+                    ignore_errors=True,
+                    redirect_stderr=True)
+                .stdout
+                .read()
+            )
 
             if 'Not a vob object' in self._new_version:
                 self._new_version = 'CHECKEDOUT'
@@ -536,14 +567,23 @@ class ClearCaseClient(BaseSCMClient):
             return None
 
         # Bail out early if we're not in a view.
-        self.viewname = execute(['cleartool', 'pwv', '-short']).strip()
+        self.viewname = (
+            run_process(['cleartool', 'pwv', '-short'])
+            .stdout
+            .read()
+            .strip()
+        )
 
         if self.viewname.startswith('** NONE'):
             return None
 
         # Get the root path of the view.
-        self.root_path = execute(['cleartool', 'pwv', '-root'],
-                                 ignore_errors=True).strip()
+        self.root_path = (
+            run_process(['cleartool', 'pwv', '-root'], ignore_errors=True)
+            .stdout
+            .read()
+            .strip()
+        )
 
         if 'Error: ' in self.root_path:
             raise SCMError('Failed to generate diff run rbt inside view.')
@@ -564,9 +604,12 @@ class ClearCaseClient(BaseSCMClient):
         if not local_path:
             return None
 
-        property_lines = execute(
-            ['cleartool', 'lsview', '-full', '-properties', '-cview'],
-            split_lines=True)
+        property_lines = (
+            run_process(['cleartool', 'lsview', '-full', '-properties',
+                         '-cview'])
+            .stdout
+            .readlines()
+        )
 
         for line in property_lines:
             properties = line.split(' ')
@@ -907,8 +950,13 @@ class ClearCaseClient(BaseSCMClient):
                 The VOB tag was unable to be determined.
         """
         if not self.vobtag:
-            self.vobtag = execute(['cleartool', 'describe', '-short', 'vob:.'],
-                                  ignore_errors=True).strip()
+            self.vobtag = (
+                run_process(['cleartool', 'describe', '-short', 'vob:.'],
+                            ignore_errors=True, redirect_stderr=True)
+                .stdout
+                .read()
+                .strip()
+            )
 
             if 'Error: ' in self.vobtag:
                 raise SCMError('Unable to determine the current VOB. Make '
@@ -931,9 +979,11 @@ class ClearCaseClient(BaseSCMClient):
             str:
             The VOB UUID.
         """
-        property_lines = execute(
-            ['cleartool', 'lsvob', '-long', vobtag],
-            split_lines=True)
+        property_lines = (
+            run_process(['cleartool', 'lsvob', '-long', vobtag])
+            .stdout
+            .readlines()
+        )
 
         for line in property_lines:
             if line.startswith('Vob family uuid:'):
@@ -984,9 +1034,13 @@ class ClearCaseClient(BaseSCMClient):
 
         # Finally check if label exists in database, otherwise quit. Ignore
         # return code 1, it means label does not exist.
-        output = execute(['cleartool', 'describe', '-short', label],
-                         extra_ignore_errors=(1,),
-                         with_errors=False)
+        output = (
+            run_process(['cleartool', 'describe', '-short', label],
+                        ignore_errors=(1,))
+            .stdout
+            .read()
+        )
+
         return bool(output)
 
     def _determine_version(
@@ -1094,10 +1148,14 @@ class ClearCaseClient(BaseSCMClient):
         full_version = cpath.join(branch_path, str(version_number))
         extended_path = f'{path}@@{full_version}'
 
-        previous_version = execute(
-            ['cleartool', 'desc', '-fmt', '%[version_predecessor]p',
-             extended_path],
-            ignore_errors=True).strip()
+        previous_version = (
+            run_process(['cleartool', 'desc', '-fmt',
+                         '%[version_predecessor]p', extended_path],
+                        ignore_errors=True)
+            .stdout
+            .read()
+            .strip()
+        )
 
         if 'Error' in previous_version:
             raise SCMError('Unable to find the predecessor version for %s'
@@ -1169,10 +1227,13 @@ class ClearCaseClient(BaseSCMClient):
 
         if file_revision.endswith('%s0' % os.sep):
             logger.debug('Found file %s with version 0', file_revision)
-            file_revision = execute(['cleartool',
-                                     'describe',
-                                     '-fmt', '%En@@%PSn',
-                                     file_revision])
+            file_revision = (
+                run_process(['cleartool', 'describe', '-fmt', '%En@@%PSn',
+                             file_revision])
+                .stdout
+                .read()
+            )
+
             logger.debug('Sanitized with predecessor, new file: %s',
                          file_revision)
 
@@ -1229,20 +1290,22 @@ class ClearCaseClient(BaseSCMClient):
 
         # We ignore return code 1 in order to omit files that ClearCase can't
         # read.
-        output = execute(
-            [
-                'cleartool',
-                'lscheckout',
-                '-avobs',
-                '-cview',
-                '-me',
-                '-fmt',
-                r'%En\t%PVn\t%Vn\n',
-            ],
-            extra_ignore_errors=(1,),
-            with_errors=False,
-            env=env,
-            split_lines=True)
+        output = (
+            run_process(
+                [
+                    'cleartool',
+                    'lscheckout',
+                    '-avobs',
+                    '-cview',
+                    '-me',
+                    '-fmt',
+                    r'%En\t%PVn\t%Vn\n',
+                ],
+                ignore_errors=(1,),
+                env=env)
+            .stdout
+            .readlines()
+        )
 
         for line in output:
             path, previous, current = line.strip().split('\t')
@@ -1277,13 +1340,13 @@ class ClearCaseClient(BaseSCMClient):
 
         # Get list of revisions and get the diff of each one. Return code 1 is
         # ignored in order to omit files that ClearCase can't read.
-        output = execute(['cleartool',
-                          'lsactivity',
-                          '-fmt',
-                          '%[versions]Qp',
-                          activity],
-                         extra_ignore_errors=(1,),
-                         with_errors=False)
+        output = (
+            run_process(
+                ['cleartool', 'lsactivity', '-fmt', '%[versions]Qp', activity],
+                ignore_errors=(1,))
+            .stdout
+            .read()
+        )
 
         if output:
             # UCM activity changeset with %[versions]Qp is split by spaces but
@@ -1393,9 +1456,11 @@ class ClearCaseClient(BaseSCMClient):
                 f'baseline:{baselines[1]}',
             ]
 
-        diff = execute(command,
-                       extra_ignore_errors=(1, 2),
-                       split_lines=True)
+        diff = (
+            run_process(command, ignore_errors=(1, 2))
+            .stdout
+            .readlines()
+        )
 
         WS_RE = re.compile(r'\s+')
         versions = [
@@ -1405,16 +1470,19 @@ class ClearCaseClient(BaseSCMClient):
         ]
 
         version_info = filter(None, [
-            execute(
-                [
-                    'cleartool',
-                    'describe',
-                    '-fmt',
-                    '%En\t%PVn\t%Vn\n',
-                    version,
-                ],
-                extra_ignore_errors=(1,),
-                results_unicode=True)
+            (
+                run_process(
+                    [
+                        'cleartool',
+                        'describe',
+                        '-fmt',
+                        '%En\t%PVn\t%Vn\n',
+                        version,
+                    ],
+                    ignore_errors=(1,))
+                .stdout_bytes
+                .read()
+            )
             for version in versions
         ])
 
@@ -1459,21 +1527,23 @@ class ClearCaseClient(BaseSCMClient):
 
         # We ignore return code 1 in order to omit files that ClearCase can't
         # read.
-        output = execute(
-            [
-                'cleartool',
-                'find',
-                '-avobs',
-                '-version',
-                'brtype(%s)' % branch,
-                '-exec',
-                (f'cleartool descr -fmt "%En\t%PVn\t%Vn\n" '
-                 f'"{CLEARCASE_XPN}"'),
-            ],
-            extra_ignore_errors=(1,),
-            with_errors=False,
-            env=env,
-            split_lines=True)
+        output = (
+            run_process(
+                [
+                    'cleartool',
+                    'find',
+                    '-avobs',
+                    '-version',
+                    f'brtype({branch})',
+                    '-exec',
+                    (f'cleartool descr -fmt "%En\t%PVn\t%Vn\n" '
+                     f'"{CLEARCASE_XPN}"'),
+                ],
+                ignore_errors=(1,),
+                env=env)
+            .stdout
+            .readlines()
+        )
 
         changed_items = cast(List[_BranchChangedEntry], [
             line.strip().split('\t')
@@ -1622,14 +1692,11 @@ class ClearCaseClient(BaseSCMClient):
             list:
             A list of the changed files.
         """
-        stream_info = execute(
-            [
-                'cleartool',
-                'describe',
-                '-long',
-                'stream:%s' % stream,
-            ],
-            split_lines=True)
+        stream_info = (
+            run_process(['cleartool', 'describe', '-long', f'stream:{stream}'])
+            .stdout
+            .readlines()
+        )
 
         branch = None
 
@@ -1802,10 +1869,12 @@ class ClearCaseClient(BaseSCMClient):
             bytes:
             The contents of the directory.
         """
-        output = execute(['cleartool', 'ls', '-short', '-nxname', '-vob_only',
-                          extended_path],
-                         split_lines=True,
-                         results_unicode=False)
+        output = (
+            run_process(['cleartool', 'ls', '-short', '-nxname', '-vob_only',
+                         extended_path])
+            .stdout_bytes
+            .readlines()
+        )
 
         contents = sorted(
             os.path.basename(absolute_path.strip())
@@ -1911,8 +1980,12 @@ class ClearCaseClient(BaseSCMClient):
         if not repository_info.is_legacy:
             # We need oids of files to translate them to paths on reviewboard
             # repository.
-            vob_oid = execute(['cleartool', 'describe', '-fmt', '%On',
-                               f'vob:{entry.new_path or entry.old_path}'])
+            vob_oid = (
+                run_process(['cleartool', 'describe', '-fmt', '%On',
+                             f'vob:{entry.new_path or entry.old_path}'])
+                .stdout
+                .read()
+            )
 
             vv_metadata = {
                 'vob': vob_oid,
@@ -2013,7 +2086,7 @@ class ClearCaseClient(BaseSCMClient):
             except OSError:
                 pass
 
-            execute(['cleartool', 'get', '-to', temp_file, filename])
+            run_process(['cleartool', 'get', '-to', temp_file, filename])
 
         return temp_file
 
@@ -2101,8 +2174,11 @@ class ClearCaseClient(BaseSCMClient):
         if self.viewtype == 'dynamic' and cpath.exists(path):
             return cpath.isdir(path)
         else:
-            object_kind = execute(
-                ['cleartool', 'describe', '-fmt', '%m', path])
+            object_kind = (
+                run_process(['cleartool', 'describe', '-fmt', '%m', path])
+                .stdout
+                .read()
+            )
 
             return object_kind.startswith('directory')
 
@@ -2172,8 +2248,12 @@ class ClearCaseClient(BaseSCMClient):
                         # file from snapshot views does not. We therefore
                         # look at the history of the file and get the last
                         # revision from it.
-                        filename = execute(['cleartool', 'lshistory', '-last',
-                                            '1', '-fmt', '%Xn', f'oid:{oid}'])
+                        filename = (
+                            run_process(['cleartool', 'lshistory', '-last',
+                                         '1', '-fmt', '%Xn', f'oid:{oid}'])
+                            .stdout
+                            .read()
+                        )
                         files.append(_ChangesetEntry(root_path=self.root_path,
                                                      old_path=filename,
                                                      old_oid=oid,
@@ -2188,8 +2268,12 @@ class ClearCaseClient(BaseSCMClient):
                 for file in files:
                     if (file.old_oid == old_oid or
                         file.new_oid == new_oid):
-                        old_version = execute(['cleartool', 'describe',
-                                               '-fmt', '%Vn', file.old_path])
+                        old_version = (
+                            run_process(['cleartool', 'describe', '-fmt',
+                                         '%Vn', file.old_path])
+                            .stdout
+                            .read()
+                        )
                         file.old_path = f'{old_file}@@{old_version}'
                         file.op = 'move'
 
@@ -2227,16 +2311,12 @@ class ClearCaseClient(BaseSCMClient):
             A dictionary with three keys: ``renamed``, ``added``, and
             ``deleted``.
         """
-        diff_lines = execute(
-            [
-                'cleartool',
-                'diff',
-                '-ser',
-                old_dir,
-                new_dir,
-            ],
-            split_lines=True,
-            extra_ignore_errors=(1,))
+        diff_lines = (
+            run_process(['cleartool', 'diff', '-ser', old_dir, new_dir],
+                        ignore_errors=(1,))
+            .stdout
+            .readlines()
+        )
 
         current_mode = None
         mode_re = re.compile(r'^-----\[ (?P<mode>[\w ]+) \]-----$')
@@ -2266,22 +2346,38 @@ class ClearCaseClient(BaseSCMClient):
             try:
                 if current_mode == 'renamed to':
                     old_file = cpath.join(old_dir, _extract_filename(line))
-                    old_oid = execute(get_oid_cmd + [old_file])
+                    old_oid = (
+                        run_process([*get_oid_cmd, old_file])
+                        .stdout
+                        .read()
+                    )
                     new_file = cpath.join(new_dir,
                                           _extract_filename(diff_lines[i + 1]))
-                    new_oid = execute(get_oid_cmd + [new_file])
+                    new_oid = (
+                        run_process([*get_oid_cmd, new_file])
+                        .stdout
+                        .read()
+                    )
 
                     results['renamed'].add(
                         (old_file, old_oid, new_file, new_oid))
                     i += 2
                 elif current_mode == 'added':
                     new_file = cpath.join(new_dir, _extract_filename(line))
-                    oid = execute(get_oid_cmd + [new_file])
+                    oid = (
+                        run_process([*get_oid_cmd, new_file])
+                        .stdout
+                        .read()
+                    )
 
                     results['added'].add((new_file, oid))
                 elif current_mode == 'deleted':
                     old_file = cpath.join(old_dir, _extract_filename(line))
-                    oid = execute(get_oid_cmd + [old_file])
+                    oid = (
+                        run_process([*get_oid_cmd, old_file])
+                        .stdout
+                        .read()
+                    )
 
                     results['deleted'].add((old_file, oid))
             except Exception as e:
@@ -2413,8 +2509,11 @@ class ClearCaseClient(BaseSCMClient):
                          'ClearCase')
             return None
 
-        property_lines = execute(['cleartool', 'hostinfo', '-l'],
-                                 split_lines=True)
+        property_lines = (
+            run_process(['cleartool', 'hostinfo', '-l'])
+            .stdout
+            .readlines()
+        )
 
         if 'Error' in property_lines:
             raise SCMError('Unable to determine the current region')
@@ -2522,17 +2621,21 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
                            'repository info.')
 
         tags = defaultdict(set)
-        regions = cast(
-            List[str],
-            execute(['cleartool', 'lsregion'],
-                    ignore_errors=True,
-                    split_lines=True))
+        regions = (
+            run_process(['cleartool', 'lsregion'], ignore_errors=True)
+            .stdout
+            .readlines()
+        )
 
         # Find local tag names for connected VOB UUIDs.
         for region, uuid in itertools.product(regions, self.vob_uuids):
             try:
-                tag = execute(['cleartool', 'lsvob', '-s', '-family', uuid,
-                               '-region', region.strip()])
+                tag = (
+                    run_process(['cleartool', 'lsvob', '-s', '-family', uuid,
+                                 '-region', region.strip()])
+                    .stdout
+                    .read()
+                )
                 tags[uuid].add(tag.strip())
             except Exception:
                 pass

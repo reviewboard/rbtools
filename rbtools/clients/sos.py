@@ -22,7 +22,6 @@ from pydiffx import DiffType, DiffX
 from pydiffx.utils.text import guess_line_endings
 from typing_extensions import NotRequired, TypedDict
 
-from rbtools.api.resource import ReviewRequestItemResource
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
                                             SCMClientDiffResult,
@@ -32,15 +31,20 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMError,
                                     TooManyRevisionsError)
 from rbtools.deprecation import RemovedInRBTools80Warning
-from rbtools.diffs.tools.base import DiffFileResult
 from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install
 from rbtools.utils.diffs import filename_match_any_patterns
 from rbtools.utils.filesystem import make_tempfile
-from rbtools.utils.process import execute
+from rbtools.utils.process import run_process
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from typing_extensions import Unpack
+
+    from rbtools.api.resource import ReviewRequestItemResource
+    from rbtools.diffs.tools.base import DiffFileResult
+    from rbtools.utils.process import RunProcessKwargs, RunProcessResult
 
 
 logger = logging.getLogger(__name__)
@@ -781,7 +785,12 @@ class SOSClient(BaseSCMClient):
             'review_request_extra_data': review_request_extra_data,
         }
 
-    def run_soscmd(self, subcommand, *args, **kwargs):
+    def run_soscmd(
+        self,
+        subcommand: str,
+        *args: str,
+        **kwargs: Unpack[RunProcessKwargs],
+    ) -> RunProcessResult:
         """Run soscmd with the provided arguments.
 
         This will be run in the specified directory (if passing ``cwd`` as
@@ -789,7 +798,7 @@ class SOSClient(BaseSCMClient):
         it will instead run in the current directory.
 
         Args:
-            subcommand (unicode):
+            subcommand (str):
                 The :command:`soscmd` sub-command to run.
 
             *args (tuple):
@@ -809,9 +818,9 @@ class SOSClient(BaseSCMClient):
             os.getcwd()
         )
 
-        return execute(['soscmd', subcommand] + list(args),
-                       cwd=cwd,
-                       **kwargs)
+        return run_process(['soscmd', subcommand, *args],
+                           cwd=cwd,
+                           **kwargs)
 
     def _get_files(self, changelist=None, selection=None, include_files=None,
                    exclude_patterns=None):
@@ -914,8 +923,11 @@ class SOSClient(BaseSCMClient):
             A list of modified files/objects. See :py:meth:`_get_files`
             for the contents of the dictionaries.
         """
-        lines = self.run_soscmd('add', '-s', '-c', changelist,
-                                split_lines=True)
+        lines = (
+            self.run_soscmd('add', '-s', '-c', changelist)
+            .stdout
+            .readlines()
+        )
 
         adds = set()
         deletes = set()
@@ -1305,9 +1317,11 @@ class SOSClient(BaseSCMClient):
             '-Nhdr',
         ] + (selection or [])
 
-        status = self.run_soscmd(*soscmd_args,
-                                 results_unicode=False,
-                                 split_lines=True)
+        status = (
+            self.run_soscmd(*soscmd_args)
+            .stdout_bytes
+            .readlines()
+        )
 
         # Parse the status results.
         for _line in status:
@@ -1386,7 +1400,11 @@ class SOSClient(BaseSCMClient):
                 ``renamed_dirs``, ``renamed_files``
         """
         try:
-            lines = self.run_soscmd('diff', path, split_lines=True)
+            lines = (
+                self.run_soscmd('diff', path)
+                .stdout
+                .readlines()
+            )
         except Exception:
             # We may not be able to diff this directory. Bail.
             return
@@ -1559,8 +1577,11 @@ class SOSClient(BaseSCMClient):
         if selection:
             soscmd_args += selection
 
-        lines = self.run_soscmd(*soscmd_args,
-                                split_lines=True)
+        lines = (
+            self.run_soscmd(*soscmd_args)
+            .stdout
+            .readlines()
+        )
 
         # We now need to parse the nobjstatus results. This is in the form
         # of:
@@ -1660,9 +1681,11 @@ class SOSClient(BaseSCMClient):
             # Store the current SOS selection to a file.
             selection = [
                 _line
-                for _line in self.run_soscmd('status', '-f%P',
-                                             results_unicode=False,
-                                             split_lines=True)
+                for _line in (
+                    self.run_soscmd('status', '-f%P')
+                    .stdout_bytes
+                    .readlines()
+                )
                 if not _line.startswith(b'!!')
             ]
 
@@ -1679,7 +1702,7 @@ class SOSClient(BaseSCMClient):
                 # Restore the old selection.
                 logger.debug('Restoring SOS selection')
                 self.run_soscmd('select', '-sall', '-sNr',
-                                '-sfile%s' % filename)
+                                f'-sfile{filename}')
         finally:
             try:
                 os.unlink(filename)
@@ -1738,8 +1761,8 @@ class SOSClient(BaseSCMClient):
 
                     os.unlink(tmp_orig_filename)
                     self.run_soscmd('exportrev',
-                                    '%s/#/%d' % (filename, orig_revision),
-                                    '-out%s' % tmp_orig_filename)
+                                    f'{filename}/#/{orig_revision}',
+                                    f'-out{tmp_orig_filename}')
 
             # Diff the new file against that.
             diff_result = diff_tool.run_diff_file(orig_path=tmp_orig_filename,
@@ -1886,7 +1909,11 @@ class SOSClient(BaseSCMClient):
         try:
             version = self._cache['sos_version']
         except KeyError:
-            version_str = self.run_soscmd('version', cwd=os.getcwd())
+            version_str = (
+                self.run_soscmd('version', cwd=os.getcwd())
+                .stdout
+                .read()
+            )
 
             m = re.match(r'^soscmd version (?P<major_version>\d+)\.'
                          r'(?P<minor_version>\d+).*',
@@ -1925,12 +1952,10 @@ class SOSClient(BaseSCMClient):
         try:
             return self._cache[info_type]
         except KeyError:
-            rc, value = self.run_soscmd('query', info_type,
-                                        cwd=os.getcwd(),
-                                        return_error_code=True)
+            result = self.run_soscmd('query', info_type, cwd=os.getcwd())
 
-            if rc == 0:
-                value = value.strip()
+            if result.exit_code == 0:
+                value = result.stdout.read().strip()
             else:
                 value = None
 
