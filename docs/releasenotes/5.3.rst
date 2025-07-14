@@ -1,0 +1,78 @@
+.. default-intersphinx:: rbt5.x rb-latest
+
+=========================
+RBTools 5.3 Release Notes
+=========================
+
+**Release date:** July 14, 2025
+
+
+Installation
+============
+
+Follow our :ref:`installation guide <rbtools-installation>` to install
+RBTools.
+
+To learn more, see:
+
+* `Documentation <https://www.reviewboard.org/docs/rbtools/5.x/>`_
+* `RBTools on PyPI <https://pypi.org/project/rbtools/>`_
+* `RBTools on GitHub <https://github.com/reviewboard/rbtools/>`_
+
+
+New Features
+============
+
+* Added support for newer versions of Azure DevOps Server / Team Foundation
+  Server.
+
+  RBTools can now work with modern versions of :command:`tf.exe` from
+  Visual Studio, making it easy to post your changes without maintaining
+  multiple copies of TFVC.
+
+  See the :ref:`rbtools-tfs` documentation for more information.
+
+* Renamed our Cliosoft SOS support to Keysight SOS.
+
+  Cliosoft SOS was purchased by Keysight, and is now `Keysight SOS`_.
+  RBTools now documents this as Keysight SOS and lists it in the list of
+  supported repository types.
+
+  See :ref:`rbtools-workflow-sos` to learn more about using Keysight SOS.
+
+
+.. _Keysight SOS: https://www.keysight.com/us/en/products/software/pathwave-design-software/design-data-and-ip-management/design-data-management-sos.html
+
+
+Bug Fixes
+=========
+
+Installation
+------------
+
+* Fixed an issue running the :ref:`rbt <rbt>` command after using the
+  :ref:`RBTools for Windows installer <rbtools-installer>`.
+
+* Added back support for the :rbtcommand:`rbt install` command, used to
+  install Azure DevOps Server / Team Foundation Server support.
+
+
+Azure DevOps Server / Team Foundation Server
+--------------------------------------------
+
+* Fixed parsing commit history containing Windows-style newlines.
+
+
+Git
+---
+
+* Fixed using :option:`rbt post --exclude` with filenames containing spaces.
+  (:bug:`5045`)
+
+
+Contributors
+============
+
+* Christian Hammond
+* David Trowbridge
+* Michelle Aubin

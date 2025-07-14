@@ -2,4 +2,4 @@
 
 python_dir="`dirname "$0"`/../Python"
 
-"${python_dir}/python.exe" "${python_dir}/Scripts/rbt-script.py" $*
+"${python_dir}/python.exe" "${python_dir}/Scripts/rbt.exe" $*
