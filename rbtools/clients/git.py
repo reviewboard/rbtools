@@ -23,6 +23,7 @@ from rbtools.clients.errors import (
 )
 from rbtools.clients.perforce import PerforceClient
 from rbtools.clients.svn import SVNClient, SVNRepositoryInfo
+from rbtools.deprecation import RemovedInRBTools80Warning
 from rbtools.diffs.patches import PatchResult
 from rbtools.utils.checks import check_install
 from rbtools.utils.console import edit_text
@@ -377,6 +378,11 @@ class GitClient(BaseSCMClient):
                 The specified revisions list contained too many revisions.
         """
         if revisions is None:
+            RemovedInRBTools80Warning.warn(
+                'parse_revision_spec was called without any '
+                'arguments, or with None. The revisions argument will become '
+                'mandatory in RBTools 8.0.'
+            )
             revisions = []
 
         n_revs = len(revisions)
@@ -996,7 +1002,7 @@ class GitClient(BaseSCMClient):
 
     def diff(
         self,
-        revisions: SCMClientRevisionSpec,
+        revisions: SCMClientRevisionSpec | None,
         *,
         include_files: (Sequence[str] | None) = None,
         exclude_patterns: (Sequence[str] | None) = None,
@@ -1063,6 +1069,7 @@ class GitClient(BaseSCMClient):
                                               base_dir=git_toplevel,
                                               cwd=os.getcwd())
 
+        assert revisions is not None
         merge_base = revisions.get('parent_base', revisions['base'])
         assert isinstance(merge_base, str)
 

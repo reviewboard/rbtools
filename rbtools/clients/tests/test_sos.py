@@ -637,7 +637,7 @@ class SOSClientTests(BaseSOSTestCase):
         client = self.build_client()
 
         self.assertEqual(
-            client.parse_revision_spec(),
+            client.parse_revision_spec([]),
             {
                 'base': None,
                 'extra': {

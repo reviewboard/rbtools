@@ -646,7 +646,7 @@ class SVNClientTests(BaseSVNClientTests):
         client = self.build_client()
 
         self.assertEqual(
-            client.parse_revision_spec(),
+            client.parse_revision_spec([]),
             {
                 'base': 'BASE',
                 'tip': '--rbtools-working-copy',
@@ -773,7 +773,7 @@ class SVNClientTests(BaseSVNClientTests):
     def test_get_commit_message_working_copy(self):
         """Testing SVNClient.get_commit_message with a working copy change"""
         client = self.build_client()
-        revisions = client.parse_revision_spec()
+        revisions = client.parse_revision_spec([])
 
         self.assertIsNone(client.get_commit_message(revisions))
 
@@ -815,7 +815,8 @@ class SVNClientTests(BaseSVNClientTests):
         revisions = client.parse_revision_spec([])
 
         self.assertEqual(
-            client.diff(revisions, exclude_patterns=['exclude.txt']),
+            client.diff(revisions, include_files=[],
+                        exclude_patterns=['exclude.txt']),
             {
                 'diff': (
                     b'Index: /bar.txt\n'
@@ -850,7 +851,8 @@ class SVNClientTests(BaseSVNClientTests):
         revisions = client.parse_revision_spec([])
 
         self.assertEqual(
-            client.diff(revisions, exclude_patterns=['exclude.txt']),
+            client.diff(revisions, include_files=[],
+                        exclude_patterns=['exclude.txt']),
             {
                 'diff': b'',
             })
@@ -871,7 +873,8 @@ class SVNClientTests(BaseSVNClientTests):
         ]
 
         self.assertEqual(
-            client.diff(revisions, exclude_patterns=exclude_patterns),
+            client.diff(revisions, include_files=[],
+                        exclude_patterns=exclude_patterns),
             {
                 'diff': b'',
             })
@@ -899,10 +902,10 @@ class SVNClientTests(BaseSVNClientTests):
         self._svn_add_file('dir1/A.txt', FOO3)
 
         # Case 1: Generate diff from checkout root.
-        revisions = client.parse_revision_spec()
+        revisions = client.parse_revision_spec([])
 
         self.assertEqual(
-            client.diff(revisions),
+            client.diff(revisions, include_files=[], exclude_patterns=[]),
             {
                 'diff': (
                     b'Index: /dir1/A.txt\n'
@@ -930,7 +933,7 @@ class SVNClientTests(BaseSVNClientTests):
         os.chdir('dir1')
 
         self.assertEqual(
-            client.diff(revisions),
+            client.diff(revisions, include_files=[], exclude_patterns=[]),
             {
                 'diff': (
                     b'Index: /dir1/A.txt\n'
@@ -960,7 +963,8 @@ class SVNClientTests(BaseSVNClientTests):
         os.chdir('dir2')
 
         self.assertEqual(
-            client.diff(revisions, include_files=['../dir1/A.txt']),
+            client.diff(revisions, include_files=['../dir1/A.txt'],
+                        exclude_patterns=[]),
             {
                 'diff': (
                     b'Index: /dir1/A.txt\n'
@@ -990,10 +994,10 @@ class SVNClientTests(BaseSVNClientTests):
         self._svn_add_file('A.txt', '\xe2'.encode('iso-8859-1'))
         self._run_svn(['propset', 'svn:mime-type', 'text/plain', 'A.txt'])
 
-        revisions = client.parse_revision_spec()
+        revisions = client.parse_revision_spec([])
 
         self.assertEqual(
-            client.diff(revisions),
+            client.diff(revisions, include_files=[], exclude_patterns=[]),
             {
                 'diff': (
                     b'Index: /A.txt\n'
@@ -1031,7 +1035,7 @@ class SVNClientTests(BaseSVNClientTests):
         revisions = client.parse_revision_spec(['4'])
 
         self.assertEqual(
-            client.diff(revisions),
+            client.diff(revisions, include_files=[], exclude_patterns=[]),
             {
                 'diff': (
                     b'Index: /\xc3\xa2.txt\n'
@@ -1056,7 +1060,7 @@ class SVNClientTests(BaseSVNClientTests):
         revisions = client.parse_revision_spec([])
 
         self.assertEqual(
-            client.diff(revisions),
+            client.diff(revisions, include_files=[], exclude_patterns=[]),
             {
                 'diff': (
                     b'Index: /empty-file\t(deleted)\n'
@@ -1198,22 +1202,30 @@ class SVNClientTests(BaseSVNClientTests):
         #  3) from checkout root when all relevant files belong to a changelist
         #  4) via explicit include target
 
-        revisions = client.parse_revision_spec()
-        self.assertEqual(client.diff(revisions), expected_diff_result)
+        revisions = client.parse_revision_spec([])
+        self.assertEqual(
+            client.diff(revisions, include_files=[], exclude_patterns=[]),
+            expected_diff_result)
 
         self._run_svn(['changelist', 'cl1', 'dir1/foo.txt'])
         revisions = client.parse_revision_spec(['cl1'])
-        self.assertEqual(client.diff(revisions), expected_diff_result)
+        self.assertEqual(
+            client.diff(revisions, include_files=[], exclude_patterns=[]),
+            expected_diff_result)
 
-        revisions = client.parse_revision_spec()
-        self.assertEqual(client.diff(revisions), expected_diff_result)
+        revisions = client.parse_revision_spec([])
+        self.assertEqual(
+            client.diff(revisions, include_files=[], exclude_patterns=[]),
+            expected_diff_result)
 
         self._run_svn(['changelist', '--remove', 'dir1/foo.txt'])
 
         os.chdir('dir2')
-        revisions = client.parse_revision_spec()
-        self.assertEqual(client.diff(revisions, include_files=['../dir1']),
-                         expected_diff_result)
+        revisions = client.parse_revision_spec([])
+        self.assertEqual(
+            client.diff(revisions, include_files=['../dir1'],
+                        exclude_patterns=[]),
+            expected_diff_result)
 
     def test_history_scheduled_with_commit_nominal(self):
         """Testing SVNClient.history_scheduled_with_commit nominal cases"""
@@ -1244,29 +1256,30 @@ class SVNClientTests(BaseSVNClientTests):
             #     changelist
             #  4) via explicit include target
 
-            revisions = client.parse_revision_spec()
+            revisions = client.parse_revision_spec([])
 
             with self.assertRaises(SystemExit):
-                client.diff(revisions)
+                client.diff(revisions, include_files=[], exclude_patterns=[])
 
             self._run_svn(['changelist', 'cl1', 'dir1/foo.txt'])
             revisions = client.parse_revision_spec(['cl1'])
 
             with self.assertRaises(SystemExit):
-                client.diff(revisions)
+                client.diff(revisions, include_files=[], exclude_patterns=[])
 
-            revisions = client.parse_revision_spec()
+            revisions = client.parse_revision_spec([])
 
             with self.assertRaises(SystemExit):
-                client.diff(revisions)
+                client.diff(revisions, include_files=[], exclude_patterns=[])
 
             self._run_svn(['changelist', '--remove', 'dir1/foo.txt'])
 
             os.chdir('dir2')
-            revisions = client.parse_revision_spec()
+            revisions = client.parse_revision_spec([])
 
             with self.assertRaises(SystemExit):
-                client.diff(revisions, include_files=['../dir1'])
+                client.diff(revisions, include_files=['../dir1'],
+                            exclude_patterns=[])
         finally:
             sys.stderr = old_stderr
 
@@ -1292,7 +1305,7 @@ class SVNClientTests(BaseSVNClientTests):
         revisions = client.parse_revision_spec(['1:2'])
 
         self.assertEqual(
-            client.diff(revisions),
+            client.diff(revisions, include_files=[], exclude_patterns=[]),
             {
                 'diff': (
                     b'Index: /foo.txt\n'
@@ -1328,7 +1341,7 @@ class SVNClientTests(BaseSVNClientTests):
         revisions = client.parse_revision_spec(['2'])
 
         self.assertEqual(
-            client.diff(revisions),
+            client.diff(revisions, include_files=[], exclude_patterns=[]),
             {
                 'diff': (
                     b'Index: /foo.txt\n'
@@ -1373,7 +1386,8 @@ class SVNClientTests(BaseSVNClientTests):
         revisions = client.parse_revision_spec([])
 
         self.assertEqual(
-            client.diff(revisions, exclude_patterns=['foo_copy.txt']),
+            client.diff(revisions, include_files=[],
+                        exclude_patterns=['foo_copy.txt']),
             {
                 'diff': b'',
             })
@@ -1382,7 +1396,8 @@ class SVNClientTests(BaseSVNClientTests):
         revisions = client.parse_revision_spec(['cl1'])
 
         self.assertEqual(
-            client.diff(revisions, exclude_patterns=['foo_copy.txt']),
+            client.diff(revisions, include_files=[],
+                        exclude_patterns=['foo_copy.txt']),
             {
                 'diff': b'',
             })
@@ -1398,10 +1413,10 @@ class SVNClientTests(BaseSVNClientTests):
                     '-- test line (test2)\n')
 
         client = self.build_client(needs_diff=True)
-        revisions = client.parse_revision_spec()
+        revisions = client.parse_revision_spec([])
 
         self.assertEqual(
-            client.diff(revisions),
+            client.diff(revisions, include_files=[], exclude_patterns=[]),
             {
                 'diff': (
                     b'Index: /bug-4546.txt\n'

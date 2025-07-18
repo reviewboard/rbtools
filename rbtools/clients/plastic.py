@@ -1,9 +1,11 @@
 """A client for Plastic SCM."""
 
+from __future__ import annotations
+
 import logging
 import os
 import re
-from typing import List, Optional
+from typing import Optional, TYPE_CHECKING
 
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
@@ -13,9 +15,13 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     TooManyRevisionsError,
                                     SCMClientDependencyError,
                                     SCMError)
+from rbtools.deprecation import RemovedInRBTools80Warning
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import execute
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class PlasticClient(BaseSCMClient):
@@ -108,7 +114,7 @@ class PlasticClient(BaseSCMClient):
 
     def parse_revision_spec(
         self,
-        revisions: List[str] = [],
+        revisions: (Sequence[str] | None) = None,
     ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
@@ -139,6 +145,14 @@ class PlasticClient(BaseSCMClient):
             rbtools.clients.errors.TooManyRevisionsError:
                 The specified revisions list contained too many revisions.
         """
+        if revisions is None:
+            RemovedInRBTools80Warning.warn(
+                'parse_revision_spec was called without any '
+                'arguments, or with None. The revisions argument will become '
+                'mandatory in RBTools 8.0.'
+            )
+            revisions = []
+
         n_revisions = len(revisions)
 
         if n_revisions == 0:
@@ -154,7 +168,7 @@ class PlasticClient(BaseSCMClient):
 
     def diff(
         self,
-        revisions: SCMClientRevisionSpec,
+        revisions: SCMClientRevisionSpec | None,
         **kwargs,
     ) -> SCMClientDiffResult:
         """Perform a diff across all modified files in a Plastic workspace.
@@ -174,10 +188,12 @@ class PlasticClient(BaseSCMClient):
             A dictionary containing keys documented in
             :py:class:`~rbtools.clients.base.scmclient.SCMClientDiffResult`.
         """
+        assert revisions is not None
+
         # TODO: use 'files'
         changenum = None
         tip = revisions['tip']
-        assert tip
+        assert isinstance(tip, str)
 
         if tip.startswith(self.REVISION_CHANGESET_PREFIX):
             logging.debug('Doing a diff against changeset %s', tip)

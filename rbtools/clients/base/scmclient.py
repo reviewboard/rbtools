@@ -1090,7 +1090,7 @@ class BaseSCMClient:
 
     def parse_revision_spec(
         self,
-        revisions: List[str] = [],
+        revisions: (Sequence[str] | None) = None,
     ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
@@ -1186,13 +1186,13 @@ class BaseSCMClient:
 
     def diff(
         self,
-        revisions: SCMClientRevisionSpec,
+        revisions: SCMClientRevisionSpec | None,
         *,
-        include_files: List[str] = [],
-        exclude_patterns: List[str] = [],
+        include_files: (Sequence[str] | None) = None,
+        exclude_patterns: (Sequence[str] | None) = None,
         no_renames: bool = False,
         repository_info: Optional[RepositoryInfo] = None,
-        extra_args: List[str] = [],
+        extra_args: (Sequence[str] | None) = None,
         with_parent_diff: bool = True,
     ) -> SCMClientDiffResult:
         """Perform a diff using the given revisions.
@@ -1416,7 +1416,7 @@ class BaseSCMClient:
         message: str,
         author: PatchAuthor,
         run_editor: bool,
-        files: List[str] = [],
+        files: (Sequence[str] | None) = None,
         all_files: bool = False,
     ) -> None:
         """Create a commit based on the provided message and author.

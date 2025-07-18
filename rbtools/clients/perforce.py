@@ -25,6 +25,7 @@ from rbtools.clients.errors import (AmendError,
                                     SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
+from rbtools.deprecation import RemovedInRBTools80Warning
 from rbtools.diffs.tools.base.diff_tool import BaseDiffTool
 from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install
@@ -35,6 +36,8 @@ from rbtools.utils.process import (RunProcessError,
                                    run_process)
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from rbtools.diffs.patches import Patch
 
 
@@ -754,7 +757,7 @@ class PerforceClient(BaseSCMClient):
 
     def parse_revision_spec(
         self,
-        revisions: List[str] = [],
+        revisions: (Sequence[str] | None) = None,
     ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
@@ -797,6 +800,14 @@ class PerforceClient(BaseSCMClient):
             rbtools.clients.errors.TooManyRevisionsError:
                 The specified revisions list contained too many revisions.
         """
+        if revisions is None:
+            RemovedInRBTools80Warning.warn(
+                'parse_revision_spec was called without any '
+                'arguments, or with None. The revisions argument will become '
+                'mandatory in RBTools 8.0.'
+            )
+            revisions = []
+
         n_revs = len(revisions)
 
         if n_revs == 0:
@@ -942,11 +953,11 @@ class PerforceClient(BaseSCMClient):
 
     def diff(
         self,
-        revisions: SCMClientRevisionSpec,
+        revisions: SCMClientRevisionSpec | None,
         *,
-        include_files: List[str] = [],
-        exclude_patterns: List[str] = [],
-        extra_args: List[str] = [],
+        include_files: (Sequence[str] | None) = None,
+        exclude_patterns: (Sequence[str] | None) = None,
+        extra_args: (Sequence[str] | None) = None,
         **kwargs,
     ) -> SCMClientDiffResult:
         """Perform a diff using the given revisions.
@@ -967,9 +978,8 @@ class PerforceClient(BaseSCMClient):
                 A list of shell-style glob patterns to blacklist during diff
                 generation.
 
-            extra_args (list, unused):
+            extra_args (list of str):
                 Additional arguments to be passed to the diff generation.
-                Unused for git.
 
             **kwargs (dict, unused):
                 Unused keyword arguments.
@@ -985,6 +995,12 @@ class PerforceClient(BaseSCMClient):
                 The number of the changeset being posted (if ``revisions``
                 represents a single changeset).
         """
+        if include_files is None:
+            include_files = []
+
+        if exclude_patterns is None:
+            exclude_patterns = []
+
         diff_tool = self.get_diff_tool()
         assert diff_tool is not None
 
@@ -994,6 +1010,10 @@ class PerforceClient(BaseSCMClient):
             # The "path posting" is still interesting enough to keep around. If
             # the given arguments don't parse as valid changelists, fall back
             # on that behavior.
+            if extra_args is None:
+                raise SCMError(
+                    'Diff needs either revisions or file path pairs.')
+
             return self._path_diff(diff_tool=diff_tool,
                                    args=extra_args,
                                    exclude_patterns=exclude_patterns)
@@ -1037,7 +1057,7 @@ class PerforceClient(BaseSCMClient):
                 local_include_files=local_include_files,
                 exclude_patterns=exclude_patterns)
 
-            result = {
+            result: SCMClientDiffResult = {
                 'diff': stream.getvalue(),
             }
 
@@ -1240,6 +1260,7 @@ class PerforceClient(BaseSCMClient):
         # create a lot of unhappy users.
         if revisions is not None:
             tip = revisions['tip']
+            assert tip is not None
 
             if tip.startswith(self.REVISION_PENDING_CLN_PREFIX):
                 tip = tip[len(self.REVISION_PENDING_CLN_PREFIX):]
@@ -1861,8 +1882,8 @@ class PerforceClient(BaseSCMClient):
     def _path_diff(
         self,
         diff_tool: BaseDiffTool,
-        args: List[str],
-        exclude_patterns: List[str],
+        args: Sequence[str],
+        exclude_patterns: Sequence[str],
     ) -> SCMClientDiffResult:
         """Process a path-style diff.
 

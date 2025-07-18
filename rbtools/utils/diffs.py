@@ -52,7 +52,7 @@ def filter_diff(
     diff: Iterable[bytes],
     file_index_re: Pattern[bytes],
     *,
-    exclude_patterns: List[str],
+    exclude_patterns: Sequence[str],
     base_dir: str = '',
 ) -> Iterator[bytes]:
     """Filter through the lines of diff to exclude files.

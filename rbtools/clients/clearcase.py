@@ -25,6 +25,7 @@ from rbtools.clients.base.scmclient import (BaseSCMClient,
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     SCMError)
+from rbtools.deprecation import RemovedInRBTools80Warning
 from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempfile
@@ -37,6 +38,8 @@ else:
     import os.path as cpath
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from rbtools.api.resource import (
         RepositoryInfoResource,
         RepositoryItemResource,
@@ -662,7 +665,7 @@ class ClearCaseClient(BaseSCMClient):
 
     def parse_revision_spec(
         self,
-        revisions: list[str] = [],
+        revisions: (Sequence[str] | None) = None,
     ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
@@ -694,6 +697,14 @@ class ClearCaseClient(BaseSCMClient):
             rbtools.clients.errors.TooManyRevisionsError:
                 The specified revisions list contained too many revisions.
         """
+        if revisions is None:
+            RemovedInRBTools80Warning.warn(
+                'parse_revision_spec was called without any '
+                'arguments, or with None. The revisions argument will become '
+                'mandatory in RBTools 8.0.'
+            )
+            revisions = []
+
         n_revs = len(revisions)
 
         if n_revs == 0:
@@ -801,12 +812,11 @@ class ClearCaseClient(BaseSCMClient):
 
     def diff(
         self,
-        revisions: SCMClientRevisionSpec,
+        revisions: SCMClientRevisionSpec | None,
         *,
-        include_files: list[str] = [],
-        exclude_patterns: list[str] = [],
+        include_files: (Sequence[str] | None) = None,
+        exclude_patterns: (Sequence[str] | None) = None,
         repository_info: ClearCaseRepositoryInfo,
-        extra_args: list[str] = [],
         **kwargs,
     ) -> SCMClientDiffResult:
         """Perform a diff using the given revisions.
@@ -826,10 +836,6 @@ class ClearCaseClient(BaseSCMClient):
             repository_info (ClearCaseRepositoryInfo, optional):
                 The repository info structure.
 
-            extra_args (list, unused):
-                Additional arguments to be passed to the diff generation.
-                Unused for ClearCase.
-
             **kwargs (dict, optional):
                 Unused keyword arguments.
 
@@ -840,12 +846,19 @@ class ClearCaseClient(BaseSCMClient):
             ``diff`` (:py:class:`bytes`):
                 The contents of the diff to upload.
         """
+        if include_files is None:
+            include_files = []
+
+        if exclude_patterns is None:
+            exclude_patterns = []
+
         if include_files:
             raise SCMError(
                 'The ClearCase backend does not currently support the '
                 '-I/--include parameter. To diff for specific files, pass in '
                 'file@revision1:file@revision2 pairs as arguments')
 
+        assert revisions is not None
         base = revisions['base']
         tip = revisions['tip']
 

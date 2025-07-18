@@ -53,6 +53,7 @@ class Diff(BaseCommand):
                 'additional argument after the command.')
 
         tool = self.tool
+        assert tool is not None
 
         try:
             revisions = tool.parse_revision_spec(args)
@@ -77,7 +78,7 @@ class Diff(BaseCommand):
         if self.options.no_renames:
             if not tool.supports_no_renames:
                 raise CommandError('The %s SCM tool does not support diffs '
-                                   'without renames.', tool.type)
+                                   'without renames.', tool.name)
 
             diff_kwargs['no_renames'] = True
 

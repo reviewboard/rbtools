@@ -757,7 +757,7 @@ class PerforceClientTests(PerforceSCMClientTestCase):
         client = self.build_client()
 
         self.assertEqual(
-            client.parse_revision_spec(),
+            client.parse_revision_spec([]),
             {
                 'base': PerforceClient.REVISION_CURRENT_SYNC,
                 'tip': ('%sdefault'

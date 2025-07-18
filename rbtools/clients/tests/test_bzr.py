@@ -844,7 +844,7 @@ class BazaarClientTests(SCMClientTestCase):
         tip_commit_id = client._get_revno()
 
         self.assertEqual(
-            client.parse_revision_spec(),
+            client.parse_revision_spec([]),
             {
                 'base': base_commit_id,
                 'tip': tip_commit_id,

@@ -536,7 +536,8 @@ class MercurialClientTests(MercurialTestCase):
         revisions = client.parse_revision_spec([])
 
         spy = self.spy_on(client._execute)
-        result = client.diff(revisions, exclude_patterns=['exclude.txt'])
+        result = client.diff(revisions,
+                             exclude_patterns=['exclude.txt'])
 
         self.assertSpyCalledWith(
             spy,
@@ -591,7 +592,8 @@ class MercurialClientTests(MercurialTestCase):
         revisions = client.parse_revision_spec([])
 
         spy = self.spy_on(client._execute)
-        result = client.diff(revisions, exclude_patterns=['empty.txt'])
+        result = client.diff(revisions,
+                             exclude_patterns=['empty.txt'])
 
         self.assertSpyCalledWith(
             spy,

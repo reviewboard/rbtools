@@ -941,7 +941,7 @@ class GitClientTests(BaseGitClientTests):
         client.get_repository_info()
 
         self.assertEqual(
-            client.parse_revision_spec(),
+            client.parse_revision_spec([]),
             {
                 'base': base_commit_id,
                 'commit_id': tip_commit_id,
@@ -973,7 +973,7 @@ class GitClientTests(BaseGitClientTests):
         client.get_repository_info()
 
         self.assertEqual(
-            client.parse_revision_spec(),
+            client.parse_revision_spec([]),
             {
                 'base': base_commit_id,
                 'commit_id': tip_commit_id,
@@ -1174,7 +1174,7 @@ class GitClientTests(BaseGitClientTests):
         #
         # Because parent_base == base, parent_base will not be in revisions.
         self.assertEqual(
-            client.parse_revision_spec(),
+            client.parse_revision_spec([]),
             {
                 'base': parent_commit_id,
                 'commit_id': tip_commit_id,
@@ -1304,7 +1304,7 @@ class GitClientTests(BaseGitClientTests):
         #     * 18c5c09 (origin/master, origin/HEAD, master) Commit 1
         #     * e6a3577 Initial Commit
         self.assertEqual(
-            client.parse_revision_spec(),
+            client.parse_revision_spec([]),
             {
                 'base': parent_commit_id,
                 'commit_id': tip_commit_id,
@@ -1353,7 +1353,7 @@ class GitClientTests(BaseGitClientTests):
         #     * 18c5c09 (origin/master, origin/HEAD) Commit 1
         #     * e6a3577 Initial Commit
         self.assertEqual(
-            client.parse_revision_spec(),
+            client.parse_revision_spec([]),
             {
                 'base': parent_commit_id,
                 'commit_id': tip_commit_id,
@@ -1587,7 +1587,7 @@ class GitClientTests(BaseGitClientTests):
 
         self._git_add_file_commit('foo.txt', FOO2, 'Commit 2')
         client.get_repository_info()
-        revisions = client.parse_revision_spec()
+        revisions = client.parse_revision_spec([])
 
         self.assertEqual(client.get_raw_commit_message(revisions),
                          'Commit 2')

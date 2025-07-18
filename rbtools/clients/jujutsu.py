@@ -31,6 +31,7 @@ from rbtools.clients.errors import (
     TooManyRevisionsError,
 )
 from rbtools.utils.console import edit_text
+from rbtools.deprecation import RemovedInRBTools80Warning
 from rbtools.utils.diffs import (
     normalize_patterns,
     remove_filenames_matching_patterns,
@@ -364,6 +365,11 @@ class JujutsuClient(BaseSCMClient):
                 The specified revisions list contained too many revisions.
         """
         if revisions is None:
+            RemovedInRBTools80Warning.warn(
+                'parse_revision_spec was called without any '
+                'arguments, or with None. The revisions argument will become '
+                'mandatory in RBTools 8.0.'
+            )
             revisions = []
 
         n_revs = len(revisions)
@@ -444,7 +450,7 @@ class JujutsuClient(BaseSCMClient):
 
     def diff(
         self,
-        revisions: SCMClientRevisionSpec,
+        revisions: SCMClientRevisionSpec | None,
         *,
         include_files: (Sequence[str] | None) = None,
         exclude_patterns: (Sequence[str] | None) = None,
@@ -497,6 +503,7 @@ class JujutsuClient(BaseSCMClient):
                 base_dir=self._local_path,
                 cwd=os.getcwd())
 
+        assert revisions is not None
         base = revisions['base']
         tip = revisions['tip']
 

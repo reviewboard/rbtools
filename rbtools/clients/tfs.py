@@ -9,7 +9,7 @@ import os
 import re
 import sys
 import xml.etree.ElementTree as ET
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
 from urllib.parse import unquote
 
 from rbtools.clients import BaseSCMClient, RepositoryInfo
@@ -19,6 +19,7 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
+from rbtools.deprecation import RemovedInRBTools80Warning
 from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.appdirs import user_data_dir
 from rbtools.utils.checks import check_install
@@ -27,6 +28,9 @@ from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import (RunProcessError,
                                    RunProcessResult,
                                    run_process)
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class BaseTFWrapper:
@@ -81,7 +85,7 @@ class BaseTFWrapper:
 
     def parse_revision_spec(
         self,
-        revisions: List[str],
+        revisions: Sequence[str],
     ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
@@ -130,8 +134,8 @@ class BaseTFWrapper:
         *,
         client: TFSClient,
         revisions: SCMClientRevisionSpec,
-        include_files: List[str],
-        exclude_patterns: List[str],
+        include_files: Sequence[str],
+        exclude_patterns: Sequence[str],
     ) -> SCMClientDiffResult:
         """Return the generated diff.
 
@@ -236,7 +240,7 @@ class TFExeWrapper(BaseTFWrapper):
 
     def parse_revision_spec(
         self,
-        revisions: List[str],
+        revisions: Sequence[str],
     ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
@@ -358,8 +362,8 @@ class TFExeWrapper(BaseTFWrapper):
         *,
         client: TFSClient,
         revisions: SCMClientRevisionSpec,
-        include_files: List[str],
-        exclude_patterns: List[str],
+        include_files: Sequence[str],
+        exclude_patterns: Sequence[str],
     ) -> SCMClientDiffResult:
         """Return the generated diff.
 
@@ -705,7 +709,7 @@ class TEEWrapper(BaseTFWrapper):
 
     def parse_revision_spec(
         self,
-        revisions: List[str],
+        revisions: Sequence[str],
     ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
@@ -833,8 +837,8 @@ class TEEWrapper(BaseTFWrapper):
         *,
         client: TFSClient,
         revisions: SCMClientRevisionSpec,
-        include_files: List[str],
-        exclude_patterns: List[str],
+        include_files: Sequence[str],
+        exclude_patterns: Sequence[str],
     ) -> SCMClientDiffResult:
         """Return the generated diff.
 
@@ -1153,7 +1157,7 @@ class TFHelperWrapper(BaseTFWrapper):
 
     def parse_revision_spec(
         self,
-        revisions: List[str],
+        revisions: Sequence[str],
     ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
@@ -1224,8 +1228,8 @@ class TFHelperWrapper(BaseTFWrapper):
         *,
         client: TFSClient,
         revisions: SCMClientRevisionSpec,
-        include_files: List[str],
-        exclude_patterns: List[str],
+        include_files: Sequence[str],
+        exclude_patterns: Sequence[str],
     ) -> SCMClientDiffResult:
         """Return the generated diff.
 
@@ -1442,7 +1446,7 @@ class TFSClient(BaseSCMClient):
 
     def parse_revision_spec(
         self,
-        revisions: List[str] = [],
+        revisions: (Sequence[str] | None) = None,
     ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
@@ -1483,14 +1487,22 @@ class TFSClient(BaseSCMClient):
             rbtools.clients.errors.InvalidRevisionSpecError:
                 The given revision spec could not be parsed.
         """
+        if revisions is None:
+            RemovedInRBTools80Warning.warn(
+                'parse_revision_spec was called without any '
+                'arguments, or with None. The revisions argument will become '
+                'mandatory in RBTools 8.0.'
+            )
+            revisions = []
+
         return self.tf_wrapper.parse_revision_spec(revisions)
 
     def diff(
         self,
         revisions: SCMClientRevisionSpec,
         *,
-        include_files: List[str] = [],
-        exclude_patterns: List[str] = [],
+        include_files: (Sequence[str] | None) = None,
+        exclude_patterns: (Sequence[str] | None) = None,
         **kwargs,
     ) -> SCMClientDiffResult:
         """Return the generated diff.
@@ -1515,6 +1527,12 @@ class TFSClient(BaseSCMClient):
             See :py:class:`~rbtools.clients.base.scmclient.SCMClientDiffResult`
             for the format of this dictionary.
         """
+        if include_files is None:
+            include_files = []
+
+        if exclude_patterns is None:
+            exclude_patterns = []
+
         return self.tf_wrapper.diff(
             client=self,
             revisions=revisions,

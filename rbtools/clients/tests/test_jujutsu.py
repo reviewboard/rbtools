@@ -209,7 +209,7 @@ class JujutsuClientTests(BaseJujutsuClientTests):
         tip = client._get_change_id('@')
 
         self.assertEqual(
-            client.parse_revision_spec(),
+            client.parse_revision_spec([]),
             {
                 'base': base,
                 'commit_id': tip,
@@ -236,7 +236,7 @@ class JujutsuClientTests(BaseJujutsuClientTests):
         tip = client._get_change_id('@')
 
         self.assertEqual(
-            client.parse_revision_spec(),
+            client.parse_revision_spec([]),
             {
                 'base': base,
                 'commit_id': tip,
@@ -449,7 +449,8 @@ class JujutsuClientTests(BaseJujutsuClientTests):
         revisions = client.parse_revision_spec([])
 
         self.assertEqual(
-            client.diff(revisions, exclude_patterns=['exclude.txt']),
+            client.diff(revisions,
+                        exclude_patterns=['exclude.txt']),
             {
                 'commit_id': commit_id,
                 'base_commit_id': base_commit_id,
@@ -489,7 +490,8 @@ class JujutsuClientTests(BaseJujutsuClientTests):
         revisions = client.parse_revision_spec([])
 
         self.assertEqual(
-            client.diff(revisions, exclude_patterns=['exclude.txt']),
+            client.diff(revisions,
+                        exclude_patterns=['exclude.txt']),
             {
                 'commit_id': commit_id,
                 'base_commit_id': base_commit_id,

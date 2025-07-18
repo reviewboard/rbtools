@@ -7,7 +7,7 @@ import os
 import re
 import shutil
 from datetime import datetime, timezone
-from typing import Any, Dict, Final, Generic, Optional, Type, TypeVar
+from typing import Any, Dict, Final, Generic, Optional, TypeVar, TYPE_CHECKING
 from unittest import SkipTest
 
 import kgb
@@ -19,6 +19,11 @@ from rbtools.clients.errors import SCMClientDependencyError
 from rbtools.diffs.tools.errors import MissingDiffToolError
 from rbtools.testing import TestCase
 from rbtools.utils.filesystem import make_tempdir
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from rbtools.clients.base.scmclient import SCMClientDiffResult
 
 
 _TestSCMClientType_co = TypeVar('_TestSCMClientType_co',
@@ -308,10 +313,10 @@ class SCMClientTestCase(Generic[_TestSCMClientType_co],
 
     def normalize_diff_result(
         self,
-        diff_result: Dict[str, Optional[bytes]],
+        diff_result: SCMClientDiffResult | None,
         *,
         date_format: str = '%Y-%m-%d %H:%M:%S'
-    ) -> Dict[str, Optional[bytes]]:
+    ) -> SCMClientDiffResult:
         """Normalize a diff result for comparison.
 
         This will ensure that dates are all normalized to a fixed date
@@ -321,7 +326,7 @@ class SCMClientTestCase(Generic[_TestSCMClientType_co],
             4.0
 
         Args:
-            diff_result (dict):
+            diff_result (rbtools.clients.base.scmclient.SCMClientDiffResult):
                 The diff result.
 
             date_format (str, optional):
@@ -329,12 +334,13 @@ class SCMClientTestCase(Generic[_TestSCMClientType_co],
                 timestamps.
 
         Returns:
-            dict:
+            rbtools.clients.base.scmclient.SCMClientDiffResult:
             The normalized diff result.
         """
+        assert diff_result is not None
         self.assertIsInstance(diff_result, dict)
 
-        format_patterns: Dict[bytes, bytes] = {
+        format_patterns: Mapping[bytes, bytes] = {
             b'%H': br'\d{2}',
             b'%M': br'\d{2}',
             b'%S': br'\d{2}',

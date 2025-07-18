@@ -1,10 +1,12 @@
 """A client for CVS."""
 
+from __future__ import annotations
+
 import logging
 import os
 import re
 import socket
-from typing import List, Optional
+from typing import Optional, TYPE_CHECKING
 
 from rbtools.clients.base.repository import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
@@ -13,9 +15,13 @@ from rbtools.clients.base.scmclient import (BaseSCMClient,
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     TooManyRevisionsError)
+from rbtools.deprecation import RemovedInRBTools80Warning
 from rbtools.utils.checks import check_install
 from rbtools.utils.diffs import filter_diff, normalize_patterns
 from rbtools.utils.process import run_process
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class CVSClient(BaseSCMClient):
@@ -108,7 +114,7 @@ class CVSClient(BaseSCMClient):
 
     def parse_revision_spec(
         self,
-        revisions: List[str] = [],
+        revisions: (Sequence[str] | None) = None,
     ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
@@ -154,6 +160,14 @@ class CVSClient(BaseSCMClient):
             rbtools.clients.errors.TooManyRevisionsError:
                 The specified revisions list contained too many revisions.
         """
+        if revisions is None:
+            RemovedInRBTools80Warning.warn(
+                'parse_revision_spec was called without any '
+                'arguments, or with None. The revisions argument will become '
+                'mandatory in RBTools 8.0.'
+            )
+            revisions = []
+
         n_revs = len(revisions)
 
         if n_revs == 0:
@@ -174,10 +188,10 @@ class CVSClient(BaseSCMClient):
 
     def diff(
         self,
-        revisions: SCMClientRevisionSpec,
+        revisions: SCMClientRevisionSpec | None,
         *,
-        include_files: List[str] = [],
-        exclude_patterns: List[str] = [],
+        include_files: (Sequence[str] | None) = None,
+        exclude_patterns: (Sequence[str] | None) = None,
         **kwargs
     ) -> SCMClientDiffResult:
         """Perform a diff using the given revisions.
@@ -208,6 +222,13 @@ class CVSClient(BaseSCMClient):
 
             This will only populate the ``diff`` key.
         """
+        if include_files is None:
+            include_files = []
+
+        if exclude_patterns is None:
+            exclude_patterns = []
+
+        assert revisions is not None
         base = revisions['base']
         tip = revisions['tip']
 
@@ -236,7 +257,7 @@ class CVSClient(BaseSCMClient):
         # Note that `cvs diff` returns "1" if differences were found, so we
         # have to ignore that as an error.
         diff = iter(
-            run_process(diff_cmd + include_files,
+            run_process([*diff_cmd, *include_files],
                         ignore_errors=(1,),
                         log_debug_output_on_error=False)
             .stdout_bytes

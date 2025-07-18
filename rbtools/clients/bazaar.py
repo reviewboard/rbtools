@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from typing import List, Optional, cast
+from typing import List, Optional, TYPE_CHECKING, cast
 
 from rbtools.clients.base.repository import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
@@ -13,9 +13,13 @@ from rbtools.clients.base.scmclient import (BaseSCMClient,
                                             SCMClientRevisionSpec)
 from rbtools.clients.errors import (SCMClientDependencyError,
                                     TooManyRevisionsError)
+from rbtools.deprecation import RemovedInRBTools80Warning
 from rbtools.utils.checks import check_install
 from rbtools.utils.diffs import filter_diff, normalize_patterns
 from rbtools.utils.process import run_process
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 USING_PARENT_PREFIX = 'Using parent branch '
@@ -214,7 +218,7 @@ class BazaarClient(BaseSCMClient):
 
     def parse_revision_spec(
         self,
-        revisions: List[str] = [],
+        revisions: (Sequence[str] | None) = None,
     ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
@@ -253,6 +257,14 @@ class BazaarClient(BaseSCMClient):
             rbtools.clients.errors.TooManyRevisionsError:
                 The specified revisions list contained too many revisions.
         """
+        if revisions is None:
+            RemovedInRBTools80Warning.warn(
+                'parse_revision_spec was called without any '
+                'arguments, or with None. The revisions argument will become '
+                'mandatory in RBTools 8.0.'
+            )
+            revisions = []
+
         n_revs = len(revisions)
         result: SCMClientRevisionSpec
 
@@ -340,10 +352,10 @@ class BazaarClient(BaseSCMClient):
 
     def diff(
         self,
-        revisions: SCMClientRevisionSpec,
+        revisions: SCMClientRevisionSpec | None,
         *,
-        include_files: List[str] = [],
-        exclude_patterns: List[str] = [],
+        include_files: (Sequence[str] | None) = None,
+        exclude_patterns: (Sequence[str] | None) = None,
         **kwargs,
     ) -> SCMClientDiffResult:
         """Perform a diff using the given revisions.
@@ -380,11 +392,18 @@ class BazaarClient(BaseSCMClient):
 
             This will only populate the ``diff`` key.
         """
+        if include_files is None:
+            include_files = []
+
+        if exclude_patterns is None:
+            exclude_patterns = []
+
         repository_info = self.get_repository_info()
         assert repository_info is not None
         assert repository_info.path is not None
         assert isinstance(repository_info.path, str)
 
+        assert revisions is not None
         parent_base = revisions.get('parent_base')
         base = revisions['base']
         tip = revisions['tip']
@@ -424,8 +443,8 @@ class BazaarClient(BaseSCMClient):
         base: str,
         tip: str,
         repository_info: RepositoryInfo,
-        include_files: List[str],
-        exclude_patterns: List[str],
+        include_files: Sequence[str],
+        exclude_patterns: Sequence[str],
     ) -> Optional[bytes]:
         """Return the diff between 'base' and 'tip'.
 

@@ -7,6 +7,8 @@ Version Added:
     3.1
 """
 
+from __future__ import annotations
+
 import io
 import logging
 import os
@@ -14,7 +16,7 @@ import re
 import sqlite3
 from collections import OrderedDict
 from contextlib import contextmanager
-from typing import List, Optional, Union, cast
+from typing import List, Optional, Union, TYPE_CHECKING, cast
 
 from pydiffx import DiffType, DiffX
 from pydiffx.utils.text import guess_line_endings
@@ -29,12 +31,16 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
+from rbtools.deprecation import RemovedInRBTools80Warning
 from rbtools.diffs.tools.base import DiffFileResult
 from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install
 from rbtools.utils.diffs import filename_match_any_patterns
 from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import execute
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 logger = logging.getLogger(__name__)
@@ -325,7 +331,7 @@ class SOSClient(BaseSCMClient):
 
     def parse_revision_spec(
         self,
-        revisions: List[str] = [],
+        revisions: (Sequence[str] | None) = None,
     ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
@@ -363,6 +369,14 @@ class SOSClient(BaseSCMClient):
             rbtools.clients.errors.TooManyRevisionsError:
                 The specified revisions list contained too many revisions.
         """
+        if revisions is None:
+            RemovedInRBTools80Warning.warn(
+                'parse_revision_spec was called without any '
+                'arguments, or with None. The revisions argument will become '
+                'mandatory in RBTools 8.0.'
+            )
+            revisions = []
+
         n_revs = len(revisions)
 
         sos_revisions: SOSRevisionSpecExtra
@@ -453,10 +467,10 @@ class SOSClient(BaseSCMClient):
 
     def diff(
         self,
-        revisions: SCMClientRevisionSpec,
+        revisions: SCMClientRevisionSpec | None,
         *,
-        include_files: List[str] = [],
-        exclude_patterns: List[str] = [],
+        include_files: (Sequence[str] | None) = None,
+        exclude_patterns: (Sequence[str] | None) = None,
         with_parent_diff: bool = True,
         **kwargs,
     ) -> SCMClientDiffResult:
@@ -502,6 +516,13 @@ class SOSClient(BaseSCMClient):
             A dictionary containing keys documented in
             :py:class:`~rbtools.clients.base.scmclient.SCMClientDiffResult`.
         """
+        if include_files is None:
+            include_files = []
+
+        if exclude_patterns is None:
+            exclude_patterns = []
+
+        assert revisions is not None
         assert 'extra' in revisions
         revisions_extra = cast(SOSRevisionSpecExtra, revisions['extra'])
 
@@ -532,7 +553,7 @@ class SOSClient(BaseSCMClient):
                     not revisions_extra.get('has_explicit_selection')):
                     # Select all specified files (-sfo) or directories (-sdo),
                     # and allow for unmanaged files (-sunm).
-                    selection = self.INCLUDE_FILES_SELECTION + include_files
+                    selection = [*self.INCLUDE_FILES_SELECTION, *include_files]
                 else:
                     selection = revisions_extra['sos_selection']
             else:

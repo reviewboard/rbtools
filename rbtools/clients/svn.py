@@ -26,6 +26,7 @@ from rbtools.clients.errors import (AuthenticationError,
                                     SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
+from rbtools.deprecation import RemovedInRBTools80Warning
 from rbtools.diffs.patches import PatchResult
 from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install
@@ -40,6 +41,8 @@ from rbtools.utils.process import (RunProcessError,
 from rbtools.utils.streams import BufferedIterator
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from rbtools.diffs.patches import Patch
     from rbtools.api.resource import (
         RepositoryInfoResource,
@@ -613,7 +616,7 @@ class SVNClient(BaseSCMClient):
 
     def parse_revision_spec(
         self,
-        revisions: List[str] = [],
+        revisions: (Sequence[str] | None) = None,
     ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
@@ -652,6 +655,14 @@ class SVNClient(BaseSCMClient):
             rbtools.clients.errors.TooManyRevisionsError:
                 The specified revisions list contained too many revisions.
         """
+        if revisions is None:
+            RemovedInRBTools80Warning.warn(
+                'parse_revision_spec was called without any '
+                'arguments, or with None. The revisions argument will become '
+                'mandatory in RBTools 8.0.'
+            )
+            revisions = []
+
         n_revisions = len(revisions)
 
         if n_revisions == 1 and ':' in revisions[0]:
@@ -852,10 +863,10 @@ class SVNClient(BaseSCMClient):
 
     def diff(
         self,
-        revisions: SCMClientRevisionSpec,
+        revisions: SCMClientRevisionSpec | None,
         *,
-        include_files: List[str] = [],
-        exclude_patterns: List[str] = [],
+        include_files: (Sequence[str] | None) = None,
+        exclude_patterns: (Sequence[str] | None) = None,
         **kwargs,
     ) -> SCMClientDiffResult:
         """Perform a diff in a Subversion repository.
@@ -889,6 +900,12 @@ class SVNClient(BaseSCMClient):
             A dictionary containing keys documented in
             :py:class:`rbtools.clients.base.scmclient.SCMClientDiffResult`.
         """
+        if include_files is None:
+            include_files = []
+
+        if exclude_patterns is None:
+            exclude_patterns = []
+
         repository_info = self.get_repository_info()
         assert repository_info is not None
 
@@ -908,10 +925,11 @@ class SVNClient(BaseSCMClient):
             'tip': None,
         }
 
+        assert revisions is not None
         base = str(revisions['base'])
         tip = str(revisions['tip'])
 
-        diff_cmd: List[str] = ['diff', '--diff-cmd=diff', '--notice-ancestry']
+        diff_cmd: list[str] = ['diff', '--diff-cmd=diff', '--notice-ancestry']
 
         if (self.capabilities and
             self.capabilities.has_capability('diffs', 'file_attachments')):
@@ -1031,8 +1049,8 @@ class SVNClient(BaseSCMClient):
         self,
         repository_info: RepositoryInfo,
         changelist: Optional[str],
-        include_files: List[str],
-        exclude_patterns: List[str],
+        include_files: Sequence[str],
+        exclude_patterns: Sequence[str],
     ) -> bool:
         """Return whether any files have history scheduled.
 

@@ -8,8 +8,7 @@ import re
 import uuid
 from contextlib import ExitStack
 from gettext import gettext as _
-from typing import (Any, Iterator, Optional, Sequence, TYPE_CHECKING, Union,
-                    cast)
+from typing import Any, Optional, TYPE_CHECKING, Union, cast
 from urllib.parse import urlsplit, urlunparse
 
 from housekeeping import deprecate_non_keyword_only_args
@@ -27,6 +26,7 @@ from rbtools.clients.errors import (CreateCommitError,
                                     SCMError,
                                     TooManyRevisionsError)
 from rbtools.clients.svn import SVNClient
+from rbtools.deprecation import RemovedInRBTools80Warning
 from rbtools.diffs.errors import ApplyPatchError
 from rbtools.diffs.patches import PatchAuthor, PatchResult
 from rbtools.utils.checks import check_install
@@ -37,6 +37,7 @@ from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import execute
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator, Sequence
     from urllib.parse import SplitResult
 
     from rbtools.diffs.patches import Patch
@@ -594,7 +595,7 @@ class MercurialClient(BaseSCMClient):
 
     def parse_revision_spec(
         self,
-        revisions: list[str] = [],
+        revisions: (Sequence[str] | None) = None,
     ) -> SCMClientRevisionSpec:
         """Parse the given revision spec.
 
@@ -638,6 +639,14 @@ class MercurialClient(BaseSCMClient):
             rbtools.clients.errors.TooManyRevisionsError:
                 The specified revisions list contained too many revisions.
         """
+        if revisions is None:
+            RemovedInRBTools80Warning.warn(
+                'parse_revision_spec was called without any '
+                'arguments, or with None. The revisions argument will become '
+                'mandatory in RBTools 8.0.'
+            )
+            revisions = []
+
         result: SCMClientRevisionSpec
 
         self._init()
@@ -950,10 +959,10 @@ class MercurialClient(BaseSCMClient):
 
     def diff(
         self,
-        revisions: SCMClientRevisionSpec,
+        revisions: SCMClientRevisionSpec | None,
         *,
-        include_files: list[str] = [],
-        exclude_patterns: list[str] = [],
+        include_files: (Sequence[str] | None) = None,
+        exclude_patterns: (Sequence[str] | None) = None,
         with_parent_diff: bool = True,
         **kwargs,
     ) -> SCMClientDiffResult:
@@ -987,6 +996,12 @@ class MercurialClient(BaseSCMClient):
             A dictionary containing keys documented in
             :py:class:`~rbtools.clients.base.scmclient.SCMClientDiffResult`.
         """
+        if include_files is None:
+            include_files = []
+
+        if exclude_patterns is None:
+            exclude_patterns = []
+
         self._init()
 
         diff_args = ['--hidden', '--nodates', '-g']
@@ -999,6 +1014,7 @@ class MercurialClient(BaseSCMClient):
         for pattern in exclude_patterns:
             diff_args += ['-X', pattern]
 
+        assert revisions is not None
         node_base_id = cast(str, revisions['base'])
 
         diff = self._run_diff(diff_args,
@@ -1187,7 +1203,7 @@ class MercurialClient(BaseSCMClient):
         message: str,
         author: PatchAuthor,
         run_editor: bool,
-        files: list[str] = [],
+        files: (Sequence[str] | None) = None,
         all_files: bool = False,
     ) -> None:
         """Commit the given modified files.
@@ -1220,6 +1236,9 @@ class MercurialClient(BaseSCMClient):
                 The commit message could not be created. It may have been
                 aborted by the user.
         """
+        if files is None:
+            files = []
+
         if run_editor:
             filename = make_tempfile(content=message.encode('utf-8'),
                                      prefix='hg-editor-',
