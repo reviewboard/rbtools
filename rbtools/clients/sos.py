@@ -787,7 +787,7 @@ class SOSClient(BaseSCMClient):
             self._get_wa_root() or
             os.getcwd()
         )
-
+       # print(f"SUBCOMMAND is {subcommand} and args {args}")
         return execute(['soscmd', subcommand] + list(args),
                        cwd=cwd,
                        **kwargs)
@@ -1713,11 +1713,11 @@ class SOSClient(BaseSCMClient):
                 # For unmanaged (generally new) files, we want to diff against
                 # an empty temp file. We'll export if it's anything but new.
                 if orig_revision != SOSObjectRevision.UNMANAGED:
-                    assert isinstance(orig_revision, int)
+                  #  assert isinstance(orig_revision, int)
 
                     os.unlink(tmp_orig_filename)
                     self.run_soscmd('exportrev',
-                                    '%s/#/%d' % (filename, orig_revision),
+                                    '%s/#/%s' % (filename, str(orig_revision).strip()),
                                     '-out%s' % tmp_orig_filename)
 
             # Diff the new file against that.
