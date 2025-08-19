@@ -968,25 +968,6 @@ class BaseCommand:
         repository_info = self.repository_info
         tool = self.tool
 
-        if self.needs_scm_client:
-            # _init_server_url might have already done this, in the case that
-            # it needed to use the SCM client to detect the server name. Only
-            # repeat if necessary.
-            if repository_info is None and tool is None:
-                repository_info, tool = self.initialize_scm_tool(
-                    client_name=getattr(self.options, 'repository_type', None))
-                self.repository_info = repository_info
-                self.tool = tool
-
-            assert tool is not None
-
-            # Some SCMs allow configuring the repository name in the SCM
-            # metadata. This is a legacy configuration, and is only used as a
-            # fallback for when the repository name is not specified through
-            # the config or command line.
-            if options.repository_name is None:
-                options.repository_name = tool.get_repository_name()
-
         # The TREES config allows people to namespace config keys in a single
         # .reviewboardrc file. We look for matching keys in that for the local
         # repository path, as well as all remote paths for the repository. If
@@ -1027,6 +1008,26 @@ class BaseCommand:
                     del self.config['TREES']
 
                     raise NeedsReinitialize()
+
+        if self.needs_scm_client:
+            # _init_server_url might have already done this, in the case that
+            # it needed to use the SCM client to detect the server name. Only
+            # repeat if necessary.
+            if repository_info is None and tool is None:
+                repository_info, tool = self.initialize_scm_tool(
+                    client_name=getattr(self.options, 'repository_type', None))
+
+            self.repository_info = repository_info
+            self.tool = tool
+
+            assert tool is not None
+
+            # Some SCMs allow configuring the repository name in the SCM
+            # metadata. This is a legacy configuration, and is only used as a
+            # fallback for when the repository name is not specified through
+            # the config or command line.
+            if options.repository_name is None:
+                options.repository_name = tool.get_repository_name()
 
         if self.needs_api:
             self.server_url = self._init_server_url()
