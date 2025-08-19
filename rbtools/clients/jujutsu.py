@@ -249,7 +249,16 @@ class JujutsuClient(BaseSCMClient):
                     .read()
                     .strip()
                 )
-                store_base = os.path.join(jj_root, '.jj', 'repo', 'store')
+
+                repo = os.path.join(jj_root, '.jj', 'repo')
+
+                # jj workspaces have 'repo' as a file containing the path to
+                # the parent checkout.
+                if not os.path.isdir(repo):
+                    with open(repo, encoding='utf-8') as f:
+                        repo = f.read().strip()
+
+                store_base = os.path.join(repo, 'store')
                 target = os.path.join(store_base, 'git_target')
 
                 if not os.path.exists(target):
