@@ -513,6 +513,48 @@ class JujutsuClientTests(BaseJujutsuClientTests):
                 'parent_diff': None,
             })
 
+    def test_diff_with_deleted_files(self) -> None:
+        """Testing JujutsuClient.diff with deleted files"""
+        client = self.build_client(needs_diff=True)
+        client.get_repository_info()
+
+        base_commit_id = client._get_change_id('@-')
+
+        # Delete the file from working copy
+        os.unlink('foo.txt')
+        commit_id = client._get_change_id('@')
+
+        revisions = client.parse_revision_spec([])
+
+        self.assertEqual(
+            client.diff(revisions),
+            {
+                'base_commit_id': base_commit_id,
+                'commit_id': commit_id,
+                'diff': (
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'deleted file mode 100644\n'
+                    b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+                    b'0000000000000000000000000000000000000000\n\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ /dev/null\n'
+                    b'@@ -1,12 +0,0 @@\n'
+                    b'-ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'-Italiam, fato profugus, Laviniaque venit\n'
+                    b'-litora, multum ille et terris iactatus et alto\n'
+                    b'-vi superum saevae memorem Iunonis ob iram;\n'
+                    b'-multa quoque et bello passus, dum conderet urbem,\n'
+                    b'-inferretque deos Latio, genus unde Latinum,\n'
+                    b'-Albanique patres, atque altae moenia Romae.\n'
+                    b'-Musa, mihi causas memora, quo numine laeso,\n'
+                    b'-quidve dolens, regina deum tot volvere casus\n'
+                    b'-insignem pietate virum, tot adire labores\n'
+                    b'-impulerit. Tantaene animis caelestibus irae?\n'
+                    b'-\n'
+                ),
+                'parent_diff': None,
+            })
+
     def test_diff_with_exclude_patterns_root_pattern_in_subdir(self) -> None:
         """Testing JujutsuClient.diff with file exclusion in the repo root"""
         client = self.build_client(needs_diff=True)
@@ -758,7 +800,7 @@ class JujutsuClientTests(BaseJujutsuClientTests):
             .stdout
             .read()
         )
-        self.assertIn('The working copy is clean', status)
+        self.assertIn('The working copy has no changes', status)
 
         message = (
             run_process(['jj', 'log', '-r' '@-', '--no-graph', '-T',

@@ -1338,7 +1338,7 @@ class JujutsuClient(BaseSCMClient):
                 An error occurred while processing the diff.
         """
         index_re = re.compile(
-            br'^index (?P<a>[0-9a-f]+)..(?P<b>[0-9a-f]+) (?P<rest>.*)$')
+            br'^index (?P<a>[0-9a-f]+)..(?P<b>[0-9a-f]+)((?P<rest>\s.*)?)$')
         sha_result_re = re.compile(r'^(?P<sha>[0-9a-f]+) blob \d+$')
 
         with subprocess.Popen(
@@ -1363,7 +1363,7 @@ class JujutsuClient(BaseSCMClient):
                 if m:
                     sha_a = m.group('a').decode()
                     sha_b = m.group('b').decode()
-                    rest = m.group('rest').decode()
+                    rest = m.group('rest') or b''
 
                     partial_hashes.append(sha_a)
                     partial_hashes.append(sha_b)
@@ -1372,13 +1372,18 @@ class JujutsuClient(BaseSCMClient):
                     p.stdin.write(f'{sha_b}\n')
 
                     index_lines.add(i)
-                    index_lines_rest.append(rest)
+                    index_lines_rest.append(rest.decode())
 
             p.stdin.close()
 
             sha_results = p.stdout.read().splitlines()
 
             for i, result in enumerate(sha_results):
+                if result == '0000000000 missing':
+                    full_hashes.append('0' * 40)
+
+                    continue
+
                 m = sha_result_re.match(result)
 
                 if m:
@@ -1404,6 +1409,6 @@ class JujutsuClient(BaseSCMClient):
                     sha_b = full_hashes.pop()
                     rest = index_lines_rest.pop()
 
-                    yield f'index {sha_a}..{sha_b} {rest}\n'.encode()
+                    yield f'index {sha_a}..{sha_b}{rest}\n'.encode()
                 else:
                     yield line
