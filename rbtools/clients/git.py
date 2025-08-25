@@ -31,6 +31,7 @@ from rbtools.utils.diffs import (normalize_patterns,
                                  filename_match_any_patterns)
 from rbtools.utils.encoding import force_unicode
 from rbtools.utils.errors import EditorError
+from rbtools.utils.filesystem import chdir
 from rbtools.utils.process import (RunProcessError,
                                    RunProcessResult,
                                    run_process)
@@ -122,6 +123,16 @@ class GitPatcher(SCMClientPatcher['GitClient']):
         if self.revert:
             cmd.append('-R')
 
+        binary_files = patch.binary_files
+
+        # Because the regular patch doesn't include actual binary file diffs,
+        # we'll get errors about "missing binary file data". We therefore
+        # exclude these paths from `git apply` and manually apply the binary
+        # files below.
+        for binary_file in binary_files:
+            escaped_path = self._escape_path_pattern(binary_file.path)
+            cmd.append(f'--exclude={escaped_path}')
+
         p = patch.prefix_level
 
         if p:
@@ -151,12 +162,157 @@ class GitPatcher(SCMClientPatcher['GitClient']):
         else:
             applied = False
 
+        if applied and binary_files:
+            repository_info = self.scmclient.get_repository_info()
+            assert repository_info is not None
+
+            local_path = repository_info.local_path
+            assert local_path is not None
+
+            # `git apply` will apply the patch to the entire repository no
+            # matter what the cwd is, but for binary files we need to be in
+            # the repository root.
+            with chdir(local_path):
+                binary_applied, binary_failed = self.apply_binary_files(
+                    binary_files)
+        else:
+            binary_applied = None
+            binary_failed = None
+
         return PatchResult(applied=applied,
                            has_conflicts=has_conflicts,
                            conflicting_files=conflicting_files,
                            patch_output=data,
                            patch=patch,
-                           patch_range=(patch_num, patch_num))
+                           patch_range=(patch_num, patch_num),
+                           binary_applied=binary_applied,
+                           binary_failed=binary_failed)
+
+    def handle_add_file(
+        self,
+        path: str,
+        content: bytes,
+    ) -> None:
+        """Add a file.
+
+        Version Added:
+            6.0
+
+        Args:
+            path (str):
+                The path to the file.
+
+            content (bytes):
+                The content for the file.
+
+        Raises:
+            OSError:
+                A file operation failed.
+
+            Exception:
+                An error occurred when running ``git``.
+        """
+        super().handle_add_file(path, content)
+        self.scmclient._run_git(['add', self._escape_path_pathspec(path)])
+
+    def handle_move_file(
+        self,
+        old_path: str,
+        new_path: str,
+    ) -> None:
+        """Move a file.
+
+        Version Added:
+            6.0
+
+        Args:
+            old_path (str):
+                The old filename.
+
+            new_path (str):
+                The new filename.
+
+        Raises:
+            OSError:
+                A file operation failed.
+
+            Exception:
+                An error occurred when running ``git``.
+        """
+        # Create the directory if it doesn't exist.
+        dirname = os.path.dirname(new_path)
+
+        if dirname:
+            os.makedirs(dirname, exist_ok=True)
+
+        self.scmclient._run_git(['mv', old_path, new_path])
+
+    def handle_remove_file(
+        self,
+        path: str,
+    ) -> None:
+        """Delete a file.
+
+        Version Added:
+            6.0
+
+        Args:
+            path (str):
+                The path to the file to delete.
+
+        Raises:
+            Exception:
+                An error occurred when running ``git``.
+        """
+        self.scmclient._run_git(['rm', self._escape_path_pathspec(path)])
+
+    def _escape_path_pattern(
+        self,
+        path: str,
+    ) -> str:
+        """Escape a path so git does not interperet it as a path-pattern.
+
+        `git apply --exclude` has its own path-pattern implementation that
+        handles a small set of special characters. This method escapes a path
+        so that it will not accidentally be interpreted as a pattern.
+
+        Version Added:
+            6.0
+
+        Args:
+            path (str):
+                The file path.
+
+        Returns:
+            str:
+            The escaped path.
+        """
+        return (
+            path
+            .replace('\\', '\\\\')
+            .replace('*', '\\*')
+            .replace('?', '\\?')
+            .replace('[', '\\[')
+        )
+
+    def _escape_path_pathspec(
+        self,
+        path: str,
+    ) -> str:
+        """Escape a path so git does not interpret it as a pathspec.
+
+        Version Added:
+            6.0
+
+        Args:
+            path (str):
+                The file path.
+
+        Returns:
+            str:
+            The escaped path.
+        """
+        return f':(literal){path}'
 
 
 class GitClient(BaseSCMClient):

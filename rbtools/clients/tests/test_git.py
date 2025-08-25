@@ -9,6 +9,7 @@ from typing import ClassVar, Optional, TYPE_CHECKING
 
 import kgb
 
+from rbtools.api.resource import FileAttachmentItemResource
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.errors import (CreateCommitError,
                                     MergeError,
@@ -18,7 +19,8 @@ from rbtools.clients.errors import (CreateCommitError,
                                     TooManyRevisionsError)
 from rbtools.clients.git import GitClient, get_git_candidates
 from rbtools.clients.tests import FOO1, FOO2, FOO3, FOO4, SCMClientTestCase
-from rbtools.diffs.patches import Patch, PatchAuthor
+from rbtools.diffs.patches import BinaryFilePatch, Patch, PatchAuthor
+from rbtools.testing.api.transport import URLMapTransport
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import is_exe_in_path
 from rbtools.utils.process import (RunProcessResult,
@@ -2759,7 +2761,7 @@ class GitPatcherTests(BaseGitClientTests):
         self.assertTrue(result.success)
         self.assertIsNotNone(result.patch)
 
-        with open('foo.txt', 'rb') as fp:
+        with open('foo.txt', mode='rb') as fp:
             self.assertEqual(fp.read(), FOO1)
 
         # There should not be a new commit. HEAD won't change.
@@ -2805,7 +2807,7 @@ class GitPatcherTests(BaseGitClientTests):
         self.assertTrue(result.success)
         self.assertIsNotNone(result.patch)
 
-        with open('foo.txt', 'rb') as fp:
+        with open('foo.txt', mode='rb') as fp:
             self.assertEqual(fp.read(), FOO1)
 
         # There should be a new commit.
@@ -2865,7 +2867,7 @@ class GitPatcherTests(BaseGitClientTests):
         self.assertTrue(result.success)
         self.assertIsNotNone(result.patch)
 
-        with open('foo.txt', 'rb') as fp:
+        with open('foo.txt', mode='rb') as fp:
             self.assertEqual(fp.read(), FOO2)
 
         # There should not be a new commit. HEAD won't change.
@@ -2929,7 +2931,7 @@ class GitPatcherTests(BaseGitClientTests):
         self.assertTrue(result.success)
         self.assertIsNotNone(result.patch)
 
-        with open('foo.txt', 'rb') as fp:
+        with open('foo.txt', mode='rb') as fp:
             self.assertEqual(fp.read(), FOO2)
 
         # There should be two new commits.
@@ -2991,7 +2993,7 @@ class GitPatcherTests(BaseGitClientTests):
         self.assertTrue(result.success)
         self.assertIsNotNone(result.patch)
 
-        with open('foo.txt', 'rb') as fp:
+        with open('foo.txt', mode='rb') as fp:
             self.assertEqual(
                 fp.read(),
                 b'ARMA virumque cano, Troiae qui primus ab oris\n'
@@ -3069,7 +3071,7 @@ class GitPatcherTests(BaseGitClientTests):
         self.assertTrue(result.success)
         self.assertIsNotNone(result.patch)
 
-        with open('foo.txt', 'rb') as fp:
+        with open('foo.txt', mode='rb') as fp:
             self.assertEqual(
                 fp.read(),
                 b'ARMA virumque cano, Troiae qui primus ab oris\n'
@@ -3086,3 +3088,754 @@ class GitPatcherTests(BaseGitClientTests):
 
         # There should be two new commits.
         self.assertEqual(self._git_get_num_commits(), num_commits + 2)
+
+    def test_binary_file_add(self) -> None:
+        """Testing GitPatcher with an added binary file"""
+        client = self.build_client()
+
+        test_content = b'Binary file content'
+        test_path = 'new_binary_file.bin'
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 123,
+                'absolute_url': 'https://example.com/r/1/file/123/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/123/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=None,
+            new_path=test_path,
+            status='added',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        patch_content = (
+            b'diff --git a/new_binary_file.bin b/new_binary_file.bin\n'
+            b'new file mode 100644\n'
+            b'index 0000000..e69de29 100644\n'
+            b'Binary files /dev/null and b/new_binary_file.bin differ\n'
+        )
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(patches=[patch])
+
+        self.spy_on(client._run_git)
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], test_path)
+
+        self.assertTrue(os.path.exists(test_path))
+
+        with open(test_path, mode='rb') as f:
+            self.assertEqual(f.read(), test_content)
+
+        self.assertSpyCalledWith(
+            client._run_git, ['add', f':(literal){test_path}'])
+
+    def test_binary_file_add_with_special_chars(self) -> None:
+        """Testing GitPatcher with binary file containing special characters"""
+        client = self.build_client()
+
+        test_content = b'Binary file content'
+        # Test path with special characters that need escaping: *, ?, [
+        test_path = 'images/test_file*with?special[chars].bin'
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 123,
+                'absolute_url': 'https://example.com/r/1/file/123/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/123/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=None,
+            new_path=test_path,
+            status='added',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        patch_content = (
+            b'diff --git a/images/test_file*with?special[chars].bin '
+            b'b/images/test_file*with?special[chars].bin\n'
+            b'new file mode 100644\n'
+            b'index 0000000..e69de29 100644\n'
+            b'Binary files /dev/null and '
+            b'b/images/test_file*with?special[chars].bin differ\n'
+        )
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(patches=[patch])
+
+        self.spy_on(client._run_git)
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], test_path)
+
+        self.assertTrue(os.path.exists(test_path))
+
+        with open(test_path, mode='rb') as f:
+            self.assertEqual(f.read(), test_content)
+
+        self.assertSpyCalledWith(
+            client._run_git, ['add', f':(literal){test_path}'])
+
+        # Verify that the path was properly escaped in the git apply call
+        # The escaped path should have *, ?, [ characters escaped with
+        # backslashes.
+        git_apply_calls = [
+            call for call in client._run_git.spy.calls
+            if call.args[0][0] == 'apply'
+        ]
+        self.assertEqual(len(git_apply_calls), 1)
+
+        apply_command = git_apply_calls[0].args[0]
+
+        # Check that the exclude parameter has properly escaped special
+        # characters.
+        exclude_arg = None
+
+        for arg in apply_command:
+            if arg.startswith('--exclude='):
+                exclude_arg = arg
+                break
+
+        self.assertIsNotNone(exclude_arg)
+        self.assertEqual(
+            exclude_arg,
+            '--exclude=images/test_file\\*with\\?special\\[chars].bin')
+
+        with open(test_path, mode='rb') as f:
+            self.assertEqual(f.read(), test_content)
+
+    def test_binary_file_add_in_subdirectory(self) -> None:
+        """Testing GitPatcher with an added binary file in a subdirectory"""
+        client = self.build_client()
+
+        test_content = b'Binary file content'
+        test_path = 'subdir/new_binary_file.bin'
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 124,
+                'absolute_url': 'https://example.com/r/1/file/124/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/124/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=None,
+            new_path=test_path,
+            status='added',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        patch_content = (
+            b'diff --git a/subdir/new_binary_file.bin '
+            b'b/subdir/new_binary_file.bin\n'
+            b'new file mode 100644\n'
+            b'index 0000000000000000000000000000000000000000..'
+            b'0a0efb879d12d3480ad13cfb2e5db80db8f52ea1\n'
+            b'Binary files /dev/null and b/subdir/new_binary_file.bin differ\n'
+        )
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(patches=[patch])
+
+        self.spy_on(client._run_git)
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], test_path)
+
+        self.assertTrue(os.path.exists('subdir'))
+        self.assertTrue(os.path.exists(test_path))
+
+        with open(test_path, mode='rb') as f:
+            self.assertEqual(f.read(), test_content)
+
+        self.assertSpyCalledWith(
+            client._run_git, ['add', f':(literal){test_path}'])
+
+    def test_binary_file_move(self) -> None:
+        """Testing GitPatcher with a moved binary file"""
+        client = self.build_client()
+
+        old_path = 'old_file.bin'
+        new_path = 'new_file.bin'
+        test_content = b'Binary file content'
+
+        with open(old_path, mode='wb') as f:
+            f.write(b'Old file content')
+
+        self._run_git(['add', old_path])
+        self._run_git(['commit', '-m', 'Add old file'])
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 125,
+                'absolute_url': 'https://example.com/r/1/file/125/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/125/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=old_path,
+            new_path=new_path,
+            status='moved',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        patch_content = (
+            b'diff --git a/old_file.bin b/new_file.bin\n'
+            b'index c9385c77b66550a9abc0bacc5fd7d739e74c12bd..'
+            b'0a0efb879d12d3480ad13cfb2e5db80db8f52ea1 100644\n'
+            b'rename from old_file.bin\n'
+            b'rename to new_file.bin\n'
+            b'Binary files a/old_file.bin and b/new_file.bin differ\n'
+        )
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(patches=[patch])
+
+        self.spy_on(client._run_git)
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], new_path)
+
+        self.assertSpyCalledWith(client._run_git, ['mv', old_path, new_path])
+
+    def test_binary_file_move_with_subdirectory(self) -> None:
+        """Testing GitPatcher with a moved binary file into a subdirectory"""
+        client = self.build_client()
+
+        old_path = 'old_file.bin'
+        new_path = 'subdir/new_file.bin'
+        test_content = b'Binary file content'
+
+        with open(old_path, mode='wb') as f:
+            f.write(b'Old file content')
+
+        self._run_git(['add', old_path])
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 126,
+                'absolute_url': 'https://example.com/r/1/file/126/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/126/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=old_path,
+            new_path=new_path,
+            status='moved',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        patch_content = (
+            b'diff --git a/old_file.bin b/subdir/new_file.bin\n'
+            b'index c9385c77b66550a9abc0bacc5fd7d739e74c12bd..'
+            b'0a0efb879d12d3480ad13cfb2e5db80db8f52ea1 100644\n'
+            b'rename from old_file.bin\n'
+            b'rename to subdir/new_file.bin\n'
+            b'Binary files a/old_file.bin and b/subdir/new_file.bin differ\n'
+        )
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(patches=[patch])
+
+        self.spy_on(client._run_git)
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], new_path)
+
+        self.assertTrue(os.path.exists('subdir'))
+
+        self.assertSpyCalledWith(client._run_git, ['mv', old_path, new_path])
+
+    def test_binary_file_remove(self) -> None:
+        """Testing GitPatcher with a removed binary file."""
+        client = self.build_client()
+
+        test_path = 'file_to_remove.bin'
+        test_content = b'Binary file content'
+
+        with open(test_path, mode='wb') as f:
+            f.write(test_content)
+
+        self._run_git(['add', test_path])
+        self._run_git(['commit', '-m', 'Add test file'])
+
+        binary_file = self.make_binary_file_patch(
+            old_path=test_path,
+            new_path=None,
+            status='deleted',
+            file_attachment=None,
+            content=test_content,
+        )
+
+        patch_content = (
+            b'diff --git a/dummy b/dummy\n'
+            b'new file mode 100644\n'
+            b'index 0000000..e69de29\n'
+            b'--- /dev/null\n'
+            b'+++ b/dummy\n'
+        )
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(patches=[patch])
+
+        self.spy_on(client._run_git)
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], test_path)
+
+        self.assertSpyCalledWith(
+            client._run_git, ['rm', f':(literal){test_path}'])
+
+    def test_patch_with_empty_files(self) -> None:
+        """Testing GitPatcher.patch with empty files."""
+        client = self.build_client()
+
+        empty_to_delete = 'empty_delete.txt'
+        with open(empty_to_delete, mode='w', encoding='utf-8') as f:
+            pass
+
+        self._run_git(['add', empty_to_delete])
+        self._run_git(['commit', '-m', 'Add empty file'])
+
+        empty_to_add = 'empty_add.txt'
+
+        patch_content = (
+            b'diff --git a/empty_add.txt b/empty_add.txt\n'
+            b'new file mode 100644\n'
+            b'index 0000000..e69de29\n'
+            b'--- /dev/null\n'
+            b'+++ b/empty_add.txt\n'
+            b'diff --git a/empty_delete.txt b/empty_delete.txt\n'
+            b'deleted file mode 100644\n'
+            b'index e69de29..0000000\n'
+            b'--- a/empty_delete.txt\n'
+            b'+++ /dev/null\n'
+        )
+
+        patcher = client.get_patcher(patches=[
+            Patch(content=patch_content),
+        ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        self.assertTrue(os.path.exists(empty_to_add))
+
+        with open(empty_to_add, mode='rb') as f:
+            self.assertEqual(f.read(), b'')
+
+        self.assertFalse(os.path.exists(empty_to_delete))
+
+    def test_patch_with_regular_and_empty_files(self) -> None:
+        """Testing GitPatcher.patch with regular and empty files."""
+        client = self.build_client()
+
+        self._run_git(['update-index', '--refresh'])
+
+        empty_to_delete = 'empty_delete.txt'
+        with open(empty_to_delete, mode='w', encoding='utf-8') as f:
+            pass
+
+        self._run_git(['add', empty_to_delete])
+        self._run_git(['commit', '-m', 'Add empty file'])
+
+        empty_to_add = 'empty_add.txt'
+
+        patch_content = (
+            b'diff --git a/foo.txt b/foo.txt\n'
+            b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+            b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
+            b'--- a/foo.txt\n'
+            b'+++ b/foo.txt\n'
+            b'@@ -6,7 +6,4 @@ multa quoque et bello passus, '
+            b'dum conderet urbem,\n'
+            b' inferretque deos Latio, genus unde Latinum,\n'
+            b' Albanique patres, atque altae moenia Romae.\n'
+            b' Musa, mihi causas memora, quo numine laeso,\n'
+            b'-quidve dolens, regina deum tot volvere casus\n'
+            b'-insignem pietate virum, tot adire labores\n'
+            b'-impulerit. Tantaene animis caelestibus irae?\n'
+            b' \n'
+            b'diff --git a/empty_add.txt b/empty_add.txt\n'
+            b'new file mode 100644\n'
+            b'index 0000000..e69de29\n'
+            b'--- /dev/null\n'
+            b'+++ b/empty_add.txt\n'
+            b'diff --git a/empty_delete.txt b/empty_delete.txt\n'
+            b'deleted file mode 100644\n'
+            b'index e69de29..0000000\n'
+            b'--- a/empty_delete.txt\n'
+            b'+++ /dev/null\n'
+        )
+
+        patcher = client.get_patcher(patches=[
+            Patch(content=patch_content),
+        ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        with open('foo.txt', mode='rb') as fp:
+            self.assertEqual(fp.read(), FOO1)
+
+        self.assertTrue(os.path.exists(empty_to_add))
+        with open(empty_to_add, mode='rb') as f:
+            self.assertEqual(f.read(), b'')
+
+        self.assertFalse(os.path.exists(empty_to_delete))
+
+    def test_patch_with_regular_and_binary_files(self) -> None:
+        """Testing GitPatcher.patch with regular and binary files."""
+        client = self.build_client()
+
+        self._run_git(['update-index', '--refresh'])
+
+        binary_add_path = 'new_image.png'
+        binary_add_content = b'\x89PNG\r\n\x1a\n new image'
+
+        binary_modify_path = 'existing.bin'
+        binary_modify_old_content = b'old binary content'
+        binary_modify_new_content = b'new binary content'
+
+        with open(binary_modify_path, mode='wb') as f:
+            f.write(binary_modify_old_content)
+
+        self._run_git(['add', binary_modify_path])
+        self._run_git(['commit', '-m', 'Add existing binary'])
+
+        attachment_add = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 201,
+                'absolute_url': 'https://example.com/r/1/file/201/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/201/'
+        )
+
+        attachment_modify = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 202,
+                'absolute_url': 'https://example.com/r/1/file/202/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/202/'
+        )
+
+        binary_file_add = self.make_binary_file_patch(
+            old_path=None,
+            new_path=binary_add_path,
+            status='added',
+            file_attachment=attachment_add,
+            content=binary_add_content,
+        )
+
+        binary_file_modify = self.make_binary_file_patch(
+            old_path=binary_modify_path,
+            new_path=binary_modify_path,
+            status='modified',
+            file_attachment=attachment_modify,
+            content=binary_modify_new_content,
+        )
+
+        patch_content = (
+            b'diff --git a/foo.txt b/foo.txt\n'
+            b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+            b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
+            b'--- a/foo.txt\n'
+            b'+++ b/foo.txt\n'
+            b'@@ -6,7 +6,4 @@ multa quoque et bello passus, '
+            b'dum conderet urbem,\n'
+            b' inferretque deos Latio, genus unde Latinum,\n'
+            b' Albanique patres, atque altae moenia Romae.\n'
+            b' Musa, mihi causas memora, quo numine laeso,\n'
+            b'-quidve dolens, regina deum tot volvere casus\n'
+            b'-insignem pietate virum, tot adire labores\n'
+            b'-impulerit. Tantaene animis caelestibus irae?\n'
+            b' \n'
+            b'diff --git a/new_image.png b/new_image.png\n'
+            b'new file mode 100644\n'
+            b'index 0000000..abc1234\n'
+            b'Binary files /dev/null and b/new_image.png differ\n'
+            b'diff --git a/existing.bin b/existing.bin\n'
+            b'index def5678..abc1234 100644\n'
+            b'Binary files a/existing.bin and b/existing.bin differ\n'
+        )
+
+        patch = Patch(
+            content=patch_content,
+            binary_files=[binary_file_add, binary_file_modify]
+        )
+        patcher = client.get_patcher(patches=[patch])
+
+        self.spy_on(client._run_git)
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 2)
+        self.assertIn(binary_add_path, result.binary_applied)
+        self.assertIn(binary_modify_path, result.binary_applied)
+
+        with open('foo.txt', mode='rb') as fp:
+            self.assertEqual(fp.read(), FOO1)
+
+        self.assertTrue(os.path.exists(binary_add_path))
+        with open(binary_add_path, mode='rb') as f:
+            self.assertEqual(f.read(), binary_add_content)
+
+        self.assertTrue(os.path.exists(binary_modify_path))
+        with open(binary_modify_path, mode='rb') as f:
+            self.assertEqual(f.read(), binary_modify_new_content)
+
+    def test_patch_with_empty_and_binary_files(self) -> None:
+        """Testing GitPatcher.patch with empty and binary files."""
+        client = self.build_client()
+
+        empty_to_delete = 'empty_delete.txt'
+        with open(empty_to_delete, mode='w', encoding='utf-8') as f:
+            pass
+
+        self._run_git(['add', empty_to_delete])
+        self._run_git(['commit', '-m', 'Add empty file'])
+
+        empty_to_add = 'empty_add.txt'
+        binary_path = 'archive.zip'
+        binary_content = b'PK\x03\x04 zip content'
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 300,
+                'absolute_url': 'https://example.com/r/1/file/300/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/300/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=None,
+            new_path=binary_path,
+            status='added',
+            file_attachment=attachment,
+            content=binary_content,
+        )
+
+        patch_content = (
+            b'diff --git a/empty_add.txt b/empty_add.txt\n'
+            b'new file mode 100644\n'
+            b'index 0000000..e69de29\n'
+            b'--- /dev/null\n'
+            b'+++ b/empty_add.txt\n'
+            b'diff --git a/empty_delete.txt b/empty_delete.txt\n'
+            b'deleted file mode 100644\n'
+            b'index e69de29..0000000\n'
+            b'--- a/empty_delete.txt\n'
+            b'+++ /dev/null\n'
+            b'diff --git a/archive.zip b/archive.zip\n'
+            b'new file mode 100644\n'
+            b'index 0000000..abc1234\n'
+            b'Binary files /dev/null and b/archive.zip differ\n'
+        )
+
+        patch = Patch(
+            content=patch_content,
+            binary_files=[binary_file]
+        )
+        patcher = client.get_patcher(patches=[patch])
+
+        self.spy_on(client._run_git)
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], binary_path)
+
+        self.assertTrue(os.path.exists(empty_to_add))
+        with open(empty_to_add, mode='rb') as f:
+            self.assertEqual(f.read(), b'')
+
+        self.assertFalse(os.path.exists(empty_to_delete))
+
+        self.assertTrue(os.path.exists(binary_path))
+        with open(binary_path, mode='rb') as f:
+            self.assertEqual(f.read(), binary_content)
+
+    def test_patch_with_mixed_file_types(self) -> None:
+        """Testing GitPatcher.patch with regular, empty, and binary files.
+
+        This test combines all three file types (regular, empty, and binary)
+        with various operations in a single patch.
+        """
+        client = self.build_client()
+
+        self._run_git(['update-index', '--refresh'])
+
+        empty_to_delete = 'empty_delete.txt'
+        with open(empty_to_delete, mode='w', encoding='utf-8') as f:
+            pass
+
+        binary_to_delete = 'old_file.bin'
+        with open(binary_to_delete, mode='wb') as f:
+            f.write(b'old binary to delete')
+
+        self._run_git(['add', empty_to_delete, binary_to_delete])
+        self._run_git(['commit', '-m', 'Add files to delete'])
+
+        empty_to_add = 'empty_add.txt'
+        binary_add_path = 'new_data.bin'
+        binary_add_content = b'\x00\x01\x02\x03 new data'
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 400,
+                'absolute_url': 'https://example.com/r/1/file/400/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/400/'
+        )
+
+        binary_file_add = self.make_binary_file_patch(
+            old_path=None,
+            new_path=binary_add_path,
+            status='added',
+            file_attachment=attachment,
+            content=binary_add_content,
+        )
+
+        binary_file_delete = BinaryFilePatch(
+            old_path=binary_to_delete,
+            new_path=None,
+            status='deleted',
+            file_attachment=None,
+        )
+
+        patch_content = (
+            b'diff --git a/foo.txt b/foo.txt\n'
+            b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+            b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
+            b'--- a/foo.txt\n'
+            b'+++ b/foo.txt\n'
+            b'@@ -6,7 +6,4 @@ multa quoque et bello passus, '
+            b'dum conderet urbem,\n'
+            b' inferretque deos Latio, genus unde Latinum,\n'
+            b' Albanique patres, atque altae moenia Romae.\n'
+            b' Musa, mihi causas memora, quo numine laeso,\n'
+            b'-quidve dolens, regina deum tot volvere casus\n'
+            b'-insignem pietate virum, tot adire labores\n'
+            b'-impulerit. Tantaene animis caelestibus irae?\n'
+            b' \n'
+            b'diff --git a/empty_add.txt b/empty_add.txt\n'
+            b'new file mode 100644\n'
+            b'index 0000000..e69de29\n'
+            b'--- /dev/null\n'
+            b'+++ b/empty_add.txt\n'
+            b'diff --git a/empty_delete.txt b/empty_delete.txt\n'
+            b'deleted file mode 100644\n'
+            b'index e69de29..0000000\n'
+            b'--- a/empty_delete.txt\n'
+            b'+++ /dev/null\n'
+            b'diff --git a/new_data.bin b/new_data.bin\n'
+            b'new file mode 100644\n'
+            b'index 0000000..abc1234\n'
+            b'Binary files /dev/null and b/new_data.bin differ\n'
+            b'diff --git a/old_file.bin b/old_file.bin\n'
+            b'deleted file mode 100644\n'
+            b'index def5678..0000000\n'
+            b'Binary files a/old_file.bin and /dev/null differ\n'
+        )
+
+        patch = Patch(
+            content=patch_content,
+            binary_files=[binary_file_add, binary_file_delete]
+        )
+        patcher = client.get_patcher(patches=[patch])
+
+        self.spy_on(client._run_git)
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 2)
+        self.assertIn(binary_add_path, result.binary_applied)
+        self.assertIn(binary_to_delete, result.binary_applied)
+
+        with open('foo.txt', mode='rb') as fp:
+            self.assertEqual(fp.read(), FOO1)
+
+        self.assertTrue(os.path.exists(empty_to_add))
+        with open(empty_to_add, mode='rb') as f:
+            self.assertEqual(f.read(), b'')
+
+        self.assertFalse(os.path.exists(empty_to_delete))
+
+        self.assertTrue(os.path.exists(binary_add_path))
+        with open(binary_add_path, mode='rb') as f:
+            self.assertEqual(f.read(), binary_add_content)
+
+        self.assertFalse(os.path.exists(binary_to_delete))
