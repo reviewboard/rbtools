@@ -102,6 +102,7 @@ if TYPE_CHECKING:
     )
     from rbtools.api.resource.file_diff import (
         FileDiffItemResource,
+        FileDiffGetListParams,
         FileDiffListResource,
     )
     from rbtools.api.resource.general_comment import (
@@ -1432,7 +1433,7 @@ class RootResource(ItemResource):
         *,
         review_request_id: int,
         diff_revision: int,
-        **kwargs: Unpack[BaseGetListParams],
+        **kwargs: Unpack[FileDiffGetListParams],
     ) -> FileDiffListResource:
         """Get the file diffs for a diff revision.
 
@@ -1645,7 +1646,7 @@ class RootResource(ItemResource):
         *,
         review_request_id: int,
         diff_revision: int,
-        **kwargs: Unpack[BaseGetListParams],
+        **kwargs: Unpack[FileDiffGetListParams],
     ) -> FileDiffListResource:
         """Get the file diffs for a diff revision.
 

@@ -18,8 +18,12 @@ from rbtools.api.resource.base_diff_commit import BaseDiffCommitItemResource
 from rbtools.api.resource.mixins import GetPatchMixin
 
 if TYPE_CHECKING:
-    from rbtools.api.request import QueryArgs
-    from rbtools.api.resource.file_diff import FileDiffListResource
+    from typing_extensions import Unpack
+
+    from rbtools.api.resource.file_diff import (
+        FileDiffGetListParams,
+        FileDiffListResource,
+    )
 
 
 @resource_mimetype('application/vnd.reviewboard.org.commit')
@@ -33,7 +37,7 @@ class DiffCommitItemResource(BaseDiffCommitItemResource):
     @api_stub
     def get_files(
         self,
-        **kwargs: QueryArgs,
+        **kwargs: Unpack[FileDiffGetListParams],
     ) -> FileDiffListResource:
         """Get the files for the commit.
 

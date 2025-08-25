@@ -32,7 +32,10 @@ if TYPE_CHECKING:
     from rbtools.api.resource.diff_commit import DiffCommitListResource
     from rbtools.api.resource.draft_diff_commit import \
         DraftDiffCommitListResource
-    from rbtools.api.resource.file_diff import FileDiffListResource
+    from rbtools.api.resource.file_diff import (
+        FileDiffGetListParams,
+        FileDiffListResource,
+    )
     from rbtools.api.resource.repository import RepositoryItemResource
 
 
@@ -193,7 +196,7 @@ class DiffItemResource(GetPatchMixin, ItemResource):
     @api_stub
     def get_draft_files(
         self,
-        **kwargs: Unpack[BaseGetListParams],
+        **kwargs: Unpack[FileDiffGetListParams],
     ) -> FileDiffListResource:
         """Get the files for the diff when the diff is a draft.
 
@@ -217,7 +220,7 @@ class DiffItemResource(GetPatchMixin, ItemResource):
     @api_stub
     def get_files(
         self,
-        **kwargs: Unpack[BaseGetListParams],
+        **kwargs: Unpack[FileDiffGetListParams],
     ) -> FileDiffListResource:
         """Get the files for the diff.
 

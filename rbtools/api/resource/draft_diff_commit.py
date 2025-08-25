@@ -22,7 +22,10 @@ if TYPE_CHECKING:
     from typing_extensions import Unpack
 
     from rbtools.api.resource.base import BaseGetListParams
-    from rbtools.api.resource.file_diff import FileDiffListResource
+    from rbtools.api.resource.file_diff import (
+        FileDiffGetListParams,
+        FileDiffListResource,
+    )
     from rbtools.api.request import HttpRequest, QueryArgs
 
 
@@ -43,7 +46,7 @@ class DraftDiffCommitItemResource(BaseDiffCommitItemResource):
     @api_stub
     def get_draft_files(
         self,
-        **kwargs: Unpack[BaseGetListParams],
+        **kwargs: Unpack[FileDiffGetListParams],
     ) -> FileDiffListResource:
         """Get the files for this commit.
 

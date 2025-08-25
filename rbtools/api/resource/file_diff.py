@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from rbtools.api.resource.base import (
+    BaseGetParams,
     ItemResource,
     ListResource,
     api_stub,
@@ -24,10 +25,7 @@ if TYPE_CHECKING:
     from typing_extensions import Unpack
 
     from rbtools.api.request import HttpRequest, QueryArgs
-    from rbtools.api.resource.base import (
-        BaseGetParams,
-        ResourceExtraDataField,
-    )
+    from rbtools.api.resource.base import ResourceExtraDataField
     from rbtools.api.resource.diff_comment import (
         DiffCommentGetListParams,
         DiffCommentListResource,
@@ -238,6 +236,26 @@ class FileDiffItemResource(GetPatchMixin, ItemResource):
                 An error occurred while communicating with the server.
         """
         raise NotImplementedError
+
+
+class FileDiffGetListParams(BaseGetParams, total=False):
+    """Parameters for the file diff list GET operation.
+
+    Version Added:
+        6.0
+    """
+
+    #: Filter files based on whether they are binary.
+    #:
+    #: If not specified, all files will be returned.
+    binary: bool
+
+    #: The ID of the commit that the file was in.
+    #:
+    #: If specified, this will return the filediff for a specific commit
+    #: within a change. If not, the filediff for the entire squashed diff will
+    #: be returned.
+    commit_id: str
 
 
 @resource_mimetype('application/vnd.reviewboard.org.files')
