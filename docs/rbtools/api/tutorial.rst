@@ -1,8 +1,8 @@
 .. _python-api-tutorial:
 
-========
-Tutorial
-========
+================
+Common Use Cases
+================
 
 This tutorial will walk you through using the API to accomplish a
 number of common Review Board tasks. We will start by creating a new
@@ -28,38 +28,36 @@ You may only upload a diff to a review request that had a repository
 specified when it was created. For our repository we will select the
 first in the list of repositories, and retrieve its ``id``::
 
-   repos = root.get_repositories()
-   if repos.num_items < 1:
-       raise Exception('No valid repositories.')
+   try:
+       repository = root.get_repositories(name='Main repo')[0]
+   except KeyError:
+       raise Exception('Could not find main repository')
 
-   repository = repos[0].id
+Now, we can create a review request::
 
-Having a valid repository ID, we may now create a review request::
-
-   review_request = root.get_review_requests().create(repository=repository)
+   review_request = root.get_review_requests().create(
+        repository=repository.id)
 
 Now that we have created a review request, we may upload a diff.
 
 
-Uploading the Diff
-==================
+Adding a Diff
+=============
 
 Uploading a diff is accomplished by performing a POST request on the
-review request's :ref:`webapi2.0-diff-list-resource`. This can be
-accomplished using the resource's :py:meth:`create` method, but the
-:ref:`webapi2.0-diff-list-resource` has
-:ref:`python-api-resource-specific-functionality`
-to make this task easier. The :py:meth:`upload_diff`
-method can be used to automatically format the request properly given the
-body of the diff. For more information see the
-:ref:`diff-list-resource-specific-functionality`.
+review request's :ref:`webapi2.0-diff-list-resource`. Theoretically this could
+be accomplished using the resource's
+:py:meth:`~rbtools.api.resource.base.ListResource.create` method, but the
+:py:class:`~rbtools.api.resource.diff.DiffListResource` has a helper to make
+this task easier. The
+:py:meth:`~rbtools.api.resource.diff.DiffListResource.upload_diff` method can
+be used to handle the complexities of formatting the request.
 
 We will upload a simple diff which we read from a file using the
 following code::
 
-   f = open("path/to/diff.txt", mode="r")
-   diff_contents = f.read()
-   f.close()
+   with open('path/to/diff.txt', mode='rb') as f:
+       diff_contents = f.read()
 
    review_request.get_diffs().upload_diff(diff_contents)
 
@@ -67,23 +65,22 @@ following code::
 Adding a File Attachment
 ========================
 
-Uploading file attachments is similar to the process of uploading a
-diff. First the review request's :ref:`webapi2.0-file-attachment-list-resource`
-must be retrieved, and the resource's :py:meth:`upload_attachment` method is
-called. For more information about :py:meth:`upload_attachment`, please see
-:ref:`file-attachment-list-resource-specific-functionality`.
+Uploading file attachments is similar to the process of uploading a diff. First
+the review request's :ref:`webapi2.0-file-attachment-list-resource` must be
+retrieved, and the resource's
+:py:meth:`~rbtools.api.resource.file_attachment.FileAttachmentListResource.upload_attachment`
+method is called.
 
-When uploading the attachment, the second argument should contain the
-body of the file to be uploaded, in string format. We will upload
-an attachment read from a file to demonstrate the functionality::
+When uploading the attachment, the ``content`` argument should contain the body
+of the file to be uploaded, in string format. We will upload an attachment read
+from a file to demonstrate the functionality::
 
-   f = open("path/to/attachment", mode="r")
-   attachment_contents = f.read()
-   f.close()
+   with open('path/to/attachment.png', mode='rb') as f:
+       attachment_contents = f.read()
 
    review_request.get_file_attachments().upload_attachment(
-       "attachment",
-       attachment_contents,
+       filename='attachment',
+       content=attachment_contents,
        caption="An attachment.")
 
 
@@ -97,7 +94,7 @@ retrieve the draft using the link from our request::
    draft = review_request.get_draft()
    draft = draft.update(
        summary='API tutorial request',
-       description='This request was created in the API tutorial.')
+       description='This request was created using the RBTools Python API.')
 
 After retrieving the draft, a summary and description were added by
 calling :py:meth:`update`. The call to update returns the resulting updated
@@ -105,13 +102,9 @@ draft, which we use to overwrite our previous draft.
 
 In order to publish a review request, at least one review group or
 reviewer must be added to the request. To meet this requirement, we
-will add ourselves as the reviewer. To accomplish this we will use the
-:ref:`webapi2.0-session-resource` to retrieve the user we are logged
-in as::
+can add a couple reviewers using their usernames::
 
-   user = root.get_session().get_user()
-   draft = draft.update(target_people=user.username)
-
+   draft = draft.update(target_people='user1,user2')
 
 To publish this review request, we update the draft and set
 ``public`` to ``True``::
@@ -134,7 +127,7 @@ a comment on the first line of a file in the review requests diff::
 
    filediff_id = review.get_diffs()[0].get_files()[0].id
    review.get_diff_comments().create(
-       filediff_id=1,
+       filediff_id=filediff_id,
        first_line=1,
        num_lines=1,
        text='This is a diff comment!')
