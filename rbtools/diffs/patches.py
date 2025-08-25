@@ -11,12 +11,15 @@ from __future__ import annotations
 from contextlib import contextmanager
 from gettext import gettext as _
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import TYPE_CHECKING
 
 from housekeeping import deprecate_non_keyword_only_args
 
 from rbtools.deprecation import RemovedInRBTools70Warning
 from rbtools.utils.filesystem import make_tempfile
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class PatchAuthor:
@@ -148,45 +151,45 @@ class Patch:
     #:
     #: This will generally be available if generating a patch from an
     #: existing commit.
-    author: Optional[PatchAuthor]
+    author: PatchAuthor | None
 
     #: The base directory in the repository where the patch was generated.
     #:
     #: This is dependent on the SCM and the method used to generate the
     #: patch.
-    base_dir: Optional[str]
+    base_dir: str | None
 
     #: The commit message describing the patch.
     #:
     #: This will generally be available if generating a patch from an
     #: existing commit.
-    message: Optional[str]
+    message: str | None
 
     #: The path prefix stripping level to use when applying the patch.
     #:
     #: This is the number of path components to strip from the beginning of
     #: each filename in the patch. It's the equivalent of
     #: :command:`patch -p<X>`.
-    prefix_level: Optional[int]
+    prefix_level: int | None
 
     #: The cached contents of the patch.
-    _content: Optional[bytes]
+    _content: bytes | None
 
     #: Whether the patch is opened for reading.
     _opened: bool
 
     #: The cached file path for the patch.
-    _path: Optional[Path]
+    _path: Path | None
 
     def __init__(
         self,
         *,
-        author: Optional[PatchAuthor] = None,
-        base_dir: Optional[str] = None,
-        content: Optional[bytes] = None,
-        message: Optional[str] = None,
-        path: Optional[Path] = None,
-        prefix_level: Optional[int] = None,
+        author: (PatchAuthor | None) = None,
+        base_dir: (str | None) = None,
+        content: (bytes | None) = None,
+        message: (str | None) = None,
+        path: (Path | None) = None,
+        prefix_level: (int | None) = None,
     ) -> None:
         """Initialize the patch.
 
@@ -352,11 +355,11 @@ class Patch:
         """Validate that the patch is opened for reading.
 
         Raises:
-            IOError:
+            OSError:
                 The patch was not opened for reading.
         """
         if not self._opened:
-            raise IOError(_('Patch objects must be opened before being read.'))
+            raise OSError(_('Patch objects must be opened before being read.'))
 
     def __repr__(self) -> str:
         """Return a string representation of the object.
@@ -425,7 +428,7 @@ class PatchResult:
     #:
     #: Version Added:
     #:     5.1
-    patch: Optional[Patch]
+    patch: Patch | None
 
     #: The range of patches represented by this result.
     #:
@@ -440,10 +443,10 @@ class PatchResult:
     #:
     #: Version Added:
     #:     5.1
-    patch_range: Optional[tuple[int, int]]
+    patch_range: tuple[int, int] | None
 
     #: The output of the patch command.
-    patch_output: Optional[bytes]
+    patch_output: bytes | None
 
     @deprecate_non_keyword_only_args(RemovedInRBTools70Warning)
     def __init__(
@@ -451,10 +454,10 @@ class PatchResult:
         *,
         applied: bool,
         has_conflicts: bool = False,
-        conflicting_files: list[str] = [],
-        patch_output: Optional[bytes] = None,
-        patch: Optional[Patch] = None,
-        patch_range: Optional[tuple[int, int]] = None,
+        conflicting_files: (list[str] | None) = None,
+        patch_output: (bytes | None) = None,
+        patch: (Patch | None) = None,
+        patch_range: (tuple[int, int] | None) = None,
     ) -> None:
         """Initialize the object.
 
@@ -500,7 +503,7 @@ class PatchResult:
                     5.1
         """
         self.applied = applied
-        self.conflicting_files = conflicting_files
+        self.conflicting_files = conflicting_files or []
         self.has_conflicts = has_conflicts
         self.patch = patch
         self.patch_output = patch_output

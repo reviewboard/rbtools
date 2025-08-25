@@ -11,7 +11,7 @@ import os
 import re
 from gettext import gettext as _
 from pathlib import Path
-from typing import Iterator, Optional, Sequence, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from typing_extensions import NotRequired, TypedDict
 
@@ -23,6 +23,8 @@ from rbtools.utils.filesystem import chdir
 from rbtools.utils.process import run_process
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator, Sequence
+
     from rbtools.api.resource import ReviewRequestItemResource
     from rbtools.clients.base.repository import RepositoryInfo
     from rbtools.diffs.patches import Patch
@@ -94,7 +96,7 @@ class ParsedPatchOutput(TypedDict):
     patched_files: list[str]
 
     #: Any fatal error text present in the stream.
-    fatal_error: NotRequired[Optional[str]]
+    fatal_error: NotRequired[str | None]
 
 
 class PatcherKwargs(TypedDict):
@@ -110,10 +112,10 @@ class PatcherKwargs(TypedDict):
     #: The local path where patches will be applied.
     #:
     #: If not provided, this will patch in the current directory by default.
-    dest_path: NotRequired[Optional[Path]]
+    dest_path: NotRequired[Path | None]
 
     #: Information on the current source code repository.
-    repository_info: NotRequired[Optional[RepositoryInfo]]
+    repository_info: NotRequired[RepositoryInfo | None]
 
     #: Whether to revert the patches.
     revert: NotRequired[bool]
@@ -175,7 +177,7 @@ class Patcher:
     #:
     #: This may be needed in order to apply patches correctly to some kinds
     #: of repositories.
-    repository_info: Optional[RepositoryInfo]
+    repository_info: RepositoryInfo | None
 
     #: Whether the patches will be reverted.
     revert: bool
@@ -196,8 +198,8 @@ class Patcher:
         self,
         *,
         patches: Sequence[Patch],
-        dest_path: Optional[Path] = None,
-        repository_info: Optional[RepositoryInfo] = None,
+        dest_path: (Path | None) = None,
+        repository_info: (RepositoryInfo | None) = None,
         revert: bool = False,
         squash: bool = False,
     ) -> None:
@@ -241,9 +243,9 @@ class Patcher:
     def prepare_for_commit(
         self,
         *,
-        default_author: Optional[PatchAuthor] = None,
-        default_message: Optional[str] = None,
-        review_request: Optional[ReviewRequestItemResource] = None,
+        default_author: (PatchAuthor | None) = None,
+        default_message: (str | None) = None,
+        review_request: (ReviewRequestItemResource | None) = None,
         run_commit_editor: bool = False,
     ) -> None:
         """Prepare the patching process to commit applied changes.
@@ -338,8 +340,14 @@ class Patcher:
                         'prepare_for_commit().'
                     )
 
-                default_author = PatchAuthor(full_name=submitter.fullname,
-                                             email=submitter.email)
+                fullname = submitter.fullname
+                assert isinstance(fullname, str)
+
+                email = submitter.email
+                assert isinstance(email, str)
+
+                default_author = PatchAuthor(full_name=fullname,
+                                             email=email)
                 default_message = extract_commit_message(review_request)
 
             if total_patches == 1:
@@ -503,20 +511,21 @@ class Patcher:
                 # TODO [DEPRECATED]: This can go away with RBTools 7.
                 end_patch_num = patch_num
 
-            if patch_result.success:
-                # If the user wants to commit, then we'll be committing every
-                # patch individually, unless the user wants to squash commits
-                # in which case we'll only do this on the final commit.
-                if commit and (not squash or end_patch_num == total_patches):
-                    # If this is an older implementation, we may need to
-                    # set the patch.
-                    #
-                    # TODO [DEPRECATED]: This can go away with RBTools 7.
-                    if not patch_result.patch:
-                        patch_result.patch = patch
+            # If the user wants to commit, then we'll be committing every
+            # patch individually, unless the user wants to squash commits
+            # in which case we'll only do this on the final commit.
+            if (patch_result.success and
+                commit and
+                (not squash or end_patch_num == total_patches)):
+                # If this is an older implementation, we may need to
+                # set the patch.
+                #
+                # TODO [DEPRECATED]: This can go away with RBTools 7.
+                if not patch_result.patch:
+                    patch_result.patch = patch
 
-                    self.create_commit(patch_result=patch_result,
-                                       run_commit_editor=run_commit_editor)
+                self.create_commit(patch_result=patch_result,
+                                   run_commit_editor=run_commit_editor)
 
             yield patch_result
 
@@ -651,7 +660,7 @@ class Patcher:
         self,
         *,
         patch: Patch,
-    ) -> Optional[int]:
+    ) -> int | None:
         """Return the default path prefix strip level for a patch.
 
         This function determines how much of a path to strip by default,
@@ -708,7 +717,7 @@ class Patcher:
         #
         # There's some overlap with empty file indicators, so both states may
         # be returned.
-        fatal_error: Optional[str]
+        fatal_error: str | None
 
         m = _FATAL_PATCH_ERROR_RE.search(patch_output)
 

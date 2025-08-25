@@ -5,8 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from gettext import gettext as _, ngettext
-from typing import (Any, BinaryIO, Dict, Optional, Sequence, TYPE_CHECKING,
-                    Union)
+from typing import TYPE_CHECKING
 
 from typing_extensions import TypedDict
 
@@ -18,6 +17,9 @@ from rbtools.utils.encoding import force_unicode
 from rbtools.utils.review_request import parse_review_request_url
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from typing import Any, BinaryIO
+
     from rbtools.api.resource import DiffItemResource
     from rbtools.commands.base.output import OutputWrapper
 
@@ -36,7 +38,7 @@ class PendingPatchInfo(TypedDict):
     """
 
     #: The diff revision from the review request.
-    diff_revision: Optional[int]
+    diff_revision: int | None
 
     #: Whether this patch contains scanned metadata.
     #:
@@ -51,7 +53,8 @@ class PatchCommand(BaseCommand):
     """Applies a specific patch from a RB server.
 
     The patch file indicated by the request id is downloaded from the
-    server and then applied locally."""
+    server and then applied locally.
+    """
 
     name = 'patch'
     author = 'The Review Board Project'
@@ -131,8 +134,8 @@ class PatchCommand(BaseCommand):
     def get_patches(
         self,
         *,
-        diff_revision: Optional[int] = None,
-        commit_ids: Optional[set[str]] = None,
+        diff_revision: (int | None) = None,
+        commit_ids: (set[str] | None) = None,
         squashed: bool = False,
         reverted: bool = False,
     ) -> Sequence[PendingPatchInfo]:
@@ -147,7 +150,7 @@ class PatchCommand(BaseCommand):
 
                 The latest revision will be used if not provided.
 
-            commit_ids (list of unicode, optional):
+            commit_ids (list of str, optional):
                 The specific commit IDs to apply.
 
                 If not specified, the squashed version of any commits
@@ -174,7 +177,7 @@ class PatchCommand(BaseCommand):
                   ``commit_ids`` was provided.
                 * One or more requested commit IDs could not be found.
         """
-        patch_prefix_level: Optional[int] = self.options.px
+        patch_prefix_level: (int | None) = self.options.px
 
         assert (patch_prefix_level is None or
                 isinstance(patch_prefix_level, int))
@@ -255,10 +258,10 @@ class PatchCommand(BaseCommand):
 
                 # Make sure we're not missing any.
                 if len(commits) != len(commit_ids):
-                    found_commit_ids = set(
+                    found_commit_ids = {
                         commit['commit_id']
                         for commit in commits
-                    )
+                    }
 
                     raise CommandError(
                         _('The following commit IDs could not be found: %s')
@@ -298,128 +301,6 @@ class PatchCommand(BaseCommand):
 
         return patches
 
-    def _legacy_apply_patch(
-        self,
-        *,
-        diff_file_path: str,
-        base_dir: str,
-        patch_num: int,
-        total_patches: int,
-        revert: bool = False,
-    ) -> bool:
-        """Apply a patch to the tree.
-
-        Args:
-            diff_file_path (str):
-                The file path of the diff being applied.
-
-            base_dir (str):
-                The base directory within which to apply the patch.
-
-            patch_num (int):
-                The 1-based index of the patch being applied.
-
-            total_patches (int):
-                The total number of patches being applied.
-
-            revert (bool, optional):
-                Whether the patch is being reverted.
-
-        Returns:
-            bool:
-            ``True`` if the patch was applied/reverted successfully.
-            ``False`` if the patch was partially applied/reverted but there
-            were conflicts.
-
-        Raises:
-            rbtools.command.CommandError:
-                There was an error applying or reverting the patch.
-        """
-        repository_info = self.repository_info
-        tool = self.tool
-
-        assert repository_info is not None
-        assert tool is not None
-
-        # If we're working with more than one patch, show the patch number
-        # we're applying or reverting. If we're only working with one, the
-        # previous log from _apply_patches() will suffice.
-        if total_patches > 1:
-            if revert:
-                msg = _('Reverting patch %(num)d/%(total)d...')
-            else:
-                msg = _('Applying patch %(num)d/%(total)d...')
-
-            logger.info(
-                msg,
-                {
-                    'num': patch_num,
-                    'total': total_patches,
-                })
-
-        result = tool.apply_patch(
-            patch_file=diff_file_path,
-            base_path=repository_info.base_path,
-            base_dir=base_dir,
-            p=self.options.px,
-            revert=revert)
-        patch_output = (result.patch_output or b'').strip()
-
-        if patch_output:
-            self.stdout.new_line()
-            self.stdout_bytes.write(patch_output)
-            self.stdout.new_line()
-            self.stdout.new_line()
-
-        if not result.applied:
-            if revert:
-                raise CommandError(
-                    'Unable to revert the patch. The patch may be invalid, or '
-                    'there may be conflicts that could not be resolved.')
-            else:
-                raise CommandError(
-                    'Unable to apply the patch. The patch may be invalid, or '
-                    'there may be conflicts that could not be resolved.')
-
-        if result.has_conflicts:
-            if result.conflicting_files:
-                if revert:
-                    self.stdout.write('The patch was partially reverted, but '
-                                      'there were conflicts in:')
-                    self.json.add_error('The patch was partially reverted, '
-                                        'but there were conflicts.')
-                else:
-                    self.stdout.write('The patch was partially applied, but '
-                                      'there were conflicts in:')
-                    self.json.add_error('The patch was partially applied, '
-                                        'but there were conflicts.')
-
-                self.stdout.new_line()
-
-                self.json.add('conflicting_files', [])
-
-                for filename in result.conflicting_files:
-                    filename = force_unicode(filename)
-                    self.stdout.write('    %s' % filename)
-                    self.json.append('conflicting_files', filename)
-
-                self.stdout.new_line()
-            elif revert:
-                err = ('The patch was partially reverted, but there were '
-                       'conflicts.')
-                self.stdout.write(err)
-                self.json.add_error(err)
-            else:
-                err = ('The patch was partially applied, but there were '
-                       'conflicts.')
-                self.stdout.write(err)
-                self.json.add_error('The patch was partially applied, but '
-                                    'there were conflicts.')
-
-            return False
-
-        return True
-
     def initialize(self) -> None:
         """Initialize the command.
 
@@ -442,12 +323,13 @@ class PatchCommand(BaseCommand):
                 parse_review_request_url(review_request_id)
 
             if diff_revision and '-' in diff_revision:
-                raise CommandError('Interdiff patches are not supported: %s.'
-                                   % diff_revision)
+                raise CommandError(
+                    f'Interdiff patches are not supported: {diff_revision}.')
 
             if review_request_id is None:
-                raise CommandError('The URL %s does not appear to be a '
-                                   'review request.')
+                raise CommandError(
+                    f'The URL {options.args[0]} does not appear to be a '
+                    f'review request.')
 
             options.server = server_url
             options.diff_revision = diff_revision
@@ -525,7 +407,7 @@ class PatchCommand(BaseCommand):
             except NotImplementedError:
                 pass
 
-        commit_ids: Optional[set[str]]
+        commit_ids: set[str] | None
 
         if options.commit_ids:
             # Do our best to normalize what gets passed in, so that we don't
@@ -553,7 +435,7 @@ class PatchCommand(BaseCommand):
             try:
                 with open(patch_outfile, 'wb') as fp:
                     self._output_patches(patches, fp)
-            except IOError as e:
+            except OSError as e:
                 raise CommandError(_('Unable to write patch to %s: %s')
                                    % (patch_outfile, e))
         else:
@@ -561,7 +443,10 @@ class PatchCommand(BaseCommand):
 
         return 0
 
-    def _get_draft_diff(self, **query_kwargs) -> Optional[DiffItemResource]:
+    def _get_draft_diff(
+        self,
+        **query_kwargs,
+    ) -> DiffItemResource | None:
         """Return the latest draft diff for the review request.
 
         Args:
@@ -573,6 +458,7 @@ class PatchCommand(BaseCommand):
             The draft diff resource if found, or ``None``.
         """
         try:
+            assert self.api_root is not None
             draft = self.api_root.get_draft(
                 review_request_id=self._review_request_id)
 
@@ -583,9 +469,9 @@ class PatchCommand(BaseCommand):
     def _get_diff(
         self,
         *,
-        diff_revision: Optional[int],
+        diff_revision: int | None,
         squashed: bool,
-    ) -> Optional[DiffItemResource]:
+    ) -> DiffItemResource | None:
         """Retrieve the latest diff for a review request.
 
         This will attempt to retrieve the diff for the given diff revision,
@@ -615,15 +501,17 @@ class PatchCommand(BaseCommand):
             rbtools.commands.CommandError:
                 There was an error fetching required information from the API.
         """
-        diff: Optional[DiffItemResource] = None
-        draft_diff: Optional[DiffItemResource] = None
+        diff: (DiffItemResource | None) = None
+        draft_diff: (DiffItemResource | None) = None
         review_request_id = self._review_request_id
         use_latest_diff = diff_revision is None
+
         api_root = self.api_root
+        assert api_root is not None
 
         # Set default arguments for all our diff fetch requests.
-        get_diff_kwargs: Dict[str, Any] = {}
-        get_draft_diff_kwargs: Dict[str, Any] = {}
+        get_diff_kwargs: dict[str, Any] = {}
+        get_draft_diff_kwargs: dict[str, Any] = {}
 
         if not squashed:
             get_diff_kwargs['expand'] = 'commits'
@@ -666,6 +554,7 @@ class PatchCommand(BaseCommand):
             try:
                 # Fetch the main diff and (unless we're squashing) any commits
                 # within.
+                assert diff_revision is not None
                 diff = api_root.get_diff(review_request_id=review_request_id,
                                          diff_revision=diff_revision,
                                          **get_diff_kwargs)
@@ -686,7 +575,7 @@ class PatchCommand(BaseCommand):
     def _output_patches(
         self,
         patches: Sequence[PendingPatchInfo],
-        fp: Union[BinaryIO, OutputWrapper[bytes]],
+        fp: BinaryIO | OutputWrapper[bytes],
     ) -> None:
         """Output the contents of the patches to the console.
 
@@ -734,6 +623,7 @@ class PatchCommand(BaseCommand):
         # Fetch the review request to use as a description and for URLs in
         # JSON metadata. We only want to fetch this once.
         try:
+            assert self.api_root is not None
             review_request = self.api_root.get_review_request(
                 review_request_id=self._review_request_id,
                 force_text_type='plain')
@@ -855,7 +745,7 @@ class PatchCommand(BaseCommand):
 
                         for filename in failed_patch_result.conflicting_files:
                             filename = force_unicode(filename)
-                            self.stdout.write('    %s' % filename)
+                            self.stdout.write(f'    {filename}')
                             self.json.append('conflicting_files', filename)
 
                     self.stdout.new_line()
