@@ -9,16 +9,18 @@ from subprocess import list2cmdline
 
 import kgb
 
+from rbtools.api.resource import FileAttachmentItemResource
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     SCMError,
                                     TooManyRevisionsError)
 from rbtools.clients.perforce import PerforceClient, P4Wrapper
 from rbtools.clients.tests import FOO1, SCMClientTestCase
-from rbtools.diffs.patches import Patch
+from rbtools.diffs.patches import BinaryFilePatch, Patch
 from rbtools.testing import TestCase
+from rbtools.testing.api.transport import URLMapTransport
 from rbtools.utils.checks import check_install
-from rbtools.utils.filesystem import make_tempfile
+from rbtools.utils.filesystem import make_tempdir, make_tempfile
 from rbtools.utils.process import RunProcessResult, run_process_exec
 
 
@@ -1298,6 +1300,10 @@ class PerforcePatcherTests(PerforceSCMClientTestCase):
                 'args': (['patch', '-f', '-i', tempfiles[0]],),
                 'op': kgb.SpyOpReturn((0, b'', b'')),
             },
+            {
+                'args': (['p4', 'reconcile'],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
         ]))
 
         patcher = client.get_patcher(
@@ -1327,7 +1333,7 @@ class PerforcePatcherTests(PerforceSCMClientTestCase):
         self.assertTrue(result.success)
         self.assertIsNotNone(result.patch)
 
-        self.assertSpyCallCount(run_process_exec, 1)
+        self.assertSpyCallCount(run_process_exec, 2)
 
     def test_patch_with_prefix_level(self) -> None:
         """Testing PerforcePatcher.patch with Patch.prefix_level="""
@@ -1338,6 +1344,10 @@ class PerforcePatcherTests(PerforceSCMClientTestCase):
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': (['patch', '-f', '-p3', '-i', tempfiles[0]],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'reconcile'],),
                 'op': kgb.SpyOpReturn((0, b'', b'')),
             },
         ]))
@@ -1373,7 +1383,7 @@ class PerforcePatcherTests(PerforceSCMClientTestCase):
         self.assertTrue(result.success)
         self.assertIsNotNone(result.patch)
 
-        self.assertSpyCallCount(run_process_exec, 1)
+        self.assertSpyCallCount(run_process_exec, 2)
 
     def test_patch_with_revert(self) -> None:
         """Testing PerforcePatcher.patch with revert=True"""
@@ -1384,6 +1394,10 @@ class PerforcePatcherTests(PerforceSCMClientTestCase):
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': (['patch', '-f', '-R', '-i', tempfiles[0]],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'reconcile'],),
                 'op': kgb.SpyOpReturn((0, b'', b'')),
             },
         ]))
@@ -1416,7 +1430,7 @@ class PerforcePatcherTests(PerforceSCMClientTestCase):
         self.assertTrue(result.success)
         self.assertIsNotNone(result.patch)
 
-        self.assertSpyCallCount(run_process_exec, 1)
+        self.assertSpyCallCount(run_process_exec, 2)
 
     def test_patch_with_empty_files(self) -> None:
         """Testing PerforcePatcher.patch with empty files"""
@@ -1428,7 +1442,19 @@ class PerforcePatcherTests(PerforceSCMClientTestCase):
             },
         })
         repository_info = client.get_repository_info()
+
         tempfiles = self.precreate_tempfiles(1)
+        tempdir = make_tempdir()
+        readme_file = os.path.join(tempdir, 'README')
+        new_file = os.path.join(tempdir, 'NEWFILE')
+
+        with open(readme_file, mode='w', encoding='utf-8'):
+            pass
+
+        client.p4.where_files = {
+            '//mydepot/test/README': readme_file,
+            '//mydepot/test/NEWFILE': new_file,
+        }
 
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
@@ -1440,11 +1466,15 @@ class PerforcePatcherTests(PerforceSCMClientTestCase):
                 )),
             },
             {
-                'args': (['p4', 'add', '//mydepot/test/NEWFILE'],),
+                'args': (['p4', 'add', new_file],),
                 'op': kgb.SpyOpReturn((0, b'', b'')),
             },
             {
-                'args': (['p4', 'delete', '//mydepot/test/README'],),
+                'args': (['p4', 'delete', readme_file],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'reconcile'],),
                 'op': kgb.SpyOpReturn((0, b'', b'')),
             },
         ]))
@@ -1467,4 +1497,896 @@ class PerforcePatcherTests(PerforceSCMClientTestCase):
         self.assertTrue(result.success)
         self.assertIsNotNone(result.patch)
 
+        self.assertSpyCallCount(run_process_exec, 4)
+
+        self.assertTrue(os.path.exists(new_file))
+
+    def test_patch_binary_file_add(self) -> None:
+        """Testing PerforcePatcher.patch with an added binary file"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempdir = make_tempdir()
+
+        test_content = b'Binary file content'
+        test_path = '//mydepot/test/new_binary_file.bin'
+        local_path = os.path.join(tempdir, 'new_binary_file.bin')
+
+        client.p4.where_files = {
+            test_path: local_path,
+        }
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 123,
+                'absolute_url': 'https://example.com/r/1/file/123/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/123/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=None,
+            new_path=test_path,
+            status='added',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        tempfiles = self.precreate_tempfiles(1)
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': (['patch', '-f', '-i', tempfiles[0]],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'edit', local_path],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'add', local_path],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'reconcile'],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+        ]))
+
+        patch_content = (
+            b'==== //mydepot/test/new_binary_file.bin#0 ==A== '
+            b'//mydepot/test/new_binary_file.bin ====\n'
+        )
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], local_path)
+
+        self.assertTrue(os.path.exists(local_path))
+
+        with open(local_path, 'rb') as f:
+            self.assertEqual(f.read(), test_content)
+
+        self.assertSpyCallCount(run_process_exec, 4)
+
+    def test_patch_binary_file_modify(self) -> None:
+        """Testing PerforcePatcher.patch with a modified binary file"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempdir = make_tempdir()
+
+        old_content = b'Old binary content'
+        new_content = b'New binary content'
+        test_path = '//mydepot/test/modified_file.bin'
+        local_path = os.path.join(tempdir, 'modified_file.bin')
+
+        with open(local_path, 'wb') as f:
+            f.write(old_content)
+
+        client.p4.where_files = {
+            test_path: local_path,
+        }
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 124,
+                'absolute_url': 'https://example.com/r/1/file/124/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/124/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=test_path,
+            new_path=test_path,
+            status='modified',
+            file_attachment=attachment,
+            content=new_content,
+        )
+
+        tempfiles = self.precreate_tempfiles(1)
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': (['patch', '-f', '-i', tempfiles[0]],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'edit', local_path],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'reconcile'],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+        ]))
+
+        temp1 = os.path.join(tempdir, 'temp1')
+        temp2 = os.path.join(tempdir, 'temp2')
+        patch_content = (
+            f'==== //mydepot/test/modified_file.bin#1 ==M== '
+            f'//mydepot/test/modified_file.bin ====\n'
+            f'Binary files {temp1} and {temp2} differ\n'
+        ).encode()
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], local_path)
+
+        self.assertTrue(os.path.exists(local_path))
+
+        with open(local_path, 'rb') as f:
+            self.assertEqual(f.read(), new_content)
+
         self.assertSpyCallCount(run_process_exec, 3)
+
+    def test_patch_binary_file_move(self) -> None:
+        """Testing PerforcePatcher.patch with a moved binary file"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempdir = make_tempdir()
+
+        old_path = '//mydepot/test/old_file.bin'
+        new_path = '//mydepot/test/new_file.bin'
+        local_old_path = os.path.join(tempdir, 'old_file.bin')
+        local_new_path = os.path.join(tempdir, 'new_file.bin')
+        test_content = b'Binary file content'
+        temp1 = os.path.join(tempdir, 'temp1')
+        temp2 = os.path.join(tempdir, 'temp2')
+
+        with open(local_old_path, 'wb') as f:
+            f.write(b'Old file content')
+
+        client.p4.where_files = {
+            old_path: local_old_path,
+            new_path: local_new_path,
+        }
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 125,
+                'absolute_url': 'https://example.com/r/1/file/125/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/125/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=old_path,
+            new_path=new_path,
+            status='moved',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        tempfiles = self.precreate_tempfiles(1)
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': (['patch', '-f', '-i', tempfiles[0]],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'edit', local_old_path],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'move', local_old_path, local_new_path],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'edit', local_new_path],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'reconcile'],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+        ]))
+
+        patch_content = (
+            b'Moved from: //mydepot/test/old_file.bin\n'
+            b'Moved to: //mydepot/test/new_file.bin\n'
+            b'==== //mydepot/test/old_file.bin#1 ==MV== '
+            b'//mydepot/test/new_file.bin ====\n'
+            b'Binary files %s and %s differ\n'
+            % (temp1.encode('utf-8'), temp2.encode('utf-8'))
+        )
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], local_new_path)
+
+        self.assertTrue(os.path.exists(local_new_path))
+
+        with open(local_new_path, 'rb') as f:
+            self.assertEqual(f.read(), test_content)
+
+        self.assertSpyCallCount(run_process_exec, 5)
+
+    def test_patch_binary_file_remove(self) -> None:
+        """Testing PerforcePatcher.patch with a removed binary file"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempdir = make_tempdir()
+
+        test_path = '//mydepot/test/file_to_remove.bin'
+        local_path = os.path.join(tempdir, 'file_to_remove.bin')
+        test_content = b'Binary file content'
+
+        with open(local_path, 'wb') as f:
+            f.write(test_content)
+
+        client.p4.where_files = {
+            test_path: local_path,
+        }
+
+        binary_file = BinaryFilePatch(
+            old_path=test_path,
+            new_path=None,
+            status='deleted',
+            file_attachment=None,
+        )
+
+        tempfiles = self.precreate_tempfiles(1)
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': (['patch', '-f', '-i', tempfiles[0]],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'delete', local_path],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'reconcile'],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+        ]))
+
+        temp1 = os.path.join(tempdir, 'temp1')
+        temp2 = os.path.join(tempdir, 'temp2')
+        patch_content = (
+            f'==== //mydepot/test/file_to_remove.bin#1 ==D== '
+            f'//mydepot/test/file_to_remove.bin ====\n'
+            f'Binary files {temp1} and {temp2} differ\n'
+        ).encode()
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], local_path)
+
+        self.assertSpyCallCount(run_process_exec, 3)
+
+    def test_patch_with_regular_and_empty_files(self) -> None:
+        """Testing PerforcePatcher.patch with regular and empty files."""
+        client = self.build_client(caps={
+            'scmtools': {
+                'perforce': {
+                    'empty_files': True,
+                },
+            },
+        })
+        repository_info = client.get_repository_info()
+
+        tempfiles = self.precreate_tempfiles(1)
+        tempdir = make_tempdir()
+        readme_file = os.path.join(tempdir, 'README')
+        empty_file = os.path.join(tempdir, 'EMPTYFILE')
+        deleted_empty_file = os.path.join(tempdir, 'DELETED_EMPTY')
+
+        with open(deleted_empty_file, mode='w', encoding='utf-8'):
+            pass
+
+        client.p4.where_files = {
+            '//mydepot/test/README': readme_file,
+            '//mydepot/test/EMPTYFILE': empty_file,
+            '//mydepot/test/DELETED_EMPTY': deleted_empty_file,
+        }
+
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': (['patch', '-f', '-i', tempfiles[0]],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'add', empty_file],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'delete', deleted_empty_file],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'reconcile'],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+        ]))
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=(
+                    b'--- //mydepot/test/README\t//mydepot/test/README#2\n'
+                    b'+++ //mydepot/test/README\t2022-01-02 12:34:56\n'
+                    b'@@ -1 +1 @@\n'
+                    b'-This is a test.\n'
+                    b'+This is updated.\n'
+                    b'==== //mydepot/test/EMPTYFILE#1 ==A== '
+                    b'//mydepot/test/EMPTYFILE#1 ====\n'
+                    b'==== //mydepot/test/DELETED_EMPTY#1 ==D== '
+                    b'//mydepot/test/DELETED_EMPTY#1 ====\n'
+                )),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        self.assertSpyCallCount(run_process_exec, 4)
+        self.assertTrue(os.path.exists(empty_file))
+
+    def test_patch_with_regular_and_binary_files(self) -> None:
+        """Testing PerforcePatcher.patch with regular and binary files."""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempdir = make_tempdir()
+
+        readme_file = os.path.join(tempdir, 'README')
+        binary_file_path = '//mydepot/test/image.png'
+        local_binary_path = os.path.join(tempdir, 'image.png')
+        modified_binary_path = '//mydepot/test/document.pdf'
+        local_modified_binary = os.path.join(tempdir, 'document.pdf')
+
+        old_binary_content = b'\x89PNG old content'
+        with open(local_modified_binary, 'wb') as f:
+            f.write(old_binary_content)
+
+        client.p4.where_files = {
+            '//mydepot/test/README': readme_file,
+            binary_file_path: local_binary_path,
+            modified_binary_path: local_modified_binary,
+        }
+
+        attachment_new = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 200,
+                'absolute_url': 'https://example.com/r/1/file/200/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/200/'
+        )
+
+        attachment_modified = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 201,
+                'absolute_url': 'https://example.com/r/1/file/201/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/201/'
+        )
+
+        new_binary_content = b'\x89PNG new image content'
+        modified_binary_content = b'%PDF modified content'
+
+        binary_file_new = self.make_binary_file_patch(
+            old_path=None,
+            new_path=binary_file_path,
+            status='added',
+            file_attachment=attachment_new,
+            content=new_binary_content,
+        )
+
+        binary_file_modified = self.make_binary_file_patch(
+            old_path=modified_binary_path,
+            new_path=modified_binary_path,
+            status='modified',
+            file_attachment=attachment_modified,
+            content=modified_binary_content,
+        )
+
+        tempfiles = self.precreate_tempfiles(1)
+        temp1 = os.path.join(tempdir, 'temp1')
+        temp2 = os.path.join(tempdir, 'temp2')
+
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': (['patch', '-f', '-i', tempfiles[0]],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'edit', local_binary_path],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'add', local_binary_path],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'edit', local_modified_binary],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+            {
+                'args': (['p4', 'reconcile'],),
+                'op': kgb.SpyOpReturn((0, b'', b'')),
+            },
+        ]))
+
+        patch_content = (
+            b'--- //mydepot/test/README\t//mydepot/test/README#5\n'
+            b'+++ //mydepot/test/README\t2022-01-02 12:34:56\n'
+            b'@@ -1,3 +1,4 @@\n'
+            b' Line 1\n'
+            b'-Line 2\n'
+            b'+Line 2 modified\n'
+            b'+Line 2.5 added\n'
+            b' Line 3\n'
+            b'==== //mydepot/test/image.png#0 ==A== '
+            b'//mydepot/test/image.png ====\n'
+            b'==== //mydepot/test/document.pdf#1 ==M== '
+            b'//mydepot/test/document.pdf ====\n'
+            b'Binary files %s and %s differ\n'
+            % (temp1.encode('utf-8'), temp2.encode('utf-8'))
+        )
+
+        patch = Patch(
+            content=patch_content,
+            binary_files=[binary_file_new, binary_file_modified]
+        )
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 2)
+        self.assertIn(local_binary_path, result.binary_applied)
+        self.assertIn(local_modified_binary, result.binary_applied)
+
+        self.assertTrue(os.path.exists(local_binary_path))
+        with open(local_binary_path, 'rb') as f:
+            self.assertEqual(f.read(), new_binary_content)
+
+        self.assertTrue(os.path.exists(local_modified_binary))
+        with open(local_modified_binary, 'rb') as f:
+            self.assertEqual(f.read(), modified_binary_content)
+
+        self.assertSpyCallCount(run_process_exec, 5)
+
+    def test_patch_with_empty_and_binary_files(self) -> None:
+        """Testing PerforcePatcher.patch with empty and binary files."""
+        client = self.build_client(caps={
+            'scmtools': {
+                'perforce': {
+                    'empty_files': True,
+                },
+            },
+        })
+        repository_info = client.get_repository_info()
+        tempdir = make_tempdir()
+
+        empty_added = os.path.join(tempdir, 'EMPTY_ADDED')
+        empty_deleted = os.path.join(tempdir, 'EMPTY_DELETED')
+        binary_path = '//mydepot/test/archive.zip'
+        local_binary = os.path.join(tempdir, 'archive.zip')
+
+        with open(empty_deleted, mode='w', encoding='utf-8') as f:
+            pass
+
+        client.p4.where_files = {
+            '//mydepot/test/EMPTY_ADDED': empty_added,
+            '//mydepot/test/EMPTY_DELETED': empty_deleted,
+            binary_path: local_binary,
+        }
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 300,
+                'absolute_url': 'https://example.com/r/1/file/300/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/300/'
+        )
+
+        binary_content = b'PK\x03\x04 zip file content'
+        binary_file = self.make_binary_file_patch(
+            old_path=None,
+            new_path=binary_path,
+            status='added',
+            file_attachment=attachment,
+            content=binary_content,
+        )
+
+        self.spy_on(run_process_exec, op=kgb.SpyOpReturn((0, b'', b'')))
+
+        patch_content = (
+            b'==== //mydepot/test/EMPTY_ADDED#1 ==A== '
+            b'//mydepot/test/EMPTY_ADDED#1 ====\n'
+            b'==== //mydepot/test/EMPTY_DELETED#1 ==D== '
+            b'//mydepot/test/EMPTY_DELETED#1 ====\n'
+            b'==== //mydepot/test/archive.zip#0 ==A== '
+            b'//mydepot/test/archive.zip ====\n'
+        )
+
+        patch = Patch(
+            content=patch_content,
+            binary_files=[binary_file]
+        )
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], local_binary)
+
+        self.assertTrue(os.path.exists(empty_added))
+        self.assertTrue(os.path.exists(local_binary))
+
+        with open(local_binary, 'rb') as f:
+            self.assertEqual(f.read(), binary_content)
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            ['p4', 'reconcile'])
+
+    def test_patch_with_mixed_operations(self) -> None:
+        """Testing PerforcePatcher.patch with all file types and operations.
+
+        This test combines regular files, empty files, and binary files with
+        various operations (add, modify, delete, move) in a single patch.
+        """
+        client = self.build_client(caps={
+            'scmtools': {
+                'perforce': {
+                    'empty_files': True,
+                },
+            },
+        })
+        repository_info = client.get_repository_info()
+        tempdir = make_tempdir()
+
+        readme_file = os.path.join(tempdir, 'README')
+        makefile = os.path.join(tempdir, 'Makefile')
+
+        empty_added = os.path.join(tempdir, 'EMPTY_NEW')
+        empty_deleted = os.path.join(tempdir, 'EMPTY_OLD')
+
+        binary_new_path = '//mydepot/test/icon.png'
+        local_binary_new = os.path.join(tempdir, 'icon.png')
+        binary_modified_path = '//mydepot/test/data.bin'
+        local_binary_modified = os.path.join(tempdir, 'data.bin')
+        binary_deleted_path = '//mydepot/test/old.exe'
+        local_binary_deleted = os.path.join(tempdir, 'old.exe')
+        binary_moved_old_path = '//mydepot/test/old_name.dll'
+        binary_moved_new_path = '//mydepot/test/new_name.dll'
+        local_binary_moved_old = os.path.join(tempdir, 'old_name.dll')
+        local_binary_moved_new = os.path.join(tempdir, 'new_name.dll')
+
+        with open(empty_deleted, mode='w', encoding='utf-8') as f:
+            pass
+
+        with open(local_binary_modified, 'wb') as f:
+            f.write(b'\x00\x01\x02 old data')
+
+        with open(local_binary_deleted, 'wb') as f:
+            f.write(b'exe content to delete')
+
+        with open(local_binary_moved_old, 'wb') as f:
+            f.write(b'dll to move')
+
+        client.p4.where_files = {
+            '//mydepot/test/README': readme_file,
+            '//mydepot/test/Makefile': makefile,
+            '//mydepot/test/EMPTY_NEW': empty_added,
+            '//mydepot/test/EMPTY_OLD': empty_deleted,
+            binary_new_path: local_binary_new,
+            binary_modified_path: local_binary_modified,
+            binary_deleted_path: local_binary_deleted,
+            binary_moved_old_path: local_binary_moved_old,
+            binary_moved_new_path: local_binary_moved_new,
+        }
+
+        attachment_new = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 400,
+                'absolute_url': 'https://example.com/r/1/file/400/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/400/'
+        )
+
+        attachment_modified = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 401,
+                'absolute_url': 'https://example.com/r/1/file/401/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/401/'
+        )
+
+        attachment_moved = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 402,
+                'absolute_url': 'https://example.com/r/1/file/402/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/402/'
+        )
+
+        binary_new_content = b'\x89PNG new icon'
+        binary_modified_content = b'\x00\x01\x02 new data'
+        binary_moved_content = b'dll moved content'
+
+        binary_file_new = self.make_binary_file_patch(
+            old_path=None,
+            new_path=binary_new_path,
+            status='added',
+            file_attachment=attachment_new,
+            content=binary_new_content,
+        )
+
+        binary_file_modified = self.make_binary_file_patch(
+            old_path=binary_modified_path,
+            new_path=binary_modified_path,
+            status='modified',
+            file_attachment=attachment_modified,
+            content=binary_modified_content,
+        )
+
+        binary_file_deleted = BinaryFilePatch(
+            old_path=binary_deleted_path,
+            new_path=None,
+            status='deleted',
+            file_attachment=None,
+        )
+
+        binary_file_moved = self.make_binary_file_patch(
+            old_path=binary_moved_old_path,
+            new_path=binary_moved_new_path,
+            status='moved',
+            file_attachment=attachment_moved,
+            content=binary_moved_content,
+        )
+
+        temp1 = os.path.join(tempdir, 'temp1')
+        temp2 = os.path.join(tempdir, 'temp2')
+
+        self.spy_on(run_process_exec, op=kgb.SpyOpReturn((0, b'', b'')))
+
+        patch_content = (
+            b'--- //mydepot/test/README\t//mydepot/test/README#3\n'
+            b'+++ //mydepot/test/README\t2022-01-02 12:34:56\n'
+            b'@@ -1,2 +1,3 @@\n'
+            b' README content\n'
+            b'-Version 1\n'
+            b'+Version 2\n'
+            b'+New line\n'
+            b'--- //mydepot/test/Makefile\t//mydepot/test/Makefile#1\n'
+            b'+++ //mydepot/test/Makefile\t2022-01-02 12:34:56\n'
+            b'@@ -1 +0,0 @@\n'
+            b'-all: test\n'
+            b'==== //mydepot/test/EMPTY_NEW#1 ==A== '
+            b'//mydepot/test/EMPTY_NEW#1 ====\n'
+            b'==== //mydepot/test/EMPTY_OLD#1 ==D== '
+            b'//mydepot/test/EMPTY_OLD#1 ====\n'
+            b'==== //mydepot/test/icon.png#0 ==A== '
+            b'//mydepot/test/icon.png ====\n'
+            b'==== //mydepot/test/data.bin#2 ==M== '
+            b'//mydepot/test/data.bin ====\n'
+            b'Binary files %s and %s differ\n'
+            b'==== //mydepot/test/old.exe#5 ==D== '
+            b'//mydepot/test/old.exe ====\n'
+            b'Binary files %s and %s differ\n'
+            b'Moved from: //mydepot/test/old_name.dll\n'
+            b'Moved to: //mydepot/test/new_name.dll\n'
+            b'==== //mydepot/test/old_name.dll#1 ==MV== '
+            b'//mydepot/test/new_name.dll ====\n'
+            b'Binary files %s and %s differ\n'
+            % (temp1.encode('utf-8'), temp2.encode('utf-8'),
+               temp1.encode('utf-8'), temp2.encode('utf-8'),
+               temp1.encode('utf-8'), temp2.encode('utf-8'))
+        )
+
+        patch = Patch(
+            content=patch_content,
+            binary_files=[
+                binary_file_new,
+                binary_file_modified,
+                binary_file_deleted,
+                binary_file_moved,
+            ]
+        )
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 4)
+
+        self.assertIn(local_binary_new, result.binary_applied)
+        self.assertIn(local_binary_modified, result.binary_applied)
+        self.assertIn(local_binary_deleted, result.binary_applied)
+        self.assertIn(local_binary_moved_new, result.binary_applied)
+
+        self.assertTrue(os.path.exists(local_binary_new))
+        with open(local_binary_new, 'rb') as f:
+            self.assertEqual(f.read(), binary_new_content)
+
+        self.assertTrue(os.path.exists(local_binary_modified))
+        with open(local_binary_modified, 'rb') as f:
+            self.assertEqual(f.read(), binary_modified_content)
+
+        self.assertTrue(os.path.exists(local_binary_moved_new))
+        with open(local_binary_moved_new, 'rb') as f:
+            self.assertEqual(f.read(), binary_moved_content)
+
+        self.assertTrue(os.path.exists(empty_added))
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            ['p4', 'reconcile'])
+
+    def test_patch_with_mixed_files_and_patch_failure(self) -> None:
+        """Testing PerforcePatcher.patch with mixed files when patch fails.
+
+        This tests the scenario where the patch command fails on regular
+        files but empty and binary files should still be processed correctly.
+        """
+        client = self.build_client(caps={
+            'scmtools': {
+                'perforce': {
+                    'empty_files': True,
+                },
+            },
+        })
+        repository_info = client.get_repository_info()
+        tempdir = make_tempdir()
+
+        readme_file = os.path.join(tempdir, 'README')
+        empty_file = os.path.join(tempdir, 'EMPTY')
+        binary_path = '//mydepot/test/file.bin'
+        local_binary = os.path.join(tempdir, 'file.bin')
+
+        client.p4.where_files = {
+            '//mydepot/test/README': readme_file,
+            '//mydepot/test/EMPTY': empty_file,
+            binary_path: local_binary,
+        }
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 500,
+                'absolute_url': 'https://example.com/r/1/file/500/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/500/'
+        )
+
+        binary_content = b'binary content'
+        binary_file = self.make_binary_file_patch(
+            old_path=None,
+            new_path=binary_path,
+            status='added',
+            file_attachment=attachment,
+            content=binary_content,
+        )
+
+        def process_spy(*args, **kwargs) -> tuple[int, bytes, bytes]:
+            cmd = args[0] if args else kwargs.get('command', [])
+
+            if cmd and cmd[0] == 'patch':
+                return (1, b'', b'patch: **** malformed patch\n')
+
+            return (0, b'', b'')
+
+        self.spy_on(run_process_exec, call_fake=process_spy)
+
+        patch_content = (
+            b'--- //mydepot/test/README\t//mydepot/test/README#1\n'
+            b'+++ //mydepot/test/README\t2022-01-02 12:34:56\n'
+            b'@@ -1 +1 @@\n'
+            b'malformed content\n'
+            b'==== //mydepot/test/EMPTY#1 ==A== '
+            b'//mydepot/test/EMPTY#1 ====\n'
+            b'==== //mydepot/test/file.bin#0 ==A== '
+            b'//mydepot/test/file.bin ====\n'
+        )
+
+        patch = Patch(
+            content=patch_content,
+            binary_files=[binary_file]
+        )
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+
+        # The patch may still succeed overall even if patch command fails,
+        # as long as empty and binary files are applied correctly.
+        # We mainly care that binary files were still applied.
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], local_binary)
+
+        self.assertTrue(os.path.exists(local_binary))
+        with open(local_binary, 'rb') as f:
+            self.assertEqual(f.read(), binary_content)
+
+        self.assertTrue(os.path.exists(empty_file))

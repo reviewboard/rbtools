@@ -26,7 +26,6 @@ from rbtools.clients.errors import (AmendError,
                                     SCMError,
                                     TooManyRevisionsError)
 from rbtools.deprecation import RemovedInRBTools80Warning
-from rbtools.diffs.tools.base.diff_tool import BaseDiffTool
 from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install
 from rbtools.utils.encoding import force_unicode
@@ -39,7 +38,8 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
-    from rbtools.diffs.patches import Patch
+    from rbtools.diffs.patches import BinaryFilePatch, Patch, PatchResult
+    from rbtools.diffs.tools.base.diff_tool import BaseDiffTool
     from rbtools.utils.process import RunProcessKwargs, RunProcessResult
 
 
@@ -507,7 +507,7 @@ class P4Wrapper(object):
         return keyvals
 
 
-class PerforcePatcher(SCMClientPatcher):
+class PerforcePatcher(SCMClientPatcher['PerforceClient']):
     """A patcher that applies Perforce patches to a tree.
 
     This applies patches using the standard :command:`patch` command, but
@@ -523,6 +523,48 @@ class PerforcePatcher(SCMClientPatcher):
     DELETED_FILES_RE = re.compile(
         br'^==== //(\S+)#\d+ ==D== \S+ ====$',
         re.M)
+
+    def apply_single_patch(
+        self,
+        *,
+        patch: Patch,
+        patch_num: int,
+    ) -> PatchResult:
+        """Apply a single patch.
+
+        This is an internal method that will take a single patch and apply it.
+        It may be applied to files that already contain other modifications or
+        have had other patches applied to it.
+
+        Version Added:
+            6.0
+
+        Args:
+            patch (rbtools.diffs.patches.Patch):
+                The patch to apply, opened for reading.
+
+            patch_num (int):
+                The 1-based index of this patch in the full list of patches.
+
+        Returns:
+            rbtools.diffs.patches.PatchResult:
+            The result of the patch application, whether the patch applied
+            successfully or with normal patch failures.
+
+        Raises:
+            rbtools.diffs.errors.ApplyPatchResult:
+                There was an error attempting to apply the patch.
+
+                This won't be raised simply for conflicts or normal patch
+                failures. It may be raised for errors encountered during
+                the patching process.
+        """
+        result = super().apply_single_patch(patch=patch, patch_num=patch_num)
+
+        # Reconcile files to ensure everything is opened for edit.
+        run_process(['p4', 'reconcile'])
+
+        return result
 
     def apply_patch_for_empty_files(
         self,
@@ -551,23 +593,39 @@ class PerforcePatcher(SCMClientPatcher):
             added_files_re = self.ADDED_FILES_RE
             deleted_files_re = self.DELETED_FILES_RE
 
-        # Prepend the root of the Perforce client to each file name.
-        p4_info = scmclient.p4.info()
-        client_root = p4_info.get('Client root')
-        added_files = [
-            f'{client_root}/{filename.decode("utf-8")}'
-            for filename in added_files_re.findall(patch_content)
-        ]
-        deleted_files = [
-            f'{client_root}/{filename.decode("utf-8")}'
-            for filename in deleted_files_re.findall(patch_content)
-        ]
+        all_binary_filenames: set[str] = set()
+
+        for binary_file in patch.binary_files:
+            if binary_file.old_path:
+                all_binary_filenames.add(binary_file.old_path)
+
+            if binary_file.new_path:
+                all_binary_filenames.add(binary_file.new_path)
+
+        def _get_filenames(
+            matches: Sequence[bytes],
+        ) -> Sequence[str]:
+            result: list[str] = []
+
+            for filename_bytes in matches:
+                filename = scmclient._depot_to_local(filename_bytes.decode())
+
+                # We'll handle patching binary files separately.
+                if filename in all_binary_filenames:
+                    continue
+
+                result.append(filename)
+
+            return result
+
+        added_files = _get_filenames(added_files_re.findall(patch_content))
+        deleted_files = _get_filenames(deleted_files_re.findall(patch_content))
 
         if added_files:
             make_empty_files(added_files)
 
             try:
-                run_process(['p4', 'add'] + added_files)
+                run_process(['p4', 'add', *added_files])
                 patched_empty_files = True
             except RunProcessError:
                 logger.error('Unable to execute "p4 add" on: %s',
@@ -575,13 +633,156 @@ class PerforcePatcher(SCMClientPatcher):
 
         if deleted_files:
             try:
-                run_process(['p4', 'delete'] + deleted_files)
+                run_process(['p4', 'delete', *deleted_files])
                 patched_empty_files = True
             except RunProcessError:
                 logger.error('Unable to execute "p4 delete" on: %s',
                              ', '.join(deleted_files))
 
-        return patched_empty_files
+        return bool(patched_empty_files or patch.binary_files)
+
+    def apply_binary_file(
+        self,
+        binary_file: BinaryFilePatch,
+    ) -> tuple[bool, str | None]:
+        """Apply a single binary file.
+
+        Version Added:
+            6.0
+
+        Args:
+            binary_file (rbtools.diffs.patches.BinaryFilePatch):
+                The binary file to apply.
+
+        Returns:
+            tuple:
+            A 2-tuple of:
+
+            Tuple:
+                0 (bool):
+                    Whether the operation was a success.
+
+                1 (str or None):
+                    The error, if the operation failed.
+        """
+        client = self.scmclient
+
+        if binary_file.old_path:
+            binary_file.old_path = client._depot_to_local(binary_file.old_path)
+
+        if binary_file.new_path:
+            binary_file.new_path = client._depot_to_local(binary_file.new_path)
+
+        return super().apply_binary_file(binary_file)
+
+    def handle_add_file(
+        self,
+        path: str,
+        content: bytes,
+    ) -> None:
+        """Add a file.
+
+        Version Added:
+            6.0
+
+        Args:
+            path (str):
+                The path to the file.
+
+            content (bytes):
+                The content for the file.
+
+        Raises:
+            OSError:
+                A file operation failed.
+
+            Exception:
+                An error occurred when running ``p4``.
+        """
+        super().handle_add_file(path, content)
+
+        run_process(['p4', 'add', path])
+
+    def handle_move_file(
+        self,
+        old_path: str,
+        new_path: str,
+    ) -> None:
+        """Move a file.
+
+        Version Added:
+            6.0
+
+        Args:
+            old_path (str):
+                The old filename.
+
+            new_path (str):
+                The new filename.
+
+        Raises:
+            OSError:
+                A file operation failed.
+
+            Exception:
+                An error occurred when running ``p4``.
+        """
+        # Create the directory if it doesn't exist.
+        dirname = os.path.dirname(new_path)
+
+        if dirname:
+            os.makedirs(dirname, exist_ok=True)
+
+        # Before we rename the file, we have to open it for edit.
+        run_process(['p4', 'edit', old_path])
+        run_process(['p4', 'move', old_path, new_path])
+
+    def handle_remove_file(
+        self,
+        path: str,
+    ) -> None:
+        """Delete a file.
+
+        Version Added:
+            6.0
+
+        Args:
+            path (str):
+                The path to the file to delete.
+
+        Raises:
+            Exception:
+                An error occurred when running ``p4``.
+        """
+        run_process(['p4', 'delete', path])
+
+    def handle_write_file(
+        self,
+        path: str,
+        content: bytes,
+    ) -> None:
+        """Write the content of a file.
+
+        Version Added:
+            6.0
+
+        Args:
+            path (str):
+                The path to the file.
+
+            content (bytes):
+                The content for the file.
+
+        Raises:
+            Exception:
+                An error occurred when running ``p4``.
+
+            OSError:
+                A file operation failed.
+        """
+        run_process(['p4', 'edit', path])
+
+        super().handle_write_file(path, content)
 
 
 class PerforceClient(BaseSCMClient):
@@ -2289,7 +2490,10 @@ class PerforceClient(BaseSCMClient):
             # done.
             os.chmod(tmpfile, stat.S_IREAD | stat.S_IWRITE)
 
-    def _depot_to_local(self, depot_path):
+    def _depot_to_local(
+        self,
+        depot_path: str,
+    ) -> str:
         """Convert a depot path to a local path.
 
         Given a path in the depot return the path on the local filesystem to
@@ -2297,14 +2501,17 @@ class PerforceClient(BaseSCMClient):
         result from the where command.
 
         Args:
-            depot_path (unicode):
+            depot_path (str):
                 The path of a file within the Perforce depot.
 
         Returns:
-            unicode:
+            str:
             The location of that same file within the local client, if
             available.
         """
+        if not depot_path.startswith('/'):
+            depot_path = f'//{depot_path}'
+
         where_output = self.p4.where(depot_path)
 
         try:
