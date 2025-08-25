@@ -562,11 +562,16 @@ def run_process_exec(
     if isinstance(input_string, str):
         input_string = input_string.encode()
 
+    if input_string:
+        stdin = None
+    else:
+        stdin = subprocess.PIPE
+
     # Run the process.
     result = subprocess.run(
         command,
         input=input_string,
-        stdin=subprocess.PIPE,
+        stdin=stdin,
         stdout=stdout,
         stderr=stderr,
         env=env,
