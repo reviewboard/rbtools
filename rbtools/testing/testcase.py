@@ -14,15 +14,18 @@ from typing import Iterator, Optional, Sequence, TYPE_CHECKING, Union
 import kgb
 
 from rbtools.api.client import RBClient
+from rbtools.diffs.patches import BinaryFilePatch
 from rbtools.testing.api.transport import URLMapTransport
 from rbtools.utils.filesystem import (cleanup_tempfiles,
                                       make_tempdir,
                                       make_tempfile)
 
 if TYPE_CHECKING:
+    from typing import Literal
     from unittest.case import _AssertRaisesContext
 
     from rbtools.api.transport import Transport
+    from rbtools.api.resource import FileAttachmentItemResource
 
 
 class TestCase(unittest.TestCase):
@@ -552,3 +555,59 @@ class TestCase(unittest.TestCase):
             if use_temp_dir:
                 os.chdir(cwd)
                 shutil.rmtree(temp_dir)
+
+    def make_binary_file_patch(
+        self,
+        *,
+        old_path: str | None,
+        new_path: str | None,
+        status: Literal['added', 'deleted', 'modified', 'moved'],
+        file_attachment: FileAttachmentItemResource | None,
+        content: bytes,
+    ) -> BinaryFilePatch:
+        """Create a binary file patch for testing.
+
+        Version Added:
+            6.0
+
+        Args:
+            old_path (str):
+                The original file path relative to the repository root.
+
+            new_path (str):
+                The modified file path relative to the repository root.
+
+            status (str):
+                The file operation.
+
+            file_attachment (rbtools.api.resource.FileAttachmentItemResource):
+                The resource that the file should be downloaded from.
+
+            content (bytes):
+                The file content to return when the file is "downloaded".
+
+        Returns:
+            rbtools.diffs.patches.BinaryFilePatch:
+            The patch object.
+        """
+        spy_on = getattr(self, 'spy_on', None)
+
+        assert spy_on, (
+            f'{self.__class__!r} must mix in kgb.SpyAgency in order to call '
+            f'this method.')
+
+        binary_file = BinaryFilePatch(
+            old_path=old_path,
+            new_path=new_path,
+            status=status,
+            file_attachment=file_attachment,
+        )
+
+        def download_content(_self: BinaryFilePatch) -> None:
+            setattr(binary_file, '_content', content)
+            setattr(binary_file, '_content_loaded', True)
+
+        spy_on(binary_file._download_content,
+               call_fake=download_content)
+
+        return binary_file

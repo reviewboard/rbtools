@@ -1,4 +1,4 @@
-kgb~=7.1.1
+kgb~=7.3.0
 mercurial
 pytest
 pytest-env

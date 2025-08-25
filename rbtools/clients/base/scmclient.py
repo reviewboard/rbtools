@@ -6,24 +6,29 @@ Version Added:
 
 from __future__ import annotations
 
-import argparse
 import logging
 import re
 from pathlib import Path
 from typing import (Any, ClassVar, Dict, Generic, List, Mapping, Optional,
-                    Sequence, TYPE_CHECKING, Tuple, TypeVar, Union, cast)
+                    Sequence, TYPE_CHECKING, TypeVar, Union, cast)
 
+from housekeeping import func_deprecated
 from typing_extensions import NotRequired, TypedDict, Unpack, final
 
 from rbtools.clients.errors import (SCMClientDependencyError,
                                     SCMError)
-from rbtools.deprecation import RemovedInRBTools70Warning
+from rbtools.deprecation import (
+    RemovedInRBTools70Warning,
+    RemovedInRBTools80Warning,
+)
 from rbtools.diffs.errors import ApplyPatchError
 from rbtools.diffs.patcher import Patcher
 from rbtools.diffs.patches import Patch
 from rbtools.diffs.tools.registry import diff_tools_registry
 
 if TYPE_CHECKING:
+    import argparse
+
     from rbtools.api.capabilities import Capabilities
     from rbtools.api.resource import (
         RepositoryInfoResource,
@@ -35,6 +40,12 @@ if TYPE_CHECKING:
     from rbtools.diffs.tools.base import BaseDiffTool
     from rbtools.diffs.patcher import PatcherKwargs
     from rbtools.diffs.patches import PatchAuthor, PatchResult
+
+    #: Type for the _strip_p_num_slashes method.
+    #:
+    #: Version Added:
+    #:    6.0
+    _TStripPrefixArg = TypeVar('_TStripPrefixArg', list[str], str)
 
 
 #: A generic type variable for BaseSCMClient subclasses.
@@ -1305,11 +1316,51 @@ class BaseSCMClient:
         else:
             return -1
 
+    def strip_p_num_slashes(
+        self,
+        file_or_files: _TStripPrefixArg,
+        p_num: int,
+    ) -> _TStripPrefixArg:
+        """Strip the smallest prefix containing p_num slashes from filenames.
+
+        To match the behavior of the :command:`patch -pX` option, adjacent
+        slashes are counted as a single slash.
+
+        Version Added:
+            6.0:
+            Renamed from ``_strip_p_num_slashes``.
+
+        Args:
+            file_or_files (str or list of str):
+                The filename(s) to process.
+
+            p_num (int):
+                The number of prefixes to strip.
+
+        Returns:
+            list of str:
+            The processed list of filenames.
+        """
+        if p_num == 0:
+            return file_or_files
+
+        if hasattr(self, '_p_num_regex'):
+            regex = self._p_num_regex
+        else:
+            regex = re.compile(r'[^/]*/+')
+            self._p_num_regex = regex
+
+        if isinstance(file_or_files, list):
+            return [regex.sub('', f, p_num) for f in file_or_files]
+        else:
+            return regex.sub('', file_or_files, p_num)
+
+    @func_deprecated(RemovedInRBTools80Warning)
     def _strip_p_num_slashes(
         self,
-        files: List[str],
+        files: list[str],
         p_num: int,
-    ) -> List[str]:
+    ) -> list[str]:
         """Strip the smallest prefix containing p_num slashes from filenames.
 
         To match the behavior of the :command:`patch -pX` option, adjacent
@@ -1326,11 +1377,7 @@ class BaseSCMClient:
             list of str:
             The processed list of filenames.
         """
-        if p_num > 0:
-            regex = re.compile(r'[^/]*/+')
-            return [regex.sub('', f, p_num) for f in files]
-        else:
-            return files
+        return self.strip_p_num_slashes(files, p_num)
 
     def has_pending_changes(self) -> bool:
         """Return whether there are changes waiting to be committed.

@@ -12,7 +12,7 @@ from typing_extensions import TypedDict
 from rbtools.api.errors import APIError
 from rbtools.commands.base import BaseCommand, CommandError, Option
 from rbtools.diffs.errors import ApplyPatchError
-from rbtools.diffs.patches import Patch, PatchAuthor
+from rbtools.diffs.patches import BinaryFilePatch, Patch, PatchAuthor
 from rbtools.utils.encoding import force_unicode
 from rbtools.utils.review_request import parse_review_request_url
 
@@ -20,7 +20,11 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
     from typing import Any, BinaryIO
 
-    from rbtools.api.resource import DiffItemResource
+    from rbtools.api.resource import (
+        DiffCommitItemResource,
+        DiffItemResource,
+        FileDiffItemResource,
+    )
     from rbtools.commands.base.output import OutputWrapper
 
 
@@ -127,6 +131,12 @@ class PatchCommand(BaseCommand):
                help='Squash all patches into one commit. This is only used if '
                     'also using -c/--commit or -C/--commit-no-edit.',
                added_in='2.0'),
+        Option('--no-binary',
+               dest='no_binary',
+               action='store_true',
+               default=False,
+               help='Skip binary files during patch application.',
+               added_in='6.0'),
         BaseCommand.server_options,
         BaseCommand.repository_options,
     ]
@@ -138,6 +148,7 @@ class PatchCommand(BaseCommand):
         commit_ids: (set[str] | None) = None,
         squashed: bool = False,
         reverted: bool = False,
+        include_binary: bool = True,
     ) -> Sequence[PendingPatchInfo]:
         """Return the requested patches and their metadata.
 
@@ -163,6 +174,12 @@ class PatchCommand(BaseCommand):
 
             reverted (bool, optional):
                 Return patches in the order needed to revert them.
+
+            include_binary (bool, optional):
+                Whether to include binary files in the patches.
+
+                Version Added:
+                    6.0
 
         Returns:
             list of PendingPatchInfo:
@@ -235,6 +252,12 @@ class PatchCommand(BaseCommand):
                     _('Unable to retrieve the diff content for revision %s')
                     % diff_revision)
 
+            if include_binary:
+                binary_files = self._get_binary_files_for_diff(
+                    diff, reverted=reverted)
+            else:
+                binary_files = None
+
             # We only have one patch to apply, containing a squashed version
             # of all commits.
             patches.append({
@@ -242,7 +265,8 @@ class PatchCommand(BaseCommand):
                 'has_metadata': False,
                 'patch': Patch(base_dir=getattr(diff, 'basedir', None),
                                content=diff_content,
-                               prefix_level=patch_prefix_level),
+                               prefix_level=patch_prefix_level,
+                               binary_files=binary_files),
             })
         else:
             # We'll be returning one patch per commit. This may be the
@@ -281,6 +305,12 @@ class PatchCommand(BaseCommand):
 
                 assert isinstance(diff_content, bytes)
 
+                if include_binary:
+                    binary_files = self._get_binary_files_for_commit(
+                        commit, reverted=reverted)
+                else:
+                    binary_files = None
+
                 patches.append({
                     'diff_revision': diff_revision,
                     'has_metadata': True,
@@ -293,13 +323,142 @@ class PatchCommand(BaseCommand):
                                            email=commit.author_email),
                         content=diff_content,
                         prefix_level=patch_prefix_level,
-                        message=commit.commit_message),
+                        message=commit.commit_message,
+                        binary_files=binary_files),
                 })
 
         if reverted:
             patches = list(reversed(patches))
 
         return patches
+
+    def _get_binary_files_for_diff(
+        self,
+        diff: DiffItemResource,
+        *,
+        reverted: bool,
+    ) -> Sequence[BinaryFilePatch]:
+        """Get binary files for a diff resource.
+
+        Version Added:
+            6.0
+
+        Args:
+            diff (rbtools.api.resource.DiffItemResource):
+                The diff resource to get binary files from.
+
+            reverted (bool):
+                Return binary files to revert the changes.
+
+        Returns:
+            list of rbtools.diffs.patches.BinaryFilePatch:
+            List of binary files found in the diff.
+        """
+        if 'draft_files' in diff.links:
+            files = diff.get_draft_files(binary=True)
+        else:
+            files = diff.get_files(binary=True)
+
+        return [
+            self._get_binary_file_from_filediff(file_diff, reverted=reverted)
+            for file_diff in files.all_items
+        ]
+
+    def _get_binary_files_for_commit(
+        self,
+        commit: DiffCommitItemResource,
+        *,
+        reverted: bool,
+    ) -> Sequence[BinaryFilePatch]:
+        """Get binary files for a commit resource.
+
+        Version Added:
+            6.0
+
+        Args:
+            commit:
+                The commit resource to get binary files from.
+
+            reverted (bool):
+                Return binary files to revert the changes.
+
+        Returns:
+            list of rbtools.diffs.patches.BinaryFilePatch:
+            List of binary files found in the commit.
+        """
+        if 'draft_files' in commit.links:
+            files = commit.get_draft_files(binary=True)
+        else:
+            files = commit.get_files(binary=True)
+
+        return [
+            self._get_binary_file_from_filediff(file_diff, reverted=reverted)
+            for file_diff in files.all_items
+        ]
+
+    def _get_binary_file_from_filediff(
+        self,
+        file_diff: FileDiffItemResource,
+        *,
+        reverted: bool,
+    ) -> BinaryFilePatch:
+        """Return a binary file patch for a FileDiff.
+
+        Version Added:
+            6.0
+
+        Args:
+            file_diff (rbtools.api.resource.FileDiffItemResource):
+                The file diff resource.
+
+            reverted (bool):
+                Whether the patch is being reverted.
+
+        Returns:
+            rbtools.diffs.patches.BinaryFilePatch:
+            The binary file patch object.
+        """
+        status: (str | None) = None
+
+        if reverted:
+            if file_diff.source_revision == 'PRE-CREATION':
+                status = 'deleted'
+            elif file_diff.status == 'deleted':
+                status = 'added'
+
+            old_path = file_diff.dest_file
+            new_path = file_diff.source_file
+
+            if status != 'added':
+                attachment = file_diff.get_source_attachment()
+            else:
+                attachment = None
+        else:
+            if file_diff.source_revision == 'PRE-CREATION':
+                status = 'added'
+            elif file_diff.status == 'deleted':
+                status = 'deleted'
+
+            old_path = file_diff.source_file
+            new_path = file_diff.dest_file
+
+            if status != 'deleted':
+                attachment = file_diff.get_dest_attachment()
+            else:
+                attachment = None
+
+        if status is None:
+            if file_diff.status == 'moved':
+                status = 'moved'
+            else:
+                status = 'modified'
+
+        return BinaryFilePatch(
+            old_path=old_path,
+            new_path=new_path,
+            status=status,
+            file_attachment=attachment,
+        )
 
     def initialize(self) -> None:
         """Initialize the command.
@@ -427,7 +586,8 @@ class PatchCommand(BaseCommand):
             diff_revision=diff_revision,
             commit_ids=commit_ids,
             squashed=options.squash,
-            reverted=revert)
+            reverted=revert,
+            include_binary=not options.no_binary)
 
         if patch_stdout:
             self._output_patches(patches, self.stdout_bytes)
@@ -704,10 +864,49 @@ class PatchCommand(BaseCommand):
 
                 if revert:
                     self.stdout.write(
-                        f'Reverted patch {patch_num} / {total_patches}')
+                        _('Reverted patch {patch_num} / {total_patches}')
+                        .format(patch_num=patch_num,
+                                total_patches=total_patches))
                 else:
                     self.stdout.write(
-                        f'Applied patch {patch_num} / {total_patches}')
+                        _('Applied patch {patch_num} / {total_patches}')
+                        .format(patch_num=patch_num,
+                                total_patches=total_patches))
+
+                # Report binary file results.
+                if patch_result.binary_applied:
+                    n = len(patch_result.binary_applied)
+
+                    self.stdout.write(
+                        ngettext(
+                            'Applied {n} binary file.',
+                            'Applied {n} binary files.',
+                            n)
+                        .format(n=n))
+
+                    self.json.add('binary_files_applied',
+                                  patch_result.binary_applied)
+
+                if patch_result.binary_failed:
+                    n = len(patch_result.binary_failed)
+
+                    self.stdout.write(
+                        ngettext(
+                            'Failed to apply {n} binary file.',
+                            'Failed to apply {n} binary files.',
+                            n)
+                        .format(n=n))
+
+                    failed_json = []
+
+                    for filename, reason in patch_result.binary_failed.items():
+                        self.stdout.write(f'  {filename}: {reason}')
+                        failed_json.append({
+                            'filename': filename,
+                            'reason': reason
+                        })
+
+                    self.json.add('binary_files_failed', failed_json)
         except ApplyPatchError as e:
             failed_patch_result = e.failed_patch_result
 

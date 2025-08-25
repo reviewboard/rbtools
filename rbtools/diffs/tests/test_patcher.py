@@ -11,14 +11,22 @@ from pathlib import Path
 
 import kgb
 
-from rbtools.api.resource import ReviewRequestItemResource
-from rbtools.api.tests.base import MockTransport
+from rbtools.api.resource import (
+    FileAttachmentItemResource,
+    ReviewRequestItemResource,
+)
 from rbtools.clients.base.repository import RepositoryInfo
 from rbtools.diffs.errors import ApplyPatchError
 from rbtools.diffs.patcher import Patcher
-from rbtools.diffs.patches import Patch, PatchAuthor, PatchResult
+from rbtools.diffs.patches import (
+    BinaryFilePatch,
+    Patch,
+    PatchAuthor,
+    PatchResult,
+)
 from rbtools.testing import TestCase
-from rbtools.utils.filesystem import make_tempdir
+from rbtools.testing.api.transport import URLMapTransport
+from rbtools.utils.filesystem import chdir, make_tempdir
 
 
 class CommitPatcher(Patcher):
@@ -172,7 +180,7 @@ class PatcherTests(kgb.SpyAgency, TestCase):
     def test_prepare_for_commit_with_review_request(self) -> None:
         """Testing Patcher.prepare_for_commit with review_request="""
         review_request = ReviewRequestItemResource(
-            transport=MockTransport(),
+            transport=URLMapTransport('https://reviews.example.com/'),
             payload={
                 'id': 123,
                 'summary': 'Default summary.',
@@ -252,7 +260,7 @@ class PatcherTests(kgb.SpyAgency, TestCase):
         submitter expanded
         """
         review_request = ReviewRequestItemResource(
-            transport=MockTransport(),
+            transport=URLMapTransport('https://reviews.example.com/'),
             payload={
                 'id': 123,
                 'summary': 'Default summary.',
@@ -1490,3 +1498,160 @@ class PatcherTests(kgb.SpyAgency, TestCase):
                     'subdir/bar.txt',
                 ],
             })
+
+    def test_apply_binary_file_added(self) -> None:
+        """Testing Patcher.apply_binary_file with added file"""
+        temp_dir = make_tempdir()
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 123,
+                'absolute_url': 'https://example.com/r/1/file/123/download/',
+            },
+            url=(
+                'http://reviews.example.com/api/review-requests/1/'
+                'file-attachments/123/'
+            ),
+        )
+
+        test_content = b'\x89PNG\r\n\x1a\n'
+        binary_file = self.make_binary_file_patch(
+            old_path=None,
+            new_path='images/test.png',
+            status='added',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        patcher = Patcher(patches=[], dest_path=Path(temp_dir))
+
+        with chdir(temp_dir):
+            success, error = patcher.apply_binary_file(binary_file)
+
+        self.assertTrue(success)
+        self.assertIsNone(error)
+
+        # Check file was created with correct content.
+        file_path = os.path.join(temp_dir, 'images', 'test.png')
+        self.assertTrue(os.path.exists(file_path))
+
+        with open(file_path, 'rb') as f:
+            self.assertEqual(f.read(), test_content)
+
+    def test_apply_binary_file_deleted(self) -> None:
+        """Testing Patcher.apply_binary_file with deleted file"""
+        temp_dir = make_tempdir()
+
+        # Create file to delete.
+        test_file = os.path.join(temp_dir, 'to_delete.png')
+
+        with open(test_file, 'wb') as fp:
+            fp.write(b'content')
+
+        binary_file = BinaryFilePatch(
+            old_path='to_delete.png',
+            new_path=None,
+            status='deleted',
+            file_attachment=None,
+        )
+
+        patcher = Patcher(patches=[],
+                          dest_path=Path(temp_dir))
+
+        with chdir(temp_dir):
+            success, error = patcher.apply_binary_file(binary_file)
+
+        self.assertTrue(success)
+        self.assertIsNone(error)
+        self.assertFalse(os.path.exists(test_file))
+
+    def test_apply_binary_file_moved(self) -> None:
+        """Testing Patcher.apply_binary_file with moved file"""
+        temp_dir = make_tempdir()
+
+        old_file_path = os.path.join(temp_dir, 'images', 'old_location.png')
+        os.makedirs(os.path.dirname(old_file_path), exist_ok=True)
+        test_content = b'\x89PNG\r\n\x1a\n'
+        with open(old_file_path, 'wb') as f:
+            f.write(test_content)
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 124,
+                'absolute_url': 'https://example.com/r/1/file/124/download/',
+            },
+            url=(
+                'http://reviews.example.com/api/review-requests/1/'
+                'file-attachments/124/'
+            ),
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path='images/old_location.png',
+            new_path='assets/new_location.png',
+            status='moved',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        patcher = Patcher(patches=[], dest_path=Path(temp_dir))
+
+        with chdir(temp_dir):
+            success, error = patcher.apply_binary_file(binary_file)
+
+        self.assertTrue(success)
+        self.assertIsNone(error)
+
+        # Check old file was removed.
+        self.assertFalse(os.path.exists(old_file_path))
+
+        # Check new file was created with correct content.
+        new_file_path = os.path.join(temp_dir, 'assets', 'new_location.png')
+        self.assertTrue(os.path.exists(new_file_path))
+
+        with open(new_file_path, 'rb') as f:
+            self.assertEqual(f.read(), test_content)
+
+    def test_apply_binary_file_download_error(self) -> None:
+        """Testing Patcher.apply_binary_file with download error"""
+        temp_dir = make_tempdir()
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 123,
+                'absolute_url': 'https://example.com/r/1/file/123/download/',
+            },
+            url=(
+                'http://reviews.example.com/api/review-requests/1/'
+                'file-attachments/123/'
+            ),
+        )
+
+        binary_file = BinaryFilePatch(
+            old_path='test.png',
+            new_path='',
+            status='added',
+            file_attachment=attachment,
+        )
+
+        self.spy_on(
+            binary_file._download_content,
+            call_fake=lambda self: (
+                setattr(binary_file, 'download_error', 'Network error'),
+                setattr(binary_file, '_content', None),
+                setattr(binary_file, '_content_loaded', True)
+            )[-1]
+        )
+
+        patcher = Patcher(patches=[], dest_path=Path(temp_dir))
+        success, error = patcher.apply_binary_file(binary_file)
+
+        self.assertFalse(success)
+
+        assert error is not None
+        self.assertIn('Failed to download: Network error', error)
+
+        # Check file was not created.
+        file_path = os.path.join(temp_dir, 'test.png')
+        self.assertFalse(os.path.exists(file_path))

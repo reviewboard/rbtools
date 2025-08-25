@@ -13,7 +13,7 @@ from gettext import gettext as _
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from typing_extensions import NotRequired, TypedDict
+from typing_extensions import NotRequired, TypedDict, assert_never
 
 from rbtools.diffs.errors import ApplyPatchError
 from rbtools.diffs.patches import PatchAuthor, PatchResult
@@ -23,11 +23,11 @@ from rbtools.utils.filesystem import chdir
 from rbtools.utils.process import run_process
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Sequence
+    from collections.abc import Iterator, Mapping, Sequence
 
     from rbtools.api.resource import ReviewRequestItemResource
     from rbtools.clients.base.repository import RepositoryInfo
-    from rbtools.diffs.patches import Patch
+    from rbtools.diffs.patches import BinaryFilePatch, Patch
 
 
 logger = logging.getLogger(__name__)
@@ -427,6 +427,15 @@ class Patcher:
                                 'Partially applied %(patch_subject)s, but '
                                 'there were conflicts.'
                             )
+                    elif patch_result.binary_failed:
+                        error = '\n'.join([
+                            _('Failed to patch binary files:'),
+                            *(
+                                f'    {filename}: {failure}'
+                                for filename, failure in
+                                patch_result.binary_failed.items()
+                            )
+                          ])
                     else:
                         if self.revert:
                             error = _(
@@ -607,27 +616,36 @@ class Patcher:
                              redirect_stderr=True)
         patch_output = result.stdout_bytes.read()
 
-        conflicting_files: list[str] = []
-        patched: bool = False
+        # Next, apply any binary files.
+        if (binary_files := patch.binary_files):
+            binary_applied, binary_failed = self.apply_binary_files(
+                binary_files)
+        else:
+            binary_applied = None
+            binary_failed = None
+
+        if self.can_patch_empty_files:
+            patched_empty_files = self.apply_patch_for_empty_files(patch)
+        else:
+            patched_empty_files = False
+
+        conflicting_files: list[str]
+        patched: bool
 
         if result.exit_code == 0:
             patched = True
+            conflicting_files = []
         else:
             parsed_output = self.parse_patch_output(patch_output)
+            conflicting_files = parsed_output['conflicting_files']
 
-            # Check the patch for any added/deleted empty files to handle.
-            if self.can_patch_empty_files and parsed_output['has_empty_files']:
-                # We'll let the patcher's special implementation handle this,
-                # if it can.
-                #
-                # If there are no empty files in a "garbage-only" patch, the
-                # patch is probably malformed.
-                patched = self.apply_patch_for_empty_files(patch)
-                has_fatal_error = not patched
-            else:
-                has_fatal_error = bool(parsed_output.get('fatal_error'))
+            patched = bool(
+                parsed_output['has_partial_applied_files'] or
+                binary_applied or
+                patched_empty_files
+            )
 
-            if has_fatal_error:
+            if not patched and parsed_output.get('fatal_error'):
                 raise ApplyPatchError(
                     _('There was an error applying %%(patch_subject)s: '
                       '%(error)s')
@@ -641,12 +659,6 @@ class Patcher:
                         patch_output=patch_output,
                         patch_range=(patch_num, patch_num)))
 
-            # Handle any conflicts/partially-applied state from the result.
-            conflicting_files = parsed_output['conflicting_files']
-
-            if parsed_output['has_partial_applied_files']:
-                patched = True
-
         # We're done here. Send the result.
         return PatchResult(
             applied=patched,
@@ -654,7 +666,9 @@ class Patcher:
             patch_output=patch_output,
             patch_range=(patch_num, patch_num),
             has_conflicts=len(conflicting_files) > 0,
-            conflicting_files=conflicting_files)
+            conflicting_files=conflicting_files,
+            binary_applied=binary_applied,
+            binary_failed=binary_failed)
 
     def get_default_prefix_level(
         self,
@@ -817,3 +831,228 @@ class Patcher:
                 There was an error while applying the patch.
         """
         raise NotImplementedError
+
+    def apply_binary_files(
+        self,
+        binary_files: Sequence[BinaryFilePatch],
+    ) -> tuple[Sequence[str], Mapping[str, str]]:
+        """Apply binary files to the filesystem.
+
+        Version Added:
+            6.0
+
+        Args:
+            binary_files (list of rbtools.diffs.patches.BinaryFilePatch):
+                List of binary files to apply.
+
+        Returns:
+            tuple:
+            A 2-tuple of:
+
+            Tuple:
+                0 (list of str):
+                    A list of file paths that were successfully applied.
+
+                1 (dict):
+                    A mapping of file paths to failure reasons.
+        """
+        successfully_applied: list[str] = []
+        failed_files: dict[str, str] = {}
+
+        for f in binary_files:
+            try:
+                success, err = self.apply_binary_file(f)
+            except Exception as e:
+                success = False
+                err = str(e)
+
+            if success:
+                successfully_applied.append(f.path)
+            else:
+                assert err is not None
+
+                failed_files[f.path] = err
+
+        return successfully_applied, failed_files
+
+    def apply_binary_file(
+        self,
+        binary_file: BinaryFilePatch,
+    ) -> tuple[bool, str | None]:
+        """Apply a single binary file.
+
+        Version Added:
+            6.0
+
+        Args:
+            binary_file (rbtools.diffs.patches.BinaryFilePatch):
+                The binary file to apply.
+
+        Returns:
+            tuple:
+            A 2-tuple of:
+
+            Tuple:
+                0 (bool):
+                    Whether the operation was a success.
+
+                1 (str or None):
+                    The error, if the operation failed.
+        """
+        status = binary_file.status
+        old_path = binary_file.old_path
+        new_path = binary_file.new_path
+
+        if status == 'deleted':
+            # Remove the file if it exists.
+            assert old_path is not None
+            self.handle_remove_file(old_path)
+
+            return True, None
+        else:
+            # For added/modified files, write the content.
+            content = binary_file.content
+
+            if content is None:
+                if binary_file.download_error:
+                    error = _('Failed to download: {error}').format(
+                        error=binary_file.download_error)
+                    return False, error
+                else:
+                    return False, _('Binary file content not available')
+
+            if status == 'added':
+                assert new_path is not None
+                self.handle_add_file(new_path, content)
+            elif status == 'moved':
+                assert old_path is not None
+                assert new_path is not None
+
+                self.handle_move_file(old_path, new_path)
+                self.handle_write_file(new_path, content)
+            elif status == 'modified':
+                assert new_path is not None
+                self.handle_write_file(new_path, content)
+            else:
+                assert_never(status)
+
+            return True, None
+
+    def handle_add_file(
+        self,
+        path: str,
+        content: bytes,
+    ) -> None:
+        """Add a file.
+
+        This may be overridden by subclasses if they need to interact with an
+        SCM to perform the add.
+
+        Version Added:
+            6.0
+
+        Args:
+            path (str):
+                The path to the file.
+
+            content (bytes):
+                The content for the file.
+
+        Raises:
+            OSError:
+                A file operation failed.
+        """
+        # Create the directory if it doesn't exist.
+        dirname = os.path.dirname(path)
+
+        if dirname:
+            os.makedirs(dirname, exist_ok=True)
+
+        self.handle_write_file(path, content)
+
+    def handle_move_file(
+        self,
+        old_path: str,
+        new_path: str,
+    ) -> None:
+        """Move a file.
+
+        This may be overridden by subclasses if they need to interact with an
+        SCM to perform the move.
+
+        Version Added:
+            6.0
+
+        Args:
+            old_path (str):
+                The old filename.
+
+            new_path (str):
+                The new filename.
+
+        Raises:
+            OSError:
+                A file operation failed.
+        """
+        # Create the directory if it doesn't exist.
+        dirname = os.path.dirname(new_path)
+
+        if dirname:
+            os.makedirs(dirname, exist_ok=True)
+
+        os.rename(old_path, new_path)
+
+    def handle_remove_file(
+        self,
+        path: str,
+    ) -> None:
+        """Delete a file.
+
+        This may be overridden by subclasses if they need to interact with an
+        SCM to perform the move.
+
+        Version Added:
+            6.0
+
+        Args:
+            path (str):
+                The path to the file to delete.
+
+        Raises:
+            OSError:
+                A file operation failed.
+        """
+        if os.path.exists(path):
+            os.remove(path)
+        else:
+            # File doesn't exist, but that's ok for deletion.
+            logger.warning('Binary file %s was deleted in the '
+                           'patch, but local file was not found.',
+                           path)
+
+    def handle_write_file(
+        self,
+        path: str,
+        content: bytes,
+    ) -> None:
+        """Write the content of a file.
+
+        This may be overridden by subclasses if they need to interact with an
+        SCM to perform the operation.
+
+        Version Added:
+            6.0
+
+        Args:
+            path (str):
+                The path to the file.
+
+            content (bytes):
+                The content for the file.
+
+        Raises:
+            OSError:
+                A file operation failed.
+        """
+        with open(path, 'wb') as fp:
+            fp.write(content)

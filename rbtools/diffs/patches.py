@@ -8,18 +8,159 @@ Version Added:
 
 from __future__ import annotations
 
+import logging
 from contextlib import contextmanager
 from gettext import gettext as _
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Literal, TYPE_CHECKING
+from urllib.error import URLError
+from urllib.request import urlopen
 
 from housekeeping import deprecate_non_keyword_only_args
+from typelets.runtime import raise_invalid_type
 
 from rbtools.deprecation import RemovedInRBTools70Warning
 from rbtools.utils.filesystem import make_tempfile
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterator, Mapping, Sequence
+
+    from typing_extensions import TypeAlias
+
+    from rbtools.api.resource import FileAttachmentItemResource
+
+
+logger = logging.getLogger(__name__)
+
+
+#: Type for the status of a binary file change.
+#:
+#: Version Added:
+#:     6.0
+BinaryFileStatus: TypeAlias = Literal[
+    'added',
+    'deleted',
+    'modified',
+    'moved',
+]
+
+
+class BinaryFilePatch:
+    """Represents a binary file in a patch with lazy content loading.
+
+    Version Added:
+        6.0
+    """
+
+    ######################
+    # Instance variables #
+    ######################
+
+    #: Download error if any.
+    download_error: str | None
+
+    #: Modified file path relative to the repository root.
+    new_path: str | None
+
+    #: Original file path relative to the repository root.
+    old_path: str | None
+
+    #: File operation.
+    status: BinaryFileStatus
+
+    #: Source for downloading content.
+    _attachment: FileAttachmentItemResource | None
+
+    #: Cached binary content.
+    _content: bytes | None
+
+    #: Whether download was attempted.
+    _content_loaded: bool
+
+    def __init__(
+        self,
+        *,
+        old_path: str | None,
+        new_path: str | None,
+        status: BinaryFileStatus,
+        file_attachment: FileAttachmentItemResource | None,
+    ) -> None:
+        """Initialize the binary file.
+
+        Args:
+            old_path (str):
+                Original file path relative to the repository root.
+
+            new_path (str):
+                Modified file path relative to the repository root.
+
+            status (str):
+                File operation ('added', 'deleted', 'modified', or 'moved').
+
+            file_attachment (rbtools.api.resource.FileAttachmentItemResource):
+                Source for downloading content.
+        """
+        self.download_error = None
+        self.old_path = old_path
+        self.new_path = new_path
+        self.status = status
+        self._attachment = file_attachment
+        self._content = None
+        self._content_loaded = False
+
+    @property
+    def path(self) -> str:
+        """The path of the file, for display purposes."""
+        path = self.new_path or self.old_path
+        assert path is not None
+
+        return path
+
+    @property
+    def content(self) -> bytes | None:
+        """Lazy-loaded binary content."""
+        if not self._content_loaded:
+            self._download_content()
+
+        return self._content
+
+    def _download_content(self) -> None:
+        """Download binary content from the API."""
+        if self._content_loaded:
+            return
+
+        if self.status == 'deleted':
+            # For deleted files, we don't need anything.
+            self._content_loaded = True
+        elif not self._attachment:
+            self.download_error = _('No attachment available')
+            self._content_loaded = True
+        else:
+            try:
+                url = self._attachment.absolute_url
+
+                logger.debug('Downloading binary file for %s from %s',
+                             self.path, url)
+
+                with urlopen(url) as rsp:
+                    self._content = rsp.read()
+            except URLError as e:
+                self.download_error = str(e)
+
+            self._content_loaded = True
+
+    def __repr__(self) -> str:
+        """Return a string representation of the object.
+
+        Returns:
+            str:
+            The string representation.
+        """
+        return (
+            f'<BinaryFilePatch(old_path={self.old_path!r}, '
+            f'new_path={self.new_path!r}, status={self.status!r}, '
+            f'loaded={self._content_loaded})>'
+        )
 
 
 class PatchAuthor:
@@ -117,6 +258,15 @@ class PatchAuthor:
                 self.email == other.email and
                 self.full_name == other.full_name)
 
+    def __hash__(self) -> int:
+        """Return a hash of the object.
+
+        Returns:
+            int:
+            A hash for the object.
+        """
+        return hash(f'{self.full_name}:{self.email}')
+
     def __repr__(self) -> str:
         """Return a string representation of this object.
 
@@ -172,6 +322,12 @@ class Patch:
     #: :command:`patch -p<X>`.
     prefix_level: int | None
 
+    #: List of binary files in this patch.
+    #:
+    #: Version Added:
+    #:     6.0
+    binary_files: Sequence[BinaryFilePatch]
+
     #: The cached contents of the patch.
     _content: bytes | None
 
@@ -190,6 +346,7 @@ class Patch:
         message: (str | None) = None,
         path: (Path | None) = None,
         prefix_level: (int | None) = None,
+        binary_files: (Sequence[BinaryFilePatch] | None) = None,
     ) -> None:
         """Initialize the patch.
 
@@ -227,6 +384,12 @@ class Patch:
                 If not provided, the patching code will determine a default.
                 This default may not be correct for the patch.
 
+            binary_files (list of BinaryFilePatch, optional):
+                List of binary files associated with this patch.
+
+                Version Added:
+                    6.0
+
         Raises:
             ValueError:
                 One or more parameters or parameter combinations were invalid.
@@ -246,14 +409,15 @@ class Patch:
                 pass
 
         if prefix_level is not None and not isinstance(prefix_level, int):
-            raise ValueError(
-                f'prefix_level must be an integer, not {prefix_level!r}.'
-            )
+            raise_invalid_type(
+                prefix_level,
+                f'prefix_level must be an integer, not {prefix_level!r}.')
 
         self.author = author
         self.base_dir = base_dir
         self.message = message
         self.prefix_level = prefix_level
+        self.binary_files = binary_files or []
         self._content = content
         self._path = path
         self._opened = False
@@ -448,6 +612,18 @@ class PatchResult:
     #: The output of the patch command.
     patch_output: bytes | None
 
+    #: Binary files that were successfully applied.
+    #:
+    #: Version Added:
+    #:     6.0
+    binary_applied: Sequence[str]
+
+    #: Binary files that failed to apply, mapped to failure reason.
+    #:
+    #: Version Added:
+    #:     6.0
+    binary_failed: Mapping[str, str]
+
     @deprecate_non_keyword_only_args(RemovedInRBTools70Warning)
     def __init__(
         self,
@@ -458,6 +634,8 @@ class PatchResult:
         patch_output: (bytes | None) = None,
         patch: (Patch | None) = None,
         patch_range: (tuple[int, int] | None) = None,
+        binary_applied: (Sequence[str] | None) = None,
+        binary_failed: (Mapping[str, str] | None) = None,
     ) -> None:
         """Initialize the object.
 
@@ -501,6 +679,18 @@ class PatchResult:
 
                 Version Added:
                     5.1
+
+            binary_applied (list of str, optional):
+                Binary files that were successfully applied.
+
+                Version Added:
+                    6.0
+
+            binary_failed (dict, optional):
+                Binary files that failed to apply, mapped to failure reason.
+
+                Version Added:
+                    6.0
         """
         self.applied = applied
         self.conflicting_files = conflicting_files or []
@@ -508,11 +698,17 @@ class PatchResult:
         self.patch = patch
         self.patch_output = patch_output
         self.patch_range = patch_range
+        self.binary_applied = binary_applied or []
+        self.binary_failed = binary_failed or {}
 
     @property
     def success(self) -> bool:
         """Whether this was a successful patch application."""
-        return self.applied and not self.has_conflicts
+        return (
+            self.applied and
+            not self.has_conflicts and
+            len(self.binary_failed) == 0
+        )
 
     def __repr__(self) -> str:
         """Return a string representation of the object.
@@ -526,5 +722,7 @@ class PatchResult:
             f' has_conflicts={self.has_conflicts},'
             f' patch_range={self.patch_range!r},'
             f' conflicting_files={self.conflicting_files!r},'
+            f' binary_applied={self.binary_applied},'
+            f' binary_failed={self.binary_failed},'
             f' patch={self.patch!r})>'
         )
