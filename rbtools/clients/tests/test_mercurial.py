@@ -10,12 +10,12 @@ import time
 import unittest
 from random import randint
 from textwrap import dedent
-from typing import Optional
 
 import kgb
 from rbtools.diffs.errors import ApplyPatchError
 
 import rbtools.helpers
+from rbtools.api.resource import FileAttachmentItemResource
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.errors import (CreateCommitError,
                                     MergeError,
@@ -25,7 +25,8 @@ from rbtools.clients.mercurial import MercurialClient, MercurialRefType
 from rbtools.clients.tests import (FOO, FOO1, FOO2, FOO3, FOO4, FOO5, FOO6,
                                    SCMClientTestCase)
 from rbtools.config.loader import load_config
-from rbtools.diffs.patches import Patch, PatchAuthor
+from rbtools.diffs.patches import BinaryFilePatch, Patch, PatchAuthor
+from rbtools.testing.api.transport import URLMapTransport
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import (is_exe_in_path,
                                       make_tempdir)
@@ -38,7 +39,7 @@ hgext_path = os.path.abspath(os.path.join(rbtools.helpers.__file__, '..',
                                           'hgext.py'))
 
 
-class MercurialTestCase(SCMClientTestCase):
+class MercurialTestCase(SCMClientTestCase[MercurialClient]):
     """Base class for all Mercurial unit tests."""
 
     TESTSERVER = 'http://127.0.0.1:8080'
@@ -69,13 +70,13 @@ class MercurialTestCase(SCMClientTestCase):
     ######################
 
     #: The path to the Mercurial clone directory for a test.
-    clone_dir: Optional[str]
+    clone_dir: str | None
 
     @classmethod
     def setup_checkout(
         cls,
         checkout_dir: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Populate a Mercurial clone.
 
         This will create a clone of the sample Mercurial repository stored in
@@ -116,7 +117,7 @@ class MercurialTestCase(SCMClientTestCase):
         if self.clone_dir is not None:
             self.clone_hgrc_path = os.path.join(self.clone_dir, '.hg', 'hgrc')
 
-            with open(self.clone_hgrc_path, 'w') as fp:
+            with open(self.clone_hgrc_path, 'w', encoding='utf-8') as fp:
                 fp.write(self.CLONE_HGRC % {
                     'hg_dir': self.hg_dir,
                     'clone_dir': self.clone_dir,
@@ -134,7 +135,7 @@ class MercurialTestCase(SCMClientTestCase):
         """Run a Mercurial command.
 
         Args:
-            command (list of unicode):
+            command (list of str):
                 The command and arguments to pass to :program:`hg`.
 
             **kwargs (dict):
@@ -146,39 +147,46 @@ class MercurialTestCase(SCMClientTestCase):
             The result of :py:func:`~rbtools.utils.process.run_process`.
         """
         return run_process(
-            ['hg'] + command,
+            ['hg', *command],
             env={
                 'HGPLAIN': '1',
             },
             **kwargs)
 
-    def hg_add_file_commit(self, filename='test.txt', data=b'Test',
-                           msg='Test commit', branch=None,
-                           bookmark=None, tag=None, date=None):
+    def hg_add_file_commit(
+        self,
+        filename: str = 'test.txt',
+        data: bytes = b'Test',
+        msg: str = 'Test commit',
+        branch: (str | None) = None,
+        bookmark: (str | None) = None,
+        tag: (str | None) = None,
+        date: (str | None) = None,
+    ) -> None:
         """Add a file to the repository and commit it.
 
         This can also optionally construct a branch for the commit.
 
         Args:
-            filename (unicode, optional):
+            filename (str, optional):
                 The name of the file to write.
 
             data (bytes, optional):
                 The data to write to the file.
 
-            msg (unicode, optional):
+            msg (str, optional):
                 The commit message.
 
-            branch (unicode, optional):
+            branch (str, optional):
                 The optional branch to create.
 
-            bookmark (unicode, optional):
+            bookmark (str, optional):
                 The optional bookmark to create.
 
-            tag (unicode, optional):
+            tag (str, optional):
                 The optional tag to create.
 
-            date (unicode, optional):
+            date (str, optional):
                 The optional date to set for the commit.
 
                 Version Added:
@@ -2492,7 +2500,7 @@ class MercurialPatcherTests(MercurialTestCase):
         self.assertEqual(self._hg_get_tip(), f'{commit1}+')
 
     def test_patch_with_multiple_patches_and_commit(self) -> None:
-        """Testing MercurialPatcher.patch with multiple patches"""
+        """Testing MercurialPatcher.patch with multiple patches and commit"""
         client = self.build_client()
         repository_info = client.get_repository_info()
         tempfiles = self.precreate_tempfiles(2)
@@ -2786,3 +2794,950 @@ class MercurialPatcherTests(MercurialTestCase):
 
         # There should not be a new commit, but should have pending changes.
         self.assertEqual(self._hg_get_tip(), f'{tip}+')
+
+    def test_binary_file_add(self) -> None:
+        """Testing MercurialPatcher with an added binary file"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        test_content = b'Binary file content'
+        test_path = 'new_binary_file.bin'
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 123,
+                'absolute_url': 'https://example.com/r/1/file/123/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/123/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=None,
+            new_path=test_path,
+            status='added',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        tip = self._hg_get_tip()
+
+        patch_content = (
+            b'# HG changeset patch\n'
+            b'# Node ID 001a1c12e834183a95634690eb8ab65ca2711094\n'
+            b'# Parent %(base_commit_id)s\n'
+            b'diff -r %(base_commit_id)s -r 001a1c12e834 %(path)s\n'
+            b'Binary file %(path)s has changed\n'
+            % {
+                b'base_commit_id': tip.encode(),
+                b'path': test_path.encode(),
+            }
+        )
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=patch_content, binary_files=[binary_file]),
+            ])
+
+        self.spy_on(client._execute)
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], test_path)
+
+        self.assertTrue(os.path.exists(test_path))
+
+        with open(test_path, 'rb') as f:
+            self.assertEqual(f.read(), test_content)
+
+        self.assertSpyCalledWith(
+            client._execute, ['hg', 'add', test_path])
+
+    def test_binary_file_add_in_subdirectory(self) -> None:
+        """Testing MercurialPatcher with an added binary file in subdirectory
+        """
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        test_content = b'Binary data in subdirectory'
+        test_path = 'subdir/nested_binary_file.bin'
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 124,
+                'absolute_url': 'https://example.com/r/1/file/124/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/124/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=None,
+            new_path=test_path,
+            status='added',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        tip = self._hg_get_tip()
+
+        patch_content = (
+            b'# HG changeset patch\n'
+            b'# Node ID 002b2d23f945294b06745701fc9bc76db3822105\n'
+            b'# Parent %(base_commit_id)s\n'
+            b'diff -r %(base_commit_id)s -r 002b2d23f945 %(path)s\n'
+            b'Binary file %(path)s has changed\n'
+            % {
+                b'base_commit_id': tip.encode(),
+                b'path': test_path.encode(),
+            }
+        )
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=patch_content, binary_files=[binary_file]),
+            ])
+
+        self.spy_on(client._execute)
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], test_path)
+
+        self.assertTrue(os.path.exists(test_path))
+        self.assertTrue(os.path.isdir('subdir'))
+
+        with open(test_path, 'rb') as f:
+            self.assertEqual(f.read(), test_content)
+
+        self.assertSpyCalledWith(
+            client._execute, ['hg', 'add', test_path])
+
+    def test_binary_file_move(self) -> None:
+        """Testing MercurialPatcher with a moved binary file"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        old_content = b'Original binary content'
+        new_content = b'Updated binary content'
+        old_path = 'original.bin'
+        new_path = 'renamed.bin'
+
+        self.hg_add_file_commit(old_path, old_content)
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 125,
+                'absolute_url': 'https://example.com/r/1/file/125/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/125/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=old_path,
+            new_path=new_path,
+            status='moved',
+            file_attachment=attachment,
+            content=new_content,
+        )
+
+        tip = self._hg_get_tip()
+
+        patch_content = (
+            b'# HG changeset patch\n'
+            b'# Node ID 003c3e34g056305c17856812gd0cd87ec4933216\n'
+            b'# Parent %(base_commit_id)s\n'
+            b'diff -r %(base_commit_id)s -r 003c3e34g056 %(old_path)s\n'
+            b'rename from %(old_path)s\n'
+            b'rename to %(new_path)s\n'
+            b'Binary file %(new_path)s has changed\n'
+            % {
+                b'base_commit_id': tip.encode(),
+                b'old_path': old_path.encode(),
+                b'new_path': new_path.encode(),
+            }
+        )
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=patch_content, binary_files=[binary_file]),
+            ])
+
+        self.spy_on(client._execute)
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], new_path)
+
+        self.assertFalse(os.path.exists(old_path))
+
+        self.assertTrue(os.path.exists(new_path))
+        with open(new_path, 'rb') as f:
+            self.assertEqual(f.read(), new_content)
+
+        self.assertSpyCalledWith(
+            client._execute, ['hg', 'rename', old_path, new_path])
+
+    def test_binary_file_move_with_subdirectory(self) -> None:
+        """Testing MercurialPatcher with a moved binary file and a new
+        subdirectory
+        """
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        old_content = b'File to be moved'
+        new_content = b'Updated file in subdirectory'
+        old_path = 'root_file.bin'
+        new_path = 'subdir/moved_file.bin'
+
+        self.hg_add_file_commit(old_path, old_content)
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 126,
+                'absolute_url': 'https://example.com/r/1/file/126/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/126/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=old_path,
+            new_path=new_path,
+            status='moved',
+            file_attachment=attachment,
+            content=new_content,
+        )
+
+        tip = self._hg_get_tip()
+
+        patch_content = (
+            b'# HG changeset patch\n'
+            b'# Node ID 004d4f45h167416d28967923he1de98fd5044327\n'
+            b'# Parent %(base_commit_id)s\n'
+            b'diff -r %(base_commit_id)s -r 004d4f45h167 %(old_path)s\n'
+            b'rename from %(old_path)s\n'
+            b'rename to %(new_path)s\n'
+            b'Binary file %(new_path)s has changed\n'
+            % {
+                b'base_commit_id': tip.encode(),
+                b'old_path': old_path.encode(),
+                b'new_path': new_path.encode(),
+            }
+        )
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=patch_content, binary_files=[binary_file]),
+            ])
+
+        self.spy_on(client._execute)
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], new_path)
+
+        self.assertFalse(os.path.exists(old_path))
+
+        self.assertTrue(os.path.isdir('subdir'))
+        self.assertTrue(os.path.exists(new_path))
+        with open(new_path, 'rb') as f:
+            self.assertEqual(f.read(), new_content)
+
+        self.assertSpyCalledWith(
+            client._execute, ['hg', 'rename', old_path, new_path])
+
+    def test_binary_file_remove(self) -> None:
+        """Testing MercurialPatcher with a removed binary file"""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        file_content = b'Content to be removed'
+        file_path = 'file_to_remove.bin'
+
+        self.hg_add_file_commit(file_path, file_content)
+
+        binary_file = BinaryFilePatch(
+            old_path=file_path,
+            new_path=None,
+            status='deleted',
+            file_attachment=None,
+        )
+
+        tip = self._hg_get_tip()
+
+        patch_content = (
+            b'# HG changeset patch\n'
+            b'# Node ID 005e5g56i278527e39078034if2ef09ge6155438\n'
+            b'# Parent %(base_commit_id)s\n'
+            b'diff -r %(base_commit_id)s -r 005e5g56i278 %(file_path)s\n'
+            b'Binary file %(file_path)s has changed\n'
+            % {
+                b'base_commit_id': tip.encode(),
+                b'file_path': file_path.encode(),
+            }
+        )
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=patch_content, binary_files=[binary_file]),
+            ])
+
+        self.spy_on(client._execute)
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], file_path)
+
+        self.assertFalse(os.path.exists(file_path))
+
+        self.assertSpyCalledWith(
+            client._execute, ['hg', 'remove', file_path])
+
+    def test_binary_files_with_multiple_patches(self) -> None:
+        """Testing MercurialPatcher.patch with multiple patches containing
+        binary files
+        """
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        # First binary file - addition
+        content1 = b'First binary content'
+        path1 = 'first.bin'
+
+        attachment1 = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 130,
+                'absolute_url': 'https://example.com/r/1/file/130/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/130/'
+        )
+
+        binary_file1 = self.make_binary_file_patch(
+            old_path=None,
+            new_path=path1,
+            status='added',
+            file_attachment=attachment1,
+            content=content1,
+        )
+
+        # Second binary file - addition
+        content2 = b'Second binary content'
+        path2 = 'second.bin'
+
+        attachment2 = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 131,
+                'absolute_url': 'https://example.com/r/1/file/131/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/131/'
+        )
+
+        binary_file2 = self.make_binary_file_patch(
+            old_path=None,
+            new_path=path2,
+            status='added',
+            file_attachment=attachment2,
+            content=content2,
+        )
+
+        tip = self._hg_get_tip()
+        commit1_id = b'007h7i78k490749g51290256kh4hg21ig8377660'
+        commit2_id = b'008i8j89l501850h62301367li5ih32jh9488771'
+
+        patch_content1 = (
+            b'# HG changeset patch\n'
+            b'# Node ID %(commit_id)s\n'
+            b'# Parent %(base_commit_id)s\n'
+            b'diff -r %(base_commit_id)s -r 007h7i78k490 %(path)s\n'
+            b'Binary file %(path)s has changed\n'
+            % {
+                b'base_commit_id': tip.encode(),
+                b'commit_id': commit1_id,
+                b'path': path1.encode(),
+            }
+        )
+
+        patch_content2 = (
+            b'# HG changeset patch\n'
+            b'# Node ID %(commit_id)s\n'
+            b'# Parent %(base_commit_id)s\n'
+            b'diff -r %(base_commit_id)s -r 008i8j89l501 %(path)s\n'
+            b'Binary file %(path)s has changed\n'
+            % {
+                b'base_commit_id': commit1_id,
+                b'commit_id': commit2_id,
+                b'path': path2.encode(),
+            }
+        )
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=patch_content1, binary_files=[binary_file1]),
+                Patch(content=patch_content2, binary_files=[binary_file2]),
+            ])
+
+        self.spy_on(client._execute)
+
+        results = list(patcher.patch())
+
+        # When not committing, there's only one patch result.
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 2)
+        self.assertEqual(result.binary_applied[0], path1)
+        self.assertEqual(result.binary_applied[1], path2)
+
+        # Verify files were created with correct content
+        self.assertTrue(os.path.exists(path1))
+
+        with open(path1, 'rb') as f:
+            self.assertEqual(f.read(), content1)
+
+        self.assertTrue(os.path.exists(path2))
+
+        with open(path2, 'rb') as f:
+            self.assertEqual(f.read(), content2)
+
+        # Verify the hg add commands were called for both files
+        self.assertSpyCalledWith(client._execute, ['hg', 'add', path1])
+        self.assertSpyCalledWith(client._execute, ['hg', 'add', path2])
+
+    def test_binary_files_with_multiple_patches_and_commit(self) -> None:
+        """Testing MercurialPatcher.patch with multiple patches containing
+        binary files and commit
+        """
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+
+        # First binary file - addition
+        content1 = b'First binary content for commit'
+        path1 = 'committed_first.bin'
+
+        attachment1 = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 132,
+                'absolute_url': 'https://example.com/r/1/file/132/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/132/'
+        )
+
+        binary_file1 = self.make_binary_file_patch(
+            old_path=None,
+            new_path=path1,
+            status='added',
+            file_attachment=attachment1,
+            content=content1,
+        )
+
+        # Second binary file - addition
+        content2 = b'Second binary content for commit'
+        path2 = 'committed_second.bin'
+
+        attachment2 = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 133,
+                'absolute_url': 'https://example.com/r/1/file/133/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/133/'
+        )
+
+        binary_file2 = self.make_binary_file_patch(
+            old_path=None,
+            new_path=path2,
+            status='added',
+            file_attachment=attachment2,
+            content=content2,
+        )
+
+        tip = self._hg_get_tip()
+        commit1_id = b'009j9k90m612961i73412478mj6jh43ki0599882'
+        commit2_id = b'010k0l01n723072j84523589nk7ki54lj1600993'
+
+        patch_content1 = (
+            b'# HG changeset patch\n'
+            b'# Node ID %(commit_id)s\n'
+            b'# Parent %(base_commit_id)s\n'
+            b'First binary patch commit\n'
+            b'\n'
+            b'diff -r %(base_commit_id)s -r 009j9k90m612 %(path)s\n'
+            b'Binary file %(path)s has changed\n'
+            % {
+                b'base_commit_id': tip.encode(),
+                b'commit_id': commit1_id,
+                b'path': path1.encode(),
+            }
+        )
+
+        patch_content2 = (
+            b'# HG changeset patch\n'
+            b'# Node ID %(commit_id)s\n'
+            b'# Parent %(base_commit_id)s\n'
+            b'Second binary patch commit\n'
+            b'\n'
+            b'diff -r %(base_commit_id)s -r 010k0l01n723 %(path)s\n'
+            b'Binary file %(path)s has changed\n'
+            % {
+                b'base_commit_id': commit1_id,
+                b'commit_id': commit2_id,
+                b'path': path2.encode(),
+            }
+        )
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=patch_content1, binary_files=[binary_file1]),
+                Patch(content=patch_content2, binary_files=[binary_file2]),
+            ])
+        patcher.prepare_for_commit(
+            default_author=PatchAuthor(full_name='Test User',
+                                       email='test@example.com'),
+            default_message='Test message')
+
+        self.spy_on(client._execute)
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 2)
+
+        result1 = results[0]
+        self.assertTrue(result1.success)
+        self.assertEqual(len(result1.binary_applied), 1)
+        self.assertEqual(result1.binary_applied[0], path1)
+
+        result2 = results[1]
+        self.assertTrue(result2.success)
+        self.assertEqual(len(result2.binary_applied), 1)
+        self.assertEqual(result2.binary_applied[0], path2)
+
+        self.assertTrue(os.path.exists(path1))
+        with open(path1, 'rb') as f:
+            self.assertEqual(f.read(), content1)
+
+        self.assertTrue(os.path.exists(path2))
+        with open(path2, 'rb') as f:
+            self.assertEqual(f.read(), content2)
+
+        self.assertSpyCalledWith(client._execute, ['hg', 'add', path1])
+        self.assertSpyCalledWith(client._execute, ['hg', 'add', path2])
+
+        final_tip = self._hg_get_tip()
+        self.assertNotEqual(tip, final_tip)
+
+    def test_patch_with_regular_and_empty_files(self) -> None:
+        """Testing MercurialPatcher.patch with regular and empty files."""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
+
+        self.hg_add_file_commit(filename='empty_file',
+                                data=b'',
+                                msg='Add an empty file.')
+
+        tip = self._hg_get_tip()
+
+        self.spy_on(run_process_exec)
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=(
+                    b'# HG changeset patch\n'
+                    b'# Node ID 001a1c12e834183a95634690eb8ab65ca2711094\n'
+                    b'# Parent  %(base_commit_id)s\n'
+                    b'diff --git a/foo.txt b/foo.txt\n'
+                    b'--- a/foo.txt\n'
+                    b'+++ b/foo.txt\n'
+                    b'@@ -6,7 +6,8 @@\n'
+                    b' inferretque deos Latio, genus unde Latinum,\n'
+                    b' Albanique patres, atque altae moenia Romae.\n'
+                    b' Musa, mihi causas memora, quo numine laeso,\n'
+                    b'+New line added\n'
+                    b' quidve dolens, regina deum tot volvere casus\n'
+                    b' insignem pietate virum, tot adire labores\n'
+                    b' impulerit. Tantaene animis caelestibus irae?\n'
+                    b' \n'
+                    b'diff --git a/empty_file b/empty_file\n'
+                    b'deleted file mode 100644\n'
+                    b'diff --git a/new_empty_file b/new_empty_file\n'
+                    b'new file mode 100644\n'
+                    % {
+                        b'base_commit_id': tip.encode('utf-8'),
+                    }
+                )),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        with open('foo.txt', 'rb') as fp:
+            content = fp.read()
+            self.assertIn(b'New line added', content)
+
+        self.assertFalse(os.path.exists('empty_file'))
+        self.assertTrue(os.path.exists('new_empty_file'))
+
+        with open('new_empty_file', 'rb') as fp:
+            self.assertEqual(fp.read(), b'')
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            ['hg', 'import', '--no-commit', '--partial', tempfiles[0],
+             '--config', f'extensions.rbtoolsnormalize={hgext_path}'])
+
+    def test_patch_with_regular_and_binary_files(self) -> None:
+        """Testing MercurialPatcher.patch with regular and binary files."""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
+
+        test_content1 = b'Binary file content 1'
+        test_content2 = b'Binary file content 2'
+
+        attachment1 = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 201,
+                'absolute_url': 'https://example.com/r/1/file/201/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/201/'
+        )
+
+        attachment2 = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 202,
+                'absolute_url': 'https://example.com/r/1/file/202/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/202/'
+        )
+
+        binary_file1 = self.make_binary_file_patch(
+            old_path=None,
+            new_path='new_binary.bin',
+            status='added',
+            file_attachment=attachment1,
+            content=test_content1,
+        )
+
+        binary_file2 = self.make_binary_file_patch(
+            old_path='bar.txt',
+            new_path='bar.txt',
+            status='modified',
+            file_attachment=attachment2,
+            content=test_content2,
+        )
+
+        tip = self._hg_get_tip()
+
+        self.spy_on(run_process_exec)
+        self.spy_on(client._execute)
+
+        patch_content = (
+            b'# HG changeset patch\n'
+            b'# Node ID 001a1c12e834183a95634690eb8ab65ca2711094\n'
+            b'# Parent  %(base_commit_id)s\n'
+            b'diff --git a/foo.txt b/foo.txt\n'
+            b'--- a/foo.txt\n'
+            b'+++ b/foo.txt\n'
+            b'@@ -6,7 +6,8 @@\n'
+            b' inferretque deos Latio, genus unde Latinum,\n'
+            b' Albanique patres, atque altae moenia Romae.\n'
+            b' Musa, mihi causas memora, quo numine laeso,\n'
+            b'+New line added\n'
+            b' quidve dolens, regina deum tot volvere casus\n'
+            b' insignem pietate virum, tot adire labores\n'
+            b' impulerit. Tantaene animis caelestibus irae?\n'
+            b' \n'
+            b'diff -r %(base_commit_id)s -r 001a1c12e834 new_binary.bin\n'
+            b'Binary file new_binary.bin has changed\n'
+            b'diff -r %(base_commit_id)s -r 001a1c12e834 bar.txt\n'
+            b'Binary file bar.txt has changed\n'
+            % {
+                b'base_commit_id': tip.encode('utf-8'),
+            }
+        )
+
+        patch = Patch(content=patch_content,
+                      binary_files=[binary_file1, binary_file2])
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 2)
+
+        with open('foo.txt', 'rb') as fp:
+            content = fp.read()
+            self.assertIn(b'New line added', content)
+
+        self.assertTrue(os.path.exists('new_binary.bin'))
+        self.assertTrue(os.path.exists('bar.txt'))
+
+        with open('new_binary.bin', 'rb') as f:
+            self.assertEqual(f.read(), test_content1)
+
+        with open('bar.txt', 'rb') as f:
+            self.assertEqual(f.read(), test_content2)
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            ['hg', 'import', '--no-commit', '--partial', tempfiles[0],
+             '--config', f'extensions.rbtoolsnormalize={hgext_path}'])
+        self.assertSpyCalledWith(client._execute,
+                                 ['hg', 'add', 'new_binary.bin'])
+
+    def test_patch_with_empty_and_binary_files(self) -> None:
+        """Testing MercurialPatcher.patch with empty and binary files."""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
+
+        self.hg_add_file_commit(filename='empty_file',
+                                data=b'',
+                                msg='Add an empty file.')
+
+        test_content = b'Binary file content'
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 301,
+                'absolute_url': 'https://example.com/r/1/file/301/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/301/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=None,
+            new_path='new_binary.bin',
+            status='added',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        tip = self._hg_get_tip()
+
+        self.spy_on(run_process_exec)
+        self.spy_on(client._execute)
+
+        patch_content = (
+            b'# HG changeset patch\n'
+            b'# Node ID 001a1c12e834183a95634690eb8ab65ca2711094\n'
+            b'# Parent  %(base_commit_id)s\n'
+            b'diff --git a/empty_file b/empty_file\n'
+            b'deleted file mode 100644\n'
+            b'diff --git a/new_empty_file b/new_empty_file\n'
+            b'new file mode 100644\n'
+            b'diff -r %(base_commit_id)s -r 001a1c12e834 new_binary.bin\n'
+            b'Binary file new_binary.bin has changed\n'
+            % {
+                b'base_commit_id': tip.encode('utf-8'),
+            }
+        )
+
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+
+        self.assertFalse(os.path.exists('empty_file'))
+        self.assertTrue(os.path.exists('new_empty_file'))
+
+        with open('new_empty_file', 'rb') as fp:
+            self.assertEqual(fp.read(), b'')
+
+        self.assertTrue(os.path.exists('new_binary.bin'))
+
+        with open('new_binary.bin', 'rb') as f:
+            self.assertEqual(f.read(), test_content)
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            ['hg', 'import', '--no-commit', '--partial', tempfiles[0],
+             '--config', f'extensions.rbtoolsnormalize={hgext_path}'])
+        self.assertSpyCalledWith(client._execute,
+                                 ['hg', 'add', 'new_binary.bin'])
+
+    def test_patch_with_mixed_file_types(self) -> None:
+        """Testing MercurialPatcher.patch with regular, empty, and binary
+        files.
+        """
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
+
+        self.hg_add_file_commit(filename='empty_file',
+                                data=b'',
+                                msg='Add an empty file.')
+
+        test_content1 = b'New binary content'
+        test_content2 = b'Modified binary content'
+
+        attachment1 = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 401,
+                'absolute_url': 'https://example.com/r/1/file/401/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/401/'
+        )
+
+        attachment2 = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 402,
+                'absolute_url': 'https://example.com/r/1/file/402/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/402/'
+        )
+
+        binary_file1 = self.make_binary_file_patch(
+            old_path=None,
+            new_path='new_binary.bin',
+            status='added',
+            file_attachment=attachment1,
+            content=test_content1,
+        )
+
+        binary_file2 = self.make_binary_file_patch(
+            old_path='bar.txt',
+            new_path='bar.txt',
+            status='modified',
+            file_attachment=attachment2,
+            content=test_content2,
+        )
+
+        tip = self._hg_get_tip()
+
+        self.spy_on(run_process_exec)
+        self.spy_on(client._execute)
+
+        patch_content = (
+            b'# HG changeset patch\n'
+            b'# Node ID 001a1c12e834183a95634690eb8ab65ca2711094\n'
+            b'# Parent  %(base_commit_id)s\n'
+            b'diff --git a/foo.txt b/foo.txt\n'
+            b'--- a/foo.txt\n'
+            b'+++ b/foo.txt\n'
+            b'@@ -6,7 +6,8 @@\n'
+            b' inferretque deos Latio, genus unde Latinum,\n'
+            b' Albanique patres, atque altae moenia Romae.\n'
+            b' Musa, mihi causas memora, quo numine laeso,\n'
+            b'+New line added\n'
+            b' quidve dolens, regina deum tot volvere casus\n'
+            b' insignem pietate virum, tot adire labores\n'
+            b' impulerit. Tantaene animis caelestibus irae?\n'
+            b' \n'
+            b'diff --git a/empty_file b/empty_file\n'
+            b'deleted file mode 100644\n'
+            b'diff --git a/new_empty_file b/new_empty_file\n'
+            b'new file mode 100644\n'
+            b'diff -r %(base_commit_id)s -r 001a1c12e834 new_binary.bin\n'
+            b'Binary file new_binary.bin has changed\n'
+            b'diff -r %(base_commit_id)s -r 001a1c12e834 bar.txt\n'
+            b'Binary file bar.txt has changed\n'
+            % {
+                b'base_commit_id': tip.encode('utf-8'),
+            }
+        )
+
+        patch = Patch(content=patch_content,
+                      binary_files=[binary_file1, binary_file2])
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 2)
+
+        with open('foo.txt', 'rb') as fp:
+            content = fp.read()
+            self.assertIn(b'New line added', content)
+
+        self.assertFalse(os.path.exists('empty_file'))
+        self.assertTrue(os.path.exists('new_empty_file'))
+
+        with open('new_empty_file', 'rb') as fp:
+            self.assertEqual(fp.read(), b'')
+
+        self.assertTrue(os.path.exists('new_binary.bin'))
+        self.assertTrue(os.path.exists('bar.txt'))
+
+        with open('new_binary.bin', 'rb') as f:
+            self.assertEqual(f.read(), test_content1)
+
+        with open('bar.txt', 'rb') as f:
+            self.assertEqual(f.read(), test_content2)
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            ['hg', 'import', '--no-commit', '--partial', tempfiles[0],
+             '--config', f'extensions.rbtoolsnormalize={hgext_path}'])
+        self.assertSpyCalledWith(client._execute,
+                                 ['hg', 'add', 'new_binary.bin'])

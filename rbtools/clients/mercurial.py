@@ -11,8 +11,6 @@ from gettext import gettext as _
 from typing import Any, Optional, TYPE_CHECKING, Union, cast
 from urllib.parse import urlsplit, urlunparse
 
-from housekeeping import deprecate_non_keyword_only_args
-
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
                                             SCMClientCommitHistoryItem,
@@ -33,7 +31,7 @@ from rbtools.utils.checks import check_install
 from rbtools.utils.console import edit_file
 from rbtools.utils.encoding import force_unicode
 from rbtools.utils.errors import EditorError
-from rbtools.utils.filesystem import make_tempfile
+from rbtools.utils.filesystem import chdir, make_tempfile
 from rbtools.utils.process import RunProcessError, run_process
 
 if TYPE_CHECKING:
@@ -42,7 +40,7 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
-    from rbtools.diffs.patches import Patch
+    from rbtools.diffs.patches import BinaryFilePatch, Patch
     from rbtools.utils.process import RunProcessKwargs, RunProcessResult
 
 
@@ -68,7 +66,7 @@ class MercurialRefType:
     UNKNOWN = 'unknown'
 
 
-class MercurialPatcher(SCMClientPatcher):
+class MercurialPatcher(SCMClientPatcher['MercurialClient']):
     """A patcher that applies Mercurial patches to a tree.
 
     This applies patches using :command:`hg import` and to manually handle
@@ -141,13 +139,7 @@ class MercurialPatcher(SCMClientPatcher):
 
                     filenames.append(str(patch.path))
 
-                if len(patches) == 1:
-                    result_patch = patches[0]
-                else:
-                    result_patch = None
-
-                yield self._run_hg_import(filenames=filenames,
-                                          patch=result_patch,
+                yield self._run_hg_import(patches=patches,
                                           prefix_level=prefix_level,
                                           patch_range=(1, len(patches)))
 
@@ -173,34 +165,29 @@ class MercurialPatcher(SCMClientPatcher):
             The result of the patch application, whether the patch applied
             successfully or with normal patch failures.
         """
-        return self._run_hg_import(filenames=[str(patch.path)],
+        return self._run_hg_import(patches=[patch],
                                    prefix_level=patch.prefix_level,
-                                   patch=patch,
                                    patch_range=(patch_num, patch_num))
 
     def _run_hg_import(
         self,
         *,
-        filenames: Sequence[str],
-        prefix_level: Optional[int],
-        patch: Optional[Patch],
+        patches: Sequence[Patch],
+        prefix_level: int | None,
         patch_range: tuple[int, int],
     ) -> PatchResult:
         """Run hg import and return a result.
 
         This will run :command:`hg import` in a non-commit mode, taking a list
-        of files and applying them to the local tree.
+        of patches and applying them to the local tree.
 
         Args:
-            filenames (list of str):
-                The list of patch filenames to apply.
+            patches (list of rbtools.diffs.patches.Patch):
+                The list of patch objects to apply.
 
             prefix_level (int):
                 The number of path components to strip from each path in the
                 patch files.
-
-            patch (rbtools.diffs.patches.Patch):
-                The optional patch to associate with a result.
 
             patch_range (tuple):
                 The patch range to associate with a result.
@@ -224,7 +211,7 @@ class MercurialPatcher(SCMClientPatcher):
         if prefix_level is not None:
             cmd += ['-p', str(prefix_level)]
 
-        cmd += filenames
+        cmd += [str(patch.path) for patch in patches]
 
         result = scmclient._execute(cmd, ignore_errors=True,
                                     redirect_stderr=True)
@@ -233,6 +220,11 @@ class MercurialPatcher(SCMClientPatcher):
 
         conflicting_files: list[str] = []
         applied: bool
+
+        if len(patches) == 1:
+            result_patch = patches[0]
+        else:
+            result_patch = None
 
         if result.exit_code == 0:
             applied = True
@@ -249,21 +241,124 @@ class MercurialPatcher(SCMClientPatcher):
                     patcher=self,
                     failed_patch_result=PatchResult(
                         applied=False,
-                        patch=patch,
+                        patch=result_patch,
                         patch_output=patch_output,
                         patch_range=patch_range))
 
             conflicting_files = parsed_output['conflicting_files']
             applied = parsed_output['has_partial_applied_files']
 
+        binary_files_to_apply: list[BinaryFilePatch] = []
+
+        if applied:
+            for patch in patches:
+                binary_files_to_apply.extend(patch.binary_files)
+
+        if binary_files_to_apply:
+            assert self.repository_info is not None
+
+            local_path = self.repository_info.local_path
+            assert local_path is not None
+
+            # Apply binary files in the repository root
+            with chdir(local_path):
+                binary_applied, binary_failed = self.apply_binary_files(
+                    binary_files_to_apply)
+        else:
+            binary_applied = None
+            binary_failed = None
+
         # We're done here. Send the result.
         return PatchResult(
             applied=applied,
-            patch=patch,
+            patch=result_patch,
             patch_output=patch_output,
             patch_range=patch_range,
             has_conflicts=len(conflicting_files) > 0,
-            conflicting_files=conflicting_files)
+            conflicting_files=conflicting_files,
+            binary_applied=binary_applied,
+            binary_failed=binary_failed)
+
+    def handle_add_file(
+        self,
+        path: str,
+        content: bytes,
+    ) -> None:
+        """Add a file.
+
+        Version Added:
+            6.0
+
+        Args:
+            path (str):
+                The path to the file.
+
+            content (bytes):
+                The content for the file.
+
+        Raises:
+            Exception:
+                An error occurred when running ``hg``.
+
+            OSError:
+                A file operation failed.
+        """
+        super().handle_add_file(path, content)
+
+        scmclient = self.scmclient
+        scmclient._execute([scmclient._exe, 'add', path])
+
+    def handle_move_file(
+        self,
+        old_path: str,
+        new_path: str,
+    ) -> None:
+        """Move a file.
+
+        Version Added:
+            6.0
+
+        Args:
+            old_path (str):
+                The old filename.
+
+            new_path (str):
+                The new filename.
+
+        Raises:
+            OSError:
+                A file operation failed.
+
+            Exception:
+                An error occurred when running ``hg``.
+        """
+        dirname = os.path.dirname(new_path)
+
+        if dirname:
+            os.makedirs(dirname, exist_ok=True)
+
+        scmclient = self.scmclient
+        scmclient._execute([scmclient._exe, 'rename', old_path, new_path])
+
+    def handle_remove_file(
+        self,
+        path: str,
+    ) -> None:
+        """Delete a file.
+
+        Version Added:
+            6.0
+
+        Args:
+            path (str):
+                The path to the file to delete.
+
+        Raises:
+            Exception:
+                An error occurred when running ``hg``.
+        """
+        scmclient = self.scmclient
+        scmclient._execute([scmclient._exe, 'remove', path])
 
 
 class MercurialClient(BaseSCMClient):
