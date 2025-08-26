@@ -27,7 +27,7 @@ from rbtools.clients.errors import (AuthenticationError,
                                     SCMError,
                                     TooManyRevisionsError)
 from rbtools.deprecation import RemovedInRBTools80Warning
-from rbtools.diffs.patches import PatchResult
+from rbtools.diffs.patches import BinaryFilePatch, PatchResult
 from rbtools.diffs.writers import UnifiedDiffWriter
 from rbtools.utils.checks import check_install
 from rbtools.utils.console import get_pass
@@ -79,8 +79,8 @@ class SVNPatcher(SCMClientPatcher['SVNClient']):
         self,
         *,
         patch: Patch,
-        base_dir: Optional[str] = None,
-    ) -> Optional[int]:
+        base_dir: (str | None) = None,
+    ) -> int | None:
         """Return the default path prefix strip level for a patch.
 
         This function determines how much of a path to strip by default,
@@ -163,10 +163,9 @@ class SVNPatcher(SCMClientPatcher['SVNClient']):
         else:
             checkout_base_dir = ''
 
-        patch_file = str(patch.path)
         patch_base_dir = patch.base_dir
 
-        in_subdir = (patch_base_dir and
+        in_subdir = (patch_base_dir is not None and
                      checkout_base_dir != patch_base_dir and
                      checkout_base_dir.startswith(patch_base_dir))
 
@@ -190,79 +189,89 @@ class SVNPatcher(SCMClientPatcher['SVNClient']):
             # files.
             patch.prefix_level = prefix_level
 
-        if in_subdir:
-            # The patch was created in a higher-level directory. Log a warning
-            # and filter out any files which are not present in the current
-            # directory.
-            excluded, empty = self._exclude_files_not_in_tree(
-                patch_file, checkout_base_dir)
+        patch_content, binary_files, excluded, empty = self._filter_patch(
+            patch, in_subdir, checkout_base_dir)
 
-            if excluded:
-                logger.warning(
-                    'This patch was generated in a different '
-                    'directory. To prevent conflicts, all files '
-                    'not under the current directory have been '
-                    'excluded. To apply all files in this '
-                    'patch, apply this patch from the %s directory.',
-                    patch_base_dir)
+        if in_subdir and excluded:
+            logger.warning(
+                'The original patch was generated in a different '
+                'directory. To prevent conflicts, all files not under the '
+                'current directory have been excluded. To apply all files '
+                'in this change, apply the patch from the %s directory.',
+                patch_base_dir)
 
-                if empty:
-                    logger.warning('All files were excluded from the patch.')
-
-        # Build the command line.
-        cmd: list[str] = ['patch']
-
-        if prefix_level is not None and prefix_level >= 0:
-            cmd.append(f'--strip={prefix_level}')
-
-        if revert:
-            cmd.append('--reverse-diff')
-
-        cmd.append(patch_file)
-
-        # Apply the patch.
-        patch_output = (
-            scmclient._run_svn(cmd,
-                               ignore_errors=True,
-                               redirect_stderr=True)
-            .stdout_bytes
-            .read()
-        )
-
-        # We'll now check the results of the application, and determine if
-        # we need to handle empty files.
-        #
-        # We can't trust exit codes for svn patch, since we'll get 0 even if
-        # we fail to patch anything. Instead, we'll look for the status output.
         applied: bool = False
-
-        if self.can_patch_empty_files:
-            applied = self.apply_patch_for_empty_files(patch)
-
-        # Check for conflicts.
-        patch_status_re = self.SVN_PATCH_STATUS_RE
+        patch_output: bytes = b''
         conflicting_files: list[str] = []
 
-        for line in patch_output.splitlines():
-            m = patch_status_re.match(line)
+        if empty:
+            applied = True
 
-            if m:
-                status = m.group('status')
+            if not binary_files:
+                logger.warning('All files were excluded from the patch.')
+        else:
+            # Build the command line.
+            cmd: list[str] = ['patch']
 
-                if status == b'C':
-                    # There was a conflict.
-                    conflicting_files.append(
-                        m.group('filename').decode('utf-8'))
-                else:
-                    # Anything else is a successful result.
-                    applied = True
+            if prefix_level is not None and prefix_level >= 0:
+                cmd.append(f'--strip={prefix_level}')
+
+            if revert:
+                cmd.append('--reverse-diff')
+
+            patch_file = make_tempfile(content=patch_content)
+            cmd.append(patch_file)
+
+            # Apply the patch.
+            patch_output = (
+                scmclient._run_svn(cmd,
+                                   ignore_errors=True,
+                                   redirect_stderr=True)
+                .stdout_bytes
+                .read()
+            )
+
+            # We'll now check the results of the application, and determine if
+            # we need to handle empty files.
+            #
+            # We can't trust exit codes for svn patch, since we'll get 0 even
+            # if we fail to patch anything. Instead, we'll look for the status
+            # output.
+            if self.can_patch_empty_files:
+                applied = self.apply_patch_for_empty_files(patch)
+
+            # Check for conflicts.
+            patch_status_re = self.SVN_PATCH_STATUS_RE
+
+            for line in patch_output.splitlines():
+                m = patch_status_re.match(line)
+
+                if m:
+                    status = m.group('status')
+
+                    if status == b'C':
+                        # There was a conflict.
+                        conflicting_files.append(
+                            m.group('filename').decode('utf-8'))
+                    else:
+                        # Anything else is a successful result.
+                        applied = True
+
+        if applied:
+            binary_applied, binary_failed = self.apply_binary_files(
+                binary_files)
+        else:
+            binary_applied = None
+            binary_failed = None
 
         return PatchResult(applied=applied,
                            patch=patch,
                            patch_output=patch_output,
                            patch_range=(patch_num, patch_num),
                            has_conflicts=len(conflicting_files) > 0,
-                           conflicting_files=conflicting_files)
+                           conflicting_files=conflicting_files,
+                           binary_applied=binary_applied,
+                           binary_failed=binary_failed)
 
     def apply_patch_for_empty_files(
         self,
@@ -302,7 +311,7 @@ class SVNPatcher(SCMClientPatcher['SVNClient']):
 
         if added_files:
             if prefix_level:
-                added_files = scmclient._strip_p_num_slashes(added_files,
+                added_files = scmclient.strip_p_num_slashes(added_files,
                                                              prefix_level)
 
             make_empty_files(added_files)
@@ -310,7 +319,7 @@ class SVNPatcher(SCMClientPatcher['SVNClient']):
             # We require --force here because svn will complain if we run
             # `svn add` on a file that has already been added or deleted.
             try:
-                scmclient._run_svn(['add', '--force'] + added_files)
+                scmclient._run_svn(['add', '--force', *added_files])
                 patched_empty_files = True
             except RunProcessError:
                 logger.error('Unable to execute "svn add" on: %s',
@@ -318,13 +327,13 @@ class SVNPatcher(SCMClientPatcher['SVNClient']):
 
         if deleted_files:
             if prefix_level:
-                deleted_files = scmclient._strip_p_num_slashes(deleted_files,
+                deleted_files = scmclient.strip_p_num_slashes(deleted_files,
                                                                prefix_level)
 
             # We require --force here because svn will complain if we run
             # `svn delete` on a file that has already been added or deleted.
             try:
-                scmclient._run_svn(['delete', '--force'] + deleted_files)
+                scmclient._run_svn(['delete', '--force', *deleted_files])
                 patched_empty_files = True
             except RunProcessError:
                 logger.error('Unable to execute "svn delete" on: %s',
@@ -332,17 +341,27 @@ class SVNPatcher(SCMClientPatcher['SVNClient']):
 
         return patched_empty_files
 
-    def _exclude_files_not_in_tree(
+    def _filter_patch(
         self,
-        patch_file: str,
-        base_path: str,
-    ) -> tuple[bool, bool]:
-        """Process a diff and remove entries not in the current directory.
+        patch: Patch,
+        in_subdir: bool,
+        base_path: str | None,
+    ) -> tuple[bytes, Sequence[BinaryFilePatch], bool, bool]:
+        """Filter the patch to remove undesirable files.
+
+        This method filters a patch file to remove entries which will cause
+        `svn patch` to fail.
+
+        Version Added:
+            6.0
 
         Args:
-            patch_file (str):
-                The filename of the patch file to process. This file will be
-                overwritten by the processed patch.
+            patch (rbtools.diffs.patches.Patch):
+                The patch object.
+
+            in_subdir (bool):
+                Whether the current working directory is a subdirectory of the
+                location where the patch was originally created.
 
             base_path (str):
                 The relative path between the root of the repository and the
@@ -350,52 +369,183 @@ class SVNPatcher(SCMClientPatcher['SVNClient']):
 
         Returns:
             tuple:
-            A 2-tuple of:
+            A 3-tuple of:
 
             Tuple:
-                0 (bool):
-                    Whether any files have been excluded.
+                0 (bytes):
+                    The modified patch contents.
 
-                1 (bool):
-                    Whether the diff is empty.
+                1 (list of rbtools.diffs.patches.BinaryFilePatch):
+                    A list of the binary files to include in the patch
+                    operation.
+
+                2 (bool):
+                    Whether any (non-binary) files have been excluded from the
+                    modified patch.
+
+                3 (bool):
+                    Whether the diff file is now empty.
         """
-        excluded_files = False
-        empty_patch = True
+        # Paths in the diff start with a leading slash, but paths from the
+        # filediffs for binary files do not.
+        def _get_path_for_binary(
+            binary_file: BinaryFilePatch,
+        ) -> str:
+            path = binary_file.path
 
-        # If our base path does not have a trailing slash (which it won't
-        # unless we are at a checkout root), we append a slash so that we can
-        # determine if files are under the base_path. We do this so that files
-        # like /trunkish (which begins with /trunk) do not mistakenly get
-        # placed in /trunk if that is the base_path.
-        if not base_path.endswith('/'):
+            if not path.startswith('/'):
+                path = '/' + path
+
+            return path
+
+        binary_files = patch.binary_files
+        binary_file_paths = {
+            _get_path_for_binary(binary)
+            for binary in binary_files
+        }
+
+        filtered_patch_lines: list[bytes] = []
+        excluded_files: bool = False
+        empty_patch: bool = True
+
+        index_file_re = SVNClient.INDEX_FILE_RE
+
+        include_file = True
+
+        if base_path is not None and not base_path.endswith('/'):
             base_path += '/'
 
-        filtered_patch_name = make_tempfile()
+        for line in patch.content.splitlines(keepends=True):
+            m = index_file_re.match(line)
 
-        with open(filtered_patch_name, 'wb') as filtered_patch, \
-             open(patch_file, 'rb') as original_patch:
-            include_file = True
+            if m:
+                filename = m.group(1).decode()
+                include_file = (
+                    (base_path is None or filename.startswith(base_path)) and
+                    filename not in binary_file_paths
+                )
 
-            INDEX_FILE_RE = SVNClient.INDEX_FILE_RE
+                if not include_file:
+                    excluded_files = True
+                else:
+                    empty_patch = False
 
-            for line in original_patch.readlines():
-                m = INDEX_FILE_RE.match(line)
+            if include_file:
+                filtered_patch_lines.append(line)
 
-                if m:
-                    filename = m.group(1).decode('utf-8')
-                    include_file = filename.startswith(base_path)
+        scmclient = self.scmclient
+        binary_files_to_patch: list[BinaryFilePatch] = []
+        prefix_level = patch.prefix_level
 
-                    if not include_file:
-                        excluded_files = True
-                    else:
-                        empty_patch = False
+        for f in binary_files:
+            if (base_path is not None and
+                not _get_path_for_binary(f).startswith(base_path)):
+                continue
 
-                if include_file:
-                    filtered_patch.write(line)
+            # If we have a prefix, strip that off the binary files.
+            if prefix_level:
+                if f.old_path is not None:
+                    f.old_path = scmclient.strip_p_num_slashes(
+                        f.old_path, prefix_level)
 
-        os.rename(filtered_patch_name, patch_file)
+                if f.new_path is not None:
+                    f.new_path = scmclient.strip_p_num_slashes(
+                        f.new_path, prefix_level)
 
-        return excluded_files, empty_patch
+            binary_files_to_patch.append(f)
+
+        return (
+            b''.join(filtered_patch_lines),
+            binary_files_to_patch,
+            excluded_files,
+            empty_patch,
+        )
+
+    def handle_add_file(
+        self,
+        path: str,
+        content: bytes,
+    ) -> None:
+        """Add a file.
+
+        Version Added:
+            6.0
+
+        Args:
+            path (str):
+                The path to the file.
+
+            content (bytes):
+                The content for the file.
+
+        Raises:
+            OSError:
+                A file operation failed.
+
+            Exception:
+                Another error occurred when running ``svn``.
+        """
+        super().handle_add_file(path, content)
+
+        dirname = os.path.dirname(path)
+
+        self.scmclient._run_svn(['add', '--force', dirname])
+        self.scmclient._run_svn(['add', '--force', path])
+
+    def handle_move_file(
+        self,
+        old_path: str,
+        new_path: str,
+    ) -> None:
+        """Move a file.
+
+        Version Added:
+            6.0
+
+        Args:
+            old_path (str):
+                The old filename.
+
+            new_path (str):
+                The new filename.
+
+        Raises:
+            OSError:
+                A file operation failed.
+
+            Exception:
+                Another error occurred when running ``svn``.
+        """
+        # Create the directory if it doesn't exist.
+        dirname = os.path.dirname(new_path)
+
+        if dirname:
+            os.makedirs(dirname, exist_ok=True)
+            self.scmclient._run_svn(['add', '--force', dirname])
+
+        self.scmclient._run_svn(['move', old_path, new_path])
+
+    def handle_remove_file(
+        self,
+        path: str,
+    ) -> None:
+        """Delete a file.
+
+        Version Added:
+            6.0
+
+        Args:
+            path (str):
+                The path to the file to delete.
+
+        Raises:
+            OSError:
+                A file operation failed.
+
+            Exception:
+                Another error occurred when running ``svn``.
+        """
+        self.scmclient._run_svn(['remove', path])
 
 
 class SVNClient(BaseSCMClient):

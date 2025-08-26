@@ -7,12 +7,13 @@ import os
 import re
 import sys
 import unittest
-from typing import Sequence, TYPE_CHECKING
+from typing import TYPE_CHECKING
 from urllib.request import urlopen
 
 import kgb
 
 from rbtools.api.client import RBClient
+from rbtools.api.resource import FileAttachmentItemResource
 from rbtools.api.tests.base import MockResponse
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
@@ -21,15 +22,17 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
 from rbtools.clients.svn import SVNRepositoryInfo, SVNClient
 from rbtools.clients.tests import FOO1, FOO2, FOO3, SCMClientTestCase
 from rbtools.diffs.errors import ApplyPatchError
-from rbtools.diffs.patches import Patch
+from rbtools.diffs.patches import BinaryFilePatch, Patch
+from rbtools.testing.api.transport import URLMapTransport
 from rbtools.utils.checks import check_install
-from rbtools.utils.filesystem import make_tempfile
 from rbtools.utils.process import (RunProcessResult,
                                    run_process,
                                    run_process_exec)
 from rbtools.utils.repository import get_repository_resource
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from rbtools.clients.base.scmclient import SCMClientDiffResult
 
 
@@ -1436,6 +1439,7 @@ class SVNClientTests(BaseSVNClientTests):
         """Testing SVNClient.apply_patch"""
         client = self.build_client()
         repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
 
         self.spy_on(run_process_exec)
 
@@ -1472,7 +1476,7 @@ class SVNClientTests(BaseSVNClientTests):
         self.assertSpyCalledWith(
             run_process_exec,
             [
-                'svn', '--non-interactive', 'patch', '--strip=1', 'test.diff',
+                'svn', '--non-interactive', 'patch', '--strip=1', tempfiles[0],
             ],
             redirect_stderr=True)
 
@@ -1488,6 +1492,7 @@ class SVNClientTests(BaseSVNClientTests):
         """Testing SVNClient.apply_patch with p="""
         client = self.build_client()
         repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
 
         self.spy_on(
             run_process_exec,
@@ -1495,7 +1500,7 @@ class SVNClientTests(BaseSVNClientTests):
                 {
                     'args': ([
                         'svn', '--non-interactive', 'patch', '--strip=3',
-                        'test.diff',
+                        tempfiles[0],
                     ],),
                     'kwargs': {
                         'redirect_stderr': True,
@@ -1548,6 +1553,7 @@ class SVNClientTests(BaseSVNClientTests):
         """Testing SVNClient.apply_patch with revert=True"""
         client = self.build_client()
         repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
 
         self.spy_on(
             run_process_exec,
@@ -1555,7 +1561,7 @@ class SVNClientTests(BaseSVNClientTests):
                 {
                     'args': ([
                         'svn', '--non-interactive', 'patch', '--strip=1',
-                        '--reverse-diff', 'test.diff',
+                        '--reverse-diff', tempfiles[0],
                     ],),
                     'kwargs': {
                         'redirect_stderr': True,
@@ -1626,6 +1632,7 @@ class SVNClientTests(BaseSVNClientTests):
         """Testing SVNClient.apply_patch with empty files"""
         client = self.build_client()
         repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
 
         self.spy_on(
             run_process_exec,
@@ -1633,7 +1640,7 @@ class SVNClientTests(BaseSVNClientTests):
                 {
                     'args': ([
                         'svn', '--non-interactive', 'patch', '--strip=1',
-                        'test.diff',
+                        tempfiles[0],
                     ],),
                     'kwargs': {
                         'redirect_stderr': True,
@@ -1655,13 +1662,13 @@ class SVNClientTests(BaseSVNClientTests):
 
         with open('test.diff', 'wb') as fp:
             fp.write(
-                b'Index: empty-file\t(deleted)\n'
+                b'Index: /empty-file\t(deleted)\n'
                 b'================================================'
                 b'===================\n'
-                b'Index: new-empty-file-1\t(added)\n'
+                b'Index: /new-empty-file-1\t(added)\n'
                 b'================================================'
                 b'===================\n'
-                b'Index: new-empty-file-2\t(added)\n'
+                b'Index: /new-empty-file-2\t(added)\n'
                 b'================================================'
                 b'===================\n'
             )
@@ -1690,6 +1697,7 @@ class SVNClientTests(BaseSVNClientTests):
         """Testing SVNClient.apply_patch with empty files and revert=True"""
         client = self.build_client()
         repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
 
         self.spy_on(
             run_process_exec,
@@ -1697,7 +1705,7 @@ class SVNClientTests(BaseSVNClientTests):
                 {
                     'args': ([
                         'svn', '--non-interactive', 'patch', '--strip=1',
-                        '--reverse-diff', 'test.diff',
+                        '--reverse-diff', tempfiles[0],
                     ],),
                     'kwargs': {
                         'redirect_stderr': True,
@@ -1725,13 +1733,13 @@ class SVNClientTests(BaseSVNClientTests):
 
         with open('test.diff', 'wb') as fp:
             fp.write(
-                b'Index: empty-file\t(deleted)\n'
+                b'Index: /empty-file\t(deleted)\n'
                 b'================================================'
                 b'===================\n'
-                b'Index: new-empty-file-1\t(added)\n'
+                b'Index: /new-empty-file-1\t(added)\n'
                 b'================================================'
                 b'===================\n'
-                b'Index: new-empty-file-2\t(added)\n'
+                b'Index: /new-empty-file-2\t(added)\n'
                 b'================================================'
                 b'===================\n'
             )
@@ -1755,6 +1763,7 @@ class SVNClientTests(BaseSVNClientTests):
         """Testing SVNClient.apply_patch with not applied"""
         client = self.build_client()
         repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
 
         self.spy_on(
             run_process_exec,
@@ -1762,7 +1771,7 @@ class SVNClientTests(BaseSVNClientTests):
                 {
                     'args': ([
                         'svn', '--non-interactive', 'patch', '--strip=1',
-                        'test.diff',
+                        tempfiles[0],
                     ],),
                     'kwargs': {
                         'redirect_stderr': True,
@@ -1772,7 +1781,7 @@ class SVNClientTests(BaseSVNClientTests):
 
         with open('test.diff', 'wb') as fp:
             fp.write(
-                b'Index: foorp.txt\n'
+                b'Index: /foorp.txt\n'
                 b'================================================'
                 b'===================\n'
             )
@@ -1792,6 +1801,7 @@ class SVNClientTests(BaseSVNClientTests):
         """Testing SVNClient.apply_patch with conflicts"""
         client = self.build_client()
         repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
 
         self.spy_on(
             run_process_exec,
@@ -1799,7 +1809,7 @@ class SVNClientTests(BaseSVNClientTests):
                 {
                     'args': ([
                         'svn', '--non-interactive', 'patch', '--strip=1',
-                        'test.diff',
+                        tempfiles[0],
                     ],),
                     'kwargs': {
                         'redirect_stderr': True,
@@ -1859,6 +1869,7 @@ class SVNClientTests(BaseSVNClientTests):
         """Testing SVNClient.apply_patch with applied and conflicts"""
         client = self.build_client()
         repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
 
         self.spy_on(
             run_process_exec,
@@ -1866,7 +1877,7 @@ class SVNClientTests(BaseSVNClientTests):
                 {
                     'args': ([
                         'svn', '--non-interactive', 'patch', '--strip=1',
-                        'test.diff',
+                        tempfiles[0],
                     ],),
                     'kwargs': {
                         'redirect_stderr': True,
@@ -2035,9 +2046,9 @@ class SVNPatcherTests(BaseSVNClientTests):
         """Testing SVNPatcher.patch"""
         client = self.build_client()
         repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
 
         self.spy_on(run_process_exec)
-        self.spy_on(make_tempfile)
 
         patcher = client.get_patcher(
             repository_info=repository_info,
@@ -2081,10 +2092,7 @@ class SVNPatcherTests(BaseSVNClientTests):
 
         self.assertSpyCalledWith(
             run_process_exec,
-            [
-                'svn', '--non-interactive', 'patch', '--strip=1',
-                make_tempfile.calls[0].return_value,
-            ],
+            ['svn', '--non-interactive', 'patch', '--strip=1', tempfiles[0]],
             redirect_stderr=True)
 
         with open('foo.txt', 'rb') as fp:
@@ -2106,9 +2114,9 @@ class SVNPatcherTests(BaseSVNClientTests):
         """Testing SVNPatcher.patch with Patch.prefix_level="""
         client = self.build_client()
         repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
 
         self.spy_on(run_process_exec)
-        self.spy_on(make_tempfile)
 
         patcher = client.get_patcher(
             repository_info=repository_info,
@@ -2154,10 +2162,7 @@ class SVNPatcherTests(BaseSVNClientTests):
 
         self.assertSpyCalledWith(
             run_process_exec,
-            [
-                'svn', '--non-interactive', 'patch', '--strip=3',
-                make_tempfile.calls[0].return_value,
-            ],
+            ['svn', '--non-interactive', 'patch', '--strip=3', tempfiles[0]],
             redirect_stderr=True)
 
         with open('foo.txt', 'rb') as fp:
@@ -2179,9 +2184,9 @@ class SVNPatcherTests(BaseSVNClientTests):
         """Testing SVNPatcher.patch with revert=True"""
         client = self.build_client()
         repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
 
         self.spy_on(run_process_exec)
-        self.spy_on(make_tempfile)
 
         with open('â.txt', 'ab') as fp:
             fp.write(b'And this! \xf0\x9f\xa5\xb9\n')
@@ -2246,7 +2251,7 @@ class SVNPatcherTests(BaseSVNClientTests):
             run_process_exec,
             [
                 'svn', '--non-interactive', 'patch', '--strip=1',
-                '--reverse-diff', make_tempfile.calls[0].return_value,
+                '--reverse-diff', tempfiles[0],
             ],
             redirect_stderr=True)
 
@@ -2269,21 +2274,43 @@ class SVNPatcherTests(BaseSVNClientTests):
         """Testing SVNPatcher.patch with empty files"""
         client = self.build_client()
         repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
 
-        self.spy_on(run_process_exec)
-        self.spy_on(make_tempfile)
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': (
+                    ['svn', '--non-interactive', 'patch', '--strip=1',
+                     tempfiles[0]],
+                ),
+                'kwargs': {
+                    'redirect_stderr': True,
+                }
+            },
+            {
+                'args': (
+                    ['svn', '--non-interactive', 'add', '--force',
+                     'new-empty-file-1', 'new-empty-file-2'],
+                ),
+            },
+            {
+                'args': (
+                    ['svn', '--non-interactive', 'delete', '--force',
+                     'empty-file'],
+                ),
+            },
+        ]))
 
         patcher = client.get_patcher(
             repository_info=repository_info,
             patches=[
                 Patch(content=(
-                    b'Index: empty-file\t(deleted)\n'
+                    b'Index: /empty-file\t(deleted)\n'
                     b'================================================'
                     b'===================\n'
-                    b'Index: new-empty-file-1\t(added)\n'
+                    b'Index: /new-empty-file-1\t(added)\n'
                     b'================================================'
                     b'===================\n'
-                    b'Index: new-empty-file-2\t(added)\n'
+                    b'Index: /new-empty-file-2\t(added)\n'
                     b'================================================'
                     b'===================\n'
                 )),
@@ -2296,27 +2323,6 @@ class SVNPatcherTests(BaseSVNClientTests):
         self.assertTrue(result.success)
         self.assertIsNotNone(result.patch)
         self.assertEqual(result.patch_output, b'')
-
-        self.assertSpyCallCount(run_process_exec, 3)
-        self.assertSpyCalledWith(
-            run_process_exec.calls[0],
-            [
-                'svn', '--non-interactive', 'patch', '--strip=1',
-                make_tempfile.calls[0].return_value,
-            ],
-            redirect_stderr=True)
-        self.assertSpyCalledWith(
-            run_process_exec.calls[1],
-            [
-                'svn', '--non-interactive', 'add', '--force',
-                'new-empty-file-1', 'new-empty-file-2',
-            ])
-        self.assertSpyCalledWith(
-            run_process_exec.calls[2],
-            [
-                'svn', '--non-interactive', 'delete', '--force',
-                'empty-file',
-            ])
 
         self.assertFalse(os.path.exists('empty-file'))
         self.assertTrue(os.path.exists('new-empty-file-1'))
@@ -2332,9 +2338,31 @@ class SVNPatcherTests(BaseSVNClientTests):
         """Testing SVNPatcher.patch with empty files and revert=True"""
         client = self.build_client()
         repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
 
-        self.spy_on(run_process_exec)
-        self.spy_on(make_tempfile)
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': (
+                    ['svn', '--non-interactive', 'patch', '--strip=1',
+                     '--reverse-diff', tempfiles[0]],
+                ),
+                'kwargs': {
+                    'redirect_stderr': True,
+                },
+            },
+            {
+                'args': (
+                    ['svn', '--non-interactive', 'add', '--force',
+                     'empty-file'],
+                ),
+            },
+            {
+                'args': (
+                    ['svn', '--non-interactive', 'delete', '--force',
+                     'new-empty-file-1', 'new-empty-file-2'],
+                ),
+            },
+        ]))
 
         with open('new-empty-file-1', 'wb'):
             pass
@@ -2347,13 +2375,13 @@ class SVNPatcherTests(BaseSVNClientTests):
             revert=True,
             patches=[
                 Patch(content=(
-                    b'Index: empty-file\t(deleted)\n'
+                    b'Index: /empty-file\t(deleted)\n'
                     b'================================================'
                     b'===================\n'
-                    b'Index: new-empty-file-1\t(added)\n'
+                    b'Index: /new-empty-file-1\t(added)\n'
                     b'================================================'
                     b'===================\n'
-                    b'Index: new-empty-file-2\t(added)\n'
+                    b'Index: /new-empty-file-2\t(added)\n'
                     b'================================================'
                     b'===================\n'
                 )),
@@ -2367,27 +2395,6 @@ class SVNPatcherTests(BaseSVNClientTests):
         self.assertIsNotNone(result.patch)
         self.assertEqual(result.patch_output, b'')
 
-        self.assertSpyCallCount(run_process_exec, 3)
-        self.assertSpyCalledWith(
-            run_process_exec.calls[0],
-            [
-                'svn', '--non-interactive', 'patch', '--strip=1',
-                '--reverse-diff', make_tempfile.calls[0].return_value,
-            ],
-            redirect_stderr=True)
-        self.assertSpyCalledWith(
-            run_process_exec.calls[1],
-            [
-                'svn', '--non-interactive', 'add', '--force',
-                'empty-file',
-            ])
-        self.assertSpyCalledWith(
-            run_process_exec.calls[2],
-            [
-                'svn', '--non-interactive', 'delete', '--force',
-                'new-empty-file-1', 'new-empty-file-2',
-            ])
-
         self.assertTrue(os.path.exists('empty-file'))
         self.assertFalse(os.path.exists('new-empty-file-1'))
         self.assertFalse(os.path.exists('new-empty-file-2'))
@@ -2399,15 +2406,15 @@ class SVNPatcherTests(BaseSVNClientTests):
         """Testing SVNPatcher.patch with not applied"""
         client = self.build_client()
         repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
 
         self.spy_on(run_process_exec)
-        self.spy_on(make_tempfile)
 
         patcher = client.get_patcher(
             repository_info=repository_info,
             patches=[
                 Patch(content=(
-                    b'Index: foorp.txt\n'
+                    b'Index: /foorp.txt\n'
                     b'================================================'
                     b'===================\n'
                 )),
@@ -2431,19 +2438,16 @@ class SVNPatcherTests(BaseSVNClientTests):
 
         self.assertSpyCalledWith(
             run_process_exec,
-            [
-                'svn', '--non-interactive', 'patch', '--strip=1',
-                make_tempfile.calls[0].return_value,
-            ],
+            ['svn', '--non-interactive', 'patch', '--strip=1', tempfiles[0]],
             redirect_stderr=True)
 
     def test_patch_with_conflicts(self) -> None:
         """Testing SVNPatcher.patch with conflicts"""
         client = self.build_client()
         repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
 
         self.spy_on(run_process_exec)
-        self.spy_on(make_tempfile)
 
         patcher = client.get_patcher(
             repository_info=repository_info,
@@ -2503,19 +2507,16 @@ class SVNPatcherTests(BaseSVNClientTests):
 
         self.assertSpyCalledWith(
             run_process_exec,
-            [
-                'svn', '--non-interactive', 'patch', '--strip=1',
-                make_tempfile.calls[0].return_value,
-            ],
+            ['svn', '--non-interactive', 'patch', '--strip=1', tempfiles[0]],
             redirect_stderr=True)
 
     def test_patch_with_applied_and_conflicts(self) -> None:
         """Testing SVNPatcher.patch with applied and conflicts"""
         client = self.build_client()
         repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
 
         self.spy_on(run_process_exec)
-        self.spy_on(make_tempfile)
 
         patcher = client.get_patcher(
             repository_info=repository_info,
@@ -2571,10 +2572,7 @@ class SVNPatcherTests(BaseSVNClientTests):
 
         self.assertSpyCalledWith(
             run_process_exec,
-            [
-                'svn', '--non-interactive', 'patch', '--strip=1',
-                make_tempfile.calls[0].return_value,
-            ],
+            ['svn', '--non-interactive', 'patch', '--strip=1', tempfiles[0]],
             redirect_stderr=True)
 
     def test_patch_with_no_basedir_overlap(self) -> None:
@@ -2583,9 +2581,9 @@ class SVNPatcherTests(BaseSVNClientTests):
         """
         client = self.build_client()
         repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
 
         self.spy_on(run_process_exec)
-        self.spy_on(make_tempfile)
 
         patcher = client.get_patcher(
             repository_info=repository_info,
@@ -2631,10 +2629,7 @@ class SVNPatcherTests(BaseSVNClientTests):
 
         self.assertSpyCalledWith(
             run_process_exec,
-            [
-                'svn', '--non-interactive', 'patch', '--strip=2',
-                make_tempfile.calls[0].return_value,
-            ],
+            ['svn', '--non-interactive', 'patch', '--strip=2', tempfiles[0]],
             redirect_stderr=True)
 
         with open('foo.txt', 'rb') as fp:
@@ -2658,12 +2653,12 @@ class SVNPatcherTests(BaseSVNClientTests):
         """
         client = self.build_client()
         repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
         assert repository_info is not None
 
         repository_info.base_path = '/trunk'
 
         self.spy_on(run_process_exec)
-        self.spy_on(make_tempfile)
 
         patcher = client.get_patcher(
             repository_info=repository_info,
@@ -2708,10 +2703,7 @@ class SVNPatcherTests(BaseSVNClientTests):
 
         self.assertSpyCalledWith(
             run_process_exec,
-            [
-                'svn', '--non-interactive', 'patch', '--strip=2',
-                make_tempfile.calls[0].return_value,
-            ],
+            ['svn', '--non-interactive', 'patch', '--strip=2', tempfiles[0]],
             redirect_stderr=True)
 
         with open('foo.txt', 'rb') as fp:
@@ -2728,3 +2720,645 @@ class SVNPatcherTests(BaseSVNClientTests):
                 b'Albanique patres, atque altae moenia Romae!\n'
                 b'Musa, mihi causas memora, quo numine laeso,\n'
                 b'\n')
+
+    def test_add_binary_file(self) -> None:
+        """Testing SVNPatcher with an added binary file."""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        assert repository_info is not None
+
+        test_content = b'Binary file content'
+        test_path = 'new_binary_file.bin'
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 123,
+                'absolute_url': 'https://example.com/r/1/file/123/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/123/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=None,
+            new_path=test_path,
+            status='added',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        patch_content = (
+            b'Index: /new_binary_file.bin\t(added)\n'
+            b'==============================================================='
+            b'====\n'
+            b'Cannot display: file marked as a binary type.\n'
+            b'svn:mime-type = application/octet-stream\n'
+        )
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(patches=[patch])
+
+        self.spy_on(client._run_svn)
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], test_path)
+
+        self.assertTrue(os.path.exists(test_path))
+
+        with open(test_path, 'rb') as f:
+            self.assertEqual(f.read(), test_content)
+
+        self.assertSpyCalledWith(client._run_svn,
+                                 ['add', '--force', test_path])
+
+    def test_add_binary_file_with_subdirectory(self) -> None:
+        """Testing SVNPatcher with an added binary file in subdirectory."""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        assert repository_info is not None
+
+        test_content = b'Binary file content'
+        test_path = 'subdir/new_binary_file.bin'
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 124,
+                'absolute_url': 'https://example.com/r/1/file/124/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/124/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=None,
+            new_path=test_path,
+            status='added',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        patch_content = (
+            b'Index: /subdir/new_binary_file.bin\t(added)\n'
+            b'=============================================================='
+            b'=====\n'
+            b'Cannot display: file marked as a binary type.\n'
+            b'svn:mime-type = application/octet-stream\n'
+        )
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(patches=[patch])
+
+        self.spy_on(client._run_svn)
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], test_path)
+
+        self.assertTrue(os.path.exists(test_path))
+
+        with open(test_path, 'rb') as f:
+            self.assertEqual(f.read(), test_content)
+
+        self.assertSpyCalledWith(client._run_svn,
+                                 ['add', '--force', test_path])
+
+    def test_move_binary_file(self) -> None:
+        """Testing SVNPatcher with a moved binary file."""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        assert repository_info is not None
+
+        old_path = 'binary_file.bin'
+        new_path = 'new_file.bin'
+        test_content = b'Binary file content'
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 125,
+                'absolute_url': 'https://example.com/r/1/file/125/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/125/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=old_path,
+            new_path=new_path,
+            status='moved',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        patch_content = (
+            b'Index: /new_file.bin\n'
+            b'=============================================================='
+            b'=====\n'
+            b'--- /binary_file.bin\t(revision 1)\n'
+            b'+++ /new_file.bin\t(working copy)\n'
+            b'Cannot display: file marked as a binary type.\n'
+            b'svn:mime-type = application/octet-stream\n'
+        )
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(patches=[patch])
+
+        self.spy_on(client._run_svn)
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], new_path)
+
+        self.assertSpyCalledWith(client._run_svn, ['move', old_path, new_path])
+
+    def test_remove_binary_file(self) -> None:
+        """Testing SVNPatcher with a removed binary file."""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        assert repository_info is not None
+
+        test_path = 'binary_file.bin'
+
+        binary_file = BinaryFilePatch(
+            old_path=test_path,
+            new_path=None,
+            status='deleted',
+            file_attachment=None,
+        )
+
+        patch_content = (
+            b'Index: binary_file.bin\n'
+            b'=============================================================='
+            b'=====\n'
+            b'--- binary_file.bin\t(revision 7)\n'
+            b'+++ binary_file.bin\t(working copy)\n'
+            b'Cannot display: file marked as a binary type.\n'
+            b'svn:mime-type = application/octet-stream\n'
+        )
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(patches=[patch])
+
+        self.spy_on(client._run_svn)
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], test_path)
+
+        self.assertSpyCalledWith(client._run_svn, ['remove', test_path])
+
+    def test_patch_binary_files_in_subdirectory(self) -> None:
+        """Testing SVNPatcher.patch with binary files when checkout is a
+        subdirectory of patch base directory (should partially apply patch)
+        """
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        assert repository_info is not None
+
+        repository_info.base_path = '/trunk'
+
+        test_content = b'Binary file content'
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 125,
+                'absolute_url': 'https://example.com/r/1/file/125/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/125/'
+        )
+
+        # Binary file inside the subdirectory.
+        binary_file1 = self.make_binary_file_patch(
+            old_path=None,
+            new_path='trunk/inside_binary.bin',
+            status='added',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        # Binary file outside the subdirectory.
+        binary_file2 = self.make_binary_file_patch(
+            old_path=None,
+            new_path='outside_binary.bin',
+            status='added',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        self.spy_on(run_process_exec)
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(
+                    base_dir='/',
+                    content=(
+                        b'Index: /outside_binary.bin\t(added)\n'
+                        b'================================================'
+                        b'===================\n'
+                        b'Cannot display: file marked as a binary type.\n'
+                        b'svn:mime-type = application/octet-stream\n'
+                        b'Index: /trunk/inside_binary.bin\t(added)\n'
+                        b'================================================'
+                        b'===================\n'
+                        b'--- /trunk/inside_binary.bin\t(added)\n'
+                        b'Cannot display: file marked as a binary type.\n'
+                        b'svn:mime-type = application/octet-stream\n'
+                    ),
+                    binary_files=[binary_file1, binary_file2]),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+        self.assertEqual(len(result.binary_applied), 1)
+
+        self.assertTrue(os.path.exists('inside_binary.bin'))
+        self.assertFalse(os.path.exists('outside_binary.bin'))
+
+    def test_patch_with_regular_and_empty_files(self) -> None:
+        """Testing SVNPatcher.patch with regular and empty files."""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        tempfiles = self.precreate_tempfiles(1)
+
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': (
+                    ['svn', '--non-interactive', 'patch', '--strip=1',
+                     tempfiles[0]],
+                ),
+                'kwargs': {
+                    'redirect_stderr': True,
+                }
+            },
+            {
+                'args': (
+                    ['svn', '--non-interactive', 'add', '--force',
+                     'new-empty-file'],
+                ),
+            },
+            {
+                'args': (
+                    ['svn', '--non-interactive', 'delete', '--force',
+                     'empty-file'],
+                ),
+            },
+        ]))
+
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[
+                Patch(content=(
+                    b'Index: /foo.txt\n'
+                    b'================================================'
+                    b'===================\n'
+                    b'--- /foo.txt\n'
+                    b'+++ /foo.txt\n'
+                    b'@@ -1,2 +1,3 @@\n'
+                    b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b' ARMA virumque cano, Troiae qui primus ab oris\n'
+                    b'+New line added\n'
+                    b'Index: /empty-file\t(deleted)\n'
+                    b'================================================'
+                    b'===================\n'
+                    b'Index: /new-empty-file\t(added)\n'
+                    b'================================================'
+                    b'===================\n'
+                )),
+            ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        with open('foo.txt', 'rb') as fp:
+            content = fp.read()
+            self.assertIn(b'New line added', content)
+
+        self.assertFalse(os.path.exists('empty-file'))
+        self.assertTrue(os.path.exists('new-empty-file'))
+
+        with open('new-empty-file', 'rb') as fp:
+            self.assertEqual(fp.read(), b'')
+
+    def test_patch_with_regular_and_binary_files(self) -> None:
+        """Testing SVNPatcher.patch with regular and binary files."""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        assert repository_info is not None
+        tempfiles = self.precreate_tempfiles(1)
+
+        test_content1 = b'Binary file content 1'
+        test_content2 = b'Binary file content 2'
+
+        attachment1 = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 201,
+                'absolute_url': 'https://example.com/r/1/file/201/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/201/'
+        )
+
+        attachment2 = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 202,
+                'absolute_url': 'https://example.com/r/1/file/202/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/202/'
+        )
+
+        binary_file1 = self.make_binary_file_patch(
+            old_path=None,
+            new_path='new_binary.bin',
+            status='added',
+            file_attachment=attachment1,
+            content=test_content1,
+        )
+
+        binary_file2 = self.make_binary_file_patch(
+            old_path='binary_file.bin',
+            new_path='binary_file.bin',
+            status='modified',
+            file_attachment=attachment2,
+            content=test_content2,
+        )
+
+        self.spy_on(run_process_exec)
+        self.spy_on(client._run_svn)
+
+        patch_content = (
+            b'Index: /foo.txt\n'
+            b'=============================================================='
+            b'=====\n'
+            b'--- /foo.txt\n'
+            b'+++ /foo.txt\n'
+            b'@@ -1,2 +1,3 @@\n'
+            b' ARMA virumque cano, Troiae qui primus ab oris\n'
+            b' ARMA virumque cano, Troiae qui primus ab oris\n'
+            b'+New line added\n'
+            b'Index: /new_binary.bin\t(added)\n'
+            b'=============================================================='
+            b'=====\n'
+            b'Cannot display: file marked as a binary type.\n'
+            b'svn:mime-type = application/octet-stream\n'
+            b'Index: /binary_file.bin\n'
+            b'=============================================================='
+            b'=====\n'
+            b'Cannot display: file marked as a binary type.\n'
+            b'svn:mime-type = application/octet-stream\n'
+        )
+
+        patch = Patch(content=patch_content,
+                      binary_files=[binary_file1, binary_file2])
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 2)
+
+        with open('foo.txt', 'rb') as fp:
+            content = fp.read()
+            self.assertIn(b'New line added', content)
+
+        self.assertTrue(os.path.exists('new_binary.bin'))
+        self.assertTrue(os.path.exists('binary_file.bin'))
+
+        with open('new_binary.bin', 'rb') as f:
+            self.assertEqual(f.read(), test_content1)
+
+        with open('binary_file.bin', 'rb') as f:
+            self.assertEqual(f.read(), test_content2)
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            ['svn', '--non-interactive', 'patch', '--strip=1', tempfiles[0]],
+            redirect_stderr=True)
+        self.assertSpyCalledWith(client._run_svn,
+                                 ['add', '--force', 'new_binary.bin'])
+
+    def test_patch_with_empty_and_binary_files(self) -> None:
+        """Testing SVNPatcher.patch with empty and binary files."""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        assert repository_info is not None
+        tempfiles = self.precreate_tempfiles(1)
+
+        test_content = b'Binary file content'
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 301,
+                'absolute_url': 'https://example.com/r/1/file/301/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/301/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=None,
+            new_path='new_binary.bin',
+            status='added',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        self.spy_on(run_process_exec)
+        self.spy_on(client._run_svn)
+
+        patch_content = (
+            b'Index: /empty-file\t(deleted)\n'
+            b'=============================================================='
+            b'=====\n'
+            b'Index: /new-empty-file\t(added)\n'
+            b'=============================================================='
+            b'=====\n'
+            b'Index: /new_binary.bin\t(added)\n'
+            b'=============================================================='
+            b'=====\n'
+            b'Cannot display: file marked as a binary type.\n'
+            b'svn:mime-type = application/octet-stream\n'
+        )
+
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+
+        self.assertFalse(os.path.exists('empty-file'))
+        self.assertTrue(os.path.exists('new-empty-file'))
+
+        with open('new-empty-file', 'rb') as fp:
+            self.assertEqual(fp.read(), b'')
+
+        self.assertTrue(os.path.exists('new_binary.bin'))
+
+        with open('new_binary.bin', 'rb') as f:
+            self.assertEqual(f.read(), test_content)
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            ['svn', '--non-interactive', 'patch', '--strip=1', tempfiles[0]],
+            redirect_stderr=True)
+        self.assertSpyCalledWith(client._run_svn,
+                                 ['add', '--force', 'new_binary.bin'])
+
+    def test_patch_with_mixed_file_types(self) -> None:
+        """Testing SVNPatcher.patch with regular, empty, and binary files."""
+        client = self.build_client()
+        repository_info = client.get_repository_info()
+        assert repository_info is not None
+        tempfiles = self.precreate_tempfiles(1)
+
+        test_content1 = b'New binary content'
+        test_content2 = b'Modified binary content'
+
+        attachment1 = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 401,
+                'absolute_url': 'https://example.com/r/1/file/401/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/401/'
+        )
+
+        attachment2 = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 402,
+                'absolute_url': 'https://example.com/r/1/file/402/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/402/'
+        )
+
+        binary_file1 = self.make_binary_file_patch(
+            old_path=None,
+            new_path='new_binary.bin',
+            status='added',
+            file_attachment=attachment1,
+            content=test_content1,
+        )
+
+        binary_file2 = self.make_binary_file_patch(
+            old_path='binary_file.bin',
+            new_path='binary_file.bin',
+            status='modified',
+            file_attachment=attachment2,
+            content=test_content2,
+        )
+
+        self.spy_on(run_process_exec)
+        self.spy_on(client._run_svn)
+
+        patch_content = (
+            b'Index: /foo.txt\n'
+            b'=============================================================='
+            b'=====\n'
+            b'--- /foo.txt\t(revision 5)\n'
+            b'+++ /foo.txt\t(working copy)\n'
+            b'@@ -6,6 +6,6 @@\n'
+            b' dum conderet urbem,\n'
+            b' inferretque deos Latio, genus unde Latinum,\n'
+            b' Albanique patres, atque altae moenia Romae.\n'
+            b'-Albanique patres, atque altae moenia Romae.\n'
+            b'+Albanique patres, atque altae moenia Romae!\n'
+            b' Musa, mihi causas memora, quo numine laeso,\n'
+            b'\n'
+            b'Index: /empty-file\t(deleted)\n'
+            b'=============================================================='
+            b'=====\n'
+            b'Index: /new-empty-file\t(added)\n'
+            b'=============================================================='
+            b'=====\n'
+            b'Index: /new_binary.bin\t(added)\n'
+            b'=============================================================='
+            b'=====\n'
+            b'Cannot display: file marked as a binary type.\n'
+            b'svn:mime-type = application/octet-stream\n'
+            b'Index: /binary_file.bin\n'
+            b'=============================================================='
+            b'=====\n'
+            b'Cannot display: file marked as a binary type.\n'
+            b'svn:mime-type = application/octet-stream\n'
+        )
+
+        patch = Patch(content=patch_content,
+                      binary_files=[binary_file1, binary_file2])
+        patcher = client.get_patcher(
+            repository_info=repository_info,
+            patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 2)
+
+        with open('foo.txt', 'rb') as fp:
+            content = fp.read()
+            self.assertIn(b'Romae!', content)
+
+        self.assertFalse(os.path.exists('empty-file'))
+        self.assertTrue(os.path.exists('new-empty-file'))
+
+        with open('new-empty-file', 'rb') as fp:
+            self.assertEqual(fp.read(), b'')
+
+        self.assertTrue(os.path.exists('new_binary.bin'))
+        self.assertTrue(os.path.exists('binary_file.bin'))
+
+        with open('new_binary.bin', 'rb') as f:
+            self.assertEqual(f.read(), test_content1)
+
+        with open('binary_file.bin', 'rb') as f:
+            self.assertEqual(f.read(), test_content2)
+
+        self.assertSpyCalledWith(
+            run_process_exec,
+            ['svn', '--non-interactive', 'patch', '--strip=1', tempfiles[0]],
+            redirect_stderr=True)
+        self.assertSpyCalledWith(client._run_svn,
+                                 ['add', '--force', 'new_binary.bin'])
