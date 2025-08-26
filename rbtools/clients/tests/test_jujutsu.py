@@ -22,7 +22,9 @@ from rbtools.clients.errors import (
 from rbtools.clients.jujutsu import JujutsuClient
 from rbtools.clients.tests import (FOO, FOO1, FOO2, FOO3, FOO4,
                                    SCMClientTestCase)
-from rbtools.diffs.patches import Patch, PatchAuthor
+from rbtools.api.resource import FileAttachmentItemResource
+from rbtools.diffs.patches import BinaryFilePatch, Patch, PatchAuthor
+from rbtools.testing.api.transport import URLMapTransport
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempdir
 from rbtools.utils.process import run_process
@@ -1832,6 +1834,578 @@ class JujutsuPatcherTests(BaseJujutsuClientTests):
         self.assertEqual(grandparent, old_parent)
         self.assertEqual(self._get_description(parent),
                          '[Revert] Test message')
+
+    def test_binary_file_add(self) -> None:
+        """Testing JujutsuPatcher with an added binary file"""
+        client = self.build_client()
+
+        test_content = b'Binary file content'
+        test_path = 'new_binary_file.bin'
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 123,
+                'absolute_url': 'https://example.com/r/1/file/123/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/123/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=None,
+            new_path=test_path,
+            status='added',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        patch_content = (
+            b'diff --git a/new_binary_file.bin b/new_binary_file.bin\n'
+            b'new file mode 100644\n'
+            b'index 0000000..e69de29 100644\n'
+            b'Binary files /dev/null and b/new_binary_file.bin differ\n'
+        )
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], test_path)
+
+        self.assertTrue(os.path.exists(test_path))
+
+        with open(test_path, 'rb') as f:
+            self.assertEqual(f.read(), test_content)
+
+    def test_binary_file_add_in_subdirectory(self) -> None:
+        """Testing JujutsuPatcher with an added binary file in a subdirectory
+        """
+        client = self.build_client()
+
+        test_content = b'Binary file content in subdirectory'
+        test_path = 'subdir/new_binary_file.bin'
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 123,
+                'absolute_url': 'https://example.com/r/1/file/123/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/123/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=None,
+            new_path=test_path,
+            status='added',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        patch_content = (
+            b'diff --git a/subdir/new_binary_file.bin '
+            b'b/subdir/new_binary_file.bin\n'
+            b'new file mode 100644\n'
+            b'index 0000000000000000000000000000000000000000..'
+            b'e619c1387f5feb91f0ca83194650bfe4f6c2e347\n'
+            b'Binary files /dev/null and b/subdir/new_binary_file.bin differ\n'
+        )
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], test_path)
+
+        self.assertTrue(os.path.exists(test_path))
+
+        with open(test_path, 'rb') as f:
+            self.assertEqual(f.read(), test_content)
+
+    def test_binary_file_move(self) -> None:
+        """Testing JujutsuPatcher with a moved binary file"""
+        client = self.build_client()
+
+        old_path = 'old_binary.bin'
+        new_path = 'new_binary.bin'
+        test_content = b'Moved binary file content'
+
+        # Create the original file
+        with open(old_path, 'wb') as f:
+            f.write(test_content)
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 123,
+                'absolute_url': 'https://example.com/r/1/file/123/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/123/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=old_path,
+            new_path=new_path,
+            status='moved',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        patch_content = (
+            b'diff --git a/old_binary.bin b/new_binary.bin\n'
+            b'similarity index 100%\n'
+            b'rename from old_binary.bin\n'
+            b'rename to new_binary.bin\n'
+        )
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], new_path)
+
+        self.assertFalse(os.path.exists(old_path))
+        self.assertTrue(os.path.exists(new_path))
+
+        with open(new_path, 'rb') as f:
+            self.assertEqual(f.read(), test_content)
+
+    def test_binary_file_remove(self) -> None:
+        """Testing JujutsuPatcher with a removed binary file"""
+        client = self.build_client()
+
+        test_path = 'to_remove.bin'
+
+        # Create the file to be removed
+        with open(test_path, 'wb') as f:
+            f.write(b'File to be removed')
+
+        binary_file = BinaryFilePatch(
+            old_path=test_path,
+            new_path=None,
+            status='deleted',
+            file_attachment=None,
+        )
+
+        patch_content = (
+            b'diff --git a/to_remove.bin b/to_remove.bin\n'
+            b'deleted file mode 100644\n'
+            b'index e69de29..0000000 100644\n'
+            b'Binary files a/to_remove.bin and /dev/null differ\n'
+        )
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], test_path)
+
+        self.assertFalse(os.path.exists(test_path))
+
+    def test_binary_file_modified(self) -> None:
+        """Testing JujutsuPatcher with a modified binary file"""
+        client = self.build_client()
+
+        test_path = 'modified_binary.bin'
+        original_content = b'Original binary content'
+        new_content = b'Modified binary content'
+
+        # Create the original file
+        with open(test_path, 'wb') as f:
+            f.write(original_content)
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 123,
+                'absolute_url': 'https://example.com/r/1/file/123/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/123/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=test_path,
+            new_path=test_path,
+            status='modified',
+            file_attachment=attachment,
+            content=new_content,
+        )
+
+        patch_content = (
+            b'diff --git a/modified_binary.bin b/modified_binary.bin\n'
+            b'index e69de29..f572d396 100644\n'
+            b'Binary files a/modified_binary.bin and b/modified_binary.bin '
+            b'differ\n'
+        )
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 1)
+        self.assertEqual(result.binary_applied[0], test_path)
+
+        self.assertTrue(os.path.exists(test_path))
+
+        with open(test_path, 'rb') as f:
+            self.assertEqual(f.read(), new_content)
+
+    def test_patch_with_regular_and_empty_files(self) -> None:
+        """Testing JujutsuPatcher.patch with regular files and binary files
+
+        Note: This test focuses on regular + binary file combinations.
+        Empty file handling with the patch command is tested in Git tests.
+        """
+        client = self.build_client()
+
+        test_content = b'Binary file content'
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 201,
+                'absolute_url': 'https://example.com/r/1/file/201/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/201/'
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path=None,
+            new_path='new_binary.bin',
+            status='added',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        patcher = client.get_patcher(patches=[
+            Patch(content=(
+                b'diff --git a/foo.txt b/foo.txt\n'
+                b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+                b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
+                b'--- a/foo.txt\n'
+                b'+++ b/foo.txt\n'
+                b'@@ -6,7 +6,8 @@ multa quoque et bello passus, '
+                b'dum conderet urbem,\n'
+                b' inferretque deos Latio, genus unde Latinum,\n'
+                b' Albanique patres, atque altae moenia Romae.\n'
+                b' Musa, mihi causas memora, quo numine laeso,\n'
+                b'+New line added\n'
+                b' quidve dolens, regina deum tot volvere casus\n'
+                b' insignem pietate virum, tot adire labores\n'
+                b' impulerit. Tantaene animis caelestibus irae?\n'
+                b' \n'
+                b'diff --git a/new_binary.bin b/new_binary.bin\n'
+                b'new file mode 100644\n'
+                b'index 0000000..e69de29 100644\n'
+                b'Binary files /dev/null and b/new_binary.bin differ\n'
+            ),
+                binary_files=[binary_file]),
+        ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        with open('foo.txt', 'rb') as fp:
+            content = fp.read()
+            self.assertIn(b'New line added', content)
+
+        self.assertTrue(os.path.exists('new_binary.bin'))
+
+        with open('new_binary.bin', 'rb') as f:
+            self.assertEqual(f.read(), test_content)
+
+    def test_patch_with_regular_and_binary_files(self) -> None:
+        """Testing JujutsuPatcher.patch with regular and binary files"""
+        client = self.build_client()
+
+        test_content1 = b'Binary file content 1'
+        test_content2 = b'Binary file content 2'
+
+        attachment1 = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 201,
+                'absolute_url': 'https://example.com/r/1/file/201/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/201/'
+        )
+
+        attachment2 = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 202,
+                'absolute_url': 'https://example.com/r/1/file/202/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/202/'
+        )
+
+        binary_file1 = self.make_binary_file_patch(
+            old_path=None,
+            new_path='new_binary.bin',
+            status='added',
+            file_attachment=attachment1,
+            content=test_content1,
+        )
+
+        binary_file2 = self.make_binary_file_patch(
+            old_path='bar.txt',
+            new_path='bar.txt',
+            status='modified',
+            file_attachment=attachment2,
+            content=test_content2,
+        )
+
+        with open('bar.txt', 'wb') as f:
+            f.write(b'old binary content')
+
+        patch_content = (
+            b'diff --git a/foo.txt b/foo.txt\n'
+            b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+            b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
+            b'--- a/foo.txt\n'
+            b'+++ b/foo.txt\n'
+            b'@@ -6,7 +6,8 @@ multa quoque et bello passus, '
+            b'dum conderet urbem,\n'
+            b' inferretque deos Latio, genus unde Latinum,\n'
+            b' Albanique patres, atque altae moenia Romae.\n'
+            b' Musa, mihi causas memora, quo numine laeso,\n'
+            b'+New line added\n'
+            b' quidve dolens, regina deum tot volvere casus\n'
+            b' insignem pietate virum, tot adire labores\n'
+            b' impulerit. Tantaene animis caelestibus irae?\n'
+            b' \n'
+            b'diff --git a/new_binary.bin b/new_binary.bin\n'
+            b'new file mode 100644\n'
+            b'index 0000000..e69de29 100644\n'
+            b'Binary files /dev/null and b/new_binary.bin differ\n'
+            b'diff --git a/bar.txt b/bar.txt\n'
+            b'index 0000000..e69de29 100644\n'
+            b'Binary files a/bar.txt and b/bar.txt differ\n'
+        )
+
+        patch = Patch(content=patch_content,
+                      binary_files=[binary_file1, binary_file2])
+        patcher = client.get_patcher(patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 2)
+
+        with open('foo.txt', 'rb') as fp:
+            content = fp.read()
+            self.assertIn(b'New line added', content)
+
+        self.assertTrue(os.path.exists('new_binary.bin'))
+        self.assertTrue(os.path.exists('bar.txt'))
+
+        with open('new_binary.bin', 'rb') as f:
+            self.assertEqual(f.read(), test_content1)
+
+        with open('bar.txt', 'rb') as f:
+            self.assertEqual(f.read(), test_content2)
+
+    def test_patch_with_empty_and_binary_files(self) -> None:
+        """Testing JujutsuPatcher.patch with multiple binary files"""
+        client = self.build_client()
+
+        test_content1 = b'Binary file content 1'
+        test_content2 = b'Binary file content 2'
+
+        attachment1 = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 301,
+                'absolute_url': 'https://example.com/r/1/file/301/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/301/'
+        )
+
+        attachment2 = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 302,
+                'absolute_url': 'https://example.com/r/1/file/302/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/302/'
+        )
+
+        binary_file1 = self.make_binary_file_patch(
+            old_path=None,
+            new_path='new_binary1.bin',
+            status='added',
+            file_attachment=attachment1,
+            content=test_content1,
+        )
+
+        binary_file2 = self.make_binary_file_patch(
+            old_path=None,
+            new_path='new_binary2.bin',
+            status='added',
+            file_attachment=attachment2,
+            content=test_content2,
+        )
+
+        patch_content = (
+            b'diff --git a/new_binary1.bin b/new_binary1.bin\n'
+            b'new file mode 100644\n'
+            b'index 0000000..e69de29 100644\n'
+            b'Binary files /dev/null and b/new_binary1.bin differ\n'
+            b'diff --git a/new_binary2.bin b/new_binary2.bin\n'
+            b'new file mode 100644\n'
+            b'index 0000000..e69de29 100644\n'
+            b'Binary files /dev/null and b/new_binary2.bin differ\n'
+        )
+
+        patch = Patch(content=patch_content,
+                      binary_files=[binary_file1, binary_file2])
+        patcher = client.get_patcher(patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 2)
+
+        self.assertTrue(os.path.exists('new_binary1.bin'))
+        self.assertTrue(os.path.exists('new_binary2.bin'))
+
+        with open('new_binary1.bin', 'rb') as f:
+            self.assertEqual(f.read(), test_content1)
+
+        with open('new_binary2.bin', 'rb') as f:
+            self.assertEqual(f.read(), test_content2)
+
+    def test_patch_with_mixed_file_types(self) -> None:
+        """Testing JujutsuPatcher.patch with regular and multiple binary files
+        """
+        client = self.build_client()
+
+        test_content1 = b'New binary content'
+        test_content2 = b'Modified binary content'
+
+        attachment1 = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 401,
+                'absolute_url': 'https://example.com/r/1/file/401/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/401/'
+        )
+
+        attachment2 = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 402,
+                'absolute_url': 'https://example.com/r/1/file/402/download/',
+            },
+            url='https://reviews.example.com/api/review-requests/1/'
+                'file-attachments/402/'
+        )
+
+        binary_file1 = self.make_binary_file_patch(
+            old_path=None,
+            new_path='new_binary.bin',
+            status='added',
+            file_attachment=attachment1,
+            content=test_content1,
+        )
+
+        binary_file2 = self.make_binary_file_patch(
+            old_path='bar.txt',
+            new_path='bar.txt',
+            status='modified',
+            file_attachment=attachment2,
+            content=test_content2,
+        )
+
+        with open('bar.txt', 'wb') as f:
+            f.write(b'old binary content')
+
+        patch_content = (
+            b'diff --git a/foo.txt b/foo.txt\n'
+            b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+            b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
+            b'--- a/foo.txt\n'
+            b'+++ b/foo.txt\n'
+            b'@@ -6,7 +6,8 @@ multa quoque et bello passus, '
+            b'dum conderet urbem,\n'
+            b' inferretque deos Latio, genus unde Latinum,\n'
+            b' Albanique patres, atque altae moenia Romae.\n'
+            b' Musa, mihi causas memora, quo numine laeso,\n'
+            b'+New line added\n'
+            b' quidve dolens, regina deum tot volvere casus\n'
+            b' insignem pietate virum, tot adire labores\n'
+            b' impulerit. Tantaene animis caelestibus irae?\n'
+            b' \n'
+            b'diff --git a/new_binary.bin b/new_binary.bin\n'
+            b'new file mode 100644\n'
+            b'index 0000000..e69de29 100644\n'
+            b'Binary files /dev/null and b/new_binary.bin differ\n'
+            b'diff --git a/bar.txt b/bar.txt\n'
+            b'index 0000000..e69de29 100644\n'
+            b'Binary files a/bar.txt and b/bar.txt differ\n'
+        )
+
+        patch = Patch(content=patch_content,
+                      binary_files=[binary_file1, binary_file2])
+        patcher = client.get_patcher(patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertEqual(len(result.binary_applied), 2)
+
+        with open('foo.txt', 'rb') as fp:
+            content = fp.read()
+            self.assertIn(b'New line added', content)
+
+        self.assertTrue(os.path.exists('new_binary.bin'))
+        self.assertTrue(os.path.exists('bar.txt'))
+
+        with open('new_binary.bin', 'rb') as f:
+            self.assertEqual(f.read(), test_content1)
+
+        with open('bar.txt', 'rb') as f:
+            self.assertEqual(f.read(), test_content2)
 
     def _get_description(
         self,
