@@ -39,7 +39,7 @@ class PatchTests(TestCase):
 
         author = patch.author
         assert author is not None
-        self.assertEqual(author.fullname, 'Test User')
+        self.assertEqual(author.full_name, 'Test User')
         self.assertEqual(author.email, 'test@example.com')
 
     def test_init_with_path(self) -> None:
@@ -59,7 +59,7 @@ class PatchTests(TestCase):
 
         author = patch.author
         assert author is not None
-        self.assertEqual(author.fullname, 'Test User')
+        self.assertEqual(author.full_name, 'Test User')
         self.assertEqual(author.email, 'test@example.com')
 
     def test_init_without_content_or_path(self) -> None:
@@ -94,9 +94,16 @@ class PatchTests(TestCase):
         """Testing Patch.__init__ with prefix_level as string with non-int
         contents
         """
-        message = "prefix_level must be an integer, not 'XXX'."
+        error_message = "prefix_level must be an integer, not 'XXX'."
+        warning_message = (
+            'prefix_level must be an integer, not a string. Support for '
+            'string prefix levels will be removed in RBTools 7.'
+        )
 
-        with self.assertRaisesMessage(ValueError, message):
+        with self.assertRaisesMessage(ValueError,
+                                      error_message), \
+             self.assertWarns(RemovedInRBTools70Warning,
+                              msg=warning_message):
             Patch(author=PatchAuthor(full_name='Test User',
                                      email='test@example.com'),
                   content=b'XXX',
