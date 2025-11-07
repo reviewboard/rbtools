@@ -692,7 +692,38 @@ class GitClientTests(BaseGitClientTests):
                 'parent_diff': None,
             })
 
-    def test_diff_with_branch_diverge(self):
+    def test_diff_with_exclude_patterns_and_moved_file(self) -> None:
+        """Testing GitClient.diff with file exclusion and moved file"""
+        client = self.build_client(
+            needs_diff=True,
+            caps={
+                'diffs': {
+                    'moved_files': True,
+                },
+            })
+        client.get_repository_info()
+
+        self._git_add_file_commit('original.txt', FOO1, 'create original.txt')
+
+        base_commit_id = self._git_get_head()
+
+        self._run_git(['mv', 'original.txt', 'renamed.txt'])
+        self._run_git(['commit', '-m', 'rename original.txt to renamed.txt'])
+
+        self._git_add_file_commit('exclude.txt', FOO2, 'add exclude.txt')
+
+        commit_id = self._git_get_head()
+        revisions = client.parse_revision_spec([base_commit_id, commit_id])
+
+        result = client.diff(revisions, exclude_patterns=['exclude.txt'])
+
+        diff_content = result['diff']
+        assert diff_content is not None
+
+        self.assertIn(b'renamed.txt', diff_content)
+        self.assertNotIn(b'exclude.txt', diff_content)
+
+    def test_diff_with_branch_diverge(self) -> None:
         """Testing GitClient.diff with divergent branches"""
         client = self.build_client(needs_diff=True)
 

@@ -27,7 +27,7 @@ from rbtools.diffs.patches import PatchResult
 from rbtools.utils.checks import check_install
 from rbtools.utils.console import edit_text
 from rbtools.utils.diffs import (normalize_patterns,
-                                 remove_filenames_matching_patterns)
+                                 filename_match_any_patterns)
 from rbtools.utils.encoding import force_unicode
 from rbtools.utils.errors import EditorError
 from rbtools.utils.process import (RunProcessError,
@@ -1096,7 +1096,12 @@ class GitClient(BaseSCMClient):
             # If we have specified files to exclude, we will get a list of all
             # changed files and run `git diff` on each un-excluded file
             # individually.
-            changed_files_cmd = git_args + ['diff-tree'] + diff_cmd_params
+            changed_files_cmd = [
+                *git_args,
+                'diff-tree',
+                '-z',
+                *diff_cmd_params,
+            ]
 
             if self._type in (self.TYPE_GIT_SVN, self.TYPE_GIT_P4):
                 # We don't want to send -u along to git diff-tree because it
@@ -1106,28 +1111,37 @@ class GitClient(BaseSCMClient):
             elif self._type == self.TYPE_GIT:
                 changed_files_cmd.append('-r')
 
-            changed_files: Iterator[str] = (
+            diff_tree_output = (
                 self._run_git(
                     changed_files_cmd + [rev_range] + include_files,
                     ignore_errors=True,
                     log_debug_output_on_error=False)
                 .stdout
+                .read()
+                .rstrip('\0')
+                .split('\0')
             )
 
-            # The output of git diff-tree will be a list of entries that have
-            # changed between the two revisions that we give it. The last part
-            # of the line is the name of the file that has changed.
-            changed_files = remove_filenames_matching_patterns(
-                filenames=(
-                    filename.split('\t', 1)[1].rstrip('\n')
-                    for filename in changed_files
-                ),
-                patterns=exclude_patterns,
-                base_dir=git_toplevel)
+            diff_lines: list[bytes] = []
+            diff_tree_iter = iter(diff_tree_output)
 
-            diff_lines: List[bytes] = []
+            for part in diff_tree_iter:
+                _unused, change = part.rsplit(' ', 1)
 
-            for filename in changed_files:
+                if change[0] in {'C', 'R'}:
+                    # This is a copy or rename.
+                    next(diff_tree_iter)
+                    new_file = next(diff_tree_iter)
+                    filename = new_file
+                else:
+                    # This is a regular file operation.
+                    filename = next(diff_tree_iter)
+
+                if filename_match_any_patterns(filename=filename,
+                                               patterns=exclude_patterns,
+                                               base_dir=git_toplevel):
+                    continue
+
                 lines = (
                     self._run_git(diff_cmd + [rev_range, '--', filename],
                                   ignore_errors=True,
