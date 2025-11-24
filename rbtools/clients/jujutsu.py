@@ -1157,31 +1157,42 @@ class JujutsuClient(BaseSCMClient):
                 'the upstream remote branch you want to use '
                 '(e.g. main@origin).')
 
+        bookmarks_template = \
+            'remote_bookmarks.filter(|b| b.remote() != "git")'
+
         try:
             reachable = [
                 line
-                for line in (
-                    run_process(['jj', 'log', '-r',
-                                 f'(remote_bookmarks()::{tip})-', '-T',
-                                 'remote_bookmarks ++ "\n"',
-                                 '--no-graph'])
-                    .stdout
-                    .read()
-                    .splitlines()
-                )
+                for line in run_process([
+                    'jj', 'log',
+                    '-r', f'(remote_bookmarks()::{tip})-',
+                    '-T', f'{bookmarks_template} ++ "\n"',
+                    '--no-graph',
+                ])
+                .stdout
+                .read()
+                .splitlines()
                 if line
             ]
 
             if reachable:
-                return (
-                    run_process(['jj', 'log', '-r',
-                                 f'latest({" | ".join(reachable)})',
-                                 '-T', 'remote_bookmarks', '--no-graph',
-                                 '-n', '1'])
+                remote_bookmarks = [
+                    line
+                    for line in run_process([
+                        'jj', 'log',
+                        '-r', f'latest({" | ".join(reachable)})',
+                        '-T', bookmarks_template,
+                        '--no-graph',
+                        '-n', '1',
+                    ])
                     .stdout
                     .read()
-                    .strip()
-                )
+                    .splitlines()
+                    if line
+                ]
+
+                if remote_bookmarks:
+                    return remote_bookmarks[0]
         except RunProcessError as e:
             logger.warning(
                 'Unable to get log for reachable commits on remote '
@@ -1189,12 +1200,23 @@ class JujutsuClient(BaseSCMClient):
                 e)
 
         try:
-            return (
-                run_process(['jj', 'log', '-r', 'trunk()', '-T',
-                             'remote_bookmarks', '--no-graph', '-n', '1'])
+            remote_bookmarks = [
+                line
+                for line in run_process([
+                    'jj', 'log',
+                    '-r', 'trunk()',
+                    '-T', bookmarks_template,
+                    '--no-graph',
+                    '-n', '1',
+                ])
                 .stdout
                 .read()
-            )
+                .splitlines()
+                if line
+            ]
+
+            if remote_bookmarks:
+                return remote_bookmarks[0]
         except RunProcessError as e:
             logger.warning(
                 'Unable to get log for remote_bookmarks on trunk: %s', e)
