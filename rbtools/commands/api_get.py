@@ -1,5 +1,7 @@
 """Implementation of rbt api-get."""
 
+from __future__ import annotations
+
 import json
 import re
 

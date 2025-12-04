@@ -1,5 +1,7 @@
 """Implementation of rbt status."""
 
+from __future__ import annotations
+
 import logging
 import re
 from shutil import get_terminal_size

@@ -4,6 +4,8 @@ Version Added:
     4.0
 """
 
+from __future__ import annotations
+
 from typing import Iterable, List, Optional, cast
 
 

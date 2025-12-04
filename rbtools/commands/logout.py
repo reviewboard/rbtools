@@ -1,5 +1,7 @@
 """Implementation of rbt logout."""
 
+from __future__ import annotations
+
 import logging
 
 from rbtools.commands.base import BaseCommand

@@ -13,6 +13,8 @@ Version Added:
     5.0
 """
 
+from __future__ import annotations
+
 from rbtools.config.config import ConfigData, RBToolsConfig
 from rbtools.config.loader import (get_config_paths,
                                    load_config,

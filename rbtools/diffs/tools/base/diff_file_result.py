@@ -4,6 +4,8 @@ Version Added:
     4.0
 """
 
+from __future__ import annotations
+
 import io
 import re
 from typing import Iterator, List, Optional, Tuple

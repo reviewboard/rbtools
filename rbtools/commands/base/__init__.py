@@ -21,6 +21,8 @@ Version Added:
     5.0
 """
 
+from __future__ import annotations
+
 from rbtools.commands.base.commands import (BaseCommand,
                                             BaseMultiCommand,
                                             BaseSubCommand)

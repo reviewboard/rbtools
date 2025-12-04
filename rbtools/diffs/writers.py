@@ -4,6 +4,8 @@ Version Added:
     4.0
 """
 
+from __future__ import annotations
+
 import io
 from typing import Iterable, Optional, Union
 

@@ -4,6 +4,8 @@ Version Added:
     4.0
 """
 
+from __future__ import annotations
+
 from rbtools.testing import TestCase
 from rbtools.utils.streams import BufferedIterator
 

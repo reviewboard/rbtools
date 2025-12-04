@@ -1,5 +1,7 @@
 """Implementation of rbt list-repo-types."""
 
+from __future__ import annotations
+
 import textwrap
 
 from rbtools.clients import load_scmclients

@@ -4,6 +4,8 @@ Version Added:
     4.0
 """
 
+from __future__ import annotations
+
 import logging
 from typing import Dict, Iterable, Iterator, List, Optional, Type
 

@@ -1,5 +1,7 @@
 """Unit tests for rbtools.utils.review_request."""
 
+from __future__ import annotations
+
 import kgb
 
 from rbtools.api.errors import APIError

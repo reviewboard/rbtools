@@ -1,5 +1,7 @@
 """Tests for RBTools setup-repo command."""
 
+from __future__ import annotations
+
 import os
 
 from kgb import SpyAgency

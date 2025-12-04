@@ -4,6 +4,8 @@ Version Added:
     4.0
 """
 
+from __future__ import annotations
+
 import io
 
 from rbtools.diffs.tools.base import DiffFileResult

@@ -1,5 +1,7 @@
 """Error classes for utility functions."""
 
+from __future__ import annotations
+
 
 class EditorError(Exception):
     """An error invoking an external text editor."""

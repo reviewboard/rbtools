@@ -1,6 +1,7 @@
-"""
-Sphinx plugins for special links in the Release Notes.
-"""
+"""Sphinx plugins for special links in the Release Notes."""
+
+from __future__ import annotations
+
 from docutils import nodes, utils
 
 

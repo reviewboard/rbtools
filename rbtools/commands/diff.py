@@ -1,5 +1,7 @@
 """Implementation of rbt diff."""
 
+from __future__ import annotations
+
 from rbtools.clients.errors import InvalidRevisionSpecError
 from rbtools.commands.base import BaseCommand, CommandError
 

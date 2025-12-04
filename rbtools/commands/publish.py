@@ -1,5 +1,7 @@
 """Implementation of rbt publish."""
 
+from __future__ import annotations
+
 import logging
 
 from rbtools.api.errors import APIError

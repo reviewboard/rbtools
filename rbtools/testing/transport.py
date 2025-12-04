@@ -6,7 +6,7 @@ Deprecated::
     :py:class:`rbtools.testing.api.transport.URLMapTransport.`
 """
 
-from __future__ import unicode_literals
+from __future__ import annotations
 
 from typing import Optional
 

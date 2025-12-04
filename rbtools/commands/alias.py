@@ -1,5 +1,7 @@
 """Implementation of rbt alias."""
 
+from __future__ import annotations
+
 from collections import defaultdict
 from subprocess import list2cmdline
 

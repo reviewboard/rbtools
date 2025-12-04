@@ -1,5 +1,7 @@
 """The rbt info command."""
 
+from __future__ import annotations
+
 from shutil import get_terminal_size
 
 from texttable import Texttable

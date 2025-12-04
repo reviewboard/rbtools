@@ -1,5 +1,7 @@
 """Implementation of rbt close."""
 
+from __future__ import annotations
+
 from rbtools.api.errors import APIError
 from rbtools.commands.base import BaseCommand, CommandError, Option
 

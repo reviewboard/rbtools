@@ -1,5 +1,8 @@
 """Utilities for commands."""
 
+from __future__ import annotations
+
+
 DEFAULT_OPTIONS_MAP = {
     'debug': '--debug',
     'server': '--server',

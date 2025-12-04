@@ -1,5 +1,7 @@
 """Implementation of rbt attach."""
 
+from __future__ import annotations
+
 import os
 from urllib.parse import urljoin
 

@@ -1,5 +1,7 @@
 """Topological graphing and sorting utilities."""
 
+from __future__ import annotations
+
 from collections import defaultdict, deque
 
 

@@ -1,5 +1,7 @@
 """Unit tests for rbtools.utils.aliases."""
 
+from __future__ import annotations
+
 from rbtools.testing import TestCase
 from rbtools.utils.aliases import replace_arguments
 

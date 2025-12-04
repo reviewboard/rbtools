@@ -1,8 +1,5 @@
-# -*- coding: utf-8 -*-
-#
-# RBTools documentation build configuration file, created by sphinx-
-# quickstart on Thu Feb 12 02:10:34 2009.
-#
+"""RBTools documentation build configuration."""
+
 # This file is execfile()d with the current directory set to its
 # containing dir.
 #
@@ -15,6 +12,8 @@
 #
 # All configuration values have a default; values that are commented
 # out serve to show the default.
+
+from __future__ import annotations
 
 import os
 import sys

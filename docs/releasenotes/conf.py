@@ -1,8 +1,5 @@
-# -*- coding: utf-8 -*-
-#
-# Release Notes build configuration file, created by
-# sphinx-quickstart on Thu Feb 12 02:10:34 2009.
-#
+"""Release Notes build configuration."""
+
 # This file is execfile()d with the current directory set to its
 # containing dir.
 #
@@ -20,6 +17,9 @@
 # If your extensions are in another directory, add it here. If the
 # directory is relative to the documentation root, use os.path.abspath
 # to make it absolute, like shown here.
+
+from __future__ import annotations
+
 import os
 import sys
 from datetime import datetime

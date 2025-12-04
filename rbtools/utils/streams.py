@@ -4,6 +4,8 @@ Version Added:
     4.0
 """
 
+from __future__ import annotations
+
 from collections import deque
 from itertools import islice
 from typing import Deque, Iterable, Iterator, List, TypeVar

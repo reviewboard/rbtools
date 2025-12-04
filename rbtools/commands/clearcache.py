@@ -1,5 +1,7 @@
 """Implementation of rbt clear-cache."""
 
+from __future__ import annotations
+
 from rbtools.api.cache import APICache, clear_cache
 from rbtools.commands.base import BaseCommand, Option
 

@@ -4,6 +4,8 @@ Version Added:
     4.0
 """
 
+from __future__ import annotations
+
 from typing import List, Optional
 
 from typing_extensions import final
