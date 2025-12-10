@@ -41,6 +41,7 @@ from rbtools.utils.console import get_pass
 from rbtools.utils.filesystem import cleanup_tempfiles, get_home_path
 from rbtools.utils.repository import get_repository_resource
 from rbtools.utils.users import credentials_prompt
+from rbtools.utils.web_login import attempt_web_login
 
 if TYPE_CHECKING:
     from rbtools.api.resource import Resource, RootResource
@@ -1373,6 +1374,31 @@ class BaseCommand:
 
         return get_pass('Token: ', require=True)
 
+    def web_login_callback(self) -> bool:
+        """Attempt to authorize using web-based login.
+
+        This is used as a callback in the API when the user requires
+        authorization.
+
+        Version Added:
+            5.4
+
+        Raises:
+            WebLoginNotAvailable:
+                Web-based login is not available on the Review Board server.
+        """
+        api_client = self.api_client
+        api_root = self.api_root
+
+        # This callback will only be used by commands who require the
+        # API, so these will have been set.
+        assert api_client is not None
+        assert api_root is not None
+
+        return attempt_web_login(
+            api_client=api_client,
+            api_root=api_root)
+
     def _make_api_client(
         self,
         server_url: str,
@@ -1404,6 +1430,7 @@ class BaseCommand:
             api_token=options.api_token,
             auth_callback=self.credentials_prompt,
             otp_token_callback=self.otp_token_prompt,
+            web_login_callback=self.web_login_callback,
             disable_proxy=not options.enable_proxy,
             verify_ssl=not options.disable_ssl_verification,
             allow_caching=not options.disable_cache,

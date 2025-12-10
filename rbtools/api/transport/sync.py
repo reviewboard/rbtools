@@ -10,7 +10,8 @@ from rbtools.api.factory import create_resource
 from rbtools.api.request import (AuthCallback,
                                  HttpRequest,
                                  OTPCallback,
-                                 ReviewBoardServer)
+                                 ReviewBoardServer,
+                                 WebLoginCallback)
 from rbtools.api.resource import Resource, RootResource
 from rbtools.api.transport import Transport
 
@@ -58,9 +59,14 @@ class SyncTransport(Transport):
         proxy_authorization: Optional[str] = None,
         *args,
         config: Optional[RBToolsConfig] = None,
+        web_login_callback: (WebLoginCallback | None) = None,
         **kwargs,
     ) -> None:
         """Initialize the transport.
+
+        Version Changed:
+            5.4:
+            Added the ``web_login_callback`` argument.
 
         Args:
             url (str):
@@ -133,6 +139,12 @@ class SyncTransport(Transport):
             *args (tuple):
                 Positional arguments to pass to the base class.
 
+            web_login_callback (callable, optional):
+                A callback to attempt authentication through web-based login.
+
+                Version Added:
+                    5.4
+
             **kwargs (dict):
                 Keyword arguments to pass to the base class.
         """
@@ -152,6 +164,7 @@ class SyncTransport(Transport):
             disable_proxy=disable_proxy,
             auth_callback=auth_callback,
             otp_token_callback=otp_token_callback,
+            web_login_callback=web_login_callback,
             verify_ssl=verify_ssl,
             save_cookies=save_cookies,
             ext_auth_cookies=ext_auth_cookies,
