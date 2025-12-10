@@ -15,6 +15,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import TYPE_CHECKING
 
+import tqdm
 from packaging.version import parse as parse_version
 
 from rbtools.api.capabilities import Capabilities
@@ -184,6 +185,12 @@ class WebLoginManager:
             (hostname, port),
             _WebLoginHandler_factory(api_client, self.enable_logging))
         self.server = server
+
+        # When a tqdm progress bar is active, the below logs get printed on
+        # the same line as a progress bar. We add a newline in that case so
+        # that things look nicer.
+        if (getattr(tqdm.tqdm, '_instances')):
+            logger.info('')
 
         if self.open_browser:
             logger.info('Opening %s to log in to the %s Review Board '
