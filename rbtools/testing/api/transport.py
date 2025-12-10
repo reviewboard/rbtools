@@ -4,11 +4,13 @@ Version Added:
     3.1
 """
 
+from __future__ import annotations
+
 import json
 import logging
 from collections import defaultdict
 from urllib.parse import parse_qs, urljoin, urlparse
-from typing import Optional
+from typing import Any, Optional
 
 from rbtools.api.errors import create_api_error
 from rbtools.api.factory import create_resource
@@ -183,9 +185,7 @@ class URLMapTransport(Transport):
         self.payload_factory = payload_factory
 
         # Set up the default resource URLs for this instance.
-        root_info = self.add_item_url(
-            **payload_factory.make_root_object_data())
-        root_payload = root_info['node']['payload']
+        self.add_root_url()
 
         self.add_item_url(
             url='/api/info/',
@@ -196,7 +196,7 @@ class URLMapTransport(Transport):
                 # This is dynamic, so that it will always reflect changes
                 # made to the root resource.
                 payload_factory.make_api_info_object_data(
-                    root_payload=root_payload)
+                    root_payload=self.root_payload)['payload']
             ))
 
         self.add_list_url(
@@ -217,12 +217,23 @@ class URLMapTransport(Transport):
             mimetype=payload_factory.make_mimetype('users'),
             item_mimetype=payload_factory.make_mimetype('users'))
 
-        # Pull out the capabilities for clients to easily set in tests.
-        self.capabilities = root_payload['capabilities']
+
 
         if username:
             assert password
             self.login(username=username, password=password)
+
+    @property
+    def capabilities(self) -> dict[str, Any]:
+        """The server info capabilities.
+
+        Clients can use this to easily set capabilities information in unit
+        tests.
+
+        Type:
+            dict
+        """
+        return self.root_payload['capabilities']
 
     def add_url(self, url, mimetype, method='GET', http_status=200,
                 headers={}, payload={}, link_expansion_types={},
@@ -437,6 +448,31 @@ class URLMapTransport(Transport):
                 payload_extra=payload_extra),
             mimetype='application/vnd.reviewboard.org.error+json',
             **kwargs)
+
+    def add_root_url(self, **kwargs) -> dict[str, Any]:
+        """Add the URL for the root resource.
+
+        Version Added:
+            5.4
+
+        Args:
+            **kwargs (dict):
+                Keyword arguments for the root payload. See
+                :py:meth:`rbtools.testing.api.payloads.PayloadFactory.
+                make_root_object_data` for details.
+
+        Returns:
+            dict:
+            The results of the add operation, for further tracking or
+            processing. See the return type for :py:meth:`add_url` for
+            details.
+        """
+        root_object_data = self.payload_factory.make_root_object_data(**kwargs)
+        root_info = self.add_item_url(**root_object_data)
+        root_payload = root_info['node']['payload']
+        self.root_payload = root_payload
+
+        return root_info
 
     def add_repository_urls(self, repository_id=1, info_payload=None,
                             **kwargs):
@@ -802,9 +838,17 @@ class URLMapTransport(Transport):
 
         headers = method_info.get('headers', {})
         item_mimetype = headers.get('Item-Content-Type')
+        resource_key = (method_info.get('item_key') or
+                        method_info.get('list_key'))
 
         if callable(payload):
             payload = payload()
+
+        if resource_key:
+            resource_payload = payload[resource_key]
+
+            if callable(resource_payload):
+                payload[resource_key] = resource_payload()
 
         api_call['response'] = payload
 
@@ -828,13 +872,11 @@ class URLMapTransport(Transport):
                 # looking for them.
                 expand_keys = set(expand[0].split(','))
 
-                item_key = method_info.get('item_key')
-                list_key = method_info.get('list_key')
                 link_expansion_types = \
                     method_info.get('link_expansion_types', {})
 
                 self._expand_links(payload=payload,
-                                   key=item_key or list_key,
+                                   key=resource_key,
                                    expand_keys=expand_keys,
                                    link_expansion_types=link_expansion_types)
 
