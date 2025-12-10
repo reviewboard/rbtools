@@ -1,3 +1,7 @@
+"""Documentation utils for RBTools commands."""
+
+from __future__ import annotations
+
 import re
 import sys
 
@@ -282,13 +286,26 @@ class CommandOptionsDirective(Directive):
 
         return [section]
 
-    def output_option(self, option):
+    def output_option(
+        self,
+        option: Option,
+    ) -> list[nodes.paragraph]:
+        """Output the documentation for an option of a command.
+
+        Args:
+            option (rbtools.commands.base.options.Option):
+                The option.
+
+        Returns:
+            list of docutils.nodes.paragraph:
+            The documentation for the option.
+        """
         default_text = ''
 
         content = [self.format_content(option.attrs['help'])]
 
-        if 'extended_help' in option.attrs:
-            content.append(self.format_content(option.attrs['extended_help']))
+        if extended_help := option.extended_help:
+            content.append(self.format_content(extended_help))
 
         if 'default' in option.attrs:
             action = option.attrs.get('action', 'store')
@@ -302,18 +319,16 @@ class CommandOptionsDirective(Directive):
                 default_text = ('If not specified, ``%s`` is used by default.'
                                 % default)
 
-        if 'config_key' in option.attrs:
+        if config_key := option.config_key:
             if default_text:
                 default_text += (
-                    ' The default can be changed by setting :rbtconfig:`%s` '
-                    'in :ref:`rbtools-reviewboardrc`.'
-                    % option.attrs['config_key']
+                    f' The default can be changed by setting :rbtconfig:'
+                    f'`{config_key}` in :ref:`rbtools-reviewboardrc`.'
                 )
             else:
                 default_text = (
-                    'The default can be set in :rbtconfig:`%s` in '
-                    ':ref:`rbtools-reviewboardrc`.'
-                    % option.attrs['config_key']
+                    f'The default can be set in :rbtconfig:`{config_key}` in '
+                    f':ref:`rbtools-reviewboardrc`.'
                 )
 
         if default_text:
@@ -341,23 +356,35 @@ class CommandOptionsDirective(Directive):
         else:
             option_args = ', '.join(option.opts)
 
-        if 'deprecated_in' in option.attrs:
-            content.append('.. deprecated:: %s'
-                           % option.attrs['deprecated_in'])
+        if deprecated_in := option.deprecated_in:
+            depr_dir = f'.. deprecated:: {deprecated_in}'
+            depr_desc_parts: list[str] = []
 
-        if 'added_in' in option.attrs:
-            content.append('.. versionadded:: %s' % option.attrs['added_in'])
+            if removed_in := option.removed_in:
+                depr_desc_parts.append(f'Will be removed in {removed_in}.')
 
-        if 'versions_changed' in option.attrs:
-            versions_changed = option.attrs['versions_changed']
+            if replacement := option.replacement:
+                depr_desc_parts.append(f'Use :option:`{replacement}` instead.')
 
+            depr_desc = ' '.join(depr_desc_parts)
+
+            if depr_desc:
+                depr_final_str = '\n'.join([depr_dir, depr_desc])
+            else:
+                depr_final_str = depr_dir
+
+            content.append(depr_final_str)
+
+        if added_in := option.added_in:
+            content.append(f'.. versionadded:: {added_in}')
+
+        if versions_changed := option.versions_changed:
             for version in sorted(versions_changed, reverse=True):
+                version_content = self.indent_content(
+                    self.format_content(versions_changed[version]),
+                    indent_level=2)
                 content.append(
-                    '.. versionchanged:: %s\n%s' % (
-                        version,
-                        self.indent_content(
-                            self.format_content(versions_changed[version]),
-                            indent_level=2)))
+                    f'.. versionchanged:: {version}\n{version_content}')
 
         node = parse_text(
             self,

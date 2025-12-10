@@ -10,6 +10,7 @@ from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     import argparse
+    from collections.abc import Mapping
 
     from rbtools.config import RBToolsConfig
 
@@ -17,16 +18,18 @@ if TYPE_CHECKING:
 class Option:
     """Represents an option for a command.
 
-    The arguments to the constructor should be treated like those
-    to argparse's add_argument, with the exception that the keyword
-    argument 'config_key' is also valid. If config_key is provided
-    it will be used to retrieve the config value as a default if the
-    option is not specified. This will take precedence over the
-    default argument.
+    This serves as a wrapper around the ArgumentParser options, allowing us
+    to specify additional attributes that are specific to RBTools, such as
+    defaults which will be grabbed from the configuration after it is loaded.
 
-    Serves as a wrapper around the ArgumentParser options, allowing us
-    to specify defaults which will be grabbed from the configuration
-    after it is loaded.
+    The arguments to the constructor should be treated like those
+    to argparse's :py:meth:`ArgumentParser.add_argument`, with the exception
+    of the custom arguments that are defined in the constructor.
+
+    Version Added:
+        5.4:
+        The optional RBTools specific attributes are now stored on the class
+        instead of in ``attrs``.
 
     Version Added:
         5.0:
@@ -53,19 +56,90 @@ class Option:
     def __init__(
         self,
         *opts: str,
+        added_in: (str | None) = None,
+        config_key: (str | None) = None,
+        deprecated_in: (str | None) = None,
+        extended_help: (str | None) = None,
+        removed_in: (str | None) = None,
+        replacement: (str | None) = None,
+        versions_changed: (Mapping[str, str] | None) = None,
         **attrs,
     ) -> None:
         """Initialize the option.
+
+        Version Changed:
+            5.4:
+            Added explicit arguments for the optional RBTools specific
+            arguments that may be set on an option, pulling them out of
+            ``**attrs``.
 
         Args:
             *opts (tuple of str):
                 The long and short form option names.
 
+            added_in (str, optional):
+                The version the option was added in.
+
+                Version Added:
+                    5.4
+
+            config_key (str, optional):
+                A config key to retrieve a default value from RBTools config
+                when the option is not explicitly provided. This will take
+                precedence over any ``default`` in ``attrs``.
+
+                Version Added:
+                    5.4
+
+            deprecated_in (str, optional):
+                The version the option was deprecated in.
+
+                Version Added:
+                    5.4
+
+            extended_help (str, optional):
+                Extended help message.
+
+                Version Added:
+                    5.4
+
+            removed_in (str, optional):
+                The version in which the option will be removed.
+
+                Version Added:
+                    5.4
+
+            replacement (str, optional):
+                The new option to use instead of the deprecated option, if any.
+
+                This should be the longest form name for the option,
+                including any preceding hyphens (e.g. ``--my-option``).
+
+                Version Added:
+                    5.4
+
+            versions_changed (dict[str, str], optional):
+                A dict of versions in which the option changed. The keys are
+                version strings and values are change description strings.
+
+                Version Added:
+                    5.4
+
             **attrs (dict):
-                The attributes for the option.
+                The argparse attributes for the option.
+
+                These should be valid arguments that can be passed to
+                :py:meth:`ArgumentParser.add_argument`.
         """
         self.opts = opts
         self.attrs = attrs
+        self.added_in = added_in
+        self.config_key = config_key
+        self.deprecated_in = deprecated_in
+        self.extended_help = extended_help
+        self.removed_in = removed_in
+        self.replacement = replacement
+        self.versions_changed = versions_changed
 
     def add_to(
         self,
@@ -93,24 +167,24 @@ class Option:
         """
         attrs = self.attrs.copy()
 
-        if config is not None and 'config_key' in attrs:
-            config_key = attrs.pop('config_key')
-
-            if config_key in config:
+        if (config is not None and
+            (config_key := self.config_key) and
+            config_key in config):
                 attrs['default'] = config[config_key]
 
-        if 'deprecated_in' in attrs:
-            attrs['help'] = (
-                '%(help)s\n[Deprecated since %(deprecated_in)s]'
-                % attrs)
+        if deprecated_in := self.deprecated_in:
+            if removed_in := self.removed_in:
+                deprecated_str = (
+                    f'Deprecated since {deprecated_in} and will be '
+                    f'removed in {removed_in}.'
+                )
+            else:
+                deprecated_str = f'Deprecated since {deprecated_in}.'
 
-        # These are used for other purposes, and are not supported by
-        # argparse.
-        for attr in ('added_in',
-                     'deprecated_in',
-                     'extended_help',
-                     'versions_changed'):
-            attrs.pop(attr, None)
+            if replacement := self.replacement:
+                deprecated_str += f' Use {replacement} instead.'
+
+            attrs['help'] += f'\n[{deprecated_str}]'
 
         parent.add_argument(*self.opts, **attrs)
 

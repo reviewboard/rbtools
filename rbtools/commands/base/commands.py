@@ -44,6 +44,8 @@ from rbtools.utils.users import credentials_prompt
 from rbtools.utils.web_login import attempt_web_login
 
 if TYPE_CHECKING:
+    from typing import Sequence
+
     from rbtools.api.resource import Resource, RootResource
     from rbtools.api.transport import Transport
     from rbtools.clients.base.repository import RepositoryInfo
@@ -1137,6 +1139,8 @@ class BaseCommand:
             self._init_logging()
             logging.debug('Command line: %s', subprocess.list2cmdline(argv))
 
+            self._check_deprecated_args()
+
             try:
                 self.initialize()
             except NeedsReinitialize:
@@ -1549,6 +1553,70 @@ class BaseCommand:
         """
         raise NotImplementedError()
 
+    def get_options_flat(self) -> Sequence[Option]:
+        """Return a list of all options for the command.
+
+        This returns a flat list of options, pulling out the options that
+        are inside any option groups set on the command.
+
+        Version Added:
+            5.4
+
+        Returns:
+            list of rbtools.commands.base.options.Option:
+            The list of options for the command.
+        """
+        all_options: list[Option] = []
+
+        for item in self.option_list + self._global_options:
+            if isinstance(item, OptionGroup):
+                all_options += item.option_list
+            else:
+                all_options.append(item)
+
+        return all_options
+
+    def _check_deprecated_args(self) -> None:
+        """Check if any deprecated arguments have been passed to the command.
+
+        If a deprecated argument is present, a warning will be emitted for it.
+
+        Version Added:
+            5.4
+        """
+        deprecated_options: set[Option] = set()
+
+        for option in self.get_options_flat():
+            if option.deprecated_in:
+                deprecated_options.add(option)
+
+        for option in deprecated_options:
+            option_value = getattr(self.options, option.attrs['dest'])
+
+            if option_value != option.attrs['default']:
+                # A deprecated option has been passed.
+                assert option.deprecated_in is not None
+
+                option_name = option.opts[-1]
+                deprecated_str = 'Option %s is deprecated as of RBTools %s.'
+                deprecated_format_args: list[str] = [
+                    option_name,
+                    option.deprecated_in,
+                ]
+
+                if removed_in := option.removed_in:
+                    deprecated_str = (
+                        'Option %s is deprecated as of RBTools %s and will '
+                        'be removed in %s.'
+                    )
+                    deprecated_format_args.append(removed_in)
+
+                if replacement := option.replacement:
+                    deprecated_str += ' Use %s instead.'
+                    deprecated_format_args.append(replacement)
+
+                logging.warning(deprecated_str, *deprecated_format_args)
+
     def _init_logging(self) -> None:
         """Initialize logging for the command.
 
@@ -1745,6 +1813,37 @@ class BaseMultiCommand(BaseCommand):
 
     #: A mapping of subcommand names to argument parsers.
     subcommand_parsers: dict[str, argparse.ArgumentParser]
+
+    def get_options_flat(self) -> Sequence[Option]:
+        """Return a list of all options for the command.
+
+        This returns a flat list of options, pulling out the options that
+        are inside any option groups set on the command, and in any
+        subcommands.
+
+        Version Added:
+            5.4
+
+        Returns:
+            list of rbtools.commands.base.options.Option:
+            The list of options for the command.
+        """
+        all_options = list(super().get_options_flat())
+
+        for item in self.common_subcommand_option_list:
+            if isinstance(item, OptionGroup):
+                all_options += item.option_list
+            else:
+                all_options.append(item)
+
+        for command_cls in self.subcommands:
+            for item in command_cls.option_list:
+                if isinstance(item, OptionGroup):
+                    all_options += item.option_list
+                else:
+                    all_options.append(item)
+
+        return all_options
 
     def usage(
         self,
