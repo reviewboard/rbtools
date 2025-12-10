@@ -1,9 +1,33 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
 from typing import Optional, Type
 from urllib.parse import urlparse
 
 from rbtools.api.resource import Resource, RootResource
 from rbtools.api.transport import Transport
 from rbtools.api.transport.sync import SyncTransport
+
+
+@dataclass
+class RBClientWebLoginOptions:
+    """Options for a client's use of web-based login.
+
+    This can be set on :py:class:`RBClient` to dictate if and how web-based
+    login is used to authenticate the client.
+
+    Version Added:
+        5.4
+    """
+
+    #: Whether to allow using web-based login when authenticating the client.
+    allow: bool
+
+    #: Whether to output debug logs from the login server.
+    debug: bool
+
+    #: Whether to automatically open the login URL in a browser.
+    open_browser: bool
 
 
 class RBClient:
@@ -44,11 +68,21 @@ class RBClient:
     #: Type: str
     user_agent: Optional[str]
 
+    #: Options for web-based login.
+    #:
+    #: This will determine if and how web-based login is used to authenticate
+    #: the client.
+    #:
+    #: Version Added:
+    #:     5.4
+    web_login_options: RBClientWebLoginOptions | None
+
     def __init__(
         self,
         url: str,
         transport_cls: Type[Transport] = SyncTransport,
         *args,
+        web_login_options: (RBClientWebLoginOptions | None) = None,
         **kwargs,
     ) -> None:
         """Initialize the client.
@@ -63,6 +97,16 @@ class RBClient:
             *args (tuple):
                 Positional arguments to pass to the transport.
 
+            web_login_options (rbtools.api.client.RBClientWebLoginOptions,
+                               optional):
+                Options for web-based login.
+
+                This will determine if and how web-based login is used to
+                authenticate the client.
+
+                Version Added:
+                    5.4
+
             **kwargs (dict):
                 Keyword arguments to pass to the transport.
         """
@@ -70,6 +114,7 @@ class RBClient:
 
         self.url = url
         self.domain = urlparse(url)[1]
+        self.web_login_options = web_login_options
         self._transport = transport
 
         if hasattr(transport, 'server') and hasattr(transport.server, 'agent'):

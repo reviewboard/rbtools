@@ -22,7 +22,7 @@ from typing_extensions import override
 
 from rbtools import get_version_string
 from rbtools.api.capabilities import Capabilities
-from rbtools.api.client import RBClient
+from rbtools.api.client import RBClient, RBClientWebLoginOptions
 from rbtools.api.errors import APIError, ServerInterfaceError
 from rbtools.api.transport.sync import SyncTransport
 from rbtools.clients import scan_usable_client
@@ -376,6 +376,16 @@ class BaseCommand:
                default=False,
                added_in='3.0',
                help='Output results as JSON data instead of text.'),
+        Option('--open-browser',
+               dest='open_browser',
+               action='store_true',
+               config_key='OPEN_BROWSER',
+               default=False,
+               help='For commands that navigate you to a URL, this will '
+                    'automatically open a browser to the URL. When used '
+                    'with --web-login, this will open a browser to the '
+                    'login page.',
+               added_in='5.4'),
     ]
 
     server_options = OptionGroup(
@@ -421,6 +431,14 @@ class BaseCommand:
                    help='The API token to use for authentication, instead of '
                         'using a username and password.',
                    added_in='0.7'),
+            Option('--web-login',
+                   dest='web_login',
+                   action='store_true',
+                   config_key='WEB_LOGIN',
+                   default=False,
+                   help='Use web-based login instead of prompting for '
+                        'authentication credentials directly in the terminal.',
+                   added_in='5.4'),
             Option('--disable-proxy',
                    action='store_false',
                    dest='enable_proxy',
@@ -1409,6 +1427,11 @@ class BaseCommand:
         """
         options = self.options
 
+        web_login_options = RBClientWebLoginOptions(
+            allow=options.web_login,
+            debug=options.debug,
+            open_browser=options.open_browser)
+
         return RBClient(
             server_url,
             username=options.username,
@@ -1428,7 +1451,8 @@ class BaseCommand:
             client_cert=options.client_cert,
             proxy_authorization=options.proxy_authorization,
             transport_cls=self.transport_cls,
-            config=self.config)
+            config=self.config,
+            web_login_options=web_login_options)
 
     def get_api(
         self,

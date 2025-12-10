@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import logging
 import sys
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
+from rbtools.api.client import RBClientWebLoginOptions
 from rbtools.api.errors import AuthorizationError
-from rbtools.config.loader import load_config
 from rbtools.utils.console import get_input, get_pass
 from rbtools.utils.web_login import WebLoginManager, is_web_login_enabled
 
@@ -21,13 +21,13 @@ def get_authenticated_session(
     api_client: RBClient,
     api_root: RootResource,
     auth_required: bool = False,
-    session: Optional[Resource] = None,
+    session: (Resource | None) = None,
     num_retries: int = 3,
-    via_web: Optional[bool] = None,
-    open_browser: bool = False,
-    enable_logging: bool = False,
-    capabilities: Optional[Capabilities] = None,
-) -> Optional[Resource]:
+    via_web: (bool | None) = None,
+    open_browser: (bool | None) = None,
+    enable_logging: (bool | None) = None,
+    capabilities: (Capabilities | None) = None,
+) -> Resource | None:
     """Return an authenticated session.
 
     None will be returned if the user is not authenticated, unless the
@@ -61,11 +61,17 @@ def get_authenticated_session(
         via_web (bool, optional):
             Whether to use web-based login.
 
+            If this is set, it will take precedence over what's set in
+            :py:attr:`rbtools.api.client.RBClient.web_login_options`.
+
             Version Added:
                 5.0
 
         open_browser (bool, optional):
             Whether to automatically open a browser when using web-based login.
+
+            If this is set, it will take precedence over what's set in
+            :py:attr:`rbtools.api.client.RBClient.web_login_options`.
 
             Version Added:
                 5.0
@@ -73,6 +79,9 @@ def get_authenticated_session(
         enable_logging (bool, optional):
             Whether to display the logs for the web login server when using
             web-based login.
+
+            If this is set, it will take precedence over what's set in
+            :py:attr:`rbtools.api.client.RBClient.web_login_options`.
 
             Version Added:
                 5.0
@@ -97,19 +106,31 @@ def get_authenticated_session(
         if not auth_required:
             return None
 
-        if via_web is None:
-            config = load_config()
-            via_web = config.get('WEB_LOGIN')
-
         web_login_enabled = is_web_login_enabled(
             server_info=api_root.get_info(),
             capabilities=capabilities)
 
-        if via_web and web_login_enabled:
-            web_login_manager = WebLoginManager(
-                api_client=api_client,
-                enable_logging=enable_logging,
-                open_browser=open_browser)
+        if web_login_enabled:
+            web_login_options = (
+                api_client.web_login_options or
+                RBClientWebLoginOptions(
+                    allow=False,
+                    debug=False,
+                    open_browser=False)
+            )
+
+            if via_web is not None:
+                web_login_options.allow = via_web
+
+            if open_browser is not None:
+                web_login_options.open_browser = open_browser
+
+            if enable_logging is not None:
+                web_login_options.debug = enable_logging
+
+            api_client.web_login_options = web_login_options
+
+            web_login_manager = WebLoginManager(api_client=api_client)
 
             web_login_manager.start_web_login_server()
             login_successful = web_login_manager.wait_login_result()
