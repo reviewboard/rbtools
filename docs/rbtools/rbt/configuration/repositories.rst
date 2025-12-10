@@ -654,8 +654,8 @@ Example:
 
     WEB_LOGIN = True
 
-When using :command:`rbt login`, this can be enabled by passing
-:option:`--web`.
+This can be enabled by passing :option:`--web-login` to any command that
+requires authentication.
 
 
 Git Properties

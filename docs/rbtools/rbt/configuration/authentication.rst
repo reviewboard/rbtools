@@ -14,10 +14,10 @@ Login Sessions
 When running a command which requires authenticating with the server, RBTools
 will either direct you to log in via the Review Board web site, or prompt you
 for your username and password. This depends on whether :rbtconfig:`WEB_LOGIN`
-is set in :file:`.reviewboardrc`.
+is set in :file:`.reviewboardrc` or :option:`--web-login` was passed to the
+command.
 
-You can also log in by explicitly by running :command:`rbt login`, which has
-the :option:`--web` option for enabling web-based login.
+You can also log in by explicitly running :command:`rbt login`.
 
 After logging in, your session will be stored in the :file:`.rbtools-cookies`
 file. Depending on how the server is set up, these sessions will periodically
