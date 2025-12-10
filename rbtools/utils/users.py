@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from rbtools.api.client import RBClientWebLoginOptions
 from rbtools.api.errors import AuthorizationError
 from rbtools.utils.console import get_input, get_pass
-from rbtools.utils.web_login import WebLoginManager, is_web_login_enabled
+from rbtools.utils.web_login import WebLoginNotAllowed, attempt_web_login
 
 if TYPE_CHECKING:
     from rbtools.api.capabilities import Capabilities
@@ -97,8 +97,6 @@ def get_authenticated_session(
         The authenticated session resource or ``None`` if the user is not
         authenticated.
     """
-    # TODO: Consolidate the logic in this function with
-    #       Command.credentials_prompt().
     if not session:
         session = api_root.get_session(expand='user')
 
@@ -106,85 +104,43 @@ def get_authenticated_session(
         if not auth_required:
             return None
 
-        web_login_enabled = is_web_login_enabled(
-            server_info=api_root.get_info(),
-            capabilities=capabilities)
+        web_login_options = (
+            api_client.web_login_options or
+            RBClientWebLoginOptions(
+                allow=False,
+                debug=False,
+                open_browser=False)
+        )
 
-        if web_login_enabled:
-            web_login_options = (
-                api_client.web_login_options or
-                RBClientWebLoginOptions(
-                    allow=False,
-                    debug=False,
-                    open_browser=False)
-            )
+        if via_web is not None:
+            web_login_options.allow = via_web
 
-            if via_web is not None:
-                web_login_options.allow = via_web
+        if open_browser is not None:
+            web_login_options.open_browser = open_browser
 
-            if open_browser is not None:
-                web_login_options.open_browser = open_browser
+        if enable_logging is not None:
+            web_login_options.debug = enable_logging
 
-            if enable_logging is not None:
-                web_login_options.debug = enable_logging
+        api_client.web_login_options = web_login_options
 
-            api_client.web_login_options = web_login_options
-
-            web_login_manager = WebLoginManager(api_client=api_client)
-
-            web_login_manager.start_web_login_server()
-            login_successful = web_login_manager.wait_login_result()
+        try:
+            login_successful = attempt_web_login(
+                api_client=api_client,
+                api_root=api_root,
+                capabilities=capabilities)
 
             if login_successful:
                 return api_root.get_session(expand='user')
             else:
                 logging.error('Web-based login failed.')
                 raise AuthorizationError()
-
-        if via_web and not web_login_enabled:
-            logging.debug('Web-based login requires at least Review Board '
-                          '5.0.5 and for the ``client_web_login`` site '
-                          'configuration setting to be set to ``True``. '
-                          'Falling back to username and password prompt.')
-
-        # Interactive prompts don't work correctly when input doesn't come
-        # from a terminal. This could seem to be a rare case not worth
-        # worrying about, but this is what happens when using native
-        # Python in Cygwin terminal emulator under Windows and it's very
-        # puzzling to the users, especially because stderr is also _not_
-        # flushed automatically in this case, so the program just appears
-        # to hang.
-        if not sys.stdin.isatty():
-            message_parts = [
-                'Authentication is required but RBTools cannot prompt for '
-                'it.'
-            ]
-
-            if sys.platform == 'win32':
-                message_parts.append(
-                    'This can occur if you are piping input into the '
-                    'command, or if you are running in a Cygwin terminal '
-                    'emulator and not using Cygwin Python.'
-                )
-            else:
-                message_parts.append(
-                    'This can occur if you are piping input into the '
-                    'command.'
-                )
-
-            message_parts.append(
-                'You may need to explicitly provide API credentials when '
-                'invoking the command, or try logging in separately.'
-            )
-
-            raise AuthorizationError(message=' '.join(message_parts))
-
-        logging.info('Please log in to the Review Board server at %s',
-                     api_client.domain)
+        except WebLoginNotAllowed:
+            pass
 
         for i in range(num_retries + 1):
-            username = get_input('Username: ', require=True)
-            password = get_pass('Password: ', require=True)
+            username, password = credentials_prompt(
+                server_url=api_client.domain,
+                is_retry=(i != 0))
             api_client.login(username=username, password=password)
 
             try:
@@ -220,3 +176,87 @@ def get_username(api_client, api_root, auth_required=False):
         return user.username
 
     return None
+
+
+def credentials_prompt(
+    server_url: str,
+    username: (str | None) = None,
+    password: (str | None) = None,
+    is_retry: bool = False,
+) -> tuple[str, str]:
+    """Prompt for a username and/or password using the command line.
+
+    Version Added:
+        5.4
+
+    Args:
+        server_url (str):
+            The Review Board server URL.
+
+        username (str, optional):
+            The username for authentication, if one has already been provided.
+
+        password (str, optional):
+            The password for authentication, if one has already been provided.
+
+        is_retry (bool, optional):
+            Whether credentials have already been prompted for before.
+
+    Returns:
+        tuple:
+        A 2-tuple of:
+
+        Tuple:
+            username (str):
+                The user-provided username.
+
+            password (str):
+                The user-provided password.
+
+    Raises:
+        rbtools.api.errors.AuthorizationError:
+            RBTools is unable to prompt for the credentials.
+    """
+    # Interactive prompts don't work correctly when input doesn't come
+    # from a terminal. This could seem to be a rare case not worth
+    # worrying about, but this is what happens when using native
+    # Python in Cygwin terminal emulator under Windows and it's very
+    # puzzling to the users, especially because stderr is also _not_
+    # flushed automatically in this case, so the program just appears
+    # to hang.
+    if not sys.stdin.isatty():
+        message_parts = [
+            'Authentication is required but RBTools cannot prompt for '
+            'it.'
+        ]
+
+        if sys.platform == 'win32':
+            message_parts.append(
+                'This can occur if you are piping input into the '
+                'command, or if you are running in a Cygwin terminal '
+                'emulator and not using Cygwin Python.'
+            )
+        else:
+            message_parts.append(
+                'This can occur if you are piping input into the '
+                'command.'
+            )
+
+        message_parts.append(
+            'You may need to explicitly provide API credentials when '
+            'invoking the command, or try logging in separately.'
+        )
+
+        raise AuthorizationError(message=' '.join(message_parts))
+
+    if not is_retry:
+        logging.info('Please log in to the Review Board server at %s',
+                     server_url)
+
+    if username is None:
+        username = get_input('Username: ', require=True)
+
+    if password is None:
+        password = get_pass('Password: ', require=True)
+
+    return username, password

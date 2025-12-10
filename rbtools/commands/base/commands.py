@@ -37,9 +37,10 @@ from rbtools.commands.base.options import Option, OptionGroup
 from rbtools.commands.base.output import JSONOutput, OutputWrapper
 from rbtools.config import ConfigData, RBToolsConfig, load_config
 from rbtools.diffs.tools.errors import MissingDiffToolError
-from rbtools.utils.console import get_input, get_pass
+from rbtools.utils.console import get_pass
 from rbtools.utils.filesystem import cleanup_tempfiles, get_home_path
 from rbtools.utils.repository import get_repository_resource
+from rbtools.utils.users import credentials_prompt
 
 if TYPE_CHECKING:
     from rbtools.api.resource import Resource, RootResource
@@ -1300,56 +1301,20 @@ class BaseCommand:
             rbtools.commands.base.errors.CommandError:
                 HTTP authentication failed.
         """
-        # TODO: Consolidate the logic in this function with
-        #       get_authenticated_session() in rbtools/utils/users.py.
-
         if username is None or password is None:
             if getattr(self.options, 'diff_filename', None) == '-':
                 raise CommandError('HTTP authentication is required, but '
                                    'cannot be used with --diff-filename=-')
 
-            # Interactive prompts don't work correctly when input doesn't come
-            # from a terminal. This could seem to be a rare case not worth
-            # worrying about, but this is what happens when using native
-            # Python in Cygwin terminal emulator under Windows and it's very
-            # puzzling to the users, especially because stderr is also _not_
-            # flushed automatically in this case, so the program just appears
-            # to hang.
-            if not self.stdin_is_atty:
-                message_parts = [
-                    'Authentication is required but RBTools cannot prompt for '
-                    'it.',
-                ]
-
-                if sys.platform == 'win32':
-                    message_parts.append(
-                        'This can occur if you are piping input into the '
-                        'command, or if you are running in a Cygwin terminal '
-                        'emulator and not using Cygwin Python.'
-                    )
-                else:
-                    message_parts.append(
-                        'This can occur if you are piping input into the '
-                        'command.'
-                    )
-
-                message_parts.append(
-                    'You may need to explicitly provide API credentials when '
-                    'invoking the command, or try logging in separately.'
-                )
-
-                raise CommandError(' '.join(message_parts))
-
             self.stdout.new_line()
-            self.stdout.write('Please log in to the Review Board server at '
-                              '%s.'
-                              % urlparse(uri)[1])
 
-            if username is None:
-                username = get_input('Username: ')
-
-            if password is None:
-                password = get_pass('Password: ')
+            try:
+                username, password = credentials_prompt(
+                    server_url=urlparse(uri)[1],
+                    username=username,
+                    password=password)
+            except Exception as e:
+                raise CommandError(str(e))
 
         return username, password
 
