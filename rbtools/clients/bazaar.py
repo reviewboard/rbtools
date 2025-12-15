@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from typing import List, Optional, TYPE_CHECKING, cast
+from typing import Optional, TYPE_CHECKING, cast
 
 from rbtools.clients.base.repository import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
@@ -331,7 +331,7 @@ class BazaarClient(BaseSCMClient):
             A new revision spec that contains a revision number instead of a
             symbolic revision.
         """
-        command: List[str] = [self.bzr, 'revno']
+        command: list[str] = [self.bzr, 'revno']
 
         if revision_spec:
             command += ['-r', revision_spec]
@@ -471,7 +471,7 @@ class BazaarClient(BaseSCMClient):
 
             This will be ``None`` if the diff would be empty.
         """
-        diff_cmd: List[str] = [
+        diff_cmd: list[str] = [
             self.bzr,
             'diff',
             '-q',
@@ -486,7 +486,8 @@ class BazaarClient(BaseSCMClient):
         diff_cmd += [
             '-r',
             '%s..%s' % (base, tip),
-        ] + include_files
+            *include_files,
+        ]
 
         diff = iter(
             run_process(diff_cmd,
@@ -536,7 +537,7 @@ class BazaarClient(BaseSCMClient):
         # 2014-01-02  First Name  <email@address>
         #
         # ...
-        log_cmd: List[str] = [
+        log_cmd: list[str] = [
             self.bzr,
             'log',
             '-r',
@@ -547,14 +548,14 @@ class BazaarClient(BaseSCMClient):
         # This is because diff treats the range as (r1, r2] while log treats
         # the lange as [r1, r2].
         n_revs = len(
-            run_process(log_cmd + ['--line'],
+            run_process([*log_cmd, '--line'],
                         ignore_errors=True)
             .stdout
             .readlines()
         ) - 1
 
         lines = iter(
-            run_process(log_cmd + ['--gnu-changelog', '-l', str(n_revs)],
+            run_process([*log_cmd, '--gnu-changelog', '-l', str(n_revs)],
                         ignore_errors=True)
             .stdout
         )

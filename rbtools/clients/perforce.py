@@ -12,7 +12,7 @@ import stat
 import subprocess
 import sys
 from fnmatch import fnmatch
-from typing import List, Optional, TYPE_CHECKING, Tuple, Union, overload
+from typing import Optional, TYPE_CHECKING, Tuple, Union, overload
 
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
@@ -980,7 +980,7 @@ class PerforceClient(BaseSCMClient):
             pass
 
         # Build the final list of repository paths.
-        repository_paths: List[str] = []
+        repository_paths: list[str] = []
 
         for server in servers:
             repository_path = '%s:%s' % (server, port)
@@ -1537,9 +1537,9 @@ class PerforceClient(BaseSCMClient):
         diff_writer: UnifiedDiffWriter,
         base: str,
         tip: str,
-        depot_include_files: List[str],
-        local_include_files: List[str],
-        exclude_patterns: List[str],
+        depot_include_files: Sequence[str],
+        local_include_files: Sequence[str],
+        exclude_patterns: Sequence[str],
     ) -> None:
         """Compute the changes across files given a revision range.
 
@@ -2655,7 +2655,7 @@ class PerforceClient(BaseSCMClient):
             str:
             The new changelist spec.
         """
-        new_lines: List[str] = []
+        new_lines: list[str] = []
         key = 'Description:'
         skipping_to_next_field: bool = False
 

@@ -10,7 +10,7 @@ import re
 import sys
 import threading
 from collections import OrderedDict, defaultdict, deque
-from typing import Any, Iterable, List, Optional, TYPE_CHECKING, Tuple, cast
+from typing import Any, Iterable, Optional, TYPE_CHECKING, Tuple, cast
 
 from pydiffx.dom import DiffX
 from pydiffx.dom.objects import DiffXChangeSection
@@ -1351,7 +1351,7 @@ class ClearCaseClient(BaseSCMClient):
             # UCM activity changeset with %[versions]Qp is split by spaces but
             # not EOL. However, since each version is enclosed in double
             # quotes, we can split and consolidate the list.
-            changed_items = cast(List[str], filter(
+            changed_items = list(filter(
                 None,
                 (x.strip() for x in output.split('"'))))
 
@@ -1487,8 +1487,8 @@ class ClearCaseClient(BaseSCMClient):
 
         entry_lines = ''.join(version_info).split('\n')
 
-        changed_items = cast(List[_BranchChangedEntry], [
-            line.strip().split('\t')
+        changed_items = cast(list[_BranchChangedEntry], [
+            line.strip().split('\t', 3)
             for line in entry_lines
         ])
 
@@ -1544,8 +1544,8 @@ class ClearCaseClient(BaseSCMClient):
             .readlines()
         )
 
-        changed_items = cast(List[_BranchChangedEntry], [
-            line.strip().split('\t')
+        changed_items = cast(list[_BranchChangedEntry], [
+            line.strip().split('\t', 3)
             for line in output
         ])
 
@@ -2610,10 +2610,10 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
 
         if 'uuid' in info:
             # Legacy ClearCase backend that supports a single VOB.
-            self.vob_uuids = cast(List[str], [info['uuid']])
+            self.vob_uuids = cast(list[str], [info['uuid']])
         elif 'uuids' in info:
             # New VersionVault/ClearCase backend that supports multiple VOBs.
-            self.vob_uuids = cast(List[str], info['uuids'])
+            self.vob_uuids = cast(list[str], info['uuids'])
             self.is_legacy = False
         else:
             raise SCMError('Unable to fetch VOB information from server '

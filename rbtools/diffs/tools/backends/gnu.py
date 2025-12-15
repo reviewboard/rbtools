@@ -10,11 +10,14 @@ import io
 import os
 import platform
 import re
-from typing import Iterator, List, Set
+from typing import Iterator, Set, TYPE_CHECKING
 
 from rbtools.diffs.tools.base import BaseDiffTool, DiffFileResult
 from rbtools.utils.filesystem import iter_exes_in_path
 from rbtools.utils.process import RunProcessError, run_process
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class GNUDiffTool(BaseDiffTool):
@@ -121,7 +124,7 @@ class GNUDiffTool(BaseDiffTool):
         modified_path: str,
         show_hunk_context: bool = False,
         treat_missing_as_empty: bool = True,
-    ) -> List[str]:
+    ) -> Sequence[str]:
         """Return the command line for running the diff tool.
 
         This should generally be used by :py:meth:`run_diff_file`, and
@@ -151,7 +154,7 @@ class GNUDiffTool(BaseDiffTool):
         """
         assert self.exe_path
 
-        flags: List[str] = ['u']
+        flags: list[str] = ['u']
 
         if treat_missing_as_empty:
             flags.append('N')

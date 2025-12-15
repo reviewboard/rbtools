@@ -9,8 +9,8 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
-from typing import (Any, ClassVar, Generic, List, Mapping, Optional, Sequence,
-                    TYPE_CHECKING, TypeVar, Union, cast)
+from typing import (Any, ClassVar, Generic, Optional, TYPE_CHECKING, TypeVar,
+                    Union, cast)
 
 from housekeeping import func_deprecated
 from typing_extensions import NotRequired, TypedDict, Unpack, final
@@ -29,6 +29,7 @@ from rbtools.diffs.tools.registry import diff_tools_registry
 
 if TYPE_CHECKING:
     import argparse
+    from collections.abc import Mapping, Sequence
 
     from rbtools.api.capabilities import Capabilities
     from rbtools.api.resource import (
@@ -518,7 +519,7 @@ class BaseSCMClient:
     #:
     #: Type:
     #:     str
-    server_tool_ids: ClassVar[Optional[List[str]]] = None
+    server_tool_ids: ClassVar[Sequence[str] | None] = None
 
     #: Whether this tool requires a command line diff tool.
     #:
@@ -537,7 +538,7 @@ class BaseSCMClient:
     #:
     #: Type:
     #:     bool or list
-    requires_diff_tool: Union[bool, List[str]] = False
+    requires_diff_tool: Union[bool, Sequence[str]] = False
 
     #: Whether the SCM uses server-side changesets
     #:
@@ -1271,7 +1272,7 @@ class BaseSCMClient:
     def get_commit_history(
         self,
         revisions: SCMClientRevisionSpec,
-    ) -> Optional[List[SCMClientCommitHistoryItem]]:
+    ) -> Optional[Sequence[SCMClientCommitHistoryItem]]:
         """Return the commit history between the given revisions.
 
         Derived classes must override this method if they support posting with

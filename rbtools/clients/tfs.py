@@ -9,7 +9,7 @@ import os
 import re
 import sys
 import xml.etree.ElementTree as ET
-from typing import List, Optional, TYPE_CHECKING, cast
+from typing import Optional, TYPE_CHECKING, cast
 from urllib.parse import unquote
 
 from appdirs import user_data_dir
@@ -421,8 +421,8 @@ class TFExeWrapper(BaseTFWrapper):
         *,
         client: TFSClient,
         base: str,
-        include_files: List[str],
-        exclude_patterns: List[str],
+        include_files: Sequence[str],
+        exclude_patterns: Sequence[str],
     ) -> SCMClientDiffResult:
         """Return a diff of the working copy.
 
@@ -577,7 +577,7 @@ class TFExeWrapper(BaseTFWrapper):
 
     def _run_tf(
         self,
-        args: List[str],
+        args: Sequence[str],
     ) -> RunProcessResult:
         """Run the "tf" command.
 
@@ -589,7 +589,7 @@ class TFExeWrapper(BaseTFWrapper):
             rbtools.utils.process.RunProcessResult:
             The result of the command.
         """
-        command = ['tf'] + args + ['/noprompt']
+        command = ['tf', *args, '/noprompt']
 
         tfs_login = getattr(self.options, 'tfs_login', None)
 
@@ -608,7 +608,7 @@ class TEEWrapper(BaseTFWrapper):
     def get_default_tf_locations(
         cls,
         target_platform: str = sys.platform
-    ) -> List[str]:
+    ) -> Sequence[str]:
         """Return default locations for tf.cmd for the given platform.
 
         Version Added:
@@ -622,7 +622,7 @@ class TEEWrapper(BaseTFWrapper):
             list of str:
             The list of possible platforms.
         """
-        tf_locations: List[str] = []
+        tf_locations: list[str] = []
 
         if target_platform.startswith('win'):
             # First check in the system path. If that doesn't work, look in the
@@ -898,8 +898,8 @@ class TEEWrapper(BaseTFWrapper):
         *,
         client: TFSClient,
         base: str,
-        include_files: List[str],
-        exclude_patterns: List[str],
+        include_files: Sequence[str],
+        exclude_patterns: Sequence[str],
     ) -> SCMClientDiffResult:
         """Return a diff of the working copy.
 
@@ -1066,7 +1066,7 @@ class TEEWrapper(BaseTFWrapper):
 
     def _run_tf(
         self,
-        args: List[str],
+        args: Sequence[str],
     ) -> RunProcessResult:
         """Run the "tf" command.
 
@@ -1080,7 +1080,7 @@ class TEEWrapper(BaseTFWrapper):
         """
         assert self.tf is not None
 
-        cmdline: List[str] = [self.tf, '-noprompt']
+        cmdline: list[str] = [self.tf, '-noprompt']
 
         tfs_login = getattr(self.options, 'tfs_login', None)
 
@@ -1298,7 +1298,7 @@ class TFHelperWrapper(BaseTFWrapper):
 
     def _run_helper(
         self,
-        args: List[str],
+        args: Sequence[str],
         **kwargs,
     ) -> RunProcessResult:
         """Run the rb-tfs binary.

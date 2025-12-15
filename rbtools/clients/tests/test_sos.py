@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Any, List, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 import kgb
 
@@ -25,7 +25,7 @@ from rbtools.utils.filesystem import make_tempdir
 from rbtools.utils.process import run_process_exec
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Mapping, Sequence
 
 
 class BaseSOSTestCase(SCMClientTestCase[SOSClient]):
@@ -119,7 +119,7 @@ class BaseSOSTestCase(SCMClientTestCase[SOSClient]):
 
     def make_rule_stash_selection(
         self,
-        result: List[bytes],
+        result: Sequence[bytes],
     ) -> Mapping[str, Any]:
         """Return a spy match rule for stashing the current selection.
 
@@ -178,7 +178,7 @@ class BaseSOSTestCase(SCMClientTestCase[SOSClient]):
     def make_rule_list_changelist(
         self,
         name: str,
-        results: List[str],
+        results: Sequence[str],
     ) -> Mapping[str, Any]:
         """A spy match rule for listing files in a SOS changelist.
 
@@ -208,8 +208,8 @@ class BaseSOSTestCase(SCMClientTestCase[SOSClient]):
 
     def make_rule_status(
         self,
-        results: List[bytes],
-        selection: List[str] = ['-scm'],
+        results: Sequence[bytes],
+        selection: Sequence[str] = ['-scm'],
     ) -> Mapping[str, Any]:
         """A spy match rule for fetching the current selection status.
 
@@ -356,9 +356,9 @@ class BaseSOSTestCase(SCMClientTestCase[SOSClient]):
 
     def make_rule_nobjstatus(
         self,
-        sos_paths: List[str],
-        flags: List[str],
-        results: List[str],
+        sos_paths: Sequence[str],
+        flags: Sequence[str],
+        results: Sequence[str],
     ) -> Mapping[str, Any]:
         """A spy match rule for fetching attributes for one or more files.
 
@@ -377,7 +377,7 @@ class BaseSOSTestCase(SCMClientTestCase[SOSClient]):
             The match rule.
         """
         return {
-            'args': (['soscmd', 'nobjstatus', '-ucl'] + flags + sos_paths,),
+            'args': (['soscmd', 'nobjstatus', '-ucl', *flags, *sos_paths],),
             'kwargs': {
                 'cwd': self.workarea_dir,
             },
@@ -430,7 +430,7 @@ class BaseSOSTestCase(SCMClientTestCase[SOSClient]):
     def make_rule_diff_tree(
         self,
         sos_path: str,
-        lines: List[str],
+        lines: Sequence[str],
         dir_revision: str = '1',
     ) -> Mapping[str, Any]:
         """A spy match rule for diffing pending file operations on a directory.

@@ -6,11 +6,14 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Optional, TYPE_CHECKING
 
 from typing_extensions import final
 
 from rbtools.diffs.tools.base.diff_file_result import DiffFileResult
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class BaseDiffTool:
@@ -114,7 +117,7 @@ class BaseDiffTool:
         modified_path: str,
         show_hunk_context: bool = False,
         treat_missing_as_empty: bool = True,
-    ) -> List[str]:
+    ) -> Sequence[str]:
         """Return the command line for running the diff tool.
 
         This should generally be used by :py:meth:`run_diff_file`, and

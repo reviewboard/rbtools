@@ -6,8 +6,8 @@ import io
 import logging
 import os
 import subprocess
-from typing import (Any, AnyStr, List, Optional, Tuple, TYPE_CHECKING,
-                    TypedDict, Union)
+from typing import (Any, AnyStr, Optional, Tuple, TYPE_CHECKING, TypedDict,
+                    Union)
 
 from rbtools.deprecation import RemovedInRBTools80Warning
 from rbtools.utils.encoding import force_unicode
@@ -666,8 +666,8 @@ def execute(
         then the process' output will be returned. If either or both of them
         are ``True``, then this is the other element of the returned tuple.
     """
-    data: Optional[Union[str, bytes, List[str], List[bytes]]]
-    errors: Optional[Union[str, bytes, List[str], List[bytes]]]
+    data: str | bytes | list[str] | list[bytes] | None
+    errors: str | bytes | list[str] | list[bytes] | None
     stdout: io.IOBase
     stderr: io.IOBase
 

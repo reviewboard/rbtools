@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import List, Tuple, Union
+from collections.abc import Sequence
+from typing import Tuple, Union
 
 from typing_extensions import TypeAlias
 
@@ -95,7 +96,7 @@ class SCMClientDependencyError(SCMError):
     MissingItem: TypeAlias = Union[str, MissingOneOfDep]
 
     #: A type alias for a list of missing dependencies.
-    MissingList: TypeAlias = List[MissingItem]
+    MissingList: TypeAlias = Sequence[MissingItem]
 
     def __init__(
         self,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import List
+from typing import TYPE_CHECKING
 
 import kgb
 
@@ -19,6 +19,9 @@ from rbtools.utils.filesystem import make_tempdir
 from rbtools.utils.process import (RunProcessResult,
                                    run_process,
                                    run_process_exec)
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class BazaarClientStandaloneTests(SCMClientTestCase[BazaarClient]):
@@ -351,7 +354,7 @@ class BazaarClientTests(SCMClientTestCase):
     @classmethod
     def _run_bzr(
         cls,
-        command: List[str],
+        command: Sequence[str],
         **kwargs,
     ) -> RunProcessResult:
         """Run Bazaar/Breezy with the provided arguments.
@@ -373,7 +376,7 @@ class BazaarClientTests(SCMClientTestCase):
             The result of the :py:func:`~rtools.utils.process.execute` call.
         """
         return run_process(
-            [cls._bzr] + command,
+            [cls._bzr, *command],
             env={
                 'BRZ_EMAIL': 'Test User <test@example.com>',
                 'BZR_EMAIL': 'Test User <test@example.com>',

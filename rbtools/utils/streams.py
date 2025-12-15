@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections import deque
 from itertools import islice
-from typing import Deque, Iterable, Iterator, List, TypeVar
+from typing import Deque, Iterable, Iterator, TypeVar
 
 
 T = TypeVar('T')
@@ -77,7 +77,7 @@ class BufferedIterator(Iterator[T]):
     def peek(
         self,
         count: int = 1,
-    ) -> List[T]:
+    ) -> list[T]:
         """Return up to a specified number of items without consuming them.
 
         Peeked items will remain in the iterator for consumption.
@@ -107,7 +107,7 @@ class BufferedIterator(Iterator[T]):
     def consume(
         self,
         count: int = 1,
-    ) -> List[T]:
+    ) -> list[T]:
         """Consume up to a specified number of items from the iterator.
 
         This will return the consumed items as a list.

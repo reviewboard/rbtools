@@ -6,9 +6,11 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import List, Optional, TYPE_CHECKING, Union
+from typing import Optional, TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from rbtools.api.resource import (
         RepositoryInfoResource,
         RepositoryItemResource
@@ -37,7 +39,7 @@ class RepositoryInfo:
     #:
     #: Type:
     #:     str or list of str
-    path: Optional[Union[str, List[str]]]
+    path: Optional[Union[str, Sequence[str]]]
 
     #: Relative path between the working directory and repository root.
     #:
@@ -59,7 +61,7 @@ class RepositoryInfo:
     def __init__(
         self,
         *,
-        path: Optional[Union[str, List[str]]] = None,
+        path: (str | Sequence[str] | None) = None,
         base_path: Optional[str] = None,
         local_path: Optional[str] = None,
     ) -> None:

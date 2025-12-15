@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import logging
 import subprocess
-from typing import List, Optional, Union
+from typing import Optional, TYPE_CHECKING, Union
 
 from rbtools.api.client import RBClient
 from rbtools.api.errors import APIError, ServerInterfaceError
 from rbtools.deprecation import PendingRemovalInRBToolsWarning
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 SUBMITTED = 'submitted'
@@ -54,7 +57,7 @@ def get_api(server_url, **kwargs):
 
 
 def execute(
-    command: Union[List[str], str],
+    command: Sequence[str] | str,
     *,
     text: bool = False,
     strip: bool = True,

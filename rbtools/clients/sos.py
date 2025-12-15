@@ -16,7 +16,7 @@ import re
 import sqlite3
 from collections import OrderedDict
 from contextlib import contextmanager
-from typing import List, Optional, Union, TYPE_CHECKING, cast
+from typing import Optional, Union, TYPE_CHECKING, cast
 
 from pydiffx import DiffType, DiffX
 from pydiffx.utils.text import guess_line_endings
@@ -85,7 +85,7 @@ class SOSRevisionSpecExtra(TypedDict):
     #:
     #: Type:
     #:     list of str
-    sos_selection: NotRequired[List[str]]
+    sos_selection: NotRequired[Sequence[str]]
 
 
 class SOSObjectType(object):

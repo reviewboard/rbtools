@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import logging
 import os
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, List, Optional, Tuple
+from typing import Any, Optional, Tuple
 
 from typing_extensions import TypeAlias
 
@@ -475,7 +475,7 @@ def scan_scmclients_for_path(
                                scmclient_errors=scmclient_errors)
 
 
-SCMClientScanCandidateList: TypeAlias = List[SCMClientScanCandidate]
+SCMClientScanCandidateList: TypeAlias = Sequence[SCMClientScanCandidate]
 SCMClientScanErrors: TypeAlias = Mapping[str, Exception]
 SCMClientScanDependencyErrors: TypeAlias = \
     Mapping[str, SCMClientDependencyError]

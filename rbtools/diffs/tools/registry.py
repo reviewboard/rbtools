@@ -7,12 +7,15 @@ Version Added:
 from __future__ import annotations
 
 import logging
-from typing import Iterable, Iterator, List, Optional, Type
+from typing import Iterable, Iterator, Optional, Type, TYPE_CHECKING
 
 from rbtools.diffs.tools.backends.apple import AppleDiffTool
 from rbtools.diffs.tools.backends.gnu import GNUDiffTool
 from rbtools.diffs.tools.base import BaseDiffTool
 from rbtools.diffs.tools.errors import MissingDiffToolError
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 logger = logging.getLogger(__name__)
@@ -50,7 +53,7 @@ class DiffToolsRegistry:
     #:
     #: Type:
     #:     list
-    _diff_tools: List[BaseDiffTool]
+    _diff_tools: Sequence[BaseDiffTool]
 
     #: Whether the list of default classes have been populated.
     #:
@@ -205,7 +208,7 @@ class DiffToolsRegistry:
 
         logger.debug('[diff tool scan] Scanning for installed diff tools...')
 
-        diff_tools: List[BaseDiffTool] = []
+        diff_tools: list[BaseDiffTool] = []
 
         for diff_tool_cls in self.iter_diff_tool_classes():
             diff_tool = diff_tool_cls()
@@ -236,7 +239,7 @@ class DiffToolsRegistry:
 
         logger.debug('[diff tool scan] Scan complete.')
 
-    def _get_defaults(self) -> List[Type[BaseDiffTool]]:
+    def _get_defaults(self) -> Sequence[Type[BaseDiffTool]]:
         """Return the default list of diff tool classes.
 
         Returns:

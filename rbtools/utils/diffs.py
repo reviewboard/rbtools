@@ -5,7 +5,7 @@ from __future__ import annotations
 import fnmatch
 import os
 import sys
-from typing import Iterable, Iterator, List, Optional, Pattern, TYPE_CHECKING
+from typing import Iterable, Iterator, Optional, Pattern, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -117,7 +117,7 @@ def normalize_patterns(
     *,
     base_dir: str,
     cwd: Optional[str] = None,
-) -> List[str]:
+) -> Sequence[str]:
     """Normalize a list of patterns so that they are all absolute paths.
 
     Paths that begin with a path separator are interpreted as being relative to

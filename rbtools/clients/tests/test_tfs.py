@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
-from typing import Any, List, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 import kgb
 
@@ -24,7 +24,7 @@ from rbtools.utils.filesystem import chdir, make_tempdir
 from rbtools.utils.process import run_process_exec
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Mapping, Sequence
 
 
 class TFExeWrapperTests(SCMClientTestCase):
@@ -34,7 +34,7 @@ class TFExeWrapperTests(SCMClientTestCase):
 
     def make_vc_status_rule(
         self,
-        changes: List[Mapping[str, str]],
+        changes: Sequence[Mapping[str, str]],
     ) -> Mapping[str, Any]:
         """Return a rule for fetching change history.
 
@@ -766,7 +766,7 @@ class TFExeWrapperTests(SCMClientTestCase):
     def _run_diff_test(
         self,
         *,
-        rules: List[Mapping[str, Any]],
+        rules: Sequence[Mapping[str, Any]],
         expected_diff_result: Mapping[str, Any],
     ) -> None:
         """Run a test of TFExeWrapper.diff.
@@ -1237,7 +1237,7 @@ class TEEWrapperTests(SCMClientTestCase):
 
     def make_status_rule(
         self,
-        changes: List[Mapping[str, str]],
+        changes: Sequence[Mapping[str, str]],
     ) -> Mapping[str, Any]:
         """Return a rule for fetching change history.
 
@@ -2081,7 +2081,7 @@ class TEEWrapperTests(SCMClientTestCase):
     def _run_diff_test(
         self,
         *,
-        rules: List[Mapping[str, Any]],
+        rules: Sequence[Mapping[str, Any]],
         expected_diff_result: Mapping[str, Any],
     ) -> None:
         """Run a test of TEEWrapper.diff.

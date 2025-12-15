@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import re
 import sys
-from typing import Any, List
+from typing import Any, TYPE_CHECKING
 
 import rbtools.testing
 from rbtools.deprecation import RemovedInRBTools80Warning
@@ -14,6 +14,9 @@ from rbtools.utils.process import (RunProcessError,
                                    RunProcessResult,
                                    execute,
                                    run_process)
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class RunProcessTests(TestCase):
@@ -424,7 +427,7 @@ class RunProcessTests(TestCase):
         expected_stderr_bytes: bytes = b'',
         expected_stdout_str: str = '',
         expected_stderr_str: str = '',
-        expected_extra_log_lines: List[str] = [],
+        expected_extra_log_lines: Sequence[str] = [],
     ) -> None:
         """Check the results of a call to run_process().
 

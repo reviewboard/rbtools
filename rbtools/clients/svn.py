@@ -10,7 +10,7 @@ import posixpath
 import re
 import sys
 from xml.etree import ElementTree
-from typing import Iterator, List, Optional, TYPE_CHECKING, Tuple, cast
+from typing import Iterator, Optional, TYPE_CHECKING, Tuple, cast
 from urllib.parse import unquote
 
 from rbtools.api.errors import APIError
@@ -899,7 +899,7 @@ class SVNClient(BaseSCMClient):
             int:
             The revision number.
         """
-        command: List[str] = ['-r', str(revision), '-l', '1']
+        command: list[str] = ['-r', str(revision), '-l', '1']
 
         repository_url = getattr(self.options, 'repository_url', None)
 
@@ -989,7 +989,7 @@ class SVNClient(BaseSCMClient):
 
         repository_url = getattr(self.options, 'repository_url', None)
 
-        command: List[str] = ['-r', '%s:%s' % (base, tip)]
+        command: list[str] = ['-r', '%s:%s' % (base, tip)]
 
         if repository_url:
             command.append(repository_url)
@@ -1223,7 +1223,7 @@ class SVNClient(BaseSCMClient):
         base_path = repository_info.base_path
         assert base_path
 
-        status_cmd: List[str] = ['status', '-q', '--ignore-externals']
+        status_cmd: list[str] = ['status', '-q', '--ignore-externals']
 
         if changelist:
             status_cmd += ['--changelist', changelist]
@@ -1386,7 +1386,7 @@ class SVNClient(BaseSCMClient):
     def _handle_empty_files(
         self,
         diff_content: Iterator[bytes],
-        diff_cmd: List[str],
+        diff_cmd: Sequence[str],
         revisions: SCMClientRevisionSpec,
     ) -> Iterator[bytes]:
         """Handle added and deleted 0-length files in the diff output.
@@ -1595,7 +1595,7 @@ class SVNClient(BaseSCMClient):
             path += '@'
 
         if path not in self._svn_info_cache:
-            cmdline: List[str] = ['info']
+            cmdline: list[str] = ['info']
 
             if path is not None:
                 cmdline.append(path)
@@ -1635,7 +1635,7 @@ class SVNClient(BaseSCMClient):
             The parsed header line. The filename will be decoded using the
             system filesystem encoding.
         """
-        parts: List[bytes] = []
+        parts: list[bytes] = []
 
         if b'\t' in diff_line:
             # There's a \t separating the filename and info. This is the
@@ -1673,7 +1673,7 @@ class SVNClient(BaseSCMClient):
 
     def _run_svn(
         self,
-        svn_args: List[str],
+        svn_args: Sequence[str],
         **kwargs,
     ) -> RunProcessResult:
         """Run the ``svn`` command.
@@ -1695,7 +1695,7 @@ class SVNClient(BaseSCMClient):
         svn_password = getattr(options, 'svn_password', None)
         svn_prompt_password = getattr(options, 'svn_prompt_password', False)
 
-        cmdline: List[str] = ['svn', '--non-interactive'] + svn_args
+        cmdline: list[str] = ['svn', '--non-interactive', *svn_args]
 
         if svn_username:
             cmdline += ['--username', svn_username]
@@ -1714,7 +1714,7 @@ class SVNClient(BaseSCMClient):
 
     def svn_log_xml(
         self,
-        svn_args: List[str],
+        svn_args: Sequence[str],
         *args,
         **kwargs,
     ) -> Optional[bytes]:
@@ -1995,7 +1995,7 @@ class SVNRepositoryInfo(RepositoryInfo):
     def _split_on_slash(
         self,
         path: str,
-    ) -> List[str]:
+    ) -> Sequence[str]:
         # Split on slashes, but ignore multiple slashes and throw away any
         # trailing slashes.
         split = re.split('/+', path)

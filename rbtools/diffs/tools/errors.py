@@ -6,7 +6,10 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Iterable, List, Optional, cast
+from typing import Iterable, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class MissingDiffToolError(Exception):
@@ -23,13 +26,13 @@ class MissingDiffToolError(Exception):
     #:
     #: Type:
     #:     list of str
-    compatible_diff_tool_ids: List[str]
+    compatible_diff_tool_ids: Sequence[str]
 
     #: A list of compatible diff tool names that could not be found.
     #:
     #: Type:
     #:     list of str
-    compatible_diff_tool_names: List[str]
+    compatible_diff_tool_names: Sequence[str]
 
     def __init__(
         self,
@@ -51,8 +54,8 @@ class MissingDiffToolError(Exception):
                 for _diff_tool_cls in registry.iter_diff_tool_classes()
             )
 
-        compatible_diff_tool_names: List[str] = []
-        instructions: List[str] = []
+        compatible_diff_tool_names: list[str] = []
+        instructions: list[str] = []
 
         for diff_tool_id in compatible_diff_tool_ids:
             diff_tool_cls = registry.get_diff_tool_class(diff_tool_id)
@@ -67,8 +70,7 @@ class MissingDiffToolError(Exception):
             else:
                 compatible_diff_tool_names.append(diff_tool_id)
 
-        self.compatible_diff_tool_ids = \
-            cast(List[str], compatible_diff_tool_ids)
+        self.compatible_diff_tool_ids = list(compatible_diff_tool_ids)
         self.compatible_diff_tool_names = compatible_diff_tool_names
 
         message = [
