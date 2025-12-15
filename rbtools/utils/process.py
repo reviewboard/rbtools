@@ -6,7 +6,7 @@ import io
 import logging
 import os
 import subprocess
-from typing import (Any, AnyStr, Dict, List, Optional, Tuple, TYPE_CHECKING,
+from typing import (Any, AnyStr, List, Optional, Tuple, TYPE_CHECKING,
                     TypedDict, Union)
 
 from rbtools.deprecation import RemovedInRBTools80Warning
@@ -202,7 +202,7 @@ class RunProcessKwargs(TypedDict):
     """
 
     cwd: NotRequired[str | None]
-    env: NotRequired[dict[str, str] | None]
+    env: NotRequired[Mapping[str, str] | None]
     encoding: NotRequired[str]
     needs_stdout: NotRequired[bool]
     needs_stderr: NotRequired[bool]
@@ -584,7 +584,7 @@ def run_process_exec(
 
 def execute(
     command: Union[AnyStr, Sequence[AnyStr]],
-    env: Optional[Dict[str, str]] = None,
+    env: (Mapping[str, str] | None) = None,
     cwd: Optional[str] = None,
     split_lines: bool = False,
     ignore_errors: bool = False,

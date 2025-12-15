@@ -7,7 +7,7 @@ import os
 import re
 import shutil
 from datetime import datetime, timezone
-from typing import Any, Dict, Final, Generic, Optional, TypeVar, TYPE_CHECKING
+from typing import Any, Final, Generic, Optional, TypeVar, TYPE_CHECKING
 from unittest import SkipTest
 
 import kgb
@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 _TestSCMClientType_co = TypeVar('_TestSCMClientType_co',
                                 bound=Optional[BaseSCMClient],
                                 covariant=True)
-_TestSCMClientOptions: TypeAlias = Dict[str, Any]
+_TestSCMClientOptions: TypeAlias = dict[str, Any]
 
 
 class SCMClientTestCase(Generic[_TestSCMClientType_co],
@@ -99,7 +99,7 @@ class SCMClientTestCase(Generic[_TestSCMClientType_co],
     #:
     #: Version Added:
     #:     4.0
-    default_scmclient_caps: Dict[str, Any] = {}
+    default_scmclient_caps: dict[str, Any] = {}
 
     #: The main checkout directory used by tests.
     #:
@@ -202,8 +202,8 @@ class SCMClientTestCase(Generic[_TestSCMClientType_co],
         self,
         *,
         options: _TestSCMClientOptions = {},
-        caps: Dict[str, Any] = {},
-        client_kwargs: Dict[str, Any] = {},
+        caps: dict[str, Any] = {},
+        client_kwargs: dict[str, Any] = {},
         setup: bool = True,
         allow_dep_checks: bool = True,
         skip_if_deps_missing: bool = True,

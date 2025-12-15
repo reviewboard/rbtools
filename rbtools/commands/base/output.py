@@ -8,12 +8,15 @@ from __future__ import annotations
 
 import io
 import json
-from typing import (Any, AnyStr, Callable, Dict, Generic, IO, Optional,
-                    TextIO, Union, cast)
+from typing import (Any, AnyStr, Callable, Generic, IO, Optional, TextIO,
+                    TYPE_CHECKING, Union, cast)
 
 from typing_extensions import TypeAlias
 
 from rbtools.utils.encoding import force_bytes, force_unicode
+
+if TYPE_CHECKING:
+    from typelets.json import JSONDict
 
 
 #: Type alias for a force_bytes() or force_unicode() function.
@@ -84,7 +87,7 @@ class JSONOutput:
     #:
     #: Version Added:
     #:     5.0
-    raw: Dict[str, Any]
+    raw: JSONDict
 
     #: The stream where JSON output will be written to.
     _output_stream: TextIO

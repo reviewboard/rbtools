@@ -9,7 +9,7 @@ import os
 import re
 import sys
 import xml.etree.ElementTree as ET
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
+from typing import List, Optional, TYPE_CHECKING, cast
 from urllib.parse import unquote
 
 from appdirs import user_data_dir
@@ -33,6 +33,8 @@ from rbtools.utils.process import (RunProcessError,
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from rbtools.config.config import RBToolsConfig
+
 
 class BaseTFWrapper:
     """Base class for TF wrappers.
@@ -41,16 +43,26 @@ class BaseTFWrapper:
         4.0
     """
 
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The loaded configuration.
+    config: RBToolsConfig | None
+
+    #: The command line options.
+    options: argparse.Namespace | None
+
     def __init__(
         self,
         *,
-        config: Optional[Dict[str, Any]] = None,
-        options: Optional[argparse.Namespace] = None,
+        config: (RBToolsConfig | None) = None,
+        options: (argparse.Namespace | None) = None,
     ) -> None:
         """Initialize the wrapper.
 
         Args:
-            config (dict, optional):
+            config (rbtools.config.config.RBToolsConfig):
                 The loaded configuration.
 
             options (argparse.Namespace, optional):
@@ -1392,16 +1404,11 @@ class TFSClient(BaseSCMClient):
             rbtools.clients.errors.SCMClientDependencyError:
                 No suitable dependencies could be found.
         """
-        wrapper_kwargs = {
-            'config': self.config,
-            'options': self.options,
-        }
-
         wrapper = None
         found = False
 
         for wrapper_cls in (TFExeWrapper, TFHelperWrapper, TEEWrapper):
-            wrapper = wrapper_cls(**wrapper_kwargs)
+            wrapper = wrapper_cls(config=self.config, options=self.options)
 
             try:
                 wrapper.check_dependencies()

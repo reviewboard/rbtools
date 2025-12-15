@@ -11,13 +11,13 @@ from __future__ import annotations
 
 from copy import deepcopy
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from typing_extensions import Self, TypeAlias
 
 
 #: A dictionary storing raw configuration data.
-ConfigDict: TypeAlias = Dict[str, Any]
+ConfigDict: TypeAlias = dict[str, Any]
 
 
 class ConfigData:

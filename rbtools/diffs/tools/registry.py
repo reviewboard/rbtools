@@ -7,7 +7,7 @@ Version Added:
 from __future__ import annotations
 
 import logging
-from typing import Dict, Iterable, Iterator, List, Optional, Type
+from typing import Iterable, Iterator, List, Optional, Type
 
 from rbtools.diffs.tools.backends.apple import AppleDiffTool
 from rbtools.diffs.tools.backends.gnu import GNUDiffTool
@@ -44,7 +44,7 @@ class DiffToolsRegistry:
     #:
     #: Type:
     #:     dict
-    _diff_tool_classes: Dict[str, Type[BaseDiffTool]]
+    _diff_tool_classes: dict[str, Type[BaseDiffTool]]
 
     #: A list of all diff tool instances.
     #:

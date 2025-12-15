@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
-from typing import Any, Dict, List
+from typing import Any, List, TYPE_CHECKING
 
 import kgb
 
@@ -23,6 +23,9 @@ from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import chdir, make_tempdir
 from rbtools.utils.process import run_process_exec
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
 
 class TFExeWrapperTests(SCMClientTestCase):
     """Unit tests for TFExeWrapper."""
@@ -31,8 +34,8 @@ class TFExeWrapperTests(SCMClientTestCase):
 
     def make_vc_status_rule(
         self,
-        changes: List[Dict[str, str]],
-    ) -> Dict[str, Any]:
+        changes: List[Mapping[str, str]],
+    ) -> Mapping[str, Any]:
         """Return a rule for fetching change history.
 
         Args:
@@ -75,7 +78,7 @@ class TFExeWrapperTests(SCMClientTestCase):
         filename: str,
         revision: str,
         content: bytes,
-    ) -> Dict[str, Any]:
+    ) -> Mapping[str, Any]:
         """Return a rule for fetching contents of a file.
 
         Args:
@@ -110,7 +113,7 @@ class TFExeWrapperTests(SCMClientTestCase):
         client: TFSClient,
         orig_file: str,
         modified_file: str,
-    ) -> Dict[str, Any]:
+    ) -> Mapping[str, Any]:
         """Return a rule for building a diff.
 
         Args:
@@ -763,8 +766,8 @@ class TFExeWrapperTests(SCMClientTestCase):
     def _run_diff_test(
         self,
         *,
-        rules: List[Dict[str, Any]],
-        expected_diff_result: Dict[str, Any],
+        rules: List[Mapping[str, Any]],
+        expected_diff_result: Mapping[str, Any],
     ) -> None:
         """Run a test of TFExeWrapper.diff.
 
@@ -1234,8 +1237,8 @@ class TEEWrapperTests(SCMClientTestCase):
 
     def make_status_rule(
         self,
-        changes: List[Dict[str, str]],
-    ) -> Dict[str, Any]:
+        changes: List[Mapping[str, str]],
+    ) -> Mapping[str, Any]:
         """Return a rule for fetching change history.
 
         Args:
@@ -1276,7 +1279,7 @@ class TEEWrapperTests(SCMClientTestCase):
         filename: str,
         revision: str,
         content: bytes,
-    ) -> Dict[str, Any]:
+    ) -> Mapping[str, Any]:
         """Return a rule for fetching contents of a file.
 
         Args:
@@ -1309,7 +1312,7 @@ class TEEWrapperTests(SCMClientTestCase):
         self,
         path: str,
         revision: str,
-    ) -> Dict[str, Any]:
+    ) -> Mapping[str, Any]:
         """Return history for a file.
 
         Args:
@@ -1353,7 +1356,7 @@ class TEEWrapperTests(SCMClientTestCase):
         client: TFSClient,
         orig_file: str,
         modified_file: str,
-    ) -> Dict[str, Any]:
+    ) -> Mapping[str, Any]:
         """Return a rule for building a diff.
 
         Args:
@@ -2078,8 +2081,8 @@ class TEEWrapperTests(SCMClientTestCase):
     def _run_diff_test(
         self,
         *,
-        rules: List[Dict[str, Any]],
-        expected_diff_result: Dict[str, Any],
+        rules: List[Mapping[str, Any]],
+        expected_diff_result: Mapping[str, Any],
     ) -> None:
         """Run a test of TEEWrapper.diff.
 

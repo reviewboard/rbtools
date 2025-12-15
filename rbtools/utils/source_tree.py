@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from typing_extensions import TypeAlias
 
@@ -475,11 +476,12 @@ def scan_scmclients_for_path(
 
 
 SCMClientScanCandidateList: TypeAlias = List[SCMClientScanCandidate]
-SCMClientScanErrors: TypeAlias = Dict[str, Exception]
-SCMClientScanDependencyErrors: TypeAlias = Dict[str, SCMClientDependencyError]
+SCMClientScanErrors: TypeAlias = Mapping[str, Exception]
+SCMClientScanDependencyErrors: TypeAlias = \
+    Mapping[str, SCMClientDependencyError]
 
-_SCMClientCache: TypeAlias = Dict[str, Optional[BaseSCMClient]]
-_SCMClientKwargs: TypeAlias = Dict[str, Any]
+_SCMClientCache: TypeAlias = dict[str, Optional[BaseSCMClient]]
+_SCMClientKwargs: TypeAlias = dict[str, Any]
 _SCMClientCandidatesResult: TypeAlias = Tuple[SCMClientScanCandidateList,
                                               SCMClientScanErrors,
                                               SCMClientScanDependencyErrors]

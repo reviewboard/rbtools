@@ -9,14 +9,15 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
-from typing import (Any, ClassVar, Dict, Generic, List, Mapping, Optional,
-                    Sequence, TYPE_CHECKING, TypeVar, Union, cast)
+from typing import (Any, ClassVar, Generic, List, Mapping, Optional, Sequence,
+                    TYPE_CHECKING, TypeVar, Union, cast)
 
 from housekeeping import func_deprecated
 from typing_extensions import NotRequired, TypedDict, Unpack, final
 
 from rbtools.clients.errors import (SCMClientDependencyError,
                                     SCMError)
+from rbtools.config.config import RBToolsConfig
 from rbtools.deprecation import (
     RemovedInRBTools70Warning,
     RemovedInRBTools80Warning,
@@ -36,7 +37,6 @@ if TYPE_CHECKING:
         RepositoryListResource,
         ReviewRequestItemResource)
     from rbtools.clients.base.repository import RepositoryInfo
-    from rbtools.config import RBToolsConfig
     from rbtools.diffs.tools.base import BaseDiffTool
     from rbtools.diffs.patcher import PatcherKwargs
     from rbtools.diffs.patches import PatchAuthor, PatchResult
@@ -176,7 +176,7 @@ class SCMClientDiffResult(TypedDict):
     #:
     #: Version Added:
     #:     3.1
-    review_request_extra_data: NotRequired[Optional[Dict[str, Any]]]
+    review_request_extra_data: NotRequired[Optional[dict[str, Any]]]
 
 
 class SCMClientCommitHistoryItem(TypedDict):
@@ -696,19 +696,19 @@ class BaseSCMClient:
 
     def __init__(
         self,
-        config: Optional[Dict[str, Any]] = None,
-        options: Optional[argparse.Namespace] = None,
+        config: (RBToolsConfig | None) = None,
+        options: (argparse.Namespace | None) = None,
     ) -> None:
         """Initialize the client.
 
         Args:
-            config (dict, optional):
+            config (rbtools.config.config.RBToolsConfig, optional):
                 The loaded user config.
 
             options (argparse.Namespace, optional):
                 The parsed command line arguments.
         """
-        self.config = config or {}
+        self.config = config or RBToolsConfig(config_dict={})
         self.options = options
         self.capabilities = None
         self.is_setup = False

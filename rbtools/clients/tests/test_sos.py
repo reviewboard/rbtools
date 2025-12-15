@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Any, Dict, List
+from typing import Any, List, TYPE_CHECKING
 
 import kgb
 
@@ -23,6 +23,9 @@ from rbtools.clients.sos import SOSClient
 from rbtools.utils.checks import check_install
 from rbtools.utils.filesystem import make_tempdir
 from rbtools.utils.process import run_process_exec
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 class BaseSOSTestCase(SCMClientTestCase[SOSClient]):
@@ -45,7 +48,7 @@ class BaseSOSTestCase(SCMClientTestCase[SOSClient]):
         self.workarea_dir = make_tempdir()
 
     @property
-    def rule_query_wa_root(self) -> Dict[str, Any]:
+    def rule_query_wa_root(self) -> Mapping[str, Any]:
         """A spy match rule for querying the workarea root.
 
         Type:
@@ -80,7 +83,7 @@ class BaseSOSTestCase(SCMClientTestCase[SOSClient]):
         }
 
     @property
-    def rule_query_server(self) -> Dict[str, Any]:
+    def rule_query_server(self) -> Mapping[str, Any]:
         """A spy match rule for querying the current SOS server.
 
         Type:
@@ -117,7 +120,7 @@ class BaseSOSTestCase(SCMClientTestCase[SOSClient]):
     def make_rule_stash_selection(
         self,
         result: List[bytes],
-    ) -> Dict[str, Any]:
+    ) -> Mapping[str, Any]:
         """Return a spy match rule for stashing the current selection.
 
         Args:
@@ -147,7 +150,7 @@ class BaseSOSTestCase(SCMClientTestCase[SOSClient]):
     def make_rule_restore_selection(
         self,
         filename: str,
-    ) -> Dict[str, Any]:
+    ) -> Mapping[str, Any]:
         """Return a spy match rule for restoring the stashed selection.
 
         Args:
@@ -176,7 +179,7 @@ class BaseSOSTestCase(SCMClientTestCase[SOSClient]):
         self,
         name: str,
         results: List[str],
-    ) -> Dict[str, Any]:
+    ) -> Mapping[str, Any]:
         """A spy match rule for listing files in a SOS changelist.
 
         Args:
@@ -207,7 +210,7 @@ class BaseSOSTestCase(SCMClientTestCase[SOSClient]):
         self,
         results: List[bytes],
         selection: List[str] = ['-scm'],
-    ) -> Dict[str, Any]:
+    ) -> Mapping[str, Any]:
         """A spy match rule for fetching the current selection status.
 
         Args:
@@ -244,7 +247,7 @@ class BaseSOSTestCase(SCMClientTestCase[SOSClient]):
         sos_path: str,
         out_filename: str,
         content: bytes,
-    ) -> Dict[str, Any]:
+    ) -> Mapping[str, Any]:
         """A spy match rule for exporting a file.
 
         This will write the provided contents to the path once the spy
@@ -282,7 +285,7 @@ class BaseSOSTestCase(SCMClientTestCase[SOSClient]):
     def make_rule_delete(
         self,
         sos_path: str,
-    ) -> Dict[str, Any]:
+    ) -> Mapping[str, Any]:
         """A spy match rule for deleting a file.
 
         This will perform a standard filesystem delete once the spy operation
@@ -316,7 +319,7 @@ class BaseSOSTestCase(SCMClientTestCase[SOSClient]):
         dirname: str,
         filename: str,
         content: bytes = b'old file content\n',
-    ) -> Dict[str, Any]:
+    ) -> Mapping[str, Any]:
         """A spy match rule for undeleting a file.
 
         This will simulate the undelete by writing the specified file
@@ -356,7 +359,7 @@ class BaseSOSTestCase(SCMClientTestCase[SOSClient]):
         sos_paths: List[str],
         flags: List[str],
         results: List[str],
-    ) -> Dict[str, Any]:
+    ) -> Mapping[str, Any]:
         """A spy match rule for fetching attributes for one or more files.
 
         Args:
@@ -393,7 +396,7 @@ class BaseSOSTestCase(SCMClientTestCase[SOSClient]):
         client: SOSClient,
         old_filename: str,
         new_filename: str,
-    ) -> Dict[str, Any]:
+    ) -> Mapping[str, Any]:
         """A spy match rule for diffing two files.
 
         This will perform an actual diff between the two files. The paths
@@ -429,7 +432,7 @@ class BaseSOSTestCase(SCMClientTestCase[SOSClient]):
         sos_path: str,
         lines: List[str],
         dir_revision: str = '1',
-    ) -> Dict[str, Any]:
+    ) -> Mapping[str, Any]:
         """A spy match rule for diffing pending file operations on a directory.
 
         Args:

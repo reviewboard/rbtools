@@ -10,7 +10,7 @@ import posixpath
 import re
 import sys
 from xml.etree import ElementTree
-from typing import Dict, Iterator, List, Optional, TYPE_CHECKING, Tuple, cast
+from typing import Iterator, List, Optional, TYPE_CHECKING, Tuple, cast
 from urllib.parse import unquote
 
 from rbtools.api.errors import APIError
@@ -599,7 +599,7 @@ class SVNClient(BaseSCMClient):
         """
         super(SVNClient, self).__init__(**kwargs)
 
-        self._svn_info_cache: Dict[str, Optional[Dict[str, str]]] = {}
+        self._svn_info_cache: dict[str, Optional[dict[str, str]]] = {}
         self._svn_repository_info_cache: Optional[SVNRepositoryInfo] = None
 
     def check_dependencies(self) -> None:
@@ -1604,7 +1604,7 @@ class SVNClient(BaseSCMClient):
                                            ignore_errors=ignore_errors)
 
             if process_result.exit_code == 0:
-                svninfo: Dict[str, str] = {}
+                svninfo: dict[str, str] = {}
 
                 for info in process_result.stdout:
                     parts = info.strip().split(': ', 1)

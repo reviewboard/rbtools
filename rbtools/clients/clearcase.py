@@ -10,8 +10,7 @@ import re
 import sys
 import threading
 from collections import OrderedDict, defaultdict, deque
-from typing import (Any, Dict, Iterable, List, Optional, TYPE_CHECKING, Tuple,
-                    cast)
+from typing import Any, Iterable, List, Optional, TYPE_CHECKING, Tuple, cast
 
 from pydiffx.dom import DiffX
 from pydiffx.dom.objects import DiffXChangeSection
@@ -38,7 +37,7 @@ else:
     import os.path as cpath
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
     from rbtools.api.resource import (
         RepositoryInfoResource,
@@ -46,7 +45,7 @@ if TYPE_CHECKING:
         RepositoryListResource,
     )
 
-    _HostProperties: TypeAlias = Optional[Dict[str, str]]
+    _HostProperties: TypeAlias = Mapping[str, str] | None
     _ExtendedPath: TypeAlias = str
     _ChangedEntry: TypeAlias = Tuple[_ExtendedPath, _ExtendedPath]
     _ChangedEntryList: TypeAlias = Iterable[_ChangedEntry]
