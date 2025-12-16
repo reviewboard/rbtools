@@ -15,8 +15,9 @@ from http.client import HTTPResponse
 from typing import Dict, List, MutableMapping, Optional, Union
 from urllib.request import urlopen, Request
 
+from appdirs import user_cache_dir
+
 from rbtools.api.errors import CacheError
-from rbtools.utils.appdirs import user_cache_dir
 
 
 #: The minimum version of Review Board to allow HTTP caching.

@@ -12,6 +12,8 @@ import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Optional, cast
 from urllib.parse import unquote
 
+from appdirs import user_data_dir
+
 from rbtools.clients import BaseSCMClient, RepositoryInfo
 from rbtools.clients.base.scmclient import (SCMClientDiffResult,
                                             SCMClientRevisionSpec)
@@ -20,7 +22,6 @@ from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMError,
                                     TooManyRevisionsError)
 from rbtools.diffs.writers import UnifiedDiffWriter
-from rbtools.utils.appdirs import user_data_dir
 from rbtools.utils.checks import check_install
 from rbtools.utils.diffs import filename_match_any_patterns
 from rbtools.utils.filesystem import make_tempfile
