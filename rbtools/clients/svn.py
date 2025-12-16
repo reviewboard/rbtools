@@ -10,7 +10,7 @@ import posixpath
 import re
 import sys
 from xml.etree import ElementTree
-from typing import Iterator, Optional, TYPE_CHECKING, Tuple, cast
+from typing import Iterator, Optional, TYPE_CHECKING, cast
 from urllib.parse import unquote
 
 from rbtools.api.errors import APIError
@@ -588,7 +588,7 @@ class SVNClient(BaseSCMClient):
     # Instance variables #
     ######################
 
-    subversion_client_version: Tuple[int, int, int]
+    subversion_client_version: tuple[int, int, int]
 
     def __init__(self, **kwargs) -> None:
         """Initialize the client.
@@ -1623,7 +1623,7 @@ class SVNClient(BaseSCMClient):
     def parse_filename_header(
         self,
         diff_line: bytes,
-    ) -> Tuple[str, bytes]:
+    ) -> tuple[str, bytes]:
         """Parse the filename header from a diff.
 
         Args:

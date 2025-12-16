@@ -23,8 +23,6 @@ from rbtools.api.request import RBTOOLS_USER_AGENT
 from rbtools.utils.browser import open_browser as open_browser_func
 
 if TYPE_CHECKING:
-    from typing import Type
-
     from rbtools.api.client import RBClient
     from rbtools.api.resource import RootResource, ServerInfoResource
 
@@ -542,7 +540,7 @@ class WebLoginHandler(BaseHTTPRequestHandler):
 def _WebLoginHandler_factory(
     api_client: RBClient,
     enable_logging: bool,
-) -> Type[WebLoginHandler]:
+) -> type[WebLoginHandler]:
     """A class factory for :py:class`WebLoginHandler`.
 
     This allows us to set attributes on the :py:class`WebLoginHandler` object.

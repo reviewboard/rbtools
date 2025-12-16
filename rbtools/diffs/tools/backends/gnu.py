@@ -91,7 +91,7 @@ class GNUDiffTool(BaseDiffTool):
             bool:
             ``True`` if GNU Diff is available. ``False`` if it's not.
         """
-        tried: Set[str] = set()
+        tried: set[str] = set()
 
         for diff_path in self._iter_diff_paths():
             if diff_path in tried:

@@ -7,7 +7,7 @@ Version Added:
 from __future__ import annotations
 
 import logging
-from typing import Iterable, Iterator, Optional, Type, TYPE_CHECKING
+from typing import Iterable, Iterator, Optional, TYPE_CHECKING
 
 from rbtools.diffs.tools.backends.apple import AppleDiffTool
 from rbtools.diffs.tools.backends.gnu import GNUDiffTool
@@ -47,7 +47,7 @@ class DiffToolsRegistry:
     #:
     #: Type:
     #:     dict
-    _diff_tool_classes: dict[str, Type[BaseDiffTool]]
+    _diff_tool_classes: dict[str, type[BaseDiffTool]]
 
     #: A list of all diff tool instances.
     #:
@@ -74,7 +74,7 @@ class DiffToolsRegistry:
         self._classes_populated = False
         self._instances_populated = False
 
-    def iter_diff_tool_classes(self) -> Iterator[Type[BaseDiffTool]]:
+    def iter_diff_tool_classes(self) -> Iterator[type[BaseDiffTool]]:
         """Iterate through all registered diff tool classes.
 
         This does not guarantee order.
@@ -91,7 +91,7 @@ class DiffToolsRegistry:
     def get_diff_tool_class(
         self,
         diff_tool_id: str,
-    ) -> Optional[Type[BaseDiffTool]]:
+    ) -> Optional[type[BaseDiffTool]]:
         """Return a diff tool class with the given ID.
 
         If the ID could not be found, this will return ``None``.
@@ -152,7 +152,7 @@ class DiffToolsRegistry:
 
     def register(
         self,
-        diff_tool_cls: Type[BaseDiffTool],
+        diff_tool_cls: type[BaseDiffTool],
     ) -> None:
         """Register a diff tool class.
 
@@ -239,7 +239,7 @@ class DiffToolsRegistry:
 
         logger.debug('[diff tool scan] Scan complete.')
 
-    def _get_defaults(self) -> Sequence[Type[BaseDiffTool]]:
+    def _get_defaults(self) -> Sequence[type[BaseDiffTool]]:
         """Return the default list of diff tool classes.
 
         Returns:
@@ -255,7 +255,7 @@ class DiffToolsRegistry:
 
     def _register(
         self,
-        diff_tool_cls: Type[BaseDiffTool],
+        diff_tool_cls: type[BaseDiffTool],
     ) -> None:
         """Internal method to register a diff tool class.
 

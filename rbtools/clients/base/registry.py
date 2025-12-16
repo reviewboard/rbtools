@@ -10,7 +10,7 @@ import importlib
 import logging
 import sys
 from collections import OrderedDict
-from typing import Iterator, Type
+from typing import Iterator
 
 if sys.version_info[:2] >= (3, 10):
     # Python >= 3.10
@@ -52,14 +52,14 @@ class SCMClientRegistry:
 
     def __init__(self) -> None:
         """Initialize the registry."""
-        self._scmclient_classes: OrderedDict[str, Type[BaseSCMClient]] = \
+        self._scmclient_classes: OrderedDict[str, type[BaseSCMClient]] = \
             OrderedDict()
         self._builtin_loaded = False
         self._entrypoints_loaded = False
 
     def __contains__(
         self,
-        scmclient: str | Type[BaseSCMClient],
+        scmclient: str | type[BaseSCMClient],
     ) -> bool:
         """Return whether a SCMClient type or ID is in the registry.
 
@@ -92,7 +92,7 @@ class SCMClientRegistry:
         except SCMClientNotFoundError:
             return False
 
-    def __iter__(self) -> Iterator[Type[BaseSCMClient]]:
+    def __iter__(self) -> Iterator[type[BaseSCMClient]]:
         """Iterate through all registered SCMClient classes.
 
         This will yield each built-in SCMClient, followed by each one provided
@@ -116,7 +116,7 @@ class SCMClientRegistry:
     def get(
         self,
         scmclient_id: str,
-    ) -> Type[BaseSCMClient]:
+    ) -> type[BaseSCMClient]:
         """Return a SCMClient class with the given ID.
 
         This will first check the built-in list of SCMClients. If not found,
@@ -159,7 +159,7 @@ class SCMClientRegistry:
 
     def register(
             self,
-            scmclient_cls: Type[BaseSCMClient],
+            scmclient_cls: type[BaseSCMClient],
     ) -> None:
         """Register a SCMClient class.
 

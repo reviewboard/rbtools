@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import io
 import re
-from typing import Iterator, Optional, Tuple
+from typing import Iterator, Optional
 
 from typing_extensions import TypedDict
 
@@ -155,7 +155,7 @@ class DiffFileResult:
     #:
     #:         1 (int):
     #:             The length of the line.
-    _line_offset_cache: list[Tuple[int, int]]
+    _line_offset_cache: list[tuple[int, int]]
 
     def __init__(
         self,

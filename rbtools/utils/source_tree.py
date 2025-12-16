@@ -10,7 +10,7 @@ import logging
 import os
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Optional, Tuple
+from typing import Any, Optional
 
 from typing_extensions import TypeAlias
 
@@ -482,6 +482,6 @@ SCMClientScanDependencyErrors: TypeAlias = \
 
 _SCMClientCache: TypeAlias = dict[str, Optional[BaseSCMClient]]
 _SCMClientKwargs: TypeAlias = dict[str, Any]
-_SCMClientCandidatesResult: TypeAlias = Tuple[SCMClientScanCandidateList,
+_SCMClientCandidatesResult: TypeAlias = tuple[SCMClientScanCandidateList,
                                               SCMClientScanErrors,
                                               SCMClientScanDependencyErrors]

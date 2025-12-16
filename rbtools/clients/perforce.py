@@ -12,7 +12,7 @@ import stat
 import subprocess
 import sys
 from fnmatch import fnmatch
-from typing import Optional, TYPE_CHECKING, Tuple, Union, overload
+from typing import Optional, TYPE_CHECKING, Union, overload
 
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
@@ -1898,7 +1898,7 @@ class PerforceClient(BaseSCMClient):
         rev_b: Union[int, str],
         cl_is_shelved: bool = False,
         cl_is_submitted: bool = False,
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         """Extract the "old" and "new" files for an edit operation.
 
         Args:
@@ -1959,7 +1959,7 @@ class PerforceClient(BaseSCMClient):
         revision: Union[int, str],
         cl_is_shelved: bool = False,
         cl_is_pending: bool = False,
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         """Extract the "old" and "new" files for an add operation.
 
         Args:
@@ -2016,7 +2016,7 @@ class PerforceClient(BaseSCMClient):
         *,
         depot_file: str,
         revision: Union[int, str],
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         """Extract the "old" and "new" files for a delete operation.
 
         Returns a tuple of (old filename, new filename). This can raise a
@@ -2063,7 +2063,7 @@ class PerforceClient(BaseSCMClient):
         tip: Union[int, str],
         base_revision: Union[int, str],
         cl_is_shelved: bool = False,
-    ) -> Tuple[str, str, str]:
+    ) -> tuple[str, str, str]:
         """Extract the "old" and "new" files for a move operation.
 
         Returns a tuple of (old filename, new filename, new depot path). This

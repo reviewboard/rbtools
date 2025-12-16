@@ -10,7 +10,7 @@ import re
 import sys
 import threading
 from collections import OrderedDict, defaultdict, deque
-from typing import Any, Iterable, Optional, TYPE_CHECKING, Tuple, cast
+from typing import Any, Iterable, Optional, TYPE_CHECKING, cast
 
 from pydiffx.dom import DiffX
 from pydiffx.dom.objects import DiffXChangeSection
@@ -47,13 +47,13 @@ if TYPE_CHECKING:
 
     _HostProperties: TypeAlias = Mapping[str, str] | None
     _ExtendedPath: TypeAlias = str
-    _ChangedEntry: TypeAlias = Tuple[_ExtendedPath, _ExtendedPath]
+    _ChangedEntry: TypeAlias = tuple[_ExtendedPath, _ExtendedPath]
     _ChangedEntryList: TypeAlias = Iterable[_ChangedEntry]
 
     #: Type for an entry with branched file versions.
     #:
     #: A 3-tuple containing the path, previous version, and current version.
-    _BranchChangedEntry: TypeAlias = Tuple[str, str, str]
+    _BranchChangedEntry: TypeAlias = tuple[str, str, str]
 
 
 logger = logging.getLogger(__name__)

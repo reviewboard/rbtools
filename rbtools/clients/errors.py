@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Tuple, Union
+from typing import Union
 
 from typing_extensions import TypeAlias
 
@@ -87,7 +87,7 @@ class SCMClientDependencyError(SCMError):
     #: Any item in the list would have satisfied the dependency check.
     #:
     #: The tuple is presented in search order.
-    MissingOneOfDep: TypeAlias = Tuple[str, ...]
+    MissingOneOfDep: TypeAlias = tuple[str, ...]
 
     #: A type alias for a missing dependency.
     #:

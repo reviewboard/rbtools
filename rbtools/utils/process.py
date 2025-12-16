@@ -6,8 +6,7 @@ import io
 import logging
 import os
 import subprocess
-from typing import (Any, AnyStr, Optional, Tuple, TYPE_CHECKING, TypedDict,
-                    Union)
+from typing import Any, AnyStr, Optional, TYPE_CHECKING, TypedDict, Union
 
 from rbtools.deprecation import RemovedInRBTools80Warning
 from rbtools.utils.encoding import force_unicode
@@ -588,7 +587,7 @@ def execute(
     cwd: Optional[str] = None,
     split_lines: bool = False,
     ignore_errors: bool = False,
-    extra_ignore_errors: Tuple[int, ...] = (),
+    extra_ignore_errors: tuple[int, ...] = (),
     with_errors: bool = True,
     none_on_ignored_error: bool = False,
     return_error_code: bool = False,
