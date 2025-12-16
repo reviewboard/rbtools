@@ -682,5 +682,118 @@ Example:
 
     WEB_LOGIN = True
 
-When using :command:`rbt login`, this can be enabled by passing
-:option:`--web`.
+This can be enabled by passing :option:`--web-login` to any command that
+requires authentication.
+
+
+Git Properties
+--------------
+
+Repository information can be set in a ``reviewboard.url`` property on
+the Git tree. Users may need to do this themselves on their own Git
+tree, so in some cases, it may be ideal to use dotfiles instead.
+
+To set the property on a Git tree, type:
+
+.. code-block:: console
+
+    $ git config reviewboard.url http://reviewboard.example.com
+
+
+Perforce Counters
+-----------------
+
+Repository information can be set on Perforce servers by using
+``reviewboard.url`` Perforce counters. How this works varies between versions
+of Perforce.
+
+Perforce version 2008.1 and up support strings in counters, so you can simply
+do:
+
+.. code-block:: console
+
+    $ p4 counter reviewboard.url http://reviewboard.example.com
+
+Older versions of Perforce support only numeric counters, so you must encode
+the server as part of the counter name. As ``/`` characters aren't supported
+in counter names, they must be replaced by ``|`` characters. ``|`` is a
+special character in shells, so you'll need need to escape these using ``\|``.
+For example:
+
+.. code-block:: console
+
+    $ p4 counter reviewboard.url.http:\|\|reviewboard.example.com 1
+
+
+Subversion Properties
+---------------------
+
+Repository information can be set in a ``reviewboard:url`` property on
+a directory. This is usually done on whatever directory or directories
+are common as base checkout paths. This usually means something like
+:file:`/trunk` or :file:`/trunk/myproject`. If the directory is in the
+user's checkout, it will be faster to find the property.
+
+To set the property on a directory, type:
+
+.. code-block:: console
+
+    $ svn propset reviewboard:url http://reviewboard.example.com .
+++++++++++++++++++++++++++++++++++++++++++ Contents of side #2
+This can be enabled by passing :option:`--web-login` to any command that
+requires authentication.
+
+
+Git Properties
+--------------
+
+Repository information can be set in a ``reviewboard.url`` property on
+the Git tree. Users may need to do this themselves on their own Git
+tree, so in some cases, it may be ideal to use dotfiles instead.
+
+To set the property on a Git tree, type:
+
+.. code-block:: console
+
+    $ git config reviewboard.url http://reviewboard.example.com
+
+
+Perforce Counters
+-----------------
+
+Repository information can be set on Perforce servers by using
+``reviewboard.url`` Perforce counters. How this works varies between versions
+of Perforce.
+
+Perforce version 2008.1 and up support strings in counters, so you can simply
+do:
+
+.. code-block:: console
+
+    $ p4 counter reviewboard.url http://reviewboard.example.com
+
+Older versions of Perforce support only numeric counters, so you must encode
+the server as part of the counter name. As ``/`` characters aren't supported
+in counter names, they must be replaced by ``|`` characters. ``|`` is a
+special character in shells, so you'll need need to escape these using ``\|``.
+For example:
+
+.. code-block:: console
+
+    $ p4 counter reviewboard.url.http:\|\|reviewboard.example.com 1
+
+
+Subversion Properties
+---------------------
+
+Repository information can be set in a ``reviewboard:url`` property on
+a directory. This is usually done on whatever directory or directories
+are common as base checkout paths. This usually means something like
+:file:`/trunk` or :file:`/trunk/myproject`. If the directory is in the
+user's checkout, it will be faster to find the property.
+
+To set the property on a directory, type:
+
+.. code-block:: console
+
+    $ svn propset reviewboard:url http://reviewboard.example.com .

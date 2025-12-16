@@ -353,14 +353,20 @@ This can also be enabled by passing :option:`--disable-cache` to any command.
 OPEN_BROWSER
 ------------
 
-**Commands:** :rbtcommand:`rbt post`
-
 **Type:** Boolean
 
 **Default:** ``False``
 
-If set, a web browser will be opened to the review request after running
-:rbtcommand:`rbt post`.
+For commands that navigate you to a URL, this will automatically open a
+browser to the URL.
+
+If set, this will affect the following:
+
+* When authenticating to a command with :option:`--web-login`, this will
+  open a browser to the Review Board login page.
+
+* After running :rbtcommand:`rbt post` a web browser will be opened to the
+  review request.
 
 Example:
 
@@ -368,7 +374,7 @@ Example:
 
     OPEN_BROWSER = True
 
-This can also be provided by using :option:`rbt post --open`.
+This can also be provided by using :option:`--open-browser`.
 
 
 .. rbtconfig:: P4_CLIENT

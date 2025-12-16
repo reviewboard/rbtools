@@ -22,7 +22,7 @@ from typing_extensions import override
 
 from rbtools import get_version_string
 from rbtools.api.capabilities import Capabilities
-from rbtools.api.client import RBClient
+from rbtools.api.client import RBClient, RBClientWebLoginOptions
 from rbtools.api.errors import APIError, ServerInterfaceError
 from rbtools.api.transport.sync import SyncTransport
 from rbtools.clients import scan_usable_client
@@ -37,9 +37,11 @@ from rbtools.commands.base.options import Option, OptionGroup
 from rbtools.commands.base.output import JSONOutput, OutputWrapper
 from rbtools.config import ConfigData, RBToolsConfig, load_config
 from rbtools.diffs.tools.errors import MissingDiffToolError
-from rbtools.utils.console import get_input, get_pass
+from rbtools.utils.console import get_pass
 from rbtools.utils.filesystem import cleanup_tempfiles, get_home_path
 from rbtools.utils.repository import get_repository_resource
+from rbtools.utils.users import credentials_prompt
+from rbtools.utils.web_login import attempt_web_login
 
 if TYPE_CHECKING:
     from rbtools.api.resource import (
@@ -379,6 +381,16 @@ class BaseCommand:
                default=False,
                added_in='3.0',
                help='Output results as JSON data instead of text.'),
+        Option('--open-browser',
+               dest='open_browser',
+               action='store_true',
+               config_key='OPEN_BROWSER',
+               default=False,
+               help='For commands that navigate you to a URL, this will '
+                    'automatically open a browser to the URL. When used '
+                    'with --web-login, this will open a browser to the '
+                    'login page.',
+               added_in='5.4'),
     ]
 
     server_options = OptionGroup(
@@ -424,6 +436,14 @@ class BaseCommand:
                    help='The API token to use for authentication, instead of '
                         'using a username and password.',
                    added_in='0.7'),
+            Option('--web-login',
+                   dest='web_login',
+                   action='store_true',
+                   config_key='WEB_LOGIN',
+                   default=False,
+                   help='Use web-based login instead of prompting for '
+                        'authentication credentials directly in the terminal.',
+                   added_in='5.4'),
             Option('--disable-proxy',
                    action='store_false',
                    dest='enable_proxy',
@@ -1121,6 +1141,8 @@ class BaseCommand:
             self._init_logging()
             logging.debug('Command line: %s', subprocess.list2cmdline(argv))
 
+            self._check_deprecated_args()
+
             try:
                 self.initialize()
             except NeedsReinitialize:
@@ -1286,56 +1308,20 @@ class BaseCommand:
             rbtools.commands.base.errors.CommandError:
                 HTTP authentication failed.
         """
-        # TODO: Consolidate the logic in this function with
-        #       get_authenticated_session() in rbtools/utils/users.py.
-
         if username is None or password is None:
             if getattr(self.options, 'diff_filename', None) == '-':
                 raise CommandError('HTTP authentication is required, but '
                                    'cannot be used with --diff-filename=-')
 
-            # Interactive prompts don't work correctly when input doesn't come
-            # from a terminal. This could seem to be a rare case not worth
-            # worrying about, but this is what happens when using native
-            # Python in Cygwin terminal emulator under Windows and it's very
-            # puzzling to the users, especially because stderr is also _not_
-            # flushed automatically in this case, so the program just appears
-            # to hang.
-            if not self.stdin_is_atty:
-                message_parts = [
-                    'Authentication is required but RBTools cannot prompt for '
-                    'it.',
-                ]
-
-                if sys.platform == 'win32':
-                    message_parts.append(
-                        'This can occur if you are piping input into the '
-                        'command, or if you are running in a Cygwin terminal '
-                        'emulator and not using Cygwin Python.'
-                    )
-                else:
-                    message_parts.append(
-                        'This can occur if you are piping input into the '
-                        'command.'
-                    )
-
-                message_parts.append(
-                    'You may need to explicitly provide API credentials when '
-                    'invoking the command, or try logging in separately.'
-                )
-
-                raise CommandError(' '.join(message_parts))
-
             self.stdout.new_line()
-            self.stdout.write('Please log in to the Review Board server at '
-                              '%s.'
-                              % urlparse(uri)[1])
 
-            if username is None:
-                username = get_input('Username: ')
-
-            if password is None:
-                password = get_pass('Password: ')
+            try:
+                username, password = credentials_prompt(
+                    server_url=urlparse(uri)[1],
+                    username=username,
+                    password=password)
+            except Exception as e:
+                raise CommandError(str(e))
 
         return username, password
 
@@ -1394,6 +1380,31 @@ class BaseCommand:
 
         return get_pass('Token: ', require=True)
 
+    def web_login_callback(self) -> bool:
+        """Attempt to authorize using web-based login.
+
+        This is used as a callback in the API when the user requires
+        authorization.
+
+        Version Added:
+            5.4
+
+        Raises:
+            WebLoginNotAvailable:
+                Web-based login is not available on the Review Board server.
+        """
+        api_client = self.api_client
+        api_root = self.api_root
+
+        # This callback will only be used by commands who require the
+        # API, so these will have been set.
+        assert api_client is not None
+        assert api_root is not None
+
+        return attempt_web_login(
+            api_client=api_client,
+            api_root=api_root)
+
     def _make_api_client(
         self,
         server_url: str,
@@ -1413,6 +1424,11 @@ class BaseCommand:
         """
         options = self.options
 
+        web_login_options = RBClientWebLoginOptions(
+            allow=options.web_login,
+            debug=options.debug,
+            open_browser=options.open_browser)
+
         return RBClient(
             server_url,
             username=options.username,
@@ -1420,6 +1436,7 @@ class BaseCommand:
             api_token=options.api_token,
             auth_callback=self.credentials_prompt,
             otp_token_callback=self.otp_token_prompt,
+            web_login_callback=self.web_login_callback,
             disable_proxy=not options.enable_proxy,
             verify_ssl=not options.disable_ssl_verification,
             allow_caching=not options.disable_cache,
@@ -1432,7 +1449,8 @@ class BaseCommand:
             client_cert=options.client_cert,
             proxy_authorization=options.proxy_authorization,
             transport_cls=self.transport_cls,
-            config=self.config)
+            config=self.config,
+            web_login_options=web_login_options)
 
     def get_api(
         self,
@@ -1536,6 +1554,70 @@ class BaseCommand:
             The resulting exit code.
         """
         raise NotImplementedError()
+
+    def get_options_flat(self) -> Sequence[Option]:
+        """Return a list of all options for the command.
+
+        This returns a flat list of options, pulling out the options that
+        are inside any option groups set on the command.
+
+        Version Added:
+            5.4
+
+        Returns:
+            list of rbtools.commands.base.options.Option:
+            The list of options for the command.
+        """
+        all_options: list[Option] = []
+
+        for item in self.option_list + self._global_options:
+            if isinstance(item, OptionGroup):
+                all_options += item.option_list
+            else:
+                all_options.append(item)
+
+        return all_options
+
+    def _check_deprecated_args(self) -> None:
+        """Check if any deprecated arguments have been passed to the command.
+
+        If a deprecated argument is present, a warning will be emitted for it.
+
+        Version Added:
+            5.4
+        """
+        deprecated_options: set[Option] = set()
+
+        for option in self.get_options_flat():
+            if option.deprecated_in:
+                deprecated_options.add(option)
+
+        for option in deprecated_options:
+            option_value = getattr(self.options, option.attrs['dest'])
+
+            if option_value != option.attrs['default']:
+                # A deprecated option has been passed.
+                assert option.deprecated_in is not None
+
+                option_name = option.opts[-1]
+                deprecated_str = 'Option %s is deprecated as of RBTools %s.'
+                deprecated_format_args: list[str] = [
+                    option_name,
+                    option.deprecated_in,
+                ]
+
+                if removed_in := option.removed_in:
+                    deprecated_str = (
+                        'Option %s is deprecated as of RBTools %s and will '
+                        'be removed in %s.'
+                    )
+                    deprecated_format_args.append(removed_in)
+
+                if replacement := option.replacement:
+                    deprecated_str += ' Use %s instead.'
+                    deprecated_format_args.append(replacement)
+
+                logging.warning(deprecated_str, *deprecated_format_args)
 
     def _init_logging(self) -> None:
         """Initialize logging for the command.
@@ -1733,6 +1815,37 @@ class BaseMultiCommand(BaseCommand):
 
     #: A mapping of subcommand names to argument parsers.
     subcommand_parsers: dict[str, argparse.ArgumentParser]
+
+    def get_options_flat(self) -> Sequence[Option]:
+        """Return a list of all options for the command.
+
+        This returns a flat list of options, pulling out the options that
+        are inside any option groups set on the command, and in any
+        subcommands.
+
+        Version Added:
+            5.4
+
+        Returns:
+            list of rbtools.commands.base.options.Option:
+            The list of options for the command.
+        """
+        all_options = list(super().get_options_flat())
+
+        for item in self.common_subcommand_option_list:
+            if isinstance(item, OptionGroup):
+                all_options += item.option_list
+            else:
+                all_options.append(item)
+
+        for command_cls in self.subcommands:
+            for item in command_cls.option_list:
+                if isinstance(item, OptionGroup):
+                    all_options += item.option_list
+                else:
+                    all_options.append(item)
+
+        return all_options
 
     def usage(
         self,

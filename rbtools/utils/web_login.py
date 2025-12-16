@@ -13,22 +13,33 @@ import socket
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Optional, TYPE_CHECKING, Type
+from typing import TYPE_CHECKING
 
+import tqdm
 from packaging.version import parse as parse_version
 
 from rbtools.api.capabilities import Capabilities
-from rbtools.api.client import RBClient
 from rbtools.api.request import RBTOOLS_USER_AGENT
 from rbtools.utils.browser import open_browser as open_browser_func
 
 if TYPE_CHECKING:
-    from rbtools.api.resource import ServerInfoResource
+    from typing import Type
+
+    from rbtools.api.client import RBClient
+    from rbtools.api.resource import RootResource, ServerInfoResource
 
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_HOSTNAME = 'localhost'
+
+
+class WebLoginNotAllowed(Exception):
+    """An error indicating web-based login is not allowed to be used.
+
+    Version Added:
+        5.4
+    """
 
 
 class WebLoginManager:
@@ -174,6 +185,12 @@ class WebLoginManager:
             (hostname, port),
             _WebLoginHandler_factory(api_client, self.enable_logging))
         self.server = server
+
+        # When a tqdm progress bar is active, the below logs get printed on
+        # the same line as a progress bar. We add a newline in that case so
+        # that things look nicer.
+        if (getattr(tqdm.tqdm, '_instances')):
+            logger.info('')
 
         if self.open_browser:
             logger.info('Opening %s to log in to the %s Review Board '
@@ -570,7 +587,7 @@ def _WebLoginHandler_factory(
 def is_web_login_enabled(
     *,
     server_info: ServerInfoResource,
-    capabilities: Optional[Capabilities],
+    capabilities: (Capabilities | None) = None,
 ) -> bool:
     """Return whether client web login is enabled on a Review Board server.
 
@@ -610,3 +627,65 @@ def is_web_login_enabled(
 
         return capabilities.has_capability('authentication',
                                            'client_web_login')
+
+
+def attempt_web_login(
+    *,
+    api_client: RBClient,
+    api_root: RootResource,
+    capabilities: (Capabilities | None) = None,
+) -> bool:
+    """Attempt to authenticate the client using web-based login.
+
+    Version Added:
+        5.4
+
+    Args:
+        api_client (rbtools.api.client.RBClient):
+            The API client of the command that is creating the server.
+
+        api_root (rbtools.api.resource.RootResource):
+            The root resource for the Review Board server.
+
+        capabilities (rbtools.api.capabilities.Capabilities, optional):
+            The Review Board server capabilities.
+
+    Returns:
+        bool:
+        Whether the client successfully authenticated.
+
+    Raises:
+        WebLoginNotAllowed:
+            Web-based login is not allowed either due to the Review Board
+            server not supporting it, it not being configured, or it being
+            configured not to allow it.
+    """
+    web_login_enabled = is_web_login_enabled(
+        server_info=api_root.get_info(),
+        capabilities=capabilities)
+
+    if not web_login_enabled:
+        logging.debug('Web-based login requires at least Review Board '
+                      '5.0.5 and for the ``client_web_login`` site '
+                      'configuration setting to be set to ``True``. '
+                      'Falling back to username and password prompt.')
+        raise WebLoginNotAllowed
+
+    web_login_options = api_client.web_login_options
+
+    if not web_login_options:
+        logging.debug('RBClient.web_login_options must be set in order '
+                      'to use web-based login.')
+        raise WebLoginNotAllowed
+
+    if not web_login_options.allow:
+        raise WebLoginNotAllowed
+
+    web_login_manager = WebLoginManager(
+        api_client=api_client,
+        enable_logging=web_login_options.debug,
+        open_browser=web_login_options.open_browser)
+
+    web_login_manager.start_web_login_server()
+
+    return web_login_manager.wait_login_result()

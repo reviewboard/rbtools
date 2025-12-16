@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 import os
 import re
@@ -33,6 +34,7 @@ from rbtools.utils.review_request import (get_draft_or_current_value,
 from rbtools.utils.users import get_user
 
 if TYPE_CHECKING:
+    import argparse
     from collections.abc import Sequence
 
     from typelets.json import JSONDict
@@ -43,6 +45,7 @@ if TYPE_CHECKING:
         FileDiffItemResource,
         ReviewRequestItemResource,
     )
+    from rbtools.config import RBToolsConfig
 
 
 _T = TypeVar('_T')
@@ -225,13 +228,6 @@ class Post(BaseCommand):
                             'posting, but without sending an e-mail '
                             'notification.',
                        added_in='1.0'),
-                Option('-o', '--open',
-                       dest='open_browser',
-                       action='store_true',
-                       config_key='OPEN_BROWSER',
-                       default=False,
-                       help='Opens a web browser to the review request '
-                            'after posting.'),
                 Option('-s', '--stamp',
                        dest='stamp_when_posting',
                        action='store_true',
@@ -881,8 +877,9 @@ class Post(BaseCommand):
         self.post_process_options()
 
         orig_cwd = os.path.abspath(os.getcwd())
+        options = self.options
 
-        if (self.options.exclude_patterns and
+        if (options.exclude_patterns and
             not self.tool.supports_diff_exclude_patterns):
             raise CommandError(
                 'The %s backend does not support excluding files via the '
@@ -905,16 +902,15 @@ class Post(BaseCommand):
         # If we are passing --diff-filename, we attempt to read the diff before
         # we normally would. This allows us to exit early if the file does not
         # exist or cannot be read and save several network requests.
-        if self.options.diff_filename:
-            if self.options.diff_filename == '-':
+        if (diff_filename := options.diff_filename):
+            if diff_filename == '-':
                 if hasattr(sys.stdin, 'buffer'):
                     # Make sure we get bytes on Python 3.x.
                     diff = sys.stdin.buffer.read()
                 else:
                     diff = sys.stdin.read()
             else:
-                diff_path = os.path.join(orig_cwd,
-                                         self.options.diff_filename)
+                diff_path = os.path.join(orig_cwd, diff_filename)
 
                 try:
                     with open(diff_path, 'rb') as f:
@@ -929,7 +925,7 @@ class Post(BaseCommand):
                 commit_id=None,
                 changenum=None,
                 review_request_extra_data=None,
-                base_dir=(self.options.basedir or
+                base_dir=(options.basedir or
                           self.repository_info.base_path))
         else:
             self.revisions = get_revisions(self.tool, self.cmd_args)
@@ -940,7 +936,7 @@ class Post(BaseCommand):
         if server_supports_history and review_request:
             with_history = review_request.created_with_history
 
-            if self.options.with_history:
+            if options.with_history:
                 if review_request.created_with_history:
                     logging.info(
                         'The -H/--with-history option is not required when '
@@ -961,7 +957,7 @@ class Post(BaseCommand):
         #
         # If we provided --diff-filename, we already computed the diff above
         # so that we could save round trips to the server in case of IO errors.
-        if not self.options.diff_filename:
+        if not options.diff_filename:
             if self.revisions:
                 extra_args = None
             else:
@@ -1011,7 +1007,7 @@ class Post(BaseCommand):
             review_request=review_request,
             diff_history=diff_history,
             squashed_diff=squashed_diff,
-            submit_as=self.options.submit_as)
+            submit_as=options.submit_as)
 
         self.stdout.write('Review request #%s posted.' % review_request_id)
         self.stdout.new_line()
@@ -1023,8 +1019,47 @@ class Post(BaseCommand):
         self.json.add('diff_url', '%sdiff/' % review_request_url)
 
         # Load the review up in the browser if requested to.
-        if self.options.open_browser:
+        if options.open_browser:
             open_browser(review_request_url)
+
+    def create_parser(
+        self,
+        config: RBToolsConfig,
+        argv: (list[str] | None) = None,
+    ) -> argparse.ArgumentParser:
+        """Create and return the argument parser for this command.
+
+        Version Added:
+            5.4
+
+        Args:
+            config (dict):
+                The loaded RBTools config.
+
+            argv (list, optional):
+                The argument list.
+
+        Returns:
+            argparse.ArgumentParser:
+            The argument parser.
+        """
+        # Make a copy of the option list so that we don't modify the
+        # shared options.
+        global_options_orig = self._global_options
+        global_options_copy = copy.deepcopy(global_options_orig)
+
+        for option in global_options_copy:
+            if option.opts[0] == '--open-browser':
+                option.opts = ('-o', '--open', '--open-browser')
+                break
+
+        try:
+            self._global_options = global_options_copy
+            parser = super().create_parser(config, argv)
+        finally:
+            self._global_options = global_options_orig
+
+        return parser
 
     def _should_post_with_history(self, server_supports_history=False):
         """Determine whether or not we should post with history.

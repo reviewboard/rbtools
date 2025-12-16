@@ -15,6 +15,7 @@ requires-python = '>=3.8'
 dynamic = ['version']
 
 dependencies = [
+	'appdirs~=1.4.4',
 	'certifi>=2023.5.7',
 	'colorama',
 	'housekeeping~=1.1',

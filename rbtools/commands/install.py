@@ -10,9 +10,9 @@ from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
 import tqdm
+from appdirs import user_data_dir
 
 from rbtools.commands.base import BaseCommand, CommandError
-from rbtools.utils.appdirs import user_data_dir
 from rbtools.utils.checks import check_install
 from rbtools.utils.process import run_process
 

@@ -13,8 +13,9 @@ import threading
 from typing import TYPE_CHECKING
 from urllib.request import urlopen, Request
 
+from appdirs import user_cache_dir
+
 from rbtools.api.errors import CacheError
-from rbtools.utils.appdirs import user_cache_dir
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, MutableMapping

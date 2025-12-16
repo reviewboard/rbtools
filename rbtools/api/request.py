@@ -63,6 +63,15 @@ RB_COOKIE_NAME = 'rbsessionid'
 
 AuthCallback: TypeAlias = Callable[..., tuple[str, str]]
 OTPCallback: TypeAlias = Callable[[str, str], str]
+
+
+#: A callback that attempts web-based login and returns its result.
+#:
+#: Version Added:
+#:     5.4
+WebLoginCallback: TypeAlias = Callable[[], bool]
+
+
 QueryArgs: TypeAlias = Union[bool, int, float, bytes, str]
 
 
@@ -576,8 +585,13 @@ class ReviewBoardHTTPPasswordMgr(HTTPPasswordMgr):
         api_token: (str | None) = None,
         auth_callback: (AuthCallback | None) = None,
         otp_token_callback: (OTPCallback | None) = None,
+        web_login_callback: (WebLoginCallback | None) = None,
     ) -> None:
         """Initialize the password manager.
+
+        Version Changed:
+            5.4:
+            Added the ``web_login_callback`` argument.
 
         Args:
             reviewboard_url (str):
@@ -599,6 +613,12 @@ class ReviewBoardHTTPPasswordMgr(HTTPPasswordMgr):
             otp_token_callback (callable, optional):
                 A callback to prompt the user for their two-factor
                 authentication code.
+
+            web_login_callback (callable, optional):
+                A callback to attempt authentication through web-based login.
+
+                Version Added:
+                    5.4
         """
         super().__init__()
         self.rb_url = reviewboard_url
@@ -607,6 +627,7 @@ class ReviewBoardHTTPPasswordMgr(HTTPPasswordMgr):
         self.api_token = api_token
         self.auth_callback = auth_callback
         self.otp_token_callback = otp_token_callback
+        self.web_login_callback = web_login_callback
 
     def find_user_password(
         self,
@@ -669,6 +690,105 @@ class ReviewBoardHTTPPasswordMgr(HTTPPasswordMgr):
         if self.otp_token_callback:
             return self.otp_token_callback(uri, method)
 
+        return None
+
+    def attempt_web_login(self) -> bool:
+        """Attempt authenticating using web-based login.
+
+        Version Added:
+            5.4
+
+        Returns:
+            bool:
+            Whether the web-based login successfully authenticated.
+        """
+        # We need to import this here to avoid circular imports.
+        from rbtools.utils.web_login import WebLoginNotAllowed
+
+        if ((web_login_callback := self.web_login_callback) and
+            not (self.rb_user or self.rb_pass or self.api_token)):
+            # Only try web login if we don't have any auth credentials set.
+            try:
+                return web_login_callback()
+            except WebLoginNotAllowed:
+                pass
+
+        return False
+
+
+class ReviewBoardWebLoginHandler(BaseHandler):
+    """Handler for authenticating through web-based login.
+
+    This will try web-based login one time upon the first HTTP 401, and
+    fall back onto the other auth handlers if it fails.
+
+    Version Added:
+        5.4
+    """
+
+    handler_order = 470   # Before Preset and Basic
+
+    def __init__(
+        self,
+        password_mgr: ReviewBoardHTTPPasswordMgr,
+    ) -> None:
+        """Initialize the handler.
+
+        Args:
+            password_mgr (ReviewBoardHTTPPasswordMgr):
+                The password manager to use for requests.
+        """
+        self.password_mgr = password_mgr
+        self.used = False
+
+    def http_error_401(
+        self,
+        req: Request,
+        fp: HTTPResponse | None,
+        code: int,
+        msg: str,
+        headers: HTTPMessage,
+    ) -> HTTPResponse | None:
+        """Handle an HTTP 401 Unauthorized from an API request.
+
+        This will attempt to authenticate using web-based login. If
+        successfully authenticated, the request will be retried. If the
+        login fails, or if this handler has already been used, the request
+        will be passed on to the next authentication handler.
+
+        Version Added:
+            5.4
+
+        Args:
+            req (rbtools.api.request.Request):
+                The API request being made.
+
+            fp (http.client.HTTPResponse, unused):
+                The file-like HTTP response object, if available.
+
+            code (int, unused):
+                The HTTP error code.
+
+            msg (str, unused):
+                The HTTP error message returned by the server.
+
+            headers (HTTPMessage, unused):
+                The headers sent in the Unauthorized error response.
+
+        Returns:
+            http.client.HTTPResponse:
+            The response if the request was successfully retried and
+            completed, or ``None`` to delegate to the next handler.
+        """
+        if not self.used:
+            self.used = True
+            authenticated = self.password_mgr.attempt_web_login()
+
+            # Retry now that we're authenticated.
+            if authenticated:
+                return self.parent.open(req, timeout=req.timeout)
+
+        # Let the other handlers try next.
         return None
 
 
@@ -1156,10 +1276,14 @@ class ReviewBoardServer:
         proxy_authorization: (str | None) = None,
         *,
         config: (RBToolsConfig | None) = None,
+        web_login_callback: (WebLoginCallback | None) = None,
     ) -> None:
         """Initialize the server object.
 
         Version Changed:
+            5.4:
+            Added the ``web_login_callback`` argument.
+
             5.1:
             Added the ``config`` argument.
 
@@ -1227,6 +1351,12 @@ class ReviewBoardServer:
 
                 Version Added:
                     5.1
+
+            web_login_callback (callable, optional):
+                A callback to attempt authentication through web-based login.
+
+                Version Added:
+                    5.4
         """
         # Normalize the URLs and compute the API URL.
         if not url.endswith('/'):
@@ -1321,7 +1451,8 @@ class ReviewBoardServer:
             rb_pass=password,
             api_token=api_token,
             auth_callback=auth_callback,
-            otp_token_callback=otp_token_callback)
+            otp_token_callback=otp_token_callback,
+            web_login_callback=web_login_callback)
         self.preset_auth_handler = PresetHTTPAuthHandler(
             url=api_url,
             password_mgr=password_mgr)
@@ -1346,6 +1477,7 @@ class ReviewBoardServer:
 
         handlers += [
             HTTPCookieProcessor(cookie_jar),
+            ReviewBoardWebLoginHandler(password_mgr),
             ReviewBoardHTTPBasicAuthHandler(password_mgr),
             HTTPDigestAuthHandler(password_mgr),
             self.preset_auth_handler,
