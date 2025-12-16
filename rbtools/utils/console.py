@@ -7,7 +7,7 @@ import logging
 import os
 import subprocess
 import sys
-from typing import Optional, TextIO
+from typing import TextIO
 
 from rbtools.utils.encoding import force_unicode
 from rbtools.utils.errors import EditorError
@@ -319,7 +319,7 @@ def edit_file(
 
 def edit_text(
     content: str = '',
-    filename: Optional[str] = None,
+    filename: (str | None) = None,
 ) -> str:
     """Run a user-configured editor to prompt for text.
 

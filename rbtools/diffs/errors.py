@@ -7,7 +7,7 @@ Version Added:
 from __future__ import annotations
 
 from gettext import gettext as _
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from rbtools.diffs.patcher import Patcher
@@ -29,7 +29,7 @@ class ApplyPatchError(Exception):
     #:
     #: This will be set if the failure was during a patch operation. If it
     #: occurred before any files were patched, it will be ``None``.
-    failed_patch_result: Optional[PatchResult]
+    failed_patch_result: PatchResult | None
 
     #: The patcher responsible for applying this patch.
     patcher: Patcher
@@ -39,7 +39,7 @@ class ApplyPatchError(Exception):
         message: str,
         *,
         patcher: Patcher,
-        failed_patch_result: Optional[PatchResult] = None,
+        failed_patch_result: (PatchResult | None) = None,
     ) -> None:
         """Initialize the error.
 

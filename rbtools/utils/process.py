@@ -6,7 +6,7 @@ import io
 import logging
 import os
 import subprocess
-from typing import Any, AnyStr, Optional, TYPE_CHECKING, TypedDict
+from typing import Any, AnyStr, TYPE_CHECKING, TypedDict
 
 from rbtools.deprecation import RemovedInRBTools80Warning
 from rbtools.utils.encoding import force_unicode
@@ -124,8 +124,8 @@ class RunProcessResult:
         self.encoding = encoding
         self.stdout_bytes = io.BytesIO(stdout)
         self.stderr_bytes = io.BytesIO(stderr)
-        self._stdout: Optional[io.TextIOWrapper] = None
-        self._stderr: Optional[io.TextIOWrapper] = None
+        self._stdout: (io.TextIOWrapper | None) = None
+        self._stderr: (io.TextIOWrapper | None) = None
 
     @property
     def stdout(self) -> io.TextIOWrapper:
@@ -584,7 +584,7 @@ def run_process_exec(
 def execute(
     command: AnyStr | Sequence[AnyStr],
     env: (Mapping[str, str] | None) = None,
-    cwd: Optional[str] = None,
+    cwd: (str | None) = None,
     split_lines: bool = False,
     ignore_errors: bool = False,
     extra_ignore_errors: tuple[int, ...] = (),

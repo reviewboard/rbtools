@@ -6,7 +6,7 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -47,7 +47,7 @@ class RepositoryInfo:
     #:
     #: Type:
     #:     str
-    base_path: Optional[str]
+    base_path: str | None
 
     #: The local filesystem path for the repository.
     #:
@@ -56,14 +56,14 @@ class RepositoryInfo:
     #:
     #: Type:
     #:     str
-    local_path: Optional[str]
+    local_path: str | None
 
     def __init__(
         self,
         *,
         path: (str | Sequence[str] | None) = None,
-        base_path: Optional[str] = None,
-        local_path: Optional[str] = None,
+        base_path: (str | None) = None,
+        local_path: (str | None) = None,
     ) -> None:
         """Initialize the object.
 

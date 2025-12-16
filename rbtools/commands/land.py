@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from rbtools.api.errors import APIError
 from rbtools.clients.errors import MergeError, PushError
@@ -311,7 +310,7 @@ class Land(BaseCommand):
 
     def main(
         self,
-        branch_name: Optional[str] = None,
+        branch_name: (str | None) = None,
         *args,
     ) -> None:
         """Run the command.

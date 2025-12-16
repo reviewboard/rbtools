@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import logging
 import subprocess
-from typing import Optional
 
 import puremagic
 from housekeeping import deprecate_non_keyword_only_args
@@ -118,7 +117,7 @@ _has_file_exe = None
 def guess_mimetype(
     *,
     data: bytes,
-    filename: Optional[str] = None,
+    filename: (str | None) = None,
 ) -> str:
     """Guess the MIME type of the given file content.
 
@@ -149,7 +148,7 @@ def guess_mimetype(
 
         return DEFAULT_MIMETYPE
 
-    mimetype: Optional[str] = None
+    mimetype: (str | None) = None
 
     try:
         p = subprocess.Popen(['file', '--mime-type', '-b', '-'],

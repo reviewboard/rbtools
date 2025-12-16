@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from typing_extensions import Self, TypeAlias
 
@@ -41,7 +41,7 @@ class ConfigData:
     ######################
 
     #: The filename that stored this configuration, if any.
-    filename: Optional[str]
+    filename: str | None
 
     #: The underlying raw configuration.
     _raw_config: ConfigDict
@@ -49,8 +49,8 @@ class ConfigData:
     def __init__(
         self,
         *,
-        config_dict: Optional[ConfigDict] = None,
-        filename: Optional[str] = None,
+        config_dict: (ConfigDict | None) = None,
+        filename: (str | None) = None,
     ) -> None:
         """Initialize the configuration data wrapper.
 
@@ -346,19 +346,19 @@ class ColorsConfig(ConfigData):
     """
 
     #: A color value for information output.
-    INFO: Optional[str] = None
+    INFO: (str | None) = None
 
     #: A color value for debug output.
-    DEBUG: Optional[str] = None
+    DEBUG: (str | None) = None
 
     #: A color value for warning output.
-    WARNING: Optional[str] = 'yellow'
+    WARNING: (str | None) = 'yellow'
 
     #: A color value for error output.
-    ERROR: Optional[str] = 'red'
+    ERROR: (str | None) = 'red'
 
     #: A color value for critical error output.
-    CRITICAL: Optional[str] = 'red'
+    CRITICAL: (str | None) = 'red'
 
 
 class RBToolsConfig(ConfigData):
@@ -424,7 +424,7 @@ class RBToolsConfig(ConfigData):
     #######################################################################
 
     #: The URL for the Review Board server.
-    REVIEWBOARD_URL: Optional[str] = None
+    REVIEWBOARD_URL: (str | None) = None
 
     #: An API token to use for authentication.
     #:
@@ -432,13 +432,13 @@ class RBToolsConfig(ConfigData):
     #:
     #: Version Added:
     #:     0.7
-    API_TOKEN: Optional[str] = None
+    API_TOKEN: (str | None) = None
 
     #: A username to use for authentication.
-    USERNAME: Optional[str] = None
+    USERNAME: (str | None) = None
 
     #: A password to use for authentication.
-    PASSWORD: Optional[str] = None
+    PASSWORD: (str | None) = None
 
     #: Whether to save new cookies to disk.
     #:
@@ -454,7 +454,7 @@ class RBToolsConfig(ConfigData):
     #:
     #: Version Added:
     #:     0.7.5
-    EXT_AUTH_COOKIES: Optional[str] = None
+    EXT_AUTH_COOKIES: (str | None) = None
 
     #: Whether to enable strict domain matching for cookies.
     #:
@@ -490,7 +490,7 @@ class RBToolsConfig(ConfigData):
     #: A value to send in Proxy-Authorization headers for HTTP requests.
     #:
     #: This can be used to authenticate with proxy services.
-    PROXY_AUTHORIZATION: Optional[str] = None
+    PROXY_AUTHORIZATION: (str | None) = None
 
     #######################################################################
     # API caching
@@ -502,7 +502,7 @@ class RBToolsConfig(ConfigData):
     #:
     #: Version Added:
     #:     0.7.3
-    CACHE_LOCATION: Optional[str] = None
+    CACHE_LOCATION: (str | None) = None
 
     #: Whether to disable HTTP caching completely.
     #:
@@ -523,13 +523,13 @@ class RBToolsConfig(ConfigData):
     #######################################################################
 
     #: A path to an additional SSL/TLS CA bundle.
-    CA_CERTS: Optional[str] = None
+    CA_CERTS: (str | None) = None
 
     #: A path to a SSL/TLS certificate for communicating with the server.
-    CLIENT_CERT: Optional[str] = None
+    CLIENT_CERT: (str | None) = None
 
     #: A path to a SSL/TLS key for communicating with the server.
-    CLIENT_KEY: Optional[str] = None
+    CLIENT_KEY: (str | None) = None
 
     #: Whether to disable SSL/TLS verification.
     DISABLE_SSL_VERIFICATION: bool = False
@@ -544,12 +544,12 @@ class RBToolsConfig(ConfigData):
     #:     0.6:
     #:     This previously supported taking a configured repository URL.
     #:     That now must be provided in :py:attr:`REPOSITORY_URL`.
-    REPOSITORY: Optional[str] = None
+    REPOSITORY: (str | None) = None
 
     #: The type of the repository on Review Board.
     #:
     #: This must be a value found in :command:`rbt list-repo-types`.
-    REPOSITORY_TYPE: Optional[str] = None
+    REPOSITORY_TYPE: (str | None) = None
 
     #: The URL to the repository.
     #:
@@ -565,7 +565,7 @@ class RBToolsConfig(ConfigData):
     #:     0.6:
     #:     This previously supported taking a configured repository name.
     #:     That now must be provided in :py:attr:`REPOSITORY`.
-    REPOSITORY_URL: Optional[str] = None
+    REPOSITORY_URL: (str | None) = None
 
     #######################################################################
     # Diff generation
@@ -578,7 +578,7 @@ class RBToolsConfig(ConfigData):
     #:
     #: It's currently only supported for Subversion, usually when using
     #: :option:`--diff-filename` options.
-    BASEDIR: Optional[str] = None
+    BASEDIR: (str | None) = None
 
     #: A list of file patterns to exclude from the diff.
     #:
@@ -590,13 +590,13 @@ class RBToolsConfig(ConfigData):
     #:
     #: This is only supported by some SCMs. In general, this should not be
     #: used. Instead, revision ranges should be provided.
-    PARENT_BRANCH: Optional[str] = None
+    PARENT_BRANCH: (str | None) = None
 
     #: The remote tracking branch that the local branch corresponds to.
     #:
     #: This is used for Git and Mercurial, and will override any automatic
     #: tracking branch detection implemented by the SCM client.
-    TRACKING_BRANCH: Optional[str] = None
+    TRACKING_BRANCH: (str | None) = None
 
     #######################################################################
     # Review requests
@@ -609,7 +609,7 @@ class RBToolsConfig(ConfigData):
     #:
     #: Other commands may use it to inspect client-side defaults, but it's
     #: recommended to inspect the review request where possible.
-    BRANCH: Optional[str] = None
+    BRANCH: (str | None) = None
 
     #: A comma-separated list of review request IDs to depend on.
     #:
@@ -621,7 +621,7 @@ class RBToolsConfig(ConfigData):
     #:
     #: Version Added:
     #:     0.6.1
-    DEPENDS_ON: Optional[str] = None
+    DEPENDS_ON: (str | None) = None
 
     #: Whether to enable Markdown for any text content.
     #:
@@ -639,7 +639,7 @@ class RBToolsConfig(ConfigData):
     #:
     #: Other commands may use it to inspect client-side defaults, but it's
     #: recommended to inspect the review request where possible.
-    TARGET_GROUPS: Optional[str] = None
+    TARGET_GROUPS: (str | None) = None
 
     #: A comma-separated list of usernames to list as reviewers.
     #:
@@ -648,20 +648,20 @@ class RBToolsConfig(ConfigData):
     #:
     #: Other commands may use it to inspect client-side defaults, but it's
     #: recommended to inspect the review request where possible.
-    TARGET_PEOPLE: Optional[str] = None
+    TARGET_PEOPLE: (str | None) = None
 
     #######################################################################
     # Perforce support
     #######################################################################
 
     #: The Perforce client name for the repository.
-    P4_CLIENT: Optional[str] = None
+    P4_CLIENT: (str | None) = None
 
     #: The IP address/port for the Perforce server.
-    P4_PORT: Optional[str] = None
+    P4_PORT: (str | None) = None
 
     #: The password or ticket of the user in Perforce.
-    P4_PASSWD: Optional[str] = None
+    P4_PASSWD: (str | None) = None
 
     #######################################################################
     # Subversion support
@@ -683,7 +683,7 @@ class RBToolsConfig(ConfigData):
     #:
     #: Version Added:
     #:     0.7.6
-    TF_CMD: Optional[str] = None
+    TF_CMD: (str | None) = None
 
     #######################################################################
     # rbt land
@@ -703,7 +703,7 @@ class RBToolsConfig(ConfigData):
     #:
     #: Version Added:
     #:     0.7
-    LAND_DEST_BRANCH: Optional[str] = None
+    LAND_DEST_BRANCH: (str | None) = None
 
     #: Whether to push the destination branch after landing the change.
     #:
@@ -727,13 +727,13 @@ class RBToolsConfig(ConfigData):
     #:
     #: * :py:attr:`GUESS_DESCRIPTION`
     #: * :py:attr:`GUESS_SUMMARY`
-    GUESS_FIELDS: Optional[str] = GuessFlag.AUTO
+    GUESS_FIELDS: (str | None) = GuessFlag.AUTO
 
     #: Whether to guess and set a review request description from a commit.
-    GUESS_DESCRIPTION: Optional[GuessFlag] = None
+    GUESS_DESCRIPTION: (GuessFlag | None) = None
 
     #: Whether to guess and set a review request summary from a commit.
-    GUESS_SUMMARY: Optional[GuessFlag] = None
+    GUESS_SUMMARY: (GuessFlag | None) = None
 
     #: Whether to publish a change immediately after posting it.
     #:
@@ -765,7 +765,7 @@ class RBToolsConfig(ConfigData):
     #:
     #: This requires the logged-in user to have the special
     #: ``reviews.can_submit_as`` permission. See :ref:`automating-rbt-post`.
-    SUBMIT_AS: Optional[str] = None
+    SUBMIT_AS: (str | None) = None
 
     #######################################################################
     # rbt api-get

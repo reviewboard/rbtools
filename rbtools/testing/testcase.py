@@ -9,7 +9,7 @@ import sys
 import tempfile
 import unittest
 from contextlib import contextmanager
-from typing import Iterator, Optional, Sequence, TYPE_CHECKING
+from typing import Iterator, Sequence, TYPE_CHECKING
 
 import kgb
 
@@ -207,7 +207,7 @@ class TestCase(unittest.TestCase):
     @contextmanager
     def env(
         self,
-        env: dict[str, Optional[str]],
+        env: dict[str, str | None],
     ) -> Iterator[None]:
         """Run code with custom environment variables temporarily set.
 
@@ -227,7 +227,7 @@ class TestCase(unittest.TestCase):
         Context:
             Code will execute with the new environment set.
         """
-        old_env: dict[str, Optional[str]] = {}
+        old_env: dict[str, str | None] = {}
 
         for key, value in env.items():
             old_env[key] = os.environ.get(key)
@@ -457,7 +457,7 @@ class TestCase(unittest.TestCase):
         self,
         config: str | dict[str, object] = {},
         *,
-        parent_dir: Optional[str] = None,
+        parent_dir: (str | None) = None,
         filename: str = '.reviewboardrc',
     ) -> str:
         """Write a .reviewboardrc file to a directory.

@@ -7,7 +7,7 @@ Version Added:
 from __future__ import annotations
 
 import logging
-from typing import Iterable, Iterator, Optional, TYPE_CHECKING
+from typing import Iterable, Iterator, TYPE_CHECKING
 
 from rbtools.diffs.tools.backends.apple import AppleDiffTool
 from rbtools.diffs.tools.backends.gnu import GNUDiffTool
@@ -91,7 +91,7 @@ class DiffToolsRegistry:
     def get_diff_tool_class(
         self,
         diff_tool_id: str,
-    ) -> Optional[type[BaseDiffTool]]:
+    ) -> type[BaseDiffTool] | None:
         """Return a diff tool class with the given ID.
 
         If the ID could not be found, this will return ``None``.
@@ -110,7 +110,7 @@ class DiffToolsRegistry:
 
     def get_available(
         self,
-        compatible_diff_tool_ids: Optional[Iterable[str]] = None,
+        compatible_diff_tool_ids: (Iterable[str] | None) = None,
     ) -> BaseDiffTool:
         """Return an available diff tool out of an optional set of IDs.
 

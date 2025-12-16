@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from typing import Optional, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, cast
 
 from rbtools.clients.base.repository import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
@@ -76,7 +76,7 @@ class BazaarClient(BaseSCMClient):
         # Separately (since either bzr or brz might be used), we want to
         # maintain a flag indicating if this is Breezy, since it changes
         # some semantics.
-        self._is_breezy: Optional[bool] = None
+        self._is_breezy: (bool | None) = None
 
     @property
     def bzr(self) -> str:
@@ -158,7 +158,7 @@ class BazaarClient(BaseSCMClient):
         else:
             raise SCMClientDependencyError(missing_exes=[('brz', 'bzr')])
 
-    def get_local_path(self) -> Optional[str]:
+    def get_local_path(self) -> str | None:
         """Return the local path to the working tree.
 
         Returns:
@@ -199,7 +199,7 @@ class BazaarClient(BaseSCMClient):
 
         return path
 
-    def get_repository_info(self) -> Optional[RepositoryInfo]:
+    def get_repository_info(self) -> RepositoryInfo | None:
         """Return repository information for the current working tree.
 
         Returns:
@@ -318,8 +318,8 @@ class BazaarClient(BaseSCMClient):
 
     def _get_revno(
         self,
-        revision_spec: Optional[str] = None,
-    ) -> Optional[str]:
+        revision_spec: (str | None) = None,
+    ) -> str | None:
         """Convert a revision spec to a revision number.
 
         Args:
@@ -445,7 +445,7 @@ class BazaarClient(BaseSCMClient):
         repository_info: RepositoryInfo,
         include_files: Sequence[str],
         exclude_patterns: Sequence[str],
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         """Return the diff between 'base' and 'tip'.
 
         Args:

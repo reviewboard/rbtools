@@ -7,7 +7,7 @@ Version Added:
 from __future__ import annotations
 
 import os
-from typing import ClassVar, Optional
+from typing import ClassVar
 
 import kgb
 
@@ -58,7 +58,7 @@ class BaseJujutsuClientTests(SCMClientTestCase[JujutsuClient]):
     def setup_checkout(
         cls,
         checkout_dir: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Populate a Jujutsu checkout.
 
         This will create a Jujutsu clone of the sample Git repository stored in

@@ -34,7 +34,7 @@ def get_authenticated_session(
     open_browser: (bool | None) = None,
     enable_logging: (bool | None) = None,
     capabilities: (Capabilities | None) = None,
-) -> Resource | None:
+) -> SessionResource | None:
     """Return an authenticated session.
 
     None will be returned if the user is not authenticated, unless the

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rbtools.api.errors import APIError
 from rbtools.commands.base import (BaseCommand,
@@ -81,7 +81,7 @@ class Stamp(BaseCommand):
     def determine_review_request(
         self,
         revisions: SCMClientRevisionSpec,
-    ) -> tuple[Optional[int], Optional[str]]:
+    ) -> tuple[int | None, str | None]:
         """Determine the correct review request for a commit.
 
         Args:

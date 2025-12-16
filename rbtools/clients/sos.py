@@ -16,7 +16,7 @@ import re
 import sqlite3
 from collections import OrderedDict
 from contextlib import contextmanager
-from typing import Optional, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, cast
 
 from pydiffx import DiffType, DiffX
 from pydiffx.utils.text import guess_line_endings
@@ -292,7 +292,7 @@ class SOSClient(BaseSCMClient):
         if not check_install(['soscmd', 'version']):
             raise SCMClientDependencyError(missing_exes=['soscmd'])
 
-    def get_local_path(self) -> Optional[str]:
+    def get_local_path(self) -> str | None:
         """Return the local path to the working tree.
 
         Returns:
@@ -312,7 +312,7 @@ class SOSClient(BaseSCMClient):
             # This is not a SOS workarea.
             return None
 
-    def get_repository_info(self) -> Optional[RepositoryInfo]:
+    def get_repository_info(self) -> RepositoryInfo | None:
         """Return repository information for the current SOS workarea.
 
         Returns:
@@ -1715,7 +1715,7 @@ class SOSClient(BaseSCMClient):
         wa_root: str,
         filename: str,
         orig_revision: int | str,
-        orig_content: Optional[bytes] = None,
+        orig_content: (bytes | None) = None,
     ) -> DiffFileResult:
         """Return diff hunks for a given file.
 

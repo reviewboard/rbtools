@@ -8,7 +8,7 @@ import shutil
 import sys
 import tempfile
 from contextlib import contextmanager
-from typing import Generator, Iterable, Optional, Sequence
+from typing import Generator, Iterable, Sequence
 
 
 _iter_exes_in_path_cache: dict[str, bool] = {}
@@ -108,10 +108,10 @@ def cleanup_tempfiles() -> None:
 
 def make_tempfile(
     *,
-    content: Optional[bytes] = None,
+    content: (bytes | None) = None,
     prefix: str = 'rbtools.',
-    suffix: Optional[str] = None,
-    filename: Optional[str] = None,
+    suffix: (str | None) = None,
+    filename: (str | None) = None,
 ) -> str:
     """Create a temporary file and return the path.
 
@@ -163,7 +163,7 @@ def make_tempfile(
 
 
 def make_tempdir(
-    parent: Optional[str] = None,
+    parent: (str | None) = None,
     track: bool = True,
 ) -> str:
     """Create a temporary directory and return the path.

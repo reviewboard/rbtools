@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import importlib_metadata
 
@@ -28,7 +28,7 @@ RB_MAIN = _RB_MAIN
 
 def find_entry_point_for_command(
     command_name: str,
-) -> Optional[EntryPoint]:
+) -> EntryPoint | None:
     """Return an entry point for the given RBTools command.
 
     Version Changed:
@@ -44,7 +44,7 @@ def find_entry_point_for_command(
         importlib.metadata.EntryPoint:
         The resulting entry point, if found, or ``None`` if not found.
     """
-    entry_points: Optional[EntryPoints]
+    entry_points: EntryPoints | None
 
     # Attempt to retrieve the command class from the entry points. We
     # first look in rbtools for the commands, and failing that, we look

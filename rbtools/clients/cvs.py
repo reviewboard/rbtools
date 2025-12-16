@@ -6,7 +6,7 @@ import logging
 import os
 import re
 import socket
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rbtools.clients.base.repository import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
@@ -57,7 +57,7 @@ class CVSClient(BaseSCMClient):
         if not check_install(['cvs']):
             raise SCMClientDependencyError(missing_exes=['cvs'])
 
-    def get_local_path(self) -> Optional[str]:
+    def get_local_path(self) -> str | None:
         """Return the local path to the working tree.
 
         Returns:
@@ -97,7 +97,7 @@ class CVSClient(BaseSCMClient):
 
         return repository_path
 
-    def get_repository_info(self) -> Optional[RepositoryInfo]:
+    def get_repository_info(self) -> RepositoryInfo | None:
         """Return repository information for the current working tree.
 
         Returns:

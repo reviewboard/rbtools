@@ -6,7 +6,7 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     import argparse
@@ -144,8 +144,8 @@ class Option:
     def add_to(
         self,
         parent: argparse._ActionsContainer,
-        config: Optional[RBToolsConfig] = None,
-        argv: Optional[list[str]] = None,
+        config: (RBToolsConfig | None) = None,
+        argv: (list[str] | None) = None,
     ) -> None:
         """Add the option to the parent parser or group.
 
@@ -215,7 +215,7 @@ class OptionGroup:
     #:
     #: Type:
     #:     str
-    description: Optional[str]
+    description: str | None
 
     #: The name of this option group.
     #:
@@ -223,7 +223,7 @@ class OptionGroup:
     #:
     #: Type:
     #:     str
-    name: Optional[str]
+    name: str | None
 
     #: The list of options this group was initialized with.
     #:
@@ -233,9 +233,9 @@ class OptionGroup:
 
     def __init__(
         self,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        option_list: Optional[list[Option]] = None,
+        name: (str | None) = None,
+        description: (str | None) = None,
+        option_list: (list[Option] | None) = None,
     ) -> None:
         """Initialize the option group.
 
@@ -257,7 +257,7 @@ class OptionGroup:
         self,
         parser: argparse.ArgumentParser,
         config: RBToolsConfig,
-        argv: Optional[list[str]] = None,
+        argv: (list[str] | None) = None,
     ) -> None:
         """Add the group and all its contained options to the parser.
 

@@ -7,7 +7,7 @@ import os
 import re
 import shutil
 from datetime import datetime, timezone
-from typing import Any, Final, Generic, Optional, TypeVar, TYPE_CHECKING
+from typing import Any, Final, Generic, TypeVar, TYPE_CHECKING
 from unittest import SkipTest
 
 import kgb
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 
 _TestSCMClientType_co = TypeVar('_TestSCMClientType_co',
-                                bound=Optional[BaseSCMClient],
+                                bound=BaseSCMClient | None,
                                 covariant=True)
 _TestSCMClientOptions: TypeAlias = dict[str, Any]
 
@@ -111,7 +111,7 @@ class SCMClientTestCase(Generic[_TestSCMClientType_co],
     #:
     #: Type:
     #:     str
-    checkout_dir: Optional[str] = None
+    checkout_dir: (str | None) = None
 
     @classmethod
     def setUpClass(cls):
@@ -146,7 +146,7 @@ class SCMClientTestCase(Generic[_TestSCMClientType_co],
     def setup_checkout(
         cls,
         checkout_dir: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Populate any clones/checkouts needed by the test suite.
 
         Subclasses can override this to populate as many or as few checkouts

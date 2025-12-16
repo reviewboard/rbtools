@@ -6,7 +6,7 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from rbtools.config.config import ConfigData
 from rbtools.testing import TestCase
@@ -31,7 +31,7 @@ class MyConfigData(ConfigData):
     INT_KEY: int = 123
     BOOL_KEY: bool = True
     STR_KEY: str = 'value'
-    OPT_STR_KEY: Optional[str] = None
+    OPT_STR_KEY: (str | None) = None
     LIST_KEY: list[Any] = [
         1,
         2,

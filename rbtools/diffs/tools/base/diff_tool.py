@@ -6,7 +6,7 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from typing_extensions import final
 
@@ -48,7 +48,7 @@ class BaseDiffTool:
     #:
     #: Type:
     #:     bool
-    available: Optional[bool]
+    available: bool | None
 
     #: The path to the executable used to run this tool.
     #:
@@ -57,7 +57,7 @@ class BaseDiffTool:
     #:
     #: Type:
     #:     str
-    exe_path: Optional[str]
+    exe_path: str | None
 
     #: The diff tool version information found when checking availability.
     #:
@@ -66,7 +66,7 @@ class BaseDiffTool:
     #:
     #: Type:
     #:     str
-    version_info: Optional[str]
+    version_info: str | None
 
     @classmethod
     def get_install_instructions(cls) -> str:

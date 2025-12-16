@@ -10,7 +10,7 @@ import re
 import sys
 import threading
 from collections import OrderedDict, defaultdict, deque
-from typing import Any, Iterable, Optional, TYPE_CHECKING, cast
+from typing import Any, Iterable, TYPE_CHECKING, cast
 
 from pydiffx.dom import DiffX
 from pydiffx.dom.objects import DiffXChangeSection
@@ -222,10 +222,10 @@ class _ChangesetEntry:
         self,
         *,
         root_path: str,
-        old_path: Optional[str] = None,
-        new_path: Optional[str] = None,
-        old_oid: Optional[str] = None,
-        new_oid: Optional[str] = None,
+        old_path: (str | None) = None,
+        new_path: (str | None) = None,
+        old_oid: (str | None) = None,
+        new_oid: (str | None) = None,
         op: str = 'modify',
         is_dir: bool = False,
     ) -> None:
@@ -310,7 +310,7 @@ class _ChangesetEntry:
         return self._old_oid
 
     @property
-    def old_name(self) -> Optional[str]:
+    def old_name(self) -> str | None:
         """The name of the old version of the element.
 
         Type:
@@ -329,7 +329,7 @@ class _ChangesetEntry:
         return self._old_name
 
     @property
-    def old_version(self) -> Optional[str]:
+    def old_version(self) -> str | None:
         """The version of the old version of the element.
 
         Type:
@@ -366,7 +366,7 @@ class _ChangesetEntry:
         return self._new_oid
 
     @property
-    def new_name(self) -> Optional[str]:
+    def new_name(self) -> str | None:
         """The name of the new version of the element.
 
         Type:
@@ -385,7 +385,7 @@ class _ChangesetEntry:
         return self._new_name
 
     @property
-    def new_version(self) -> Optional[str]:
+    def new_version(self) -> str | None:
         """The version of the new version of the element.
 
         Type:
@@ -467,17 +467,17 @@ class ClearCaseClient(BaseSCMClient):
     is_ucm: bool
 
     #: The name of the user's view.
-    viewname: Optional[str]
+    viewname: str | None
 
     #: The user's ClearCase view type.
     #:
     #: This will be either ``snapshot`` or ``dynamic``.
-    viewtype: Optional[str]
+    viewtype: str | None
 
     #: The current repository's VOB tag.
     #:
     #: This is only used for matching the Review Board server repository.
-    vobtag: Optional[str]
+    vobtag: str | None
 
     def __init__(
         self,
@@ -552,7 +552,7 @@ class ClearCaseClient(BaseSCMClient):
         if not check_install(['cleartool', 'help']):
             raise SCMClientDependencyError(missing_exes=['cleartool'])
 
-    def get_local_path(self) -> Optional[str]:
+    def get_local_path(self) -> str | None:
         """Return the local path to the working tree.
 
         Returns:
@@ -591,7 +591,7 @@ class ClearCaseClient(BaseSCMClient):
 
         return os.path.join(self.root_path, vobtag)
 
-    def get_repository_info(self) -> Optional[RepositoryInfo]:
+    def get_repository_info(self) -> RepositoryInfo | None:
         """Return repository information for the current working tree.
 
         Returns:
@@ -967,7 +967,7 @@ class ClearCaseClient(BaseSCMClient):
     def _get_vob_uuid(
         self,
         vobtag: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Return the current VOB's UUID.
 
         Args:

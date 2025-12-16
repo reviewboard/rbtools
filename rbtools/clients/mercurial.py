@@ -8,7 +8,7 @@ import re
 import uuid
 from contextlib import ExitStack
 from gettext import gettext as _
-from typing import Any, Optional, TYPE_CHECKING, cast
+from typing import Any, TYPE_CHECKING, cast
 from urllib.parse import urlsplit, urlunparse
 
 from rbtools.clients import RepositoryInfo
@@ -522,7 +522,7 @@ class MercurialClient(BaseSCMClient):
         return self._hidden_changesets_supported
 
     @property
-    def hg_root(self) -> Optional[str]:
+    def hg_root(self) -> str | None:
         """Return the root of the working directory.
 
         This will return the root directory of the current repository. If the
@@ -580,7 +580,7 @@ class MercurialClient(BaseSCMClient):
     def get_commit_history(
         self,
         revisions: SCMClientRevisionSpec,
-    ) -> Optional[list[SCMClientCommitHistoryItem]]:
+    ) -> list[SCMClientCommitHistoryItem] | None:
         """Return the commit history specified by the revisions.
 
         Args:
@@ -652,7 +652,7 @@ class MercurialClient(BaseSCMClient):
 
         return history
 
-    def get_local_path(self) -> Optional[str]:
+    def get_local_path(self) -> str | None:
         """Return the local path to the working tree.
 
         Returns:
@@ -666,7 +666,7 @@ class MercurialClient(BaseSCMClient):
 
         return self.hg_root
 
-    def get_repository_info(self) -> Optional[RepositoryInfo]:
+    def get_repository_info(self) -> RepositoryInfo | None:
         """Return repository information for the current working tree.
 
         Returns:
@@ -933,7 +933,7 @@ class MercurialClient(BaseSCMClient):
     def _calculate_hgsubversion_repository_info(
         self,
         svn_info: str,
-    ) -> Optional[RepositoryInfo]:
+    ) -> RepositoryInfo | None:
         """Return repository info for an hgsubversion checkout.
 
         Args:
@@ -946,7 +946,7 @@ class MercurialClient(BaseSCMClient):
         """
         def _info(
             r: str,
-        ) -> Optional[SplitResult]:
+        ) -> SplitResult | None:
             m = re.search(r, svn_info, re.M)
 
             if m:
@@ -1533,8 +1533,8 @@ class MercurialClient(BaseSCMClient):
 
     def _get_bottom_and_top_outgoing_revs_for_remote(
         self,
-        rev: Optional[str] = None,
-    ) -> tuple[Optional[int], Optional[int]]:
+        rev: (str | None) = None,
+    ) -> tuple[int | None, int | None]:
         """Return the bottom and top outgoing revisions.
 
         Args:
@@ -1566,7 +1566,7 @@ class MercurialClient(BaseSCMClient):
     def _get_outgoing_changesets(
         self,
         remote: str,
-        rev: Optional[str] = None,
+        rev: (str | None) = None,
     ) -> list[tuple[int, str, str]]:
         """Return the outgoing changesets between us and a remote.
 
@@ -1675,7 +1675,7 @@ class MercurialClient(BaseSCMClient):
     def scan_for_server(
         self,
         repository_info: RepositoryInfo,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Find the Review Board server matching this repository.
 
         Args:

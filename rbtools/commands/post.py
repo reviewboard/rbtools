@@ -8,7 +8,7 @@ import os
 import re
 import sys
 from collections import namedtuple
-from typing import Iterable, NamedTuple, Optional, TYPE_CHECKING, TypedDict
+from typing import Iterable, NamedTuple, TYPE_CHECKING, TypedDict
 
 from tqdm import tqdm
 from typing_extensions import NotRequired, TypeVar
@@ -448,7 +448,7 @@ class Post(BaseCommand):
     #:
     #: Version Added:
     #:     5.0
-    diff_file_attachments_resource: Optional[DiffFileAttachmentListResource]
+    diff_file_attachments_resource: DiffFileAttachmentListResource | None
 
     def post_process_options(self):
         super(Post, self).post_process_options()
@@ -604,10 +604,10 @@ class Post(BaseCommand):
 
     def post_request(
         self,
-        review_request: Optional[ReviewRequestItemResource] = None,
-        diff_history: Optional[DiffHistory] = None,
-        squashed_diff: Optional[SquashedDiff] = None,
-        submit_as: Optional[str] = None,
+        review_request: (ReviewRequestItemResource | None) = None,
+        diff_history: (DiffHistory | None) = None,
+        squashed_diff: (SquashedDiff | None) = None,
+        submit_as: (str | None) = None,
     ) -> tuple[int, str]:
         """Create or update a review request, uploading a diff in the process.
 
@@ -1104,7 +1104,7 @@ class Post(BaseCommand):
     def _get_review_request_to_update(
         self,
         server_supports_history: bool = False,
-    ) -> Optional[ReviewRequestItemResource]:
+    ) -> ReviewRequestItemResource | None:
         """Retrieve and return the review request to update.
 
         Args:
@@ -1778,7 +1778,7 @@ class Post(BaseCommand):
 
             source_filename = file.source_file
             source_revision = file.source_revision
-            source_file_content: Optional[bytes] = None
+            source_file_content: (bytes | None) = None
 
             if ('parent_source_revision' in file.extra_data and
                 source_revision != 'PRE-CREATION'):
@@ -1940,7 +1940,7 @@ class Post(BaseCommand):
         self,
         iterable: Iterable[_T],
         desc: str,
-        total: Optional[int] = None,
+        total: (int | None) = None,
     ) -> Iterable[_T]:
         """Show a progress bar for commit validation and upload.
 

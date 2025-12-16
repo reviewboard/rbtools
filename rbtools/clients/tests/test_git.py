@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import re
 import unittest
-from typing import ClassVar, Optional, TYPE_CHECKING
+from typing import ClassVar, TYPE_CHECKING
 
 import kgb
 
@@ -62,7 +62,7 @@ class BaseGitClientTests(SCMClientTestCase[GitClient]):
     def setup_checkout(
         cls,
         checkout_dir: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Populate a Git checkout.
 
         This will create a checkout of the sample Git repository stored
@@ -192,7 +192,7 @@ class GitClientTests(BaseGitClientTests):
     def setup_checkout(
         cls,
         checkout_dir: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Populate a Git checkout.
 
         This will create a checkout of the sample Git repository stored
@@ -1974,7 +1974,7 @@ class GitPerforceClientTests(BaseGitClientTests):
     def setup_checkout(
         cls,
         checkout_dir: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Populate a Git-P4 checkout.
 
         This will create a fake Perforce upstream with commits containing
@@ -2409,7 +2409,7 @@ class GitSubversionClientTests(BaseGitClientTests):
     def setup_checkout(
         cls,
         checkout_dir: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Populate a Git-SVN checkout.
 
         This will create a checkout of the sample Git repository stored
@@ -2707,7 +2707,7 @@ class GitPatcherTests(BaseGitClientTests):
     def setup_checkout(
         cls,
         checkout_dir: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Populate a Git checkout.
 
         This will create a checkout of the sample Git repository stored

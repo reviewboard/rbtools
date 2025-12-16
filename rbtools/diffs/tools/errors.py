@@ -6,7 +6,7 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Iterable, Optional, TYPE_CHECKING
+from typing import Iterable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -37,7 +37,7 @@ class MissingDiffToolError(Exception):
     def __init__(
         self,
         registry,
-        compatible_diff_tool_ids: Optional[Iterable[str]] = None,
+        compatible_diff_tool_ids: (Iterable[str] | None) = None,
     ) -> None:
         """Initialize the error.
 

@@ -9,7 +9,7 @@ import os
 import re
 import sys
 import xml.etree.ElementTree as ET
-from typing import Optional, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, cast
 from urllib.parse import unquote
 
 from appdirs import user_data_dir
@@ -78,7 +78,7 @@ class BaseTFWrapper:
         """
         pass
 
-    def get_local_path(self) -> Optional[str]:
+    def get_local_path(self) -> str | None:
         """Return the local path to the working tree.
 
         Returns:
@@ -87,7 +87,7 @@ class BaseTFWrapper:
         """
         raise NotImplementedError
 
-    def get_repository_info(self) -> Optional[RepositoryInfo]:
+    def get_repository_info(self) -> RepositoryInfo | None:
         """Return repository information for the current working tree.
 
         Returns:
@@ -216,7 +216,7 @@ class TFExeWrapper(BaseTFWrapper):
 
         raise SCMClientDependencyError(missing_exes=['tf'])
 
-    def get_local_path(self) -> Optional[str]:
+    def get_local_path(self) -> str | None:
         """Return the local path to the working tree.
 
         Returns:
@@ -237,7 +237,7 @@ class TFExeWrapper(BaseTFWrapper):
         logging.debug('Could not find the collection from "tf vc workfold"')
         return None
 
-    def get_repository_info(self) -> Optional[RepositoryInfo]:
+    def get_repository_info(self) -> RepositoryInfo | None:
         """Return repository information for the current working tree.
 
         Returns:
@@ -331,7 +331,7 @@ class TFExeWrapper(BaseTFWrapper):
     def _convert_symbolic_revision(
         self,
         revision: str,
-        path: Optional[str] = None,
+        path: (str | None) = None,
     ) -> int:
         """Convert a symbolic revision into a numeric changeset.
 
@@ -648,7 +648,7 @@ class TEEWrapper(BaseTFWrapper):
         """
         super().__init__(**kwargs)
 
-        self.tf: Optional[str] = None
+        self.tf: (str | None) = None
 
     def check_dependencies(self) -> None:
         """Check whether all dependencies for the client are available.
@@ -683,7 +683,7 @@ class TEEWrapper(BaseTFWrapper):
         # To help with debugging, we'll include the full path on each.
         raise SCMClientDependencyError(missing_exes=[tuple(tf_locations)])
 
-    def get_local_path(self) -> Optional[str]:
+    def get_local_path(self) -> str | None:
         """Return the local path to the working tree.
 
         Returns:
@@ -706,7 +706,7 @@ class TEEWrapper(BaseTFWrapper):
         logging.debug('Could not find the collection from "tf workfold"')
         return None
 
-    def get_repository_info(self) -> Optional[RepositoryInfo]:
+    def get_repository_info(self) -> RepositoryInfo | None:
         """Return repository information for the current working tree.
 
         Returns:
@@ -796,7 +796,7 @@ class TEEWrapper(BaseTFWrapper):
     def _convert_symbolic_revision(
         self,
         revision: str,
-        path: Optional[str] = None,
+        path: (str | None) = None,
     ) -> int:
         """Convert a symbolic revision into a numeric changeset.
 
@@ -1137,7 +1137,7 @@ class TFHelperWrapper(BaseTFWrapper):
         if missing_exes:
             raise SCMClientDependencyError(missing_exes=missing_exes)
 
-    def get_local_path(self) -> Optional[str]:
+    def get_local_path(self) -> str | None:
         """Return the local path to the working tree.
 
         Returns:
@@ -1154,7 +1154,7 @@ class TFHelperWrapper(BaseTFWrapper):
         except Exception:
             return None
 
-    def get_repository_info(self) -> Optional[RepositoryInfo]:
+    def get_repository_info(self) -> RepositoryInfo | None:
         """Return repository information for the current working tree.
 
         Returns:
@@ -1365,7 +1365,7 @@ class TFSClient(BaseSCMClient):
         """
         super(TFSClient, self).__init__(*args, **kwargs)
 
-        self._tf_wrapper: Optional[BaseTFWrapper] = None
+        self._tf_wrapper: (BaseTFWrapper | None) = None
 
     @property
     def tf_wrapper(self) -> BaseTFWrapper:
@@ -1434,7 +1434,7 @@ class TFSClient(BaseSCMClient):
                 'Our wrapper (rbt install tfs)',
             )])
 
-    def get_local_path(self) -> Optional[str]:
+    def get_local_path(self) -> str | None:
         """Return the local path to the working tree.
 
         Returns:
@@ -1443,7 +1443,7 @@ class TFSClient(BaseSCMClient):
         """
         return self.tf_wrapper.get_local_path()
 
-    def get_repository_info(self) -> Optional[RepositoryInfo]:
+    def get_repository_info(self) -> RepositoryInfo | None:
         """Return repository information for the current working tree.
 
         Returns:

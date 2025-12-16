@@ -8,8 +8,6 @@ Deprecated::
 
 from __future__ import annotations
 
-from typing import Optional
-
 from rbtools.api.factory import create_resource
 from rbtools.api.request import HttpRequest
 from rbtools.api.tests.base import TestWithPayloads
@@ -123,7 +121,7 @@ class TestTransport(Transport):
 
     def enable_cache(
         self,
-        cache_location: Optional[str] = None,
+        cache_location: (str | None) = None,
         in_memory: bool = False,
     ) -> None:
         """Enable caching for all future HTTP requests.

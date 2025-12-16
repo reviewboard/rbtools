@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Optional
 
 import kgb
 
@@ -25,7 +24,7 @@ class CVSClientTests(SCMClientTestCase[CVSClient]):
     def setup_checkout(
         cls,
         checkout_dir: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Populate a CVS checkout.
 
         This will create a checkout of the sample CVS repository stored

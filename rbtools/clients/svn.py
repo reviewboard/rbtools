@@ -10,7 +10,7 @@ import posixpath
 import re
 import sys
 from xml.etree import ElementTree
-from typing import Iterator, Optional, TYPE_CHECKING, cast
+from typing import Iterator, TYPE_CHECKING, cast
 from urllib.parse import unquote
 
 from rbtools.api.errors import APIError
@@ -599,8 +599,8 @@ class SVNClient(BaseSCMClient):
         """
         super(SVNClient, self).__init__(**kwargs)
 
-        self._svn_info_cache: dict[str, Optional[dict[str, str]]] = {}
-        self._svn_repository_info_cache: Optional[SVNRepositoryInfo] = None
+        self._svn_info_cache: dict[str, dict[str, str] | None] = {}
+        self._svn_repository_info_cache: (SVNRepositoryInfo | None) = None
 
     def check_dependencies(self) -> None:
         """Check whether all dependencies for the client are available.
@@ -640,7 +640,7 @@ class SVNClient(BaseSCMClient):
 
         return False
 
-    def get_local_path(self) -> Optional[str]:
+    def get_local_path(self) -> str | None:
         """Return the local path to the working tree.
 
         Returns:
@@ -659,7 +659,7 @@ class SVNClient(BaseSCMClient):
 
         return None
 
-    def get_repository_info(self) -> Optional[RepositoryInfo]:
+    def get_repository_info(self) -> RepositoryInfo | None:
         """Return repository information for the current working tree.
 
         Returns:
@@ -929,7 +929,7 @@ class SVNClient(BaseSCMClient):
     def scan_for_server(
         self,
         repository_info: RepositoryInfo,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Scan for the reviewboard:url property in the repository.
 
         This method looks for the reviewboard:url property, which is an
@@ -1087,7 +1087,7 @@ class SVNClient(BaseSCMClient):
             # was added along with support for binary files in diffs.
             diff_cmd.append('--force')
 
-        changelist: Optional[str] = None
+        changelist: (str | None) = None
 
         if tip == self.REVISION_WORKING_COPY:
             # Posting the working copy
@@ -1198,7 +1198,7 @@ class SVNClient(BaseSCMClient):
     def history_scheduled_with_commit(
         self,
         repository_info: RepositoryInfo,
-        changelist: Optional[str],
+        changelist: str | None,
         include_files: Sequence[str],
         exclude_patterns: Sequence[str],
     ) -> bool:
@@ -1256,7 +1256,7 @@ class SVNClient(BaseSCMClient):
     def find_copyfrom(
         self,
         path: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Find the source filename for copied files.
 
         The output of 'svn info' reports the "Copied From" header when invoked
@@ -1276,15 +1276,15 @@ class SVNClient(BaseSCMClient):
         """
         def smart_join(
             p1: str,
-            p2: Optional[str],
+            p2: str | None,
         ) -> str:
             if p2:
                 return os.path.join(p1, p2)
             else:
                 return p1
 
-        path1: Optional[str] = path
-        path2: Optional[str] = None
+        path1: (str | None) = path
+        path2: (str | None) = None
 
         while path1:
             info = self.svn_info(path1, ignore_errors=True) or {}
@@ -1535,7 +1535,7 @@ class SVNClient(BaseSCMClient):
         assert base_path
 
         for line in diff_content:
-            front: Optional[bytes] = None
+            front: (bytes | None) = None
             orig_line: bytes = line
 
             if (DIFF_NEW_FILE_LINE_RE.match(line) or
@@ -1717,7 +1717,7 @@ class SVNClient(BaseSCMClient):
         svn_args: Sequence[str],
         *args,
         **kwargs,
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         """Run SVN log non-interactively and retrieve XML output.
 
         We cannot run SVN log interactively and retrieve XML output because the
@@ -1886,28 +1886,28 @@ class SVNRepositoryInfo(RepositoryInfo):
     #:
     #: Type:
     #:     int
-    repository_id: Optional[int]
+    repository_id: int | None
 
     #: UUID of the Subversion repository.
     #:
     #: Type:
     #:     str
-    uuid: Optional[str]
+    uuid: str | None
 
     #: The SVN client that owns this repository information.
     #:
     #: Type:
     #:     SVNClient
-    tool: Optional[SVNClient]
+    tool: SVNClient | None
 
     def __init__(
         self,
-        path: Optional[str] = None,
-        base_path: Optional[str] = None,
-        uuid: Optional[str] = None,
-        local_path: Optional[str] = None,
-        repository_id: Optional[int] = None,
-        tool: Optional[SVNClient] = None,
+        path: (str | None) = None,
+        base_path: (str | None) = None,
+        uuid: (str | None) = None,
+        local_path: (str | None) = None,
+        repository_id: (int | None) = None,
+        tool: (SVNClient | None) = None,
     ) -> None:
         """Initialize the repository information.
 
@@ -1971,7 +1971,7 @@ class SVNRepositoryInfo(RepositoryInfo):
         self,
         path: str,
         root: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         pathdirs = self._split_on_slash(path)
         rootdirs = self._split_on_slash(root)
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import difflib
 import os
 import textwrap
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rbtools.commands.base import BaseCommand, CommandError
 from rbtools.config.loader import CONFIG_FILENAME
@@ -47,7 +47,7 @@ class SetupRepo(BaseCommand):
     def prompt_rb_repository(
         self,
         local_tool_name: str,
-        server_tool_names: Optional[str],
+        server_tool_names: str | None,
         repository_paths: str | list[str] | None,
         api_root: RootResource,
     ) -> RepositoryItemResource | None:

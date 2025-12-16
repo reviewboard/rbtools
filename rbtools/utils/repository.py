@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rbtools.api.errors import APIError
 
@@ -20,10 +20,10 @@ if TYPE_CHECKING:
 
 def get_repository_resource(
     api_root: RootResource,
-    tool: Optional[BaseSCMClient] = None,
-    repository_name: Optional[str] = None,
+    tool: (BaseSCMClient | None) = None,
+    repository_name: (str | None) = None,
     repository_paths: (str | list[str] | None) = None,
-    capabilities: Optional[Capabilities] = None,
+    capabilities: (Capabilities | None) = None,
 ) -> tuple[RepositoryItemResource | None, RepositoryInfoResource | None]:
     """Return the API resource for the matching repository on the server.
 
@@ -138,8 +138,8 @@ def get_repository_resource(
 def get_repository_id(
     repository_info: RepositoryInfo,
     api_root: RootResource,
-    repository_name: Optional[str] = None,
-) -> Optional[int]:
+    repository_name: (str | None) = None,
+) -> int | None:
     """Return the ID of a repository from the server.
 
     This will look up all accessible repositories on the server and try to

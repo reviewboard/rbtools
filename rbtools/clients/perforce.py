@@ -12,7 +12,7 @@ import stat
 import subprocess
 import sys
 from fnmatch import fnmatch
-from typing import Optional, TYPE_CHECKING, overload
+from typing import TYPE_CHECKING, overload
 
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
@@ -153,7 +153,7 @@ class P4Wrapper(object):
         self,
         new_change_spec: str,
         *,
-        changenum: Optional[str] = None,
+        changenum: (str | None) = None,
     ) -> None:
         """Modify a change description.
 
@@ -856,7 +856,7 @@ class PerforceClient(BaseSCMClient):
         """
         self.p4.check_dependencies()
 
-    def get_local_path(self) -> Optional[str]:
+    def get_local_path(self) -> str | None:
         """Return the local path to the working tree.
 
         Returns:
@@ -893,7 +893,7 @@ class PerforceClient(BaseSCMClient):
 
         return None
 
-    def get_repository_info(self) -> Optional[RepositoryInfo]:
+    def get_repository_info(self) -> RepositoryInfo | None:
         """Return repository information for the current working tree.
 
         Returns:
@@ -944,8 +944,8 @@ class PerforceClient(BaseSCMClient):
         # Validate the repository path we got above to see if it's something
         # that makes sense.
         parts = server_address.split(':')
-        hostname: Optional[str] = None
-        port: Optional[str] = None
+        hostname: (str | None) = None
+        port: (str | None) = None
 
         if len(parts) == 3 and parts[0] == 'ssl':
             hostname = parts[1]
@@ -2304,7 +2304,7 @@ class PerforceClient(BaseSCMClient):
         new_file: str,
         depot_file: str,
         base_revision: int,
-        tip_revision: Optional[int],
+        tip_revision: int | None,
         new_depot_file: str,
         changetype_short: str,
         ignore_unmodified: bool = False,

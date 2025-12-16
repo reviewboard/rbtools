@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import io
 import json
-from typing import (Any, AnyStr, Callable, Generic, IO, Optional, TextIO,
-                    TYPE_CHECKING, cast)
+from typing import (Any, AnyStr, Callable, Generic, IO, TextIO, TYPE_CHECKING,
+                    cast)
 
 from typing_extensions import TypeAlias
 
@@ -212,7 +212,7 @@ class OutputWrapper(Generic[AnyStr]):
     ######################
 
     #: The wrapped output stream.
-    output_stream: Optional[IO[AnyStr]]
+    output_stream: IO[AnyStr] | None
 
     #: A function to force a string type for writing.
     _force_str: _ForceStringFunc
@@ -236,7 +236,7 @@ class OutputWrapper(Generic[AnyStr]):
 
     def write(
         self,
-        msg: Optional[AnyStr] = None,
+        msg: (AnyStr | None) = None,
         end: (AnyStr | _Newline) = _newline,
     ) -> None:
         """Write a message to the output stream.

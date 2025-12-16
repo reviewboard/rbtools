@@ -14,7 +14,7 @@ import platform
 import subprocess
 import sys
 from http import HTTPStatus
-from typing import ClassVar, Optional, TextIO, TYPE_CHECKING
+from typing import ClassVar, TextIO, TYPE_CHECKING
 from urllib.parse import urlparse
 
 import colorama
@@ -247,19 +247,19 @@ class BaseCommand:
     #:
     #: This will be set when the command is run if :py:attr:`needs_api` is
     #: ``True``. Otherwise it will be ``None``.
-    api_client: Optional[RBClient]
+    api_client: RBClient | None
 
     #: The root of the API tree.
     #:
     #: This will be set when the command is run if :py:attr:`needs_api` is
     #: ``True``. Otherwise it will be ``None``.
-    api_root: Optional[RootResource]
+    api_root: RootResource | None
 
     #: Capabilities set by the API.
     #:
     #: This will be set when the command is run if :py:attr:`needs_api` is
     #: ``True``. Otherwise it will be ``None``.
-    capabilities: Optional[Capabilities]
+    capabilities: Capabilities | None
 
     #: The loaded configuration for RBTools.
     #:
@@ -267,7 +267,7 @@ class BaseCommand:
     #:     5.0:
     #:     This is now a :py:class:`~rbtools.config.config.RBToolsConfig`
     #:     instance, instead of a plain dictionary.
-    config: Optional[RBToolsConfig]
+    config: RBToolsConfig | None
 
     #: An output buffer for JSON results.
     #:
@@ -285,19 +285,19 @@ class BaseCommand:
     #:
     #: This will be set when the command is run if both :py:attr:`needs_api`
     #: and :py:attr:`needs_repository` are ``True``.
-    repository: Optional[RepositoryItemResource]
+    repository: RepositoryItemResource | None
 
     #: Information on the local repository.
     #:
     #: This will be set when the command is run if :py:attr:`needs_scm_client`
     #: is run. Otherwise it will be ``None``.
-    repository_info: Optional[RepositoryInfo]
+    repository_info: RepositoryInfo | None
 
     #: The URL to the Review Board server.
     #:
     #: This will be set when the command is run if :py:attr:`needs_api` is
     #: ``True``.
-    server_url: Optional[str]
+    server_url: str | None
 
     #: The stream for writing error output as Unicode strings.
     #:
@@ -360,7 +360,7 @@ class BaseCommand:
     #:
     #: This will be set when the command is run if :py:attr:`needs_scm_client`
     #: is run. Otherwise it will be ``None``.
-    tool: Optional[BaseSCMClient]
+    tool: BaseSCMClient | None
 
     #: The transport class used for talking to the API.
     transport_cls: type[Transport]
@@ -862,7 +862,7 @@ class BaseCommand:
     def create_parser(
         self,
         config: RBToolsConfig,
-        argv: Optional[list[str]] = None,
+        argv: (list[str] | None) = None,
     ) -> argparse.ArgumentParser:
         """Return a new argument parser for this command.
 
@@ -1122,7 +1122,7 @@ class BaseCommand:
         # Check that the proper number of arguments have been provided.
         argspec = inspect.getfullargspec(self.main)
         minargs = len(argspec.args) - 1
-        maxargs: Optional[int] = minargs
+        maxargs: (int | None) = minargs
 
         # Arguments that have a default value are considered optional.
         if argspec.defaults is not None:
@@ -1200,10 +1200,10 @@ class BaseCommand:
 
     def initialize_scm_tool(
         self,
-        client_name: Optional[str] = None,
+        client_name: (str | None) = None,
         *,
         tool_required: bool = True,
-    ) -> tuple[Optional[RepositoryInfo], Optional[BaseSCMClient]]:
+    ) -> tuple[RepositoryInfo | None, BaseSCMClient | None]:
         """Initialize the SCM tool for the current working directory.
 
         Version Changed:
@@ -1263,8 +1263,8 @@ class BaseCommand:
         self,
         realm: str,
         uri: str,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
+        username: (str | None) = None,
+        password: (str | None) = None,
         *args,
         **kwargs,
     ) -> tuple[str, str]:
@@ -1849,7 +1849,7 @@ class BaseMultiCommand(BaseCommand):
 
     def usage(
         self,
-        command_cls: Optional[type[BaseSubCommand]] = None,
+        command_cls: (type[BaseSubCommand] | None) = None,
     ) -> str:
         """Return a usage string for the command.
 
@@ -1878,7 +1878,7 @@ class BaseMultiCommand(BaseCommand):
     def create_parser(
         self,
         config: RBToolsConfig,
-        argv: Optional[list[str]] = None,
+        argv: (list[str] | None) = None,
     ) -> argparse.ArgumentParser:
         """Create and return the argument parser for this command.
 

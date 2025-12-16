@@ -10,7 +10,7 @@ import json
 import logging
 from collections import defaultdict
 from urllib.parse import parse_qs, urljoin, urlparse
-from typing import Any, Optional
+from typing import Any
 
 from rbtools.api.errors import create_api_error
 from rbtools.api.factory import create_resource
@@ -685,9 +685,9 @@ class URLMapTransport(Transport):
 
     def login(
         self,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        api_token: Optional[str] = None,
+        username: (str | None) = None,
+        password: (str | None) = None,
+        api_token: (str | None) = None,
         *args,
         **kwargs,
     ) -> None:

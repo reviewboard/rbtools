@@ -7,7 +7,7 @@ Version Added:
 from __future__ import annotations
 
 import io
-from typing import Any, Callable, Generic, Optional, TYPE_CHECKING, TypeVar
+from typing import Any, Callable, Generic, TYPE_CHECKING, TypeVar
 
 import kgb
 from housekeeping import deprecate_non_keyword_only_args
@@ -76,7 +76,7 @@ class CommandTestsMixin(kgb.SpyAgency, Generic[_CommandT]):
     #:
     #: Type:
     #:     type
-    command_cls: Optional[type[_CommandT]] = None
+    command_cls: (type[_CommandT] | None) = None
 
     needs_temp_home = True
 
@@ -86,7 +86,7 @@ class CommandTestsMixin(kgb.SpyAgency, Generic[_CommandT]):
     def create_command(
         self,
         *,
-        args: Optional[list[str]] = None,
+        args: (list[str] | None) = None,
         server_url: str = DEFAULT_SERVER_URL,
         initialize: bool = False,
         **kwargs,
@@ -130,7 +130,7 @@ class CommandTestsMixin(kgb.SpyAgency, Generic[_CommandT]):
 
     def run_command(
         self,
-        args: Optional[list[str]] = None,
+        args: (list[str] | None) = None,
         server_url: str = DEFAULT_SERVER_URL,
         **kwargs,
     ) -> RunCommandResult[_CommandT]:
@@ -197,14 +197,14 @@ class CommandTestsMixin(kgb.SpyAgency, Generic[_CommandT]):
     def _create_command_common(
         self,
         *,
-        args: Optional[list[str]] = None,
-        repository_info: Optional[RepositoryInfo] = None,
-        tool: Optional[BaseSCMClient] = None,
+        args: (list[str] | None) = None,
+        repository_info: (RepositoryInfo | None) = None,
+        tool: (BaseSCMClient | None) = None,
         scan: bool = False,
-        stdout: Optional[io.BytesIO] = None,
-        stderr: Optional[io.BytesIO] = None,
-        stdin: Optional[io.BytesIO] = None,
-        setup_transport_func: Optional[Callable[[Transport], None]] = None,
+        stdout: (io.BytesIO | None) = None,
+        stderr: (io.BytesIO | None) = None,
+        stdin: (io.BytesIO | None) = None,
+        setup_transport_func: (Callable[[Transport], None] | None) = None,
     ) -> _CommandT:
         """Create a command instance.
 
@@ -294,7 +294,7 @@ class CommandTestsMixin(kgb.SpyAgency, Generic[_CommandT]):
         self,
         *,
         args: list[str],
-        server_url: Optional[str] = None,
+        server_url: (str | None) = None,
     ) -> list[str]:
         """Return a command line argument list.
 

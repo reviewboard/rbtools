@@ -10,7 +10,7 @@ import logging
 import os
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 from typing_extensions import TypeAlias
 
@@ -44,7 +44,7 @@ class SCMClientScanCandidate:
     #:
     #: Type:
     #:     str
-    local_path: Optional[str] = None
+    local_path: (str | None) = None
 
 
 @dataclass
@@ -61,7 +61,7 @@ class SCMClientScanResult:
     #:
     #: Type:
     #:     rbtools.clients.base.scmclient.BaseSCMClient
-    scmclient: Optional[BaseSCMClient]
+    scmclient: BaseSCMClient | None
 
     #: The matching local path on the filesystem, if found.
     #:
@@ -70,7 +70,7 @@ class SCMClientScanResult:
     #:
     #: Type:
     #:     str
-    local_path: Optional[str]
+    local_path: str | None
 
     #: The matching repository information, if found.
     #:
@@ -78,7 +78,7 @@ class SCMClientScanResult:
     #:
     #: Type:
     #:     rbtools.clients.base.repository.RepositoryInfo
-    repository_info: Optional[RepositoryInfo]
+    repository_info: RepositoryInfo | None
 
     #: A list of all possible candidates for the tree.
     #:
@@ -128,7 +128,7 @@ def _get_or_create_scmclient_for_scan(
     cache: _SCMClientCache,
     errors: SCMClientScanErrors,
     dep_errors: SCMClientScanDependencyErrors,
-) -> Optional[BaseSCMClient]:
+) -> BaseSCMClient | None:
     """Return a SCMClient instance for an ID, utilizing a cache.
 
     This will return any existing instance from a cache, if one is found. If
@@ -307,7 +307,7 @@ def _get_scmclient_candidates(
 
 def _get_preferred_candidate_for_scan(
     candidates: SCMClientScanCandidateList,
-) -> Optional[SCMClientScanCandidate]:
+) -> SCMClientScanCandidate | None:
     """Return a preferred candidate from a scanned list of candidates.
 
     If the provided list is empty, this will return ``None``.
@@ -480,7 +480,7 @@ SCMClientScanErrors: TypeAlias = Mapping[str, Exception]
 SCMClientScanDependencyErrors: TypeAlias = \
     Mapping[str, SCMClientDependencyError]
 
-_SCMClientCache: TypeAlias = dict[str, Optional[BaseSCMClient]]
+_SCMClientCache: TypeAlias = dict[str, BaseSCMClient | None]
 _SCMClientKwargs: TypeAlias = dict[str, Any]
 _SCMClientCandidatesResult: TypeAlias = tuple[SCMClientScanCandidateList,
                                               SCMClientScanErrors,

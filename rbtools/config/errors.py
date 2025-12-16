@@ -6,8 +6,6 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Optional
-
 
 class ConfigError(Exception):
     """A base class for configuration errors.
@@ -24,13 +22,13 @@ class ConfigError(Exception):
     #:
     #: Type:
     #:     str
-    filename: Optional[str]
+    filename: str | None
 
     def __init__(
         self,
         msg: str,
         *,
-        filename: Optional[str] = None,
+        filename: (str | None) = None,
     ) -> None:
         """Initialize the error.
 
@@ -63,7 +61,7 @@ class ConfigSyntaxError(ConfigError):
     #:
     #: Type:
     #:     int
-    column: Optional[int]
+    column: int | None
 
     #: Extra details shown about the syntax error.
     #:
@@ -77,14 +75,14 @@ class ConfigSyntaxError(ConfigError):
     #:
     #: Type:
     #:     int
-    line: Optional[int]
+    line: int | None
 
     def __init__(
         self,
         *,
-        filename: Optional[str] = None,
-        line: Optional[int],
-        column: Optional[int],
+        filename: (str | None) = None,
+        line: int | None,
+        column: int | None,
         details: str,
     ) -> None:
         """Initialize the error.

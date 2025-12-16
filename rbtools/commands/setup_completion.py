@@ -32,7 +32,7 @@ class SetupCompletion(BaseCommand):
 
     def main(
         self,
-        shell: Optional[str] = None,
+        shell: (str | None) = None,
         *args,
     ) -> None:
         """Run the command.

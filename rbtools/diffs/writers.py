@@ -7,7 +7,7 @@ Version Added:
 from __future__ import annotations
 
 import io
-from typing import Iterable, Optional
+from typing import Iterable
 
 from typing_extensions import TypeAlias
 
@@ -79,7 +79,7 @@ class UnifiedDiffWriter:
     def write_orig_file_header(
         self,
         path: _BytesOrStr,
-        extra: Optional[_BytesOrStr] = None,
+        extra: (_BytesOrStr | None) = None,
     ) -> None:
         """Write a header for the original file.
 
@@ -109,7 +109,7 @@ class UnifiedDiffWriter:
     def write_modified_file_header(
         self,
         path: _BytesOrStr,
-        extra: Optional[_BytesOrStr] = None,
+        extra: (_BytesOrStr | None) = None,
     ) -> None:
         """Write a header for the modified file.
 
@@ -140,8 +140,8 @@ class UnifiedDiffWriter:
         *,
         orig_path: _BytesOrStr,
         modified_path: _BytesOrStr,
-        orig_extra: Optional[_BytesOrStr] = None,
-        modified_extra: Optional[_BytesOrStr] = None,
+        orig_extra: (_BytesOrStr | None) = None,
+        modified_extra: (_BytesOrStr | None) = None,
     ) -> None:
         """Write both original and modified file headers.
 
@@ -248,10 +248,10 @@ class UnifiedDiffWriter:
         self,
         diff_file_result: DiffFileResult,
         *,
-        orig_path: Optional[_BytesOrStr] = None,
-        modified_path: Optional[_BytesOrStr] = None,
-        orig_extra: Optional[_BytesOrStr] = None,
-        modified_extra: Optional[_BytesOrStr] = None,
+        orig_path: (_BytesOrStr | None) = None,
+        modified_path: (_BytesOrStr | None) = None,
+        orig_extra: (_BytesOrStr | None) = None,
+        modified_extra: (_BytesOrStr | None) = None,
     ) -> None:
         """Write file headers based on the result from a diff tool.
 

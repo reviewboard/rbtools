@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.base.scmclient import (BaseSCMClient,
@@ -64,7 +64,7 @@ class PlasticClient(BaseSCMClient):
         if not check_install(['cm', 'version']):
             raise SCMClientDependencyError(missing_exes=['cm'])
 
-    def get_local_path(self) -> Optional[str]:
+    def get_local_path(self) -> str | None:
         """Return the local path to the working tree.
 
         Returns:
@@ -97,7 +97,7 @@ class PlasticClient(BaseSCMClient):
 
         return m.group(1)
 
-    def get_repository_info(self) -> Optional[RepositoryInfo]:
+    def get_repository_info(self) -> RepositoryInfo | None:
         """Return repository information for the current working tree.
 
         Returns:

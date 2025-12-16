@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import io
 import re
-from typing import Iterator, Optional
+from typing import Iterator
 
 from typing_extensions import TypedDict
 
@@ -248,7 +248,7 @@ class DiffFileResult:
         return b''
 
     @property
-    def parsed_orig_file_header(self) -> Optional[DiffFileHeaderDict]:
+    def parsed_orig_file_header(self) -> DiffFileHeaderDict | None:
         """The extra contents on the file header.
 
         This is usually a timestamp, but its presence and format may vary
@@ -280,7 +280,7 @@ class DiffFileResult:
         return b''
 
     @property
-    def parsed_modified_file_header(self) -> Optional[DiffFileHeaderDict]:
+    def parsed_modified_file_header(self) -> DiffFileHeaderDict | None:
         """The extra contents on the file header.
 
         This is usually a timestamp, but its presence and format may vary
@@ -358,7 +358,7 @@ class DiffFileResult:
     def _parse_file_header(
         self,
         header: bytes,
-    ) -> Optional[DiffFileHeaderDict]:
+    ) -> DiffFileHeaderDict | None:
         """Return parsed information from a file header.
 
         Args:

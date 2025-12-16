@@ -9,8 +9,7 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
-from typing import (Any, ClassVar, Generic, Optional, TYPE_CHECKING, TypeVar,
-                    cast)
+from typing import Any, ClassVar, Generic, TYPE_CHECKING, TypeVar, cast
 
 from housekeeping import func_deprecated
 from typing_extensions import NotRequired, TypedDict, Unpack, final
@@ -76,7 +75,7 @@ class SCMClientRevisionSpec(TypedDict):
     #:
     #: Type:
     #:     object
-    base: Optional[object]
+    base: Any
 
     #: A revision to use as the tip of the resulting diff.
     #:
@@ -86,7 +85,7 @@ class SCMClientRevisionSpec(TypedDict):
     #:
     #: Type:
     #:     object
-    tip: Optional[object]
+    tip: Any
 
     #: The revision to use as the base of a parent diff.
     #:
@@ -96,7 +95,7 @@ class SCMClientRevisionSpec(TypedDict):
     #:
     #: Type:
     #:     object
-    parent_base: NotRequired[Optional[object]]
+    parent_base: NotRequired[Any]
 
     #: The commit ID of the single commit being posted, if not using a range.
     #:
@@ -104,7 +103,7 @@ class SCMClientRevisionSpec(TypedDict):
     #:
     #: Type:
     #:     str
-    commit_id: NotRequired[Optional[str]]
+    commit_id: NotRequired[Any]
 
     #: Any extra revision state not used above.
     #:
@@ -115,7 +114,7 @@ class SCMClientRevisionSpec(TypedDict):
     #:
     #: Version Added:
     #:     4.0
-    extra: NotRequired[Optional[Mapping[str, Any]]]
+    extra: NotRequired[Mapping[str, Any] | None]
 
 
 class SCMClientDiffResult(TypedDict):
@@ -134,25 +133,25 @@ class SCMClientDiffResult(TypedDict):
     #:
     #: Type:
     #:     bytes
-    diff: Optional[bytes]
+    diff: bytes | None
 
     #: The contents of the parent diff, if available.
     #:
     #: Type:
     #:     bytes
-    parent_diff: NotRequired[Optional[bytes]]
+    parent_diff: NotRequired[bytes | None]
 
     #: The change number to include when posting, if available.
     #:
     #: Type:
     #:     str
-    changenum: NotRequired[Optional[str]]
+    changenum: NotRequired[str | None]
 
     #: The commit ID to include when posting, if available.
     #:
     #: Type:
     #:     str
-    commit_id: NotRequired[Optional[str]]
+    commit_id: NotRequired[str | None]
 
     #: The ID of the commit that the change is based on, if available.
     #:
@@ -161,7 +160,7 @@ class SCMClientDiffResult(TypedDict):
     #:
     #: Type:
     #:     str
-    base_commit_id: NotRequired[Optional[str]]
+    base_commit_id: NotRequired[str | None]
 
     #: A dictionary of extra_data keys to set on the review request.
     #:
@@ -177,7 +176,7 @@ class SCMClientDiffResult(TypedDict):
     #:
     #: Version Added:
     #:     3.1
-    review_request_extra_data: NotRequired[Optional[dict[str, Any]]]
+    review_request_extra_data: NotRequired[dict[str, Any] | None]
 
 
 class SCMClientCommitHistoryItem(TypedDict):
@@ -200,49 +199,49 @@ class SCMClientCommitHistoryItem(TypedDict):
     #:
     #: Type:
     #:     str
-    parent_id: Optional[str]
+    parent_id: str | None
 
     #: The commit message.
     #:
     #: Type:
     #:     str
-    commit_message: Optional[str]
+    commit_message: str | None
 
     #: The name of the commit's author.
     #:
     #: Type:
     #:     str
-    author_name: Optional[str]
+    author_name: str | None
 
     #: The e-mail address of the commit's author.
     #:
     #: Type:
     #:     str
-    author_email: Optional[str]
+    author_email: str | None
 
     #: The date the commit was authored.
     #:
     #: Type:
     #:     str
-    author_date: Optional[str]
+    author_date: str | None
 
     #: The name of the person or entity who committed the change.
     #:
     #: Type:
     #:     str
-    committer_name: NotRequired[Optional[str]]
+    committer_name: NotRequired[str | None]
 
     #: The e-mail address of the person or entity who committed the change.
     #:
     #: Type:
     #:     str
-    committer_email: NotRequired[Optional[str]]
+    committer_email: NotRequired[str | None]
 
     #: The date the commit was made.
     #:
     #: Type:
     #:     str
-    committer_date: NotRequired[Optional[str]]
+    committer_date: NotRequired[str | None]
 
 
 class SCMClientCommitMessage(TypedDict):
@@ -261,7 +260,7 @@ class SCMClientCommitMessage(TypedDict):
     #:
     #: Type:
     #:     str
-    summary: Optional[str]
+    summary: str | None
 
     #: The description of a commit message.
     #:
@@ -270,7 +269,7 @@ class SCMClientCommitMessage(TypedDict):
     #:
     #: Type:
     #:     str
-    description: NotRequired[Optional[str]]
+    description: NotRequired[str | None]
 
 
 class SCMClientPatcher(Generic[TSCMClient], Patcher):
@@ -414,7 +413,7 @@ class _LegacyPatcher(SCMClientPatcher['BaseSCMClient']):
         base_dir = patch.base_dir or ''
         prefix_level = patch.prefix_level
 
-        norm_prefix_level: Optional[str]
+        norm_prefix_level: str | None
 
         if prefix_level is not None:
             norm_prefix_level = str(prefix_level)
@@ -451,7 +450,7 @@ class _LegacyPatcher(SCMClientPatcher['BaseSCMClient']):
             rbtools.diffs.errors.ApplyPatchError:
                 There was an error while applying the patch.
         """
-        norm_prefix_level: Optional[str]
+        norm_prefix_level: str | None
         prefix_level = patch.prefix_level
 
         if prefix_level is not None:
@@ -506,7 +505,7 @@ class BaseSCMClient:
     #:
     #: Type:
     #:     str
-    server_tool_names: ClassVar[Optional[str]] = None
+    server_tool_names: ClassVar[str | None] = None
 
     #: A comma-separated list of SCMClient IDs on the server.
     #:
@@ -658,7 +657,7 @@ class BaseSCMClient:
     #:
     #: Type:
     #:     rbtools.api.capabilities.Capabilities
-    capabilities: Optional[Capabilities]
+    capabilities: Capabilities | None
 
     #: User configuration.
     #:
@@ -679,7 +678,7 @@ class BaseSCMClient:
     #:
     #: Type:
     #:     argparse.Namespace
-    options: Optional[argparse.Namespace]
+    options: argparse.Namespace | None
 
     #: Whether the client is set up and ready for operations.
     #:
@@ -714,8 +713,8 @@ class BaseSCMClient:
         self.capabilities = None
         self.is_setup = False
 
-        self._diff_tool: Optional[BaseDiffTool] = None
-        self._has_deps: Optional[bool] = None
+        self._diff_tool: (BaseDiffTool | None) = None
+        self._has_deps: (bool | None) = None
 
     @final
     def setup(self) -> None:
@@ -857,7 +856,7 @@ class BaseSCMClient:
         """
         return False
 
-    def get_local_path(self) -> Optional[str]:
+    def get_local_path(self) -> str | None:
         """Return the local path to the working tree.
 
         This is expected to be overridden by subclasses.
@@ -878,7 +877,7 @@ class BaseSCMClient:
 
         return None
 
-    def get_repository_info(self) -> Optional[RepositoryInfo]:
+    def get_repository_info(self) -> RepositoryInfo | None:
         """Return repository information for the current working tree.
 
         This is expected to be overridden by subclasses.
@@ -892,7 +891,7 @@ class BaseSCMClient:
         """
         return None
 
-    def get_diff_tool(self) -> Optional[BaseDiffTool]:
+    def get_diff_tool(self) -> BaseDiffTool | None:
         """Return a diff tool for use with this client.
 
         This can be used by subclasses, and by callers that want to check if
@@ -938,8 +937,8 @@ class BaseSCMClient:
 
     def get_server_tool_names(
         self,
-        capabilities: Optional[Capabilities],
-    ) -> Optional[str]:
+        capabilities: Capabilities | None,
+    ) -> str | None:
         """Return the list of supported tool names on the server.
 
         Version Added:
@@ -1030,7 +1029,7 @@ class BaseSCMClient:
         """
         return None, None
 
-    def get_repository_name(self) -> Optional[str]:
+    def get_repository_name(self) -> str | None:
         """Return any repository name configured in the repository.
 
         This is used as a fallback from the standard config options, for
@@ -1063,7 +1062,7 @@ class BaseSCMClient:
     def get_changenum(
         self,
         revisions: SCMClientRevisionSpec,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Return the change number for the given revisions.
 
         This is only used when the client is supposed to send a change number
@@ -1083,7 +1082,7 @@ class BaseSCMClient:
     def scan_for_server(
         self,
         repository_info: RepositoryInfo,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Find the server path.
 
         This will search for the server name in the .reviewboardrc config
@@ -1159,7 +1158,7 @@ class BaseSCMClient:
         *,
         revisions: SCMClientRevisionSpec,
         **kwargs,
-    ) -> Optional[bool]:
+    ) -> bool | None:
         """Return whether a review request matches revisions or tree state.
 
         This works along with review request matching in tools like
@@ -1203,7 +1202,7 @@ class BaseSCMClient:
         include_files: (Sequence[str] | None) = None,
         exclude_patterns: (Sequence[str] | None) = None,
         no_renames: bool = False,
-        repository_info: Optional[RepositoryInfo] = None,
+        repository_info: (RepositoryInfo | None) = None,
         extra_args: (Sequence[str] | None) = None,
         with_parent_diff: bool = True,
     ) -> SCMClientDiffResult:
@@ -1272,7 +1271,7 @@ class BaseSCMClient:
     def get_commit_history(
         self,
         revisions: SCMClientRevisionSpec,
-    ) -> Optional[Sequence[SCMClientCommitHistoryItem]]:
+    ) -> Sequence[SCMClientCommitHistoryItem] | None:
         """Return the commit history between the given revisions.
 
         Derived classes must override this method if they support posting with
@@ -1399,7 +1398,7 @@ class BaseSCMClient:
         *,
         base_path: str,
         base_dir: str,
-        p: Optional[str] = None,
+        p: (str | None) = None,
         revert: bool = False,
     ) -> PatchResult:
         """Apply the patch and return a PatchResult indicating its success.
@@ -1503,7 +1502,7 @@ class BaseSCMClient:
     def get_commit_message(
         self,
         revisions: SCMClientRevisionSpec,
-    ) -> Optional[SCMClientCommitMessage]:
+    ) -> SCMClientCommitMessage | None:
         """Return the commit message from the commits in the given revisions.
 
         This pulls out the first line from the commit messages of the given
@@ -1697,7 +1696,7 @@ class BaseSCMClient:
     def amend_commit_description(
         self,
         message: str,
-        revisions: Optional[SCMClientRevisionSpec] = None,
+        revisions: (SCMClientRevisionSpec | None) = None,
     ) -> None:
         """Update a commit message to the given string.
 

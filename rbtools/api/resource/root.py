@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Optional, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, cast
 
 from packaging.version import parse as parse_version
 from typelets.json import JSONDict
@@ -302,7 +302,7 @@ class RootResource(ItemResource):
                 replace_api_stub(self, attr_name, stub, get_method)
 
         product = cast(JSONDict, payload.get('product', {}))
-        server_version = cast(Optional[str], product.get('package_version'))
+        server_version = cast(str | None, product.get('package_version'))
 
         if (server_version is None or
             parse_version(server_version) < parse_version(MINIMUM_VERSION)):
