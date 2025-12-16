@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import subprocess
-from typing import Optional, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from rbtools.api.client import RBClient
 from rbtools.api.errors import APIError, ServerInterfaceError
@@ -61,7 +61,7 @@ def execute(
     *,
     text: bool = False,
     strip: bool = True,
-) -> Optional[Union[bytes, str]]:
+) -> bytes | str | None:
     """Execute the specified command and return the stdout output.
 
     Version Changed:

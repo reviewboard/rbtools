@@ -7,8 +7,7 @@ Version Added:
 from __future__ import annotations
 
 import io
-from typing import (Any, Callable, Generic, Optional, TYPE_CHECKING, TypeVar,
-                    Union)
+from typing import Any, Callable, Generic, Optional, TYPE_CHECKING, TypeVar
 
 import kgb
 from housekeeping import deprecate_non_keyword_only_args
@@ -40,7 +39,7 @@ class RunCommandResult(TypedDict, Generic[_CommandT]):
     command: _CommandT
 
     #: The exit code of the command.
-    exit_code: Optional[Union[int, str]]
+    exit_code: int | str | None
 
     #: The JSON results of the command.
     json: dict[str, Any]
@@ -171,7 +170,7 @@ class CommandTestsMixin(kgb.SpyAgency, Generic[_CommandT]):
         # interfere with the test.
         self.spy_on(cleanup_tempfiles, call_original=False)
 
-        exit_code: Optional[Union[int, str]]
+        exit_code: int | str | None
 
         try:
             command.run_from_argv(argv)

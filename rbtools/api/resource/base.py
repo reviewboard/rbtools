@@ -13,7 +13,7 @@ import logging
 from collections.abc import MutableMapping
 from functools import update_wrapper, wraps
 from typing import (Any, Callable, Generic, Literal, TYPE_CHECKING, TypeVar,
-                    Union, cast, overload)
+                    cast, overload)
 from urllib.parse import urljoin
 
 from typelets.json import JSONDict, JSONValue
@@ -1025,7 +1025,7 @@ def resource_mimetype(
 #:
 #: Version Added:
 #:     6.0
-RequestMethodResult = Union[HttpRequest, Resource, None]
+RequestMethodResult = HttpRequest | Resource | None
 
 
 class request_method_returns(Generic[_TResource]):

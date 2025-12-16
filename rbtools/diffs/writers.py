@@ -7,7 +7,7 @@ Version Added:
 from __future__ import annotations
 
 import io
-from typing import Iterable, Optional, Union
+from typing import Iterable, Optional
 
 from typing_extensions import TypeAlias
 
@@ -19,7 +19,7 @@ from rbtools.utils.encoding import force_bytes
 #:
 #: This is used instead of :py:data:`typing.AnyStr`, which imposes
 #: constraints on other arguments of the same type.
-_BytesOrStr: TypeAlias = Union[bytes, str]
+_BytesOrStr: TypeAlias = bytes | str
 
 
 class UnifiedDiffWriter:
@@ -191,7 +191,7 @@ class UnifiedDiffWriter:
 
     def write_hunks(
         self,
-        hunks: Union[bytes, Iterable[bytes]],
+        hunks: bytes | Iterable[bytes],
     ) -> None:
         """Write hunks.
 

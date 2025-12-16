@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Union
 
 from typing_extensions import TypeAlias
 
@@ -93,7 +92,7 @@ class SCMClientDependencyError(SCMError):
     #:
     #: This can be a string naming the dependency, or a tuple of
     #: interchangeable dependencies.
-    MissingItem: TypeAlias = Union[str, MissingOneOfDep]
+    MissingItem: TypeAlias = str | MissingOneOfDep
 
     #: A type alias for a list of missing dependencies.
     MissingList: TypeAlias = Sequence[MissingItem]
@@ -142,7 +141,7 @@ class SCMClientDependencyError(SCMError):
 
     def _serialize_missing(
         self,
-        missing: Union[MissingList, MissingOneOfDep],
+        missing: MissingList | MissingOneOfDep,
     ) -> str:
         """Return a serialized version of missing dependencies.
 

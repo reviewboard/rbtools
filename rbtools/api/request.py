@@ -19,7 +19,7 @@ from http.cookiejar import (Cookie,
                             MozillaCookieJar)
 from io import BytesIO
 from json import loads as json_loads
-from typing import Callable, TYPE_CHECKING, Union
+from typing import Callable, TYPE_CHECKING
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import (
@@ -72,7 +72,7 @@ OTPCallback: TypeAlias = Callable[[str, str], str]
 WebLoginCallback: TypeAlias = Callable[[], bool]
 
 
-QueryArgs: TypeAlias = Union[bool, int, float, bytes, str]
+QueryArgs: TypeAlias = bool | int | float | bytes | str
 
 
 def _normalize_url_parts(

@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any, Union, overload
+from typing import Any, overload
 
 from typing_extensions import Literal
 
 
 @overload
 def force_bytes(
-    string: Union[bytes, str],
+    string: bytes | str,
     encoding: str = ...,
     *,
     strings_only: Literal[True] = ...,
@@ -84,7 +84,7 @@ def force_bytes(
 
 @overload
 def force_unicode(
-    string: Union[bytes, str],
+    string: bytes | str,
     encoding: str = ...,
     *,
     strings_only: Literal[True] = ...,

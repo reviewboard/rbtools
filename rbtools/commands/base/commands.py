@@ -14,7 +14,7 @@ import platform
 import subprocess
 import sys
 from http import HTTPStatus
-from typing import ClassVar, Optional, TextIO, Union, TYPE_CHECKING
+from typing import ClassVar, Optional, TextIO, TYPE_CHECKING
 from urllib.parse import urlparse
 
 import colorama
@@ -237,7 +237,7 @@ class BaseCommand:
     #:
     #: Type:
     #:     list of Option or OptionGroup
-    option_list: ClassVar[list[Union[Option, OptionGroup]]] = []
+    option_list: ClassVar[list[Option | OptionGroup]] = []
 
     ######################
     # Instance variables #
@@ -1804,7 +1804,7 @@ class BaseMultiCommand(BaseCommand):
     #:
     #: Type:
     #:     list
-    common_subcommand_option_list: list[Union[Option, OptionGroup]] = []
+    common_subcommand_option_list: list[Option | OptionGroup] = []
 
     ######################
     # Instance variables #

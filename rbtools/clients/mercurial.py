@@ -8,7 +8,7 @@ import re
 import uuid
 from contextlib import ExitStack
 from gettext import gettext as _
-from typing import Any, Optional, TYPE_CHECKING, Union, cast
+from typing import Any, Optional, TYPE_CHECKING, cast
 from urllib.parse import urlsplit, urlunparse
 
 from rbtools.clients import RepositoryInfo
@@ -897,7 +897,7 @@ class MercurialClient(BaseSCMClient):
 
     def _identify_revision(
         self,
-        revision: Union[str, int],
+        revision: str | int,
     ) -> str:
         """Identify the given revision.
 

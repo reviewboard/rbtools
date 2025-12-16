@@ -6,7 +6,7 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING, Union
+from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -39,7 +39,7 @@ class RepositoryInfo:
     #:
     #: Type:
     #:     str or list of str
-    path: Optional[Union[str, Sequence[str]]]
+    path: str | Sequence[str] | None
 
     #: Relative path between the working directory and repository root.
     #:

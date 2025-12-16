@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING, Union
+from typing import Optional, TYPE_CHECKING
 
 from rbtools.api.errors import APIError
 
@@ -22,7 +22,7 @@ def get_repository_resource(
     api_root: RootResource,
     tool: Optional[BaseSCMClient] = None,
     repository_name: Optional[str] = None,
-    repository_paths: Optional[Union[str, list[str]]] = None,
+    repository_paths: (str | list[str] | None) = None,
     capabilities: Optional[Capabilities] = None,
 ) -> tuple[RepositoryItemResource | None, RepositoryInfoResource | None]:
     """Return the API resource for the matching repository on the server.

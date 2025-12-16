@@ -9,7 +9,7 @@ from __future__ import annotations
 import io
 import json
 from typing import (Any, AnyStr, Callable, Generic, IO, Optional, TextIO,
-                    TYPE_CHECKING, Union, cast)
+                    TYPE_CHECKING, cast)
 
 from typing_extensions import TypeAlias
 
@@ -237,7 +237,7 @@ class OutputWrapper(Generic[AnyStr]):
     def write(
         self,
         msg: Optional[AnyStr] = None,
-        end: Union[AnyStr, _Newline] = _newline,
+        end: (AnyStr | _Newline) = _newline,
     ) -> None:
         """Write a message to the output stream.
 
@@ -273,7 +273,7 @@ class OutputWrapper(Generic[AnyStr]):
 
     def _write(
         self,
-        s: Union[AnyStr, _Newline],
+        s: AnyStr | _Newline,
     ) -> None:
         """Write a string to the output stream.
 

@@ -9,7 +9,7 @@ import sys
 import tempfile
 import unittest
 from contextlib import contextmanager
-from typing import Iterator, Optional, Sequence, TYPE_CHECKING, Union
+from typing import Iterator, Optional, Sequence, TYPE_CHECKING
 
 import kgb
 
@@ -455,7 +455,7 @@ class TestCase(unittest.TestCase):
 
     def write_reviewboardrc(
         self,
-        config: Union[str, dict[str, object]] = {},
+        config: str | dict[str, object] = {},
         *,
         parent_dir: Optional[str] = None,
         filename: str = '.reviewboardrc',
@@ -507,7 +507,7 @@ class TestCase(unittest.TestCase):
     @contextmanager
     def reviewboardrc(
         self,
-        config: Union[str, dict[str, object]],
+        config: str | dict[str, object],
         use_temp_dir: bool = False,
     ) -> Iterator[None]:
         """Populate a temporary .reviewboardrc file.

@@ -10,7 +10,7 @@ import logging
 import re
 from pathlib import Path
 from typing import (Any, ClassVar, Generic, Optional, TYPE_CHECKING, TypeVar,
-                    Union, cast)
+                    cast)
 
 from housekeeping import func_deprecated
 from typing_extensions import NotRequired, TypedDict, Unpack, final
@@ -538,7 +538,7 @@ class BaseSCMClient:
     #:
     #: Type:
     #:     bool or list
-    requires_diff_tool: Union[bool, Sequence[str]] = False
+    requires_diff_tool: (bool | Sequence[str]) = False
 
     #: Whether the SCM uses server-side changesets
     #:

@@ -6,7 +6,7 @@ import io
 import logging
 import os
 import subprocess
-from typing import Any, AnyStr, Optional, TYPE_CHECKING, TypedDict, Union
+from typing import Any, AnyStr, Optional, TYPE_CHECKING, TypedDict
 
 from rbtools.deprecation import RemovedInRBTools80Warning
 from rbtools.utils.encoding import force_unicode
@@ -582,7 +582,7 @@ def run_process_exec(
 
 
 def execute(
-    command: Union[AnyStr, Sequence[AnyStr]],
+    command: AnyStr | Sequence[AnyStr],
     env: (Mapping[str, str] | None) = None,
     cwd: Optional[str] = None,
     split_lines: bool = False,

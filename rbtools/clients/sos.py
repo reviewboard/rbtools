@@ -16,7 +16,7 @@ import re
 import sqlite3
 from collections import OrderedDict
 from contextlib import contextmanager
-from typing import Optional, Union, TYPE_CHECKING, cast
+from typing import Optional, TYPE_CHECKING, cast
 
 from pydiffx import DiffType, DiffX
 from pydiffx.utils.text import guess_line_endings
@@ -1714,7 +1714,7 @@ class SOSClient(BaseSCMClient):
         self,
         wa_root: str,
         filename: str,
-        orig_revision: Union[int, str],
+        orig_revision: int | str,
         orig_content: Optional[bytes] = None,
     ) -> DiffFileResult:
         """Return diff hunks for a given file.
