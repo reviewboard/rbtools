@@ -1003,7 +1003,12 @@ class JujutsuClient(BaseSCMClient):
                 The branch was unable to be pushed.
         """
         try:
-            run_process(['jj', 'git', 'push', '-b', remote_branch])
+            p = run_process(['jj', 'git', 'push', '-b', remote_branch])
+
+            # As of Jujutsu 0.36, this always returns a 0 exit code, even when
+            # the command failed, so we also have to check for output.
+            if 'No matching bookmarks for names' in p.stderr.read():
+                raise PushError(f'No matching bookmark name "{remote_branch}"')
         except RunProcessError as e:
             raise PushError(str(e))
 
