@@ -58,6 +58,9 @@ if TYPE_CHECKING:
     from rbtools.config import RBToolsConfig
 
 
+logger = logging.getLogger(__name__)
+
+
 RBTOOLS_COOKIE_FILE = '.rbtools-cookies'
 RBTOOLS_USER_AGENT = 'RBTools/' + get_package_version()
 RB_COOKIE_NAME = 'rbsessionid'
@@ -970,10 +973,10 @@ class ReviewBoardHTTPBasicAuthHandler(HTTPBasicAuthHandler):
             try:
                 self._otp_token_method = otp_header.split(';')[1].strip()
             except IndexError:
-                logging.error('Invalid %s header value: "%s". This header '
-                              'is needed for two-factor authentication to '
-                              'work. Please report this!',
-                              self.OTP_TOKEN_HEADER, otp_header)
+                logger.error('Invalid %s header value: "%s". This header '
+                             'is needed for two-factor authentication to '
+                             'work. Please report this!',
+                             self.OTP_TOKEN_HEADER, otp_header)
                 return None
 
         return HTTPBasicAuthHandler.http_error_auth_reqed(
@@ -1202,16 +1205,16 @@ def _create_cookie_jar(
                 shutil.copyfile(post_review_cookies, cookie_file)
                 os.chmod(cookie_file, 0o600)
             except IOError as e:
-                logging.warning('There was an error while copying '
-                                'legacy post-review cookies: %s', e)
+                logger.warning('There was an error while copying '
+                               'legacy post-review cookies: %s', e)
 
     if not os.path.isfile(cookie_file):
         try:
             open(cookie_file, 'w').close()
             os.chmod(cookie_file, 0o600)
         except IOError as e:
-            logging.warning('There was an error while creating a '
-                            'cookie file: %s', e)
+            logger.warning('There was an error while creating a '
+                           'cookie file: %s', e)
 
     return (
         MozillaCookieJar(filename=cookie_file,
@@ -1406,8 +1409,8 @@ class ReviewBoardServer:
                 assert isinstance(cookie_jar, MozillaCookieJar)
                 cookie_jar.load(ext_auth_cookies, ignore_expires=True)
             except IOError as e:
-                logging.critical('There was an error while loading a '
-                                 'cookie file: %s', e)
+                logger.critical('There was an error while loading a '
+                                'cookie file: %s', e)
 
         self.cookie_jar = cookie_jar
 
@@ -1611,14 +1614,14 @@ class ReviewBoardServer:
 
             assert rsp['stat'] == 'fail'
 
-            logging.debug('Got API Error %d (HTTP code %d): %s',
-                          rsp['err']['code'], http_status, rsp['err']['msg'])
-            logging.debug('Error data: %r', rsp)
+            logger.debug('Got API Error %d (HTTP code %d): %s',
+                         rsp['err']['code'], http_status, rsp['err']['msg'])
+            logger.debug('Error data: %r', rsp)
 
             raise create_api_error(http_status, rsp['err']['code'], rsp,
                                    rsp['err']['msg'])
         except ValueError:
-            logging.debug('Got HTTP error: %s: %s', http_status, data_str)
+            logger.debug('Got HTTP error: %s: %s', http_status, data_str)
             raise APIError(http_status, None, None, data_str)
 
     def make_request(

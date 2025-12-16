@@ -1142,7 +1142,7 @@ class BaseCommand:
 
         try:
             self._init_logging()
-            logging.debug('Command line: %s', subprocess.list2cmdline(argv))
+            self.log.debug('Command line: %s', subprocess.list2cmdline(argv))
 
             self._check_deprecated_args()
 
@@ -1172,7 +1172,7 @@ class BaseCommand:
             elif self.options.debug:
                 raise
 
-            logging.error(e)
+            self.log.error(e)
             self.json.add_error(str(e))
             exit_code = 1
         except CommandExit as e:
@@ -1186,7 +1186,7 @@ class BaseCommand:
                 raise
 
             self.json.add_error(f'Internal error: {type(e).__name__}: {e}')
-            logging.critical(e)
+            self.log.critical(e)
             exit_code = 1
 
         cleanup_tempfiles()
@@ -1620,7 +1620,7 @@ class BaseCommand:
                     deprecated_str += ' Use %s instead.'
                     deprecated_format_args.append(replacement)
 
-                logging.warning(deprecated_str, *deprecated_format_args)
+                self.log.warning(deprecated_str, *deprecated_format_args)
 
     def _init_logging(self) -> None:
         """Initialize logging for the command.
@@ -1686,11 +1686,11 @@ class BaseCommand:
             handler.setLevel(level)
             root.addHandler(handler)
 
-        logging.debug('RBTools %s', get_version_string())
-        logging.debug('Python %s', sys.version)
-        logging.debug('Running on %s', platform.platform())
-        logging.debug('Home = %s', get_home_path())
-        logging.debug('Current directory = %s', os.getcwd())
+        self.log.debug('RBTools %s', get_version_string())
+        self.log.debug('Python %s', sys.version)
+        self.log.debug('Running on %s', platform.platform())
+        self.log.debug('Home = %s', get_home_path())
+        self.log.debug('Current directory = %s', os.getcwd())
 
     def _init_server_url(self) -> str:
         """Initialize the server URL.

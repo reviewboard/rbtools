@@ -629,7 +629,7 @@ class SVNClient(BaseSCMClient):
         """
         # NOTE: This can be removed once check_dependencies() is mandatory.
         if not self.has_dependencies(expect_checked=True):
-            logging.debug('Unable to execute "svn help": skipping SVN')
+            logger.debug('Unable to execute "svn help": skipping SVN')
             return False
 
         repository_url = getattr(self.options, 'repository_url', None)
@@ -649,7 +649,7 @@ class SVNClient(BaseSCMClient):
         """
         # NOTE: This can be removed once check_dependencies() is mandatory.
         if not self.has_dependencies(expect_checked=True):
-            logging.debug('Unable to execute "svn help": skipping SVN')
+            logger.debug('Unable to execute "svn help": skipping SVN')
             return None
 
         info = self.svn_info(path=None, ignore_errors=True)
@@ -671,7 +671,7 @@ class SVNClient(BaseSCMClient):
 
         # NOTE: This can be removed once check_dependencies() is mandatory.
         if not self.has_dependencies(expect_checked=True):
-            logging.debug('Unable to execute "svn help": skipping SVN')
+            logger.debug('Unable to execute "svn help": skipping SVN')
             return None
 
         repository_url = getattr(self.options, 'repository_url', None)
@@ -708,8 +708,9 @@ class SVNClient(BaseSCMClient):
                 int(m.group(3)),
             )
         else:
-            logging.warn('Unable to parse SVN client version triple from '
-                         '"%s". Assuming version 0.0.0.', ver_string.strip())
+            logger.warning('Unable to parse SVN client version triple from '
+                           '"%s". Assuming version 0.0.0.',
+                           ver_string.strip())
             self.subversion_client_version = (0, 0, 0)
 
         self._svn_repository_info_cache = SVNRepositoryInfo(

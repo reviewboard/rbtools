@@ -572,8 +572,8 @@ class MercurialClient(BaseSCMClient):
 
                 if rc_key in self.hgrc:
                     self._remote_path = [candidate, self.hgrc[rc_key]]
-                    logging.debug('Using candidate path %r: %r',
-                                  self._remote_path[0], self._remote_path[1])
+                    logger.debug('Using candidate path %r: %r',
+                                 self._remote_path[0], self._remote_path[1])
                     break
 
         self._initted = True
@@ -662,7 +662,7 @@ class MercurialClient(BaseSCMClient):
         """
         # NOTE: This can be removed once check_dependencies() is mandatory.
         if not self.has_dependencies(expect_checked=True):
-            logging.debug('Unable to execute "hg --help": skipping Mercurial')
+            logger.debug('Unable to execute "hg --help": skipping Mercurial')
             return None
 
         return self.hg_root
@@ -676,7 +676,7 @@ class MercurialClient(BaseSCMClient):
         """
         # NOTE: This can be removed once check_dependencies() is mandatory.
         if not self.has_dependencies(expect_checked=True):
-            logging.debug('Unable to execute "hg --help": skipping Mercurial')
+            logger.debug('Unable to execute "hg --help": skipping Mercurial')
             return None
 
         self._init()
@@ -823,10 +823,10 @@ class MercurialClient(BaseSCMClient):
                 # dirty working directory.
                 if (self.has_pending_changes() and
                     not self.config.get('SUPPRESS_CLIENT_WARNINGS', False)):
-                    logging.warning('Your working directory is not clean. Any '
-                                    'changes which have not been committed '
-                                    'to a branch will not be included in your '
-                                    'review request.')
+                    logger.warning('Your working directory is not clean. Any '
+                                   'changes which have not been committed '
+                                   'to a branch will not be included in your '
+                                   'review request.')
 
             if self.options and self.options.parent_branch:
                 result['parent_base'] = result['base']
@@ -869,8 +869,8 @@ class MercurialClient(BaseSCMClient):
                 self._get_remote_branch(),
                 rev=cast(str, result['base']))
 
-            logging.debug('%d outgoing changesets between remote and base.',
-                          len(outgoing))
+            logger.debug('%d outgoing changesets between remote and base.',
+                         len(outgoing))
 
             if not outgoing:
                 return result
@@ -891,8 +891,8 @@ class MercurialClient(BaseSCMClient):
 
             result['parent_base'] = parent_base[0]
 
-            logging.debug('Identified %s as parent base',
-                          result['parent_base'])
+            logger.debug('Identified %s as parent base',
+                         result['parent_base'])
 
         return result
 
@@ -1623,7 +1623,7 @@ class MercurialClient(BaseSCMClient):
             if not rev.isdigit():
                 raise Exception('Unexpected output from hg: %s' % line)
 
-            logging.debug('Found outgoing changeset %s:%s', rev, node)
+            logger.debug('Found outgoing changeset %s:%s', rev, node)
 
             outgoing_changesets.append((int(rev), node, branch))
 

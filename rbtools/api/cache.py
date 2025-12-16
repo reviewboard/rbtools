@@ -24,6 +24,9 @@ if TYPE_CHECKING:
     from typing import Any
 
 
+logger = logging.getLogger(__name__)
+
+
 #: The minimum version of Review Board to allow HTTP caching.
 #:
 #: Versions prior to this had broken caching. If this version or older is
@@ -259,7 +262,7 @@ class APICache:
                 The database exists but the schema could not be read.
         """
         if create_db_in_memory:
-            logging.debug('Creating API cache in memory.')
+            logger.debug('Creating API cache in memory.')
 
             self.db = sqlite3.connect(':memory:')
             self.cache_path = None
@@ -275,13 +278,13 @@ class APICache:
                     cache_dir = os.path.dirname(self.cache_path)
 
                     if not os.path.exists(cache_dir):
-                        logging.debug('Cache directory "%s" does not exist; '
-                                      'creating.',
-                                      cache_dir)
+                        logger.debug('Cache directory "%s" does not exist; '
+                                     'creating.',
+                                     cache_dir)
                         os.makedirs(cache_dir)
 
-                    logging.debug('API cache "%s" does not exist; creating.',
-                                  self.cache_path)
+                    logger.debug('API cache "%s" does not exist; creating.',
+                                 self.cache_path)
 
                 self.db = sqlite3.connect(self.cache_path)
 
@@ -305,7 +308,7 @@ class APICache:
                 # connect fails. In either case, HTTP requests can still be
                 # made, they will just passed through to the URL opener without
                 # attempting to interact with the API cache.
-                logging.warning(
+                logger.warning(
                     'Could not create or access API cache "%s". Try running '
                     '"rbt clear-cache" to clear the HTTP cache for the API.',
                     self.cache_path)
@@ -341,8 +344,8 @@ class APICache:
 
         if entry:
             if entry.up_to_date():
-                logging.debug('Cached response for HTTP GET %s up to date',
-                              request.get_full_url())
+                logger.debug('Cached response for HTTP GET %s up to date',
+                             request.get_full_url())
                 response = CachedHTTPResponse(entry)
             else:
                 if entry.etag:
@@ -355,16 +358,16 @@ class APICache:
                 response = LiveHTTPResponse(urlopen(request))
 
                 if response.code == 304:
-                    logging.debug('Cached response for HTTP GET %s expired '
-                                  'and was not modified',
-                                  request.get_full_url())
+                    logger.debug('Cached response for HTTP GET %s expired '
+                                 'and was not modified',
+                                 request.get_full_url())
                     entry.local_date = datetime.datetime.now()
                     self._save_entry(entry)
                     response = CachedHTTPResponse(entry)
                 elif 200 <= response.code < 300:
-                    logging.debug('Cached response for HTTP GET %s expired '
-                                  'and was modified',
-                                  request.get_full_url())
+                    logger.debug('Cached response for HTTP GET %s expired '
+                                 'and was modified',
+                                 request.get_full_url())
                     response_headers = response.headers
                     cache_info = self._get_caching_info(request.headers,
                                                         response_headers)
@@ -391,9 +394,9 @@ class APICache:
                     else:
                         # This resource is no longer cache-able so we should
                         # delete our cached version.
-                        logging.debug('Cached response for HTTP GET request '
-                                      'to %s is no longer cacheable',
-                                      request.get_full_url())
+                        logger.debug('Cached response for HTTP GET request '
+                                     'to %s is no longer cacheable',
+                                     request.get_full_url())
                         self._delete_entry(entry)
         else:
             response = LiveHTTPResponse(urlopen(request))
@@ -414,12 +417,12 @@ class APICache:
                     response_headers.get('Item-Content-Type'),
                     response.read()))
 
-                logging.debug('Added cache entry for HTTP GET request to %s',
-                              request.get_full_url())
+                logger.debug('Added cache entry for HTTP GET request to %s',
+                             request.get_full_url())
 
             else:
-                logging.debug('HTTP GET request to %s cannot be cached',
-                              request.get_full_url())
+                logger.debug('HTTP GET request to %s cannot be cached',
+                             request.get_full_url())
 
         return response
 
@@ -475,13 +478,13 @@ class APICache:
                     else:
                         max_age = (expires - now).seconds
                 except ValueError:
-                    logging.error('The format of the "Expires" header (value '
-                                  '%s) does not match the expected format.',
-                                  expires)
+                    logger.error('The format of the "Expires" header (value '
+                                 '%s) does not match the expected format.',
+                                 expires)
                 except locale.Error:
-                    logging.error('The C locale is unavailable on this '
-                                  'system. The "Expires" header cannot be '
-                                  'parsed.')
+                    logger.error('The C locale is unavailable on this '
+                                 'system. The "Expires" header cannot be '
+                                 'parsed.')
                 finally:
                     locale.setlocale(locale.LC_TIME, old_locale)
 
@@ -804,7 +807,7 @@ def clear_cache(cache_path: str = APICache.DEFAULT_CACHE_PATH) -> bool:
         os.unlink(cache_path)
         return True
     except Exception as e:
-        logging.error('Could not clear cache in "%s": %s. Try manually '
-                      'removing it if it exists.',
-                      cache_path, e)
+        logger.error('Could not clear cache in "%s": %s. Try manually '
+                     'removing it if it exists.',
+                     cache_path, e)
         return False

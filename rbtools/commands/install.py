@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import logging
 import os
 import shutil
 import tempfile
@@ -87,6 +86,8 @@ class Install(BaseCommand):
             rbtools.commands.CommandError:
                 The authenticity of the file could not be verified.
         """
+        logger = self.log
+
         if check_install(['gpg']):
             run_process(['gpg', '--recv-keys', '4ED1F993'])
             sig_filename = self.download_file('%s.asc' % url)
@@ -97,7 +98,7 @@ class Install(BaseCommand):
                     ignore_errors=True)
 
                 if result.exit_code == 0:
-                    logging.debug('Verified file signature')
+                    logger.debug('Verified file signature')
                 else:
                     raise CommandError(
                         'Unable to verify authenticity of file downloaded '
@@ -105,11 +106,12 @@ class Install(BaseCommand):
             finally:
                 os.unlink(sig_filename)
         else:
-            logging.info('"gpg" not installed. Skipping signature validation.')
+            logger.info(
+                '"gpg" not installed. Skipping signature validation.')
 
             try:
                 sha_url = '%s.sha256sum' % url
-                logging.debug('Downloading %s', sha_url)
+                logger.debug('Downloading %s', sha_url)
                 response = urlopen(sha_url)
                 real_sha = response.read().split(' ')[0]
             except (HTTPError, URLError) as e:
@@ -119,11 +121,11 @@ class Install(BaseCommand):
                 our_sha = hashlib.sha256(f.read()).hexdigest()
 
             if real_sha == our_sha:
-                logging.debug('Verified SHA256 hash')
+                logger.debug('Verified SHA256 hash')
             else:
-                logging.debug('SHA256 hash does not match!')
-                logging.debug('  Downloaded file hash was: %s', our_sha)
-                logging.debug('  Expected hash was: %s', real_sha)
+                logger.debug('SHA256 hash does not match!')
+                logger.debug('  Downloaded file hash was: %s', our_sha)
+                logger.debug('  Expected hash was: %s', real_sha)
 
                 raise CommandError(
                     'Unable to verify the checksum of the downloaded copy of '
@@ -148,7 +150,7 @@ class Install(BaseCommand):
             rbtools.commands.CommandError:
                 The file could not be unzipped.
         """
-        logging.debug('Extracting %s to %s', zip_filename, package_dir)
+        self.log.debug('Extracting %s to %s', zip_filename, package_dir)
 
         try:
             if os.path.exists(package_dir):
@@ -193,7 +195,7 @@ class Install(BaseCommand):
             rbtools.commands.CommandError:
                 An error occurred while downloading the file.
         """
-        logging.debug('Downloading %s', url)
+        self.log.debug('Downloading %s', url)
 
         try:
             response = urlopen(url)

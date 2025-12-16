@@ -24,6 +24,9 @@ if TYPE_CHECKING:
                                                 SCMClientRevisionSpec)
 
 
+logger = logging.getLogger(__name__)
+
+
 def get_draft_or_current_value(field_name, review_request):
     """Returns the draft or current field value from a review request.
 
@@ -197,8 +200,8 @@ def find_review_request_by_change_id(
     change_id = revisions['tip']
     assert isinstance(change_id, str)
 
-    logging.debug('Attempting to find review request from tip revision ID: %s',
-                  change_id)
+    logger.debug('Attempting to find review request from tip revision ID: %s',
+                 change_id)
     # Strip off any prefix that might have been added by the SCM.
     change_id = change_id.split(':', 1)[1]
 
@@ -228,8 +231,8 @@ def find_review_request_by_change_id(
         if count > 0:
             assert count == 1, '%d review requests were returned' % count
             review_request = review_requests[0]
-            logging.debug('Found review request %s with status %s',
-                          review_request.id, review_request.status)
+            logger.debug('Found review request %s with status %s',
+                         review_request.id, review_request.status)
 
             if review_request.status != 'discarded':
                 return review_request

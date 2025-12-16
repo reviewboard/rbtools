@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import re
 from shutil import get_terminal_size
 
@@ -208,10 +207,10 @@ class Status(BaseCommand):
             if self.repository:
                 query_args['repository'] = self.repository.id
             else:
-                logging.warning('The repository detected in the current '
-                                'directory was not found on\n'
-                                'the Review Board server. Displaying review '
-                                'requests from all repositories.')
+                self.log.warning('The repository detected in the current '
+                                 'directory was not found on\n'
+                                 'the Review Board server. Displaying review '
+                                 'requests from all repositories.')
 
         review_requests = self.api_root.get_review_requests(**query_args)
         review_request_info = self.get_data(review_requests)

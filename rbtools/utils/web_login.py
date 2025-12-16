@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
 DEFAULT_HOSTNAME = 'localhost'
 
 
@@ -499,7 +500,7 @@ class WebLoginHandler(BaseHTTPRequestHandler):
             self.end_headers()
         else:
             self.server.login_successful = False
-            logger.exception(
+            logger.error(
                 'Did not receive valid data for authentication: %s', data)
             self.send_response(400)
             self.end_headers()
@@ -663,17 +664,17 @@ def attempt_web_login(
         capabilities=capabilities)
 
     if not web_login_enabled:
-        logging.debug('Web-based login requires at least Review Board '
-                      '5.0.5 and for the ``client_web_login`` site '
-                      'configuration setting to be set to ``True``. '
-                      'Falling back to username and password prompt.')
+        logger.debug('Web-based login requires at least Review Board '
+                     '5.0.5 and for the ``client_web_login`` site '
+                     'configuration setting to be set to ``True``. '
+                     'Falling back to username and password prompt.')
         raise WebLoginNotAllowed
 
     web_login_options = api_client.web_login_options
 
     if not web_login_options:
-        logging.debug('RBClient.web_login_options must be set in order '
-                      'to use web-based login.')
+        logger.debug('RBClient.web_login_options must be set in order '
+                     'to use web-based login.')
         raise WebLoginNotAllowed
 
     if not web_login_options.allow:

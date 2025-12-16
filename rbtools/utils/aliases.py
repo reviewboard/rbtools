@@ -11,6 +11,9 @@ import subprocess
 from rbtools.commands import RB_MAIN
 
 
+logger = logging.getLogger(__name__)
+
+
 # Regular expression for matching argument replacement
 _arg_re = re.compile(r'\$(\d+)')
 
@@ -161,7 +164,7 @@ def run_alias(alias_name, alias, args):
     try:
         cmd, use_shell = expand_alias(alias, args)
     except ValueError as e:
-        logging.critical(
+        logger.critical(
             'Could not parse alias "%s" (`%s`): %s',
             alias_name, alias, e)
         return 1

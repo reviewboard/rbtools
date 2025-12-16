@@ -36,6 +36,9 @@ if TYPE_CHECKING:
     from rbtools.config.config import RBToolsConfig
 
 
+logger = logging.getLogger(__name__)
+
+
 class BaseTFWrapper:
     """Base class for TF wrappers.
 
@@ -234,7 +237,7 @@ class TFExeWrapper(BaseTFWrapper):
         if m:
             return unquote(m.group(1))
 
-        logging.debug('Could not find the collection from "tf vc workfold"')
+        logger.debug('Could not find the collection from "tf vc workfold"')
         return None
 
     def get_repository_info(self) -> RepositoryInfo | None:
@@ -363,8 +366,8 @@ class TFExeWrapper(BaseTFWrapper):
         m = re.search(br'^Changeset: (\d+)\r?$', data, re.MULTILINE)
 
         if not m:
-            logging.debug('Failed to parse output from "tf vc history":\n%s',
-                          data)
+            logger.debug('Failed to parse output from "tf vc history":\n%s',
+                         data)
             raise InvalidRevisionSpecError(
                 '"%s" does not appear to be a valid versionspec' % revision)
 
@@ -703,7 +706,7 @@ class TEEWrapper(BaseTFWrapper):
         if m:
             return unquote(m.group(1))
 
-        logging.debug('Could not find the collection from "tf workfold"')
+        logger.debug('Could not find the collection from "tf workfold"')
         return None
 
     def get_repository_info(self) -> RepositoryInfo | None:
@@ -839,8 +842,8 @@ class TEEWrapper(BaseTFWrapper):
             else:
                 raise Exception('No changesets found')
         except Exception as e:
-            logging.debug('Failed to parse output from "tf history": %s\n%s',
-                          e, data, exc_info=True)
+            logger.debug('Failed to parse output from "tf history": %s\n%s',
+                         e, data, exc_info=True)
 
             raise InvalidRevisionSpecError(
                 '"%s" does not appear to be a valid versionspec' % revision)
@@ -1054,9 +1057,9 @@ class TEEWrapper(BaseTFWrapper):
                 os.unlink(new_tmp)
 
         if len(root.findall('./candidate-pending-changes/pending-change')) > 0:
-            logging.warning('There are added or deleted files which have not '
-                            'been added to TFS. These will not be included '
-                            'in your review request.')
+            logger.warning('There are added or deleted files which have not '
+                           'been added to TFS. These will not be included '
+                           'in your review request.')
 
         return {
             'diff': stream.getvalue(),
@@ -1284,9 +1287,9 @@ class TFHelperWrapper(BaseTFWrapper):
             if result.exit_code == 2:
                 # Magic return code that means success, but there were
                 # un-tracked files in the working directory.
-                logging.warning('There are added or deleted files which have '
-                                'not been added to TFS. These will not be '
-                                'included in your review request.')
+                logger.warning('There are added or deleted files which have '
+                               'not been added to TFS. These will not be '
+                               'included in your review request.')
 
             return {
                 'diff': result.stdout_bytes.read(),

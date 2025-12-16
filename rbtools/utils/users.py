@@ -299,8 +299,8 @@ def credentials_prompt(
         raise AuthorizationError(message=' '.join(message_parts))
 
     if not is_retry:
-        logging.info('Please log in to the Review Board server at %s',
-                     server_url)
+        logger.info('Please log in to the Review Board server at %s',
+                    server_url)
 
     if username is None:
         username = get_input('Username: ', require=True)

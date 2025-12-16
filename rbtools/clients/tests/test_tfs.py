@@ -1224,9 +1224,9 @@ class TFHelperWrapperTests(SCMClientTestCase):
         self.assertEqual(
             log_ctx.output,
             [
-                'WARNING:root:There are added or deleted files which have '
-                'not been added to TFS. These will not be included in your '
-                'review request.',
+                'WARNING:rbtools.clients.tfs:There are added or deleted files '
+                'which have not been added to TFS. These will not be included '
+                'in your review request.',
             ])
 
 

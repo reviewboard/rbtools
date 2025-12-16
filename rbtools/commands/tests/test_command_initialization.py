@@ -33,6 +33,7 @@ class _TestCommand(BaseCommand):
         5.1
     """
 
+    name = 'test-command'
     needs_api = True
     needs_repository = True
 
@@ -62,7 +63,7 @@ class _TestSubCommand(BaseSubCommand):
         6.0
     """
 
-    name = 'sub'
+    name = 'sub-command'
     needs_api = True
 
     option_list = [
@@ -89,6 +90,8 @@ class _TestMultiCommand(BaseMultiCommand):
     Version Added:
         5.1
     """
+
+    name = 'test-multi-command'
     subcommands = [_TestSubCommand]
 
     common_subcommand_option_list = [
@@ -211,7 +214,8 @@ class CommandInitializationTests(CommandTestsMixin[_TestCommand], TestCase):
 
         self.assertEqual(
             ctx.output[0],
-            'WARNING:root:Option --foo is deprecated as of RBTools 5.2.')
+            'WARNING:rb.test-command:Option --foo is deprecated as of RBTools '
+            '5.2.')
         self.assert_spy_called_with(
             argparse.ArgumentParser.add_argument,
             '--foo',
@@ -241,8 +245,8 @@ class CommandInitializationTests(CommandTestsMixin[_TestCommand], TestCase):
 
         self.assertEqual(
             ctx.output[0],
-            'WARNING:root:Option --foo is deprecated as of RBTools 5.2 '
-            'and will be removed in 6.0.')
+            'WARNING:rb.test-command:Option --foo is deprecated as of RBTools '
+            '5.2 and will be removed in 6.0.')
         self.assert_spy_called_with(
             argparse.ArgumentParser.add_argument,
             '--foo',
@@ -272,8 +276,8 @@ class CommandInitializationTests(CommandTestsMixin[_TestCommand], TestCase):
 
         self.assertEqual(
             ctx.output[0],
-            'WARNING:root:Option --foo is deprecated as of RBTools 5.2. '
-            'Use --debug instead.')
+            'WARNING:rb.test-command:Option --foo is deprecated as of RBTools '
+            '5.2. Use --debug instead.')
         self.assert_spy_called_with(
             argparse.ArgumentParser.add_argument,
             '--foo',
@@ -304,8 +308,8 @@ class CommandInitializationTests(CommandTestsMixin[_TestCommand], TestCase):
 
         self.assertEqual(
             ctx.output[0],
-            'WARNING:root:Option --foo is deprecated as of RBTools 5.2 '
-            'and will be removed in 6.0. Use --debug instead.')
+            'WARNING:rb.test-command:Option --foo is deprecated as of RBTools '
+            '5.2 and will be removed in 6.0. Use --debug instead.')
         self.assert_spy_called_with(
             argparse.ArgumentParser.add_argument,
             '--foo',
@@ -366,11 +370,12 @@ class MultiCommandInitializationTests(CommandTestsMixin[_TestMultiCommand],
                    deprecated_in='5.2'))
 
         with self.assertLogs(level='WARNING') as ctx:
-            self.run_command(args=['sub', '--foo'])
+            self.run_command(args=['sub-command', '--foo'])
 
         self.assertEqual(
             ctx.output[0],
-            'WARNING:root:Option --foo is deprecated as of RBTools 5.2.')
+            'WARNING:rb.test-multi-command:Option --foo is deprecated as of '
+            'RBTools 5.2.')
         self.assert_spy_called_with(
             argparse.ArgumentParser.add_argument,
             '--foo',
@@ -396,12 +401,12 @@ class MultiCommandInitializationTests(CommandTestsMixin[_TestMultiCommand],
                    removed_in='6.0'))
 
         with self.assertLogs(level='WARNING') as ctx:
-            self.run_command(args=['sub', '--foo'])
+            self.run_command(args=['sub-command', '--foo'])
 
         self.assertEqual(
             ctx.output[0],
-            'WARNING:root:Option --foo is deprecated as of RBTools 5.2 '
-            'and will be removed in 6.0.')
+            'WARNING:rb.test-multi-command:Option --foo is deprecated as of '
+            'RBTools 5.2 and will be removed in 6.0.')
         self.assert_spy_called_with(
             argparse.ArgumentParser.add_argument,
             '--foo',
@@ -427,12 +432,12 @@ class MultiCommandInitializationTests(CommandTestsMixin[_TestMultiCommand],
                    replacement='--debug'))
 
         with self.assertLogs(level='WARNING') as ctx:
-            self.run_command(args=['sub', '--foo'])
+            self.run_command(args=['sub-command', '--foo'])
 
         self.assertEqual(
             ctx.output[0],
-            'WARNING:root:Option --foo is deprecated as of RBTools 5.2. '
-            'Use --debug instead.')
+            'WARNING:rb.test-multi-command:Option --foo is deprecated as of '
+            'RBTools 5.2. Use --debug instead.')
         self.assert_spy_called_with(
             argparse.ArgumentParser.add_argument,
             '--foo',
@@ -459,12 +464,12 @@ class MultiCommandInitializationTests(CommandTestsMixin[_TestMultiCommand],
                    replacement='--debug'))
 
         with self.assertLogs(level='WARNING') as ctx:
-            self.run_command(args=['sub', '--foo'])
+            self.run_command(args=['sub-command', '--foo'])
 
         self.assertEqual(
             ctx.output[0],
-            'WARNING:root:Option --foo is deprecated as of RBTools 5.2 '
-            'and will be removed in 6.0. Use --debug instead.')
+            'WARNING:rb.test-multi-command:Option --foo is deprecated as of '
+            'RBTools 5.2 and will be removed in 6.0. Use --debug instead.')
         self.assert_spy_called_with(
             argparse.ArgumentParser.add_argument,
             '--foo',
@@ -490,11 +495,12 @@ class MultiCommandInitializationTests(CommandTestsMixin[_TestMultiCommand],
                    deprecated_in='5.2'))
 
         with self.assertLogs(level='WARNING') as ctx:
-            self.run_command(args=['sub', '--foo'])
+            self.run_command(args=['sub-command', '--foo'])
 
         self.assertEqual(
             ctx.output[0],
-            'WARNING:root:Option --foo is deprecated as of RBTools 5.2.')
+            'WARNING:rb.test-multi-command:Option --foo is deprecated as of '
+            'RBTools 5.2.')
         self.assert_spy_called_with(
             argparse.ArgumentParser.add_argument,
             '--foo',

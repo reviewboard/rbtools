@@ -48,6 +48,9 @@ if TYPE_CHECKING:
     _TStripPrefixArg = TypeVar('_TStripPrefixArg', list[str], str)
 
 
+logger = logging.getLogger(__name__)
+
+
 #: A generic type variable for BaseSCMClient subclasses.
 #:
 #: Version Added:
@@ -868,8 +871,8 @@ class BaseSCMClient:
             str:
             The filesystem path of the repository on the client system.
         """
-        logging.warning('%s should implement a get_local_path method',
-                        self.__class__)
+        logger.warning('%s should implement a get_local_path method',
+                       self.__class__)
         info = self.get_repository_info()
 
         if info:
@@ -1430,7 +1433,7 @@ class BaseSCMClient:
             try:
                 p_num = int(p)
             except ValueError:
-                logging.warning('Invalid -p value: %s; assuming zero.', p)
+                logger.warning('Invalid -p value: %s; assuming zero.', p)
                 p_num = None
 
         repository_info = self.get_repository_info()

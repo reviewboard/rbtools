@@ -54,6 +54,9 @@ if TYPE_CHECKING:
     from rbtools.config import RBToolsConfig
 
 
+logger = logging.getLogger(__name__)
+
+
 # The clients are lazy loaded via load_scmclients()
 SCMCLIENTS = None
 
@@ -106,8 +109,8 @@ def load_scmclients(config, options):
                                       options=options)
             SCMCLIENTS[scmclient_cls.scmclient_id] = scmclient
         except Exception:
-            logging.exception('Could not load SCM Client "%s"',
-                              scmclient_cls.scmclient_id)
+            logger.exception('Could not load SCM Client "%s"',
+                             scmclient_cls.scmclient_id)
 
 
 def scan_usable_client(
@@ -154,8 +157,8 @@ def scan_usable_client(
         if client_name in scmclient_registry:
             scmclient_ids.append(client_name)
         else:
-            logging.error('The provided repository type "%s" is invalid.',
-                          client_name)
+            logger.error('The provided repository type "%s" is invalid.',
+                         client_name)
             sys.exit(1)
 
     repository_url = getattr(options, 'repository_url', None)
@@ -185,14 +188,14 @@ def scan_usable_client(
 
         if client_name:
             if client_name in dep_errors:
-                logging.error("The current %s repository can't be used. %s",
-                              client_name, dep_errors[client_name])
-                logging.error('')
-                logging.error("Make sure they're installed and try again.")
+                logger.error("The current %s repository can't be used. %s",
+                             client_name, dep_errors[client_name])
+                logger.error('')
+                logger.error("Make sure they're installed and try again.")
             else:
-                logging.error('A %s repository was not detected in the '
-                              'current directory.',
-                              client_name)
+                logger.error('A %s repository was not detected in the '
+                             'current directory.',
+                             client_name)
         else:
             scmclient_errors = scan_result.scmclient_errors
             candidate_scmclient_names: list[str] = [
@@ -201,55 +204,55 @@ def scan_usable_client(
             ]
 
             if repository_url:
-                logging.error('A supported repository was not found at %s',
-                              repository_url)
+                logger.error('A supported repository was not found at %s',
+                             repository_url)
             else:
-                logging.error('A supported repository was not found in the '
-                              'the current directory or any parent directory.')
+                logger.error('A supported repository was not found in the '
+                             'the current directory or any parent directory.')
 
             if candidate_scmclient_names:
-                logging.error('')
-                logging.error('The following types of repositories were '
-                              'tried: %s',
-                              ', '.join(sorted(candidate_scmclient_names)))
+                logger.error('')
+                logger.error('The following types of repositories were '
+                             'tried: %s',
+                             ', '.join(sorted(candidate_scmclient_names)))
 
             if dep_errors:
-                logging.error('')
-                logging.error("The following were missing dependencies:")
-                logging.error('')
+                logger.error('')
+                logger.error('The following were missing dependencies:')
+                logger.error('')
 
                 for name, dep_error in sorted(dep_errors.items(),
                                               key=lambda pair: pair[0]):
-                    logging.error('* %s: %s', name, dep_error)
+                    logger.error('* %s: %s', name, dep_error)
 
             if scmclient_errors:
-                logging.error('')
-                logging.error('The following encountered unexpected '
-                              'errors: %s',
-                              ', '.join(sorted(scmclient_errors.keys())))
+                logger.error('')
+                logger.error('The following encountered unexpected '
+                             'errors: %s',
+                             ', '.join(sorted(scmclient_errors.keys())))
 
-            logging.error('')
-            logging.error('You may need to set up a .reviewboardrc file '
-                          'with REPOSITORY_NAME, REPOSITORY_TYPE, and '
-                          'REVIEWBOARD_URL, if one is not already set up. '
-                          'This can be done by running `rbt setup-repo` and '
-                          'following the instructions. This file should then '
-                          'be committed to the repository for everyone to '
-                          'use.')
+            logger.error('')
+            logger.error('You may need to set up a .reviewboardrc file '
+                         'with REPOSITORY_NAME, REPOSITORY_TYPE, and '
+                         'REVIEWBOARD_URL, if one is not already set up. '
+                         'This can be done by running `rbt setup-repo` and '
+                         'following the instructions. This file should then '
+                         'be committed to the repository for everyone to '
+                         'use.')
 
         sys.exit(1)
 
     # Verify that options specific to an SCM Client have not been misused.
     if (getattr(options, 'change_only', False) and
         not scmclient.supports_changesets):
-        logging.error('The --change-only option is not valid for the '
-                      'current SCM client.\n')
+        logger.error('The --change-only option is not valid for the '
+                     'current SCM client.\n')
         sys.exit(1)
 
     if (getattr(options, 'parent_branch', None) and
         not scmclient.supports_parent_diffs):
-        logging.error('The --parent option is not valid for the '
-                      'current SCM client.')
+        logger.error('The --parent option is not valid for the '
+                     'current SCM client.')
         sys.exit(1)
 
     from rbtools.clients.perforce import PerforceClient
@@ -257,8 +260,8 @@ def scan_usable_client(
     if (not isinstance(scmclient, PerforceClient) and
         (getattr(options, 'p4_client', None) or
          getattr(options, 'p4_port', None))):
-        logging.error('The --p4-client and --p4-port options are not '
-                      'valid for the current SCM client.\n')
+        logger.error('The --p4-client and --p4-port options are not '
+                     'valid for the current SCM client.\n')
         sys.exit(1)
 
     assert scan_result.repository_info is not None

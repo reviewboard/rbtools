@@ -6,7 +6,6 @@ Version Added:
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 from rbtools.api.errors import APIError
@@ -20,9 +19,6 @@ from rbtools.commands.base import (BaseCommand,
 
 if TYPE_CHECKING:
     from rbtools.api.resource import ReviewItemResource
-
-
-logger = logging.getLogger(__name__)
 
 
 class ReviewSubCommand(BaseSubCommand):
@@ -58,9 +54,9 @@ class ReviewSubCommand(BaseSubCommand):
                 review_request_id=review_request_id)
 
             if review_draft:
-                logger.debug('RBTools found a pre-existing review draft for '
-                             'review request %s',
-                             review_request_id)
+                self.log.debug('RBTools found a pre-existing review draft for '
+                               'review request %s',
+                               review_request_id)
         except APIError:
             review_draft = None
 

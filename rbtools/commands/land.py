@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import logging
-
 from rbtools.api.errors import APIError
 from rbtools.clients.errors import MergeError, PushError
 from rbtools.commands import RB_MAIN
@@ -184,7 +182,7 @@ class Land(BaseCommand):
             else:
                 is_rr_approved = True
         except Exception as e:
-            logging.exception(
+            self.log.exception(
                 'Unexpected error while looking up review request '
                 'approval state: %s',
                 e)

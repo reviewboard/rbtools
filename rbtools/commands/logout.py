@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import logging
-
 from rbtools.commands.base import BaseCommand
 
 
@@ -30,8 +28,8 @@ class Logout(BaseCommand):
         if session.authenticated:
             self.api_client.logout()
 
-            logging.info('You are now logged out of Review Board at %s',
-                         self.api_client.domain)
+            self.log.info('You are now logged out of Review Board at %s',
+                          self.api_client.domain)
         else:
-            logging.info('You are already logged out of Review Board at %s',
-                         self.api_client.domain)
+            self.log.info('You are already logged out of Review Board at %s',
+                          self.api_client.domain)

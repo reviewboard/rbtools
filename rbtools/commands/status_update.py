@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import logging
 
 from rbtools.api.errors import APIError
 from rbtools.commands.base import (BaseCommand,
@@ -387,10 +386,10 @@ class SetStatusUpdateSubCommand(BaseStatusUpdateSubCommand):
                 try:
                     diff_comments.create(**comment)
                 except APIError as e:
-                    logging.warning('Failed to create diff comment: %s\n'
-                                    'APIError: %s',
-                                    json.dumps(comment),
-                                    e)
+                    self.log.warning('Failed to create diff comment: %s\n'
+                                     'APIError: %s',
+                                     json.dumps(comment),
+                                     e)
 
         if 'general_comments' in file_contents:
             general_comments = new_review_draft.get_general_comments()
@@ -399,10 +398,10 @@ class SetStatusUpdateSubCommand(BaseStatusUpdateSubCommand):
                 try:
                     general_comments.create(**comment)
                 except APIError as e:
-                    logging.warning('Failed to create general comment: %s\n'
-                                    'APIError: %s',
-                                    json.dumps(comment),
-                                    e)
+                    self.log.warning('Failed to create general comment: %s\n'
+                                     'APIError: %s',
+                                     json.dumps(comment),
+                                     e)
 
         return new_review_draft
 
@@ -511,7 +510,7 @@ class StatusUpdate(BaseMultiCommand):
             subcommand_name = argv[-1]
 
             # This is an old-style invocation.
-            logging.warning(
+            self.log.warning(
                 'rbt status-update is being run with "%s" as the last '
                 'argument. This is deprecated as of RBTools 3.0, and will '
                 'be removed in 4.0. Please update your script to call '

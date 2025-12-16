@@ -24,6 +24,9 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
+logger = logging.getLogger(__name__)
+
+
 class CVSClient(BaseSCMClient):
     """A client for CVS.
 
@@ -66,7 +69,7 @@ class CVSClient(BaseSCMClient):
         """
         # NOTE: This can be removed once check_dependencies() is mandatory.
         if not self.has_dependencies(expect_checked=True):
-            logging.debug('Unable to execute "cvs": skipping CVS')
+            logger.debug('Unable to execute "cvs": skipping CVS')
             return None
 
         cvsroot_path = os.path.join('CVS', 'Root')
@@ -92,8 +95,8 @@ class CVSClient(BaseSCMClient):
                 repository_path = repository_path.replace('%s:' % host,
                                                           '%s:' % canon)
             except socket.error as msg:
-                logging.error('failed to get fqdn for %s, msg=%s',
-                              host, msg)
+                logger.error('failed to get fqdn for %s, msg=%s',
+                             host, msg)
 
         return repository_path
 

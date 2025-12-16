@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import logging
-
 from rbtools.api.errors import APIError
 from rbtools.commands.base import BaseCommand, CommandError, Option
 
@@ -69,7 +67,7 @@ class Publish(BaseCommand):
                 update_fields['changedescription_text_type'] = \
                     self._get_text_type(self.options.markdown)
             else:
-                logging.error(
+                self.log.error(
                     'The change description field can only be set when '
                     'publishing an update.')
 

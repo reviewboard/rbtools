@@ -416,7 +416,7 @@ class P4Wrapper(object):
         cmd += p4_args
 
         if marshalled:
-            logging.debug('Running: %s', subprocess.list2cmdline(cmd))
+            logger.debug('Running: %s', subprocess.list2cmdline(cmd))
             p = run_process(cmd)
             result = []
             has_error = False
@@ -431,9 +431,9 @@ class P4Wrapper(object):
                     # expect the decoded data to come back as a dictionary.
                     # Let's double-check this.
                     if not isinstance(decoded_data, dict):
-                        logging.debug('Unexpected decoded data from Perforce '
-                                      'command: %r',
-                                      decoded_data)
+                        logger.debug('Unexpected decoded data from Perforce '
+                                     'command: %r',
+                                     decoded_data)
                         raise SCMError('Expected a dictionary from Perforce, '
                                        'but got back a %s instead. Please '
                                        'file a bug about this.'
@@ -463,8 +463,8 @@ class P4Wrapper(object):
             except Exception as e:
                 stderr = '<stderr exception: %r>' % e
 
-            logging.debug('Command results = %r; stderr=%r',
-                          result, stderr)
+            logger.debug('Command results = %r; stderr=%r',
+                         result, stderr)
 
             if (not kwargs.get('ignore_errors', False) and
                 (p.exit_code != 0 or has_error)):
@@ -865,7 +865,7 @@ class PerforceClient(BaseSCMClient):
         """
         # NOTE: This can be removed once check_dependencies() is mandatory.
         if not self.has_dependencies(expect_checked=True):
-            logging.debug('Unable to execute "p4 help": skipping Perforce')
+            logger.debug('Unable to execute "p4 help": skipping Perforce')
             return None
 
         if self._p4_info is None:
@@ -1307,9 +1307,9 @@ class PerforceClient(BaseSCMClient):
 
         if not cl_is_pending:
             # Submitted changes are handled by a different method
-            logging.info('Generating diff for range of submitted changes: %s '
-                         'to %s',
-                         base, tip)
+            logger.info('Generating diff for range of submitted changes: %s '
+                        'to %s',
+                        base, tip)
             self._compute_range_changes(
                 diff_tool=diff_tool,
                 diff_writer=diff_writer,
@@ -1346,9 +1346,9 @@ class PerforceClient(BaseSCMClient):
             raise EmptyChangeError
 
         if cl_is_shelved:
-            logging.info('Generating diff for shelved changeset %s', tip)
+            logger.info('Generating diff for shelved changeset %s', tip)
         else:
-            logging.info('Generating diff for pending changeset %s', tip)
+            logger.info('Generating diff for pending changeset %s', tip)
 
         action_mapping = {
             'edit': 'M',
@@ -1400,7 +1400,7 @@ class PerforceClient(BaseSCMClient):
             old_file = ''
             new_file = ''
 
-            logging.debug('Processing %s of %s', action, depot_file)
+            logger.debug('Processing %s of %s', action, depot_file)
 
             try:
                 changetype_short = action_mapping[action]
@@ -1420,7 +1420,7 @@ class PerforceClient(BaseSCMClient):
                         cl_is_shelved=cl_is_shelved)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
-                        logging.warning('Skipping file %s: %s', depot_file, e)
+                        logger.warning('Skipping file %s: %s', depot_file, e)
 
                     continue
             elif changetype_short == 'A':
@@ -1445,13 +1445,13 @@ class PerforceClient(BaseSCMClient):
                         cl_is_pending=cl_is_pending)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
-                        logging.warning('Skipping file %s: %s', depot_file, e)
+                        logger.warning('Skipping file %s: %s', depot_file, e)
 
                     continue
 
                 if os.path.islink(new_file):
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
-                        logging.warning('Skipping symlink %s', new_file)
+                        logger.warning('Skipping symlink %s', new_file)
 
                     continue
             elif changetype_short == 'D':
@@ -1461,8 +1461,8 @@ class PerforceClient(BaseSCMClient):
                         revision=base_revision)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
-                        logging.warning('Skipping file %s#%s: %s',
-                                        depot_file, base_revision, e)
+                        logger.warning('Skipping file %s#%s: %s',
+                                       depot_file, base_revision, e)
 
                     continue
             elif changetype_short == 'MV-a':
@@ -1480,7 +1480,7 @@ class PerforceClient(BaseSCMClient):
                             cl_is_shelved=cl_is_shelved)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
-                        logging.warning('Skipping file %s: %s', depot_file, e)
+                        logger.warning('Skipping file %s: %s', depot_file, e)
 
                     continue
 
@@ -1599,9 +1599,9 @@ class PerforceClient(BaseSCMClient):
                     cln = int(file_entry[change_key])
                 except ValueError:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
-                        logging.warning('Skipping file %s: unable to parse '
-                                        'change number "%s"',
-                                        depot_file, file_entry[change_key])
+                        logger.warning('Skipping file %s: unable to parse '
+                                       'change number "%s"',
+                                       depot_file, file_entry[change_key])
 
                     break
 
@@ -1621,9 +1621,9 @@ class PerforceClient(BaseSCMClient):
                     rev = int(file_entry[rev_key])
                 except ValueError:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
-                        logging.warning('Skipping file %s: unable to parse '
-                                        'revision number "%s"',
-                                        depot_file, file_entry[rev_key])
+                        logger.warning('Skipping file %s: unable to parse '
+                                       'revision number "%s"',
+                                       depot_file, file_entry[rev_key])
 
                     break
 
@@ -1687,8 +1687,8 @@ class PerforceClient(BaseSCMClient):
                 local_file = self._depot_to_local(depot_file)
             except SCMError:
                 if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
-                    logging.warning('Could not find local filename for "%s"',
-                                    depot_file)
+                    logger.warning('Could not find local filename for "%s"',
+                                   depot_file)
 
                 local_file = None
 
@@ -1714,7 +1714,7 @@ class PerforceClient(BaseSCMClient):
                         revision=rev)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
-                        logging.warning('Skipping file %s: %s', depot_file, e)
+                        logger.warning('Skipping file %s: %s', depot_file, e)
 
                     continue
 
@@ -1735,7 +1735,7 @@ class PerforceClient(BaseSCMClient):
                         revision=initial_rev)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
-                        logging.warning('Skipping file %s: %s', depot_file, e)
+                        logger.warning('Skipping file %s: %s', depot_file, e)
 
                     continue
 
@@ -1761,7 +1761,7 @@ class PerforceClient(BaseSCMClient):
                         cl_is_submitted=True)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
-                        logging.warning('Skipping file %s: %s', depot_file, e)
+                        logger.warning('Skipping file %s: %s', depot_file, e)
 
                     continue
 
@@ -1788,7 +1788,7 @@ class PerforceClient(BaseSCMClient):
                         revision=initial_rev)
                 except ValueError as e:
                     if not self.config.get('SUPPRESS_CLIENT_WARNINGS', False):
-                        logging.warning('Skipping file %s: %s', depot_file, e)
+                        logger.warning('Skipping file %s: %s', depot_file, e)
 
                     continue
 
@@ -2468,7 +2468,7 @@ class PerforceClient(BaseSCMClient):
             tmpfile (unicode):
                 The name of a temporary file to write to.
         """
-        logging.debug('Writing "%s" to "%s"', depot_path, tmpfile)
+        logger.debug('Writing "%s" to "%s"', depot_path, tmpfile)
         self.p4.print_file(depot_path, out_file=tmpfile)
 
         # The output of 'p4 print' will be a symlink if that's what version
@@ -2547,7 +2547,7 @@ class PerforceClient(BaseSCMClient):
             # accessed from p4 change anyway
             return ''
 
-        logging.debug('Fetching description for changelist %s', changelist)
+        logger.debug('Fetching description for changelist %s', changelist)
         change = self.p4.change(changelist)
 
         if len(change) == 1 and 'Description' in change[0]:
@@ -2707,7 +2707,7 @@ class PerforceClient(BaseSCMClient):
         # Get the changelist number from the tip revision, removing the prefix
         # if necessary. Don't allow amending submitted or default changelists.
         changelist_id = revisions['tip']
-        logging.debug('Preparing to amend change %s', changelist_id)
+        logger.debug('Preparing to amend change %s', changelist_id)
 
         if not changelist_id.startswith(self.REVISION_PENDING_CLN_PREFIX):
             raise AmendError('Cannot modify submitted changelist %s'

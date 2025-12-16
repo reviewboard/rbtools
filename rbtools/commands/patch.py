@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import re
 from gettext import gettext as _, ngettext
 from typing import TYPE_CHECKING
@@ -26,9 +25,6 @@ if TYPE_CHECKING:
         FileDiffItemResource,
     )
     from rbtools.commands.base.output import OutputWrapper
-
-
-logger = logging.getLogger(__name__)
 
 
 COMMIT_ID_SPLIT_RE = re.compile(r'\s*,\s*')
@@ -209,7 +205,7 @@ class PatchCommand(BaseCommand):
 
         if server_supports_history:
             if squashed and commit_ids:
-                logger.warning(
+                self.log.warning(
                     '--squash is not compatible with --commit-ids; '
                     'ignoring --squash')
                 squashed = False
@@ -217,8 +213,9 @@ class PatchCommand(BaseCommand):
             squashed = True
 
             if commit_ids:
-                logger.warning('This server does not support review requests '
-                               'with history; ignoring --commit-ids=...')
+                self.log.warning(
+                    'This server does not support review requests with '
+                    'history; ignoring --commit-ids=...')
                 commit_ids = None
 
         diff = self._get_diff(diff_revision=diff_revision,
@@ -561,7 +558,7 @@ class PatchCommand(BaseCommand):
                     if options.commit:
                         raise CommandError(message)
                     else:
-                        logger.warning(message)
+                        self.log.warning(message)
                         self.json.add_warning(message)
             except NotImplementedError:
                 pass

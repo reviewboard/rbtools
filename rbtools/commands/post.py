@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import copy
-import logging
 import os
 import re
 import sys
@@ -48,9 +47,6 @@ if TYPE_CHECKING:
 
 
 _T = TypeVar('_T')
-
-
-logger = logging.getLogger(__name__)
 
 
 class SquashedDiff(NamedTuple):
@@ -765,9 +761,9 @@ class Post(BaseCommand):
                     self.stdout.write(err)
                     self.json.add_error(err)
                 except Exception:
-                    logging.debug('Caught exception while stamping the '
-                                  'commit message. Proceeding to post '
-                                  'without stamping.', exc_info=True)
+                    self.log.debug('Caught exception while stamping the '
+                                   'commit message. Proceeding to post '
+                                   'without stamping.', exc_info=True)
                     err = ('Could not stamp review request URL onto the '
                            'commit message.')
                     self.stdout.write(err)
@@ -937,11 +933,11 @@ class Post(BaseCommand):
 
             if options.with_history:
                 if review_request.created_with_history:
-                    logging.info(
+                    self.log.info(
                         'The -H/--with-history option is not required when '
                         'updating an existing review request.')
                 else:
-                    logging.warning(
+                    self.log.warning(
                         'The review request was not created with history. The '
                         'uploaded diff will be squashed.')
         elif server_supports_history:
@@ -973,8 +969,8 @@ class Post(BaseCommand):
                 parent_diff = squashed_diff.parent_diff
 
             if parent_diff:
-                logging.debug('Generated parent diff size: %d bytes',
-                              len(parent_diff))
+                self.log.debug('Generated parent diff size: %d bytes',
+                               len(parent_diff))
 
         if squashed_diff is not None:
             if not squashed_diff.diff:
@@ -1357,7 +1353,7 @@ class Post(BaseCommand):
                         'changedescription_text_type': text_type,
                     })
                 else:
-                    logging.error(
+                    self.log.error(
                         'The change description field can only be set when '
                         'publishing an update. Use --description instead.')
 
@@ -1682,6 +1678,8 @@ class Post(BaseCommand):
             files_to_upload (list):
                 The list of filediff resources that need uploaded files.
         """
+        logger = self.log
+
         assert self.capabilities is not None
         assert self.repository is not None
         assert self.tool is not None
@@ -1705,7 +1703,7 @@ class Post(BaseCommand):
             desc='Uploading binary files...',
             total=len(files_to_upload))
 
-        logging.debug('Uploading binary files')
+        logger.debug('Uploading binary files')
 
         max_file_size = self.capabilities.get_capability(
             'diffs', 'max_binary_size')
@@ -1716,8 +1714,9 @@ class Post(BaseCommand):
             checked_size = False
 
             if file.status == 'deleted':
-                logging.debug('Skipping %s (file deleted in change)',
-                              filename)
+                logger.debug('Skipping %s (file deleted in change)',
+                             filename)
+
                 continue
 
             # If we can get the file size without actually loading the file,
@@ -1731,6 +1730,7 @@ class Post(BaseCommand):
                         'Skipping binary file "%s": file too large for '
                         'configured limits.',
                         filename)
+
                     continue
 
                 checked_size = True
@@ -1739,6 +1739,7 @@ class Post(BaseCommand):
             except Exception as e:
                 logger.warning('Unable to check file size of %s (%s): %s',
                                filename, revision, e)
+
                 continue
 
             try:
@@ -1748,6 +1749,7 @@ class Post(BaseCommand):
                 logger.warning(
                     'Unable to get binary file content for %s (%s): %s',
                     filename, revision, e)
+
                 continue
 
             if not checked_size and len(file_content) > max_file_size:
@@ -1755,13 +1757,16 @@ class Post(BaseCommand):
                     'Skipping binary file "%s": file too large for '
                     'configured limits.',
                     filename)
+
                 continue
 
             mimetype = guess_mimetype(data=file_content, filename=filename)
 
             if not mimetype or mimetype in invalid_mimetypes:
-                logger.debug('Skipping %s (%s): MIME type %s is not supported',
-                             filename, revision, mimetype)
+                logger.debug(
+                    'Skipping %s (%s): MIME type %s is not supported',
+                    filename, revision, mimetype)
+
                 continue
 
             if mimetype not in valid_mimetypes:
@@ -1773,6 +1778,7 @@ class Post(BaseCommand):
                     valid_mimetypes.add(mimetype)
                 else:
                     invalid_mimetypes.add(mimetype)
+
                     continue
 
             source_filename = file.source_file
@@ -1794,15 +1800,17 @@ class Post(BaseCommand):
                     logger.warning(
                         'Unable to get binary file content for %s (%s): %s',
                         source_filename, source_revision, e)
+
                     continue
 
                 source_mimetype = guess_mimetype(data=source_file_content)
 
                 if mimetype != source_mimetype:
-                    logger.debug('Skipping %s (%s): MIME type of source '
-                                 'revision (%s) does not match MIME type of '
-                                 'modified revision (%s).',
-                                 filename, revision, source_mimetype, mimetype)
+                    logger.debug(
+                        'Skipping %s (%s): MIME type of source revision (%s) '
+                        'does not match MIME type of modified revision (%s).',
+                        filename, revision, source_mimetype, mimetype)
+
                     continue
 
             logger.debug('Uploading file "%s" revision %s (%s)',

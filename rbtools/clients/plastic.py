@@ -24,6 +24,9 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
+logger = logging.getLogger(__name__)
+
+
 class PlasticClient(BaseSCMClient):
     """A client for Plastic SCM.
 
@@ -73,7 +76,7 @@ class PlasticClient(BaseSCMClient):
         """
         # NOTE: This can be removed once check_dependencies() is mandatory.
         if not self.has_dependencies(expect_checked=True):
-            logging.debug('Unable to execute "cm version": skipping Plastic')
+            logger.debug('Unable to execute "cm version": skipping Plastic')
             return None
 
         # Get the workspace directory, so we can strip it from the diff output
@@ -81,7 +84,7 @@ class PlasticClient(BaseSCMClient):
                                     split_lines=False,
                                     ignore_errors=True).strip()
 
-        logging.debug('Workspace is %s', self.workspacedir)
+        logger.debug('Workspace is %s', self.workspacedir)
 
         # Get the repository that the current directory is from
         split = execute(['cm', 'ls', self.workspacedir, '--format={8}'],
@@ -196,7 +199,7 @@ class PlasticClient(BaseSCMClient):
         assert isinstance(tip, str)
 
         if tip.startswith(self.REVISION_CHANGESET_PREFIX):
-            logging.debug('Doing a diff against changeset %s', tip)
+            logger.debug('Doing a diff against changeset %s', tip)
 
             try:
                 changenum = str(int(
@@ -204,7 +207,7 @@ class PlasticClient(BaseSCMClient):
             except ValueError:
                 pass
         else:
-            logging.debug('Doing a diff against branch %s', tip)
+            logger.debug('Doing a diff against branch %s', tip)
 
             if self.options and not getattr(self.options, 'branch', None):
                 self.options.branch = tip
@@ -282,8 +285,8 @@ class PlasticClient(BaseSCMClient):
                 newrevspec = m.group('revspec')
                 parentrevspec = m.group('parentrevspec')
 
-                logging.debug('Type %s File %s Old %s New %s',
-                              changetype, filename, parentrevspec, newrevspec)
+                logger.debug('Type %s File %s Old %s New %s',
+                             changetype, filename, parentrevspec, newrevspec)
 
                 old_file = new_file = empty_filename
 
@@ -401,8 +404,8 @@ class PlasticClient(BaseSCMClient):
             tmpfile (unicode):
                 The name of the temporary file to write to.
         """
-        logging.debug('Writing "%s" (rev %s) to "%s"',
-                      filename.decode('utf-8'),
-                      filespec.decode('utf-8'),
-                      tmpfile)
+        logger.debug('Writing "%s" (rev %s) to "%s"',
+                     filename.decode('utf-8'),
+                     filespec.decode('utf-8'),
+                     tmpfile)
         execute(['cm', 'cat', filespec, '--file=' + tmpfile])

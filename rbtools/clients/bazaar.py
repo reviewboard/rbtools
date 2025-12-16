@@ -22,6 +22,9 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
+logger = logging.getLogger(__name__)
+
+
 USING_PARENT_PREFIX = 'Using parent branch '
 
 
@@ -167,8 +170,8 @@ class BazaarClient(BaseSCMClient):
         """
         # NOTE: This can be removed once check_dependencies() is mandatory.
         if not self.has_dependencies(expect_checked=True):
-            logging.debug('Unable to execute "brz help" or "bzr help": '
-                          'skipping Bazaar')
+            logger.debug('Unable to execute "brz help" or "bzr help": '
+                         'skipping Bazaar')
             return None
 
         bzr_info = (

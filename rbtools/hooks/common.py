@@ -14,6 +14,9 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
+logger = logging.getLogger(__name__)
+
+
 SUBMITTED = 'submitted'
 
 
@@ -106,7 +109,7 @@ def execute(
         output = output.strip()
 
     if process.returncode:
-        logging.warning('Failed to execute command: %s', command)
+        logger.warning('Failed to execute command: %s', command)
         return None
 
     return output
@@ -174,8 +177,8 @@ def close_review_request(server_url, username, password, review_request_id,
     review_request = get_review_request(review_request_id, api_root)
 
     if review_request.status == SUBMITTED:
-        logging.warning('Review request #%s is already %s.',
-                        review_request_id, SUBMITTED)
+        logger.warning('Review request #%s is already %s.',
+                       review_request_id, SUBMITTED)
         return
 
     if description:

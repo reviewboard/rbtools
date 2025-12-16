@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import copy
-import logging
 from typing import TYPE_CHECKING
 
 from rbtools.api.errors import AuthorizationError
@@ -102,10 +101,11 @@ class Login(BaseCommand):
             if (not was_authenticated or
                 (options.username and options.password) or
                 options.api_token):
-                logging.info('Successfully logged in to Review Board.')
+                self.log.info('Successfully logged in to Review Board.')
             else:
-                logging.info('You are already logged in to Review Board at %s',
-                             api_client.domain)
+                self.log.info(
+                    'You are already logged in to Review Board at %s',
+                    api_client.domain)
 
         return 0
 

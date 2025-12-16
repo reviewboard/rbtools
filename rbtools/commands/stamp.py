@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 from rbtools.api.errors import APIError
@@ -128,8 +127,8 @@ class Stamp(BaseCommand):
 
         # Fall back on guessing based on the description. This may return None
         # if no suitable review request is found.
-        logging.debug('Attempting to guess review request based on '
-                      'summary and description')
+        self.log.debug('Attempting to guess review request based on '
+                       'summary and description')
 
         user = get_user(api_client=api_client,
                         api_root=api_root,
@@ -150,10 +149,10 @@ class Stamp(BaseCommand):
             raise CommandError(str(e))
 
         if review_request:
-            logging.debug('Found review request ID %d', review_request.id)
+            self.log.debug('Found review request ID %d', review_request.id)
             return review_request.id, review_request.absolute_url
         else:
-            logging.debug('Could not find a matching review request')
+            self.log.debug('Could not find a matching review request')
             return None, None
 
     def main(self, *args):

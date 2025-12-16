@@ -14,6 +14,9 @@ if TYPE_CHECKING:
     from collections.abc import Generator, Iterable, Sequence
 
 
+logger = logging.getLogger(__name__)
+
+
 _iter_exes_in_path_cache: dict[str, bool] = {}
 tempfiles: list[str] = []
 tempdirs = []
@@ -216,7 +219,7 @@ def make_empty_files(
             try:
                 os.makedirs(path)
             except OSError as e:
-                logging.error('Unable to create directory %s: %s', path, e)
+                logger.error('Unable to create directory %s: %s', path, e)
                 continue
 
         try:
@@ -224,7 +227,7 @@ def make_empty_files(
                 # Set the file access and modified times to the current time.
                 os.utime(f, None)
         except OSError as e:
-            logging.error('Unable to create empty file %s: %s', f, e)
+            logger.error('Unable to create empty file %s: %s', f, e)
 
 
 def walk_parents(
