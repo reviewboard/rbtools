@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import os
 
-from kgb import SpyAgency
-
 from rbtools.api.resource import RepositoryItemResource
 from rbtools.commands.setup_repo import SetupRepo
 from rbtools.testing import CommandTestsMixin, TestCase

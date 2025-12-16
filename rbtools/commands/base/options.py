@@ -6,11 +6,12 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import argparse
     from collections.abc import Mapping
+    from typing import Any
 
     from rbtools.config import RBToolsConfig
 

@@ -7,8 +7,12 @@ Version Added:
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import Iterator
 from itertools import islice
-from typing import Deque, Iterable, Iterator, TypeVar
+from typing import TYPE_CHECKING, TypeVar
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 T = TypeVar('T')
@@ -36,7 +40,7 @@ class BufferedIterator(Iterator[T]):
                 The iterable to wrap.
         """
         self._iterator: Iterator[T] = iter(iterable)
-        self._buffer: Deque[T] = deque()
+        self._buffer: deque[T] = deque()
 
     @property
     def is_empty(self) -> bool:

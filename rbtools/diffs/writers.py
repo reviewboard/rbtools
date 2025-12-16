@@ -6,13 +6,16 @@ Version Added:
 
 from __future__ import annotations
 
-import io
-from typing import Iterable
+from typing import TYPE_CHECKING
 
-from typing_extensions import TypeAlias
-
-from rbtools.diffs.tools.base.diff_file_result import DiffFileResult
 from rbtools.utils.encoding import force_bytes
+
+if TYPE_CHECKING:
+    import io
+    from collections.abc import Iterable
+    from typing import TypeAlias
+
+    from rbtools.diffs.tools.base.diff_file_result import DiffFileResult
 
 
 #: Type alias to accept either a bytes or Unicode string.

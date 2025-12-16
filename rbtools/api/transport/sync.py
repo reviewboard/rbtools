@@ -16,7 +16,8 @@ from rbtools.api.resource import Resource, RootResource
 from rbtools.api.transport import Transport
 
 if TYPE_CHECKING:
-    from typing import Any, Callable
+    from collections.abc import Callable
+    from typing import Any
 
     from rbtools.api.resource import Resource, RootResource
     from rbtools.config import RBToolsConfig

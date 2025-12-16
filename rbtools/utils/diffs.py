@@ -5,10 +5,11 @@ from __future__ import annotations
 import fnmatch
 import os
 import sys
-from typing import Iterable, Iterator, Pattern, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterable, Iterator, Sequence
+    from re import Pattern
 
 
 def filename_match_any_patterns(

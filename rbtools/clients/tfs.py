@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 import io
 import logging
 import os
@@ -15,8 +14,6 @@ from urllib.parse import unquote
 from appdirs import user_data_dir
 
 from rbtools.clients import BaseSCMClient, RepositoryInfo
-from rbtools.clients.base.scmclient import (SCMClientDiffResult,
-                                            SCMClientRevisionSpec)
 from rbtools.clients.errors import (InvalidRevisionSpecError,
                                     SCMClientDependencyError,
                                     SCMError,
@@ -31,8 +28,11 @@ from rbtools.utils.process import (RunProcessError,
                                    run_process)
 
 if TYPE_CHECKING:
+    import argparse
     from collections.abc import Sequence
 
+    from rbtools.clients.base.scmclient import (SCMClientDiffResult,
+                                                SCMClientRevisionSpec)
     from rbtools.config.config import RBToolsConfig
 
 

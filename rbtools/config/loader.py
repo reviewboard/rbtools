@@ -7,11 +7,14 @@ Version Added:
 from __future__ import annotations
 
 import os
-from typing import Any, Final
+from typing import TYPE_CHECKING
 
 from rbtools.config.config import ConfigDict, RBToolsConfig
 from rbtools.config.errors import ConfigSyntaxError
 from rbtools.utils.filesystem import get_home_path, walk_parents
+
+if TYPE_CHECKING:
+    from typing import Any, Final
 
 
 #: Storage this module's builtins.

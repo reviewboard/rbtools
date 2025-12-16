@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Any
+
+    from typelets.json import JSONDict
 
 
 class Capabilities:
@@ -12,11 +17,11 @@ class Capabilities:
     #:
     #: Type:
     #:     dict
-    capabilities: Mapping
+    capabilities: JSONDict
 
     def __init__(
         self,
-        capabilities: Mapping,
+        capabilities: JSONDict,
     ) -> None:
         """Initialize the capabilities information.
 

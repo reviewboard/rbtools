@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import logging
 import subprocess
+from typing import TypedDict
 
 import puremagic
 from housekeeping import deprecate_non_keyword_only_args
-from typing_extensions import TypedDict
 
 from rbtools.deprecation import RemovedInRBTools70Warning
 from rbtools.utils.filesystem import is_exe_in_path

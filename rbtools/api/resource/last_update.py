@@ -6,9 +6,12 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING
 
 from rbtools.api.resource.base import ItemResource, resource_mimetype
+
+if TYPE_CHECKING:
+    from typing import Literal
 
 
 @resource_mimetype('application/vnd.reviewboard.org.last-update')

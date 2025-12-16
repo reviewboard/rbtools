@@ -6,13 +6,14 @@ import io
 import logging
 import os
 import subprocess
-from typing import Any, AnyStr, TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 from rbtools.deprecation import RemovedInRBTools80Warning
 from rbtools.utils.encoding import force_unicode
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
+    from typing import Any, AnyStr
 
     from typing_extensions import NotRequired
 

@@ -7,7 +7,7 @@ import re
 from collections import OrderedDict
 from difflib import SequenceMatcher
 from itertools import islice
-from typing import Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rbtools.api.errors import APIError
 from rbtools.api.resource import ListResource
@@ -16,7 +16,7 @@ from rbtools.utils.errors import MatchReviewRequestsError
 from rbtools.utils.users import get_user
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
     from rbtools.api.client import RBClient
     from rbtools.api.resource import ReviewRequestItemResource, RootResource

@@ -9,7 +9,7 @@ import sys
 import tempfile
 import unittest
 from contextlib import contextmanager
-from typing import Iterator, Sequence, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import kgb
 
@@ -21,6 +21,7 @@ from rbtools.utils.filesystem import (cleanup_tempfiles,
                                       make_tempfile)
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator, Sequence
     from typing import Literal
     from unittest.case import _AssertRaisesContext
 

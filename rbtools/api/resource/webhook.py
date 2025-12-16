@@ -6,7 +6,7 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Literal, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rbtools.api.resource.base import (
     ItemResource,
@@ -15,6 +15,8 @@ from rbtools.api.resource.base import (
 )
 
 if TYPE_CHECKING:
+    from typing import Literal
+
     from rbtools.api.resource.base import (
         ResourceExtraDataField,
         ResourceLinkField,

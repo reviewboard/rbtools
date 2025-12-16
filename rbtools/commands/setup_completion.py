@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-import logging
 import os
-import platform
-import sys
-from typing import Optional
 
 import importlib_resources
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import kgb
 
@@ -26,6 +26,7 @@ from rbtools.utils.process import run_process_exec
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
+    from typing import Any
 
 
 class BaseSOSTestCase(SCMClientTestCase[SOSClient]):

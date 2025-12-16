@@ -11,6 +11,7 @@ import shutil
 import ssl
 import sys
 from collections import OrderedDict
+from collections.abc import Callable
 from http.client import (HTTPMessage, HTTPResponse, HTTPSConnection,
                          NOT_MODIFIED)
 from http.cookiejar import (Cookie,
@@ -19,7 +20,7 @@ from http.cookiejar import (Cookie,
                             MozillaCookieJar)
 from io import BytesIO
 from json import loads as json_loads
-from typing import Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import (
@@ -37,7 +38,6 @@ from urllib.request import (
     urlopen)
 
 import certifi
-from typing_extensions import Never, TypeAlias
 
 from rbtools import get_package_version
 from rbtools.api.cache import APICache, CachedHTTPResponse, LiveHTTPResponse
@@ -51,7 +51,9 @@ from rbtools.utils.filesystem import get_home_path
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
-    from typing import Any
+    from typing import Any, TypeAlias
+
+    from typing_extensions import Never
 
     from rbtools.config import RBToolsConfig
 

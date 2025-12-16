@@ -21,7 +21,6 @@ from rbtools.api.resource.base_diff_commit import BaseDiffCommitItemResource
 if TYPE_CHECKING:
     from typing_extensions import Unpack
 
-    from rbtools.api.resource.base import BaseGetListParams
     from rbtools.api.resource.file_diff import (
         FileDiffGetListParams,
         FileDiffListResource,

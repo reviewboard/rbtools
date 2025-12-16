@@ -7,11 +7,10 @@ import os
 import re
 import shutil
 from datetime import datetime, timezone
-from typing import Any, Final, Generic, TypeVar, TYPE_CHECKING
+from typing import Any, Generic, TYPE_CHECKING, TypeVar
 from unittest import SkipTest
 
 import kgb
-from typing_extensions import TypeAlias
 
 from rbtools.api.capabilities import Capabilities
 from rbtools.clients import BaseSCMClient
@@ -22,6 +21,7 @@ from rbtools.utils.filesystem import make_tempdir
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+    from typing import Final, TypeAlias
 
     from rbtools.clients.base.scmclient import SCMClientDiffResult
 

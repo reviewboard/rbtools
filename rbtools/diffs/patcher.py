@@ -11,9 +11,9 @@ import os
 import re
 from gettext import gettext as _
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
-from typing_extensions import NotRequired, TypedDict, assert_never
+from typing_extensions import NotRequired, assert_never
 
 from rbtools.diffs.errors import ApplyPatchError
 from rbtools.diffs.patches import PatchAuthor, PatchResult

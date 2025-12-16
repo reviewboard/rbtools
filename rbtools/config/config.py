@@ -11,9 +11,13 @@ from __future__ import annotations
 
 from copy import deepcopy
 from enum import Enum
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
-from typing_extensions import Self, TypeAlias
+
+if TYPE_CHECKING:
+    from typing import TypeAlias
+
+    from typing_extensions import Self
 
 
 #: A dictionary storing raw configuration data.

@@ -8,14 +8,14 @@ from __future__ import annotations
 
 import io
 import json
-from typing import (Any, AnyStr, Callable, Generic, IO, TextIO, TYPE_CHECKING,
-                    cast)
-
-from typing_extensions import TypeAlias
+from collections.abc import Callable
+from typing import AnyStr, Generic, TYPE_CHECKING, cast
 
 from rbtools.utils.encoding import force_bytes, force_unicode
 
 if TYPE_CHECKING:
+    from typing import Any, IO, TextIO, TypeAlias
+
     from typelets.json import JSONDict
 
 

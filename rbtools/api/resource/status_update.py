@@ -6,7 +6,7 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import ClassVar, Literal, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rbtools.api.resource.base import (
     BaseGetListParams,
@@ -17,6 +17,8 @@ from rbtools.api.resource.base import (
 )
 
 if TYPE_CHECKING:
+    from typing import ClassVar, Literal
+
     from typing_extensions import Unpack
 
     from rbtools.api.resource.base import (

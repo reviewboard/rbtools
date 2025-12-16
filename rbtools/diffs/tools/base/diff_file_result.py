@@ -6,11 +6,12 @@ Version Added:
 
 from __future__ import annotations
 
-import io
 import re
-from typing import Iterator
+from typing import TYPE_CHECKING, TypedDict
 
-from typing_extensions import TypedDict
+if TYPE_CHECKING:
+    import io
+    from collections.abc import Iterator
 
 
 _DEFAULT_FILE_HEADER_RE = re.compile(

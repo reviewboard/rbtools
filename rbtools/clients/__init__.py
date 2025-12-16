@@ -50,6 +50,7 @@ from rbtools.diffs import patches
 
 if TYPE_CHECKING:
     import argparse
+
     from rbtools.config import RBToolsConfig
 
 

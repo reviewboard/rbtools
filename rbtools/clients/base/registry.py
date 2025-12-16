@@ -10,7 +10,7 @@ import importlib
 import logging
 import sys
 from collections import OrderedDict
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 if sys.version_info[:2] >= (3, 10):
     # Python >= 3.10
@@ -19,8 +19,11 @@ else:
     # Python <= 3.9
     from importlib_metadata import entry_points
 
-from rbtools.clients.base.scmclient import BaseSCMClient
 from rbtools.clients.errors import SCMClientNotFoundError
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from rbtools.clients.base.scmclient import BaseSCMClient
 
 
 logger = logging.getLogger(__name__)

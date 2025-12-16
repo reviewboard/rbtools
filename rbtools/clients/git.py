@@ -37,7 +37,7 @@ from rbtools.utils.process import (RunProcessError,
                                    run_process)
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Mapping, Sequence
+    from collections.abc import Mapping, Sequence
     from typing import ClassVar
 
     from rbtools.diffs.patches import Patch, PatchAuthor

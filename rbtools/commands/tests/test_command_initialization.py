@@ -7,7 +7,7 @@ Version Added:
 from __future__ import annotations
 
 import argparse
-from typing import Any
+from typing import TYPE_CHECKING
 
 from rbtools.clients import RepositoryInfo
 from rbtools.clients.git import GitClient
@@ -16,6 +16,9 @@ from rbtools.commands.base.commands import (BaseCommand,
                                             BaseSubCommand)
 from rbtools.commands.base.options import Option
 from rbtools.testing import CommandTestsMixin, TestCase
+
+if TYPE_CHECKING:
+    from typing import Any
 
 
 class _TestCommand(BaseCommand):

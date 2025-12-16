@@ -10,10 +10,10 @@ from __future__ import annotations
 import copy
 import json
 import logging
-from collections.abc import MutableMapping
+from collections.abc import Callable, MutableMapping
 from functools import update_wrapper, wraps
-from typing import (Any, Callable, Generic, Literal, TYPE_CHECKING, TypeVar,
-                    cast, overload)
+from typing import (Any, Generic, Literal, TYPE_CHECKING, TypeVar, cast,
+                    overload)
 from urllib.parse import urljoin
 
 from typelets.json import JSONDict, JSONValue

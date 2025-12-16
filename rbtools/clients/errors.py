@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
-from typing_extensions import TypeAlias
+if TYPE_CHECKING:
+    from typing import TypeAlias
 
 
 class SCMError(Exception):

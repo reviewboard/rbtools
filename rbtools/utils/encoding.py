@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, overload
+from typing import TYPE_CHECKING, overload
 
-from typing_extensions import Literal
+if TYPE_CHECKING:
+    from typing import Any, Literal
 
 
 @overload

@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import re
 import sys
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import rbtools.testing
 from rbtools.deprecation import RemovedInRBTools80Warning
@@ -17,6 +17,7 @@ from rbtools.utils.process import (RunProcessError,
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from typing import Any
 
 
 class RunProcessTests(TestCase):

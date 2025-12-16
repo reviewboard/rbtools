@@ -14,7 +14,7 @@ import platform
 import subprocess
 import sys
 from http import HTTPStatus
-from typing import ClassVar, TextIO, TYPE_CHECKING
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import colorama
@@ -44,6 +44,9 @@ from rbtools.utils.users import credentials_prompt
 from rbtools.utils.web_login import attempt_web_login
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from typing import ClassVar, TextIO
+
     from rbtools.api.resource import (
         RepositoryItemResource,
         RootResource,

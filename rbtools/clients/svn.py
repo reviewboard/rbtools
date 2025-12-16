@@ -10,7 +10,7 @@ import posixpath
 import re
 import sys
 from xml.etree import ElementTree
-from typing import Iterator, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, cast
 from urllib.parse import unquote
 
 from rbtools.api.errors import APIError
@@ -41,7 +41,7 @@ from rbtools.utils.process import (RunProcessError,
 from rbtools.utils.streams import BufferedIterator
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterator, Sequence
 
     from rbtools.diffs.patches import Patch
     from rbtools.api.resource import (

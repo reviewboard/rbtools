@@ -10,11 +10,9 @@ import re
 import sys
 import threading
 from collections import OrderedDict, defaultdict, deque
-from typing import Any, Iterable, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypedDict, cast
 
 from pydiffx.dom import DiffX
-from pydiffx.dom.objects import DiffXChangeSection
-from typing_extensions import TypeAlias, TypedDict
 
 from rbtools.api.errors import APIError
 from rbtools.clients.base.repository import RepositoryInfo
@@ -37,7 +35,10 @@ else:
     import os.path as cpath
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Iterable, Mapping, Sequence
+    from typing import Any, TypeAlias
+
+    from pydiffx.dom.objects import DiffXChangeSection
 
     from rbtools.api.resource import (
         RepositoryInfoResource,

@@ -7,7 +7,7 @@ Version Added:
 from __future__ import annotations
 
 import io
-from typing import Any, Callable, Generic, TYPE_CHECKING, TypeVar
+from typing import Generic, TYPE_CHECKING, TypeVar
 
 import kgb
 from housekeeping import deprecate_non_keyword_only_args
@@ -20,6 +20,9 @@ from rbtools.testing.api.transport import URLMapTransport
 from rbtools.utils.filesystem import cleanup_tempfiles
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import Any
+
     from rbtools.api.transport import Transport
     from rbtools.clients.base.scmclient import BaseSCMClient
     from rbtools.clients.base.repository import RepositoryInfo

@@ -6,10 +6,13 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 from rbtools.config.config import ConfigData
 from rbtools.testing import TestCase
+
+if TYPE_CHECKING:
+    from typing import Any
 
 
 class MyConfigSubData(ConfigData):

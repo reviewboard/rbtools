@@ -10,15 +10,16 @@ import logging
 import os
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
-
-from typing_extensions import TypeAlias
+from typing import Any, TYPE_CHECKING
 
 from rbtools.clients import (BaseSCMClient,
                              RepositoryInfo,
                              scmclient_registry)
 from rbtools.clients.errors import SCMClientDependencyError
 from rbtools.utils.filesystem import chdir
+
+if TYPE_CHECKING:
+    from typing import TypeAlias
 
 
 logger = logging.getLogger(__name__)

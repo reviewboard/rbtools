@@ -7,11 +7,14 @@ import logging
 import os
 import subprocess
 import sys
-from typing import TextIO
+from typing import TYPE_CHECKING
 
 from rbtools.utils.encoding import force_unicode
 from rbtools.utils.errors import EditorError
 from rbtools.utils.filesystem import make_tempfile
+
+if TYPE_CHECKING:
+    from typing import TextIO
 
 
 logger = logging.getLogger(__name__)

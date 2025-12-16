@@ -7,8 +7,7 @@ import logging
 import os
 import re
 import sys
-from collections import namedtuple
-from typing import Iterable, NamedTuple, TYPE_CHECKING, TypedDict
+from typing import NamedTuple, TYPE_CHECKING, TypedDict
 
 from tqdm import tqdm
 from typing_extensions import NotRequired, TypeVar
@@ -35,7 +34,7 @@ from rbtools.utils.users import get_user
 
 if TYPE_CHECKING:
     import argparse
-    from collections.abc import Sequence
+    from collections.abc import Iterable, Sequence
 
     from typelets.json import JSONDict
 

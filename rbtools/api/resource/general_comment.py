@@ -6,7 +6,7 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import TYPE_CHECKING
 
 from rbtools.api.resource.base import (
     BaseGetListParams,
@@ -14,6 +14,9 @@ from rbtools.api.resource.base import (
     resource_mimetype,
 )
 from rbtools.api.resource.base_comment import BaseCommentItemResource
+
+if TYPE_CHECKING:
+    from typing import ClassVar
 
 
 @resource_mimetype('application/vnd.reviewboard.org.general-comment')

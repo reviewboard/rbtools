@@ -24,8 +24,7 @@ from rbtools.utils.filesystem import make_tempfile
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Mapping, Sequence
-
-    from typing_extensions import TypeAlias
+    from typing import TypeAlias
 
     from rbtools.api.resource import FileAttachmentItemResource
 

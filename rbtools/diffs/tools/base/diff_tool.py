@@ -10,10 +10,10 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import final
 
-from rbtools.diffs.tools.base.diff_file_result import DiffFileResult
-
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from rbtools.diffs.tools.base.diff_file_result import DiffFileResult
 
 
 class BaseDiffTool:

@@ -6,7 +6,7 @@ Version Added:
 
 from __future__ import annotations
 
-from typing import TypedDict, TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 from typing_extensions import NotRequired
 

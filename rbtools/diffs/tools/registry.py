@@ -7,15 +7,16 @@ Version Added:
 from __future__ import annotations
 
 import logging
-from typing import Iterable, Iterator, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from rbtools.diffs.tools.backends.apple import AppleDiffTool
 from rbtools.diffs.tools.backends.gnu import GNUDiffTool
-from rbtools.diffs.tools.base import BaseDiffTool
 from rbtools.diffs.tools.errors import MissingDiffToolError
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterable, Iterator, Sequence
+
+    from rbtools.diffs.tools.base import BaseDiffTool
 
 
 logger = logging.getLogger(__name__)

@@ -8,7 +8,10 @@ import shutil
 import sys
 import tempfile
 from contextlib import contextmanager
-from typing import Generator, Iterable, Sequence
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Generator, Iterable, Sequence
 
 
 _iter_exes_in_path_cache: dict[str, bool] = {}

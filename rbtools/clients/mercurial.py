@@ -8,7 +8,7 @@ import re
 import uuid
 from contextlib import ExitStack
 from gettext import gettext as _
-from typing import Any, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urlsplit, urlunparse
 
 from rbtools.clients import RepositoryInfo
@@ -36,6 +36,7 @@ from rbtools.utils.process import RunProcessError, run_process
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
+    from typing import Any
     from urllib.parse import SplitResult
 
     from typing_extensions import Unpack
