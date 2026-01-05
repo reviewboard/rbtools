@@ -206,7 +206,13 @@ class MercurialPatcher(SCMClientPatcher['MercurialClient']):
         #
         # We are going to apply failing commits partially, since users will
         # have conflict and reject information to work from.
-        cmd: list[str] = [scmclient._exe, 'import', '--no-commit', '--partial']
+        cmd: list[str] = [
+            scmclient._exe,
+            'import',
+            '--config', 'patch.eol=auto',
+            '--no-commit',
+            '--partial',
+        ]
 
         if prefix_level is not None:
             cmd += ['-p', str(prefix_level)]

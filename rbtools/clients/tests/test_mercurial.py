@@ -1695,8 +1695,9 @@ class MercurialClientTests(MercurialTestCase):
         self.assertSpyCalledWith(
             run_process_exec,
             [
-                'hg', 'import', '--no-commit', '--partial', 'test.diff',
-                '--config', 'extensions.rbtoolsnormalize=%s' % hgext_path,
+                'hg', 'import', '--config', 'patch.eol=auto', '--no-commit',
+                '--partial', 'test.diff', '--config',
+                f'extensions.rbtoolsnormalize={hgext_path}',
             ])
 
         self.assertTrue(result.applied)
@@ -1719,9 +1720,9 @@ class MercurialClientTests(MercurialTestCase):
         self.assertSpyCalledWith(
             run_process_exec,
             [
-                'hg', 'import', '--no-commit', '--partial', '-p', '1',
-                'test.diff', '--config',
-                'extensions.rbtoolsnormalize=%s' % hgext_path,
+                'hg', 'import', '--config', 'patch.eol=auto', '--no-commit',
+                '--partial', '-p', '1', 'test.diff', '--config',
+                f'extensions.rbtoolsnormalize={hgext_path}',
             ])
 
         self.assertTrue(result.applied)
@@ -1748,8 +1749,9 @@ class MercurialClientTests(MercurialTestCase):
         self.assertSpyCalledWith(
             run_process_exec,
             [
-                'hg', 'import', '--no-commit', '--partial', 'test.diff',
-                '--config', 'extensions.rbtoolsnormalize=%s' % hgext_path,
+                'hg', 'import', '--config', 'patch.eol=auto', '--no-commit',
+                '--partial', 'test.diff', '--config',
+                f'extensions.rbtoolsnormalize={hgext_path}',
             ])
 
         self.assertFalse(result.applied)
@@ -2151,8 +2153,11 @@ class MercurialPatcherTests(MercurialTestCase):
 
         self.assertSpyCalledWith(
             run_process_exec,
-            ['hg', 'import', '--no-commit', '--partial', tempfiles[0],
-             '--config', f'extensions.rbtoolsnormalize={hgext_path}'])
+            [
+                'hg', 'import', '--config', 'patch.eol=auto', '--no-commit',
+                 '--partial', tempfiles[0], '--config',
+                 f'extensions.rbtoolsnormalize={hgext_path}',
+            ])
 
         # There should not be a new commit, but should have pending changes.
         self.assertEqual(self._hg_get_tip(), f'{tip}+')
@@ -2203,8 +2208,11 @@ class MercurialPatcherTests(MercurialTestCase):
 
         self.assertSpyCalledWith(
             run_process_exec,
-            ['hg', 'import', '--no-commit', '--partial', tempfiles[0],
-             '--config', f'extensions.rbtoolsnormalize={hgext_path}'])
+            [
+                'hg', 'import', '--config', 'patch.eol=auto', '--no-commit',
+                '--partial', tempfiles[0], '--config',
+                f'extensions.rbtoolsnormalize={hgext_path}',
+            ])
 
         # There should not be a new commit, but should have pending changes.
         self.assertEqual(self._hg_get_tip(), f'{tip}+')
@@ -2259,9 +2267,11 @@ class MercurialPatcherTests(MercurialTestCase):
 
         self.assertSpyCalledWith(
             run_process_exec,
-            ['hg', 'import', '--no-commit', '--partial', '-p', '3',
-             tempfiles[0], '--config',
-             f'extensions.rbtoolsnormalize={hgext_path}'])
+            [
+                'hg', 'import', '--config', 'patch.eol=auto', '--no-commit',
+                '--partial', '-p', '3', tempfiles[0], '--config',
+                f'extensions.rbtoolsnormalize={hgext_path}',
+            ])
 
         # There should not be a new commit, but should have pending changes.
         self.assertEqual(self._hg_get_tip(), f'{tip}+')
@@ -2317,9 +2327,11 @@ class MercurialPatcherTests(MercurialTestCase):
 
         self.assertSpyCalledWith(
             run_process_exec,
-            ['hg', 'import', '--no-commit', '--partial', '-p', '3',
-             tempfiles[0], '--config',
-             f'extensions.rbtoolsnormalize={hgext_path}'])
+            [
+                'hg', 'import', '--config', 'patch.eol=auto', '--no-commit',
+                '--partial', '-p', '3', tempfiles[0], '--config',
+                f'extensions.rbtoolsnormalize={hgext_path}',
+            ])
 
         # There should not be a new commit, but should have pending changes.
         self.assertEqual(self._hg_get_tip(), f'{tip}+')
@@ -2419,8 +2431,11 @@ class MercurialPatcherTests(MercurialTestCase):
 
         self.assertSpyCalledWith(
             run_process_exec,
-            ['hg', 'import', '--no-commit', '--partial', tempfiles[0],
-             '--config', f'extensions.rbtoolsnormalize={hgext_path}'])
+            [
+                'hg', 'import', '--config', 'patch.eol=auto', '--no-commit',
+                '--partial', tempfiles[0], '--config',
+                f'extensions.rbtoolsnormalize={hgext_path}',
+            ])
 
         # There should be a new commit.
         self.assertEqual(self.hg_get_num_commits(), num_commits + 1)
@@ -2438,7 +2453,8 @@ class MercurialPatcherTests(MercurialTestCase):
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ([
-                    'hg', 'import', '--no-commit', '--partial', tempfiles[0],
+                    'hg', 'import', '--config', 'patch.eol=auto',
+                    '--no-commit', '--partial', tempfiles[0],
                     tempfiles[1], '--config',
                     f'extensions.rbtoolsnormalize={hgext_path}',
                 ],)
@@ -2520,7 +2536,8 @@ class MercurialPatcherTests(MercurialTestCase):
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
             {
                 'args': ([
-                    'hg', 'import', '--no-commit', '--partial', tempfiles[0],
+                    'hg', 'import', '--config', 'patch.eol=auto',
+                    '--no-commit', '--partial', tempfiles[0],
                     '--config', f'extensions.rbtoolsnormalize={hgext_path}',
                 ],)
             },
@@ -2533,7 +2550,8 @@ class MercurialPatcherTests(MercurialTestCase):
             },
             {
                 'args': ([
-                    'hg', 'import', '--no-commit', '--partial', tempfiles[1],
+                    'hg', 'import', '--config', 'patch.eol=auto',
+                    '--no-commit', '--partial', tempfiles[1],
                     '--config', f'extensions.rbtoolsnormalize={hgext_path}',
                 ],)
             },
@@ -2675,8 +2693,11 @@ class MercurialPatcherTests(MercurialTestCase):
 
         self.assertSpyCalledWith(
             run_process_exec,
-            ['hg', 'import', '--no-commit', '--partial', tempfiles[0],
-             '--config', f'extensions.rbtoolsnormalize={hgext_path}'])
+            [
+                'hg', 'import', '--config', 'patch.eol=auto', '--no-commit',
+                '--partial', tempfiles[0], '--config',
+                f'extensions.rbtoolsnormalize={hgext_path}',
+            ])
 
         # There should not be a new commit.
         self.assertEqual(self._hg_get_tip(), tip)
@@ -2741,8 +2762,11 @@ class MercurialPatcherTests(MercurialTestCase):
 
         self.assertSpyCalledWith(
             run_process_exec,
-            ['hg', 'import', '--no-commit', '--partial', tempfiles[0],
-             '--config', f'extensions.rbtoolsnormalize={hgext_path}'])
+            [
+                'hg', 'import', '--config', 'patch.eol=auto', '--no-commit',
+                '--partial', tempfiles[0], '--config',
+                f'extensions.rbtoolsnormalize={hgext_path}',
+            ])
 
         # There should not be a new commit.
         self.assertEqual(self._hg_get_tip(), tip)
@@ -2796,8 +2820,11 @@ class MercurialPatcherTests(MercurialTestCase):
 
         self.assertSpyCalledWith(
             run_process_exec,
-            ['hg', 'import', '--no-commit', '--partial', tempfiles[0],
-             '--config', f'extensions.rbtoolsnormalize={hgext_path}'])
+            [
+                'hg', 'import', '--config', 'patch.eol=auto', '--no-commit',
+                '--partial', tempfiles[0], '--config',
+                f'extensions.rbtoolsnormalize={hgext_path}',
+            ])
 
         # There should not be a new commit, but should have pending changes.
         self.assertEqual(self._hg_get_tip(), f'{tip}+')
@@ -3434,8 +3461,11 @@ class MercurialPatcherTests(MercurialTestCase):
 
         self.assertSpyCalledWith(
             run_process_exec,
-            ['hg', 'import', '--no-commit', '--partial', tempfiles[0],
-             '--config', f'extensions.rbtoolsnormalize={hgext_path}'])
+            [
+                'hg', 'import', '--config', 'patch.eol=auto', '--no-commit',
+                '--partial', tempfiles[0], '--config',
+                f'extensions.rbtoolsnormalize={hgext_path}',
+            ])
 
     def test_patch_with_regular_and_binary_files(self) -> None:
         """Testing MercurialPatcher.patch with regular and binary files."""
@@ -3540,8 +3570,11 @@ class MercurialPatcherTests(MercurialTestCase):
 
         self.assertSpyCalledWith(
             run_process_exec,
-            ['hg', 'import', '--no-commit', '--partial', tempfiles[0],
-             '--config', f'extensions.rbtoolsnormalize={hgext_path}'])
+            [
+                'hg', 'import', '--config', 'patch.eol=auto', '--no-commit',
+                '--partial', tempfiles[0], '--config',
+                f'extensions.rbtoolsnormalize={hgext_path}',
+            ])
         self.assertSpyCalledWith(client._execute,
                                  ['hg', 'add', 'new_binary.bin'])
 
@@ -3620,8 +3653,11 @@ class MercurialPatcherTests(MercurialTestCase):
 
         self.assertSpyCalledWith(
             run_process_exec,
-            ['hg', 'import', '--no-commit', '--partial', tempfiles[0],
-             '--config', f'extensions.rbtoolsnormalize={hgext_path}'])
+            [
+                'hg', 'import', '--config', 'patch.eol=auto', '--no-commit',
+                '--partial', tempfiles[0], '--config',
+                f'extensions.rbtoolsnormalize={hgext_path}',
+            ])
         self.assertSpyCalledWith(client._execute,
                                  ['hg', 'add', 'new_binary.bin'])
 
@@ -3744,7 +3780,10 @@ class MercurialPatcherTests(MercurialTestCase):
 
         self.assertSpyCalledWith(
             run_process_exec,
-            ['hg', 'import', '--no-commit', '--partial', tempfiles[0],
-             '--config', f'extensions.rbtoolsnormalize={hgext_path}'])
+            [
+                'hg', 'import', '--config', 'patch.eol=auto', '--no-commit',
+                '--partial', tempfiles[0], '--config',
+                f'extensions.rbtoolsnormalize={hgext_path}',
+            ])
         self.assertSpyCalledWith(client._execute,
                                  ['hg', 'add', 'new_binary.bin'])
