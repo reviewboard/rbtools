@@ -161,6 +161,13 @@ class P4WrapperTests(TestCase):
 class PerforceSCMClientTestCase(SCMClientTestCase[PerforceClient]):
     scmclient_cls = PerforceClient
 
+    default_scmclient_caps = {
+        'scmtools': {
+            'perforce': {
+                'empty_files': True,
+            },
+        },
+    }
     default_scmclient_options = {
         'p4_client': 'myclient',
         'p4_passwd': '',

@@ -38,6 +38,14 @@ class BaseGitClientTests(SCMClientTestCase[GitClient]):
         4.0
     """
 
+    default_scmclient_caps = {
+        'scmtools': {
+            'git': {
+                'empty_files': True,
+            },
+        },
+    }
+
     #: The SCMClient class to instantiate.
     scmclient_cls = GitClient
 

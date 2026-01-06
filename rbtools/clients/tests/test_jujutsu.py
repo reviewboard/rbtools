@@ -37,6 +37,14 @@ class BaseJujutsuClientTests(SCMClientTestCase[JujutsuClient]):
         6.0
     """
 
+    default_scmclient_caps = {
+        'scmtools': {
+            'git': {
+                'empty_files': True,
+            },
+        },
+    }
+
     #: The SCMClient class to instantiate.
     scmclient_cls = JujutsuClient
 
@@ -2073,75 +2081,6 @@ class JujutsuPatcherTests(BaseJujutsuClientTests):
         with open(test_path, 'rb') as f:
             self.assertEqual(f.read(), new_content)
 
-    def test_patch_with_regular_and_empty_files(self) -> None:
-        """Testing JujutsuPatcher.patch with regular files and binary files
-
-        Note: This test focuses on regular + binary file combinations.
-        Empty file handling with the patch command is tested in Git tests.
-        """
-        client = self.build_client()
-
-        test_content = b'Binary file content'
-
-        attachment = FileAttachmentItemResource(
-            transport=URLMapTransport('https://reviews.example.com/'),
-            payload={
-                'id': 201,
-                'absolute_url': 'https://example.com/r/1/file/201/download/',
-            },
-            url='https://reviews.example.com/api/review-requests/1/'
-                'file-attachments/201/'
-        )
-
-        binary_file = self.make_binary_file_patch(
-            old_path=None,
-            new_path='new_binary.bin',
-            status='added',
-            file_attachment=attachment,
-            content=test_content,
-        )
-
-        patcher = client.get_patcher(patches=[
-            Patch(content=(
-                b'diff --git a/foo.txt b/foo.txt\n'
-                b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
-                b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
-                b'--- a/foo.txt\n'
-                b'+++ b/foo.txt\n'
-                b'@@ -6,7 +6,8 @@ multa quoque et bello passus, '
-                b'dum conderet urbem,\n'
-                b' inferretque deos Latio, genus unde Latinum,\n'
-                b' Albanique patres, atque altae moenia Romae.\n'
-                b' Musa, mihi causas memora, quo numine laeso,\n'
-                b'+New line added\n'
-                b' quidve dolens, regina deum tot volvere casus\n'
-                b' insignem pietate virum, tot adire labores\n'
-                b' impulerit. Tantaene animis caelestibus irae?\n'
-                b' \n'
-                b'diff --git a/new_binary.bin b/new_binary.bin\n'
-                b'new file mode 100644\n'
-                b'index 0000000..e69de29 100644\n'
-                b'Binary files /dev/null and b/new_binary.bin differ\n'
-            ),
-                binary_files=[binary_file]),
-        ])
-
-        results = list(patcher.patch())
-        self.assertEqual(len(results), 1)
-
-        result = results[0]
-        self.assertTrue(result.success)
-        self.assertIsNotNone(result.patch)
-
-        with open('foo.txt', 'rb') as fp:
-            content = fp.read()
-            self.assertIn(b'New line added', content)
-
-        self.assertTrue(os.path.exists('new_binary.bin'))
-
-        with open('new_binary.bin', 'rb') as f:
-            self.assertEqual(f.read(), test_content)
-
     def test_patch_with_regular_and_binary_files(self) -> None:
         """Testing JujutsuPatcher.patch with regular and binary files"""
         client = self.build_client()
@@ -2237,7 +2176,7 @@ class JujutsuPatcherTests(BaseJujutsuClientTests):
         with open('bar.txt', 'rb') as f:
             self.assertEqual(f.read(), test_content2)
 
-    def test_patch_with_empty_and_binary_files(self) -> None:
+    def test_patch_with_multiple_binary_files(self) -> None:
         """Testing JujutsuPatcher.patch with multiple binary files"""
         client = self.build_client()
 
@@ -2406,6 +2345,115 @@ class JujutsuPatcherTests(BaseJujutsuClientTests):
 
         with open('bar.txt', 'rb') as f:
             self.assertEqual(f.read(), test_content2)
+
+    def test_patch_with_empty_files(self) -> None:
+        """Testing JujutsuPatcher.patch with empty files"""
+        client = self.build_client()
+
+        empty_to_delete = 'empty_delete.txt'
+
+        with open(empty_to_delete, mode='w', encoding='utf-8') as f:
+            pass
+
+        self._add_file_to_repo(filename='empty_delete.txt',
+                               data=b'',
+                               message='Add empty file')
+
+        empty_to_add = 'empty_add.txt'
+
+        patch_content = (
+            b'diff --git a/empty_add.txt b/empty_add.txt\n'
+            b'new file mode 100644\n'
+            b'index 0000000..e69de29\n'
+            b'--- /dev/null\n'
+            b'+++ b/empty_add.txt\n'
+            b'diff --git a/empty_delete.txt b/empty_delete.txt\n'
+            b'deleted file mode 100644\n'
+            b'index e69de29..0000000\n'
+            b'--- a/empty_delete.txt\n'
+            b'+++ /dev/null\n'
+        )
+
+        patcher = client.get_patcher(patches=[
+            Patch(content=patch_content),
+        ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        self.assertTrue(os.path.exists(empty_to_add))
+
+        with open(empty_to_add, mode='rb') as f:
+            self.assertEqual(f.read(), b'')
+
+        self.assertFalse(os.path.exists(empty_to_delete))
+
+    def test_patch_with_regular_and_empty_files(self) -> None:
+        """Testing JujutsuPatcher.patch with regular and empty files"""
+        client = self.build_client()
+
+        empty_to_delete = 'empty_delete.txt'
+
+        with open(empty_to_delete, mode='w', encoding='utf-8') as f:
+            pass
+
+        self._add_file_to_repo(filename='empty_delete.txt',
+                               data=b'',
+                               message='Add empty file')
+
+        empty_to_add = 'empty_add.txt'
+
+        patch_content = (
+            b'diff --git a/foo.txt b/foo.txt\n'
+            b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
+            b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
+            b'--- a/foo.txt\n'
+            b'+++ b/foo.txt\n'
+            b'@@ -6,7 +6,4 @@ multa quoque et bello passus, '
+            b'dum conderet urbem,\n'
+            b' inferretque deos Latio, genus unde Latinum,\n'
+            b' Albanique patres, atque altae moenia Romae.\n'
+            b' Musa, mihi causas memora, quo numine laeso,\n'
+            b'-quidve dolens, regina deum tot volvere casus\n'
+            b'-insignem pietate virum, tot adire labores\n'
+            b'-impulerit. Tantaene animis caelestibus irae?\n'
+            b' \n'
+            b'diff --git a/empty_add.txt b/empty_add.txt\n'
+            b'new file mode 100644\n'
+            b'index 0000000..e69de29\n'
+            b'--- /dev/null\n'
+            b'+++ b/empty_add.txt\n'
+            b'diff --git a/empty_delete.txt b/empty_delete.txt\n'
+            b'deleted file mode 100644\n'
+            b'index e69de29..0000000\n'
+            b'--- a/empty_delete.txt\n'
+            b'+++ /dev/null\n'
+        )
+
+        patcher = client.get_patcher(patches=[
+            Patch(content=patch_content),
+        ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        with open('foo.txt', mode='rb') as fp:
+            self.assertEqual(fp.read(), FOO1)
+
+        self.assertTrue(os.path.exists(empty_to_add))
+
+        with open(empty_to_add, mode='rb') as f:
+            self.assertEqual(f.read(), b'')
+
+        self.assertFalse(os.path.exists(empty_to_delete))
 
     def _get_description(
         self,

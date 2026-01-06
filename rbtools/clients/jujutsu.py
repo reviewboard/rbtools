@@ -38,10 +38,12 @@ from rbtools.utils.diffs import (
 )
 from rbtools.utils.checks import check_install
 from rbtools.utils.errors import EditorError
+from rbtools.utils.filesystem import make_empty_files
 from rbtools.utils.process import RunProcessError, run_process
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator, Sequence
+    from typing import ClassVar
 
     from rbtools.diffs.patches import Patch, PatchAuthor, PatchResult
 
@@ -55,6 +57,18 @@ class JujutsuPatcher(SCMClientPatcher['JujutsuClient']):
     Version Added:
         6.0
     """
+
+    #: Regex for finding added empty files in a patch.
+    ADDED_FILES_RE: ClassVar[re.Pattern[bytes]] = re.compile(
+        br'^diff --git a/(\S+) b/\S+\nnew file mode \d+',
+        re.M
+    )
+
+    #: Regex for finding deleted empty files in a patch.
+    DELETED_FILES_RE: ClassVar[re.Pattern[bytes]] = re.compile(
+        br'^diff --git a/(\S+) b/\S+\ndeleted file mode \d+',
+        re.M
+    )
 
     ######################
     # Instance variables #
@@ -163,6 +177,84 @@ class JujutsuPatcher(SCMClientPatcher['JujutsuClient']):
                                      message=message,
                                      run_editor=self.run_commit_editor,
                                      create_new_change=True)
+
+    def apply_patch_for_empty_files(
+        self,
+        patch: Patch,
+    ) -> bool:
+        """Apply empty files from a patch.
+
+        Args:
+            patch (rbtools.diffs.patches.Patch):
+                The patch to apply empty files from.
+
+        Returns:
+            bool:
+            ``True`` if there are empty files in the patch that were applied.
+            ``False`` if there were no empty files or the files could not be
+            applied (which will lead to an error).
+        """
+        patched_empty_files: bool = False
+        patch_content = patch.content
+        prefix_level = patch.prefix_level
+        scmclient = self.scmclient
+
+        # Build a set of binary file paths to exclude from empty file
+        # handling, since binary files are handled separately.
+        binary_file_paths: set[str] = set()
+
+        for binary_file in patch.binary_files:
+            if binary_file.old_path:
+                binary_file_paths.add(binary_file.old_path)
+
+            if binary_file.new_path:
+                binary_file_paths.add(binary_file.new_path)
+
+        if self.revert:
+            added_files_re = self.DELETED_FILES_RE
+            deleted_files_re = self.ADDED_FILES_RE
+        else:
+            added_files_re = self.ADDED_FILES_RE
+            deleted_files_re = self.DELETED_FILES_RE
+
+        added_files = [
+            filename
+            for filename in (
+                filename.decode('utf-8')
+                for filename in added_files_re.findall(patch_content)
+            )
+            if filename not in binary_file_paths
+        ]
+        deleted_files = [
+            filename
+            for filename in (
+                filename.decode('utf-8')
+                for filename in deleted_files_re.findall(patch_content)
+            )
+            if filename not in binary_file_paths
+        ]
+
+        if added_files:
+            if prefix_level:
+                added_files = scmclient.strip_p_num_slashes(added_files,
+                                                            prefix_level)
+
+            make_empty_files(added_files)
+            patched_empty_files = True
+
+        if deleted_files:
+            if prefix_level:
+                deleted_files = scmclient.strip_p_num_slashes(deleted_files,
+                                                              prefix_level)
+
+            for f in deleted_files:
+                try:
+                    os.remove(f)
+                    patched_empty_files = True
+                except OSError as e:
+                    logger.error('Unable to delete file "%s": %s', f, e)
+
+        return patched_empty_files
 
 
 class JujutsuClient(BaseSCMClient):

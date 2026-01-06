@@ -61,6 +61,13 @@ class MercurialTestCase(SCMClientTestCase[MercurialClient]):
 
     scmclient_cls = MercurialClient
     populate_default_clone: bool = True
+    default_scmclient_caps = {
+        'scmtools': {
+            'mercurial': {
+                'empty_files': True,
+            },
+        },
+    }
 
     #: The path to the source test repository directory.
     hg_dir: str
