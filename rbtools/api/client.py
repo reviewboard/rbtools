@@ -21,7 +21,7 @@ class RBClientWebLoginOptions:
     login is used to authenticate the client.
 
     Version Added:
-        5.4
+        6.0
     """
 
     #: Whether to allow using web-based login when authenticating the client.
@@ -78,7 +78,7 @@ class RBClient:
     #: the client.
     #:
     #: Version Added:
-    #:     5.4
+    #:     6.0
     web_login_options: RBClientWebLoginOptions | None
 
     def __init__(
@@ -109,7 +109,7 @@ class RBClient:
                 authenticate the client.
 
                 Version Added:
-                    5.4
+                    6.0
 
             **kwargs (dict):
                 Keyword arguments to pass to the transport.

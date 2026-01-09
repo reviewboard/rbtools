@@ -34,7 +34,7 @@ class Login(BaseCommand):
     If the user is already logged in, this won't do anything.
 
     Version Changed:
-        5.4:
+        6.0:
         Deprecated the ``-l`` option in favour of ``--debug``.
 
     Version Changed:
@@ -56,8 +56,8 @@ class Login(BaseCommand):
                default=False,
                help='With web-based login, display the login server logs.',
                added_in='5.0',
-               deprecated_in='5.4',
-               removed_in='6.0',
+               deprecated_in='6.0',
+               removed_in='7.0',
                replacement='--debug'),
         BaseCommand.server_options,
     ]
@@ -117,7 +117,7 @@ class Login(BaseCommand):
         """Create and return the argument parser for this command.
 
         Version Added:
-            5.4
+            6.0
 
         Args:
             config (dict):

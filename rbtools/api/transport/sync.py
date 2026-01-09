@@ -69,7 +69,7 @@ class SyncTransport(Transport):
         """Initialize the transport.
 
         Version Changed:
-            5.4:
+            6.0:
             Added the ``web_login_callback`` argument.
 
         Args:
@@ -150,7 +150,7 @@ class SyncTransport(Transport):
                 A callback to attempt authentication through web-based login.
 
                 Version Added:
-                    5.4
+                    6.0
 
             **kwargs (dict):
                 Keyword arguments to pass to the base class.

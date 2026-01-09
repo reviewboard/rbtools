@@ -236,7 +236,7 @@ def credentials_prompt(
     """Prompt for a username and/or password using the command line.
 
     Version Added:
-        5.4
+        6.0
 
     Args:
         server_url (str):

@@ -68,7 +68,7 @@ OTPCallback: TypeAlias = Callable[[str, str], str]
 #: A callback that attempts web-based login and returns its result.
 #:
 #: Version Added:
-#:     5.4
+#:     6.0
 WebLoginCallback: TypeAlias = Callable[[], bool]
 
 
@@ -590,7 +590,7 @@ class ReviewBoardHTTPPasswordMgr(HTTPPasswordMgr):
         """Initialize the password manager.
 
         Version Changed:
-            5.4:
+            6.0:
             Added the ``web_login_callback`` argument.
 
         Args:
@@ -618,7 +618,7 @@ class ReviewBoardHTTPPasswordMgr(HTTPPasswordMgr):
                 A callback to attempt authentication through web-based login.
 
                 Version Added:
-                    5.4
+                    6.0
         """
         super().__init__()
         self.rb_url = reviewboard_url
@@ -696,7 +696,7 @@ class ReviewBoardHTTPPasswordMgr(HTTPPasswordMgr):
         """Attempt authenticating using web-based login.
 
         Version Added:
-            5.4
+            6.0
 
         Returns:
             bool:
@@ -723,7 +723,7 @@ class ReviewBoardWebLoginHandler(BaseHandler):
     fall back onto the other auth handlers if it fails.
 
     Version Added:
-        5.4
+        6.0
     """
 
     handler_order = 470   # Before Preset and Basic
@@ -757,7 +757,7 @@ class ReviewBoardWebLoginHandler(BaseHandler):
         will be passed on to the next authentication handler.
 
         Version Added:
-            5.4
+            6.0
 
         Args:
             req (rbtools.api.request.Request):
@@ -1281,7 +1281,7 @@ class ReviewBoardServer:
         """Initialize the server object.
 
         Version Changed:
-            5.4:
+            6.0:
             Added the ``web_login_callback`` argument.
 
             5.1:
@@ -1356,7 +1356,7 @@ class ReviewBoardServer:
                 A callback to attempt authentication through web-based login.
 
                 Version Added:
-                    5.4
+                    6.0
         """
         # Normalize the URLs and compute the API URL.
         if not url.endswith('/'):

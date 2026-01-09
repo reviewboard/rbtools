@@ -22,7 +22,7 @@ class _TestCommand(BaseCommand):
     """Command class that does nothing.
 
     Version Changed:
-        5.4:
+        6.0:
         Renamed to ``_TestCommand`` to make sure it doesn't get picked up
         by the test runner.
 
@@ -56,7 +56,7 @@ class _TestSubCommand(BaseSubCommand):
     """Sub Command class that does nothing.
 
     Version Added:
-        5.4
+        6.0
     """
 
     name = 'sub'
@@ -319,7 +319,7 @@ class MultiCommandInitializationTests(CommandTestsMixin[_TestMultiCommand],
     """Unit tests for multi command initialization.
 
     Version Added:
-        5.4
+        6.0
     """
 
     command_cls = _TestMultiCommand

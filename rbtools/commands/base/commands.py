@@ -390,7 +390,7 @@ class BaseCommand:
                     'automatically open a browser to the URL. When used '
                     'with --web-login, this will open a browser to the '
                     'login page.',
-               added_in='5.4'),
+               added_in='6.0'),
     ]
 
     server_options = OptionGroup(
@@ -443,7 +443,7 @@ class BaseCommand:
                    default=False,
                    help='Use web-based login instead of prompting for '
                         'authentication credentials directly in the terminal.',
-                   added_in='5.4'),
+                   added_in='6.0'),
             Option('--disable-proxy',
                    action='store_false',
                    dest='enable_proxy',
@@ -1387,7 +1387,7 @@ class BaseCommand:
         authorization.
 
         Version Added:
-            5.4
+            6.0
 
         Raises:
             WebLoginNotAvailable:
@@ -1562,7 +1562,7 @@ class BaseCommand:
         are inside any option groups set on the command.
 
         Version Added:
-            5.4
+            6.0
 
         Returns:
             list of rbtools.commands.base.options.Option:
@@ -1584,7 +1584,7 @@ class BaseCommand:
         If a deprecated argument is present, a warning will be emitted for it.
 
         Version Added:
-            5.4
+            6.0
         """
         deprecated_options: set[Option] = set()
 
@@ -1824,7 +1824,7 @@ class BaseMultiCommand(BaseCommand):
         subcommands.
 
         Version Added:
-            5.4
+            6.0
 
         Returns:
             list of rbtools.commands.base.options.Option:

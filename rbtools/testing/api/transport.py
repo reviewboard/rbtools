@@ -453,7 +453,7 @@ class URLMapTransport(Transport):
         """Add the URL for the root resource.
 
         Version Added:
-            5.4
+            6.0
 
         Args:
             **kwargs (dict):

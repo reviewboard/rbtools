@@ -1,7 +1,7 @@
 """Unit tests for HTTP auth handlers.
 
 Version Added:
-    5.4
+    6.0
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ class _TestCommand(BaseCommand):
     """Testing command.
 
     Version Added:
-        5.4
+        6.0
     """
 
     needs_api = True
@@ -53,7 +53,7 @@ class PresetHTTPAuthHandlerTests(CommandTestsMixin[_TestCommand], TestCase):
     """Unit tests for PresetHTTPAuthHandler.
 
     Version Added:
-        5.4
+        6.0
     """
 
     command_cls = _TestCommand
@@ -142,7 +142,7 @@ class ReviewBoardWebLoginHandlerTests(CommandTestsMixin[_TestCommand],
     """Unit tests for ReviewBoardWebLoginHandler.
 
     Version Added:
-        5.4
+        6.0
     """
 
     command_cls = _TestCommand
@@ -339,7 +339,7 @@ class ReviewBoardHTTPBasicAuthHandlerTests(CommandTestsMixin[_TestCommand],
     """Unit tests for ReviewBoardHTTPBasicAuthHandler.
 
     Version Added:
-        5.4
+        6.0
     """
 
     command_cls = _TestCommand

@@ -1,7 +1,7 @@
 """Unit tests for session authentication in commands.
 
 Version Added:
-    5.4
+    6.0
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ class GetAuthSessionCommand(BaseCommand):
     instead of going through our HTTP auth handlers.
 
     Version Added:
-        5.4
+        6.0
     """
 
     needs_api = True
@@ -70,7 +70,7 @@ class GetAuthSessionCommandTests(CommandTestsMixin[GetAuthSessionCommand],
     """Tests for commands that get an authenticated session.
 
     Version Added:
-        5.4
+        6.0
     """
 
     command_cls = GetAuthSessionCommand

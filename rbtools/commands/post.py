@@ -1030,7 +1030,7 @@ class Post(BaseCommand):
         """Create and return the argument parser for this command.
 
         Version Added:
-            5.4
+            6.0
 
         Args:
             config (dict):

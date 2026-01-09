@@ -38,7 +38,7 @@ class WebLoginNotAllowed(Exception):
     """An error indicating web-based login is not allowed to be used.
 
     Version Added:
-        5.4
+        6.0
     """
 
 
@@ -638,7 +638,7 @@ def attempt_web_login(
     """Attempt to authenticate the client using web-based login.
 
     Version Added:
-        5.4
+        6.0
 
     Args:
         api_client (rbtools.api.client.RBClient):

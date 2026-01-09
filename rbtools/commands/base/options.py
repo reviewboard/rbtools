@@ -27,7 +27,7 @@ class Option:
     of the custom arguments that are defined in the constructor.
 
     Version Added:
-        5.4:
+        6.0:
         The optional RBTools specific attributes are now stored on the class
         instead of in ``attrs``.
 
@@ -68,7 +68,7 @@ class Option:
         """Initialize the option.
 
         Version Changed:
-            5.4:
+            6.0:
             Added explicit arguments for the optional RBTools specific
             arguments that may be set on an option, pulling them out of
             ``**attrs``.
@@ -81,7 +81,7 @@ class Option:
                 The version the option was added in.
 
                 Version Added:
-                    5.4
+                    6.0
 
             config_key (str, optional):
                 A config key to retrieve a default value from RBTools config
@@ -89,25 +89,25 @@ class Option:
                 precedence over any ``default`` in ``attrs``.
 
                 Version Added:
-                    5.4
+                    6.0
 
             deprecated_in (str, optional):
                 The version the option was deprecated in.
 
                 Version Added:
-                    5.4
+                    6.0
 
             extended_help (str, optional):
                 Extended help message.
 
                 Version Added:
-                    5.4
+                    6.0
 
             removed_in (str, optional):
                 The version in which the option will be removed.
 
                 Version Added:
-                    5.4
+                    6.0
 
             replacement (str, optional):
                 The new option to use instead of the deprecated option, if any.
@@ -116,14 +116,14 @@ class Option:
                 including any preceding hyphens (e.g. ``--my-option``).
 
                 Version Added:
-                    5.4
+                    6.0
 
             versions_changed (dict[str, str], optional):
                 A dict of versions in which the option changed. The keys are
                 version strings and values are change description strings.
 
                 Version Added:
-                    5.4
+                    6.0
 
             **attrs (dict):
                 The argparse attributes for the option.
