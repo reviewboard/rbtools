@@ -88,7 +88,7 @@ def parse_mimetype(
     parts = mime_type.split(';')[0].split('/')
 
     if len(parts) != 2:
-        raise ValueError('f"{mime_type}" is not a valid MIME type')
+        raise ValueError(f'"{mime_type}" is not a valid MIME type')
 
     main_type, sub_type = parts
 
