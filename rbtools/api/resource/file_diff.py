@@ -55,12 +55,12 @@ class FileDiffItemResource(GetPatchMixin, ItemResource):
     #: Additional information of the destination file.
     #:
     #: This is parsed from the diff, but is usually not used for anything.
-    dest_detail: str | None
+    dest_detail: str
 
     #: The new name of the patched file.
     #:
     #: This may be the same as the source file.
-    dest_file: str | None
+    dest_file: str
 
     #: The encoding of the original and patched file, if available.
     encoding: str

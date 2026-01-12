@@ -1949,15 +1949,6 @@ class ListResource(Generic[TItemResource], Resource):
         """
         return self.num_items
 
-    def __nonzero__(self) -> bool:
-        """Return whether the list is non-zero.
-
-        Returns:
-            bool:
-            ``True``, always.
-        """
-        return self.__bool__()
-
     def __bool__(self) -> bool:
         """Return whether the list is truthy.
 
@@ -1990,11 +1981,11 @@ class ListResource(Generic[TItemResource], Resource):
                                 force_resource=True,
                                 force_resource_type=self._item_resource_type)
 
-    def __iter__(self) -> Iterator[Any]:
+    def __iter__(self) -> Iterator[TItemResource]:
         """Iterate through the items.
 
         Yields:
-            object:
+            TItemResource:
             Each item in the list.
         """
         for i in range(self.num_items):
@@ -2090,11 +2081,11 @@ class ListResource(Generic[TItemResource], Resource):
                 break
 
     @property
-    def all_items(self) -> Iterator[Any]:
+    def all_items(self) -> Iterator[TItemResource]:
         """Yield all item resources in all pages of this resource.
 
         Yields:
-            Any:
+            TItemResource:
             All items in the list.
         """
         for page in self.all_pages:
