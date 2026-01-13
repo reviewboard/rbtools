@@ -53,7 +53,7 @@ review, you'll need to check out the branch and run :rbtcommand:`post`.
    Review requests are not pull requests. They're more flexible. You don't
    have to push anything anywhere, if you don't want to.
 
-   You means you have more control over what's posted. You can selectively
+   This means you have more control over what's posted. You can selectively
    post only certain files with :option:`rbt post --include` or exclude files
    (like auto-generated files) with :option:`rbt post --exclude`.
 
@@ -130,7 +130,7 @@ For example:
    https://reviewboard.example.com/r/123/diff/
 
 The posted review request will be populated with your commit's summary and
-description. If you have :ref:`default reviewers <default-reviewers>` set up,
+description. If you have :ref:`default reviewers <rb:default-reviewers>` set up,
 they'll be assigned.
 
 Once you're done filling out fields on the review request, click
@@ -370,5 +370,5 @@ they've landed.
 Maybe we wanted to land them as linear, squashed commits, one per branch? If
 so, we could have used ``--squash``.
 
-Once you get the hang of this process, you'll find it *much* faster band more
+Once you get the hang of this process, you'll find it *much* faster and more
 flexible than methods like pull requests.

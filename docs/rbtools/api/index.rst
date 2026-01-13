@@ -17,5 +17,5 @@ documentation, which can be found in the :ref:`rb:webapiguide`.
    :maxdepth: 2
 
    overview
-   common-use-cases
+   tutorial
    coderef/index

@@ -298,7 +298,7 @@ For example:
 .. code-block:: console
    :caption: Attempting to land a change that isn't approved:
 
-   $ rbt close --json my-branch
+   $ rbt land --json my-branch
    {
        "approval_failure": {
            "message": "This review is not marked Ship It!",
@@ -315,7 +315,7 @@ For example:
 .. code-block:: console
    :caption: The change was approved but could not be applied.
 
-   $ rbt close --json -r 123
+   $ rbt land --json -r 123
    {
        "errors": [
            "Failed to execute \"rbt patch\": ..."

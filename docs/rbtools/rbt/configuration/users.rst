@@ -106,7 +106,7 @@ COOKIES_STRICT_DOMAIN_MATCH
 
 **Default:** ``False``
 
-RBTools uses cookies to manage Review Board login sessions. By defaut,
+RBTools uses cookies to manage Review Board login sessions. By default,
 if RBTools has stored cookies for both a domain and a parent domain
 (e.g., ``staging.rb.example.com`` and ``rb.example.com``), both cookies
 may be passed, and this may interfere with authentication.
@@ -317,7 +317,7 @@ Example:
 
 .. code-block:: python
 
-    GUESS_DESCRIPTION = "yes"
+    GUESS_SUMMARY = "yes"
 
 This can also be provided by using :option:`rbt post --guess-summary`.
 

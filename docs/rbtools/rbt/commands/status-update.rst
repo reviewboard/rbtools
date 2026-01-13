@@ -33,8 +33,8 @@ request validation scripts with Review Board.
 rbt status-update get
 =====================
 
-This is is used to list all the status updates on a review request, or to
-display information on a particular status update.
+This is used to list all the status updates on a review request, or to display
+information on a particular status update.
 
 It requires the :option:`-r`/:option:`--review-request-id` option, and can
 take a :option:`-s`/:option:`--status-update-id` to specify a particular

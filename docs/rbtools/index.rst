@@ -68,6 +68,7 @@ There's a whole suite of additional commands that might also be useful:
 * :ref:`rbt-attach` - Upload and attach files to a review request
 * :ref:`rbt-clear-cache` - Clear your local RBTools caches
 * :ref:`rbt-close` - Close a review request
+* :ref:`rbt-info` - Display information about a review request
 * :ref:`rbt-install` - Install special components for third-party integrations
 * :ref:`rbt-list-repo-types` - List all repository types supported by RBTools
 * :ref:`rbt-login` - Create a Review Board login session for RBTools
@@ -145,11 +146,11 @@ Every source code management system is different. We have guides on the most
 common workflows to help you get started:
 
 * :ref:`Options for authentication with Review Board <rbtools-authentication>`
-* :ref:`rbtools-workflow-sos`
 * :ref:`rbtools-workflow-git`
-* :ref:`rbtools-workflow-clearcase`
-* :ref:`rbtools-workflow-jujutsu`
 * :ref:`rbtools-workflow-perforce`
+* :ref:`rbtools-workflow-jujutsu`
+* :ref:`rbtools-workflow-clearcase`
+* :ref:`rbtools-workflow-sos`
 * :ref:`Working with Team Foundation Server <rbtools-tfs>`
 
 

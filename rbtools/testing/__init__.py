@@ -12,3 +12,6 @@ __all__ = [
     'TestCase',
     'URLMapTransport',
 ]
+
+
+__autodoc_excludes__ = __all__

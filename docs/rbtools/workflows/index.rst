@@ -4,17 +4,14 @@
 RBTools Workflows
 =================
 
-..
-   NOTE: Keep these in title case sort order.
-
 .. toctree::
    :maxdepth: 1
 
-   sos
    git
-   clearcase
-   jujutsu
    perforce
+   jujutsu
+   clearcase
+   sos
 
 
 ..

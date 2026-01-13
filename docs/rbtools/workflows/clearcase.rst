@@ -16,7 +16,7 @@ A typical workflow looks like this:
 
 2. :ref:`Post your change for review <rbtools-workflow-clearcase-step2>`
 
-3. :ref:`Make changes based on feedback and re-port for review
+3. :ref:`Make changes based on feedback and re-post for review
    <rbtools-workflow-clearcase-step3>`
 
 4. :ref:`Finish your code by checking in or delivering your activity
@@ -140,7 +140,7 @@ can see it until you're ready to publish.
 You'll now need to go to the URL and fill out the :guilabel:`Summary`,
 :guilabel:`Description`, or any other fields.
 
-If you have :ref:`default reviewers <default-reviewers>` set up, they'll be
+If you have :ref:`default reviewers <rb:default-reviewers>` set up, they'll be
 assigned automatically, but you can also specify the people or groups you want
 to review your change.
 

@@ -31,7 +31,7 @@ following rules:
 
    On Linux and MacOS X, this file can be found in :file:`$HOME`.
 
-   On Windows, it's in :file:`$USERPROFILE\\Local Settings\\Application Data`.
+   On Windows, it's in :file:`%APPDATA%`.
 
 
 .. toctree::

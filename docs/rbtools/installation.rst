@@ -142,8 +142,7 @@ You may want to use :command:`pip` instead of :command:`pipx` in you are:
 
       $ rbt
 
-   You should see the RBTools help displayed. If it doesn't work, make sure
-   that you followed the instructions from :command:`pipx ensurepath`.
+   You should see the RBTools help displayed.
 
 3. To upgrade RBTools, run:
 

@@ -148,7 +148,7 @@ html_title = 'RBTools %s Documentation' % version
 # sheets) here, relative to this directory. They are copied after the
 # builtin static files, so a file named "default.css" will overwrite
 # the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = []
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page
 # bottom, using the given strftime format.
@@ -250,7 +250,7 @@ if rbt_release_type == 'final' or rbt_release_num > 0:
     git_branch = 'release-%s' % rbt_major_version
 
     if rbt_released:
-        git_branch += '.%s' % rbt_micro_version
+        git_branch += '.%s' % rbt_minor_version
 
         if rbt_micro_version:
             git_branch += '.%s' % rbt_micro_version
