@@ -1,0 +1,125 @@
+.. default-intersphinx:: rbt6.x rb-latest
+
+=========================
+RBTools 6.0 Release Notes
+=========================
+
+**Release date:** TBD
+
+
+Installation
+============
+
+Follow our :ref:`installation guide <rbtools-installation>` to install
+RBTools.
+
+To learn more, see:
+
+* `Documentation <https://www.reviewboard.org/docs/rbtools/6.x/>`_
+* `RBTools on PyPI <https://pypi.org/project/rbtools/>`_
+* `RBTools on GitHub <https://github.com/reviewboard/rbtools/>`_
+
+
+Compatibility
+=============
+
+* RBTools supports Python 3.10 through 3.14.
+
+  Support for Python 3.8 and 3.9 has been dropped. For continued support on
+  those versions, please use RBTools 5.x.
+
+* Added a dependency on :pypi:`appdirs`. This replaces a previously bundled
+  copy.
+
+* Added a dependency on :pypi:`typelets` 1.1.x.
+
+
+New Features
+============
+
+* Added support for `Jujutsu`_
+
+  Jujutsu_ is a version control system which works seamlessly with Git servers
+  while providing new and innovative concepts and commands. Because of its
+  interoperability, it's a powerful tool that can be integrated into individual
+  developer workflows without requiring major organizational changes.
+
+  RBTools 6.0 includes full support for working with Jujutsu clones, including
+  posting, patching, and landing changes.
+
+.. _Jujutsu: https://docs.jj-vcs.dev/latest/
+
+
+* Full documentation and type hinting for all resources.
+
+  The Python API part of RBTools automatically generates client-side bindings
+  by introspecting API payloads. While this allowed the bindings to be used for
+  all APIs, including those in custom extensions, it made it difficult to work
+  with because things like method names were not properly documented.
+
+  The API now includes custom resource subclasses to match all resource
+  endpoints in Review Board. These provide documentation and type hints for the
+  entire API surface.
+
+  Under the hood, the API still uses introspection, so you can still use it
+  with your extension-provided API endpoints.
+
+
+* Allow the :option:`--open-browser` and :option:`--web-login` options to be
+  used for all commands.
+
+  Web-based login (introduced in RBTools 5.0) was only supported for the
+  :rbtcommand:`rbt login` command, which meant that the login prompts used for
+  other commands when there was no current session would not allow it. This has
+  been changed so if the server supports web-based login, it can be used at any
+  point.
+
+
+rbt patch
+---------
+
+.. program:: rbt patch
+
+* Apply patches to binary files.
+
+  As of Review Board 7.0 and RBTools 5.0, posted changes may include binary
+  files in diffs. This is limited to reviewable file types such as images.
+  "rbtcommand:`rbt patch` will now download these files and apply them as part
+  of the patch.
+
+  This is supported for Jujutsu, Git, Mercurial, Perforce, and Subversion.
+
+
+Bug Fixes
+=========
+
+rbt list-repo-types
+-------------------
+
+.. program:: rbt list-repo-types
+
+* Fixed a crash when dependencies for supported repository types were missing.
+
+
+rbt patch
+---------
+
+.. program:: rbt patch
+
+* Fixed some potential issues with commit messages and authors when squashing
+  multiple commits.
+
+* Fixed patching on Mercurial to use `--config patch.eol=auto` in order to
+  more reliably apply patches in files with varying newline styles.
+
+  Patch by André Klitzing
+
+
+
+Contributors
+============
+
+* André Klitzing
+* Christian Hammond
+* David Trowbridge
+* Michelle Aubin
