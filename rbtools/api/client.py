@@ -277,3 +277,19 @@ class RBClient:
                 exception's message.
         """
         self._transport.logout(*args, **kwargs)
+
+    def has_session_cookie(self) -> bool:
+        """Return whether a local session cookie exists for this server.
+
+        This does not guarantee that the session is valid server-side
+        (the cookie may be stale), this just returns whether a local
+        session cookie has been set for this server.
+
+        Version Added:
+            6.0
+
+        Returns:
+            bool:
+            Whether a local session cookie exists for this server.
+        """
+        return self._transport.has_session_cookie()

@@ -585,19 +585,28 @@ def _WebLoginHandler_factory(
 
 def is_web_login_enabled(
     *,
-    server_info: ServerInfoResource,
+    server_info: (ServerInfoResource | None) = None,
     capabilities: (Capabilities | None) = None,
 ) -> bool:
     """Return whether client web login is enabled on a Review Board server.
+
+    Version Changed:
+        6.0:
+        Made the ``server_info`` attribute optional.
 
     Version Added:
         5.0
 
     Args:
-        server_info (rbtools.api.resource.ServerInfoResource):
+        server_info (rbtools.api.resource.ServerInfoResource, optional):
             The server info resource for the Review Board server.
 
-        capabilities (rbtools.api.capabilities.Capabilities):
+            Version Changed:
+                6.0:
+                This is now optional. If not given then we assume web login
+                is enabled.
+
+        capabilities (rbtools.api.capabilities.Capabilities, optional):
             The capabilities for the Review Board server.
 
     Returns:
@@ -605,6 +614,12 @@ def is_web_login_enabled(
         Whether client web-based login is enabled on the given Review Board
         server.
     """
+    if not server_info:
+        # We don't have the server info, meaning we're likely attempting to
+        # authenticate a server that has a fully private API. We'll assume
+        # that web login is enabled.
+        return True
+
     minimum_supported_version = parse_version('5.0.5')
     rb_version = parse_version(server_info.product.package_version)
 
@@ -631,7 +646,7 @@ def is_web_login_enabled(
 def attempt_web_login(
     *,
     api_client: RBClient,
-    api_root: RootResource,
+    server_info: (ServerInfoResource | None) = None,
     capabilities: (Capabilities | None) = None,
 ) -> bool:
     """Attempt to authenticate the client using web-based login.
@@ -643,8 +658,8 @@ def attempt_web_login(
         api_client (rbtools.api.client.RBClient):
             The API client of the command that is creating the server.
 
-        api_root (rbtools.api.resource.RootResource):
-            The root resource for the Review Board server.
+        server_info (rbtools.api.resource.ServerInfoResource, optional):
+            The server info resource for the Review Board server.
 
         capabilities (rbtools.api.capabilities.Capabilities, optional):
             The Review Board server capabilities.
@@ -660,7 +675,7 @@ def attempt_web_login(
             configured not to allow it.
     """
     web_login_enabled = is_web_login_enabled(
-        server_info=api_root.get_info(),
+        server_info=server_info,
         capabilities=capabilities)
 
     if not web_login_enabled:

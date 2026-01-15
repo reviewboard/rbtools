@@ -41,7 +41,7 @@ from rbtools.utils.console import get_pass
 from rbtools.utils.filesystem import cleanup_tempfiles, get_home_path
 from rbtools.utils.repository import get_repository_resource
 from rbtools.utils.users import credentials_prompt
-from rbtools.utils.web_login import attempt_web_login
+from rbtools.utils.web_login import WebLoginNotAllowed, attempt_web_login
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -50,6 +50,7 @@ if TYPE_CHECKING:
     from rbtools.api.resource import (
         RepositoryItemResource,
         RootResource,
+        ServerInfoResource
     )
     from rbtools.api.transport import Transport
     from rbtools.clients.base.repository import RepositoryInfo
@@ -1393,20 +1394,25 @@ class BaseCommand:
             6.0
 
         Raises:
-            WebLoginNotAvailable:
+            rbtools.utils.web_login.WebLoginNotAllowed:
                 Web-based login is not available on the Review Board server.
         """
+        server_info: (ServerInfoResource | None) = None
         api_client = self.api_client
         api_root = self.api_root
 
-        # This callback will only be used by commands who require the
-        # API, so these will have been set.
-        assert api_client is not None
-        assert api_root is not None
+        if not api_client:
+            # This should never happen because the API client gets set
+            # before the first API call in BaseCommand.initialize(),
+            # but we'll be cautious.
+            raise WebLoginNotAllowed
+
+        if api_root:
+            server_info = api_root.get_info()
 
         return attempt_web_login(
             api_client=api_client,
-            api_root=api_root)
+            server_info=server_info)
 
     def _make_api_client(
         self,
@@ -1462,7 +1468,13 @@ class BaseCommand:
         """Return an RBClient instance and the associated root resource.
 
         Commands should use this method to gain access to the API,
-        instead of instantianting their own client.
+        instead of instantiating their own client. This will set the
+        ``api_client`` attribute.
+
+        Version Changed:
+            6.0:
+            This now sets the ``api_client`` attribute as soon as the client
+            is instantiated.
 
         Args:
             server_url (str):
@@ -1484,6 +1496,7 @@ class BaseCommand:
 
         api_client = self._make_api_client(server_url)
         api_root = None
+        self.api_client = api_client
 
         try:
             api_root = api_client.get_root()

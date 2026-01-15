@@ -431,6 +431,22 @@ class SyncTransport(Transport):
         if self.allow_caching:
             self.server.disable_cache()
 
+    def has_session_cookie(self) -> bool:
+        """Return whether a local session cookie exists for this server.
+
+        This does not guarantee that the session is valid server-side
+        (the cookie may be stale), this just returns whether a local
+        session cookie has been set for this server.
+
+        Version Added:
+            6.0
+
+        Returns:
+            bool:
+            Whether a local session cookie exists for this server.
+        """
+        return self.server.has_session_cookie()
+
     def __repr__(self) -> str:
         """Return a string representation of the object.
 

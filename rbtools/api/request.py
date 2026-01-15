@@ -18,6 +18,7 @@ from http.cookiejar import (Cookie,
                             CookieJar,
                             DefaultCookiePolicy,
                             MozillaCookieJar)
+from http.cookies import SimpleCookie
 from io import BytesIO
 from json import loads as json_loads
 from typing import TYPE_CHECKING
@@ -1667,3 +1668,33 @@ class ReviewBoardServer:
                 pass
 
         return rsp
+
+    def has_session_cookie(self) -> bool:
+        """Return whether a local session cookie exists for this server.
+
+        This checks whether the cookie jar would attach a ``rbsessionid``
+        cookie to a request to the API.
+
+        This does not guarantee that the session is valid server-side
+        (the cookie may be stale), this just returns whether a local
+        session cookie has been set for this server.
+
+        Version Added:
+            6.0
+
+        Returns:
+            bool:
+            Whether a local session cookie exists for this server.
+        """
+        req = URLRequest(self.url)
+
+        # If a rbsessionid exists for this server then the cookie jar
+        # will add it.
+        self.cookie_jar.add_cookie_header(req)
+
+        # Check if the rbsessionid cookie was added to the header.
+        cookie_header = req.get_header('Cookie', default='')
+        cookie = SimpleCookie()
+        cookie.load(cookie_header)
+
+        return RB_COOKIE_NAME in cookie

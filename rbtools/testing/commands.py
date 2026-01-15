@@ -15,6 +15,8 @@ from typing_extensions import TypedDict
 
 from rbtools.clients import scan_usable_client
 from rbtools.commands.base import BaseCommand
+from rbtools.commands.login import Login
+from rbtools.commands.logout import Logout
 from rbtools.deprecation import RemovedInRBTools70Warning
 from rbtools.testing.api.transport import URLMapTransport
 from rbtools.utils.filesystem import cleanup_tempfiles
@@ -313,11 +315,19 @@ class CommandTestsMixin(kgb.SpyAgency, Generic[_CommandT]):
             list of str:
             The command line arguments.
         """
-        assert self.command_cls is not None
+        command_cls = self.command_cls
+        assert command_cls is not None
 
-        argv: list[str] = ['rbt', self.command_cls.name]
+        argv: list[str] = ['rbt', command_cls.name]
 
-        if server_url and self.command_cls.needs_api:
+        # The Login and Logout commands have needs_api=False because we
+        # needed to control their client and API root creation, but they
+        # are still commands that need the API and communicate with the
+        # server so we include them here.
+        if (server_url and
+            (command_cls.needs_api or
+             command_cls is Login or
+             command_cls is Logout)):
             argv += ['--server', server_url]
 
         if args:

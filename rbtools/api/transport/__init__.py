@@ -216,3 +216,19 @@ class Transport:
             5.0
         """
         raise NotImplementedError
+
+    def has_session_cookie(self) -> bool:
+        """Return whether a local session cookie exists for this server.
+
+        This does not guarantee that the session is valid server-side
+        (the cookie may be stale), this just returns whether a local
+        session cookie has been set for this server.
+
+        Version Added:
+            6.0
+
+        Returns:
+            bool:
+            Whether a local session cookie exists for this server.
+        """
+        raise NotImplementedError

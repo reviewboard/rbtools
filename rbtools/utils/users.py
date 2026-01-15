@@ -133,7 +133,7 @@ def get_authenticated_session(
         try:
             login_successful = attempt_web_login(
                 api_client=api_client,
-                api_root=api_root,
+                server_info=api_root.get_info(),
                 capabilities=capabilities)
 
             if login_successful:

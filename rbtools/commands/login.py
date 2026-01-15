@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 from rbtools.api.errors import AuthorizationError
 from rbtools.commands.base import (BaseCommand,
@@ -15,6 +16,7 @@ from rbtools.utils.users import get_authenticated_session
 if TYPE_CHECKING:
     import argparse
 
+    from rbtools.api.resource import SessionResource
     from rbtools.config import RBToolsConfig
 
 
@@ -46,8 +48,6 @@ class Login(BaseCommand):
     name = 'login'
     author = 'The Review Board Project'
 
-    needs_api = True
-
     option_list = [
         Option('-l', '--enable-logging',
                dest='enable_logging',
@@ -72,16 +72,39 @@ class Login(BaseCommand):
             rbtools.command.CommandError:
                 The login failed.
         """
+        session: (SessionResource | None) = None
         options = self.options
-        api_client = self.api_client
-        api_root = self.api_root
-        assert api_client is not None
-        assert api_root is not None
+
+        # Initialize the client and root resource ourselves instead of setting
+        # needs_api=True, so that we have more control over the auth flow.
+        #
+        # Some servers have a fully private API, so fetching the root resource
+        # may prompt for authentication. This makes it hard to tell here
+        # whether the user was previously logged in or not. We check whether
+        # we have a session cookie before that happens, so that we can print
+        # the right success message upon login.
+        server_url = self._init_server_url()
+        self.server_url = server_url
+
+        if not urlparse(server_url).scheme:
+            server_url = f'http://{server_url}'
+
+        api_client = self._make_api_client(server_url)
+        self.api_client = api_client
+
+        # Check if we already have a session cookie, which indicates
+        # that the user has logged in before. We need to call this
+        # before the first API call because API calls to private API
+        # servers will trigger authentication, and then we wouldn't be
+        # able to tell if we were previously authenticated or not.
+        has_session_cookie = api_client.has_session_cookie()
+
+        api_root = api_client.get_root()
+        self.api_root = api_root
 
         session = api_root.get_session(expand='user')
-        was_authenticated = session.authenticated
 
-        if not was_authenticated:
+        if not session.authenticated:
             web_login_options = api_client.web_login_options
             assert web_login_options
             web_login_options.debug = (web_login_options.debug or
@@ -94,11 +117,12 @@ class Login(BaseCommand):
                     auth_required=True,
                     session=session,
                     capabilities=self.capabilities)
+                assert session is not None
             except AuthorizationError:
                 raise CommandError('Unable to log in to Review Board.')
 
         if session.authenticated:
-            if (not was_authenticated or
+            if (not has_session_cookie or
                 (options.username and options.password) or
                 options.api_token):
                 self.log.info('Successfully logged in to Review Board.')
