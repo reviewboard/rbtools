@@ -12,7 +12,6 @@ from tqdm import tqdm
 from typing_extensions import NotRequired, TypeVar
 
 from rbtools.api.errors import APIError
-from rbtools.api.resource.file_diff import FileDiffItemResource
 from rbtools.commands.base import (BaseCommand,
                                    CommandError,
                                    Option,

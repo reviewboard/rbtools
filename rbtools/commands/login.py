@@ -117,7 +117,6 @@ class Login(BaseCommand):
                     auth_required=True,
                     session=session,
                     capabilities=self.capabilities)
-                assert session is not None
             except AuthorizationError:
                 raise CommandError('Unable to log in to Review Board.')
 

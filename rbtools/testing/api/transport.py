@@ -217,8 +217,6 @@ class URLMapTransport(Transport):
             mimetype=payload_factory.make_mimetype('users'),
             item_mimetype=payload_factory.make_mimetype('users'))
 
-
-
         if username:
             assert password
             self.login(username=username, password=password)

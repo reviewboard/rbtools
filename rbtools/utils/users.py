@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, overload
 
 from rbtools.api.client import RBClientWebLoginOptions
 from rbtools.api.errors import AuthorizationError
@@ -12,6 +12,8 @@ from rbtools.utils.console import get_input, get_pass
 from rbtools.utils.web_login import WebLoginNotAllowed, attempt_web_login
 
 if TYPE_CHECKING:
+    from typing import Literal
+
     from rbtools.api.capabilities import Capabilities
     from rbtools.api.client import RBClient
     from rbtools.api.resource import (
@@ -22,6 +24,51 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+
+@overload
+def get_authenticated_session(
+    api_client: RBClient,
+    api_root: RootResource,
+    auth_required: Literal[True],
+    session: (SessionResource | None) = ...,
+    num_retries: int = ...,
+    via_web: (bool | None) = ...,
+    open_browser: (bool | None) = ...,
+    enable_logging: (bool | None) = ...,
+    capabilities: (Capabilities | None) = ...,
+) -> SessionResource:
+    ...
+
+
+@overload
+def get_authenticated_session(
+    api_client: RBClient,
+    api_root: RootResource,
+    auth_required: Literal[False] = ...,
+    session: (SessionResource | None) = ...,
+    num_retries: int = ...,
+    via_web: (bool | None) = ...,
+    open_browser: (bool | None) = ...,
+    enable_logging: (bool | None) = ...,
+    capabilities: (Capabilities | None) = ...,
+) -> SessionResource | None:
+    ...
+
+
+@overload
+def get_authenticated_session(
+    api_client: RBClient,
+    api_root: RootResource,
+    auth_required: bool,
+    session: (SessionResource | None) = ...,
+    num_retries: int = ...,
+    via_web: (bool | None) = ...,
+    open_browser: (bool | None) = ...,
+    enable_logging: (bool | None) = ...,
+    capabilities: (Capabilities | None) = ...,
+) -> SessionResource | None:
+    ...
 
 
 def get_authenticated_session(

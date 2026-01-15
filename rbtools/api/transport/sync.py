@@ -12,7 +12,6 @@ from rbtools.api.request import (AuthCallback,
                                  OTPCallback,
                                  ReviewBoardServer,
                                  WebLoginCallback)
-from rbtools.api.resource import Resource, RootResource
 from rbtools.api.transport import Transport
 
 if TYPE_CHECKING:

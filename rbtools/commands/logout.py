@@ -40,8 +40,8 @@ class Logout(BaseCommand):
         self.api_client = api_client
 
         if not api_client.has_session_cookie():
-            logging.info('You are already logged out of Review Board at %s',
-                         api_client.domain)
+            self.log.info('You are already logged out of Review Board at %s',
+                          api_client.domain)
             return 0
 
         api_root = api_client.get_root()
@@ -52,18 +52,10 @@ class Logout(BaseCommand):
         if session.authenticated:
             api_client.logout()
 
-<<<<<<< HEAD
             self.log.info('You are now logged out of Review Board at %s',
-                          self.api_client.domain)
+                          api_client.domain)
         else:
             self.log.info('You are already logged out of Review Board at %s',
-                          self.api_client.domain)
-=======
-            logging.info('You are now logged out of Review Board at %s',
-                         api_client.domain)
-        else:
-            logging.info('You are already logged out of Review Board at %s',
-                         api_client.domain)
+                          api_client.domain)
 
         return 0
->>>>>>> 747f1a1 (Fix issues with authenticating to private-API servers.)

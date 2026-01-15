@@ -24,7 +24,7 @@ from rbtools.utils.browser import open_browser as open_browser_func
 
 if TYPE_CHECKING:
     from rbtools.api.client import RBClient
-    from rbtools.api.resource import RootResource, ServerInfoResource
+    from rbtools.api.resource import ServerInfoResource
 
 
 logger = logging.getLogger(__name__)
