@@ -1464,7 +1464,7 @@ class BaseSCMClient:
         self,
         *,
         message: str,
-        author: PatchAuthor,
+        author: PatchAuthor | None,
         run_editor: bool,
         files: (Sequence[str] | None) = None,
         all_files: bool = False,
@@ -1474,12 +1474,24 @@ class BaseSCMClient:
         Derived classes should override this method if they wish to support
         committing changes to their repositories.
 
+        Version Changed:
+            6.0:
+            The ``author`` can now be ``None``, for cases where author
+            information is not available (e.g. authors who have private
+            profiles).
+
         Args:
             message (str):
                 The commit message to use.
 
-            author (rbtools.clients.base.patch.PatchAuthor):
+            author (rbtools.diffs.patches.PatchAuthor):
                 The author of the commit.
+
+                Version Changed:
+                    6.0:
+                    This can now be ``None``, for cases where author
+                    information is not available (e.g. authors who have
+                    private profiles).
 
             run_editor (bool):
                 Whether to run the user's editor on the commit message before
@@ -1569,12 +1581,18 @@ class BaseSCMClient:
         target: str,
         destination: str,
         message: str,
-        author: PatchAuthor,
+        author: PatchAuthor | None,
         squash: bool = False,
         run_editor: bool = False,
         close_branch: bool = True,
     ) -> None:
         """Merge the target branch with destination branch.
+
+        Version Changed:
+            6.0:
+            The ``author`` can now be ``None``, for cases where author
+            information is not available (e.g. authors who have private
+            profiles).
 
         Args:
             target (str):
@@ -1586,8 +1604,14 @@ class BaseSCMClient:
             message (str):
                 The commit message to use.
 
-            author (rbtools.clients.base.patch.PatchAuthor):
+            author (rbtools.diffs.patches.PatchAuthor):
                 The author of the commit.
+
+                Version Changed:
+                    6.0:
+                    This can now be ``None``, for cases where author
+                    information is not available (e.g. authors who have
+                    private profiles).
 
             squash (bool, optional):
                 Whether to squash the commits or do a plain merge.

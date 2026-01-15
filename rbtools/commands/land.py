@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from rbtools.api.errors import APIError
 from rbtools.clients.errors import MergeError, PushError
 from rbtools.commands import RB_MAIN
 from rbtools.commands.base import BaseCommand, CommandError, Option
+from rbtools.diffs.patches import PatchAuthor
 from rbtools.utils.commands import (build_rbtools_cmd_argv,
                                     extract_commit_message)
 from rbtools.utils.console import confirm
@@ -17,6 +20,9 @@ from rbtools.utils.review_request import (get_draft_or_current_value,
                                           guess_existing_review_request,
                                           parse_review_request_url)
 from rbtools.utils.users import get_user
+
+if TYPE_CHECKING:
+    from rbtools.api.resource.review_request import ReviewRequestItemResource
 
 
 class Land(BaseCommand):
@@ -125,7 +131,11 @@ class Land(BaseCommand):
         BaseCommand.branch_options,
     ]
 
-    def patch(self, review_request_id, squash=False):
+    def patch(
+        self,
+        review_request_id: int,
+        squash: bool = False,
+    ) -> None:
         """Patch a single review request's diff using rbt patch.
 
         Args:
@@ -159,15 +169,22 @@ class Land(BaseCommand):
                 f'Failed to execute "rbt patch":\n{result.stderr.read()}'
             )
 
-    def can_land(self, review_request):
+    def can_land(
+        self,
+        review_request: ReviewRequestItemResource,
+    ) -> str | None:
         """Determine if the review request is land-able.
 
         A review request can be landed if it is approved or, if the Review
         Board server does not keep track of approval, if the review request
         has a ship-it count.
 
-        This function returns the error with landing the review request or None
-        if it can be landed.
+        This function returns the error with landing the review request or
+        ``None`` if it can be landed.
+
+        Args:
+            review_request (rbtools.api.resource.ReviewRequestItemResource):
+                The review request containing the change to land.
         """
         try:
             is_rr_approved = review_request.approved
@@ -195,19 +212,27 @@ class Land(BaseCommand):
 
         return None
 
-    def land(self, destination_branch, review_request, source_branch=None,
-             squash=False, edit=False, delete_branch=True, dry_run=False):
+    def land(
+        self,
+        destination_branch: str,
+        review_request: ReviewRequestItemResource,
+        source_branch: (str | None) = None,
+        squash: bool = False,
+        edit: bool = False,
+        delete_branch: bool = True,
+        dry_run: bool = False,
+    ) -> None:
         """Land an individual review request.
 
         Args:
-            destination_branch (unicode):
+            destination_branch (str):
                 The destination branch that the change will be committed or
                 merged to.
 
             review_request (rbtools.api.resource.ReviewRequestItemResource):
                 The review request containing the change to land.
 
-            source_branch (unicode, optional):
+            source_branch (str, optional):
                 The source branch to land, if landing from a local branch.
 
             squash (bool, optional):
@@ -234,7 +259,12 @@ class Land(BaseCommand):
 
         if source_branch:
             review_commit_message = extract_commit_message(review_request)
-            author = review_request.get_submitter()
+            submitter = review_request.get_submitter()
+            author: (PatchAuthor | None) = None
+
+            if ((full_name := submitter.fullname) and
+                (email := submitter.email)):
+                author = PatchAuthor(full_name=full_name, email=email)
 
             json_data['source_branch'] = source_branch
 
@@ -249,6 +279,8 @@ class Land(BaseCommand):
 
             if not dry_run:
                 try:
+                    assert self.tool is not None
+
                     self.tool.merge(target=source_branch,
                                     destination=destination_branch,
                                     message=review_commit_message,
@@ -273,7 +305,7 @@ class Land(BaseCommand):
                              self.options.destination_branch))
         self.json.append('landed_review_requests', json_data)
 
-    def initialize(self):
+    def initialize(self) -> None:
         """Initialize the command.
 
         This overrides :py:meth:`BaseCommand.initialize
@@ -310,7 +342,7 @@ class Land(BaseCommand):
         self,
         branch_name: (str | None) = None,
         *args,
-    ) -> None:
+    ) -> int:
         """Run the command.
 
         Args:
@@ -473,6 +505,8 @@ class Land(BaseCommand):
                     tool.push_upstream(self.options.destination_branch)
                 except PushError as e:
                     raise CommandError(str(e))
+
+        return 0
 
     def _ask_review_request_match(self, review_request):
         return confirm(

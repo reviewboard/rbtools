@@ -1818,16 +1818,18 @@ class GitClient(BaseSCMClient):
     def create_commit(
         self,
         message: str,
-        author: PatchAuthor,
+        author: PatchAuthor | None,
         run_editor: bool,
         files: (Sequence[str] | None) = None,
         all_files: bool = False,
     ) -> None:
-        """Commit the given modified files.
+        """Create a commit based on the provided message and author.
 
-        This is expected to be called after applying a patch. This commits the
-        patch using information from the review request, opening the commit
-        message in :envvar:`$EDITOR` to allow the user to update it.
+        Version Changed:
+            6.0:
+            The ``author`` can now be ``None``, for cases where author
+            information is not available (e.g. authors who have private
+            profiles).
 
         Args:
             message (str):
@@ -1835,6 +1837,12 @@ class GitClient(BaseSCMClient):
 
             author (rbtools.diffs.patches.PatchAuthor):
                 The author of the commit.
+
+                Version Changed:
+                    6.0:
+                    This can now be ``None``, for cases where author
+                    information is not available (e.g. authors who have
+                    private profiles).
 
             run_editor (bool):
                 Whether to run the user's editor on the commit message before
@@ -1880,9 +1888,9 @@ class GitClient(BaseSCMClient):
 
         cmd = ['commit', '-m', modified_message]
 
-        try:
+        if author:
             cmd += ['--author', f'{author.full_name} <{author.email}>']
-        except AttributeError:
+        else:
             # Users who have marked their profile as private won't include the
             # full name or email fields in the API payload. Just commit as the
             # user running RBTools.
@@ -1929,13 +1937,19 @@ class GitClient(BaseSCMClient):
         target: str,
         destination: str,
         message: str,
-        author: PatchAuthor,
+        author: PatchAuthor | None,
         squash: bool = False,
         run_editor: bool = False,
         close_branch: bool = False,
         **kwargs,
     ) -> None:
         """Merge the target branch with destination branch.
+
+        Version Changed:
+            6.0:
+            The ``author`` can now be ``None``, for cases where author
+            information is not available (e.g. authors who have private
+            profiles).
 
         Args:
             target (str):
@@ -1947,8 +1961,14 @@ class GitClient(BaseSCMClient):
             message (str):
                 The commit message to use.
 
-            author (rbotols.diffs.patches.PatchAuthor):
+            author (rbtools.diffs.patches.PatchAuthor):
                 The author of the commit.
+
+                Version Changed:
+                    6.0:
+                    This can now be ``None``, for cases where author
+                    information is not available (e.g. authors who have
+                    private profiles).
 
             squash (bool, optional):
                 Whether to squash the commits or do a plain merge.
@@ -2000,7 +2020,10 @@ class GitClient(BaseSCMClient):
                     output=e.result.stdout.read()))
 
         try:
-            self.create_commit(message, author, run_editor)
+            self.create_commit(
+                message=message,
+                author=author,
+                run_editor=run_editor)
 
             if close_branch:
                 self.delete_branch(target, merged_only=False)

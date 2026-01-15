@@ -1346,24 +1346,31 @@ class MercurialClient(BaseSCMClient):
     def create_commit(
         self,
         message: str,
-        author: PatchAuthor,
+        author: PatchAuthor | None,
         run_editor: bool,
         files: (Sequence[str] | None) = None,
         all_files: bool = False,
     ) -> None:
-        """Commit the given modified files.
+        """Create a commit based on the provided message and author.
 
-        This is expected to be called after applying a patch. This commits the
-        patch using information from the review request, opening the commit
-        message in $EDITOR to allow the user to update it.
+        Version Changed:
+            6.0:
+            The ``author`` can now be ``None``, for cases where author
+            information is not available (e.g. authors who have private
+            profiles).
 
         Args:
             message (str):
                 The commit message to use.
 
-            author (rbtools.clients.base.scmclient.PatchAuthor):
-                The author of the commit. This is expected to have ``fullname``
-                and ``email`` attributes.
+            author (rbtools.diffs.patches.PatchAuthor):
+                The author of the commit.
+
+                Version Changed:
+                    6.0:
+                    This can now be ``None``, for cases where author
+                    information is not available (e.g. authors who have
+                    private profiles).
 
             run_editor (bool):
                 Whether to run the user's editor on the commit message before
@@ -1408,9 +1415,9 @@ class MercurialClient(BaseSCMClient):
 
         hg_command = [self._exe, 'commit', '-m', modified_message]
 
-        try:
+        if author:
             hg_command += ['-u', f'{author.full_name} <{author.email}>']
-        except AttributeError:
+        else:
             # Users who have marked their profile as private won't include the
             # fullname or email fields in the API payload. Just commit as the
             # user running RBTools.
@@ -1433,13 +1440,19 @@ class MercurialClient(BaseSCMClient):
         target: str,
         destination: str,
         message: str,
-        author: PatchAuthor,
+        author: PatchAuthor | None,
         squash: bool = False,
         run_editor: bool = False,
         close_branch: bool = False,
         **kwargs,
     ) -> None:
         """Merge the target branch with destination branch.
+
+        Version Changed:
+            6.0:
+            The ``author`` can now be ``None``, for cases where author
+            information is not available (e.g. authors who have private
+            profiles).
 
         Args:
             target (str):
@@ -1451,9 +1464,14 @@ class MercurialClient(BaseSCMClient):
             message (str):
                 The commit message to use.
 
-            author (rbtools.clients.base.scmclient.PatchAuthor):
-                The author of the commit. This is expected to have ``fullname``
-                and ``email`` attributes.
+            author (rbtools.diffs.patches.PatchAuthor):
+                The author of the commit.
+
+                Version Changed:
+                    6.0:
+                    This can now be ``None``, for cases where author
+                    information is not available (e.g. authors who have
+                    private profiles).
 
             squash (bool, optional):
                 Whether to squash the commits or do a plain merge. This is not

@@ -799,11 +799,18 @@ class JujutsuClientTests(BaseJujutsuClientTests):
 
         commit_message = 'summary\n\ndescription\ndescription 2'
 
+        self.spy_on(run_process)
+
         client.create_commit(
             message=commit_message,
             author=PatchAuthor(full_name='Test User',
                                email='test@example.com'),
             run_editor=False)
+
+        self.assertSpyCalledWith(
+            run_process,
+            ['jj', 'describe', '-m', commit_message,
+             '--author', 'Test User <test@example.com>'])
 
         status = (
             run_process(['jj', 'status'])
@@ -829,6 +836,27 @@ class JujutsuClientTests(BaseJujutsuClientTests):
             .strip()
         )
         self.assertEqual(author, 'Test User <test@example.com>')
+
+    def test_create_commit_without_author(self) -> None:
+        """Testing JujutsuClient.create_commit without author information"""
+        client = self.build_client()
+        client.get_repository_info()
+
+        with open('foo.txt', 'wb') as f:
+            f.write(FOO1)
+
+        commit_message = 'summary\n\ndescription\ndescription 2'
+
+        self.spy_on(run_process)
+
+        client.create_commit(
+            message=commit_message,
+            author=None,
+            run_editor=False)
+
+        self.assertSpyCalledWith(
+            run_process,
+            ['jj', 'describe', '-m', commit_message])
 
     def test_merge_one_change(self) -> None:
         """Testing JujutsuClient.merge in merge mode with one change"""
