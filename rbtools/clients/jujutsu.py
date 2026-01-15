@@ -1427,10 +1427,10 @@ class JujutsuClient(BaseSCMClient):
         revset1: str,
         revset2: str,
     ) -> str:
-        """Return the change ID of the fork point of two revsets.
+        """Return the change ID of the most recent fork point of two revsets.
 
-        This will determine the point at which the history from two commits
-        diverged. This is most useful for determining the most recent upstream
+        This will determine the most recent point at which the history from
+        two commits diverged. This is most useful for determining the upstream
         commit to work from when creating parent diffs.
 
         Args:
@@ -1452,7 +1452,7 @@ class JujutsuClient(BaseSCMClient):
         try:
             return (
                 run_process(['jj', 'log', '-r',
-                             f'fork_point({revset1} | {revset2})',
+                             f'latest(fork_point({revset1} | {revset2}))',
                              '--no-graph', '-T', 'change_id'])
                 .stdout
                 .read()
