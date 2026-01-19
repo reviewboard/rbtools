@@ -93,6 +93,15 @@ rbt patch
 Bug Fixes
 =========
 
+rbt land
+--------
+
+.. program:: rbt land
+
+* Fixed an issue where an incorrect warning about private user profiles
+  could be shown.
+
+
 rbt list-repo-types
 -------------------
 
