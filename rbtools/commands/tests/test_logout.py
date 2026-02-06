@@ -42,7 +42,7 @@ class LogoutCommandTests(CommandTestsMixin[Logout], TestCase):
         self.assertSpyNotCalled(URLMapTransport.handle_api_path)
         self.assertEqual(
             ctx.output[0],
-            'INFO:root:You are already logged out of Review Board at '
+            'INFO:rb.logout:You are already logged out of Review Board at '
             'reviews.example.com')
 
     def test_logout_with_session_cookie_and_authed_session(self) -> None:
@@ -65,7 +65,7 @@ class LogoutCommandTests(CommandTestsMixin[Logout], TestCase):
         self.assertSpyCalled(RBClient.logout)
         self.assertEqual(
             ctx.output[0],
-            'INFO:root:You are now logged out of Review Board at '
+            'INFO:rb.logout:You are now logged out of Review Board at '
             'reviews.example.com')
 
     def test_logout_with_session_cookie_and_no_authed_session(self) -> None:
@@ -88,7 +88,7 @@ class LogoutCommandTests(CommandTestsMixin[Logout], TestCase):
         self.assertSpyNotCalled(RBClient.logout)
         self.assertEqual(
             ctx.output[0],
-            'INFO:root:You are already logged out of Review Board at '
+            'INFO:rb.logout:You are already logged out of Review Board at '
             'reviews.example.com')
 
     def _setup_transport(

@@ -43,7 +43,7 @@ class LoginCommandTests(CommandTestsMixin[Login], TestCase):
 
         self.assertEqual(
             ctx.output[0],
-            'INFO:root:Successfully logged in to Review Board.')
+            'INFO:rb.login:Successfully logged in to Review Board.')
 
     def test_login_with_session_cookie(self) -> None:
         """Testing login with a previous session cookie prints an already
@@ -61,7 +61,7 @@ class LoginCommandTests(CommandTestsMixin[Login], TestCase):
 
         self.assertEqual(
             ctx.output[0],
-            'INFO:root:You are already logged in to Review Board at '
+            'INFO:rb.login:You are already logged in to Review Board at '
             'reviews.example.com')
 
     def test_login_with_user_pass_and_no_session_cookie(self) -> None:
@@ -84,7 +84,7 @@ class LoginCommandTests(CommandTestsMixin[Login], TestCase):
 
         self.assertEqual(
             ctx.output[0],
-            'INFO:root:Successfully logged in to Review Board.')
+            'INFO:rb.login:Successfully logged in to Review Board.')
 
     def test_login_with_user_pass_and_session_cookie(self) -> None:
         """Testing login with a username and password and a previous session
@@ -106,7 +106,7 @@ class LoginCommandTests(CommandTestsMixin[Login], TestCase):
 
         self.assertEqual(
             ctx.output[0],
-            'INFO:root:Successfully logged in to Review Board.')
+            'INFO:rb.login:Successfully logged in to Review Board.')
 
     def test_login_with_api_token_and_no_session_cookie(self) -> None:
         """Testing login with an api token and no previous session cookie
@@ -127,7 +127,7 @@ class LoginCommandTests(CommandTestsMixin[Login], TestCase):
 
         self.assertEqual(
             ctx.output[0],
-            'INFO:root:Successfully logged in to Review Board.')
+            'INFO:rb.login:Successfully logged in to Review Board.')
 
     def test_login_with_api_token_and_session_cookie(self) -> None:
         """Testing login with an api token and a previous session cookie
@@ -148,7 +148,7 @@ class LoginCommandTests(CommandTestsMixin[Login], TestCase):
 
         self.assertEqual(
             ctx.output[0],
-            'INFO:root:Successfully logged in to Review Board.')
+            'INFO:rb.login:Successfully logged in to Review Board.')
 
     def _setup_transport(
         self,
