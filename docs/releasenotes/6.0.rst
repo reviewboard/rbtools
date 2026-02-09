@@ -65,8 +65,9 @@ New Features
   with your extension-provided API endpoints.
 
 
-* Allow the :option:`--open-browser` and :option:`--web-login` options to be
-  used for all commands.
+* Allow the :option:`--open-browser <rbt login --open-browser>` and
+  :option:`--web-login <rbt login --web-login>` options to be used for all
+  commands.
 
   Web-based login (introduced in RBTools 5.0) was only supported for the
   :rbtcommand:`rbt login` command, which meant that the login prompts used for
@@ -84,7 +85,7 @@ rbt patch
 
   As of Review Board 7.0 and RBTools 5.0, posted changes may include binary
   files in diffs. This is limited to reviewable file types such as images.
-  "rbtcommand:`rbt patch` will now download these files and apply them as part
+  :rbtcommand:`rbt patch` will now download these files and apply them as part
   of the patch.
 
   This is supported for Jujutsu, Git, Mercurial, Perforce, and Subversion.
@@ -118,7 +119,7 @@ rbt patch
 * Fixed some potential issues with commit messages and authors when squashing
   multiple commits.
 
-* Fixed patching on Mercurial to use `--config patch.eol=auto` in order to
+* Fixed patching on Mercurial to use ``--config patch.eol=auto`` in order to
   more reliably apply patches in files with varying newline styles.
 
   Patch by André Klitzing
