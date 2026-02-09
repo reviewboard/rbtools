@@ -867,8 +867,14 @@ class BaseCommand:
         self,
         config: RBToolsConfig,
         argv: (list[str] | None) = None,
+        *,
+        color: bool = True,
     ) -> argparse.ArgumentParser:
         """Return a new argument parser for this command.
+
+        Version Changed:
+            6.0:
+            Added the ``color`` argument.
 
         Args:
             config (dict):
@@ -876,6 +882,14 @@ class BaseCommand:
 
             argv (list of str):
                 The list of command line arguments.
+
+            color (bool, optional):
+                Whether to output color, if supported in the environment.
+
+                This will output color on Python 3.14 and higher by default.
+
+                Version Added:
+                    6.0
 
         Returns:
             argparse.ArgumentParser:
@@ -888,6 +902,10 @@ class BaseCommand:
             prog=RB_MAIN,
             usage=self.usage(),
             formatter_class=SmartHelpFormatter)
+
+        # This will override the default on Python 3.14, and do nothing
+        # at all on earlier versions.
+        parser.color = color
 
         for option in self.option_list:
             option.add_to(parser, config, argv)
@@ -1085,12 +1103,26 @@ class BaseCommand:
     def create_arg_parser(
         self,
         argv: list[str],
+        *,
+        color: bool = True,
     ) -> argparse.ArgumentParser:
         """Create and return the argument parser.
+
+        Version Changed:
+            6.0:
+            Added the ``color`` argument.
 
         Args:
             argv (list of str):
                 A list of command line arguments
+
+            color (bool, optional):
+                Whether to output color, if supported in the environment.
+
+                This will output color on Python 3.14 and higher by default.
+
+                Version Added:
+                    6.0
 
         Returns:
             argparse.ArgumentParser:
@@ -1099,7 +1131,9 @@ class BaseCommand:
         if self.config is None:
             self.config = load_config()
 
-        parser = self.create_parser(self.config, argv)
+        parser = self.create_parser(config=self.config,
+                                    argv=argv,
+                                    color=color)
         parser.add_argument('args', nargs=argparse.REMAINDER)
 
         return parser
@@ -1895,8 +1929,14 @@ class BaseMultiCommand(BaseCommand):
         self,
         config: RBToolsConfig,
         argv: (list[str] | None) = None,
+        *,
+        color: bool = True,
     ) -> argparse.ArgumentParser:
         """Create and return the argument parser for this command.
+
+        Version Changed:
+            6.0:
+            Added the ``color`` argument.
 
         Args:
             config (dict):
@@ -1904,6 +1944,14 @@ class BaseMultiCommand(BaseCommand):
 
             argv (list, optional):
                 The argument list.
+
+            color (bool, optional):
+                Whether to output color, if supported in the environment.
+
+                This will output color on Python 3.14 and higher by default.
+
+                Version Added:
+                    6.0
 
         Returns:
             argparse.ArgumentParser:
@@ -1935,6 +1983,10 @@ class BaseMultiCommand(BaseCommand):
             prog=prog,
             usage=self.usage(),
             formatter_class=SmartHelpFormatter)
+
+        # This will override the default on Python 3.14, and do nothing
+        # at all on earlier versions.
+        parser.color = color
 
         for option in self.option_list:
             option.add_to(parser, config, argv)

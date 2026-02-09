@@ -1018,8 +1018,8 @@ class Post(BaseCommand):
 
     def create_parser(
         self,
-        config: RBToolsConfig,
-        argv: (list[str] | None) = None,
+        *args,
+        **kwargs,
     ) -> argparse.ArgumentParser:
         """Create and return the argument parser for this command.
 
@@ -1027,11 +1027,11 @@ class Post(BaseCommand):
             6.0
 
         Args:
-            config (dict):
-                The loaded RBTools config.
+            *args (tuple):
+                Positional arguments to pass to the parent method.
 
-            argv (list, optional):
-                The argument list.
+            **kwargs (dict):
+                Keyword arguments to pass to the parent method.
 
         Returns:
             argparse.ArgumentParser:
@@ -1049,7 +1049,7 @@ class Post(BaseCommand):
 
         try:
             self._global_options = global_options_copy
-            parser = super().create_parser(config, argv)
+            parser = super().create_parser(*args, **kwargs)
         finally:
             self._global_options = global_options_orig
 

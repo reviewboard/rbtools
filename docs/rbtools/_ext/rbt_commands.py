@@ -133,16 +133,21 @@ class CommandUsageDirective(Directive):
         command_cls = get_current_command_class(env)
         command = command_cls()
 
+        parser_kwargs = {
+            'color': False,
+            'config': {},
+        }
+
         if for_subcommand:
             subcommand_cls = get_current_command_class(env,
                                                        for_subcommand=True)
 
             command.create_parser(
-                config={},
-                argv=['rbt', command_cls.name, subcommand_cls.name])
+                argv=['rbt', command_cls.name, subcommand_cls.name],
+                **parser_kwargs)
             parser = command.subcommand_parsers[subcommand_cls.name]
         else:
-            parser = command.create_parser({})
+            parser = command.create_parser(**parser_kwargs)
 
         usage = '$ %s' % parser.format_help().splitlines()[0][7:]
 
