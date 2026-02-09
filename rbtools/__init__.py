@@ -14,7 +14,7 @@ from __future__ import annotations
 #: (Major, Minor, Micro, Patch, alpha/beta/rc/final, Release Number, Released)
 #:
 VERSION: tuple[int, int, int, int, str, int, bool] = \
-    (6, 0, 0, 0, 'alpha', 0, False)
+    (6, 0, 0, 0, 'final', 0, True)
 
 
 def get_version_string() -> str:

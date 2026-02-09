@@ -48,6 +48,7 @@ extensions = [
     'beanbag_docutils.sphinx.ext.collect_files',
     'beanbag_docutils.sphinx.ext.extlinks',
     'beanbag_docutils.sphinx.ext.http_role',
+    'beanbag_docutils.sphinx.ext.json_writer',
     'beanbag_docutils.sphinx.ext.ref_utils',
     'rbt_commands',
 ]
@@ -291,6 +292,7 @@ extlinks = {
 autosummary_generate = True
 autodoc_default_options = {
     'exclude-members': ', '.join([
+        '__annotate_func__',
         '__closed__',
         '__extra_items__',
         '__mutable_keys__',

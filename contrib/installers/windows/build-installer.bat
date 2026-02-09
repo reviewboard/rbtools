@@ -249,7 +249,7 @@ set _rbtools_version=%_return1%
 
 set _wix_path=%CD%\wix
 set _sln_file=%_wix_path%\rbtools.sln
-set _timestamp_url=http://timestamp.comodoca.com/authenticode
+set _timestamp_url=http://timestamp.sectigo.com
 
 echo.
 echo == Building the RBTools installer [x64] ==
