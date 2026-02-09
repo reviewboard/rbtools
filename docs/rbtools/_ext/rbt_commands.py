@@ -372,7 +372,11 @@ class CommandOptionsDirective(Directive):
             depr_desc = ' '.join(depr_desc_parts)
 
             if depr_desc:
-                depr_final_str = '\n'.join([depr_dir, depr_desc])
+                depr_final_str = '\n'.join([
+                    depr_dir,
+                    self.indent_content(depr_desc,
+                                        indent_level=2),
+                ])
             else:
                 depr_final_str = depr_dir
 

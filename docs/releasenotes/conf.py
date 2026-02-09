@@ -39,6 +39,7 @@ extensions = [
     'sphinx.ext.intersphinx',
     'beanbag_docutils.sphinx.ext.extlinks',
     'beanbag_docutils.sphinx.ext.intersphinx_utils',
+    'beanbag_docutils.sphinx.ext.json_writer',
     'extralinks',
 ]
 
