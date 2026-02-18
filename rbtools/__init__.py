@@ -29,10 +29,10 @@ def get_version_string() -> str:
     version = f'{major}.{minor}'
 
     if micro or patch:
-        version += '.{micro}'
+        version += f'.{micro}'
 
         if patch:
-            version += '.{patch}'
+            version += f'.{patch}'
 
     if tag != 'final':
         if tag == 'rc':
