@@ -239,8 +239,17 @@ class JujutsuPatcher(SCMClientPatcher['JujutsuClient']):
                 added_files = scmclient.strip_p_num_slashes(added_files,
                                                             prefix_level)
 
-            make_empty_files(added_files)
-            patched_empty_files = True
+            # Filter out files that the patch command already created
+            # with content. Only create files that don't yet exist
+            # (truly empty new files that patch can't handle).
+            added_files = [
+                f for f in added_files
+                if not os.path.exists(f)
+            ]
+
+            if added_files:
+                make_empty_files(added_files)
+                patched_empty_files = True
 
         if deleted_files:
             if prefix_level:
