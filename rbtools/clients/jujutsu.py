@@ -552,10 +552,10 @@ class JujutsuClient(BaseSCMClient):
             raise TooManyRevisionsError
 
         if '@' in parent_bookmark:
-            parent_base = self._get_fork_point(tip, parent_bookmark)
+            parent_base = self._get_fork_point(base, parent_bookmark)
         else:
             remote_bookmark = self._get_remote_bookmark(base)
-            parent_base = self._get_fork_point(tip, remote_bookmark)
+            parent_base = self._get_fork_point(base, remote_bookmark)
 
         # If the most recent upstream commit is not the same as our revision
         # range base, include a parent base in the result.
