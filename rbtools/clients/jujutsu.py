@@ -357,7 +357,13 @@ class JujutsuClient(BaseSCMClient):
                 # the parent checkout.
                 if not os.path.isdir(repo):
                     with open(repo, encoding='utf-8') as f:
-                        repo = f.read().strip()
+                        repo_path = f.read().strip()
+
+                    if not os.path.isabs(repo_path):
+                        repo_path = os.path.normpath(
+                            os.path.join(jj_root, '.jj', repo_path))
+
+                    repo = repo_path
 
                 store_base = os.path.join(repo, 'store')
                 target = os.path.join(store_base, 'git_target')
