@@ -267,8 +267,11 @@ def run_process(
             These will be combined with the current environment and used for
             the process.
 
-            :envvar:`LC_ALL` and :envvar:`LANGUAGE` will added to the final
-            environment, set to ``en_US.UTF-8``.
+            :envvar:`LC_ALL` and :envvar:`LANGUAGE` will be added to the
+            final environment, set to ``en_US.UTF-8``.
+
+            :envvar:`TERM` will be set to ``dumb`` to prevent terminal
+            capability warnings from polluting subprocess output.
 
         encoding (str, optional):
             The encoding used to convert any output to Unicode strings.
@@ -398,6 +401,7 @@ def run_process(
     #       here.
     new_env['LC_ALL'] = 'en_US.UTF-8'
     new_env['LANGUAGE'] = 'en_US.UTF-8'
+    new_env['TERM'] = 'dumb'
 
     # Run the process.
     try:
