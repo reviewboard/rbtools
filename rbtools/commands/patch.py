@@ -426,7 +426,8 @@ class PatchCommand(BaseCommand):
             old_path = file_diff.dest_file
             new_path = file_diff.source_file
 
-            if status != 'added':
+            if (status != 'added' and
+                'source_attachment' in file_diff.links):
                 attachment = file_diff.get_source_attachment()
             else:
                 attachment = None
@@ -439,7 +440,8 @@ class PatchCommand(BaseCommand):
             old_path = file_diff.source_file
             new_path = file_diff.dest_file
 
-            if status != 'deleted':
+            if (status != 'deleted' and
+                'dest_attachment' in file_diff.links):
                 attachment = file_diff.get_dest_attachment()
             else:
                 attachment = None
