@@ -2420,6 +2420,39 @@ class JujutsuPatcherTests(BaseJujutsuClientTests):
 
         self.assertFalse(os.path.exists(empty_to_delete))
 
+    def test_patch_with_new_non_empty_files(self) -> None:
+        """Testing JujutsuPatcher.patch with newly-added non-empty files"""
+        client = self.build_client()
+
+        new_file = 'newfile.txt'
+        new_file_content = b'This is new content.\n'
+
+        patch_content = (
+            b'diff --git a/newfile.txt b/newfile.txt\n'
+            b'new file mode 100644\n'
+            b'index 0000000..abcdef1\n'
+            b'--- /dev/null\n'
+            b'+++ b/newfile.txt\n'
+            b'@@ -0,0 +1 @@\n'
+            b'+This is new content.\n'
+        )
+
+        patcher = client.get_patcher(patches=[
+            Patch(content=patch_content),
+        ])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success)
+        self.assertIsNotNone(result.patch)
+
+        self.assertTrue(os.path.exists(new_file))
+
+        with open(new_file, mode='rb') as f:
+            self.assertEqual(f.read(), new_file_content)
+
     def test_patch_with_regular_and_empty_files(self) -> None:
         """Testing JujutsuPatcher.patch with regular and empty files"""
         client = self.build_client()

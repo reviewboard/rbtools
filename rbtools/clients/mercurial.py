@@ -975,7 +975,7 @@ class MercurialClient(BaseSCMClient):
     def _load_hgrc(self) -> None:
         """Load the hgrc file."""
         hgrc_lines = (
-            run_process([self._exe, 'showconfig'], env=self._hg_env)
+            self._execute([self._exe, 'showconfig'])
             .stdout
             .readlines()
         )
@@ -1074,8 +1074,7 @@ class MercurialClient(BaseSCMClient):
         descs = (
             self._execute(
                 [self._exe, 'log', '--hidden', '-r', f'{rev1}::{rev2}',
-                 '--template', f'{{desc}}{delim}'],
-                env=self._hg_env)
+                 '--template', f'{{desc}}{delim}'])
             .stdout
             .read()
         )
@@ -1169,8 +1168,7 @@ class MercurialClient(BaseSCMClient):
             base_commit_id = (
                 self._execute(
                     [self._exe, 'log', '-r', base_commit_id,
-                     '--template', '{node}'],
-                    env=self._hg_env)
+                     '--template', '{node}'])
                 .stdout
                 .read()
             )
@@ -1213,7 +1211,6 @@ class MercurialClient(BaseSCMClient):
             self._execute(
                 [self._exe, 'diff', *diff_args, '-r', parent_id, '-r',
                  node_id],
-                env=self._hg_env,
                 log_debug_output_on_error=False)
             .stdout_bytes
             .read()
@@ -1283,7 +1280,6 @@ class MercurialClient(BaseSCMClient):
         files = (
             self._execute(
                 [self._exe, 'locate', '-r', rev],
-                env=self._hg_env,
                 ignore_errors=True)
             .stdout
             .read()
@@ -1544,7 +1540,7 @@ class MercurialClient(BaseSCMClient):
             The name of the currently checked-out branch.
         """
         return (
-            self._execute([self._exe, 'branch'], env=self._hg_env)
+            self._execute([self._exe, 'branch'])
             .stdout
             .read()
             .strip()
@@ -1616,7 +1612,7 @@ class MercurialClient(BaseSCMClient):
         # We must handle the special case where there are no outgoing commits
         # as mercurial has a non-zero return value in this case.
         raw_outgoing = (
-            self._execute(args, env=self._hg_env, ignore_errors=(1,))
+            self._execute(args, ignore_errors=(1,))
             .stdout
             .read()
         )
@@ -1671,8 +1667,7 @@ class MercurialClient(BaseSCMClient):
             parents = (
                 self._execute(
                     [self._exe, 'log', '-r', str(rev), '--template',
-                     '{parents}'],
-                    env=self._hg_env)
+                     '{parents}'])
                 .stdout
                 .read()
             )
@@ -1760,6 +1755,18 @@ class MercurialClient(BaseSCMClient):
             f'extensions.rbtoolsnormalize={self._hgext_path}',
         ]
 
+        # Ensure the standard hg environment is always applied. Callers
+        # can still provide additional env vars which will be merged in.
+        env: dict[str, str] = dict(self._hg_env)
+
+        if 'env' in kwargs:
+            caller_env = kwargs.pop('env')
+
+            if caller_env:
+                env.update(caller_env)
+
+        kwargs['env'] = env
+
         return run_process(cmd, *args, **kwargs)
 
     def has_pending_changes(self) -> bool:
@@ -1831,7 +1838,6 @@ class MercurialClient(BaseSCMClient):
             return (
                 self._execute(
                     [self._exe, 'cat', '-r', revision, filename],
-                    env=self._hg_env,
                     log_debug_output_on_error=False,
                 )
                 .stdout_bytes
@@ -1867,7 +1873,6 @@ class MercurialClient(BaseSCMClient):
                 self._execute(
                     [self._exe, 'files', '--template', '{size}', '-r',
                      revision, filename],
-                    env=self._hg_env,
                     log_debug_output_on_error=False,
                 )
                 .stdout

@@ -1000,6 +1000,13 @@ class Patcher:
         if dirname:
             os.makedirs(dirname, exist_ok=True)
 
+        # GNU patch 2.7+ honors git "rename from"/"rename to" headers and
+        # performs the rename itself before we get here. If that's happened,
+        # the move is already done — don't fail trying to rename a missing
+        # source over an existing destination.
+        if not os.path.exists(old_path) and os.path.exists(new_path):
+            return
+
         os.rename(old_path, new_path)
 
     def handle_remove_file(

@@ -239,8 +239,17 @@ class JujutsuPatcher(SCMClientPatcher['JujutsuClient']):
                 added_files = scmclient.strip_p_num_slashes(added_files,
                                                             prefix_level)
 
-            make_empty_files(added_files)
-            patched_empty_files = True
+            # Filter out files that the patch command already created
+            # with content. Only create files that don't yet exist
+            # (truly empty new files that patch can't handle).
+            added_files = [
+                f for f in added_files
+                if not os.path.exists(f)
+            ]
+
+            if added_files:
+                make_empty_files(added_files)
+                patched_empty_files = True
 
         if deleted_files:
             if prefix_level:
@@ -348,7 +357,13 @@ class JujutsuClient(BaseSCMClient):
                 # the parent checkout.
                 if not os.path.isdir(repo):
                     with open(repo, encoding='utf-8') as f:
-                        repo = f.read().strip()
+                        repo_path = f.read().strip()
+
+                    if not os.path.isabs(repo_path):
+                        repo_path = os.path.normpath(
+                            os.path.join(jj_root, '.jj', repo_path))
+
+                    repo = repo_path
 
                 store_base = os.path.join(repo, 'store')
                 target = os.path.join(store_base, 'git_target')
@@ -537,10 +552,10 @@ class JujutsuClient(BaseSCMClient):
             raise TooManyRevisionsError
 
         if '@' in parent_bookmark:
-            parent_base = self._get_fork_point(tip, parent_bookmark)
+            parent_base = self._get_fork_point(base, parent_bookmark)
         else:
             remote_bookmark = self._get_remote_bookmark(base)
-            parent_base = self._get_fork_point(tip, remote_bookmark)
+            parent_base = self._get_fork_point(base, remote_bookmark)
 
         # If the most recent upstream commit is not the same as our revision
         # range base, include a parent base in the result.
@@ -1427,10 +1442,10 @@ class JujutsuClient(BaseSCMClient):
         revset1: str,
         revset2: str,
     ) -> str:
-        """Return the change ID of the fork point of two revsets.
+        """Return the change ID of the most recent fork point of two revsets.
 
-        This will determine the point at which the history from two commits
-        diverged. This is most useful for determining the most recent upstream
+        This will determine the most recent point at which the history from
+        two commits diverged. This is most useful for determining the upstream
         commit to work from when creating parent diffs.
 
         Args:
@@ -1452,7 +1467,7 @@ class JujutsuClient(BaseSCMClient):
         try:
             return (
                 run_process(['jj', 'log', '-r',
-                             f'fork_point({revset1} | {revset2})',
+                             f'latest(fork_point({revset1} | {revset2}))',
                              '--no-graph', '-T', 'change_id'])
                 .stdout
                 .read()
