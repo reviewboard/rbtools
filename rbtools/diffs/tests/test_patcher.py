@@ -1613,6 +1613,58 @@ class PatcherTests(kgb.SpyAgency, TestCase):
         with open(new_file_path, 'rb') as f:
             self.assertEqual(f.read(), test_content)
 
+    def test_apply_binary_file_moved_already_renamed(self) -> None:
+        """Testing Patcher.apply_binary_file with moved file when the
+        rename has already been performed (e.g. by GNU patch 2.7+ honoring git
+        rename headers)
+        """
+        temp_dir = make_tempdir()
+
+        # Simulate the state after `patch` has already handled the rename:
+        # the old path is gone, and the new path exists.
+        new_file_path = os.path.join(temp_dir, 'assets', 'new_location.png')
+        os.makedirs(os.path.dirname(new_file_path), exist_ok=True)
+        test_content = b'\x89PNG\r\n\x1a\n'
+
+        with open(new_file_path, mode='wb') as f:
+            f.write(test_content)
+
+        attachment = FileAttachmentItemResource(
+            transport=URLMapTransport('https://reviews.example.com/'),
+            payload={
+                'id': 124,
+                'absolute_url': 'https://example.com/r/1/file/124/download/',
+            },
+            url=(
+                'http://reviews.example.com/api/review-requests/1/'
+                'file-attachments/124/'
+            ),
+        )
+
+        binary_file = self.make_binary_file_patch(
+            old_path='images/old_location.png',
+            new_path='assets/new_location.png',
+            status='moved',
+            file_attachment=attachment,
+            content=test_content,
+        )
+
+        patcher = Patcher(patches=[],
+                          dest_path=Path(temp_dir))
+
+        with chdir(temp_dir):
+            success, error = patcher.apply_binary_file(binary_file)
+
+        self.assertTrue(success)
+        self.assertIsNone(error)
+
+        self.assertFalse(os.path.exists(
+            os.path.join(temp_dir, 'images', 'old_location.png')))
+        self.assertTrue(os.path.exists(new_file_path))
+
+        with open(new_file_path, 'rb') as f:
+            self.assertEqual(f.read(), test_content)
+
     def test_apply_binary_file_download_error(self) -> None:
         """Testing Patcher.apply_binary_file with download error"""
         temp_dir = make_tempdir()
