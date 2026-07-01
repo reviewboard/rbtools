@@ -945,6 +945,7 @@ class PatchCommand(BaseCommand):
                         self.stdout.new_line()
                         self.stdout.write('Conflicting files:')
                         self.stdout.new_line()
+                        self.json.add('conflicting_files', [])
 
                         for filename in failed_patch_result.conflicting_files:
                             filename = force_unicode(filename)
