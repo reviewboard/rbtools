@@ -721,15 +721,14 @@ class SVNClientTests(BaseSVNClientTests):
         repository URL
         """
         client = self.build_client(options={
-            'repository_url': ('http://svn.apache.org/repos/asf/'
-                               'subversion/trunk'),
+            'repository_url': self.svn_repo_url,
         })
 
         self.assertEqual(
-            client.parse_revision_spec(['1549823']),
+            client.parse_revision_spec(['3']),
             {
-                'base': 1549822,
-                'tip': 1549823,
+                'base': 2,
+                'tip': 3,
             })
 
     def test_parse_revision_spec_two_revisions_url(self):
@@ -737,15 +736,14 @@ class SVNClientTests(BaseSVNClientTests):
         repository URL
         """
         client = self.build_client(options={
-            'repository_url': ('http://svn.apache.org/repos/asf/'
-                               'subversion/trunk'),
+            'repository_url': self.svn_repo_url,
         })
 
         self.assertEqual(
-            client.parse_revision_spec(['1549823:1550211']),
+            client.parse_revision_spec(['3:5']),
             {
-                'base': 1549823,
-                'tip': 1550211,
+                'base': 3,
+                'tip': 5,
             })
 
     def test_parse_revision_spec_invalid_spec(self):
