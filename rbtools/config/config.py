@@ -19,6 +19,8 @@ if TYPE_CHECKING:
 
     from typing_extensions import Self
 
+    from rbtools.ui.console import ColorMode
+
 
 #: A dictionary storing raw configuration data.
 ConfigDict: TypeAlias = dict[str, Any]
@@ -388,6 +390,14 @@ class RBToolsConfig(ConfigData):
     #: Version Added:
     #:     3.0
     JSON_OUTPUT: bool = False
+
+    #: When to use colorized output.
+    #:
+    #: One of ``auto``, ``always``, or ``never``.
+    #:
+    #: Version Added:
+    #:     7.0
+    COLOR_MODE: ColorMode = 'auto'
 
     #######################################################################
     # User customization

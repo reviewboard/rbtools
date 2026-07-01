@@ -1,0 +1,687 @@
+"""Rich-backed console for RBTools commands.
+
+Version Added:
+    7.0
+"""
+
+from __future__ import annotations
+
+import logging
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, Literal, Protocol
+
+from rich.console import Console, RenderHook
+from rich.logging import RichHandler
+from rich.markup import escape as escape_markup
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    SpinnerColumn,
+    TaskProgressColumn,
+    TextColumn,
+    TimeRemainingColumn,
+    track,
+)
+from rich.text import Text
+
+from rbtools.ui.theme import (
+    ICON_ARROW,
+    ICON_ERROR,
+    ICON_SUCCESS,
+    ICON_WARNING,
+    build_theme,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Generator, Iterable
+    from typing import Any, TextIO, TypeAlias, TypeVar
+
+    from rich.status import Status
+    from rich.style import StyleType
+
+    from rbtools.ui.theme import ColorOverrides
+
+    _T = TypeVar('_T')
+
+
+#: The valid color modes.
+#:
+#: Version Added:
+#:     7.0
+ColorMode: TypeAlias = Literal['always', 'auto', 'never']
+
+
+_ERROR = Text(ICON_ERROR, style='rb.error')
+_STEP = Text(ICON_ARROW, style='rb.step')
+_SUCCESS = Text(ICON_SUCCESS, style='rb.success')
+_WARNING = Text(ICON_WARNING, style='rb.warning')
+
+
+def write_passthrough(
+    console: Console,
+    text: str,
+) -> None:
+    """Write text to a console verbatim.
+
+    This emits the string exactly as-is, with no markup, styling, wrapping, or
+    cropping. It is used by
+    :py:class:`~rbtools.commands.base.output.OutputWrapper` to route plain
+    ``stdout``/``stderr`` writes through the Rich console while keeping the
+    output identical to a direct stream write.
+
+    Version Added:
+        7.0
+
+    Args:
+        console (rich.console.Console):
+            The console to write to.
+
+        text (str):
+            The text to write.
+    """
+    console.print(text,
+                  markup=False,
+                  highlight=False,
+                  soft_wrap=True,
+                  crop=False,
+                  end='')
+
+
+class _SuppressRenderHook(RenderHook):
+    """A Rich render hook that drops all output.
+
+    This is pushed onto the consoles in ``--json`` mode so that any console
+    output produced while the command runs is discarded, leaving only the
+    JSON payload on stdout.
+
+    Version Added:
+        7.0
+    """
+
+    def process_renderables(
+        self,
+        renderables: list[Any],
+    ) -> list[Any]:
+        """Drop all renderables.
+
+        Args:
+            renderables (list):
+                The renderables that were about to be rendered.
+
+        Returns:
+            list:
+            An empty list.
+        """
+        return []
+
+
+class _ProgressController(Protocol):
+    """Protocol for a progress controller.
+
+    Version Added:
+        9.0
+    """
+
+    def advance(
+        self,
+        amount: int = 1,
+    ) -> None:
+        ...
+
+    def update(
+        self,
+        message: str,
+    ) -> None:
+        ...
+
+
+class _NullProgress:
+    """A no-op progress controller.
+
+    This is yielded by :py:meth:`RBToolsConsole.progress_bar` and used by
+    :py:meth:`RBToolsConsole.spinner` when the console is disabled, so callers
+    can invoke :py:meth:`advance` and :py:meth:`update` without any effect.
+
+    Version Added:
+        7.0
+    """
+
+    def advance(
+        self,
+        amount: int = 1,
+    ) -> None:
+        """Advance the progress bar.
+
+        Args:
+            amount (int, optional):
+                The amount to advance by.
+        """
+
+    def update(
+        self,
+        message: str,
+    ) -> None:
+        """Update the progress message.
+
+        Args:
+            message (str):
+                The new message.
+        """
+
+
+class _ProgressAdapter:
+    """A thin adapter over a Rich :py:class:`~rich.progress.Progress` task.
+
+    Version Added:
+        7.0
+    """
+
+    def __init__(
+        self,
+        progress: Progress,
+        task_id: Any,
+    ) -> None:
+        """Initialize the adapter.
+
+        Args:
+            progress (rich.progress.Progress):
+                The progress display.
+
+            task_id (rich.progress.TaskID):
+                The ID of the task to control.
+        """
+        self._progress = progress
+        self._task_id = task_id
+
+    def advance(
+        self,
+        amount: int = 1,
+    ) -> None:
+        """Advance the progress bar.
+
+        Args:
+            amount (int, optional):
+                The amount to advance by.
+        """
+        self._progress.advance(self._task_id, amount)
+
+    def update(
+        self,
+        message: str,
+    ) -> None:
+        """Update the progress bar description.
+
+        Args:
+            message (str):
+                The new description.
+        """
+        self._progress.update(self._task_id, description=message)
+
+
+class _RBToolsRichHandler(RichHandler):
+    """A Rich logging handler matching RBTools' historical formatting.
+
+    Rich's default handler shows a level column for every record. RBTools
+    treats INFO messages like plain print statements, so this handler hides
+    the level prefix for INFO only. DEBUG, WARNING, and higher still show the
+    styled level name.
+
+    Version Added:
+        7.0
+    """
+
+    def render(
+        self,
+        *,
+        record: logging.LogRecord,
+        traceback: Any,
+        message_renderable: Any,
+    ) -> Any:
+        """Render a log record for display.
+
+        The level column is hidden for INFO, so those messages appear without
+        a level prefix. DEBUG, WARNING, and higher keep their level prefix.
+
+        Args:
+            record (logging.LogRecord):
+                The log record to render.
+
+            traceback (rich.traceback.Traceback):
+                The traceback to render, if any.
+
+            message_renderable (rich.console.ConsoleRenderable):
+                The renderable for the log message.
+
+        Returns:
+            rich.console.ConsoleRenderable:
+            The renderable to display.
+        """
+        self._log_render.show_level = (record.levelno != logging.INFO)
+
+        return super().render(record=record,
+                              traceback=traceback,
+                              message_renderable=message_renderable)
+
+
+class RBToolsConsole:
+    """A Rich-backed console for RBTools commands.
+
+    This wraps two :py:class:`rich.console.Console` instances (one for stdout
+    and one for stderr) and provides RBTools-specific helpers for styled
+    messages, spinners, progress bars, and tables.
+
+    The output methods are never no-ops. When the console is enabled (writing
+    to a color terminal or forced on with ``--color=always``), they emit styled
+    output. When disabled (piped, redirected, or ``--color=never``), they emit
+    the plain-text equivalent through the same console. This lets commands make
+    a single unconditional call instead of branching on whether color is
+    available.
+
+    In ``--json`` mode, :py:meth:`suppress` is called to discard all console
+    output.
+
+    Version Added:
+        7.0
+    """
+
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The Rich console for stderr.
+    stderr_console: Console
+
+    #: The Rich console for stdout.
+    stdout_console: Console
+
+    def __init__(
+        self,
+        *,
+        stdout: (TextIO | None) = None,
+        stderr: (TextIO | None) = None,
+        color_mode: ColorMode = 'auto',
+        colors: (ColorOverrides | None) = None,
+    ) -> None:
+        """Initialize the console.
+
+        Args:
+            stdout (io.TextIOBase, optional):
+                The stream for standard output. Defaults to ``sys.stdout``.
+
+            stderr (io.TextIOBase, optional):
+                The stream for standard error. Defaults to ``sys.stderr``.
+
+            color_mode (str, optional):
+                One of ``auto`` (color when writing to a terminal), ``always``
+                (always color), or ``never`` (never color).
+
+            colors (dict, optional):
+                A mapping of log level names to color names, used to build the
+                theme. This comes from the ``COLOR`` configuration.
+        """
+        if color_mode == 'always':
+            force_terminal = True
+            no_color = False
+        elif color_mode == 'never':
+            force_terminal = False
+            no_color = True
+        else:
+            force_terminal = None
+            no_color = False
+
+        theme = build_theme(colors)
+
+        self.stdout_console = Console(
+            file=stdout,
+            theme=theme,
+            highlight=False,
+            force_terminal=force_terminal,
+            no_color=no_color)
+
+        self.stderr_console = Console(
+            file=stderr,
+            theme=theme,
+            stderr=True,
+            highlight=False,
+            force_terminal=force_terminal,
+            no_color=no_color)
+
+    @property
+    def enabled(self) -> bool:
+        """Whether styled output is active for stdout.
+
+        Type:
+            bool
+        """
+        return self.stdout_console.is_terminal
+
+    @property
+    def stderr_enabled(self) -> bool:
+        """Whether styled output is active for stderr.
+
+        Type:
+            bool
+        """
+        return self.stderr_console.is_terminal
+
+    def suppress(self) -> None:
+        """Discard all subsequent console output.
+
+        This pushes a render hook onto both consoles that drops everything. It
+        is used in ``--json`` mode so only the JSON payload is written.
+        """
+        self.stdout_console.push_render_hook(_SuppressRenderHook())
+        self.stderr_console.push_render_hook(_SuppressRenderHook())
+
+    def _emit(
+        self,
+        console: Console,
+        message: str,
+        *,
+        style: (StyleType | None) = None,
+        prefix: (str | None) = None,
+        prefix_style: (str | None) = None,
+    ) -> None:
+        """Emit a message, styled or plain based on whether color is enabled.
+
+        The message is always treated as literal text (never as Rich markup),
+        so it is safe to pass arbitrary content. When disabled, the message is
+        written verbatim through the console with no styling or prefix.
+
+        Args:
+            console (rich.console.Console):
+                The console to write to.
+
+            message (str):
+                The literal message text.
+
+            style (str, optional):
+                A style to apply to the message when enabled.
+
+            prefix (str, optional):
+                A prefix (such as an icon) to show before the message when
+                enabled. A space is added between the prefix and the message.
+
+            prefix_style (str, optional):
+                A style to apply to the prefix.
+        """
+        if self.enabled:
+            text = Text()
+
+            if prefix:
+                text.append(f'{prefix} ', style=prefix_style or '')
+
+            text.append(message, style=style or '')
+            console.print(text)
+        else:
+            write_passthrough(console, message)
+            write_passthrough(console, '\n')
+
+    def print(
+        self,
+        *args,
+        **kwargs,
+    ) -> None:
+        """Print a message to the stdout console.
+
+        This will forward a message to the Rich console.
+
+        Args:
+            *args (tuple):
+                Positional arguments to pass through to
+                :py:meth:`rich.console.Console.print`.
+
+            **kwargs (dict):
+                Keyword arguments to pass through to
+                :py:meth:`rich.console.Console.print`.
+        """
+        self.stdout_console.print(*args, **kwargs)
+
+    def print_escaped(
+        self,
+        text: str,
+        **kwargs,
+    ) -> None:
+        """Print a message to the stdout console without markup.
+
+        This acts like :py:meth:`print` but will escape text before printing.
+
+        Args:
+            text (str):
+                The text to print.
+
+            **kwargs (dict):
+                Additional keyword arguments to pass through to
+                :py:meth:`rich.console.Console.print`.
+        """
+        self.print(escape_markup(text), **kwargs)
+
+    def print_step(
+        self,
+        message: str,
+        *,
+        escape: bool = False,
+    ) -> None:
+        """Print a step message for a sequential operation.
+
+        Args:
+            message (str):
+                The message to display.
+
+            escape (bool, optional):
+                Whether to escape the message for Rich markup.
+        """
+        if escape:
+            message = escape_markup(message)
+
+        self.stdout_console.print(_STEP, message)
+
+    def print_success(
+        self,
+        message: str,
+        *,
+        escape: bool = False,
+    ) -> None:
+        """Print a success message.
+
+        Args:
+            message (str):
+                The message to display.
+
+            escape (bool, optional):
+                Whether to escape the message for Rich markup.
+        """
+        if escape:
+            message = escape_markup(message)
+
+        self.stdout_console.print(_SUCCESS, message)
+
+    def print_info(
+        self,
+        message: str,
+        *,
+        escape: bool = False,
+    ) -> None:
+        """Print an informational message.
+
+        Args:
+            message (str):
+                The message to display.
+
+            escape (bool, optional):
+                Whether to escape the message for Rich markup.
+        """
+        if escape:
+            message = escape_markup(message)
+
+        self.stdout_console.print(f'[rb.info] {message}')
+
+    def print_error(
+        self,
+        message: str,
+        *,
+        escape: bool = False,
+    ) -> None:
+        """Print an error message to stdout.
+
+        This writes inline command errors to stdout, matching the historical
+        behavior of commands that reported failures through ``stdout``.
+
+        Args:
+            message (str):
+                The message to display.
+
+            escape (bool, optional):
+                Whether to escape the message for Rich markup.
+        """
+        if escape:
+            message = escape_markup(message)
+
+        self.stderr_console.print(_ERROR, message)
+
+    def print_warning(
+        self,
+        message: str,
+        *,
+        escape: bool = False,
+    ) -> None:
+        """Print a warning message to stderr.
+
+        Args:
+            message (str):
+                The message to display.
+
+            escape (bool, optional):
+                Whether to escape the message for Rich markup.
+        """
+        if escape:
+            message = escape_markup(message)
+
+        self.stdout_console.print(_WARNING, message)
+
+    def spinner(
+        self,
+        message: str,
+    ) -> Status | None:
+        """Display an animated spinner while a block of work runs.
+
+        When disabled, the message is printed as a step and a no-op controller
+        is yielded.
+
+        Args:
+            message (str):
+                The message to display next to the spinner.
+
+        Returns:
+            rich.status.Status:
+            The status object, or ``None`` if Rich output is not enabled.
+        """
+        if not self.enabled:
+            self.print_step(message)
+            return None
+
+        return self.stdout_console.status(message)
+
+    @contextmanager
+    def progress_bar(
+        self,
+        description: str,
+        *,
+        total: (int | None) = None,
+    ) -> Generator[_ProgressController, None, None]:
+        """Display a progress bar while a block of work runs.
+
+        When disabled, a no-op controller is yielded so callers can still call
+        :py:meth:`advance` and :py:meth:`update`.
+
+        Args:
+            description (str):
+                The label shown next to the bar.
+
+            total (int, optional):
+                The total number of steps. If ``None``, the bar is
+                indeterminate.
+
+        Yields:
+            object:
+            A controller with ``advance(amount)`` and ``update(message)``
+            methods.
+        """
+        if not self.enabled:
+            yield _NullProgress()
+            return
+
+        progress = Progress(
+            SpinnerColumn(),
+            TextColumn('[rb.step]{task.description}'),
+            BarColumn(),
+            MofNCompleteColumn(),
+            TaskProgressColumn(),
+            TimeRemainingColumn(),
+            console=self.stdout_console)
+
+        with progress:
+            task_id = progress.add_task(description, total=total)
+            yield _ProgressAdapter(progress, task_id)
+
+    def track(
+        self,
+        iterable: Iterable[_T],
+        description: str,
+        *,
+        total: (int | None) = None,
+    ) -> Iterable[_T]:
+        """Wrap an iterable with a progress bar.
+
+        When disabled, the iterable is returned unchanged.
+
+        Args:
+            iterable (iterable):
+                The iterable to wrap.
+
+            description (str):
+                The label shown next to the bar.
+
+            total (int, optional):
+                The size of the iterable. Only needed when the iterable does
+                not implement `:py:meth:`object.__len__`.
+
+        Returns:
+            iterable:
+            The wrapped iterable, or the original when disabled.
+        """
+        if not self.enabled:
+            return iterable
+
+        return track(iterable,
+                     description=description,
+                     total=total,
+                     console=self.stdout_console)
+
+    def get_rich_log_handler(
+        self,
+        *,
+        level: int = logging.DEBUG,
+        show_path: bool = False,
+    ) -> _RBToolsRichHandler:
+        """Return a Rich logging handler for styled log output.
+
+        Args:
+            level (int, optional):
+                The minimum log level to handle.
+
+            show_path (bool, optional):
+                Whether to show the source path for each log record.
+
+        Returns:
+            _RBToolsRichHandler:
+            The configured handler, writing to the stderr console.
+        """
+        return _RBToolsRichHandler(
+            console=self.stderr_console,
+            level=level,
+            show_time=False,
+            show_path=show_path,
+            rich_tracebacks=False,
+            markup=False)

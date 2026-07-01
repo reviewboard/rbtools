@@ -16,6 +16,7 @@ from rbtools.utils.encoding import force_bytes, force_unicode
 if TYPE_CHECKING:
     from typing import Any, IO, TextIO, TypeAlias
 
+    from rich.console import Console
     from typelets.json import JSONDict
 
 
@@ -214,20 +215,46 @@ class OutputWrapper(Generic[AnyStr]):
     #: The wrapped output stream.
     output_stream: IO[AnyStr] | None
 
+    #: The Rich console to route text output through, if any.
+    #:
+    #: When set, writes are routed through the console (verbatim, so output is
+    #: unchanged) instead of directly to :py:attr:`output_stream`. This lets
+    #: legacy text output participate in Rich features such as ``--json``
+    #: suppression. Byte-based wrappers leave this ``None``.
+    #:
+    #: Version Added:
+    #:     7.0
+    console: Console | None
+
     #: A function to force a string type for writing.
     _force_str: _ForceStringFunc
 
     def __init__(
         self,
         output_stream: IO[AnyStr],
+        *,
+        console: (Console | None) = None,
     ) -> None:
         """Initialize with an output object to stream to.
+
+        Version Changed:
+            7.0:
+            Added the ``console`` argument.
 
         Args:
             output_stream (io.IOBase):
                 The output stream to send command output to.
+
+            console (rich.console.Console, optional):
+                A Rich console to route text output through. When provided,
+                writes go through the console verbatim instead of to
+                ``output_stream``.
+
+                Version Added:
+                    7.0
         """
         self.output_stream = output_stream
+        self.console = console
 
         if isinstance(output_stream, io.TextIOBase):
             self._force_str = cast(_ForceStringFunc, force_unicode)
@@ -284,6 +311,15 @@ class OutputWrapper(Generic[AnyStr]):
             s (bytes or str or _Newline):
                 The string or newline wrapper to write.
         """
-        # Make sure the stream hasn't been closed (for JSON writing).
-        if self.output_stream is not None:
-            self.output_stream.write(self._force_str(s, strings_only=False))
+        console = self.console
+
+        if console is not None:
+            # Route text output through the Rich console so it participates in
+            # console features (such as --json suppression). This writes the
+            # text verbatim, so the output is unchanged.
+            from rbtools.ui.console import write_passthrough
+
+            write_passthrough(console, force_unicode(s, strings_only=False))
+        elif output_stream := self.output_stream:
+            # Make sure the stream hasn't been closed (for JSON writing).
+            output_stream.write(self._force_str(s, strings_only=False))

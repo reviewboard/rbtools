@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import re
-from shutil import get_terminal_size
 
-import texttable as tt
+from rich.box import SIMPLE
+from rich.table import Table
 
 from rbtools.commands.base import BaseCommand, Option
 from rbtools.utils.users import get_username
@@ -74,8 +74,15 @@ class Status(BaseCommand):
             has_branches = False
             has_bookmarks = False
 
-            table = tt.Texttable(get_terminal_size().columns)
-            header = ['Status', 'Review Request']
+            table = Table(
+                show_header=True,
+                box=SIMPLE,
+                header_style='rb.heading',
+            )
+
+            table.add_column('Status')
+            table.add_column('ID', justify='right')
+            table.add_column('Summary')
 
             for info in review_requests:
                 if 'branch' in info:
@@ -85,17 +92,16 @@ class Status(BaseCommand):
                     has_bookmarks = True
 
             if has_branches:
-                header.append('Branch')
+                table.add_column('Branch')
 
             if has_bookmarks:
-                header.append('Bookmark')
-
-            table.header(header)
+                table.add_column('Bookmark')
 
             for info in review_requests:
                 row = [
                     info['status'],
-                    'r/%s - %s' % (info['id'], info['summary']),
+                    str(info['id']),
+                    info['summary'],
                 ]
 
                 summary = {
@@ -119,10 +125,10 @@ class Status(BaseCommand):
                     row.append(info.get('bookmark') or '')
                     summary['bookmark'] = row[-1]
 
-                table.add_row(row)
+                table.add_row(*row)
                 self.json.append('review_requests', summary)
 
-            self.stdout.write(table.draw())
+            self.console.print(table)
         else:
             self.stdout.write('No review requests found.')
 

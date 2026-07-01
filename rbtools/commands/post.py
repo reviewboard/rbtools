@@ -8,7 +8,6 @@ import re
 import sys
 from typing import NamedTuple, TYPE_CHECKING, TypedDict
 
-from tqdm import tqdm
 from typing_extensions import NotRequired, TypeVar
 
 from rbtools.api.errors import APIError
@@ -42,7 +41,6 @@ if TYPE_CHECKING:
         FileDiffItemResource,
         ReviewRequestItemResource,
     )
-    from rbtools.config import RBToolsConfig
 
 
 _T = TypeVar('_T')
@@ -1578,8 +1576,8 @@ class Post(BaseCommand):
         draft_commits = diff.get_draft_commits()
 
         iterable = self._show_progress(
-            iterable=zip(diff_history.entries,
-                         diff_history.validation_info),
+            iterable=list(zip(diff_history.entries,
+                              diff_history.validation_info)),
             desc='Uploading commits... ',
             total=len(diff_history.entries))
 
@@ -1944,7 +1942,7 @@ class Post(BaseCommand):
 
     def _show_progress(
         self,
-        iterable: Iterable[_T],
+        iterable: Sequence[_T],
         desc: str,
         total: (int | None) = None,
     ) -> Iterable[_T]:
@@ -1963,8 +1961,8 @@ class Post(BaseCommand):
                 ``__len__``.
 
         Returns:
-            tqdm.tqdm:
-            The progress bar.
+            iterable:
+            The wrapped iterable.
         """
         if total is None:
             try:
@@ -1972,9 +1970,4 @@ class Post(BaseCommand):
             except TypeError:
                 pass
 
-        return tqdm(
-            iterable=iterable,
-            bar_format='{desc} {bar} [{n_fmt}/{total_fmt}]',
-            desc=desc,
-            ncols=80,
-            total=total)
+        return self.console.track(iterable, desc, total=total)

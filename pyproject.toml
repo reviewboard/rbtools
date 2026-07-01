@@ -17,15 +17,13 @@ dynamic = ['version']
 dependencies = [
 	'appdirs~=1.4.4',
 	'certifi>=2023.5.7',
-	'colorama',
 	'housekeeping~=1.1',
 	'packaging>=21.3',
         'puremagic',
 	'pydiffx~=1.1.0',
-	'texttable',
+	'rich~=15.0',
 	'typelets~=1.1.0',
 	'typing_extensions>=4.3.0',
-	'tqdm',
 
 	# importlib.metadata compatibility import.
 	#

@@ -10,7 +10,6 @@ import zipfile
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
-import tqdm
 from appdirs import user_data_dir
 
 from rbtools.commands.base import BaseCommand, CommandError
@@ -202,11 +201,9 @@ class Install(BaseCommand):
 
             total_bytes = int(response.headers['Content-Length'].strip())
             read_bytes = 0
-            bar_format = '{desc} {bar} {percentage:3.0f}% [{remaining}]'
 
-            with tqdm.tqdm(total=total_bytes, desc=label or '',
-                           ncols=80, disable=label is None,
-                           bar_format=bar_format) as bar:
+            with self.console.progress_bar(label or 'Downloading',
+                                           total=total_bytes) as bar:
                 try:
                     f = tempfile.NamedTemporaryFile(delete=False)
                     while read_bytes != total_bytes:
@@ -216,7 +213,7 @@ class Install(BaseCommand):
 
                         f.write(chunk)
 
-                        bar.update(chunk_length)
+                        bar.advance(chunk_length)
                 finally:
                     f.close()
 

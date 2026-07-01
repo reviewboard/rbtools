@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from shutil import get_terminal_size
-
-from texttable import Texttable
+from rich.box import SIMPLE
+from rich.table import Table
 
 from rbtools.api.errors import APIError
 from rbtools.commands.base import BaseCommand, CommandError
@@ -33,6 +32,7 @@ class Info(BaseCommand):
         except APIError:
             raise CommandError('The review request does not exist.')
 
+        diffs = None
         diff = None
         commits = None
 
@@ -68,6 +68,8 @@ class Info(BaseCommand):
         self.stdout.write('URL: %s' % review_request.absolute_url)
 
         if diff:
+            assert diffs is not None
+
             self.stdout.write('Diff: %sdiff/%s/'
                               % (review_request.absolute_url, diff_revision))
             self.stdout.new_line()
@@ -78,8 +80,15 @@ class Info(BaseCommand):
                 self.stdout.new_line()
                 self.stdout.write('Commits:')
 
-                table = Texttable(get_terminal_size().columns)
-                table.header(('ID', 'Summary', 'Author'))
+                table = Table(
+                    show_header=True,
+                    box=SIMPLE,
+                    header_style='rb.heading',
+                )
+
+                table.add_column('ID', style='rb.muted')
+                table.add_column('Summary')
+                table.add_column('Author')
 
                 for commit in commits:
                     summary = commit.commit_message.split('\n', 1)[0].strip()
@@ -87,7 +96,10 @@ class Info(BaseCommand):
                     if len(summary) > 80:
                         summary = summary[:77] + '...'
 
-                    table.add_row((commit.commit_id, summary,
-                                   commit.author_name))
+                    table.add_row(
+                        commit.commit_id,
+                        summary,
+                        commit.author_name,
+                    )
 
-                self.stdout.write(table.draw())
+                self.console.print(table)

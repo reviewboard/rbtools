@@ -95,6 +95,30 @@ This can also be provided by passing :option:`--cache-location` to any
 command.
 
 
+COLOR_MODE
+----------
+
+.. rbtconfig:: COLOR_MODE
+
+.. versionadded: 7.0
+
+**Type:** String
+
+**Default:** ``"auto"``
+
+Whether to use colorized output. This can be set to ``"auto"``, ``"always"``,
+or ``"never"``.
+
+If set to ``"auto"``, colorized output will be used if the output terminal
+appears to be an interactive console.
+
+If set to ``"always"``, colorized output will always be used. This is useful
+when running in environments that can capture and interpret colored output,
+such as some continuous-integration systems.
+
+If set to ``"never"``, colorized output will never be used.
+
+
 COOKIES_STRICT_DOMAIN_MATCH
 ---------------------------
 

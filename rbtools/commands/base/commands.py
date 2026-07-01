@@ -14,10 +14,9 @@ import platform
 import subprocess
 import sys
 from http import HTTPStatus
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urlparse
 
-import colorama
 from typing_extensions import override
 
 from rbtools import get_version_string
@@ -37,6 +36,7 @@ from rbtools.commands.base.options import Option, OptionGroup
 from rbtools.commands.base.output import JSONOutput, OutputWrapper
 from rbtools.config import ConfigData, RBToolsConfig, load_config
 from rbtools.diffs.tools.errors import MissingDiffToolError
+from rbtools.ui.console import RBToolsConsole, ColorMode
 from rbtools.utils.console import get_pass
 from rbtools.utils.filesystem import cleanup_tempfiles, get_home_path
 from rbtools.utils.repository import get_repository_resource
@@ -323,6 +323,16 @@ class BaseCommand:
     #:     3.1
     stderr_is_atty: bool
 
+    #: The Rich console for styled terminal output.
+    #:
+    #: Commands can use this for status messages, spinners, progress bars, and
+    #: tables. The methods are never no-ops: they emit styled output on a color
+    #: terminal and the plain-text equivalent otherwise.
+    #:
+    #: Version Added:
+    #:     7.0
+    console: RBToolsConsole
+
     #: The stream for reading standard input.
     #:
     #: Commands should read input from here instead of using
@@ -385,6 +395,17 @@ class BaseCommand:
                default=False,
                added_in='3.0',
                help='Output results as JSON data instead of text.'),
+        Option('--color',
+               dest='color',
+               metavar='WHEN',
+               choices=['auto', 'always', 'never'],
+               config_key='COLOR_MODE',
+               default='auto',
+               added_in='7.0',
+               help='When to use colorized output: "auto" (color when '
+                    'writing to a terminal), "always", or "never". Defaults '
+                    'to "auto". The NO_COLOR and FORCE_COLOR environment '
+                    'variables are honored when this is "auto".'),
         Option('--open-browser',
                dest='open_browser',
                action='store_true',
@@ -850,8 +871,8 @@ class BaseCommand:
         self.tool = None
         self.config = None
 
-        self.stdout = OutputWrapper[str](stdout)
-        self.stderr = OutputWrapper[str](stderr)
+        self._stdout_stream = stdout
+        self._stderr_stream = stderr
         self.stdin = stdin
 
         self.stdout_bytes = OutputWrapper[bytes](stdout.buffer)
@@ -860,6 +881,11 @@ class BaseCommand:
         self.stdout_is_atty = hasattr(stdout, 'isatty') and stdout.isatty()
         self.stderr_is_atty = hasattr(stderr, 'isatty') and stderr.isatty()
         self.stdin_is_atty = hasattr(stdin, 'isatty') and stdin.isatty()
+
+        # Set up the Rich console and the stdout/stderr wrappers that route
+        # through it. The color mode is resolved again after argument parsing
+        # (in run_from_argv), once the --color flag and config are available.
+        self._setup_console(self._resolve_color_mode())
 
         self.json = JSONOutput(stdout)
 
@@ -946,41 +972,76 @@ class BaseCommand:
         else:
             return usage
 
-    def _create_formatter(
-        self,
-        level: str,
-        fmt: str,
-    ) -> logging.Formatter:
-        """Create a logging formatter for the appropriate logging level.
+    def _resolve_color_mode(self) -> ColorMode:
+        """Return the color mode to use for console output.
 
-        When writing to a TTY, the format will be colorized by the colors
-        specified in the ``COLORS`` configuration in :file:`.reviewboardrc`.
-        Otherwise, the format will not be altered.
+        This resolves the ``--color`` flag, the ``COLOR_MODE`` configuration,
+        and the ``NO_COLOR``/``FORCE_COLOR`` environment variables. In
+        ``--json`` mode, color is always disabled.
 
-        Args:
-            level (str):
-                The logging level name.
-
-            fmt (str):
-                The logging format.
+        Version Added:
+            7.0
 
         Returns:
-            logging.Formatter:
-            The created formatter.
+            str:
+            One of ``auto``, ``always``, or ``never``.
         """
-        color: str = ''
-        reset: str = ''
+        options = getattr(self, 'options', None)
 
-        if self.stdout_is_atty:
-            color_name = self.config['COLOR'].get(level.upper())
+        if options is None:
+            color_mode = 'auto'
+        elif getattr(options, 'json_output', False):
+            color_mode = 'never'
+        else:
+            color_mode = getattr(options, 'color', 'auto')
 
-            if color_name:
-                color = getattr(colorama.Fore, color_name.upper(), '')
+            if color_mode not in {'always', 'auto', 'never'}:
+                color_mode = 'auto'
 
-                if color:
-                    reset = colorama.Fore.RESET
+        if color_mode == 'auto':
+            if os.environ.get('NO_COLOR'):
+                color_mode = 'never'
+            elif os.environ.get('FORCE_COLOR'):
+                color_mode = 'always'
 
-        return logging.Formatter(fmt.format(color=color, reset=reset))
+        return cast(ColorMode, color_mode)
+
+    def _setup_console(
+        self,
+        color_mode: ColorMode,
+    ) -> None:
+        """Set up the Rich console and the stdout/stderr wrappers.
+
+        This (re)builds :py:attr:`console` for the given color mode and rebinds
+        :py:attr:`stdout` and :py:attr:`stderr` to route through it. It is
+        called from :py:meth:`__init__` and again after argument parsing.
+
+        Version Added:
+            7.0
+
+        Args:
+            color_mode (str):
+                One of ``auto``, ``always``, or ``never``.
+        """
+        if config := self.config:
+            colors = config['COLOR']
+        else:
+            colors = None
+
+        stdout_stream = self._stdout_stream
+        stderr_stream = self._stderr_stream
+
+        console = RBToolsConsole(
+            stdout=stdout_stream,
+            stderr=stderr_stream,
+            color_mode=color_mode,
+            colors=colors)
+
+        self.console = console
+        self.stdout = OutputWrapper[str](stdout_stream,
+                                         console=console.stdout_console)
+        self.stderr = OutputWrapper[str](stderr_stream,
+                                         console=console.stderr_console)
 
     def initialize(self) -> None:
         """Initialize the command.
@@ -1095,6 +1156,12 @@ class BaseCommand:
                 repository_info.update_from_remote(repository, info)
 
         if options.json_output:
+            # Text output routes through the console, so suppress it there.
+            self.console.suppress()
+
+            # Null out the raw streams as well. Text writes go through the
+            # console (so this is belt-and-suspenders for them), while the byte
+            # wrappers write to the raw stream directly and need it.
             self.stdout.output_stream = None
             self.stderr.output_stream = None
             self.stderr_bytes.output_stream = None
@@ -1155,6 +1222,10 @@ class BaseCommand:
         parser = self.create_arg_parser(argv)
         self.options = parser.parse_args(argv[2:])
 
+        # Now that the options and config are available, rebuild the console
+        # with the resolved color mode.
+        self._setup_console(self._resolve_color_mode())
+
         args = self.options.args
 
         # Check that the proper number of arguments have been provided.
@@ -1190,6 +1261,7 @@ class BaseCommand:
                 # incorporate those settings.
                 parser = self.create_arg_parser(argv)
                 self.options = parser.parse_args(argv[2:])
+                self._setup_console(self._resolve_color_mode())
 
                 self.server_url = None
                 self.api_client = None
@@ -1672,8 +1744,11 @@ class BaseCommand:
     def _init_logging(self) -> None:
         """Initialize logging for the command.
 
-        This will set up different log handlers based on the formatting we want
-        for the given levels.
+        When writing to a color terminal, this uses
+        :py:class:`rich.logging.RichHandler` for styled log output. In other
+        cases such as pipes, ``--json``, ``--color=never``, or when running
+        tests, it uses plain :py:class:`logging.StreamHandler` handlers with
+        the historical formatting:
 
         The INFO log handler will just show the text, like a print statement.
 
@@ -1683,55 +1758,66 @@ class BaseCommand:
         If debugging is enabled, a debug log handler will be set up showing
         debug messages in the form of ">>> message", making it easier to
         distinguish between debugging and other messages.
+
+        Version Changed:
+            7.0:
+            Added :py:class:`rich.logging.RichHandler` for terminal output.
         """
-        if self.stderr_is_atty:
-            # We only use colorized logging when writing to TTYs, so we don't
-            # bother initializing it then.
-            colorama.init()
-
-        # We use the stderr interface to be compliant with the default
-        # behavior of StreamHandler (which will use sys.stderr if not
-        # specified).
-        log_stream = self.stderr.output_stream
-
         root = logging.getLogger()
 
-        if self.options.debug:
-            handler = logging.StreamHandler(log_stream)
-            handler.setFormatter(self._create_formatter(
-                'DEBUG', '{color}>>>{reset} %(message)s'))
-            handler.setLevel(logging.DEBUG)
-            handler.addFilter(LogLevelFilter(logging.DEBUG))
-            root.addHandler(handler)
+        debug = self.options.debug
 
+        if debug:
             root.setLevel(logging.DEBUG)
         else:
             root.setLevel(logging.INFO)
 
-        # Handler for info messages. We'll treat these like prints.
-        handler = logging.StreamHandler(log_stream)
-        handler.setFormatter(self._create_formatter(
-            'INFO', '{color}%(message)s{reset}'))
+        if self.console.stderr_enabled:
+            # Rich handles colorized log output when writing to a terminal.
+            if debug:
+                log_level = logging.DEBUG
+            else:
+                log_level = logging.INFO
 
-        handler.setLevel(logging.INFO)
-        handler.addFilter(LogLevelFilter(logging.INFO))
-        root.addHandler(handler)
+            root.addHandler(self.console.get_rich_log_handler(
+                level=log_level,
+                show_path=debug))
+        else:
+            # We use the stderr interface to be compliant with the default
+            # behavior of StreamHandler (which will use sys.stderr if not
+            # specified).
+            log_stream = self.stderr.output_stream
 
-        # Handlers for warnings, errors, and criticals. They'll show the
-        # level prefix and the message.
-        levels = (
-            ('WARNING', logging.WARNING),
-            ('ERROR', logging.ERROR),
-            ('CRITICAL', logging.CRITICAL),
-        )
+            if debug:
+                handler = logging.StreamHandler(log_stream)
+                handler.setFormatter(logging.Formatter('>>> %(message)s'))
+                handler.setLevel(logging.DEBUG)
+                handler.addFilter(LogLevelFilter(logging.DEBUG))
+                root.addHandler(handler)
 
-        for level_name, level in levels:
+            # Handler for info messages. We'll treat these like prints.
             handler = logging.StreamHandler(log_stream)
-            handler.setFormatter(self._create_formatter(
-                level_name, '{color}%(levelname)s:{reset} %(message)s'))
-            handler.addFilter(LogLevelFilter(level))
-            handler.setLevel(level)
+            handler.setFormatter(logging.Formatter('%(message)s'))
+
+            handler.setLevel(logging.INFO)
+            handler.addFilter(LogLevelFilter(logging.INFO))
             root.addHandler(handler)
+
+            # Handlers for warnings, errors, and criticals. They'll show the
+            # level prefix and the message.
+            levels = (
+                logging.WARNING,
+                logging.ERROR,
+                logging.CRITICAL,
+            )
+
+            for level in levels:
+                handler = logging.StreamHandler(log_stream)
+                handler.setFormatter(
+                    logging.Formatter('%(levelname)s: %(message)s'))
+                handler.addFilter(LogLevelFilter(level))
+                handler.setLevel(level)
+                root.addHandler(handler)
 
         self.log.debug('RBTools %s', get_version_string())
         self.log.debug('Python %s', sys.version)
@@ -2026,6 +2112,7 @@ class BaseMultiCommand(BaseCommand):
         command = self.options.command_cls(options=self.options,
                                            config=self.config,
                                            transport_cls=self.transport_cls)
+        command.console = self.console
         command.stdout = self.stdout
         command.stderr = self.stderr
         command.json = self.json
