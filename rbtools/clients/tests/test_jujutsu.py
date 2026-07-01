@@ -2021,6 +2021,91 @@ class JujutsuPatcherTests(BaseJujutsuClientTests):
         with open(new_path, 'rb') as f:
             self.assertEqual(f.read(), test_content)
 
+    def test_binary_file_pure_move_no_attachment(self) -> None:
+        """Testing JujutsuPatcher with a moved binary file and no attachment"""
+        client = self.build_client()
+
+        old_path = 'old_binary.bin'
+        new_path = 'new_binary.bin'
+        content = b'Unchanged binary content'
+
+        with open(old_path, 'wb') as f:
+            f.write(content)
+
+        # No attachment: this is what a similarity-100% binary rename looks
+        # like coming out of _get_binary_file_from_filediff() when there is
+        # no dest_attachment link.
+        binary_file = BinaryFilePatch(
+            old_path=old_path,
+            new_path=new_path,
+            status='moved',
+            file_attachment=None,
+        )
+
+        patch_content = (
+            b'diff --git a/old_binary.bin b/new_binary.bin\n'
+            b'similarity index 100%\n'
+            b'rename from old_binary.bin\n'
+            b'rename to new_binary.bin\n'
+        )
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success,
+                        f'binary_failed={result.binary_failed!r}')
+
+        self.assertFalse(os.path.exists(old_path))
+        self.assertTrue(os.path.exists(new_path))
+
+        with open(new_path, 'rb') as f:
+            self.assertEqual(f.read(), content)
+
+    def test_binary_file_pure_copy_no_attachment(self) -> None:
+        """Testing JujutsuPatcher with a copied binary file and no attachment
+        """
+        client = self.build_client()
+
+        old_path = 'orig_binary.bin'
+        new_path = 'copy_binary.bin'
+        content = b'Copied binary content'
+
+        with open(old_path, 'wb') as f:
+            f.write(content)
+
+        binary_file = BinaryFilePatch(
+            old_path=old_path,
+            new_path=new_path,
+            status='copied',
+            file_attachment=None,
+        )
+
+        patch_content = (
+            b'diff --git a/orig_binary.bin b/copy_binary.bin\n'
+            b'similarity index 100%\n'
+            b'copy from orig_binary.bin\n'
+            b'copy to copy_binary.bin\n'
+        )
+        patch = Patch(content=patch_content, binary_files=[binary_file])
+        patcher = client.get_patcher(patches=[patch])
+
+        results = list(patcher.patch())
+        self.assertEqual(len(results), 1)
+
+        result = results[0]
+        self.assertTrue(result.success,
+                        f'binary_failed={result.binary_failed!r}')
+
+        # The original is left in place; the copy is created with its content.
+        self.assertTrue(os.path.exists(old_path))
+        self.assertTrue(os.path.exists(new_path))
+
+        with open(new_path, 'rb') as f:
+            self.assertEqual(f.read(), content)
+
     def test_binary_file_remove(self) -> None:
         """Testing JujutsuPatcher with a removed binary file"""
         client = self.build_client()

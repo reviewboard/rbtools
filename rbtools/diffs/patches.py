@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 #:     6.0
 BinaryFileStatus: TypeAlias = Literal[
     'added',
+    'copied',
     'deleted',
     'modified',
     'moved',
@@ -114,6 +115,19 @@ class BinaryFilePatch:
         assert path is not None
 
         return path
+
+    @property
+    def has_attachment_data(self) -> bool:
+        """Whether there's a source available for downloading content.
+
+        This is ``True`` if the file has an attachment to download content
+        from. A moved file with no content change (a pure rename) will not
+        have one.
+
+        Version Added:
+            7.0
+        """
+        return self._attachment is not None
 
     @property
     def content(self) -> bytes | None:

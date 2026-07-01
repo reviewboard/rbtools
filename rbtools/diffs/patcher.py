@@ -909,27 +909,56 @@ class Patcher:
             self.handle_remove_file(old_path)
 
             return True, None
+        elif status == 'moved':
+            # A moved file is applied by renaming old_path to new_path. New
+            # content only needs to be written if the file's content also
+            # changed.
+            assert old_path is not None
+            assert new_path is not None
+
+            self.handle_move_file(old_path, new_path)
+
+            if binary_file.has_attachment_data:
+                content = binary_file.content
+
+                if content is None:
+                    return False, self._get_binary_content_error(binary_file)
+
+                self.handle_write_file(new_path, content)
+
+            return True, None
+        elif status == 'copied':
+            # A copied file creates new_path while leaving old_path in place.
+            # New content only needs to be downloaded if the copy's content
+            # also changed.
+            assert old_path is not None
+            assert new_path is not None
+
+            if binary_file.has_attachment_data:
+                content = binary_file.content
+
+                if content is None:
+                    return False, self._get_binary_content_error(binary_file)
+            else:
+                try:
+                    with open(old_path, 'rb') as fp:
+                        content = fp.read()
+                except OSError as e:
+                    return False, str(e)
+
+            self.handle_add_file(new_path, content)
+
+            return True, None
         else:
             # For added/modified files, write the content.
             content = binary_file.content
 
             if content is None:
-                if binary_file.download_error:
-                    error = _('Failed to download: {error}').format(
-                        error=binary_file.download_error)
-                    return False, error
-                else:
-                    return False, _('Binary file content not available')
+                return False, self._get_binary_content_error(binary_file)
 
             if status == 'added':
                 assert new_path is not None
                 self.handle_add_file(new_path, content)
-            elif status == 'moved':
-                assert old_path is not None
-                assert new_path is not None
-
-                self.handle_move_file(old_path, new_path)
-                self.handle_write_file(new_path, content)
             elif status == 'modified':
                 assert new_path is not None
                 self.handle_write_file(new_path, content)
@@ -937,6 +966,29 @@ class Patcher:
                 assert_never(status)
 
             return True, None
+
+    def _get_binary_content_error(
+        self,
+        binary_file: BinaryFilePatch,
+    ) -> str:
+        """Return an error message for missing binary file content.
+
+        Version Added:
+            7.0
+
+        Args:
+            binary_file (rbtools.diffs.patches.BinaryFilePatch):
+                The binary file that could not be applied.
+
+        Returns:
+            str:
+            The error message.
+        """
+        if binary_file.download_error:
+            return _('Failed to download: {error}').format(
+                error=binary_file.download_error)
+        else:
+            return _('Binary file content not available')
 
     def handle_add_file(
         self,

@@ -224,6 +224,52 @@ class GetBinaryFileFromFileDiffTests(CommandTestsMixin[PatchCommand],
         self.assertEqual(result.status, 'moved')
         self.assertIsNotNone(result._attachment)
 
+    def test_with_copied_file(self) -> None:
+        """Testing PatchCommand._get_binary_file_from_filediff with copied
+        file
+        """
+        command = self.create_command(args=['1'])
+        file_diff = self._create_file_diff(status='copied')
+
+        result = command._get_binary_file_from_filediff(
+            file_diff, reverted=False)
+
+        self.assertEqual(result.old_path, 'old.png')
+        self.assertEqual(result.new_path, 'new.png')
+        self.assertEqual(result.status, 'copied')
+        self.assertIsNotNone(result._attachment)
+
+    def test_with_copied_file_no_dest_attachment(self) -> None:
+        """Testing PatchCommand._get_binary_file_from_filediff with a pure
+        copy (no content change, no dest_attachment)
+        """
+        command = self.create_command(args=['1'])
+        file_diff = self._create_file_diff(
+            has_dest_attachment=False,
+            status='copied')
+
+        result = command._get_binary_file_from_filediff(
+            file_diff, reverted=False)
+
+        self.assertEqual(result.old_path, 'old.png')
+        self.assertEqual(result.new_path, 'new.png')
+        self.assertEqual(result.status, 'copied')
+        self.assertIsNone(result._attachment)
+
+    def test_with_reverted_copied_file(self) -> None:
+        """Testing PatchCommand._get_binary_file_from_filediff with reverted
+        copied file (becomes deleted)
+        """
+        command = self.create_command(args=['1'])
+        file_diff = self._create_file_diff(status='copied')
+
+        result = command._get_binary_file_from_filediff(
+            file_diff, reverted=True)
+
+        self.assertEqual(result.old_path, 'new.png')
+        self.assertEqual(result.new_path, 'old.png')
+        self.assertEqual(result.status, 'deleted')
+
     def test_with_reverted_modified_file(self) -> None:
         """Testing PatchCommand._get_binary_file_from_filediff with reverted
         modified file

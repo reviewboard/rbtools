@@ -422,6 +422,9 @@ class PatchCommand(BaseCommand):
                 status = 'deleted'
             elif file_diff.status == 'deleted':
                 status = 'added'
+            elif file_diff.status == 'copied':
+                # Reverting a copy removes the newly-created destination file.
+                status = 'deleted'
 
             old_path = file_diff.dest_file
             new_path = file_diff.source_file
@@ -449,6 +452,8 @@ class PatchCommand(BaseCommand):
         if status is None:
             if file_diff.status == 'moved':
                 status = 'moved'
+            elif file_diff.status == 'copied':
+                status = 'copied'
             else:
                 status = 'modified'
 
