@@ -2221,9 +2221,13 @@ class TFSClientTests(SCMClientTestCase):
 
     def test_tf_wrapper_with_deps_missing(self) -> None:
         """Testing TFSClient.get_local_path with dependencies missing"""
-        self.spy_on(BaseTFWrapper.check_dependencies,
-                    owner=BaseTFWrapper,
-                    op=kgb.SpyOpRaise(SCMClientDependencyError()))
+        # Each concrete wrapper overrides check_dependencies(), so we must
+        # spy on all of them to simulate a missing environment regardless of
+        # what TFS tooling is actually installed.
+        for wrapper_cls in (TFExeWrapper, TFHelperWrapper, TEEWrapper):
+            self.spy_on(wrapper_cls.check_dependencies,
+                        owner=wrapper_cls,
+                        op=kgb.SpyOpRaise(SCMClientDependencyError()))
 
         client = self.build_client(setup=False)
 
