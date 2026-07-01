@@ -314,7 +314,7 @@ class RootResource(ItemResource):
         self,
         url_template: str,
         values: (Mapping[str, str] | None) = None,
-        **kwargs: QueryArgs,
+        query_args: (dict[str, QueryArgs] | None) = None,
     ) -> str:
         """Create a URL from a template.
 
@@ -328,8 +328,9 @@ class RootResource(ItemResource):
             values (dict, optional):
                 The values to use for replacing template variables.
 
-            **kwargs (rbtools.api.request.QueryArgs):
-                Query arguments to include with the request.
+            query_args (dict of rbtools.api.request.QueryArgs, optional):
+                Query arguments for the request. Any keys used to fill in
+                template variables will be removed from this dictionary.
 
         Returns:
             str:
@@ -338,13 +339,16 @@ class RootResource(ItemResource):
         if values is None:
             values = {}
 
+        if query_args is None:
+            query_args = {}
+
         def get_template_value(
             m: re.Match[str],
         ) -> str:
             key = m.group('key')
 
             try:
-                return str(kwargs.pop(key, None) or values[key])
+                return str(query_args.pop(key, None) or values[key])
             except KeyError:
                 raise ValueError(
                     f'Template was not provided a value for "{key}"')
@@ -379,7 +383,7 @@ class RootResource(ItemResource):
             rbtools.api.resource.Resource:
             The resource at the given URL.
         """
-        url = self._make_url_from_template(url_template, values, **kwargs)
+        url = self._make_url_from_template(url_template, values, kwargs)
 
         return self._make_httprequest(url=url, query_args=kwargs)
 

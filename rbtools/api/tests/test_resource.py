@@ -470,6 +470,22 @@ class ListResourceTests(TestWithPayloads):
             self.assertTrue(hasattr(r, method_name))
             self.assertTrue(callable(getattr(r, method_name)))
 
+    def test_root_resource_template_params_not_in_query_args(self) -> None:
+        """Testing that template parameters are consumed by the URI template
+        and not added as query arguments
+        """
+        r = create_resource(
+            transport=self.transport,
+            payload=self.root_payload,
+            url='',
+            mime_type='application/vnd.reviewboard.org.root+json')
+
+        request = r.get_reviews(review_request_id=15152, max_results=25)
+        self.assertEqual(
+            request.url,
+            'http://localhost:8080/api/review-requests/15152/reviews/'
+            '?max-results=25')
+
     def test_link_field(self) -> None:
         """Testing access of a link field"""
         r = create_resource(
