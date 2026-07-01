@@ -35,15 +35,14 @@ class LoginCommandTests(CommandTestsMixin[Login], TestCase):
                     owner=RBClient,
                     op=kgb.SpyOpReturn(False))
 
-        with self.assertLogs(level='INFO') as ctx:
-            self.run_command(
-                setup_transport_func=lambda t: self._setup_transport(
-                    t, authenticated_session=True),
-            )
+        result = self.run_command(
+            setup_transport_func=lambda t: self._setup_transport(
+                t, authenticated_session=True))
 
         self.assertEqual(
-            ctx.output[0],
-            'INFO:rb.login:Successfully logged in to Review Board.')
+            result['stdout'],
+            b'\xe2\x9c\x93 Successfully logged in to Review Board '
+            b'(reviews.example.com)\n')
 
     def test_login_with_session_cookie(self) -> None:
         """Testing login with a previous session cookie prints an already
@@ -53,16 +52,14 @@ class LoginCommandTests(CommandTestsMixin[Login], TestCase):
                     owner=RBClient,
                     op=kgb.SpyOpReturn(True))
 
-        with self.assertLogs(level='INFO') as ctx:
-            self.run_command(
-                setup_transport_func=lambda t: self._setup_transport(
-                    t, authenticated_session=True),
-            )
+        result = self.run_command(
+            setup_transport_func=lambda t: self._setup_transport(
+                t, authenticated_session=True))
 
         self.assertEqual(
-            ctx.output[0],
-            'INFO:rb.login:You are already logged in to Review Board at '
-            'reviews.example.com')
+            result['stdout'],
+            b'\xe2\x9c\x93 You are already logged in to Review Board '
+            b'(reviews.example.com)\n')
 
     def test_login_with_user_pass_and_no_session_cookie(self) -> None:
         """Testing login with a username and password and no previous session
@@ -72,19 +69,19 @@ class LoginCommandTests(CommandTestsMixin[Login], TestCase):
                     owner=RBClient,
                     op=kgb.SpyOpReturn(False))
 
-        with self.assertLogs(level='INFO') as ctx:
-            self.run_command(
-                args=[
-                    '--username', 'user',
-                    '--password', 'pass',
-                ],
-                setup_transport_func=lambda t: self._setup_transport(
-                    t, authenticated_session=True),
-            )
+        result = self.run_command(
+            args=[
+                '--username', 'user',
+                '--password', 'pass',
+            ],
+            setup_transport_func=lambda t: self._setup_transport(
+                t, authenticated_session=True),
+        )
 
         self.assertEqual(
-            ctx.output[0],
-            'INFO:rb.login:Successfully logged in to Review Board.')
+            result['stdout'],
+            b'\xe2\x9c\x93 Successfully logged in to Review Board '
+            b'(reviews.example.com)\n')
 
     def test_login_with_user_pass_and_session_cookie(self) -> None:
         """Testing login with a username and password and a previous session
@@ -94,19 +91,19 @@ class LoginCommandTests(CommandTestsMixin[Login], TestCase):
                     owner=RBClient,
                     op=kgb.SpyOpReturn(True))
 
-        with self.assertLogs(level='INFO') as ctx:
-            self.run_command(
-                args=[
-                    '--username', 'user',
-                    '--password', 'pass',
-                ],
-                setup_transport_func=lambda t: self._setup_transport(
-                    t, authenticated_session=True),
-            )
+        result = self.run_command(
+            args=[
+                '--username', 'user',
+                '--password', 'pass',
+            ],
+            setup_transport_func=lambda t: self._setup_transport(
+                t, authenticated_session=True),
+        )
 
         self.assertEqual(
-            ctx.output[0],
-            'INFO:rb.login:Successfully logged in to Review Board.')
+            result['stdout'],
+            b'\xe2\x9c\x93 Successfully logged in to Review Board '
+            b'(reviews.example.com)\n')
 
     def test_login_with_api_token_and_no_session_cookie(self) -> None:
         """Testing login with an api token and no previous session cookie
@@ -116,18 +113,18 @@ class LoginCommandTests(CommandTestsMixin[Login], TestCase):
                     owner=RBClient,
                     op=kgb.SpyOpReturn(False))
 
-        with self.assertLogs(level='INFO') as ctx:
-            self.run_command(
-                args=[
-                    '--api-token', 'token',
-                ],
-                setup_transport_func=lambda t: self._setup_transport(
-                    t, authenticated_session=True),
-            )
+        result = self.run_command(
+            args=[
+                '--api-token', 'token',
+            ],
+            setup_transport_func=lambda t: self._setup_transport(
+                t, authenticated_session=True),
+        )
 
         self.assertEqual(
-            ctx.output[0],
-            'INFO:rb.login:Successfully logged in to Review Board.')
+            result['stdout'],
+            b'\xe2\x9c\x93 Successfully logged in to Review Board '
+            b'(reviews.example.com)\n')
 
     def test_login_with_api_token_and_session_cookie(self) -> None:
         """Testing login with an api token and a previous session cookie
@@ -137,18 +134,18 @@ class LoginCommandTests(CommandTestsMixin[Login], TestCase):
                     owner=RBClient,
                     op=kgb.SpyOpReturn(True))
 
-        with self.assertLogs(level='INFO') as ctx:
-            self.run_command(
-                args=[
-                    '--api-token', 'token',
-                ],
-                setup_transport_func=lambda t: self._setup_transport(
-                    t, authenticated_session=True),
-            )
+        result = self.run_command(
+            args=[
+                '--api-token', 'token',
+            ],
+            setup_transport_func=lambda t: self._setup_transport(
+                t, authenticated_session=True),
+        )
 
         self.assertEqual(
-            ctx.output[0],
-            'INFO:rb.login:Successfully logged in to Review Board.')
+            result['stdout'],
+            b'\xe2\x9c\x93 Successfully logged in to Review Board '
+            b'(reviews.example.com)\n')
 
     def _setup_transport(
         self,

@@ -19,6 +19,9 @@ from rbtools.utils.review_request import (find_review_request_by_change_id,
 from rbtools.utils.users import get_user
 
 if TYPE_CHECKING:
+    from typing import NoReturn
+
+    from rbtools.api.resource import ReviewRequestItemResource
     from rbtools.clients.base.scmclient import SCMClientRevisionSpec
 
 
@@ -66,16 +69,28 @@ class Stamp(BaseCommand):
         BaseCommand.perforce_options,
     ]
 
-    def no_commit_error(self):
+    def no_commit_error(self) -> NoReturn:
         raise CommandError('No existing commit to stamp on.')
 
-    def _ask_review_request_match(self, review_request):
-        question = ('Stamp with Review Request #%s: "%s"? '
-                    % (review_request.id,
-                       get_draft_or_current_value(
-                           'summary', review_request)))
+    def _ask_review_request_match(
+        self,
+        review_request: ReviewRequestItemResource,
+    ) -> bool:
+        """Ask the user whether they want to stamp a given review request.
 
-        return confirm(question)
+        Args:
+            review_request (rbtools.api.resource.ReviewRequestItemResource):
+                The review request resource.
+
+        Returns:
+            bool:
+            ``True`` if the user confirms. ``False``, otherwise.
+        """
+        summary = get_draft_or_current_value('summary', review_request)
+
+        return confirm(
+            f'Stamp with Review Request #{review_request.id}: "{summary}"? '
+        )
 
     def determine_review_request(
         self,
@@ -113,6 +128,8 @@ class Stamp(BaseCommand):
 
         tool = self.tool
         assert tool is not None
+
+        assert self.repository is not None
 
         # First, try to match the changeset to a review request directly.
         if tool.supports_changesets:
@@ -155,13 +172,17 @@ class Stamp(BaseCommand):
             self.log.debug('Could not find a matching review request')
             return None, None
 
-    def main(self, *args):
+    def main(self, *args) -> None:
         """Add the review request URL to a commit message."""
         self.cmd_args = list(args)
 
+        assert self.api_root is not None
+        assert self.tool is not None
+
         if not self.tool.can_amend_commit:
-            raise NotImplementedError('rbt stamp is not supported with %s.'
-                                      % self.tool.name)
+            raise NotImplementedError(
+                f'rbt stamp is not supported with {self.tool.name}.'
+            )
 
         try:
             if self.tool.has_pending_changes():
@@ -179,11 +200,13 @@ class Stamp(BaseCommand):
                 review_request = self.api_root.get_review_request(
                     review_request_id=review_request_id)
             except APIError as e:
-                raise CommandError('Error getting review request %s: %s'
-                                   % (review_request_id, e))
+                raise CommandError(
+                    f'Error getting review request {review_request_id}: {e}'
+                )
 
             review_request_url = review_request.absolute_url
         else:
+            assert revisions is not None
             review_request_id, review_request_url = \
                 self. determine_review_request(revisions)
 
@@ -193,5 +216,7 @@ class Stamp(BaseCommand):
 
         stamp_commit_with_review_url(revisions, review_request_url, self.tool)
 
-        self.stdout.write('Successfully stamped change with the URL:')
-        self.stdout.write(review_request_url)
+        self.console.print_success(
+            f'Successfully stamped change with the URL: '
+            f'[rb.url]{review_request_url}'
+        )

@@ -21,7 +21,7 @@ class Logout(BaseCommand):
         BaseCommand.server_options,
     ]
 
-    def main(self) -> int:
+    def main(self) -> None:
         """Run the command."""
         # Initialize the client and root resource ourselves instead of setting
         # needs_api=True, so that we have more control over the auth flow.
@@ -40,9 +40,12 @@ class Logout(BaseCommand):
         self.api_client = api_client
 
         if not api_client.has_session_cookie():
-            self.log.info('You are already logged out of Review Board at %s',
-                          api_client.domain)
-            return 0
+            self.console.print_success(
+                f'You are already logged out of Review Board at '
+                f'{api_client.domain}'
+            )
+
+            return
 
         api_root = api_client.get_root()
         self.api_root = api_root
@@ -52,10 +55,12 @@ class Logout(BaseCommand):
         if session.authenticated:
             api_client.logout()
 
-            self.log.info('You are now logged out of Review Board at %s',
-                          api_client.domain)
+            self.console.print_success(
+                f'You are now logged out of Review Board at '
+                f'{api_client.domain}'
+            )
         else:
-            self.log.info('You are already logged out of Review Board at %s',
-                          api_client.domain)
-
-        return 0
+            self.console.print_success(
+                f'You are already logged out of Review Board at '
+                f'{api_client.domain}'
+            )

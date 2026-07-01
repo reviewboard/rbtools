@@ -6,6 +6,7 @@ from rbtools.api.errors import APIError
 from rbtools.commands.base import BaseCommand, CommandError, Option
 
 
+COMPLETED = 'completed'
 SUBMITTED = 'submitted'
 DISCARDED = 'discarded'
 
@@ -26,8 +27,8 @@ class Close(BaseCommand):
     option_list = [
         Option('--close-type',
                dest='close_type',
-               default=SUBMITTED,
-               help='Either `submitted` or `discarded`.'),
+               default=COMPLETED,
+               help='Either `completed` or `discarded`.'),
         Option('--description',
                dest='description',
                default=None,
@@ -36,31 +37,46 @@ class Close(BaseCommand):
         BaseCommand.repository_options,
     ]
 
-    def check_valid_type(self, close_type):
-        """Check if the user specified a proper type.
+    def main(
+        self,
+        review_request_id: int,
+    ) -> None:
+        """Run the command.
 
-        Type must either be 'discarded' or 'submitted'. If the type
-        is wrong, the command will stop and alert the user.
+        Args:
+            review_request_id (int):
+                The ID of the review request to close.
         """
-        if close_type not in (SUBMITTED, DISCARDED):
-            raise CommandError('%s is not valid type. Try "%s" or "%s"' % (
-                self.options.close_type, SUBMITTED, DISCARDED))
-
-    def main(self, review_request_id):
-        """Run the command."""
         close_type = self.options.close_type
-        self.check_valid_type(close_type)
+        close_type_label = close_type
+
+        if close_type not in {COMPLETED, SUBMITTED, DISCARDED}:
+            raise CommandError(
+                f'{close_type} is not valid type. Try "{COMPLETED}" or '
+                f'"{DISCARDED}"'
+            )
+
+        # Map the newer "completed" onto the legacy "submitted" value that the
+        # API uses. close_type_label will be left saying "completed" for use in
+        # user-visible output.
+        if close_type == COMPLETED:
+            close_type = SUBMITTED
 
         try:
+            assert self.api_root is not None
             review_request = self.api_root.get_review_request(
                 review_request_id=review_request_id)
         except APIError as e:
-            raise CommandError('Error getting review request %s: %s'
-                               % (review_request_id, e))
+            raise CommandError(
+                f'Error getting review request {review_request_id}: {e}'
+            )
 
         if review_request.status == close_type:
-            raise CommandError('Review request #%s is already %s.' % (
-                review_request_id, close_type))
+            # Use self.options.close_type here to show "completed".
+            raise CommandError(
+                f'Review request #{review_request_id} is already closed as '
+                f'{close_type_label}'
+            )
 
         description = self.options.description
 
@@ -71,8 +87,10 @@ class Close(BaseCommand):
         else:
             review_request = review_request.update(status=close_type)
 
-        self.stdout.write('Review request #%s is set to %s.'
-                          % (review_request_id, review_request.status))
+        self.console.print_success(
+            f'Review request #{review_request_id} is set to '
+            f'{close_type_label}.'
+        )
 
         self.json.add('close_type', review_request.status)
         self.json.add('description', description)

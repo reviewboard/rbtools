@@ -16,14 +16,18 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import TYPE_CHECKING
 
 from packaging.version import parse as parse_version
+from rich.markup import escape
 
 from rbtools.api.capabilities import Capabilities
 from rbtools.api.request import RBTOOLS_USER_AGENT
 from rbtools.utils.browser import open_browser as open_browser_func
 
 if TYPE_CHECKING:
+    from rich.status import Status
+
     from rbtools.api.client import RBClient
     from rbtools.api.resource import ServerInfoResource
+    from rbtools.ui.console import RBToolsConsole
 
 
 logger = logging.getLogger(__name__)
@@ -68,6 +72,12 @@ class WebLoginManager:
     #:     str
     api_client: RBClient
 
+    #: The console to use for output, if available.
+    #:
+    #: Version Added:
+    #:     7.0
+    console: RBToolsConsole | None
+
     #: Whether to enable logging for the web login server.
     #:
     #: Type:
@@ -94,6 +104,12 @@ class WebLoginManager:
     #: Type:
     #:     WebLoginServer
     server: WebLoginServer
+
+    #: The status output object.
+    #:
+    #: Version Added:
+    #:     7.0
+    status: Status | None
 
     #: The thread that the web login server is running on.
     #:
@@ -131,8 +147,13 @@ class WebLoginManager:
         hostname: str = DEFAULT_HOSTNAME,
         open_browser: bool = False,
         timeout_secs: int = 180,
+        console: (RBToolsConsole | None) = None,
     ) -> None:
         """Initialize the web login manager.
+
+        Version Changed:
+            7.0:
+            Added the ``console`` argument.
 
         Args:
             api_client (rbtools.api.client.RBClient):
@@ -153,11 +174,19 @@ class WebLoginManager:
                 The timeout for the web login server in seconds. The web login
                 server will shut down after this amount of time. This defaults
                 to 3 minutes.
+
+            console (rbtools.ui.console.RBToolsConsole, optional):
+                The console to use for output.
+
+                Version Added:
+                    7.0
         """
         self.api_client = api_client
+        self.console = console
         self.enable_logging = enable_logging
         self.hostname = hostname
         self.open_browser = open_browser
+        self.status = None
         self.timeout_secs = timeout_secs
 
     @property
@@ -185,13 +214,27 @@ class WebLoginManager:
         self.server = server
 
         if self.open_browser:
-            logger.info('Opening %s to log in to the %s Review Board '
-                        'server...',
-                        login_url, api_client.domain)
+            if self.console:
+                self.status = self.console.spinner(
+                    f'Opening [rb.url]{escape(login_url)}[/rb.url] to log '
+                    f'in to Review Board '
+                    f'([green]{escape(api_client.domain)}[/green])...'
+                )
+            else:
+                logger.info('Opening %s to log in to Review Board (%s)...',
+                            login_url, api_client.domain)
+
             open_browser_func(login_url)
         else:
-            logger.info('Please log in to the %s Review Board server at %s',
-                        api_client.domain, login_url)
+            if self.console:
+                self.status = self.console.spinner(
+                    f'Log in to Review Board '
+                    f'([green]{escape(api_client.domain)}[/green]) at '
+                    f'[rb.url]{escape(login_url)}'
+                )
+            else:
+                logger.info('Log in to Review Board (%s) at %s',
+                            api_client.domain, login_url)
 
         thread = threading.Thread(target=self._serve)
         self.thread = thread
@@ -210,18 +253,25 @@ class WebLoginManager:
             bool:
             Whether the login was successful.
         """
-        try:
-            while not self.server.stop_event.is_set():
-                time.sleep(0.1)
+        def wait() -> bool:
+            try:
+                while not self.server.stop_event.is_set():
+                    time.sleep(0.1)
 
-                if time.time() >= self.timeout_epoch_secs:
-                    self._handle_timeout()
+                    if time.time() >= self.timeout_epoch_secs:
+                        self._handle_timeout()
 
-            self.stop_server()
-            return self.login_successful
-        except (KeyboardInterrupt, SystemExit, TimeoutError):
-            self.stop_server()
-            raise
+                self.stop_server()
+                return self.login_successful
+            except (KeyboardInterrupt, SystemExit, TimeoutError):
+                self.stop_server()
+                raise
+
+        if self.status:
+            with self.status:
+                return wait()
+        else:
+            return wait()
 
     def stop_server(self) -> None:
         """Stop the web login server.
@@ -270,7 +320,7 @@ class WebLoginManager:
                 s.bind(('127.0.0.1', port))
                 s.listen(1)
                 return port
-            except Exception:
+            except Exception:  # noqa: S110
                 # Ignore the exception. This is likely to be an "Address
                 # already in use" error. We'll continue on to the next
                 # random port.
@@ -278,7 +328,7 @@ class WebLoginManager:
             finally:
                 try:
                     s.close()
-                except Exception:
+                except Exception:  # noqa: S110
                     pass
 
     def _serve(self) -> None:
@@ -643,8 +693,13 @@ def attempt_web_login(
     api_client: RBClient,
     server_info: (ServerInfoResource | None) = None,
     capabilities: (Capabilities | None) = None,
+    console: (RBToolsConsole | None) = None,
 ) -> bool:
     """Attempt to authenticate the client using web-based login.
+
+    Version Changed:
+        7.0:
+        Added the ``console`` argument.
 
     Version Added:
         6.0
@@ -658,6 +713,12 @@ def attempt_web_login(
 
         capabilities (rbtools.api.capabilities.Capabilities, optional):
             The Review Board server capabilities.
+
+        console (rbtools.ui.console.RBToolsConsole, optional):
+            The console object, if available.
+
+            Version Added:
+                7.0
 
     Returns:
         bool:
@@ -693,7 +754,8 @@ def attempt_web_login(
     web_login_manager = WebLoginManager(
         api_client=api_client,
         enable_logging=web_login_options.debug,
-        open_browser=web_login_options.open_browser)
+        open_browser=web_login_options.open_browser,
+        console=console)
 
     web_login_manager.start_web_login_server()
 

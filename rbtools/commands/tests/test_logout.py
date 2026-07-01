@@ -33,17 +33,15 @@ class LogoutCommandTests(CommandTestsMixin[Logout], TestCase):
         self.spy_on(URLMapTransport.handle_api_path,
                     owner=URLMapTransport)
 
-        with self.assertLogs(level='INFO') as ctx:
-            self.run_command(
-                setup_transport_func=lambda t: self._setup_transport(
-                    t, authenticated_session=True),
-            )
+        result = self.run_command(
+            setup_transport_func=lambda t: self._setup_transport(
+                t, authenticated_session=True))
 
         self.assertSpyNotCalled(URLMapTransport.handle_api_path)
         self.assertEqual(
-            ctx.output[0],
-            'INFO:rb.logout:You are already logged out of Review Board at '
-            'reviews.example.com')
+            result['stdout'],
+            b'\xe2\x9c\x93 You are already logged out of Review Board at '
+            b'reviews.example.com\n')
 
     def test_logout_with_session_cookie_and_authed_session(self) -> None:
         """Testing logout with a previous session cookie and an authed
@@ -56,17 +54,15 @@ class LogoutCommandTests(CommandTestsMixin[Logout], TestCase):
                     owner=RBClient,
                     call_original=False)
 
-        with self.assertLogs(level='INFO') as ctx:
-            self.run_command(
-                setup_transport_func=lambda t: self._setup_transport(
-                    t, authenticated_session=True),
-            )
+        result = self.run_command(
+            setup_transport_func=lambda t: self._setup_transport(
+                t, authenticated_session=True))
 
         self.assertSpyCalled(RBClient.logout)
         self.assertEqual(
-            ctx.output[0],
-            'INFO:rb.logout:You are now logged out of Review Board at '
-            'reviews.example.com')
+            result['stdout'],
+            b'\xe2\x9c\x93 You are now logged out of Review Board at '
+            b'reviews.example.com\n')
 
     def test_logout_with_session_cookie_and_no_authed_session(self) -> None:
         """Testing logout with a previous session cookie and no authed
@@ -79,17 +75,15 @@ class LogoutCommandTests(CommandTestsMixin[Logout], TestCase):
                     owner=RBClient,
                     call_original=False)
 
-        with self.assertLogs(level='INFO') as ctx:
-            self.run_command(
-                setup_transport_func=lambda t: self._setup_transport(
-                    t, authenticated_session=False),
-            )
+        result = self.run_command(
+            setup_transport_func=lambda t: self._setup_transport(
+                t, authenticated_session=False))
 
         self.assertSpyNotCalled(RBClient.logout)
         self.assertEqual(
-            ctx.output[0],
-            'INFO:rb.logout:You are already logged out of Review Board at '
-            'reviews.example.com')
+            result['stdout'],
+            b'\xe2\x9c\x93 You are already logged out of Review Board at '
+            b'reviews.example.com\n')
 
     def _setup_transport(
         self,

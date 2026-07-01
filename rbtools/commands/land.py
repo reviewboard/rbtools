@@ -186,6 +186,9 @@ class Land(BaseCommand):
             review_request (rbtools.api.resource.ReviewRequestItemResource):
                 The review request containing the change to land.
         """
+        is_rr_approved = True
+        approval_failure = None
+
         try:
             is_rr_approved = review_request.approved
             approval_failure = review_request.approval_failure
@@ -206,11 +209,11 @@ class Land(BaseCommand):
 
             return ('An error was encountered while executing the land '
                     'command.')
-        finally:
-            if not is_rr_approved:
-                return approval_failure
 
-        return None
+        if not is_rr_approved:
+            return approval_failure
+        else:
+            return None
 
     def land(
         self,
@@ -269,12 +272,16 @@ class Land(BaseCommand):
             json_data['source_branch'] = source_branch
 
             if squash:
-                self.stdout.write('Squashing branch "%s" into "%s".'
-                                  % (source_branch, destination_branch))
+                self.console.print_step(
+                    f'Squashing branch "{source_branch}" into '
+                    f'"{destination_branch}".'
+                )
                 json_data['type'] = 'squash'
             else:
-                self.stdout.write('Merging branch "%s" into "%s".'
-                                  % (source_branch, destination_branch))
+                self.console.print_step(
+                    f'Merging branch "{source_branch}" into '
+                    f'"{destination_branch}".'
+                )
                 json_data['type'] = 'merge'
 
             if not dry_run:
@@ -291,8 +298,10 @@ class Land(BaseCommand):
                 except MergeError as e:
                     raise CommandError(str(e))
         else:
-            self.stdout.write('Applying patch from review request %s.'
-                              % review_request.id)
+            self.console.print_step(
+                f'Applying patch from review request '
+                f'{review_request.id}.'
+            )
 
             json_data['type'] = 'patch'
 
@@ -300,9 +309,10 @@ class Land(BaseCommand):
                 self.patch(review_request.id,
                            squash=squash)
 
-        self.stdout.write('Review request %s has landed on "%s".'
-                          % (review_request.id,
-                             self.options.destination_branch))
+        self.console.print_success(
+            f'Review request {review_request.id} has landed on '
+            f'"{destination_branch}".'
+        )
         self.json.append('landed_review_requests', json_data)
 
     def initialize(self) -> None:
@@ -326,8 +336,9 @@ class Land(BaseCommand):
                 parse_review_request_url(review_request_id)
 
             if diff_revision and '-' in diff_revision:
-                raise CommandError('Interdiff patches are not supported: %s.'
-                                   % diff_revision)
+                raise CommandError(
+                    f'Interdiff patches are not supported: {diff_revision}.'
+                )
 
             if review_request_id is None:
                 raise CommandError('The URL %s does not appear to be a '
@@ -336,18 +347,21 @@ class Land(BaseCommand):
             self.options.server = server_url
             self.options.rid = review_request_id
 
-        super(Land, self).initialize()
+        super().initialize()
 
     def main(
         self,
         branch_name: (str | None) = None,
         *args,
-    ) -> int:
+    ) -> None:
         """Run the command.
 
         Args:
             branch_name (str, optional):
                 The branch name to land the change on.
+
+            *args (tuple):
+                Additional positional arguments.
         """
         api_client = self.api_client
         assert api_client is not None
@@ -364,12 +378,14 @@ class Land(BaseCommand):
             self.cmd_args.insert(0, branch_name)
 
         if not tool.can_merge:
-            raise CommandError('This command does not support %s repositories.'
-                               % tool.name)
+            raise CommandError(
+                f'This command does not support {tool.name} repositories.'
+            )
 
         if self.options.push and not tool.can_push_upstream:
-            raise CommandError('--push is not supported for %s repositories.'
-                               % tool.name)
+            raise CommandError(
+                f'--push is not supported for {tool.name} repositories.'
+            )
 
         if tool.has_pending_changes():
             raise CommandError('Working directory is not clean.')
@@ -406,8 +422,10 @@ class Land(BaseCommand):
                 raise CommandError(str(e))
 
             if not review_request or not review_request.id:
-                raise CommandError('Could not determine the existing review '
-                                   'request URL to land.')
+                raise CommandError(
+                    'Could not determine the existing review request URL to '
+                    'land.'
+                )
 
             review_request_id = review_request.id
             is_local = True
@@ -416,8 +434,9 @@ class Land(BaseCommand):
             review_request = api_root.get_review_request(
                 review_request_id=review_request_id)
         except APIError as e:
-            raise CommandError('Error getting review request %s: %s'
-                               % (review_request_id, e))
+            raise CommandError(
+                f'Error getting review request {review_request_id}: {e}'
+            )
 
         if self.options.is_local is not None:
             is_local = self.options.is_local
@@ -427,9 +446,10 @@ class Land(BaseCommand):
                 branch_name = tool.get_current_branch()
 
             if branch_name == self.options.destination_branch:
-                raise CommandError('The local branch cannot be merged onto '
-                                   'itself. Try a different local branch or '
-                                   'destination branch.')
+                raise CommandError(
+                    'The local branch cannot be merged onto itself. Try a '
+                    'different local branch or destination branch.'
+                )
         else:
             branch_name = None
 
@@ -443,8 +463,9 @@ class Land(BaseCommand):
                 'message': land_error,
             })
 
-            raise CommandError('Cannot land review request %s: %s'
-                               % (review_request_id, land_error))
+            raise CommandError(
+                f'Cannot land review request {review_request_id}: {land_error}'
+            )
 
         land_kwargs = {
             'delete_branch': self.options.delete_branch,
@@ -467,9 +488,10 @@ class Land(BaseCommand):
             dependencies = toposort(dependency_graph)[1:]
 
             if dependencies:
-                self.stdout.write('Recursively landing dependencies of '
-                                  'review request %s.'
-                                  % review_request_id)
+                self.console.print_step(
+                    f'Recursively landing dependencies of review request '
+                    f'{review_request_id}.'
+                )
 
                 for dependency in dependencies:
                     land_error = self.can_land(dependency)
@@ -483,9 +505,11 @@ class Land(BaseCommand):
                         })
 
                         raise CommandError(
-                            'Aborting recursive land of review request %s.\n'
-                            'Review request %s cannot be landed: %s'
-                            % (review_request_id, dependency.id, land_error))
+                            f'Aborting recursive land of review request '
+                            f'{review_request_id}.\n'
+                            f'Review request {dependency.id} cannot be '
+                            f'landed: {land_error}'
+                        )
 
                 for dependency in reversed(dependencies):
                     self.land(review_request=dependency, **land_kwargs)
@@ -497,8 +521,9 @@ class Land(BaseCommand):
                   **land_kwargs)
 
         if self.options.push:
-            self.stdout.write('Pushing branch "%s" upstream'
-                              % self.options.destination_branch)
+            self.console.print_step(
+                f'Pushing branch "{self.options.destination_branch}" upstream'
+            )
 
             if not self.options.dry_run:
                 try:
@@ -506,10 +531,24 @@ class Land(BaseCommand):
                 except PushError as e:
                     raise CommandError(str(e))
 
-        return 0
+    def _ask_review_request_match(
+        self,
+        review_request: ReviewRequestItemResource,
+    ) -> bool:
+        """Ask whether the user whether they want to land a review request.
 
-    def _ask_review_request_match(self, review_request):
+        Args:
+            review_request (rbtools.api.resource.review_request.
+                            ReviewRequestItemResource):
+                The review request.
+
+        Returns:
+            bool:
+            ``True`` if the user confirms landing the given review request.
+            ``False``, otherwise.
+        """
+        summary = get_draft_or_current_value('summary', review_request)
+
         return confirm(
-            'Land Review Request #%s: "%s"? '
-            % (review_request.id,
-               get_draft_or_current_value('summary', review_request)))
+            f'Land Review Request #{review_request.id}: "{summary}"? '
+        )

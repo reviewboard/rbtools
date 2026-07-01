@@ -3,15 +3,37 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING, cast
+
+from rich.box import SIMPLE
+from rich.markup import escape
+from rich.table import Table
 
 from rbtools.api.errors import APIError
-from rbtools.commands.base import (BaseCommand,
-                                   BaseMultiCommand,
-                                   BaseSubCommand,
-                                   CommandError,
-                                   CommandExit,
-                                   Option,
-                                   OptionGroup)
+from rbtools.commands.base import (
+    BaseCommand,
+    BaseMultiCommand,
+    BaseSubCommand,
+    CommandError,
+    Option,
+    OptionGroup,
+)
+from rbtools.ui.theme import ICON_ERROR, ICON_SUCCESS
+
+if TYPE_CHECKING:
+    from typelets.json import JSONDict, JSONValue
+
+
+#: A mapping from status update state to display string.
+STATUS_UPDATE_STATES = {
+    'cancelled': f'[rb.error]{ICON_ERROR} Cancelled',
+    'done-failure': f'[rb.error]{ICON_ERROR} Failed',
+    'done-success': f'[rb.success]{ICON_SUCCESS} Succeeded',
+    'error': f'[rb.error]{ICON_ERROR} Error',
+    'not-yet-run': 'Waiting to run',
+    'pending': 'Pending',
+    'timed-out': f'[rb.error]{ICON_ERROR} Timed out',
+}
 
 
 class BaseStatusUpdateSubCommand(BaseSubCommand):
@@ -26,44 +48,71 @@ class BaseStatusUpdateSubCommand(BaseSubCommand):
 
     needs_api = True
 
-    def print(self, response):
+    def print(
+        self,
+        response: JSONDict | JSONValue,
+    ) -> None:
         """Print output in format specified by user.
 
         Args:
-            response (list, dict):
+            response (list or dict):
                 Response from API with list of status-updates or a single
                 status-update.
         """
         self.json.add('status_updates', [])
 
+        table = Table(
+            show_header=True,
+            box=SIMPLE,
+            header_style='rb.heading',
+        )
+        table.add_column('ID', style='rb.muted')
+        table.add_column('Service ID', style='rb.muted')
+        table.add_column('State')
+        table.add_column('Summary')
+
         if isinstance(response, list):
             for status_update in response:
-                self._print_status_update(status_update)
+                assert isinstance(status_update, dict)
+                self._print_status_update(status_update, table)
                 self.json.append('status_updates',
                                  self._dict_status_update(status_update))
         else:
-            self._print_status_update(response)
+            assert isinstance(response, dict)
+            self._print_status_update(response, table)
             self.json.append('status_updates',
                              self._dict_status_update(response))
 
-    def _print_status_update(self, status_update):
+        self.console.print(table)
+
+    def _print_status_update(
+        self,
+        status_update: JSONDict,
+        table: Table,
+    ) -> None:
         """Print status update in a human readable format.
 
         Args:
             status_update (rbtools.api.transport.Transport):
                 Representation of status-update API for a review request.
-        """
-        if status_update.get('description'):
-            description = ': %s' % status_update.get('description')
-        else:
-            description = ''
 
-        self.stdout.write(' %d\t%s: <%s> %s%s'
-                          % (status_update.get('id'),
-                             status_update.get('service_id'),
-                             status_update.get('state'),
-                             status_update.get('summary'),
-                             description))
+            table (rich.Table):
+                The table to add the status update to.
+        """
+        summary = cast(str, status_update.get('summary'))
+        description = cast(str, status_update.get('description'))
+
+        if description:
+            text = f'{summary}: {description}'
+        else:
+            text = summary
+
+        table.add_row(
+            str(status_update.get('id')),
+            escape(cast(str, status_update.get('service_id'))),
+            STATUS_UPDATE_STATES[cast(str, status_update.get('state'))],
+            escape(text),
+        )
 
     def _dict_status_update(self, status_update):
         """Create a dict for status update.
@@ -132,6 +181,8 @@ class GetStatusUpdateSubCommand(BaseStatusUpdateSubCommand):
         status_update_id = self.options.sid
         review_request_id = self.options.rid
 
+        assert self.api_root is not None
+
         try:
             if status_update_id:
                 self.print(
@@ -145,12 +196,8 @@ class GetStatusUpdateSubCommand(BaseStatusUpdateSubCommand):
                         review_request_id=review_request_id)
                     .rsp.get('status_updates'))
         except APIError as e:
-            if e.rsp:
-                self.stdout.write(json.dumps(e.rsp, indent=2))
-                raise CommandExit(1)
-            else:
-                raise CommandError('Could not retrieve the requested '
-                                   'resource: %s' % e)
+            raise CommandError(
+                f'Could not retrieve the requested status update: {e}')
 
 
 class SetStatusUpdateSubCommand(BaseStatusUpdateSubCommand):
@@ -295,12 +342,7 @@ class SetStatusUpdateSubCommand(BaseStatusUpdateSubCommand):
 
             self.print(status_update.rsp.get('status_update'))
         except APIError as e:
-            if e.rsp:
-                self.stdout.write(json.dumps(e.rsp, indent=2))
-                raise CommandExit(1)
-            else:
-                raise CommandError('Could not set the requested '
-                                   'resource: %s' % e)
+            raise CommandError(f'Could not save the status update: {e}')
 
     def add_review(self):
         """Handle adding a review to a review request from a json file.
@@ -447,11 +489,13 @@ class DeleteStatusUpdateSubCommand(BaseStatusUpdateSubCommand):
 
             status_update.delete()
         except APIError as e:
-            raise CommandError('Could not delete the requested resource: '
-                               '%s' % e)
+            raise CommandError(
+                f'Could not delete the requested resource: {e}'
+            )
 
-        self.stdout.write('Status update %s has been deleted.'
-                          % status_update_id)
+        self.console.print_success(
+            f'Status update {status_update_id} has been deleted.'
+        )
 
 
 class StatusUpdate(BaseMultiCommand):

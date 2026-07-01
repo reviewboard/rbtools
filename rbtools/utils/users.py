@@ -21,6 +21,7 @@ if TYPE_CHECKING:
         SessionResource,
         UserItemResource,
     )
+    from rbtools.ui.console import RBToolsConsole
 
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,7 @@ def get_authenticated_session(
     open_browser: (bool | None) = ...,
     enable_logging: (bool | None) = ...,
     capabilities: (Capabilities | None) = ...,
+    console: (RBToolsConsole | None) = None,
 ) -> SessionResource:
     ...
 
@@ -52,6 +54,7 @@ def get_authenticated_session(
     open_browser: (bool | None) = ...,
     enable_logging: (bool | None) = ...,
     capabilities: (Capabilities | None) = ...,
+    console: (RBToolsConsole | None) = None,
 ) -> SessionResource | None:
     ...
 
@@ -67,6 +70,7 @@ def get_authenticated_session(
     open_browser: (bool | None) = ...,
     enable_logging: (bool | None) = ...,
     capabilities: (Capabilities | None) = ...,
+    console: (RBToolsConsole | None) = None,
 ) -> SessionResource | None:
     ...
 
@@ -81,12 +85,17 @@ def get_authenticated_session(
     open_browser: (bool | None) = None,
     enable_logging: (bool | None) = None,
     capabilities: (Capabilities | None) = None,
+    console: (RBToolsConsole | None) = None,
 ) -> SessionResource | None:
     """Return an authenticated session.
 
     None will be returned if the user is not authenticated, unless the
     'auth_required' parameter is ``True``, in which case the user will be
     prompted to login.
+
+    Version Changed:
+        7.0:
+        Added the ``console`` argument.
 
     Version Changed:
         5.0:
@@ -146,6 +155,12 @@ def get_authenticated_session(
             Version Added:
                 5.0
 
+        console (rbtools.ui.console.RBToolsConsole, optional):
+            The console to use for output.
+
+            Version Added:
+                7.0
+
     Returns:
         rbtools.api.resource.SessionResource:
         The authenticated session resource or ``None`` if the user is not
@@ -181,12 +196,19 @@ def get_authenticated_session(
             login_successful = attempt_web_login(
                 api_client=api_client,
                 server_info=api_root.get_info(),
-                capabilities=capabilities)
+                capabilities=capabilities,
+                console=console)
 
             if login_successful:
                 return api_root.get_session(expand='user')
             else:
-                logger.error('Web-based login failed.')
+                err = 'Web-based login failed'
+
+                if console:
+                    console.print_error(err)
+                else:
+                    logger.error(err)
+
                 raise AuthorizationError()
         except WebLoginNotAllowed:
             pass
@@ -206,8 +228,15 @@ def get_authenticated_session(
                 if i == num_retries:
                     raise
 
-                logger.error('The username or password was incorrect. '
-                             'Please try again.')
+                err = (
+                    'The username or password was incorrect. '
+                    'Please try again.'
+                )
+
+                if console:
+                    console.print_error(err)
+                else:
+                    logger.error(err)
 
     return session
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from rich.box import SIMPLE
+from rich.markup import escape
 from rich.table import Table
 
 from rbtools.commands.base import BaseCommand, Option
@@ -99,9 +100,9 @@ class Status(BaseCommand):
 
             for info in review_requests:
                 row = [
-                    info['status'],
+                    info['status_markup'],
                     str(info['id']),
-                    info['summary'],
+                    escape(info['summary']),
                 ]
 
                 summary = {
@@ -119,20 +120,18 @@ class Status(BaseCommand):
 
                 if has_branches:
                     row.append(info.get('branch') or '')
-                    summary['branch'] = row[-1]
+                    summary['branch'] = escape(row[-1])
 
                 if has_bookmarks:
                     row.append(info.get('bookmark') or '')
-                    summary['bookmark'] = row[-1]
+                    summary['bookmark'] = escape(row[-1])
 
                 table.add_row(*row)
                 self.json.append('review_requests', summary)
 
             self.console.print(table)
         else:
-            self.stdout.write('No review requests found.')
-
-        self.stdout.new_line()
+            self.console.print('No review requests found.')
 
     def get_data(self, review_requests):
         """Return current status and review summary for all review requests.
@@ -152,12 +151,22 @@ class Status(BaseCommand):
         for review_request in review_requests.all_items:
             if review_request.draft:
                 status = 'Draft'
-            elif review_request.issue_open_count:
-                status = 'Open Issues (%s)' % review_request.issue_open_count
-            elif review_request.ship_it_count:
-                status = 'Ship It! (%s)' % review_request.ship_it_count
+                status_markup = '[rb.draft]Draft[/rb.draft]'
+            elif n_issues := review_request.issue_open_count:
+                status = f'Open Issues ({n_issues})'
+                status_markup = (
+                    f'[rb.issues]Open Issues[/rb.issues] '
+                    f'([repr.number]{n_issues}[/repr.number])'
+                )
+            elif n_shipit := review_request.ship_it_count:
+                status = f'Ship It! ({n_shipit})'
+                status_markup = (
+                    f'[rb.shipit]Ship It![/rb.shipit] '
+                    f'([repr.number]{n_shipit}[/repr.number])'
+                )
             else:
                 status = 'Pending'
+                status_markup = '[rb.pending]Pending'
 
             if review_request.draft:
                 summary = review_request.draft[0]['summary']
@@ -170,6 +179,7 @@ class Status(BaseCommand):
                 'description': review_request.description,
                 'id':  review_request.id,
                 'status': status,
+                'status_markup': status_markup,
                 'summary': summary,
                 'url': review_request.absolute_url,
                 'shipit_count': review_request.ship_it_count,

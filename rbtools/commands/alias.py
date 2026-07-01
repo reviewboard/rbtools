@@ -65,27 +65,35 @@ class Alias(BaseCommand):
 
         for config_path in config_paths:
             if aliases[config_path]:
-                self.stdout.write('[%s]' % config_path)
+                self.console.print_escaped(f'[{config_path}]')
 
                 for alias_name, entry in aliases[config_path].items():
-                    self.stdout.write('    %s = %s'
-                                      % (alias_name, entry['command']))
+                    self.console.print_escaped(
+                        f'    {alias_name} = {entry["command"]}'
+                    )
 
                     if entry['invalid']:
-                        self.stdout.write('      !! This alias is overridden '
-                                          'by an rbt command !!')
+                        self.console.print_error(
+                            'This alias is overridden by an rbt command')
                     elif entry['overridden']:
-                        self.stdout.write('      !! This alias is overridden '
-                                          'by another alias in "%s" !!'
-                                          % predefined_aliases[alias_name])
-                self.stdout.new_line()
+                        self.console.print_error(
+                            f'This alias is overridden by another alias in '
+                            f'"{predefined_aliases[alias_name]}"'
+                        )
+                self.console.print()
 
-    def main(self, *args):
-        """Run the command."""
+    def main(self, *args) -> None:
+        """Run the command.
+
+        Args:
+            *args (tuple):
+                Positional arguments passed to the command.
+        """
         if ((self.options.list_aliases and self.options.dry_run_alias) or
             not (self.options.list_aliases or self.options.dry_run_alias)):
-            raise CommandError('You must provide exactly one of --list or '
-                               '--dry-run.')
+            raise CommandError(
+                'You must provide exactly one of --list or --dry-run.'
+            )
 
         if self.options.list_aliases:
             self.list_aliases()
@@ -93,8 +101,9 @@ class Alias(BaseCommand):
             try:
                 alias = self.config['ALIASES'][self.options.dry_run_alias]
             except KeyError:
-                raise CommandError('No such alias "%s"'
-                                   % self.options.dry_run_alias)
+                raise CommandError(
+                    f'No such alias "{self.options.dry_run_alias}"'
+                )
 
             command = expand_alias(alias, args)[0]
 

@@ -52,6 +52,6 @@ class ListRepoTypes(BaseCommand):
             })
 
             if has_repository_info:
-                self.stdout.write(' * "%s": %s' % (name, tool.name))
+                self.console.print_escaped(f' * "{name}": {tool.name}')
             else:
-                self.stdout.write('   "%s": %s' % (name, tool.name))
+                self.console.print_escaped(f'   "{name}": {tool.name}')

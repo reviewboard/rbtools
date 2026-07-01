@@ -71,16 +71,19 @@ class Diff(BaseCommand):
             not tool.supports_diff_exclude_patterns):
 
             raise CommandError(
-                'The %s backend does not support excluding files via the '
-                '-X/--exclude commandline options or the EXCLUDE_PATTERNS '
-                '.reviewboardrc option.' % tool.name)
+                f'The {tool.name} backend does not support excluding files '
+                f'via the -X/--exclude commandline options or the '
+                f'EXCLUDE_PATTERNS .reviewboardrc option.'
+            )
 
         diff_kwargs = {}
 
         if self.options.no_renames:
             if not tool.supports_no_renames:
-                raise CommandError('The %s SCM tool does not support diffs '
-                                   'without renames.', tool.name)
+                raise CommandError(
+                    f'The {tool.name} SCM tool does not support diffs without '
+                    f'renames.'
+                )
 
             diff_kwargs['no_renames'] = True
 

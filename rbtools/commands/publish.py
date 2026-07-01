@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from rbtools.api.errors import APIError
 from rbtools.commands.base import BaseCommand, CommandError, Option
+
+if TYPE_CHECKING:
+    from typing import Any
 
 
 class Publish(BaseCommand):
@@ -40,18 +45,34 @@ class Publish(BaseCommand):
                added_in='1.0'),
     ]
 
-    def main(self, review_request_id):
-        """Run the command."""
+    def main(
+        self,
+        review_request_id: int,
+    ) -> None:
+        """Run the command.
+
+        Args:
+            review_request_id (int):
+                The ID of the review request to publish.
+
+        Raises:
+            rbtools.commands.base.errors.CommandError:
+                An error occurred while publishing.
+        """
+        assert self.api_root is not None
+        assert self.capabilities is not None
+
         try:
             review_request = self.api_root.get_review_request(
                 review_request_id=review_request_id,
                 only_fields='absolute_url,id,public',
                 only_links='draft')
         except APIError as e:
-            raise CommandError('Error getting review request %s: %s'
-                               % (review_request_id, e))
+            raise CommandError(
+                f'Error getting review request {review_request_id}: {e}'
+            )
 
-        update_fields = {
+        update_fields: dict[str, Any] = {
             'public': True,
         }
 
@@ -75,10 +96,12 @@ class Publish(BaseCommand):
             draft = review_request.get_draft(only_fields='')
             draft.update(**update_fields)
         except APIError as e:
-            raise CommandError('Error publishing review request (it may '
-                               'already be published): %s' % e)
+            raise CommandError(
+                f'Error publishing review request (it may already be '
+                f'published): {e}')
 
-        self.stdout.write('Review request #%s is published.'
-                          % review_request_id)
+        self.console.print_success(
+            f'Review request #{review_request_id} is published.'
+        )
         self.json.add('review_request_id', review_request.id)
         self.json.add('review_request_url', review_request.absolute_url)

@@ -6,6 +6,8 @@ import copy
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
+from rich.markup import escape
+
 from rbtools.api.errors import AuthorizationError
 from rbtools.commands.base import (BaseCommand,
                                    CommandError,
@@ -17,7 +19,6 @@ if TYPE_CHECKING:
     import argparse
 
     from rbtools.api.resource import SessionResource
-    from rbtools.config import RBToolsConfig
 
 
 class Login(BaseCommand):
@@ -61,12 +62,8 @@ class Login(BaseCommand):
         BaseCommand.server_options,
     ]
 
-    def main(self) -> int:
+    def main(self) -> None:
         """Run the command.
-
-        Returns:
-            int:
-            The resulting exit code.
 
         Raises:
             rbtools.command.CommandError:
@@ -116,7 +113,8 @@ class Login(BaseCommand):
                     api_root=api_root,
                     auth_required=True,
                     session=session,
-                    capabilities=self.capabilities)
+                    capabilities=self.capabilities,
+                    console=self.console)
             except AuthorizationError:
                 raise CommandError('Unable to log in to Review Board.')
 
@@ -124,13 +122,14 @@ class Login(BaseCommand):
             if (not has_session_cookie or
                 (options.username and options.password) or
                 options.api_token):
-                self.log.info('Successfully logged in to Review Board.')
+                self.console.print_success(
+                    f'Successfully logged in to Review Board '
+                    f'([green]{escape(api_client.domain)}[/green])')
             else:
-                self.log.info(
-                    'You are already logged in to Review Board at %s',
-                    api_client.domain)
-
-        return 0
+                self.console.print_success(
+                    f'You are already logged in to Review Board '
+                    f'([green]{escape(api_client.domain)}[/green])'
+                )
 
     def create_parser(
         self,

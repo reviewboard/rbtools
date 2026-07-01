@@ -42,16 +42,17 @@ class Attach(BaseCommand):
             review_request = self.api_root.get_review_request(
                 review_request_id=review_request_id)
         except APIError as e:
-            raise CommandError('Error getting review request %s: %s'
-                               % (review_request_id, e))
+            raise CommandError(
+                f'Error getting review request {review_request_id}: {e}'
+            )
 
         path_to_file = os.path.abspath(path_to_file)
 
         try:
             with open(path_to_file, 'rb') as f:
                 content = f.read()
-        except IOError:
-            raise CommandError('%s is not a valid file.' % path_to_file)
+        except OSError:
+            raise CommandError(f'{path_to_file} is not a valid file.')
 
         # Check if the user specified a custom filename, otherwise
         # use the original filename.
@@ -67,10 +68,11 @@ class Attach(BaseCommand):
                     attachment_history=self.options.attachment_history_id)
             )
         except APIError as e:
-            raise CommandError('Error uploading file: %s' % e)
+            raise CommandError(f'Error uploading file: {e}')
 
-        self.stdout.write('Uploaded %s to review request %s.'
-                          % (path_to_file, review_request_id))
+        self.console.print_success(
+            f'Uploaded {path_to_file} to review request {review_request_id}.'
+        )
 
         review_url = attachment.review_url
 

@@ -58,19 +58,19 @@ class SquashedDiff(NamedTuple):
     diff: bytes
 
     #: The contents of the parent diff.
-    parent_diff: bytes
+    parent_diff: bytes | None
 
     #: The ID of the commit that the diff and parent diff are relative to.
     #:
     #: This is required for SCMs like Mercurial that do not use blob IDs for
     #: files.
-    base_commit_id: str
+    base_commit_id: str | None
 
     #: The directory that the diff is relative to.
-    base_dir: str
+    base_dir: str | None
 
     #: The ID of the commit the diff corresponds to (if applicable).
-    commit_id: str
+    commit_id: str | None
 
     #: The change number that the diff corresponds to.
     #:
@@ -82,7 +82,7 @@ class SquashedDiff(NamedTuple):
     #:
     #: Version Added:
     #:     3.1
-    review_request_extra_data: JSONDict
+    review_request_extra_data: JSONDict | None
 
 
 class DiffHistoryEntry(TypedDict):
@@ -455,9 +455,9 @@ class Post(BaseCommand):
 
             if len(key_value_pair) != 2:
                 raise CommandError(
-                    'The --field argument should be in the form of: '
-                    '--field name=value; got "%s" instead.'
-                    % field)
+                    f'The --field argument should be in the form of: '
+                    f'--field name=value; got "{field}" instead.'
+                )
 
             key, value = key_value_pair
 
@@ -502,18 +502,22 @@ class Post(BaseCommand):
                 'The --revision-range argument has been removed. To post a '
                 'diff for one or more specific revisions, pass those '
                 'revisions as arguments. For more information, see the '
-                'RBTools 0.6 Release Notes.')
+                'RBTools 0.6 Release Notes.'
+            )
 
         if self.options.svn_changelist:
             raise CommandError(
                 'The --svn-changelist argument has been removed. To use a '
                 'Subversion changelist, pass the changelist name as an '
-                'additional argument after the command.')
+                'additional argument after the command.'
+            )
 
         # Only one of --description and --description-file can be used
         if self.options.description and self.options.description_file:
-            raise CommandError('The --description and --description-file '
-                               'options are mutually exclusive.')
+            raise CommandError(
+                'The --description and --description-file options are '
+                'mutually exclusive.'
+            )
 
         # If --description-file is used, read that file
         if self.options.description_file:
@@ -522,13 +526,16 @@ class Post(BaseCommand):
                     self.options.description = fp.read()
             else:
                 raise CommandError(
-                    'The description file %s does not exist.'
-                    % self.options.description_file)
+                    f'The description file {self.options.description_file} '
+                    f'does not exist.'
+                )
 
         # Only one of --testing-done and --testing-done-file can be used
         if self.options.testing_done and self.options.testing_file:
-            raise CommandError('The --testing-done and --testing-done-file '
-                               'options are mutually exclusive.')
+            raise CommandError(
+                'The --testing-done and --testing-done-file options are '
+                'mutually exclusive.'
+            )
 
         # If --testing-done-file is used, read that file
         if self.options.testing_file:
@@ -536,8 +543,10 @@ class Post(BaseCommand):
                 with open(self.options.testing_file, 'r') as fp:
                     self.options.testing_done = fp.read()
             else:
-                raise CommandError('The testing file %s does not exist.'
-                                   % self.options.testing_file)
+                raise CommandError(
+                    f'The testing file {self.options.testing_file} does not '
+                    f'exist.'
+                )
 
         # If we have an explicitly specified summary, override
         # --guess-summary
@@ -558,8 +567,10 @@ class Post(BaseCommand):
         # If the --diff-filename argument is used, we can't do automatic
         # updating.
         if self.options.diff_filename and self.options.update:
-            raise CommandError('The --update option cannot be used when '
-                               'using --diff-filename.')
+            raise CommandError(
+                'The --update option cannot be used when using '
+                '--diff-filename.'
+            )
 
         # If we have an explicitly specified review request ID, override
         # --update
@@ -573,15 +584,18 @@ class Post(BaseCommand):
             if self.options.diff_filename:
                 raise CommandError(
                     'The -H/--with-history and --diff-filename options '
-                    'cannot both be provided.')
+                    'cannot both be provided.'
+                )
             elif self.options.basedir:
                 raise CommandError(
                     'The -H/--with-history and --basedir options cannot both '
-                    'be provided.')
+                    'be provided.'
+                )
             elif self.options.stamp_when_posting:
                 raise CommandError(
                     'The -H/--with-history and -s/--stamp options cannot both '
-                    'be provided.')
+                    'be provided.'
+                )
 
     def normalize_guess_value(self, guess, arg_name):
         if guess in self.GUESS_YES_INPUT_VALUES:
@@ -591,8 +605,9 @@ class Post(BaseCommand):
         elif guess == self.GUESS_AUTO:
             return guess
         else:
-            raise CommandError('Invalid value "%s" for argument "%s"'
-                               % (guess, arg_name))
+            raise CommandError(
+                f'Invalid value "{guess}" for argument "{arg_name}"'
+            )
 
     def post_request(
         self,
@@ -719,14 +734,14 @@ class Post(BaseCommand):
                 'Your review request still exists, but the diff is '
                 'not attached.')
 
-            error_msg.append('%s' % review_request.absolute_url)
+            error_msg.append(review_request.absolute_url)
 
             raise CommandError('\n'.join(error_msg))
 
         try:
             draft = review_request.get_draft(only_fields='commit_id')
         except APIError as e:
-            raise CommandError('Error retrieving review request draft: %s' % e)
+            raise CommandError(f'Error retrieving review request draft: {e}')
 
         # Stamp the commit message with the review request URL before posting
         # the review, so that we can use the stamped commit message when
@@ -737,25 +752,27 @@ class Post(BaseCommand):
             if diff_history:
                 err = ('Cannot stamp review request URL when posting with '
                        'history.')
-                self.stdout.write(err)
+                self.console.print_error(err)
                 self.json.add_error(err)
             elif not self.tool.can_amend_commit:
-                err = ('Cannot stamp review request URL onto the commit '
-                       'message; stamping is not supported with %s.'
-                       % self.tool.name)
-                self.stdout.write(err)
+                err = (
+                    f'Cannot stamp review request URL onto the commit '
+                    f'message; stamping is not supported with '
+                    f'{self.tool.name}.'
+                )
+                self.console.print_error(err, escape=True)
                 self.json.add_error(err)
             else:
                 try:
                     stamp_commit_with_review_url(self.revisions,
                                                  review_request.absolute_url,
                                                  self.tool)
-                    self.stdout.write('Stamped review URL onto the '
-                                      'commit message.')
+                    self.console.print_step(
+                        'Stamped review URL onto the commit message.')
                 except AlreadyStampedError:
                     err = ('Commit message has already been stamped with '
                            'the review request URL.')
-                    self.stdout.write(err)
+                    self.console.print_error(err)
                     self.json.add_error(err)
                 except Exception:
                     self.log.debug('Caught exception while stamping the '
@@ -763,7 +780,7 @@ class Post(BaseCommand):
                                    'without stamping.', exc_info=True)
                     err = ('Could not stamp review request URL onto the '
                            'commit message.')
-                    self.stdout.write(err)
+                    self.console.print_error(err)
                     self.json.add_error(err)
 
         # Update the review request draft fields based on options set
@@ -780,11 +797,11 @@ class Post(BaseCommand):
                 draft = draft.update(**update_fields)
             except APIError as e:
                 raise CommandError(
-                    'Error updating review request draft: %s\n\n'
-                    'Your review request still exists, but the diff is not '
-                    'attached.\n\n'
-                    '%s\n'
-                    % (e, review_request.absolute_url))
+                    f'Error updating review request draft: {e}\n\n'
+                    f'Your review request still exists, but the diff is not '
+                    f'attached.\n\n'
+                    f'{review_request.absolute_url}\n'
+                )
 
         return review_request.id, review_request.absolute_url
 
@@ -871,12 +888,17 @@ class Post(BaseCommand):
         orig_cwd = os.path.abspath(os.getcwd())
         options = self.options
 
+        assert self.tool is not None
+        assert self.capabilities is not None
+        assert self.repository_info is not None
+
         if (options.exclude_patterns and
             not self.tool.supports_diff_exclude_patterns):
             raise CommandError(
-                'The %s backend does not support excluding files via the '
-                '-X/--exclude command line options or the EXCLUDE_PATTERNS '
-                '.reviewboardrc option.' % self.tool.name)
+                f'The {self.tool.name} backend does not support excluding '
+                f'files via the -X/--exclude command line options or the '
+                'EXCLUDE_PATTERNS .reviewboardrc option.'
+            )
 
         if self.repository is None:
             raise CommandError('Could not find the repository on the Review '
@@ -891,16 +913,14 @@ class Post(BaseCommand):
 
         self.diff_file_attachments_resource = None
 
+        squashed_diff = None
+
         # If we are passing --diff-filename, we attempt to read the diff before
         # we normally would. This allows us to exit early if the file does not
         # exist or cannot be read and save several network requests.
         if (diff_filename := options.diff_filename):
             if diff_filename == '-':
-                if hasattr(sys.stdin, 'buffer'):
-                    # Make sure we get bytes on Python 3.x.
-                    diff = sys.stdin.buffer.read()
-                else:
-                    diff = sys.stdin.read()
+                diff = sys.stdin.buffer.read()
             else:
                 diff_path = os.path.join(orig_cwd, diff_filename)
 
@@ -908,7 +928,7 @@ class Post(BaseCommand):
                     with open(diff_path, 'rb') as f:
                         diff = f.read()
                 except OSError as e:
-                    raise CommandError('Unable to open diff filename: %s' % e)
+                    raise CommandError(f'Unable to open diff filename: {e}')
 
             squashed_diff = SquashedDiff(
                 diff=diff,
@@ -973,46 +993,53 @@ class Post(BaseCommand):
             if not squashed_diff.diff:
                 raise CommandError("There don't seem to be any diffs!")
         else:
+            assert diff_history is not None
+
             for entry in diff_history.entries:
                 if not entry['diff']:
                     raise CommandError(
-                        'Your history contains an empty diff at commit %s, '
-                        'which is not supported.'
-                        % entry['commit_id'])
+                        f'Your history contains an empty diff at commit '
+                        f'{entry["commit_id"]}, which is not supported.'
+                    )
 
         try:
             if squashed_diff:
                 self._validate_squashed_diff(squashed_diff)
             else:
+                assert diff_history is not None
                 diff_history = self._validate_diff_history(diff_history)
         except APIError as e:
             msg_prefix = ''
 
             if e.error_code == 207:
-                msg_prefix = '%s (revision %s): ' % (e.rsp['file'],
-                                                     e.rsp['revision'])
+                assert e.rsp is not None
+                msg_prefix = (
+                    f'{e.rsp["file"]} (revision {e.rsp["revision"]}): '
+                )
 
-            raise CommandError('Error validating diff\n\n%s%s'
-                               % (msg_prefix, e))
+            raise CommandError(f'Error validating diff\n\n{msg_prefix}{e}')
 
-        review_request_id, review_request_url = self.post_request(
+        review_request_id, url = self.post_request(
             review_request=review_request,
             diff_history=diff_history,
             squashed_diff=squashed_diff,
             submit_as=options.submit_as)
+        diff_url = f'{url}diff/'
 
-        self.stdout.write('Review request #%s posted.' % review_request_id)
-        self.stdout.new_line()
-        self.stdout.write(review_request_url)
-        self.stdout.write('%sdiff/' % review_request_url)
+        self.console.print_success(
+            f'Review request #{review_request_id} posted.')
+        self.console.print()
+
+        self.console.print(f'[rb.url]{url}')
+        self.console.print(f'[rb.url]{diff_url}')
 
         self.json.add('review_request_id', review_request_id)
-        self.json.add('review_request_url', review_request_url)
-        self.json.add('diff_url', '%sdiff/' % review_request_url)
+        self.json.add('review_request_url', url)
+        self.json.add('diff_url', diff_url)
 
         # Load the review up in the browser if requested to.
         if options.open_browser:
-            open_browser(review_request_url)
+            open_browser(url)
 
     def create_parser(
         self,
@@ -1077,7 +1104,8 @@ class Post(BaseCommand):
                 raise CommandError(
                     'The Review Board server at %s does not support posting '
                     'with the -H/--with-history command line option. Re-run  '
-                    'this command without it.')
+                    'this command without it.'
+                )
 
             with_history = (
                 server_supports_history and
@@ -1089,7 +1117,8 @@ class Post(BaseCommand):
             # not support it.
             raise CommandError(
                 'The %s backend does not support review requests with history '
-                'using the -H/--with-history command line option.')
+                'using the -H/--with-history command line option.'
+            )
 
         return with_history
 
@@ -1155,8 +1184,9 @@ class Post(BaseCommand):
                 raise CommandError(str(e))
 
             if not review_request or not review_request.id:
-                raise CommandError('Could not determine existing review '
-                                   'request to update.')
+                raise CommandError(
+                    'Could not determine existing review request to update.'
+                )
 
             # We found a match, but the review request object we got back only
             # has partial information. We now need to re-fetch the review

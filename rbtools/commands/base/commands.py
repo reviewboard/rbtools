@@ -1279,7 +1279,7 @@ class BaseCommand:
             elif self.options.debug:
                 raise
 
-            self.log.error(e)
+            self.console.print_error(str(e), escape=True)
             self.json.add_error(str(e))
             exit_code = 1
         except CommandExit as e:

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from rich.box import SIMPLE
 from rich.table import Table
+from rich.markdown import Markdown
+from rich.markup import escape
 
 from rbtools.api.errors import APIError
 from rbtools.commands.base import BaseCommand, CommandError
@@ -40,7 +42,7 @@ class Info(BaseCommand):
             try:
                 diffs = review_request.get_diffs()
             except APIError as e:
-                raise CommandError('Error retrieving diffs: %s' % e)
+                raise CommandError(f'Error retrieving diffs: {e}')
 
             if diff_revision is None:
                 diff_revision = diffs.total_results
@@ -51,36 +53,59 @@ class Info(BaseCommand):
                 try:
                     commits = diff.get_commits()
                 except APIError as e:
-                    raise CommandError('Error retrieving commits: %s' % e)
+                    raise CommandError(f'Error retrieving commits: {e}')
         elif diff_revision is not None:
             raise CommandError('This review request does not have diffs '
                                'attached')
 
-        self.stdout.write(review_request.summary)
-        self.stdout.new_line()
-        self.stdout.write('Submitter: %s'
-                          % (review_request.submitter.fullname or
-                             review_request.submitter.username))
-        self.stdout.new_line()
-        self.stdout.write(review_request.description)
+        submitter = (
+            review_request.submitter.fullname or
+            review_request.submitter.username
+        )
 
-        self.stdout.new_line()
-        self.stdout.write('URL: %s' % review_request.absolute_url)
+        self.console.print(f'[rb.heading]{escape(review_request.summary)}')
+        self.console.print()
+        self.console.print(f'[rb.muted]Submitter: {escape(submitter)}')
+        self.console.print()
+
+        if review_request.description_text_type == 'markdown':
+            # Rendering this to markdown eliminates wrapping, which can make
+            # things extremely unreadable in very wide terminals. Add some
+            # default wrapping just because.
+            description = Markdown(review_request.description)
+            self.console.print(
+                description,
+                width=min(self.console.stdout_console.width, 120))
+        else:
+            self.console.print(escape(review_request.description))
+
+        self.console.print()
+
+        grid = Table.grid()
+        grid.add_column()
+        grid.add_column()
+        url = review_request.absolute_url
+        grid.add_row('URL:  ', f'[rb.url]{url}')
+
+        if diff:
+            diff_url = f'{url}diff/{diff_revision}/'
+            grid.add_row('Diff:  ', f'[rb.url]{diff_url}')
+
+        self.console.print(grid)
+        self.console.print()
+        self.console.print()
 
         if diff:
             assert diffs is not None
+            n_diffs = diffs.total_results
 
-            self.stdout.write('Diff: %sdiff/%s/'
-                              % (review_request.absolute_url, diff_revision))
-            self.stdout.new_line()
-            self.stdout.write('Revision: %s (of %d)'
-                              % (diff_revision, diffs.total_results))
+            if n_diffs and n_diffs > 1:
+                self.console.print(
+                    f'[rb.muted]Diff revision {diff_revision} (of {n_diffs})')
 
             if commits:
-                self.stdout.new_line()
-                self.stdout.write('Commits:')
-
                 table = Table(
+                    title='Commits',
                     show_header=True,
                     box=SIMPLE,
                     header_style='rb.heading',

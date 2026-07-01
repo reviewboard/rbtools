@@ -9,12 +9,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from rbtools.api.errors import APIError
-from rbtools.commands.base import (BaseCommand,
-                                   BaseSubCommand,
-                                   BaseMultiCommand,
-                                   CommandError,
-                                   Option,
-                                   OptionGroup)
+from rbtools.commands.base import (
+    BaseCommand,
+    BaseSubCommand,
+    BaseMultiCommand,
+    CommandError,
+    Option,
+    OptionGroup,
+)
 
 
 if TYPE_CHECKING:
@@ -32,22 +34,28 @@ class ReviewSubCommand(BaseSubCommand):
     #:     bool
     create_review_if_missing = True
 
-    def get_review_draft(self) -> ReviewItemResource:
+    def get_review_draft(self) -> ReviewItemResource | None:
         """Return the review draft, creating if desired.
 
-        Returrns:
+        Returns:
             rbtools.api.resource.ReviewItemResource:
             The review draft resource.
+
+        Raises:
+            rbtools.commands.base.errors.CommandError:
+                An error occurred while fetching or creating the draft.
         """
         options = self.options
         review_request_id = options.review_request_id
 
         try:
+            assert self.api_root is not None
             review_request = self.api_root.get_review_request(
                 review_request_id=review_request_id)
         except APIError as e:
-            raise CommandError('Error getting review request %s: %s'
-                               % (review_request_id, e))
+            raise CommandError(
+                f'Error getting review request {review_request_id}: {e}'
+            )
 
         try:
             review_draft = self.api_root.get_review_draft(
@@ -67,15 +75,18 @@ class ReviewSubCommand(BaseSubCommand):
 
             except APIError as e:
                 raise CommandError(
-                    'Error creating review draft for review request %s: %s'
-                    % (review_request_id, e))
+                    f'Error creating review draft for review request '
+                    f'{review_request_id}: {e}'
+                )
 
-        self.json.add('review_id', review_draft.id)
-        self.json.add('review_api_url', review_draft.links.self.href)
-        self.json.add('review_url', review_draft.absolute_url)
-        self.json.add('review_status', 'draft')
         self.json.add('review_request_id', review_request_id)
         self.json.add('review_request_url', review_request.absolute_url)
+
+        if review_draft:
+            self.json.add('review_id', review_draft.id)
+            self.json.add('review_api_url', review_draft.links.self.href)
+            self.json.add('review_url', review_draft.absolute_url)
+            self.json.add('review_status', 'draft')
 
         return review_draft
 
@@ -127,7 +138,7 @@ class AddCommentSubCommand(ReviewSubCommand):
         try:
             self.add_comment(self._get_text_type(self.options.markdown))
         except APIError as e:
-            raise CommandError('Error when creating comment: %s' % e)
+            raise CommandError(f'Error when creating comment: {e}')
 
 
 class AddDiffComment(AddCommentSubCommand):
@@ -207,18 +218,23 @@ class AddDiffComment(AddCommentSubCommand):
             if file.dest_file.endswith(options.filename):
                 if file_to_comment:
                     raise CommandError(
-                        'More than one file was found in the diff with name '
-                        '"%s". Add additional path elements to clarify.'
-                        % options.filename)
+                        f'More than one file was found in the diff with name '
+                        f'"{options.filename}". Add additional path elements '
+                        f'to clarify.'
+                    )
 
                 file_to_comment = file
 
         if not file_to_comment:
             raise CommandError(
-                'Could not find a file with name "%s" in the diff.'
-                % options.filename)
+                f'Could not find a file with name "{options.filename}" in the '
+                f'diff.'
+            )
 
-        comment = self.get_review_draft().get_diff_comments().create(
+        review_draft = self.get_review_draft()
+        assert review_draft is not None
+
+        comment = review_draft.get_diff_comments().create(
             filediff_id=file_to_comment.id,
             text=options.text,
             text_type=text_type,
@@ -266,21 +282,24 @@ class AddFileAttachmentComment(AddCommentSubCommand):
 
         # Sanity check the file attachment first.
         try:
+            assert self.api_root is not None
             self.api_root.get_file_attachment(
                 review_request_id=options.review_request_id,
                 file_attachment_id=options.fid)
         except APIError:
             raise CommandError(
-                'Unable to find file attachment with ID %s on review '
-                'request "%s".'
-                % (options.fid, options.review_request_id))
+                f'Unable to find file attachment with ID {options.fid} on '
+                f'review request "{options.review_request_id}".'
+            )
 
-        comment = \
-            self.get_review_draft().get_file_attachment_comments().create(
-                text=options.text,
-                text_type=text_type,
-                issue_opened=options.open_issue,
-                file_attachment_id=options.fid)
+        review_draft = self.get_review_draft()
+        assert review_draft is not None
+
+        comment = review_draft.get_file_attachment_comments().create(
+            text=options.text,
+            text_type=text_type,
+            issue_opened=options.open_issue,
+            file_attachment_id=options.fid)
 
         self.json.add('comment_type', 'file_attachment_comment')
         self.json.add('comment_id', comment.id)
@@ -327,15 +346,16 @@ class Discard(ReviewSubCommand):
 
         if not review_draft:
             raise CommandError(
-                'Could not find a draft review for review request %s.'
-                % self.options.review_request_id)
+                f'Could not find a draft review for review request '
+                f'{self.options.review_request_id}.'
+            )
 
         try:
             review_draft.delete()
             self.json.add('review_status', 'discarded')
         except APIError as e:
             raise CommandError(
-                'Error discarding review draft: %s' % e)
+                f'Error discarding review draft: {e}')
 
 
 class Edit(ReviewSubCommand):
@@ -404,10 +424,10 @@ class Edit(ReviewSubCommand):
                 self.get_review_draft().update(**update_fields)
             except APIError as e:
                 raise CommandError(
-                    'Error updating review request draft: %s\n\n'
-                    'Your review draft still exists, but may not contain the '
-                    'desired information.'
-                    % e)
+                    f'Error updating review request draft: {e}\n\n'
+                    f'Your review draft still exists, but may not contain the '
+                    f'desired information.'
+                )
 
 
 class Publish(ReviewSubCommand):
@@ -423,14 +443,15 @@ class Publish(ReviewSubCommand):
 
         if not review_draft:
             raise CommandError(
-                'Could not find a draft review for review request %s.'
-                % self.options.review_request_id)
+                f'Could not find a draft review for review request '
+                f'{self.options.review_request_id}.'
+            )
 
         try:
             review_draft.update(public=True)
             self.json.add('review_status', 'published')
         except APIError as e:
-            raise CommandError('Unable to publish review draft: %s' % e)
+            raise CommandError(f'Unable to publish review draft: {e}')
 
 
 class Review(BaseMultiCommand):

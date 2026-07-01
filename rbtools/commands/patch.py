@@ -507,16 +507,12 @@ class PatchCommand(BaseCommand):
     def main(
         self,
         review_request_id: int,
-    ) -> int:
+    ) -> None:
         """Run the command.
 
         Args:
             review_request_id (int):
                 The ID of the review request to patch from.
-
-        Returns:
-            int:
-            The resulting exit code.
 
         Raises:
             rbtools.command.CommandError:
@@ -604,8 +600,6 @@ class PatchCommand(BaseCommand):
                                    % (patch_outfile, e))
         else:
             self._apply_patches(patches)
-
-        return 0
 
     def _get_draft_diff(
         self,
@@ -806,23 +800,23 @@ class PatchCommand(BaseCommand):
         if revert:
             summary = ngettext(
                 ('Reverting 1 patch from review request '
-                 '%(review_request_id)s (diff revision %(diff_revision)s)'),
-                ('Reverting %(num)d patches from review request '
-                 '%(review_request_id)s (diff revision %(diff_revision)s)'),
+                 '{review_request_id} (diff revision {diff_revision})'),
+                ('Reverting {num} patches from review request '
+                 '{review_request_id} (diff revision {diff_revision})'),
                 total_patches)
         else:
             summary = ngettext(
                 ('Applying 1 patch from review request '
-                 '%(review_request_id)s (diff revision %(diff_revision)s)'),
+                 '{review_request_id} (diff revision {diff_revision})'),
                 ('Applying %(num)d patches from review request '
-                 '%(review_request_id)s (diff revision %(diff_revision)s)'),
+                 '{review_request_id} (diff revision {diff_revision})'),
                 total_patches)
 
-        self.stdout.write(summary % {
-            'num': total_patches,
-            'review_request_id': self._review_request_id,
-            'diff_revision': diff_revision,
-        })
+        self.console.print_step(summary.format(
+            num=total_patches,
+            review_request_id=self._review_request_id,
+            diff_revision=diff_revision,
+        ))
         self.json.add('review_request_id', review_request.id)
         self.json.add('review_request_url', review_request.absolute_url)
         self.json.add('diff_revision', diff_revision)
@@ -867,12 +861,12 @@ class PatchCommand(BaseCommand):
                     self.stdout.new_line()
 
                 if revert:
-                    self.stdout.write(
+                    self.console.print_success(
                         _('Reverted patch {patch_num} / {total_patches}')
                         .format(patch_num=patch_num,
                                 total_patches=total_patches))
                 else:
-                    self.stdout.write(
+                    self.console.print_success(
                         _('Applied patch {patch_num} / {total_patches}')
                         .format(patch_num=patch_num,
                                 total_patches=total_patches))
@@ -881,7 +875,7 @@ class PatchCommand(BaseCommand):
                 if patch_result.binary_applied:
                     n = len(patch_result.binary_applied)
 
-                    self.stdout.write(
+                    self.console.print_success(
                         ngettext(
                             'Applied {n} binary file.',
                             'Applied {n} binary files.',
@@ -894,7 +888,7 @@ class PatchCommand(BaseCommand):
                 if patch_result.binary_failed:
                     n = len(patch_result.binary_failed)
 
-                    self.stdout.write(
+                    self.console.print_error(
                         ngettext(
                             'Failed to apply {n} binary file.',
                             'Failed to apply {n} binary files.',
@@ -904,7 +898,7 @@ class PatchCommand(BaseCommand):
                     failed_json = []
 
                     for filename, reason in patch_result.binary_failed.items():
-                        self.stdout.write(f'  {filename}: {reason}')
+                        self.console.print_error(f'  {filename}: {reason}')
                         failed_json.append({
                             'filename': filename,
                             'reason': reason
@@ -914,7 +908,7 @@ class PatchCommand(BaseCommand):
         except ApplyPatchError as e:
             failed_patch_result = e.failed_patch_result
 
-            self.stdout.write(str(e))
+            self.console.print_error(str(e))
             self.json.add('failed_patch_num', patch_num)
 
             if failed_patch_result is None:

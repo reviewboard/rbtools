@@ -41,7 +41,7 @@ class SetupCompletionTest(CommandTestsMixin[SetupCompletion], TestCase):
         self.assertEqual(result['exit_code'], 1)
         self.assertEqual(
             result['stderr'],
-            b'ERROR: Shell completions for xxx are not supported.\n')
+            b'\xe2\x9c\x97 Shell completions for xxx are not supported.\n')
 
     def test_with_shell_env(self) -> None:
         """Testing SetupCompletion with $SHELL"""
@@ -74,6 +74,6 @@ class SetupCompletionTest(CommandTestsMixin[SetupCompletion], TestCase):
         self.assertEqual(result['exit_code'], 1)
         self.assertEqual(
             result['stderr'],
-            b'ERROR: Your current shell was not found. Please re-run `rbt '
-            b'setup-completion` with your shell (bash or zsh) as an '
+            b'\xe2\x9c\x97 Your current shell was not found. Please re-run '
+            b'`rbt setup-completion` with \nyour shell (bash or zsh) as an '
             b'argument.\n')

@@ -90,7 +90,7 @@ class AliasCommandTests(CommandTestsMixin[Alias], TestCase):
                              'alias2')
             self.assertEqual(result['exit_code'], 1)
             self.assertEqual(result['stderr'],
-                             b'ERROR: No such alias "alias2"\n')
+                             b'\xe2\x9c\x97 No such alias "alias2"\n')
 
     def test_alias_dry_run_no_arg(self):
         """Testing rbt alias --dry-run with no alias argument provided"""

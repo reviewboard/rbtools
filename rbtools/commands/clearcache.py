@@ -29,4 +29,4 @@ class ClearCache(BaseCommand):
                           APICache.DEFAULT_CACHE_PATH)
 
         if clear_cache(cache_location):
-            self.stdout.write('Cleared cache in "%s"' % cache_location)
+            self.console.print_success(f'Cleared cache in "{cache_location}"')
