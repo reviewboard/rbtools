@@ -2634,30 +2634,53 @@ class ClearCaseRepositoryInfo(RepositoryInfo):
             raise SCMError('Unable to fetch VOB information from server '
                            'repository info.')
 
-        tags = defaultdict(set)
+        wanted_uuids = set(self.vob_uuids)
+        tags_by_uuid: dict[str, set[str]] = defaultdict(set)
         regions = (
             run_process(['cleartool', 'lsregion'], ignore_errors=True)
             .stdout
             .readlines()
         )
 
-        # Find local tag names for connected VOB UUIDs.
-        for region, uuid in itertools.product(regions, self.vob_uuids):
-            try:
-                tag = (
-                    run_process(['cleartool', 'lsvob', '-s', '-family', uuid,
-                                 '-region', region.strip()])
-                    .stdout
-                    .read()
-                )
-                tags[uuid].add(tag.strip())
-            except Exception:
-                pass
+        # Find local tag names for connected VOB UUIDs. We list all VOBs in
+        # each region in a single call and match them by family UUID, rather
+        # than querying each UUID in each region separately. The latter
+        # scales as regions x VOBs and can be very slow on installations
+        # with many regions and VOBs.
+        for region in regions:
+            region = region.strip()
+
+            if not region:
+                continue
+
+            lines = (
+                run_process(['cleartool', 'lsvob', '-l', '-region', region],
+                            ignore_errors=True)
+                .stdout
+            )
+
+            tag: (str | None) = None
+
+            for line in lines:
+                line = line.strip()
+
+                if line.startswith('Tag:'):
+                    parts = line.split(maxsplit=2)
+
+                    if len(parts) >= 2:
+                        tag = parts[1]
+                    else:
+                        tag = None
+                elif line.startswith('Vob family uuid:'):
+                    uuid = line.rsplit(' ', 1)[-1].strip()
+
+                    if tag is not None and uuid in wanted_uuids:
+                        tags_by_uuid[uuid].add(tag)
 
         self.vob_tags = set()
         self.uuid_to_tags = {}
 
-        for uuid, tags in tags.items():
+        for uuid, tags in tags_by_uuid.items():
             self.vob_tags.update(tags)
             self.uuid_to_tags[uuid] = list(tags)
 

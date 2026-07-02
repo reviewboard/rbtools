@@ -929,22 +929,15 @@ class ClearCaseClientTests(SCMClientTestCase):
                 )),
             },
             {
-                'args': (['cleartool', 'lsvob', '-s', '-family',
-                          '9ac6856f.c9af11eb.9851.52:54:00:7f:63:a5',
-                          '-region', 'region'],),
+                'args': (['cleartool', 'lsvob', '-l', '-region', 'region'],),
                 'op': kgb.SpyOpReturn((
                     0,
-                    b'vob1\n',
-                    b'',
-                )),
-            },
-            {
-                'args': (['cleartool', 'lsvob', '-s', '-family',
-                          'b520a815.c9af11eb.986f.52:54:00:7f:63:a5',
-                          '-region', 'region'],),
-                'op': kgb.SpyOpReturn((
-                    0,
-                    b'vob2\n',
+                    (b'Tag: vob1\n'
+                     b'  Vob family uuid:  '
+                     b'9ac6856f.c9af11eb.9851.52:54:00:7f:63:a5\n'
+                     b'Tag: vob2\n'
+                     b'  Vob family uuid:  '
+                     b'b520a815.c9af11eb.986f.52:54:00:7f:63:a5\n'),
                     b'',
                 )),
             },
@@ -979,12 +972,12 @@ class ClearCaseClientTests(SCMClientTestCase):
                 )),
             },
             {
-                'args': (['cleartool', 'lsvob', '-s', '-family',
-                          '9ac6856f.c9af11eb.9851.52:54:00:7f:63:a5',
-                          '-region', 'region'],),
+                'args': (['cleartool', 'lsvob', '-l', '-region', 'region'],),
                 'op': kgb.SpyOpReturn((
                     0,
-                    b'vob\n',
+                    (b'Tag: vob\n'
+                     b'  Vob family uuid:  '
+                     b'9ac6856f.c9af11eb.9851.52:54:00:7f:63:a5\n'),
                     b'',
                 )),
             },
@@ -1118,12 +1111,12 @@ class ClearCaseClientTests(SCMClientTestCase):
                 )),
             },
             {
-                'args': (['cleartool', 'lsvob', '-s', '-family',
-                          '9ac6856f.c9af11eb.9851.52:54:00:7f:63:a5',
-                          '-region', 'region'],),
+                'args': (['cleartool', 'lsvob', '-l', '-region', 'region'],),
                 'op': kgb.SpyOpReturn((
                     0,
-                    b'vob\n',
+                    (b'Tag: vob\n'
+                     b'  Vob family uuid:  '
+                     b'9ac6856f.c9af11eb.9851.52:54:00:7f:63:a5\n'),
                     b'',
                 )),
             },
@@ -1255,12 +1248,12 @@ class ClearCaseClientTests(SCMClientTestCase):
                 )),
             },
             {
-                'args': (['cleartool', 'lsvob', '-s', '-family',
-                          '9ac6856f.c9af11eb.9851.52:54:00:7f:63:a5',
-                          '-region', 'region'],),
+                'args': (['cleartool', 'lsvob', '-l', '-region', 'region'],),
                 'op': kgb.SpyOpReturn((
                     0,
-                    b'/vobs/els\n',
+                    (b'Tag: /vobs/els\n'
+                     b'  Vob family uuid:  '
+                     b'9ac6856f.c9af11eb.9851.52:54:00:7f:63:a5\n'),
                     b'',
                 )),
             },
