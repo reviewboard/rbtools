@@ -582,15 +582,25 @@ class ClearCaseClient(BaseSCMClient):
             return None
 
         # Get the root path of the view.
-        self.root_path = (
+        root_path = (
             run_process(['cleartool', 'pwv', '-root'], ignore_errors=True)
             .stdout
             .read()
             .strip()
         )
 
-        if 'Error: ' in self.root_path:
+        if 'Error: ' in root_path:
             raise SCMError('Failed to generate diff run rbt inside view.')
+
+        # When inside a view set with "cleartool setview", "pwv -root" returns
+        # an empty string. In that case, VOBs appear directly under the
+        # filesystem root. We therefore use os.sep as a fallback when the
+        # detected root is empty.
+        #
+        # Without this, all paths would be computed relative to the
+        # current directory, producing diffs with paths that the server
+        # cannot resolve.
+        self.root_path = root_path or os.sep
 
         vobtag = self._get_vobtag()
 

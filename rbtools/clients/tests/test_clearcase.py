@@ -617,6 +617,44 @@ class ClearCaseClientTests(SCMClientTestCase):
 
         self.assertEqual(client.get_local_path(), '/test/view/vob')
 
+    def test_get_local_path_inside_setview(self) -> None:
+        """Testing ClearCaseClient.get_local_path inside a view set with
+        cleartool setview
+        """
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': (['cleartool', 'pwv', '-short'],),
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'test-view\n',
+                    b'',
+                )),
+            },
+            {
+                # "pwv -root" returns an empty string when the view was
+                # entered using "cleartool setview".
+                'args': (['cleartool', 'pwv', '-root'],),
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'\n',
+                    b'',
+                )),
+            },
+            {
+                'args': (['cleartool', 'describe', '-short', 'vob:.'],),
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'/vobs/testvob\n',
+                    b'',
+                )),
+            },
+        ]))
+
+        client = self.build_client(allow_dep_checks=False)
+
+        self.assertEqual(client.get_local_path(), '/vobs/testvob')
+        self.assertEqual(client.root_path, os.sep)
+
     def test_get_repository_info_snapshot(self) -> None:
         """Testing ClearCaseClient.get_repository_info with snapshot view"""
         self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
