@@ -172,19 +172,21 @@ class _GetElementsFromLabelThread(threading.Thread):
             '-avobs',
         ]
 
-        if self.label is None:
+        if self.label == 'LATEST':
+            # "LATEST" is not a real label type. Compare against the
+            # versions currently selected by the view instead.
+            command += [
+                '-exec',
+                (f'cleartool describe -fmt "%On\t%En\t%Vn\n" '
+                 f'"{CLEARCASE_PN}"'),
+            ]
+        else:
             command += [
                 '-version',
                 'lbtype(%s)' % self.label,
                 '-exec',
                 (f'cleartool describe -fmt "%On\t%En\t%Vn\n" '
                  f'"{CLEARCASE_XPN}"'),
-            ]
-        else:
-            command = [
-                '-exec',
-                (f'cleartool describe -fmt "%On\t%En\t%Vn\n" '
-                 f'"{CLEARCASE_PN}"'),
             ]
 
         output = (
@@ -197,6 +199,8 @@ class _GetElementsFromLabelThread(threading.Thread):
         )
 
         for line in output:
+            line = line.strip()
+
             # Skip any empty lines.
             if not line:
                 continue

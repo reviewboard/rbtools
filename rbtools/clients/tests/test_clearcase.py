@@ -4,10 +4,15 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 
 import kgb
 
-from rbtools.clients.clearcase import ClearCaseClient, ClearCaseRepositoryInfo
+from rbtools.clients.clearcase import (
+    ClearCaseClient,
+    ClearCaseRepositoryInfo,
+    _GetElementsFromLabelThread,
+)
 from rbtools.clients.errors import SCMClientDependencyError, SCMError
 from rbtools.clients.tests import SCMClientTestCase
 from rbtools.utils.checks import check_install
@@ -1112,6 +1117,93 @@ class ClearCaseClientTests(SCMClientTestCase):
             ('test.pdf@@/main/0', 'test.pdf'),
             ('test.py@@/main/1', 'test.py'),
         ])
+
+    def test_get_elements_from_label_thread(self) -> None:
+        """Testing _GetElementsFromLabelThread with a label"""
+        if sys.platform.startswith('win'):
+            xpn = '%CLEARCASE_XPN%'
+        else:
+            xpn = '$CLEARCASE_XPN'
+
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': ([
+                    'cleartool',
+                    'find',
+                    '-avobs',
+                    '-version',
+                    'lbtype(test-label)',
+                    '-exec',
+                    ('cleartool describe -fmt "%On\t%En\t%Vn\n" '
+                     f'"{xpn}"'),
+                ],),
+                'op': kgb.SpyOpReturn((
+                    0,
+                    (b'oid1\t/vobs/els/test.py\t/main/test-label/1\n'
+                     b'oid2\t/vobs/els/test2.py\t/main/test-label/2\n'),
+                    b'',
+                )),
+            },
+        ]))
+
+        elements = {}
+        thread = _GetElementsFromLabelThread(
+            dir_name=os.getcwd(),
+            label='test-label@/vobs/els',
+            elements=elements,
+            vob_tags={'/vobs/els'})
+        thread.run()
+
+        self.assertEqual(elements, {
+            '/vobs/els/test.py': {
+                'oid': 'oid1',
+                'version': '/main/test-label/1',
+            },
+            '/vobs/els/test2.py': {
+                'oid': 'oid2',
+                'version': '/main/test-label/2',
+            },
+        })
+
+    def test_get_elements_from_label_thread_latest(self) -> None:
+        """Testing _GetElementsFromLabelThread with LATEST"""
+        if sys.platform.startswith('win'):
+            pn = '%CLEARCASE_PN%'
+        else:
+            pn = '$CLEARCASE_PN'
+
+        self.spy_on(run_process_exec, op=kgb.SpyOpMatchInOrder([
+            {
+                'args': ([
+                    'cleartool',
+                    'find',
+                    '-avobs',
+                    '-exec',
+                    ('cleartool describe -fmt "%On\t%En\t%Vn\n" '
+                     f'"{pn}"'),
+                ],),
+                'op': kgb.SpyOpReturn((
+                    0,
+                    b'oid1\t/vobs/els/test.py\t/main/3\n',
+                    b'',
+                )),
+            },
+        ]))
+
+        elements = {}
+        thread = _GetElementsFromLabelThread(
+            dir_name=os.getcwd(),
+            label='LATEST',
+            elements=elements,
+            vob_tags={'/vobs/els'})
+        thread.run()
+
+        self.assertEqual(elements, {
+            '/vobs/els/test.py': {
+                'oid': 'oid1',
+                'version': '/main/3',
+            },
+        })
 
     def test_activity_changelist(self) -> None:
         """Testing ClearCaseClient._get_activity_changelist"""
