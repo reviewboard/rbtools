@@ -76,6 +76,28 @@ class RBToolsConsoleTests(TestCase):
         self.assertEqual(self._read(console, stdout_buffer), b'')
         self.assertEqual(self._read(console, stderr_buffer, err=True), b'')
 
+    def test_print_json(self) -> None:
+        """Testing RBToolsConsole.print_json renders JSON to stdout"""
+        console, stdout_buffer, _stderr = self._make_console()
+
+        console.print_json({'b': 2, 'a': 1})
+
+        self.assertEqual(
+            self._read(console, stdout_buffer),
+            b'{\n    "a": 1,\n    "b": 2\n}\n')
+
+    def test_print_json_lifts_suppression(self) -> None:
+        """Testing RBToolsConsole.print_json emits after suppress"""
+        console, stdout_buffer, _stderr = self._make_console()
+
+        console.suppress()
+        console.print('should not appear')
+        console.print_json({'a': 1})
+
+        self.assertEqual(
+            self._read(console, stdout_buffer),
+            b'{\n    "a": 1\n}\n')
+
     def test_track_disabled_returns_iterable(self) -> None:
         """Testing RBToolsConsole.track with color disabled returns the
         iterable unchanged

@@ -976,8 +976,7 @@ class BaseCommand:
         """Return the color mode to use for console output.
 
         This resolves the ``--color`` flag, the ``COLOR_MODE`` configuration,
-        and the ``NO_COLOR``/``FORCE_COLOR`` environment variables. In
-        ``--json`` mode, color is always disabled.
+        and the ``NO_COLOR``/``FORCE_COLOR`` environment variables.
 
         Version Added:
             7.0
@@ -990,8 +989,6 @@ class BaseCommand:
 
         if options is None:
             color_mode = 'auto'
-        elif getattr(options, 'json_output', False):
-            color_mode = 'never'
         else:
             color_mode = getattr(options, 'color', 'auto')
 
@@ -1304,7 +1301,7 @@ class BaseCommand:
             else:
                 self.json.add('status', 'success')
 
-            self.json.print_to_stream()
+            self.console.print_json(self.json.raw)
 
         sys.exit(exit_code)
 
@@ -1746,7 +1743,7 @@ class BaseCommand:
 
         When writing to a color terminal, this uses
         :py:class:`rich.logging.RichHandler` for styled log output. In other
-        cases such as pipes, ``--json``, ``--color=never``, or when running
+        cases such as pipes, ``--color=never``, or when running
         tests, it uses plain :py:class:`logging.StreamHandler` handlers with
         the historical formatting:
 

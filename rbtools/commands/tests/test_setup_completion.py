@@ -6,6 +6,8 @@ Version Added:
 
 from __future__ import annotations
 
+import json
+
 from rbtools.commands.setup_completion import SetupCompletion
 from rbtools.testing import CommandTestsMixin, TestCase
 
@@ -60,11 +62,13 @@ class SetupCompletionTest(CommandTestsMixin[SetupCompletion], TestCase):
 
         self.assertEqual(result['exit_code'], 0)
         self.assertEqual(result['stderr'], b'')
-        self.assertEqual(result['stdout'], b'')
 
         json_data = result['json']
         self.assertEqual(json_data['status'], 'success')
         self.assertIn('#compdef rbt', json_data['script'])
+
+        # The JSON payload is rendered to stdout through the console.
+        self.assertEqual(json.loads(result['stdout']), json_data)
 
     def test_with_shell_unknown(self) -> None:
         """Testing SetupCompletion with shell unknown"""

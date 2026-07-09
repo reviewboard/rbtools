@@ -39,6 +39,7 @@ if TYPE_CHECKING:
 
     from rich.status import Status
     from rich.style import StyleType
+    from typelets.json import JSONDict
 
     from rbtools.ui.theme import ColorOverrides
 
@@ -295,6 +296,9 @@ class RBToolsConsole:
     #: The Rich console for stdout.
     stdout_console: Console
 
+    #: Whether console output is currently suppressed.
+    _suppressed: bool
+
     def __init__(
         self,
         *,
@@ -347,6 +351,8 @@ class RBToolsConsole:
             force_terminal=force_terminal,
             no_color=no_color)
 
+        self._suppressed = False
+
     @property
     def enabled(self) -> bool:
         """Whether styled output is active for stdout.
@@ -370,9 +376,48 @@ class RBToolsConsole:
 
         This pushes a render hook onto both consoles that drops everything. It
         is used in ``--json`` mode so only the JSON payload is written.
+
+        The suppression on stdout is later lifted by :py:meth:`print_json`,
+        which emits the JSON payload.
         """
         self.stdout_console.push_render_hook(_SuppressRenderHook())
         self.stderr_console.push_render_hook(_SuppressRenderHook())
+        self._suppressed = True
+
+    def print_json(
+        self,
+        data: JSONDict,
+        *,
+        indent: int = 4,
+        sort_keys: bool = True,
+    ) -> None:
+        """Print structured data as JSON to stdout.
+
+        In ``--json`` mode, output is suppressed while the command runs (see
+        :py:meth:`suppress`). This lifts that suppression on the stdout console
+        and renders the data through Rich's JSON renderer, so the JSON payload
+        is the only thing written to stdout.
+
+        Version Added:
+            7.0
+
+        Args:
+            data (dict):
+                The structured data to render as JSON.
+
+            indent (int, optional):
+                The number of spaces to indent each nesting level.
+
+            sort_keys (bool, optional):
+                Whether to sort object keys alphabetically.
+        """
+        if self._suppressed:
+            self.stdout_console.pop_render_hook()
+            self._suppressed = False
+
+        self.stdout_console.print_json(data=data,
+                                       indent=indent,
+                                       sort_keys=sort_keys)
 
     def _emit(
         self,
