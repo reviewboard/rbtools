@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator, Iterable
     from typing import Any, TextIO, TypeAlias, TypeVar
 
+    from rich.live import Live
     from rich.status import Status
     from rich.style import StyleType
     from typelets.json import JSONDict
@@ -232,6 +233,56 @@ class _RBToolsRichHandler(RichHandler):
         7.0
     """
 
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The console that owns this handler.
+    _rbtools_console: RBToolsConsole
+
+    def __init__(
+        self,
+        *args,
+        rbtools_console: RBToolsConsole,
+        **kwargs,
+    ) -> None:
+        """Initialize the handler.
+
+        Args:
+            *args (tuple):
+                Positional arguments to pass to
+                :py:class:`rich.logging.RichHandler`.
+
+            rbtools_console (RBToolsConsole):
+                The console that owns this handler. This is used to pause any
+                active spinner or progress bar while a record is written.
+
+            **kwargs (dict):
+                Keyword arguments to pass to
+                :py:class:`rich.logging.RichHandler`.
+        """
+        super().__init__(*args, **kwargs)
+
+        self._rbtools_console = rbtools_console
+
+    def emit(
+        self,
+        record: logging.LogRecord,
+    ) -> None:
+        """Write a log record.
+
+        Log records go to the stderr console, while spinners and progress bars
+        are drawn on the stdout console. Rich cannot coordinate the two, so the
+        record is written with any active display paused. Otherwise the record
+        would be interleaved with the animation.
+
+        Args:
+            record (logging.LogRecord):
+                The log record to write.
+        """
+        with self._rbtools_console.pause():
+            super().emit(record)
+
     def render(
         self,
         *,
@@ -299,6 +350,9 @@ class RBToolsConsole:
     #: Whether console output is currently suppressed.
     _suppressed: bool
 
+    #: The live display for the active spinner or progress bar, if any.
+    _live: Live | None
+
     def __init__(
         self,
         *,
@@ -352,6 +406,7 @@ class RBToolsConsole:
             no_color=no_color)
 
         self._suppressed = False
+        self._live = None
 
     @property
     def enabled(self) -> bool:
@@ -605,6 +660,44 @@ class RBToolsConsole:
 
         self.stdout_console.print(_WARNING, message)
 
+    @contextmanager
+    def pause(self) -> Generator[None, None, None]:
+        """Temporarily hide any active spinner or progress bar.
+
+        Rich draws spinners and progress bars by repeatedly rewriting the last
+        lines of the terminal. Anything else that writes there at the same time
+        ends up interleaved with the animation. That includes log records
+        (which go to the stderr console) and interactive prompts (which write
+        straight to the terminal, bypassing Rich).
+
+        This erases the active display, runs the block, and then redraws the
+        display where it left off. It does nothing if no display is active.
+
+        Version Added:
+            7.0
+
+        Context:
+            The active display is hidden.
+        """
+        live = self._live
+
+        if live is None or not live.is_started:
+            yield
+            return
+
+        # Rich only erases a live display on stop if it's transient, so
+        # temporarily make it one. Otherwise a copy of the display would be
+        # left behind on each pause.
+        transient = live.transient
+        live.transient = True
+        live.stop()
+
+        try:
+            yield
+        finally:
+            live.transient = transient
+            live.start(refresh=True)
+
     def spinner(
         self,
         message: str,
@@ -667,8 +760,13 @@ class RBToolsConsole:
             console=self.stdout_console)
 
         with progress:
-            task_id = progress.add_task(description, total=total)
-            yield _ProgressAdapter(progress, task_id)
+            self._live = progress.live
+
+            try:
+                task_id = progress.add_task(description, total=total)
+                yield _ProgressAdapter(progress, task_id)
+            finally:
+                self._live = None
 
     def track(
         self,
@@ -699,10 +797,44 @@ class RBToolsConsole:
         if not self.enabled:
             return iterable
 
-        return track(iterable,
-                     description=description,
-                     total=total,
-                     console=self.stdout_console)
+        if total is None:
+            try:
+                total = len(iterable)  # type: ignore[arg-type]
+            except TypeError:
+                pass
+
+        return self._track(iterable, description, total=total)
+
+    def _track(
+        self,
+        iterable: Iterable[_T],
+        description: str,
+        *,
+        total: (int | None),
+    ) -> Iterable[_T]:
+        """Yield from an iterable, advancing a progress bar for each item.
+
+        This backs :py:meth:`track`. It's kept separate so that ``track`` can
+        return the unwrapped iterable without starting a progress bar.
+
+        Args:
+            iterable (iterable):
+                The iterable to wrap.
+
+            description (str):
+                The label shown next to the bar.
+
+            total (int):
+                The size of the iterable, or ``None`` if unknown.
+
+        Yields:
+            object:
+            Each item from ``iterable``.
+        """
+        with self.progress_bar(description, total=total) as progress:
+            for item in iterable:
+                yield item
+                progress.advance()
 
     def get_rich_log_handler(
         self,
@@ -724,6 +856,7 @@ class RBToolsConsole:
             The configured handler, writing to the stderr console.
         """
         return _RBToolsRichHandler(
+            rbtools_console=self,
             console=self.stderr_console,
             level=level,
             show_time=False,

@@ -7,7 +7,10 @@ Version Added:
 from __future__ import annotations
 
 import io
+import logging
 from typing import TYPE_CHECKING
+
+import kgb
 
 from rbtools.testing import TestCase
 from rbtools.ui.console import RBToolsConsole, write_passthrough
@@ -16,7 +19,7 @@ if TYPE_CHECKING:
     from rbtools.ui.console import ColorMode
 
 
-class RBToolsConsoleTests(TestCase):
+class RBToolsConsoleTests(kgb.SpyAgency, TestCase):
     """Unit tests for RBToolsConsole.
 
     Version Added:
@@ -107,6 +110,12 @@ class RBToolsConsoleTests(TestCase):
         items = [1, 2, 3]
         self.assertIs(console.track(items, 'Working'), items)
 
+    def test_track_enabled_yields_all_items(self) -> None:
+        """Testing RBToolsConsole.track with color enabled yields all items"""
+        console, _, _ = self._make_console(color_mode='always')
+
+        self.assertEqual(list(console.track([1, 2, 3], 'Working')), [1, 2, 3])
+
     def test_progress_bar_disabled(self) -> None:
         """Testing RBToolsConsole.progress_bar with color disabled yields a
         no-op controller
@@ -118,6 +127,56 @@ class RBToolsConsoleTests(TestCase):
             bar.update('Still downloading')
 
         self.assertEqual(self._read(console, stdout_buffer), b'')
+
+    def test_pause_with_no_live_display(self) -> None:
+        """Testing RBToolsConsole.pause with no active live display"""
+        console, stdout_buffer, _ = self._make_console()
+
+        with console.pause():
+            console.print('Hello world')
+
+        self.assertEqual(self._read(console, stdout_buffer),
+                         b'Hello world\n')
+
+    def test_pause_with_progress_bar(self) -> None:
+        """Testing RBToolsConsole.pause stops and restarts a progress bar"""
+        console, _, _ = self._make_console(color_mode='always')
+
+        with console.progress_bar('Downloading', total=10):
+            live = console._live
+            assert live is not None
+
+            self.assertTrue(live.is_started)
+            self.assertFalse(live.transient)
+
+            with console.pause():
+                self.assertTrue(live.transient)
+                self.assertFalse(live.is_started)
+
+            self.assertTrue(live.is_started)
+
+            # The display must go back to being non-transient, so that it's
+            # still shown once the work completes.
+            self.assertFalse(live.transient)
+
+    def test_log_handler_pauses_progress_bar(self) -> None:
+        """Testing the Rich log handler pauses an active progress bar"""
+        console, _, _ = self._make_console(color_mode='always')
+        handler = console.get_rich_log_handler()
+        record = logging.LogRecord(name='test', level=logging.INFO,
+                                   pathname=__file__, lineno=1,
+                                   msg='Please log in.', args=(),
+                                   exc_info=None)
+
+        with console.progress_bar('Downloading', total=10):
+            live = console._live
+            assert live is not None
+
+            self.spy_on(live.stop)
+            handler.emit(record)
+
+            self.assertSpyCalled(live.stop)
+            self.assertTrue(live.is_started)
 
     def _make_console(
         self,

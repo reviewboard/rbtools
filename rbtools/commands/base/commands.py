@@ -1420,15 +1420,19 @@ class BaseCommand:
                 raise CommandError('HTTP authentication is required, but '
                                    'cannot be used with --diff-filename=-')
 
-            self.stdout.new_line()
+            # This can be called in the middle of a progress bar, since it's
+            # triggered by an API request. Pause it so the prompts aren't
+            # drawn over.
+            with self.console.pause():
+                self.stdout.new_line()
 
-            try:
-                username, password = credentials_prompt(
-                    server_url=urlparse(uri)[1],
-                    username=username,
-                    password=password)
-            except Exception as e:
-                raise CommandError(str(e))
+                try:
+                    username, password = credentials_prompt(
+                        server_url=urlparse(uri)[1],
+                        username=username,
+                        password=password)
+                except Exception as e:
+                    raise CommandError(str(e))
 
         return username, password
 
@@ -1467,25 +1471,28 @@ class BaseCommand:
                                'required, but cannot be used with '
                                '--diff-filename=-')
 
-        self.stdout.new_line()
-        self.stdout.write('Please enter your two-factor authentication '
-                          'token for Review Board.')
+        # As with credentials_prompt, this can be called in the middle of a
+        # progress bar.
+        with self.console.pause():
+            self.stdout.new_line()
+            self.stdout.write('Please enter your two-factor authentication '
+                              'token for Review Board.')
 
-        if token_method == 'sms':
-            self.stdout.write('You should be getting a text message with '
-                              'an authentication token.')
-            self.stdout.write('Enter the token below.')
-        elif token_method == 'call':
-            self.stdout.write('You should be getting an automated phone '
-                              'call with an authentication token.')
-            self.stdout.write('Enter the token below.')
-        elif token_method == 'generator':
-            self.stdout.write('Enter the token shown on your token '
-                              'generator app below.')
+            if token_method == 'sms':
+                self.stdout.write('You should be getting a text message with '
+                                  'an authentication token.')
+                self.stdout.write('Enter the token below.')
+            elif token_method == 'call':
+                self.stdout.write('You should be getting an automated phone '
+                                  'call with an authentication token.')
+                self.stdout.write('Enter the token below.')
+            elif token_method == 'generator':
+                self.stdout.write('Enter the token shown on your token '
+                                  'generator app below.')
 
-        self.stdout.new_line()
+            self.stdout.new_line()
 
-        return get_pass('Token: ', require=True)
+            return get_pass('Token: ', require=True)
 
     def web_login_callback(self) -> bool:
         """Attempt to authorize using web-based login.
