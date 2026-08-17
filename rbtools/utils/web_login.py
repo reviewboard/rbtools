@@ -437,7 +437,9 @@ class WebLoginHandler(BaseHTTPRequestHandler):
         self.enable_logging = enable_logging
         url = self.api_client.url
 
-        if not url.endswith('/'):
+        if url.startswith('https://rbcommons.com/'):
+            url = 'https://rbcommons.com/'
+        elif not url.endswith('/'):
             url += '/'
 
         self.rb_server_url = url
