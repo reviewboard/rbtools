@@ -992,11 +992,7 @@ class JujutsuClient(BaseSCMClient):
                 "change description.",
             ))
 
-        cmd = ['jj', 'describe', '-m', modified_message]
-
-        if author:
-            cmd += ['--author', f'{author.full_name} <{author.email}>']
-        else:
+        if not author:
             # Users who have marked their profile as private won't include the
             # full name or email fields in the API payload. Just commit as the
             # user running RBTools.
@@ -1005,7 +1001,11 @@ class JujutsuClient(BaseSCMClient):
                            'author attribution.')
 
         try:
-            run_process(cmd)
+            run_process(['jj', 'describe', '-m', modified_message])
+
+            if author:
+                run_process(['jj', 'metaedit', '--author',
+                             f'{author.full_name} <{author.email}>'])
 
             if create_new_change:
                 run_process(['jj', 'new'])

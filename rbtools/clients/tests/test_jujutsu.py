@@ -809,8 +809,10 @@ class JujutsuClientTests(BaseJujutsuClientTests):
 
         self.assertSpyCalledWith(
             run_process,
-            ['jj', 'describe', '-m', commit_message,
-             '--author', 'Test User <test@example.com>'])
+            ['jj', 'describe', '-m', commit_message])
+        self.assertSpyCalledWith(
+            run_process,
+            ['jj', 'metaedit', '--author', 'Test User <test@example.com>'])
 
         status = (
             run_process(['jj', 'status'])
