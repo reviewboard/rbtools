@@ -95,10 +95,10 @@ This can also be provided by passing :option:`--cache-location` to any
 command.
 
 
+.. rbtconfig:: COLOR_MODE
+
 COLOR_MODE
 ----------
-
-.. rbtconfig:: COLOR_MODE
 
 .. versionadded: 7.0
 
@@ -119,10 +119,43 @@ such as some continuous-integration systems.
 If set to ``"never"``, colorized output will never be used.
 
 
-COOKIES_STRICT_DOMAIN_MATCH
----------------------------
+.. rbtconfig:: COMMIT_MESSAGE_PARSER
+
+COMMIT_MESSAGE_PARSER
+---------------------
+
+.. versionadded: 7.0
+
+**Type:** Callable
+
+**Default:** Unset
+
+A custom function for parsing commit messages.
+
+The default logic for parsing commit messages attempts to do the inverse of the
+commit message that is created from :rbtcommand:`rbt patch` or
+:rbtcommand:`rbt land`.
+
+If you have different conventions for your commit messages, you may define this
+to be a callable which takes the raw commit message as a :py:class:`str` and
+returns a :py:class:`~rbtools.utils.commit_messages.ParsedCommitMessage`.
+
+The returned value can include data for any of these fields:
+
+* ``branch``
+* ``bugs_closed``
+* ``depends_on``
+* ``description``
+* ``summary`` (required)
+* ``target_groups``
+* ``target_people``
+* ``testing_done``
+
 
 .. rbtconfig:: COOKIES_STRICT_DOMAIN_MATCH
+
+COOKIES_STRICT_DOMAIN_MATCH
+---------------------------
 
 .. versionadded:: 5.1
 
@@ -266,12 +299,23 @@ GUESS_FIELDS
 
 **Type:** String
 
-**Default:** ``"auto"``
+**Default:** Unset (behaves as ``"auto"``)
 
-The default behavior for guessing the value for the review request's intended
-summary and description based on the posted commit's message (on repositories
-that support posting from an existing commit). This can be set to ``"yes"``,
-``"no"``, or ``"auto"``.
+The default behavior for guessing the values for the review request's fields
+based on the posted commit's message (on repositories that support posting
+from an existing commit). This can be set to ``"yes"``, ``"no"``, or
+``"auto"``.
+
+This applies to every field that can be filled in from a commit message, and
+takes precedence over :rbtconfig:`GUESS_SUMMARY` and
+:rbtconfig:`GUESS_DESCRIPTION`.
+
+.. versionchanged:: 7.0
+
+   This now applies to every review request field that can be filled in from
+   a commit message, rather than only the summary and description. When set,
+   it now overrides :rbtconfig:`GUESS_SUMMARY` and
+   :rbtconfig:`GUESS_DESCRIPTION` rather than just supplying their default.
 
 If set to ``"yes"``, then the review request's fields will always be set,
 overriding any manual changes you've made the next time you run
@@ -303,10 +347,11 @@ GUESS_DESCRIPTION
 
 **Type:** String
 
-**Default:** Value of :rbtconfig:`GUESS_FIELDS`
+**Default:** ``"auto"``, unless :rbtconfig:`GUESS_FIELDS` is set
 
 The default behavior for guessing a review request's intended description
-based on the posted commit's message.
+based on the posted commit's message. This is ignored when
+:rbtconfig:`GUESS_FIELDS` is set.
 
 Most of the time, you'll just want to use :rbtconfig:`GUESS_FIELDS`. See
 :ref:`guessing-behavior` for additional information.
@@ -329,10 +374,11 @@ GUESS_SUMMARY
 
 **Type:** String
 
-**Default:** Value of :rbtconfig:`GUESS_FIELDS`
+**Default:** ``"auto"``, unless :rbtconfig:`GUESS_FIELDS` is set
 
 The default behavior for guessing a review request's intended summary based on
-the posted commit's message.
+the posted commit's message. This is ignored when :rbtconfig:`GUESS_FIELDS`
+is set.
 
 Most of the time, you'll just want to use :rbtconfig:`GUESS_FIELDS`. See
 :ref:`guessing-behavior` for additional information.

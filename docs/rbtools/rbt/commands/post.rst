@@ -466,9 +466,17 @@ changes from a working directory. For example, Git, Mercurial and Bazaar.
 
 .. tip::
 
-   :option:`-g/--guess-fields <-g>` implies :option:`--guess-summary` and
-   :option:`--guess-description`. Generally, you'll want to use it instead
-   of the more specific options.
+   :option:`-g/--guess-fields <-g>` applies to every field, and takes
+   precedence over :option:`--guess-summary` and :option:`--guess-description`.
+   Generally, you'll want to use it instead of the more specific options.
+
+.. versionchanged:: 7.0
+
+   :option:`-g/--guess-fields <-g>` now applies to every review request field
+   that can be filled in from a commit message, rather than only the summary
+   and description. When provided, it also overrides
+   :option:`--guess-summary` and :option:`--guess-description` rather than
+   just supplying their default.
 
 
 .. _guessing-behavior:
@@ -498,9 +506,9 @@ For example:
 
     $ rbt post --guess-fields=no
 
-By default, if no guessing options are specified, ``--guess-fields=auto`` will
-be implied. This allows you to run the following and have it automatically
-fill in the summary and description:
+By default, if no guessing options are specified, ``auto`` will be used for
+every field. This allows you to run the following and have it automatically
+fill in the fields found in the commit message:
 
 .. code-block:: console
 
@@ -530,14 +538,27 @@ values.
 On RBTools 0.6 or higher, the default is ``'auto'``. On older versions,
 the default was ``False`` (equivalent to ``'no'``).
 
-Setting ``GUESS_FIELDS`` will imply setting ``GUESS_SUMMARY`` and
-``GUESS_DESCRIPTION``. Rarely will you need to set anything but
-``GUESS_FIELDS``.
+Setting ``GUESS_FIELDS`` applies to every field, and takes precedence over
+``GUESS_SUMMARY`` and ``GUESS_DESCRIPTION``. Rarely will you need to set
+anything but ``GUESS_FIELDS``.
 
 For example, to default to guessing fields for review requests that are either
 newly created or being updated, you can use::
 
     GUESS_FIELDS = 'yes'
+
+
+.. _configuring-guessing-parsing:
+
+Configuring Commit Message Parsing
+----------------------------------
+
+When field guessing is enabled, the contents of fields will be parsed from your
+commit messages.
+
+If you have commit messages that are formatted in a particular way and would
+like to change how fields are guessed, you may define
+:rbtconfig:`COMMIT_MESSAGE_PARSER`.
 
 
 .. _automating-rbt-post:

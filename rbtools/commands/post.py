@@ -6,7 +6,7 @@ import copy
 import os
 import re
 import sys
-from typing import NamedTuple, TYPE_CHECKING, TypedDict
+from typing import NamedTuple, TYPE_CHECKING, TypedDict, cast
 
 from typing_extensions import NotRequired, TypeVar
 
@@ -31,7 +31,8 @@ from rbtools.utils.users import get_user
 
 if TYPE_CHECKING:
     import argparse
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Iterable, Mapping, Sequence
+    from typing import ClassVar
 
     from typelets.json import JSONDict
 
@@ -173,6 +174,35 @@ class Post(BaseCommand):
     #: Reserved built-in fields that can be set using the ``--field`` argument.
     reserved_fields = ('description', 'testing-done', 'summary')
 
+    #: Review request fields that can be filled in from a commit message.
+    #:
+    #: When guessing is enabled for one of these fields, and the user hasn't
+    #: set it explicitly, the value from the parsed commit message will be
+    #: used.
+    #:
+    #: The default commit message parser only provides ``summary``,
+    #: ``description``, ``testing_done``, and ``bugs_closed``. The rest are
+    #: available to custom parsers configured through
+    #: :rbtconfig:`COMMIT_MESSAGE_PARSER`.
+    #:
+    #: TODO: Custom parsers can return keys outside of this set, which are
+    #:       currently dropped. We should decide how to map those onto
+    #:       ``extra_data`` fields (much like --field does for non-reserved
+    #:       names) and support them here.
+    #:
+    #: Version Added:
+    #:     7.0
+    GUESSABLE_FIELDS: ClassVar[Sequence[str]] = (
+        'branch',
+        'bugs_closed',
+        'depends_on',
+        'description',
+        'summary',
+        'target_groups',
+        'target_people',
+        'testing_done',
+    )
+
     GUESS_AUTO = 'auto'
     GUESS_YES = 'yes'
     GUESS_NO = 'no'
@@ -298,11 +328,12 @@ class Post(BaseCommand):
                        action='store',
                        config_key='GUESS_FIELDS',
                        nargs='?',
-                       default=GUESS_AUTO,
+                       default=None,
                        const=GUESS_YES,
                        choices=GUESS_CHOICES,
-                       help='Equivalent to setting both --guess-summary '
-                            'and --guess-description.',
+                       help='Sets the guessing behavior for all review '
+                            'request fields. This takes precedence over '
+                            '--guess-summary and --guess-description.',
                        extended_help=(
                            'This can optionally take a value to control the '
                            'guessing behavior. See :ref:`guessing-behavior` '
@@ -486,16 +517,18 @@ class Post(BaseCommand):
                'TARGET_PEOPLE' in self.config):
                 self.options.target_people = self.config['TARGET_PEOPLE']
 
-        # -g implies --guess-summary and --guess-description
-        self.options.guess_fields = self.normalize_guess_value(
-            self.options.guess_fields, '--guess-fields')
+        # Normalize each guessing option that was actually provided. These
+        # are left as None when unset, so that _should_guess_field() can
+        # tell an explicit value apart from an unset option.
+        for field_name, arg_name in (('guess_fields', '--guess-fields'),
+                                     ('guess_summary', '--guess-summary'),
+                                     ('guess_description',
+                                      '--guess-description')):
+            guess = getattr(self.options, field_name)
 
-        for field_name in ('guess_summary', 'guess_description'):
-            # We want to ensure we only override --guess-{field} with
-            # --guess-fields when --guess-{field} is not provided.
-            # to the default (auto).
-            if getattr(self.options, field_name) is None:
-                setattr(self.options, field_name, self.options.guess_fields)
+            if guess is not None:
+                setattr(self.options, field_name,
+                        self.normalize_guess_value(guess, arg_name))
 
         if self.options.revision_range:
             raise CommandError(
@@ -547,22 +580,6 @@ class Post(BaseCommand):
                     f'The testing file {self.options.testing_file} does not '
                     f'exist.'
                 )
-
-        # If we have an explicitly specified summary, override
-        # --guess-summary
-        if self.options.summary:
-            self.options.guess_summary = self.GUESS_NO
-        else:
-            self.options.guess_summary = self.normalize_guess_value(
-                self.options.guess_summary, '--guess-summary')
-
-        # If we have an explicitly specified description, override
-        # --guess-description
-        if self.options.description:
-            self.options.guess_description = self.GUESS_NO
-        else:
-            self.options.guess_description = self.normalize_guess_value(
-                self.options.guess_description, '--guess-description')
 
         # If the --diff-filename argument is used, we can't do automatic
         # updating.
@@ -805,56 +822,112 @@ class Post(BaseCommand):
 
         return review_request.id, review_request.absolute_url
 
-    def check_guess_fields(self):
-        """Checks and handles field guesses for the review request.
+    def _should_guess_field(
+        self,
+        field_name: str,
+        *,
+        is_new_review_request: bool,
+    ) -> bool:
+        """Return whether a field should be guessed from the commit message.
 
-        This will attempt to guess the values for the summary and
-        description fields, based on the contents of the commit message
-        at the provided revisions, if requested by the caller.
+        :option:`--guess-fields` takes precedence when it's provided. When
+        it isn't, :option:`--guess-summary` and :option:`--guess-description`
+        apply to their own fields, and every other field defaults to
+        ``auto``.
 
-        If the backend doesn't support guessing, or if guessing isn't
-        requested, or if explicit values were set in the options, nothing
-        will be set for the fields.
+        Version Added:
+            7.0
+
+        Args:
+            field_name (str):
+                The name of the review request field.
+
+            is_new_review_request (bool):
+                Whether a new review request is being created.
+
+        Returns:
+            bool:
+            ``True`` if the field should be guessed from the commit message.
         """
-        is_new_review_request = (not self.options.rid and
-                                 not self.options.update)
+        options = self.options
+        guess = options.guess_fields
 
-        guess_summary = (
-            self.options.guess_summary == self.GUESS_YES or
-            (self.options.guess_summary == self.GUESS_AUTO and
-             is_new_review_request))
-        guess_description = (
-            self.options.guess_description == self.GUESS_YES or
-            (self.options.guess_description == self.GUESS_AUTO and
-             is_new_review_request))
+        if guess is None:
+            if field_name == 'summary':
+                guess = options.guess_summary
+            elif field_name == 'description':
+                guess = options.guess_description
 
-        if self.revisions and (guess_summary or guess_description):
-            try:
-                commit_message = self.tool.get_commit_message(self.revisions)
+            if guess is None:
+                guess = self.GUESS_AUTO
 
-                if commit_message:
-                    guessed_summary = commit_message['summary']
-                    guessed_description = commit_message['description']
+        return (guess == self.GUESS_YES or
+                (guess == self.GUESS_AUTO and is_new_review_request))
 
-                    if guess_summary and guess_description:
-                        self.options.summary = guessed_summary
-                        self.options.description = guessed_description
-                    elif guess_summary:
-                        self.options.summary = guessed_summary
-                    elif guess_description:
-                        # If we're guessing the description but not the summary
-                        # (for example, if --summary was included), we probably
-                        # don't want to strip off the summary line of the
-                        # commit message.
-                        if guessed_description.startswith(guessed_summary):
-                            self.options.description = guessed_description
-                        else:
-                            self.options.description = \
-                                guessed_summary + '\n\n' + guessed_description
-            except NotImplementedError:
-                # The SCMClient doesn't support getting commit messages,
-                # so we can't provide the guessed versions.
-                pass
+    def _get_guessed_fields(self) -> dict[str, str]:
+        """Return review request fields guessed from the commit message.
+
+        This parses the commit message for the posted revisions, returning
+        any of the :py:attr:`GUESSABLE_FIELDS` it provides that guessing is
+        enabled for and that the user hasn't set explicitly.
+
+        Version Added:
+            7.0
+
+        Returns:
+            dict:
+            A mapping of review request field names to guessed values.
+
+            This will be empty if there's nothing to guess, or if the SCM
+            doesn't support fetching commit messages.
+        """
+        options = self.options
+        is_new_review_request = not options.rid and not options.update
+
+        field_names = {
+            field
+            for field in self.GUESSABLE_FIELDS
+            if (not getattr(options, field) and
+                self._should_guess_field(
+                    field,
+                    is_new_review_request=is_new_review_request))
+        }
+
+        if not self.revisions or not field_names:
+            return {}
+
+        try:
+            commit_message = self.tool.get_commit_message(self.revisions)
+        except NotImplementedError:
+            # The SCMClient doesn't support getting commit messages, so we
+            # can't provide the guessed versions.
+            return {}
+
+        if not commit_message:
+            return {}
+
+        # The parsed message is a TypedDict, so read it through a plain
+        # mapping in order to look up the field names computed above.
+        message_values = cast('Mapping[str, str]', commit_message)
+        guessed: dict[str, str] = {}
+
+        for field_name in field_names:
+            value = message_values.get(field_name)
+
+            if value:
+                guessed[field_name] = value
+
+        # If we're guessing the description but not the summary (for example,
+        # if --summary was used), we don't want to lose the summary line of
+        # the commit message.
+        if 'description' in guessed and 'summary' not in guessed:
+            summary = commit_message['summary']
+            description = guessed['description']
+
+            if not description.startswith(summary):
+                guessed['description'] = f'{summary}\n\n{description}'
+
+        return guessed
 
     def _ask_review_request_match(self, review_request):
         question = ('Update Review Request #%s: "%s"? '
@@ -1335,39 +1408,39 @@ class Post(BaseCommand):
                 update_fields['trivial'] = True
 
         if not options.diff_only:
-            # If the user has requested to guess the summary or description,
-            # get the commit message and override the summary and description
-            # options, which we'll fill in below. The guessing takes place
-            # after stamping so that the guessed description matches the commit
-            # when rbt exits.
+            guessed_fields: dict[str, str] = {}
+
+            # If the user has requested to guess fields, get the commit
+            # message so we can fill in anything they didn't set explicitly.
+            # The guessing takes place after stamping so that the guessed
+            # description matches the commit when rbt exits.
             if not options.diff_filename:
-                self.check_guess_fields()
+                guessed_fields = self._get_guessed_fields()
+
+            # An explicit value always wins over a guessed one.
+            field_values = {
+                _field: getattr(options, _field) or guessed_fields.get(_field)
+                for _field in self.GUESSABLE_FIELDS
+            }
+
+            bugs_closed = field_values.pop('bugs_closed')
 
             update_fields.update(options.extra_fields)
             update_fields.update({
                 _field: _value
-                for _field, _value in (
-                    ('branch', options.branch),
-                    ('depends_on', options.depends_on),
-                    ('description', options.description),
-                    ('summary', options.summary),
-                    ('target_groups', options.target_groups),
-                    ('target_people', options.target_people),
-                    ('testing_done', options.testing_done),
-                )
+                for _field, _value in field_values.items()
                 if _value
             })
 
-            if options.bugs_closed:
+            if bugs_closed:
                 # Append to the existing list of bugs.
-                options.bugs_closed = ','.join(sorted(
-                    (set(re.split('[, ]+', options.bugs_closed.strip(', '))) |
+                update_fields['bugs_closed'] = ','.join(sorted(
+                    (set(re.split('[, ]+', bugs_closed.strip(', '))) |
                      set(review_request.bugs_closed))))
-                update_fields['bugs_closed'] = options.bugs_closed
 
             text_type = self._get_text_type(options.markdown)
 
-            if options.description or options.testing_done:
+            if field_values['description'] or field_values['testing_done']:
                 # The user specified that their Description/Testing Done are
                 # valid Markdown, so tell the server so it won't escape the
                 # text.

@@ -738,12 +738,19 @@ class RBToolsConfig(ConfigData):
 
     #: Whether to guess and set review request fields from a commit.
     #:
+    #: This applies to every review request field that can be filled in from
+    #: a commit message, and takes precedence over :py:attr:`GUESS_SUMMARY`
+    #: and :py:attr:`GUESS_DESCRIPTION`.
+    #:
+    #: When this is ``None``, those two settings apply to their own fields,
+    #: and every other field defaults to ``auto``.
+    #:
     #: Version Changed:
     #:     7.0:
-    #:     This is now used to enable guessing for more than just the summary
-    #:     and description, and should be preferred over the individual
-    #:     settings.
-    GUESS_FIELDS: (str | None) = GuessFlag.AUTO
+    #:     This now defaults to ``None`` instead of ``auto``, so that an
+    #:     explicit value can be told apart from an unset one. The effective
+    #:     default behavior is unchanged.
+    GUESS_FIELDS: (str | None) = None
 
     #: Whether to guess and set a review request description from a commit.
     GUESS_DESCRIPTION: (GuessFlag | None) = None

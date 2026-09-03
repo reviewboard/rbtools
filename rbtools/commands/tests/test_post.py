@@ -1266,6 +1266,116 @@ class BuildReviewRequestDraftDataTests(BasePostCommandTests):
             },
             expected_request_data={})
 
+    def test_with_guess_fields_overriding_guess_summary(self) -> None:
+        """Testing Post._build_review_request_draft_data with
+        --guess-fields=yes overriding --guess-summary=no
+        """
+        self._run_test(
+            args=[
+                '--guess-fields=yes',
+                '--guess-summary=no',
+            ],
+            commit_message={
+                'summary': 'This is the summary.',
+                'description': 'This is the description.',
+            },
+            expected_request_data={
+                'summary': 'This is the summary.',
+                'description': 'This is the description.',
+                'text_type': 'plain',
+            })
+
+    def test_with_guess_fields_overriding_guess_description(self) -> None:
+        """Testing Post._build_review_request_draft_data with
+        --guess-fields=no overriding --guess-description=yes
+        """
+        self._run_test(
+            args=[
+                '--guess-fields=no',
+                '--guess-description=yes',
+            ],
+            commit_message={
+                'summary': 'This is the summary.',
+                'description': 'This is the description.',
+            },
+            expected_request_data={})
+
+    def test_with_guess_fields_and_extra_fields(self) -> None:
+        """Testing Post._build_review_request_draft_data with
+        --guess-fields=yes and a commit message providing other fields
+        """
+        self._run_test(
+            args=['--guess-fields=yes'],
+            commit_message={
+                'summary': 'This is the summary.',
+                'description': 'This is the description.',
+                'testing_done': 'Ran the tests.',
+                'bugs_closed': '123,456',
+                'branch': 'my-branch',
+                'depends_on': '42',
+                'target_groups': 'my-group',
+                'target_people': 'my-user',
+            },
+            expected_request_data={
+                'summary': 'This is the summary.',
+                'description': 'This is the description.',
+                'testing_done': 'Ran the tests.',
+                'bugs_closed': '123,456',
+                'branch': 'my-branch',
+                'depends_on': '42',
+                'target_groups': 'my-group',
+                'target_people': 'my-user',
+                'text_type': 'plain',
+            })
+
+    def test_with_guess_fields_and_explicit_values(self) -> None:
+        """Testing Post._build_review_request_draft_data with
+        --guess-fields=yes and explicitly set fields
+        """
+        # Since the summary isn't being guessed, the commit's summary line
+        # is kept at the top of the guessed description.
+        self._run_test(
+            args=[
+                '--guess-fields=yes',
+                '--summary=Explicit summary.',
+                '--testing-done=Explicit testing.',
+                '--branch=explicit-branch',
+            ],
+            commit_message={
+                'summary': 'This is the summary.',
+                'description': 'This is the description.',
+                'testing_done': 'Ran the tests.',
+                'branch': 'my-branch',
+            },
+            expected_request_data={
+                'summary': 'Explicit summary.',
+                'description': ('This is the summary.\n'
+                                '\n'
+                                'This is the description.'),
+                'testing_done': 'Explicit testing.',
+                'branch': 'explicit-branch',
+                'text_type': 'plain',
+            })
+
+    def test_with_guess_fields_unset_guesses_other_fields(self) -> None:
+        """Testing Post._build_review_request_draft_data with no guessing
+        options guesses fields beyond the summary and description
+        """
+        self._run_test(
+            commit_message={
+                'summary': 'This is the summary.',
+                'description': 'This is the description.',
+                'testing_done': 'Ran the tests.',
+                'branch': 'my-branch',
+            },
+            expected_request_data={
+                'summary': 'This is the summary.',
+                'description': 'This is the description.',
+                'testing_done': 'Ran the tests.',
+                'branch': 'my-branch',
+                'text_type': 'plain',
+            })
+
     def _run_test(self,
                   expected_request_data,
                   args=[],
