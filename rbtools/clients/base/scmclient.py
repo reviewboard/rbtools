@@ -9,10 +9,10 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
-from typing import Any, ClassVar, Generic, TYPE_CHECKING, TypeVar, cast
+from typing import Generic, TYPE_CHECKING, TypeVar, TypedDict, cast
 
 from housekeeping import func_deprecated
-from typing_extensions import NotRequired, TypedDict, Unpack, final
+from typing_extensions import NotRequired, Unpack, final
 
 from rbtools.clients.errors import (SCMClientDependencyError,
                                     SCMError)
@@ -25,10 +25,15 @@ from rbtools.diffs.errors import ApplyPatchError
 from rbtools.diffs.patcher import Patcher
 from rbtools.diffs.patches import Patch
 from rbtools.diffs.tools.registry import diff_tools_registry
+from rbtools.utils.commit_messages import (
+    ParsedCommitMessage,
+    parse_commit_message,
+)
 
 if TYPE_CHECKING:
     import argparse
     from collections.abc import Mapping, Sequence
+    from typing import Any, ClassVar, TypeAlias
 
     from rbtools.api.capabilities import Capabilities
     from rbtools.api.resource import (
@@ -247,32 +252,13 @@ class SCMClientCommitHistoryItem(TypedDict):
     committer_date: NotRequired[str | None]
 
 
-class SCMClientCommitMessage(TypedDict):
-    """A commit message from a local repository.
-
-    This class helps provide type hinting to results from
-    :py:meth:`BaseSCMClient.get_commit_message`.
-
-    Version Added:
-        4.0
-    """
-
-    #: The summary of a commit message.
-    #:
-    #: This should generally match the first line of a commit.
-    #:
-    #: Type:
-    #:     str
-    summary: str | None
-
-    #: The description of a commit message.
-    #:
-    #: This should generally match the remainder of the commit message after
-    #: the summary, if any content remains.
-    #:
-    #: Type:
-    #:     str
-    description: NotRequired[str | None]
+#: A commit message from the local repository.
+#:
+#: Deprecated:
+#:     7.0:
+#:     This is now an alias for :py:class:`rbtools.utils.commit_messages.
+#:     ParsedCommitMessage`. This alias will be removed in RBTools 9.0.
+SCMClientCommitMessage: TypeAlias = ParsedCommitMessage
 
 
 class SCMClientPatcher(Generic[TSCMClient], Patcher):
@@ -1517,41 +1503,32 @@ class BaseSCMClient:
     def get_commit_message(
         self,
         revisions: SCMClientRevisionSpec,
-    ) -> SCMClientCommitMessage | None:
+    ) -> ParsedCommitMessage | None:
         """Return the commit message from the commits in the given revisions.
 
-        This pulls out the first line from the commit messages of the given
-        revisions. That is then used as the summary.
+        This parses the raw commit message to extract the summary,
+        description, testing done, and bugs closed fields.
+
+        Version Changed:
+            7.0:
+            This now uses
+            :py:func:`~rbtools.utils.commit_messages.parse_commit_message` to
+            extract review request fields from the message. A custom parser
+            can be configured via the :rbtconfig:`COMMIT_MESSAGE_PARSER`
+            config setting.
 
         Args:
             revisions (dict):
                 A dictionary as returned by :py:meth:`parse_revision_spec`.
 
         Returns:
-            dict:
-            A dictionary containing keys found in
-            :py:class:`SCMClientCommitMessage`.
-
-            This may be ``None``, if no commit message is found.
+            rbtools.utils.commit_messages.ParsedCommitMessage:
+            The parsed commit message. This may be ``None``, if no commit
+            message is found.
         """
-        commit_message = self.get_raw_commit_message(revisions)
-        lines = commit_message.splitlines()
-
-        if not lines:
-            return None
-
-        result: SCMClientCommitMessage = {
-            'summary': lines[0],
-        }
-
-        # Try to pull the body of the commit out of the full commit
-        # description, so that we can skip the summary.
-        if len(lines) >= 3 and lines[0] and not lines[1]:
-            result['description'] = '\n'.join(lines[2:]).strip()
-        else:
-            result['description'] = commit_message
-
-        return result
+        return parse_commit_message(
+            self.get_raw_commit_message(revisions),
+            custom_parser=self.config.COMMIT_MESSAGE_PARSER)
 
     def delete_branch(
         self,

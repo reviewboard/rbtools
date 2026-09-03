@@ -788,7 +788,7 @@ class SVNClientTests(BaseSVNClientTests):
         self.assertEqual(
             client.get_commit_message(revisions),
             {
-                'description': 'Commit 2 -- a non-utf8 character: \xe9\n',
+                'description': 'Commit 2 -- a non-utf8 character: \xe9',
                 'summary': 'Commit 2 -- a non-utf8 character: \xe9',
             })
 

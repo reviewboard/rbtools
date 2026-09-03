@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from rbtools.ui.console import ColorMode
+    from rbtools.utils.commit_messages import CommitMessageParser
 
 
 #: A dictionary storing raw configuration data.
@@ -737,10 +738,11 @@ class RBToolsConfig(ConfigData):
 
     #: Whether to guess and set review request fields from a commit.
     #:
-    #: This will control the values for the following settings:
-    #:
-    #: * :py:attr:`GUESS_DESCRIPTION`
-    #: * :py:attr:`GUESS_SUMMARY`
+    #: Version Changed:
+    #:     7.0:
+    #:     This is now used to enable guessing for more than just the summary
+    #:     and description, and should be preferred over the individual
+    #:     settings.
     GUESS_FIELDS: (str | None) = GuessFlag.AUTO
 
     #: Whether to guess and set a review request description from a commit.
@@ -748,6 +750,19 @@ class RBToolsConfig(ConfigData):
 
     #: Whether to guess and set a review request summary from a commit.
     GUESS_SUMMARY: (GuessFlag | None) = None
+
+    #: A custom callable for parsing commit messages.
+    #:
+    #: This will be used to extract field content when guessing fields.
+    #:
+    #: When set, this replaces the default parsing logic in
+    #: :py:func:`~rbtools.utils.commit_messages.parse_commit_message`. The
+    #: callable must accept the raw commit message as a :py:class:`str` and
+    #: return a :py:class:`~rbtools.utils.commit_messages.ParsedCommitMessage`.
+    #:
+    #: Version Added:
+    #:     7.0
+    COMMIT_MESSAGE_PARSER: (CommitMessageParser | None) = None
 
     #: Whether to publish a change immediately after posting it.
     #:
