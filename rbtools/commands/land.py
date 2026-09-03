@@ -9,8 +9,8 @@ from rbtools.clients.errors import MergeError, PushError
 from rbtools.commands import RB_MAIN
 from rbtools.commands.base import BaseCommand, CommandError, Option
 from rbtools.diffs.patches import PatchAuthor
-from rbtools.utils.commands import (build_rbtools_cmd_argv,
-                                    extract_commit_message)
+from rbtools.utils.commands import build_rbtools_cmd_argv
+from rbtools.utils.commit_messages import format_commit_message
 from rbtools.utils.console import confirm
 from rbtools.utils.errors import MatchReviewRequestsError
 from rbtools.utils.graphs import toposort
@@ -261,7 +261,7 @@ class Land(BaseCommand):
         }
 
         if source_branch:
-            review_commit_message = extract_commit_message(review_request)
+            review_commit_message = format_commit_message(review_request)
             submitter = review_request.get_submitter()
             author: (PatchAuthor | None) = None
 

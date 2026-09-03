@@ -2,6 +2,19 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+from housekeeping import func_moved
+
+from rbtools.deprecation import RemovedInRBTools90Warning
+from rbtools.utils.commit_messages import (
+    STAMP_STRING_FORMAT,
+    format_commit_message,
+)
+
+if TYPE_CHECKING:
+    from rbtools.api.resource.review_request import ReviewRequestItemResource
+
 
 DEFAULT_OPTIONS_MAP = {
     'debug': '--debug',
@@ -17,46 +30,33 @@ DEFAULT_OPTIONS_MAP = {
 }
 
 
-#: The format string used to specify a URL to a review request in commits.
-#:
-#: Commands that prepare a commit message for pushing, such as rbt stamp,
-#: rbt patch, and rbt land, must use this format to indicate the URL to the
-#: matching review request. Review Board will parse the commit messages when
-#: executing any post-receive hooks, looking for this string and a valid URL.
-STAMP_STRING_FORMAT = 'Reviewed at %s'
-
-
 class AlreadyStampedError(Exception):
     """An error indicating the change has already been stamped."""
 
 
-def extract_commit_message(review_request):
-    """Returns a commit message based on the review request.
+@func_moved(RemovedInRBTools90Warning,
+            new_func=format_commit_message)
+def extract_commit_message(
+    review_request: ReviewRequestItemResource,
+) -> str:
+    """Return a commit message based on the review request.
 
     The commit message returned contains the Summary, Description, Bugs,
     and Testing Done fields from the review request, if available.
+
+    Deprecated:
+        7.0:
+        Moved to :py:mod:`rbtools.utils.commit_messages`.
+
+    Args:
+        review_request (rbtools.api.resource.ReviewRequestItemResource):
+            The review request.
+
+    Returns:
+        str:
+        A commit message assembled from the review request fields.
     """
-    info = []
-
-    summary = review_request.summary
-    description = review_request.description
-    testing_done = review_request.testing_done
-
-    if not description.startswith(summary):
-        info.append(summary)
-
-    info.append(description)
-
-    if testing_done:
-        info.append('Testing Done:\n%s' % testing_done)
-
-    if review_request.bugs_closed:
-        info.append('Bugs closed: %s'
-                    % ', '.join(review_request.bugs_closed))
-
-    info.append(STAMP_STRING_FORMAT % review_request.absolute_url)
-
-    return '\n\n'.join(info)
+    return format_commit_message(review_request)
 
 
 def build_rbtools_cmd_argv(options, options_map=DEFAULT_OPTIONS_MAP):

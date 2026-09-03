@@ -17,7 +17,7 @@ from typing_extensions import NotRequired, assert_never
 
 from rbtools.diffs.errors import ApplyPatchError
 from rbtools.diffs.patches import PatchAuthor, PatchResult
-from rbtools.utils.commands import extract_commit_message
+from rbtools.utils.commit_messages import format_commit_message
 from rbtools.utils.encoding import force_unicode
 from rbtools.utils.filesystem import chdir
 from rbtools.utils.process import run_process
@@ -348,7 +348,7 @@ class Patcher:
 
                 default_author = PatchAuthor(full_name=fullname,
                                              email=email)
-                default_message = extract_commit_message(review_request)
+                default_message = format_commit_message(review_request)
 
             if total_patches == 1:
                 # Set the patch based on the provided or determined default
