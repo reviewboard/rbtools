@@ -9,13 +9,18 @@ This particular module provides forwarding imports for:
 .. autosummary::
    :nosignatures:
 
-   rbtools.diffs.patches.PatchAuthor
-   rbtools.diffs.patches.PatchResult
    rbtools.clients.base.registry.scmclient_registry
    rbtools.clients.base.repository.RepositoryInfo
    rbtools.clients.base.scmclient.BaseSCMClient
 
 As well as some (soon to be legacy) utility functions and classes.
+
+Version Changed:
+    7.0:
+    * Removed the forwarding imports for
+      :py:class:`~rbtools.diffs.patches.PatchAuthor` and
+      :py:class:`~rbtools.diffs.patches.PatchResult`. These must now be
+      imported from :py:mod:`rbtools.diffs.patches`.
 
 Version Changed:
     5.1:
@@ -40,13 +45,9 @@ import os
 import sys
 from typing import TYPE_CHECKING
 
-from housekeeping import ClassMovedMixin
-
 from rbtools.clients.base.registry import scmclient_registry
 from rbtools.clients.base.repository import RepositoryInfo
 from rbtools.clients.base.scmclient import BaseSCMClient
-from rbtools.deprecation import RemovedInRBTools70Warning
-from rbtools.diffs import patches
 
 if TYPE_CHECKING:
     import argparse
@@ -59,34 +60,6 @@ logger = logging.getLogger(__name__)
 
 # The clients are lazy loaded via load_scmclients()
 SCMCLIENTS = None
-
-
-class PatchAuthor(ClassMovedMixin,
-                  patches.PatchAuthor,
-                  warning_cls=RemovedInRBTools70Warning):
-    """The author of a patch or commit.
-
-    This has moved to :py:class:`rbtools.diffs.patches.PatchAuthor`. See that
-    class for documentation.
-
-    Deprecated:
-        5.1:
-        This will be removed in RBTools 7.
-    """
-
-
-class PatchResult(ClassMovedMixin,
-                  patches.PatchResult,
-                  warning_cls=RemovedInRBTools70Warning):
-    """The result of a patch operation.
-
-    This has moved to :py:class:`rbtools.diffs.patches.PatchResult`. See that
-    class for documentation.
-
-    Deprecated:
-        5.1:
-        This will be removed in RBTools 7.
-    """
 
 
 def load_scmclients(config, options):
@@ -271,8 +244,6 @@ def scan_usable_client(
 
 __all__ = [
     'BaseSCMClient',
-    'PatchAuthor',
-    'PatchResult',
     'RepositoryInfo',
     'SCMCLIENTS',
     'load_scmclients',
@@ -283,8 +254,6 @@ __all__ = [
 
 __autodoc_excludes__ = [
     'BaseSCMClient',
-    'PatchAuthor',
-    'PatchResult',
     'RepositoryInfo',
     'scmclient_registry',
 ]
