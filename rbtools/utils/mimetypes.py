@@ -11,9 +11,7 @@ import subprocess
 from typing import TypedDict
 
 import puremagic
-from housekeeping import deprecate_non_keyword_only_args
 
-from rbtools.deprecation import RemovedInRBTools70Warning
 from rbtools.utils.filesystem import is_exe_in_path
 
 
@@ -113,13 +111,21 @@ DEFAULT_MIMETYPE = 'application/octet-stream'
 _has_file_exe = None
 
 
-@deprecate_non_keyword_only_args(RemovedInRBTools70Warning)
 def guess_mimetype(
     *,
     data: bytes,
     filename: (str | None) = None,
 ) -> str:
     """Guess the MIME type of the given file content.
+
+    Version Changed:
+        7.0:
+        Positional arguments are no longer supported.
+
+    Version Changed:
+        5.1:
+        This now requires keyword-only arguments. Support for positional
+        arguments will be removed in RBTools 7.
 
     Version Added:
         5.0

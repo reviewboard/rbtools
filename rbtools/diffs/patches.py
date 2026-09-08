@@ -16,10 +16,8 @@ from typing import Literal, TYPE_CHECKING
 from urllib.error import URLError
 from urllib.request import urlopen
 
-from housekeeping import deprecate_non_keyword_only_args
 from typelets.runtime import raise_invalid_type
 
-from rbtools.deprecation import RemovedInRBTools70Warning
 from rbtools.utils.filesystem import make_tempfile
 
 if TYPE_CHECKING:
@@ -211,7 +209,6 @@ class PatchAuthor:
     #:     This was added as a replacement for ``fullname``.
     full_name: str
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools70Warning)
     def __init__(
         self,
         *,
@@ -219,6 +216,10 @@ class PatchAuthor:
         email: str,
     ) -> None:
         """Initialize the author information.
+
+        Version Changed:
+            7.0:
+            Positional arguments are no longer supported.
 
         Version Changed:
             5.1:
@@ -607,7 +608,6 @@ class PatchResult:
     #:     6.0
     binary_failed: Mapping[str, str]
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools70Warning)
     def __init__(
         self,
         *,
@@ -623,9 +623,13 @@ class PatchResult:
         """Initialize the object.
 
         Version Changed:
+            7.0:
+            Positional arguments are no longer supported.
+
+        Version Changed:
             5.1:
             * This now requires keyword-only arguments. Support for positional
-              arguments will be removed in RBTools 7.
+            arguments will be removed in RBTools 7.
 
             * Added the ``patch`` and ``patch_range`` arguments.
 

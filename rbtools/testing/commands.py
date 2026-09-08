@@ -10,14 +10,12 @@ import io
 from typing import Generic, TYPE_CHECKING, TypeVar
 
 import kgb
-from housekeeping import deprecate_non_keyword_only_args
 from typing_extensions import TypedDict
 
 from rbtools.clients import scan_usable_client
 from rbtools.commands.base import BaseCommand
 from rbtools.commands.login import Login
 from rbtools.commands.logout import Logout
-from rbtools.deprecation import RemovedInRBTools70Warning
 from rbtools.testing.api.transport import URLMapTransport
 from rbtools.utils.filesystem import cleanup_tempfiles
 
@@ -87,7 +85,6 @@ class CommandTestsMixin(kgb.SpyAgency, Generic[_CommandT]):
 
     DEFAULT_SERVER_URL = 'https://reviews.example.com/'
 
-    @deprecate_non_keyword_only_args(RemovedInRBTools70Warning)
     def create_command(
         self,
         *,
@@ -97,6 +94,15 @@ class CommandTestsMixin(kgb.SpyAgency, Generic[_CommandT]):
         **kwargs,
     ) -> _CommandT:
         """Create an argument parser with the given extra fields.
+
+        Version Changed:
+            7.0:
+            Positional arguments are no longer supported.
+
+        Version Changed:
+            5.1:
+            This now requires keyword-only arguments. Support for positional
+            arguments will be removed in RBTools 7.
 
         Args:
             args (list of str, optional):
