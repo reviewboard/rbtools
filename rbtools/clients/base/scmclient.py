@@ -17,10 +17,7 @@ from typing_extensions import NotRequired, Unpack, final
 from rbtools.clients.errors import (SCMClientDependencyError,
                                     SCMError)
 from rbtools.config.config import RBToolsConfig
-from rbtools.deprecation import (
-    RemovedInRBTools70Warning,
-    RemovedInRBTools80Warning,
-)
+from rbtools.deprecation import RemovedInRBTools80Warning
 from rbtools.diffs.errors import ApplyPatchError
 from rbtools.diffs.patcher import Patcher
 from rbtools.diffs.patches import Patch
@@ -347,112 +344,6 @@ class SCMClientPatcher(Generic[TSCMClient], Patcher):
                                      run_editor=self.run_commit_editor)
 
 
-class _LegacyPatcher(SCMClientPatcher['BaseSCMClient']):
-    """A Patcher that wraps legacy SCMClient patching functions.
-
-    This is used for SCMClients that don't yet support the modern patching
-    support introduced in RBTools 5.1.
-
-    This is scheduled to be removed in RBTools 7.
-
-    Version Added:
-        5.1
-    """
-
-    def apply_single_patch(
-        self,
-        *,
-        patch: Patch,
-        patch_num: int,
-    ) -> PatchResult:
-        """Apply a single patch.
-
-        This will take a single patch and apply it using the SCMClient's
-        legacy patching methods.
-
-        Args:
-            patch (rbtools.diffs.patches.Patch):
-                The patch to apply, opened for reading.
-
-            patch_num (int):
-                The 1-based index of this patch in the full list of patches.
-
-        Returns:
-            rbtools.diffs.patches.PatchResult:
-            The result of the patch application, whether the patch applied
-            successfully or with normal patch failures.
-
-        Raises:
-            rbtools.diffs.errors.ApplyPatchResult:
-                There was an error attempting to apply the patch.
-
-                This won't be raised simply for conflicts or normal patch
-                failures. It may be raised for errors encountered during
-                the patching process.
-        """
-        repository_info = self.repository_info
-
-        assert repository_info is not None
-
-        # NOTE: Typing is bad here, but was before. It's non-trivial to sort
-        #       out the base_path and base_dir typing requirements, since the
-        #       logic and expectations are all over the map. We'll fix it with
-        #       the move to the new Patcher support.
-        base_path = repository_info.base_path
-        base_dir = patch.base_dir or ''
-        prefix_level = patch.prefix_level
-
-        norm_prefix_level: str | None
-
-        if prefix_level is not None:
-            norm_prefix_level = str(prefix_level)
-        else:
-            norm_prefix_level = None
-
-        return self.scmclient.apply_patch(
-            patch_file=str(patch.path),
-            base_path=base_path,  # type: ignore
-            base_dir=base_dir,
-            p=norm_prefix_level,
-            revert=self.revert)
-
-    def apply_patch_for_empty_files(
-        self,
-        patch: Patch,
-    ) -> bool:
-        """Apply an empty file patch to a file.
-
-        This will invoke the SCMClient's logic for applying a patch for an
-        empty file.
-
-        Args:
-            patch (rbtools.diffs.patches.Patch):
-                The opened patch to check and possibly apply.
-
-        Returns:
-            bool:
-            ``True`` if there are empty files in the patch that were applied.
-            ``False`` if there were no empty files or the files could not be
-            applied (which will lead to an error).
-
-        Raises:
-            rbtools.diffs.errors.ApplyPatchError:
-                There was an error while applying the patch.
-        """
-        norm_prefix_level: str | None
-        prefix_level = patch.prefix_level
-
-        if prefix_level is not None:
-            norm_prefix_level = str(prefix_level)
-        else:
-            norm_prefix_level = None
-
-        return self.scmclient.apply_patch_for_empty_files(
-            patch.content,
-            p_num=norm_prefix_level,  # type: ignore
-            revert=self.revert)
-
-
 class BaseSCMClient:
     """A base class for interfacing with a source code management tool.
 
@@ -631,9 +522,8 @@ class BaseSCMClient:
     #:
     #: Version Added:
     #:     5.1:
-    #:     This replaces the old :py:meth:`apply_patch` and
-    #:     :py:meth:`apply_patch_for_empty_files` methods from earlier
-    #:     releases.
+    #:     This replaces the old ``apply_patch_for_empty_files()`` method
+    #:     from earlier releases.
     patcher_cls: type[SCMClientPatcher] = SCMClientPatcher
 
     ######################
@@ -969,24 +859,7 @@ class BaseSCMClient:
             SCMClientPatcher:
             The patcher used to apply patches for this client.
         """
-        patcher_cls = self.patcher_cls
-        scmclient_cls = type(self)
-
-        if (scmclient_cls.apply_patch is not BaseSCMClient.apply_patch and
-            patcher_cls is BaseSCMClient.patcher_cls):
-            # This is a legacy SCMClient implementation that overrode
-            # apply_patch() without providing a custom patcher. We need to
-            # return a compatibility wrapper.
-            RemovedInRBTools70Warning.warn(
-                '%(name)s must be updated to set a custom patcher class as '
-                '%(name)s.patcher_cls. Support for apply_patch() will be '
-                'removed in RBTools 7.'
-                % {
-                    'name': scmclient_cls.__name__,
-                })
-            patcher_cls = _LegacyPatcher
-
-        return patcher_cls(scmclient=self, **kwargs)
+        return self.patcher_cls(scmclient=self, **kwargs)
 
     def find_matching_server_repository(
         self,
@@ -1669,33 +1542,6 @@ class BaseSCMClient:
             files.
         """
         return False
-
-    def apply_patch_for_empty_files(
-        self,
-        patch: bytes,
-        *,
-        p_num: str,
-        revert: bool = False,
-    ) -> bool:
-        """Return whether any empty files in the patch are applied.
-
-        Args:
-            patch (bytes):
-                The contents of the patch.
-
-            p_num (str):
-                The prefix level of the diff.
-
-            revert (bool, optional):
-                Whether the patch should be reverted rather than applied.
-
-        Returns:
-            bool:
-            ``True`` if there are empty files in the patch. ``False`` if there
-            were no empty files, or if an error occurred while applying the
-            patch.
-        """
-        raise NotImplementedError
 
     def amend_commit_description(
         self,

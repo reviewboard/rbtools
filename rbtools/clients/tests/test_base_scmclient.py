@@ -9,9 +9,8 @@ from typing import TYPE_CHECKING
 import kgb
 
 from rbtools.clients import BaseSCMClient
-from rbtools.clients.base.scmclient import _LegacyPatcher, SCMClientPatcher
+from rbtools.clients.base.scmclient import SCMClientPatcher
 from rbtools.clients.errors import SCMClientDependencyError, SCMError
-from rbtools.deprecation import RemovedInRBTools70Warning
 from rbtools.diffs.errors import ApplyPatchError
 from rbtools.diffs.patches import PatchResult
 from rbtools.diffs.tools.backends.gnu import GNUDiffTool
@@ -244,46 +243,6 @@ class BaseSCMClientTests(kgb.SpyAgency, TestCase):
         patcher = client.get_patcher(patches=[])
 
         self.assertIs(type(patcher), SCMClientPatcher)
-
-    def test_get_patcher_with_legacy_apply_patch(self) -> None:
-        """Testing BaseSCMClient.get_patcher with legacy custom apply_patch()
-        """
-        class LegacySCMClient(MySCMClient):
-            def apply_patch(self, *args, **kwargs):
-                pass
-
-        client = LegacySCMClient()
-
-        message = re.escape(
-            'LegacySCMClient must be updated to set a custom patcher class '
-            'as LegacySCMClient.patcher_cls. Support for apply_patch() will '
-            'be removed in RBTools 7.'
-        )
-
-        with self.assertWarnsRegex(RemovedInRBTools70Warning, message):
-            patcher = client.get_patcher(patches=[])
-
-        self.assertIs(type(patcher), _LegacyPatcher)
-
-    def test_get_patcher_with_legacy_apply_patch_and_custom_patcher(
-        self,
-    ) -> None:
-        """Testing BaseSCMClient.get_patcher with legacy custom apply_patch()
-        and custom patcher
-        """
-        class MyPatcher(SCMClientPatcher):
-            pass
-
-        class LegacySCMClient(MySCMClient):
-            patcher_cls = MyPatcher
-
-            def apply_patch(self, *args, **kwargs):
-                pass
-
-        client = LegacySCMClient()
-        patcher = client.get_patcher(patches=[])
-
-        self.assertIs(type(patcher), MyPatcher)
 
     def test_apply_patch(self) -> None:
         """Testing SCMClient.apply_patch"""
