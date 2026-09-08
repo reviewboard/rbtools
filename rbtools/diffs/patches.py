@@ -184,7 +184,12 @@ class PatchAuthor:
     <rbtools.clients.base.scmclient.BaseSCMClient.apply_patch>`.
 
     Version Changed:
+        7.0:
+        * Removed the deprecated ``fullname`` property.
+
+    Version Changed:
         5.1:
+        * Added the ``full_name`` property and deprecated ``fullname``.
         * Moved from ``rbtools.clients.base.patch``.
 
     Version Changed:
@@ -203,7 +208,7 @@ class PatchAuthor:
     #:
     #: Version Added:
     #:     5.1:
-    #:     This was added as a replacement for :py:attr:`fullname`.
+    #:     This was added as a replacement for ``fullname``.
     full_name: str
 
     @deprecate_non_keyword_only_args(RemovedInRBTools70Warning)
@@ -229,26 +234,6 @@ class PatchAuthor:
         """
         self.full_name = full_name
         self.email = email
-
-    @property
-    def fullname(self) -> str:
-        """The full name  of this author.
-
-        Deprecated:
-            5.1:
-            This is deprecated in favor of :py:attr:`full_name`. It will be
-            removed in RBTools 7.
-
-        Returns:
-            bool:
-            The full name of the author.
-        """
-        RemovedInRBTools70Warning.warn(
-            'PatchAuthor.fullname is deprecated. Please use '
-            'PatchAuthor.full_name instead. This will be removed in '
-            'RBTools 7.')
-
-        return self.full_name
 
     def __eq__(
         self,
