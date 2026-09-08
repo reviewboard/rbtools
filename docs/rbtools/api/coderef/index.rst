@@ -129,7 +129,6 @@ Base Support
 
    rbtools.clients
    rbtools.clients.base
-   rbtools.clients.base.patch
    rbtools.clients.base.registry
    rbtools.clients.base.repository
    rbtools.clients.base.scmclient

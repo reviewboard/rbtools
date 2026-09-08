@@ -3,7 +3,7 @@
 Version Added:
     5.1:
     :py:class:`PatchAuthor` and :py:class:`PatchResult` were moved from
-    :py:mod:`rbtools.scmclients.base.patch`.
+    ``rbtools.clients.base.patch``.
 """
 
 from __future__ import annotations
@@ -185,13 +185,11 @@ class PatchAuthor:
 
     Version Changed:
         5.1:
-        * Moved from :py:mod:`rbtools.clients.base.patch`. That module
-          will provide compatibility imports until RBTools 7.
+        * Moved from ``rbtools.clients.base.patch``.
 
     Version Changed:
         4.0:
-        * Moved from :py:mod:`rbtools.clients`. That module still provides
-          compatibility imports until RBTools 7.
+        * Moved from :py:mod:`rbtools.clients`.
     """
 
     ######################
@@ -572,13 +570,11 @@ class PatchResult:
 
     Version Changed:
         5.1:
-        * Moved from :py:mod:`rbtools.clients.base.patch`. That module
-          will provide compatibility imports until RBTools 7.
+        * Moved from ``rbtools.clients.base.patch``.
 
     Version Changed:
         4.0:
-        * Moved from :py:mod:`rbtools.clients`. That module will provide
-          compatibility imports until RBTools 7.
+        * Moved from :py:mod:`rbtools.clients`.
     """
 
     ######################

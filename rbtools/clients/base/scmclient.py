@@ -1410,7 +1410,7 @@ class BaseSCMClient:
                 Whether the patch should be reverted rather than applied.
 
         Returns:
-            rbtools.clients.base.patch.PatchResult:
+            rbtools.diffs.patches.PatchResult:
             The result of the patch operation.
         """
         if p is None:
