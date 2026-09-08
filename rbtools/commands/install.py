@@ -272,8 +272,10 @@ class Install(BaseCommand):
                 if show_progress:
                     assert label is not None
 
-                    with self.console.progress_bar(label,
-                                                   total=total_bytes) as bar:
+                    with self.console.progress_bar(
+                            label,
+                            total=total_bytes,
+                            transient=False) as bar:
                         for chunk_len in download_chunks():
                             bar.advance(chunk_len)
                 else:

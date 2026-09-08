@@ -17,12 +17,13 @@ from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
     Progress,
+    ProgressColumn,
     SpinnerColumn,
     TaskProgressColumn,
     TextColumn,
     TimeRemainingColumn,
-    track,
 )
+from rich.table import Table
 from rich.text import Text
 
 from rbtools.ui.theme import (
@@ -37,7 +38,9 @@ if TYPE_CHECKING:
     from collections.abc import Generator, Iterable
     from typing import Any, TextIO, TypeAlias, TypeVar
 
+    from rich.console import RenderableType
     from rich.live import Live
+    from rich.progress import Task
     from rich.status import Status
     from rich.style import StyleType
     from typelets.json import JSONDict
@@ -118,6 +121,61 @@ class _SuppressRenderHook(RenderHook):
         return []
 
 
+class _StepsColumn(ProgressColumn):
+    """A progress column showing how far along a multi-step task is.
+
+    If there's only a single step, this will just show the step description.
+    When there is more than one step, this shows a progress bar,
+    completed/total count, percentage, and a time estimate.
+
+    Version Added:
+        7.0
+    """
+
+    ######################
+    # Instance variables #
+    ######################
+
+    #: The columns rendered for a multi-step task.
+    _columns: list[ProgressColumn]
+
+    def __init__(self) -> None:
+        """Initialize the column."""
+        super().__init__()
+
+        self._columns = [
+            BarColumn(),
+            MofNCompleteColumn(),
+            TaskProgressColumn(),
+            TimeRemainingColumn(),
+        ]
+
+    def render(
+        self,
+        task: Task,
+    ) -> RenderableType:
+        """Render the column for a task.
+
+        Args:
+            task (rich.progress.Task):
+                The task being rendered.
+
+        Returns:
+            rich.console.RenderableType:
+            The rendered columns, or empty text if the task has fewer than
+            two steps.
+        """
+        total = task.total
+
+        if total is None or total <= 1:
+            return Text('')
+
+        grid = Table.grid(padding=(0, 1))
+        grid.add_row(*(column(task) for column in self._columns))
+
+        return grid
+
+
 class _ProgressController(Protocol):
     """Protocol for a progress controller.
 
@@ -183,6 +241,7 @@ class _ProgressAdapter:
         self,
         progress: Progress,
         task_id: Any,
+        prefix: (str | None) = None,
     ) -> None:
         """Initialize the adapter.
 
@@ -192,9 +251,13 @@ class _ProgressAdapter:
 
             task_id (rich.progress.TaskID):
                 The ID of the task to control.
+
+            prefix (str, optional):
+                A prefix to show before any updated description.
         """
         self._progress = progress
         self._task_id = task_id
+        self._prefix = prefix
 
     def advance(
         self,
@@ -218,6 +281,9 @@ class _ProgressAdapter:
             message (str):
                 The new description.
         """
+        if self._prefix:
+            message = f'{self._prefix}: {message}'
+
         self._progress.update(self._task_id, description=message)
 
 
@@ -353,6 +419,12 @@ class RBToolsConsole:
     #: The live display for the active spinner or progress bar, if any.
     _live: Live | None
 
+    #: The active progress display, if any.
+    #:
+    #: Nested calls to :py:meth:`progress_bar` share this, so that a spinner
+    #: stays on screen for the whole run of a command.
+    _progress: Progress | None
+
     def __init__(
         self,
         *,
@@ -407,6 +479,7 @@ class RBToolsConsole:
 
         self._suppressed = False
         self._live = None
+        self._progress = None
 
     @property
     def enabled(self) -> bool:
@@ -727,19 +800,39 @@ class RBToolsConsole:
         description: str,
         *,
         total: (int | None) = None,
+        transient: bool = True,
     ) -> Generator[_ProgressController, None, None]:
-        """Display a progress bar while a block of work runs.
+        """Display a spinner and progress bar while a block of work runs.
+
+        A spinner and the description are always shown. The bar, counts, and
+        time estimate are only drawn when there's more than one step to
+        track, since a single step would jump straight from 0% to 100%.
+
+        These nest. When one of these blocks runs inside another, it takes
+        over the display for its duration and the outer description comes
+        back when it finishes. The nested description is shown after the
+        outermost one, as ``"Outer: inner"``. That keeps a spinner and a
+        stable label on screen for the whole run of a command, rather than
+        flickering between steps.
+
+        By default the display is erased once the outermost block finishes,
+        leaving the result to be shown in its place. Pass ``transient=False``
+        for work that should leave its final state on screen.
 
         When disabled, a no-op controller is yielded so callers can still call
         :py:meth:`advance` and :py:meth:`update`.
 
         Args:
             description (str):
-                The label shown next to the bar.
+                The label shown next to the spinner.
 
             total (int, optional):
-                The total number of steps. If ``None``, the bar is
-                indeterminate.
+                The total number of steps. If ``None`` or 1, no bar is shown.
+
+            transient (bool, optional):
+                Whether to erase the display when the work finishes. This is
+                ignored when nested inside another block, which owns the
+                display.
 
         Yields:
             object:
@@ -750,22 +843,50 @@ class RBToolsConsole:
             yield _NullProgress()
             return
 
-        progress = Progress(
-            SpinnerColumn(),
-            TextColumn('[rb.step]{task.description}'),
-            BarColumn(),
-            MofNCompleteColumn(),
-            TaskProgressColumn(),
-            TimeRemainingColumn(),
-            console=self.stdout_console)
+        progress = self._progress
+
+        if progress is not None:
+            # A display is already active. Take it over for the duration of
+            # this block, hiding what it was showing, and put it back
+            # afterwards. This keeps the spinner running the whole time.
+            prefix = progress.tasks[0].description
+            hidden = [
+                task.id
+                for task in progress.tasks
+                if task.visible
+            ]
+
+            for task_id in hidden:
+                progress.update(task_id, visible=False)
+
+            task_id = progress.add_task(f'{prefix}: {description}',
+                                        total=total)
+
+            try:
+                yield _ProgressAdapter(progress, task_id, prefix)
+            finally:
+                progress.remove_task(task_id)
+
+                for task_id in hidden:
+                    progress.update(task_id, visible=True)
+
+            return
+
+        progress = Progress(SpinnerColumn(),
+                            TextColumn('[rb.step]{task.description}'),
+                            _StepsColumn(),
+                            console=self.stdout_console,
+                            transient=transient)
 
         with progress:
+            self._progress = progress
             self._live = progress.live
 
             try:
                 task_id = progress.add_task(description, total=total)
                 yield _ProgressAdapter(progress, task_id)
             finally:
+                self._progress = None
                 self._live = None
 
     def track(

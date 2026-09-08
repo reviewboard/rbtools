@@ -170,6 +170,7 @@ class Post(BaseCommand):
     needs_api = True
     needs_repository = True
     needs_scm_client = True
+    progress_description = 'Posting review request'
 
     #: Reserved built-in fields that can be set using the ``--field`` argument.
     reserved_fields = ('description', 'testing-done', 'summary')
@@ -935,7 +936,8 @@ class Post(BaseCommand):
                        get_draft_or_current_value(
                            'summary', review_request)))
 
-        return confirm(question)
+        with self.console.pause():
+            return confirm(question)
 
     def main(self, *args):
         """Create and update review requests.
@@ -1042,25 +1044,28 @@ class Post(BaseCommand):
         #
         # If we provided --diff-filename, we already computed the diff above
         # so that we could save round trips to the server in case of IO errors.
-        if not options.diff_filename:
-            if self.revisions:
-                extra_args = None
-            else:
-                extra_args = self.cmd_args
+        #
+        # Each step here shows its status under the command's spinner.
+        with self.console.progress_bar('generating diff'):
+            if not options.diff_filename:
+                if self.revisions:
+                    extra_args = None
+                else:
+                    extra_args = self.cmd_args
 
-            if with_history:
-                squashed_diff = None
-                diff_history = self._get_diff_history(extra_args)
-                parent_diff = (diff_history.entries and
-                               diff_history.entries[0].get('parent_diff'))
-            else:
-                squashed_diff = self._get_squashed_diff(extra_args)
-                diff_history = None
-                parent_diff = squashed_diff.parent_diff
+                if with_history:
+                    squashed_diff = None
+                    diff_history = self._get_diff_history(extra_args)
+                    parent_diff = (diff_history.entries and
+                                   diff_history.entries[0].get('parent_diff'))
+                else:
+                    squashed_diff = self._get_squashed_diff(extra_args)
+                    diff_history = None
+                    parent_diff = squashed_diff.parent_diff
 
-            if parent_diff:
-                self.log.debug('Generated parent diff size: %d bytes',
-                               len(parent_diff))
+                if parent_diff:
+                    self.log.debug('Generated parent diff size: %d bytes',
+                                   len(parent_diff))
 
         if squashed_diff is not None:
             if not squashed_diff.diff:
@@ -1075,28 +1080,32 @@ class Post(BaseCommand):
                         f'{entry["commit_id"]}, which is not supported.'
                     )
 
-        try:
-            if squashed_diff:
-                self._validate_squashed_diff(squashed_diff)
-            else:
-                assert diff_history is not None
-                diff_history = self._validate_diff_history(diff_history)
-        except APIError as e:
-            msg_prefix = ''
+        with self.console.progress_bar('validating diff'):
+            try:
+                if squashed_diff:
+                    self._validate_squashed_diff(squashed_diff)
+                else:
+                    assert diff_history is not None
+                    diff_history = self._validate_diff_history(diff_history)
+            except APIError as e:
+                msg_prefix = ''
 
-            if e.error_code == 207:
-                assert e.rsp is not None
-                msg_prefix = (
-                    f'{e.rsp["file"]} (revision {e.rsp["revision"]}): '
-                )
+                if e.error_code == 207:
+                    assert e.rsp is not None
+                    msg_prefix = (
+                        f'{e.rsp["file"]} (revision {e.rsp["revision"]}): '
+                    )
 
-            raise CommandError(f'Error validating diff\n\n{msg_prefix}{e}')
+                raise CommandError(f'Error validating diff\n\n{msg_prefix}{e}')
 
         review_request_id, url = self.post_request(
             review_request=review_request,
             diff_history=diff_history,
             squashed_diff=squashed_diff,
             submit_as=options.submit_as)
+
+        self.stop_progress()
+
         diff_url = f'{url}diff/'
 
         self.console.print_success(
@@ -1681,7 +1690,7 @@ class Post(BaseCommand):
         iterable = self._show_progress(
             iterable=list(zip(diff_history.entries,
                               diff_history.validation_info)),
-            desc='Uploading commits... ',
+            desc='uploading commits',
             total=len(diff_history.entries))
 
         commits: list[DraftDiffCommitItemResource] = []
@@ -1749,7 +1758,7 @@ class Post(BaseCommand):
         # Fake an iterable here to show progress on uploading the diff.
         iterable = self._show_progress(
             iterable=[None],
-            desc='Uploading diff...',
+            desc='uploading diff',
             total=1)
         diff = None
 
@@ -1800,7 +1809,7 @@ class Post(BaseCommand):
 
         iterable = self._show_progress(
             iterable=files_to_upload,
-            desc='Uploading binary files...',
+            desc='uploading binary files',
             total=len(files_to_upload))
 
         logger.debug('Uploading binary files')
@@ -2028,7 +2037,7 @@ class Post(BaseCommand):
         validation_info_list = [None]
 
         for history_entry in self._show_progress(iterable=diff_history.entries,
-                                                 desc='Validating commits...'):
+                                                 desc='validating commits'):
             validation_rsp = validator.validate_commit(
                 repository=str(self.repository.id),
                 diff=history_entry['diff'],

@@ -13,6 +13,7 @@ import os
 import platform
 import subprocess
 import sys
+from contextlib import ExitStack
 from http import HTTPStatus
 from typing import TYPE_CHECKING, cast
 from urllib.parse import urlparse
@@ -228,6 +229,16 @@ class BaseCommand:
     #:     bool
     needs_repository: ClassVar[bool] = False
 
+    #: A description to show in a spinner while the command runs.
+    #:
+    #: If this is set, a spinner will be shown from the start of
+    #: initialization until :py:meth:`main` returns. Steps within the command
+    #: can nest their own progress under it.
+    #:
+    #: Version Added:
+    #:     7.0
+    progress_description: ClassVar[str | None] = None
+
     #: Usage text for what arguments the command takes.
     #:
     #: Arguments for the command are anything passed in other than defined
@@ -378,6 +389,12 @@ class BaseCommand:
 
     #: The transport class used for talking to the API.
     transport_cls: type[Transport]
+
+    #: The stack holding the command's spinner, if one is running.
+    #:
+    #: Version Added:
+    #:     7.0
+    _progress_stack: ExitStack
 
     _global_options: list[Option] = [
         Option('-d', '--debug',
@@ -870,6 +887,7 @@ class BaseCommand:
         self.server_url = None
         self.tool = None
         self.config = None
+        self._progress_stack = ExitStack()
 
         self._stdout_stream = stdout
         self._stderr_stream = stderr
@@ -1249,27 +1267,36 @@ class BaseCommand:
 
             self._check_deprecated_args()
 
-            try:
-                self.initialize()
-            except NeedsReinitialize:
-                # This happens when we find a matching path in the TREES
-                # config. That gets merged into self.config, but then we need
-                # to rerun argument parsing and initialization so that we can
-                # incorporate those settings.
-                parser = self.create_arg_parser(argv)
-                self.options = parser.parse_args(argv[2:])
-                self._setup_console(self._resolve_color_mode())
+            with self._progress_stack:
+                self._start_progress()
 
-                self.server_url = None
-                self.api_client = None
-                self.api_root = None
-                self.capabilities = None
-                self.repository_info = None
-                self.tool = None
+                try:
+                    self.initialize()
+                except NeedsReinitialize:
+                    # This happens when we find a matching path in the TREES
+                    # config. That gets merged into self.config, but then we
+                    # need to rerun argument parsing and initialization so that
+                    # we can incorporate those settings.
+                    #
+                    # The console is rebuilt, so the spinner has to be
+                    # restarted on the new one.
+                    self.stop_progress()
 
-                self.initialize()
+                    parser = self.create_arg_parser(argv)
+                    self.options = parser.parse_args(argv[2:])
+                    self._setup_console(self._resolve_color_mode())
 
-            exit_code = self.main(*args) or 0
+                    self.server_url = None
+                    self.api_client = None
+                    self.api_root = None
+                    self.capabilities = None
+                    self.repository_info = None
+                    self.tool = None
+
+                    self._start_progress()
+                    self.initialize()
+
+                exit_code = self.main(*args) or 0
         except CommandError as e:
             if isinstance(e, ParseError):
                 parser.error(str(e))
@@ -1304,6 +1331,32 @@ class BaseCommand:
             self.console.print_json(self.json.raw)
 
         sys.exit(exit_code)
+
+    def stop_progress(self) -> None:
+        """Stop the command's spinner, if it's running.
+
+        Commands with a :py:attr:`progress_description` can call this once
+        their work is done. Any results printed afterwards are then shown in
+        place of the spinner, rather than above it.
+
+        Version Added:
+            7.0
+        """
+        self._progress_stack.close()
+
+    def _start_progress(self) -> None:
+        """Start the spinner for the command, if it has one.
+
+        The spinner is not shown for JSON output.
+
+        Version Added:
+            7.0
+        """
+        description = self.progress_description
+
+        if description and not self.options.json_output:
+            self._progress_stack.enter_context(
+                self.console.progress_bar(description))
 
     def initialize_scm_tool(
         self,

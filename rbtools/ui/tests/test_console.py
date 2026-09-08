@@ -128,6 +128,116 @@ class RBToolsConsoleTests(kgb.SpyAgency, TestCase):
 
         self.assertEqual(self._read(console, stdout_buffer), b'')
 
+    def test_progress_bar_with_multiple_steps(self) -> None:
+        """Testing RBToolsConsole.progress_bar with multiple steps shows a
+        bar
+        """
+        console, stdout_buffer, _stderr = \
+            self._make_console(color_mode='always')
+
+        with console.progress_bar('Downloading', total=10) as bar:
+            bar.advance(5)
+
+        output = self._read(console, stdout_buffer)
+
+        self.assertIn('━'.encode('utf-8'), output)
+        self.assertIn(b'5/10', output)
+
+    def test_progress_bar_with_single_step(self) -> None:
+        """Testing RBToolsConsole.progress_bar with a single step shows only
+        a spinner
+        """
+        console, stdout_buffer, _stderr = \
+            self._make_console(color_mode='always')
+
+        with console.progress_bar('Downloading', total=1) as bar:
+            bar.advance()
+
+        output = self._read(console, stdout_buffer)
+
+        self.assertIn(b'Downloading', output)
+        self.assertNotIn('━'.encode('utf-8'), output)
+        self.assertNotIn(b'1/1', output)
+
+    def test_progress_bar_is_transient(self) -> None:
+        """Testing RBToolsConsole.progress_bar erases the display when done"""
+        console, stdout_buffer, _stderr = \
+            self._make_console(color_mode='always')
+
+        with console.progress_bar('Downloading', total=10) as bar:
+            bar.advance(5)
+
+        console.print('Done.')
+
+        output = self._read(console, stdout_buffer)
+
+        # The display is erased by moving up a line and clearing it, just
+        # before the next thing is written.
+        self.assertIn(b'\x1b[1A\x1b[2KDone.\n', output)
+
+    def test_progress_bar_non_transient(self) -> None:
+        """Testing RBToolsConsole.progress_bar with transient=False leaves the
+        display on screen
+        """
+        console, stdout_buffer, _stderr = \
+            self._make_console(color_mode='always')
+
+        with console.progress_bar('Downloading', total=10,
+                                  transient=False) as bar:
+            bar.advance(10)
+
+        console.print('Done.')
+
+        output = self._read(console, stdout_buffer)
+
+        self.assertNotIn(b'\x1b[1A\x1b[2KDone.\n', output)
+        self.assertIn(b'10/10', output)
+
+    def test_progress_bar_nested(self) -> None:
+        """Testing RBToolsConsole.progress_bar nested inside another shares
+        the display
+        """
+        console, stdout_buffer, _stderr = \
+            self._make_console(color_mode='always')
+
+        with console.progress_bar('Posting') as outer:
+            live = console._live
+
+            with console.progress_bar('validating', total=3) as inner:
+                # The inner block takes over the same display, rather than
+                # starting a new one.
+                self.assertIs(console._live, live)
+                inner.advance()
+
+            outer.advance()
+
+        output = self._read(console, stdout_buffer)
+
+        self.assertIn(b'Posting', output)
+        self.assertIn(b'Posting: validating', output)
+        self.assertIn(b'/3', output)
+
+        # Only the outermost block writes the cursor show/hide sequences that
+        # bracket a live display.
+        self.assertEqual(output.count(b'\x1b[?25l'), 1)
+
+    def test_progress_bar_nested_update(self) -> None:
+        """Testing RBToolsConsole.progress_bar nested inside another keeps
+        the outer description when updated
+        """
+        console, _stdout, _stderr = self._make_console(color_mode='always')
+
+        with (console.progress_bar('Posting'),
+              console.progress_bar('uploading') as inner):
+            inner.update('publishing')
+
+            progress = console._progress
+            assert progress is not None
+
+            self.assertEqual(
+                [task.description for task in progress.tasks],
+                ['Posting', 'Posting: publishing'])
+
     def test_pause_with_no_live_display(self) -> None:
         """Testing RBToolsConsole.pause with no active live display"""
         console, stdout_buffer, _ = self._make_console()
@@ -147,17 +257,11 @@ class RBToolsConsoleTests(kgb.SpyAgency, TestCase):
             assert live is not None
 
             self.assertTrue(live.is_started)
-            self.assertFalse(live.transient)
 
             with console.pause():
-                self.assertTrue(live.transient)
                 self.assertFalse(live.is_started)
 
             self.assertTrue(live.is_started)
-
-            # The display must go back to being non-transient, so that it's
-            # still shown once the work completes.
-            self.assertFalse(live.transient)
 
     def test_log_handler_pauses_progress_bar(self) -> None:
         """Testing the Rich log handler pauses an active progress bar"""
