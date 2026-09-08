@@ -510,15 +510,9 @@ class Patcher:
                                                        patch_num=patch_num)
 
             patch_range = patch_result.patch_range
+            assert patch_range is not None
 
-            if patch_range is not None:
-                end_patch_num = patch_range[1]
-            else:
-                # This is an older implementation. We'll have to assume
-                # 1 higher than the previous patch.
-                #
-                # TODO [DEPRECATED]: This can go away with RBTools 7.
-                end_patch_num = patch_num
+            end_patch_num = patch_range[1]
 
             # If the user wants to commit, then we'll be committing every
             # patch individually, unless the user wants to squash commits
@@ -526,13 +520,6 @@ class Patcher:
             if (patch_result.success and
                 commit and
                 (not squash or end_patch_num == total_patches)):
-                # If this is an older implementation, we may need to
-                # set the patch.
-                #
-                # TODO [DEPRECATED]: This can go away with RBTools 7.
-                if not patch_result.patch:
-                    patch_result.patch = patch
-
                 self.create_commit(patch_result=patch_result,
                                    run_commit_editor=run_commit_editor)
 

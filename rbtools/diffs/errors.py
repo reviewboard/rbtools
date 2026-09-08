@@ -85,16 +85,9 @@ class ApplyPatchError(Exception):
 
         if failed_patch_result is not None:
             patch_range = failed_patch_result.patch_range
+            assert patch_range is not None
 
-            if patch_range is not None:
-                start_patch_num, end_patch_num = patch_range
-            else:
-                # This is an older implementation. We'll have to assume
-                # 1 higher than the previous patch.
-                #
-                # TODO [DEPRECATED]: This can go away with RBTools 7.
-                start_patch_num = len(patcher.applied_patch_results) + 1
-                end_patch_num = start_patch_num
+            start_patch_num, end_patch_num = patch_range
 
             if start_patch_num == end_patch_num:
                 error_vars['patch_num'] = start_patch_num

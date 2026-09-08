@@ -842,15 +842,9 @@ class PatchCommand(BaseCommand):
             # Start applying all the patches.
             for patch_result in patcher.patch():
                 patch_range = patch_result.patch_range
+                assert patch_range is not None
 
-                if patch_range is not None:
-                    patch_num = patch_range[0]
-                else:
-                    # This is an older implementation. We'll have to assume
-                    # 1 higher than the previous patch.
-                    #
-                    # TODO [DEPRECATED]: This can go away with RBTools 7.
-                    patch_num += 1
+                patch_num = patch_range[0]
 
                 if patch_result.patch_output:
                     self.stdout.new_line()
@@ -916,15 +910,9 @@ class PatchCommand(BaseCommand):
                 self.json.add_error(str(e))
             else:
                 patch_range = failed_patch_result.patch_range
+                assert patch_range is not None
 
-                if patch_range is not None:
-                    patch_num = patch_range[0]
-                else:
-                    # This is an older implementation. We'll have to assume
-                    # 1 higher than the previous patch.
-                    #
-                    # TODO [DEPRECATED]: This can go away with RBTools 7.
-                    patch_num += 1
+                patch_num = patch_range[0]
 
                 if failed_patch_result.patch_output:
                     self.stdout.new_line()

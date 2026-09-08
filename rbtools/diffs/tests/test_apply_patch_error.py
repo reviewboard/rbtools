@@ -66,19 +66,3 @@ class ApplyPatchErrorTests(TestCase):
                 patch_range=(1, 3)))
 
         self.assertEqual(str(e), '1-3:patches 1-3 of 3:3')
-
-    def test_with_failed_patch_result_no_patc_range(self) -> None:
-        """Testing ApplyPatchError with failed patch result and no patch
-        range information
-        """
-        patcher = Patcher(patches=[
-            Patch(content=b'...'),
-            Patch(content=b'...'),
-        ])
-
-        e = ApplyPatchError(
-            message='%(patch_num)s:%(patch_subject)s:%(total_patches)s',
-            patcher=patcher,
-            failed_patch_result=PatchResult(applied=False))
-
-        self.assertEqual(str(e), '1:patch 1 of 2:2')
