@@ -393,17 +393,6 @@ class Patch:
         if not content and not path:
             raise ValueError(_('Either content= or path= must be provided.'))
 
-        if isinstance(prefix_level, str):
-            RemovedInRBTools70Warning.warn(
-                'prefix_level must be an integer, not a string. Support '
-                'for string prefix levels will be removed in RBTools 7.')
-
-            try:
-                prefix_level = int(prefix_level)
-            except ValueError:
-                # We'll cover this below.
-                pass
-
         if prefix_level is not None and not isinstance(prefix_level, int):
             raise_invalid_type(
                 prefix_level,

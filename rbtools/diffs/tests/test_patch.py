@@ -6,7 +6,6 @@ Version Added:
 
 from __future__ import annotations
 
-import re
 from io import BytesIO
 from pathlib import Path
 from urllib.error import URLError
@@ -15,7 +14,6 @@ from urllib.request import urlopen
 import kgb
 
 from rbtools.api.resource import FileAttachmentItemResource
-from rbtools.deprecation import RemovedInRBTools70Warning
 from rbtools.diffs.patches import BinaryFilePatch, Patch, PatchAuthor
 from rbtools.testing import TestCase
 from rbtools.testing.api.transport import URLMapTransport
@@ -216,43 +214,17 @@ class PatchTests(TestCase):
                   message='This is a commit message.',
                   prefix_level=1)
 
-    def test_init_with_prefix_level_int_string(self) -> None:
-        """Testing Patch.__init__ with prefix_level as string-encoded int"""
-        message = re.escape(
-            'prefix_level must be an integer, not a string. Support '
-            'for string prefix levels will be removed in RBTools 7.'
-        )
+    def test_init_with_prefix_level_string(self) -> None:
+        """Testing Patch.__init__ with prefix_level as a string"""
+        message = "prefix_level must be an integer, not '1'."
 
-        with self.assertWarnsRegex(RemovedInRBTools70Warning, message):
-            patch = Patch(author=PatchAuthor(full_name='Test User',
-                                             email='test@example.com'),
-                          content=b'XXX',
-                          base_dir='/base',
-                          message='This is a commit message.',
-                          prefix_level='1')  # type: ignore
-
-        self.assertEqual(patch.prefix_level, 1)
-
-    def test_init_with_prefix_level_invalid_string(self) -> None:
-        """Testing Patch.__init__ with prefix_level as string with non-int
-        contents
-        """
-        error_message = "prefix_level must be an integer, not 'XXX'."
-        warning_message = (
-            'prefix_level must be an integer, not a string. Support for '
-            'string prefix levels will be removed in RBTools 7.'
-        )
-
-        with self.assertRaisesMessage(ValueError,
-                                      error_message), \
-             self.assertWarns(RemovedInRBTools70Warning,
-                              msg=warning_message):
+        with self.assertRaisesMessage(ValueError, message):
             Patch(author=PatchAuthor(full_name='Test User',
                                      email='test@example.com'),
                   content=b'XXX',
                   base_dir='/base',
                   message='This is a commit message.',
-                  prefix_level='XXX')  # type: ignore
+                  prefix_level='1')  # type: ignore
 
     def test_content_with_content_set(self) -> None:
         """Testing Patch.content with content set"""
