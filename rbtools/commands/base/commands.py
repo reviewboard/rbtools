@@ -2138,7 +2138,9 @@ class BaseMultiCommand(BaseCommand):
         subparsers = parser.add_subparsers(
             description=(
                 'To get additional help for these commands, run: '
-                '%s <subcommand> --help' % prog))
+                '%s <subcommand> --help' % prog),
+            metavar='<subcommand>',
+            required=True)
 
         for command_cls in self.subcommands:
             subcommand_name = command_cls.name
@@ -2161,6 +2163,29 @@ class BaseMultiCommand(BaseCommand):
         self.subcommand_parsers = subcommand_parsers
 
         return parser
+
+    def run_from_argv(
+        self,
+        argv: list[str],
+    ) -> None:
+        """Execute the command using the provided arguments.
+
+        If no subcommand was provided, this will print the help text and
+        exit.
+
+        Version Added:
+            7.0
+
+        Args:
+            argv (list of str):
+                A list of command line arguments
+        """
+        if len(argv) <= 2:
+            parser = self.create_parser(config=load_config(), argv=argv)
+            parser.print_help()
+            sys.exit(1)
+
+        super().run_from_argv(argv)
 
     def initialize(self) -> None:
         """Initialize the command."""

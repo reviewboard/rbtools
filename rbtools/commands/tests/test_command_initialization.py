@@ -7,7 +7,8 @@ Version Added:
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
+import io
+from contextlib import contextmanager, redirect_stdout
 from typing import TYPE_CHECKING
 
 from rbtools.clients import RepositoryInfo
@@ -452,6 +453,18 @@ class MultiCommandInitializationTests(CommandTestsMixin[_TestMultiCommand],
             subcommand.option_list = self.original_subcommand_option_lists[i]
 
         super().tearDown()
+
+    def test_without_subcommand(self) -> None:
+        """Testing running a multi command without a subcommand prints help"""
+        stdout = io.StringIO()
+
+        with redirect_stdout(stdout):
+            result = self.run_command()
+
+        self.assertEqual(result['exit_code'], 1)
+        self.assertIn('usage: rbt test-multi-command <subcommand>',
+                      stdout.getvalue())
+        self.assertIn('sub-command', stdout.getvalue())
 
     def test_with_common_deprecated_option(self) -> None:
         """Testing warning and help output when passing a common deprecated
