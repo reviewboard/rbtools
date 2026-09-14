@@ -519,6 +519,30 @@ class JujutsuClientTests(BaseJujutsuClientTests):
                 'parent_diff': None,
             })
 
+    def test_diff_with_exclude_patterns_and_special_filenames(self) -> None:
+        """Testing JujutsuClient.diff with file exclusion and filenames
+        containing fileset syntax
+        """
+        client = self.build_client(needs_diff=True)
+        client.get_repository_info()
+
+        filename = 'foo,v (1) "2".txt'
+
+        self._add_file_to_repo(filename=filename, data=FOO1,
+                               message='Commit 1')
+        self._add_file_to_repo(filename='exclude.txt', data=FOO2,
+                               message='Commit 2', commit=False)
+
+        revisions = client.parse_revision_spec([])
+        diff = client.diff(revisions,
+                           exclude_patterns=['exclude.txt'])['diff']
+
+        assert diff is not None
+        self.assertTrue(diff.startswith(
+            b'diff --git a/foo,v (1) "2".txt b/foo,v (1) "2".txt\n'))
+        self.assertIn(b'+++ b/foo,v (1) "2".txt\n', diff)
+        self.assertNotIn(b'exclude.txt', diff)
+
     def test_diff_exclude_in_subdir(self) -> None:
         """Testing JujutsuClient.diff with file exclusion in a subdir"""
         client = self.build_client(needs_diff=True)

@@ -1222,9 +1222,13 @@ class JujutsuClient(BaseSCMClient):
             diff_lines: list[bytes] = []
 
             for filename in changed_files:
+                # jj parses paths as filesets, where characters like "," are
+                # operators. Quote the name as an exact file pattern.
+                escaped = filename.replace('\\', '\\\\').replace('"', '\\"')
+
                 lines = (
                     run_process(['jj', 'diff', '--git', '--from', base,
-                                 '--to', tip, '--', filename])
+                                 '--to', tip, '--', f'file:"{escaped}"'])
                     .stdout_bytes
                     .readlines()
                 )
