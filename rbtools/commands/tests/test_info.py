@@ -83,6 +83,20 @@ class InfoCommandTests(CommandTestsMixin[Info], TestCase):
         self.assertEqual(result['exit_code'], 1)
         self.assertIn(b'Diff revision 5 does not exist.', result['stderr'])
 
+    def test_with_non_numeric_diff_revision(self) -> None:
+        """Testing rbt info with a non-numeric diff revision"""
+        def setup_transport(
+            transport: URLMapTransport,
+        ) -> None:
+            self._add_review_request(transport)
+
+        result = self.run_command(args=['1', 'abc'],
+                                  setup_transport_func=setup_transport)
+
+        self.assertEqual(result['exit_code'], 1)
+        self.assertIn(b'"abc" is not a valid diff revision.',
+                      result['stderr'])
+
     def _add_review_request(
         self,
         transport: URLMapTransport,

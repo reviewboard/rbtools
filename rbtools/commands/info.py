@@ -27,6 +27,13 @@ class Info(BaseCommand):
     ]
 
     def main(self, review_request_id, diff_revision=None):
+        if diff_revision is not None:
+            try:
+                diff_revision = int(diff_revision)
+            except ValueError:
+                raise CommandError(
+                    f'"{diff_revision}" is not a valid diff revision.')
+
         try:
             review_request = self.api_root.get_review_request(
                 review_request_id=review_request_id,
