@@ -44,10 +44,15 @@ class Info(BaseCommand):
             except APIError as e:
                 raise CommandError(f'Error retrieving diffs: {e}')
 
-            if diff_revision is None:
+            if diff_revision is None and diffs.total_results:
                 diff_revision = diffs.total_results
 
-            diff = diffs.get_item(diff_revision)
+            if diff_revision is not None:
+                try:
+                    diff = diffs.get_item(diff_revision)
+                except APIError:
+                    raise CommandError(
+                        f'Diff revision {diff_revision} does not exist.')
 
             if getattr(diff, 'commit_count', 0) > 0:
                 try:
