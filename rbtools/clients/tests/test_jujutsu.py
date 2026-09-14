@@ -606,7 +606,7 @@ class JujutsuClientTests(BaseJujutsuClientTests):
                     b'diff --git a/foo.txt b/foo.txt\n'
                     b'deleted file mode 100644\n'
                     b'index 634b3e8ff85bada6f928841a9f2c505560840b3a..'
-                    b'0000000000000000000000000000000000000000\n\n'
+                    b'0000000000000000000000000000000000000000\n'
                     b'--- a/foo.txt\n'
                     b'+++ /dev/null\n'
                     b'@@ -1,12 +0,0 @@\n'

@@ -1557,7 +1557,7 @@ class JujutsuClient(BaseSCMClient):
                 An error occurred while processing the diff.
         """
         index_re = re.compile(
-            br'^index (?P<a>[0-9a-f]+)..(?P<b>[0-9a-f]+)((?P<rest>\s.*)?)$')
+            br'^index (?P<a>[0-9a-f]+)..(?P<b>[0-9a-f]+)((?P<rest> .*)?)$')
         sha_result_re = re.compile(r'^(?P<sha>[0-9a-f]+) blob \d+$')
 
         with subprocess.Popen(
