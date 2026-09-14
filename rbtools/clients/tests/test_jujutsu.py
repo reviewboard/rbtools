@@ -14,6 +14,7 @@ import kgb
 from rbtools.clients.base.repository import RepositoryInfo
 from rbtools.clients.errors import (
     AmendError,
+    InvalidRevisionSpecError,
     PushError,
     SCMError,
     SCMClientDependencyError,
@@ -358,6 +359,42 @@ class JujutsuClientTests(BaseJujutsuClientTests):
 
         with self.assertRaises(TooManyRevisionsError):
             client.parse_revision_spec(['1', '2', '3'])
+
+    def test_parse_revision_spec_invalid_revision(self) -> None:
+        """Testing JujutsuClient.parse_revision_spec with a revision that
+        does not exist
+        """
+        client = self.build_client()
+
+        message = (
+            'Invalid revision "kkkkqqqq": Revision `kkkkqqqq` doesn\'t exist'
+        )
+
+        with self.assertRaisesMessage(InvalidRevisionSpecError, message):
+            client.parse_revision_spec(['kkkkqqqq'])
+
+        with self.assertRaisesMessage(InvalidRevisionSpecError, message):
+            client.parse_revision_spec(['kkkkqqqq', '@'])
+
+    def test_parse_revision_spec_empty_revset(self) -> None:
+        """Testing JujutsuClient.parse_revision_spec with a revset that
+        does not match any changes
+        """
+        client = self.build_client()
+
+        with self.assertRaisesMessage(
+            InvalidRevisionSpecError,
+            'Revision "none()" did not match any changes.'):
+            client.parse_revision_spec(['none()'])
+
+    def test_parse_revision_spec_root_commit(self) -> None:
+        """Testing JujutsuClient.parse_revision_spec with the root commit"""
+        client = self.build_client()
+
+        with self.assertRaisesMessage(
+            InvalidRevisionSpecError,
+            'Revision "zzzzzzzz" is the root commit, which has no changes.'):
+            client.parse_revision_spec(['zzzzzzzz'])
 
     def test_diff_with_working_copy(self) -> None:
         """Testing JujutsuClient.diff with the working copy change"""

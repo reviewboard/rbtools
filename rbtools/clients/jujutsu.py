@@ -24,6 +24,7 @@ from rbtools.clients.base.scmclient import (
 from rbtools.clients.errors import (
     AmendError,
     CreateCommitError,
+    InvalidRevisionSpecError,
     MergeError,
     PushError,
     SCMError,
@@ -511,7 +512,7 @@ class JujutsuClient(BaseSCMClient):
         elif n_revs == 1:
             # A single revision was passed in. This could be an actual single
             # revision, or it could be a revset that represents a range.
-            changes = self._get_change_ids(revisions[0])
+            changes = self._resolve_revset(revisions[0])
             n_changes = len(changes)
 
             if n_changes == 1:
@@ -519,6 +520,16 @@ class JujutsuClient(BaseSCMClient):
                 # find its parent as the base.
                 tip = changes[0]
                 base = self._get_change_id(f'{tip}-')
+
+                if not base:
+                    # Only the root commit has no parent.
+                    raise InvalidRevisionSpecError(
+                        _(
+                            'Revision "{revision}" is the root commit, which '
+                            'has no changes.'
+                        )
+                        .format(revision=revisions[0]))
+
                 parent_bookmark = self._get_parent_bookmark(base)
 
                 result = {
@@ -539,8 +550,8 @@ class JujutsuClient(BaseSCMClient):
                     'tip': tip,
                 }
         elif n_revs == 2:
-            base = self._get_change_id(revisions[0])
-            tip = self._get_change_id(revisions[1])
+            base = self._resolve_revset(revisions[0])[0]
+            tip = self._resolve_revset(revisions[1])[0]
             parent_bookmark = self._get_parent_bookmark(base)
 
             result = {
@@ -1415,6 +1426,43 @@ class JujutsuClient(BaseSCMClient):
             .read()
             .splitlines()
         )
+
+    def _resolve_revset(
+        self,
+        revset: str,
+    ) -> Sequence[str]:
+        """Return the change IDs for a user-provided revset.
+
+        Unlike :py:meth:`_get_change_ids`, this reports problems with the
+        revset in a form suitable for showing to the user.
+
+        Args:
+            revset (str):
+                The revset to query.
+
+        Returns:
+            list of str:
+            A non-empty list of the change IDs in the revset.
+
+        Raises:
+            rbtools.clients.errors.InvalidRevisionSpecError:
+                The revset could not be parsed or did not match any changes.
+        """
+        try:
+            changes = self._get_change_ids(revset)
+        except RunProcessError as e:
+            error = e.result.stderr.read().strip().removeprefix('Error: ')
+
+            raise InvalidRevisionSpecError(
+                _('Invalid revision "{revset}": {error}')
+                .format(revset=revset, error=error))
+
+        if not changes:
+            raise InvalidRevisionSpecError(
+                _('Revision "{revset}" did not match any changes.')
+                .format(revset=revset))
+
+        return changes
 
     def _get_remotes(
         self,
