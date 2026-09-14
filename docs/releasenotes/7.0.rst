@@ -1,0 +1,313 @@
+.. default-intersphinx:: rbt7.x rb-latest
+
+=========================
+RBTools 7.0 Release Notes
+=========================
+
+**Release date:** TBD
+
+
+Installation
+============
+
+Follow our :ref:`installation guide <rbtools-installation>` to install
+RBTools.
+
+To learn more, see:
+
+* `Documentation <https://www.reviewboard.org/docs/rbtools/7.x/>`_
+* `RBTools on PyPI <https://pypi.org/project/rbtools/>`_
+* `RBTools on GitHub <https://github.com/reviewboard/rbtools/>`_
+
+
+Compatibility
+=============
+
+* RBTools supports Python 3.10 through 3.14.
+
+* Added a dependency on :pypi:`rich` 15.x.
+
+* Removed the dependencies on :pypi:`colorama`, :pypi:`texttable`, and
+  :pypi:`tqdm`.
+
+
+New Features
+============
+
+* New and improved console output.
+
+  RBTools now uses :pypi:`rich` for all console output. Commands show
+  colorized status messages, tables, spinners, and progress bars. JSON output
+  from :option:`--json` is now syntax-highlighted.
+
+  Output is also cleaner when RBTools needs to prompt for input in the middle
+  of a command. For example, if you run :rbtcommand:`rbt post` while logged
+  out, progress output is hidden while the login prompt is shown.
+
+
+* Added a :option:`--color` option to all commands.
+
+  This controls when colorized output is used. It accepts ``auto`` (the
+  default), ``always``, or ``never``. This can also be set with the
+  :rbtconfig:`COLOR_MODE` configuration key.
+
+  The standard ``NO_COLOR`` and ``FORCE_COLOR`` environment variables are
+  also supported when the mode is ``auto``.
+
+
+* Fill in more review request fields from commit messages.
+
+  When guessing fields, RBTools now parses the **Testing Done** and **Bugs
+  Closed** fields out of commit messages, in addition to the summary and
+  description. This matches the format written by :rbtcommand:`rbt patch` and
+  :rbtcommand:`rbt land`, so changes can be round-tripped between Review Board
+  and your repository.
+
+  Recognized field headers and ``Reviewed at <url>`` lines are stripped from
+  the guessed description.
+
+  If your team uses different commit message conventions, you can set
+  :rbtconfig:`COMMIT_MESSAGE_PARSER` to a custom function. Custom parsers can
+  also provide the branch, depends on, target groups, and target people
+  fields.
+
+
+rbt close
+---------
+
+.. program:: rbt close
+
+* :option:`--close-type` now accepts ``completed`` as the default close type.
+
+  This matches the terminology used in Review Board. ``submitted`` is still
+  accepted.
+
+
+rbt info
+--------
+
+.. program:: rbt info
+
+* Show drafts for review requests.
+
+  :rbtcommand:`rbt info` now shows the draft for unpublished review
+  requests, and for published review requests when you are the submitter.
+
+
+rbt post
+--------
+
+.. program:: rbt post
+
+* Improved progress output.
+
+  :rbtcommand:`rbt post` now shows a single spinner with the current task. A
+  progress bar is added when validating or uploading multiple commits. When
+  posting is complete, the spinner is replaced with the result.
+
+* :option:`--guess-fields` now applies to all guessable fields.
+
+  This includes summary, description, testing done, bugs closed, and any
+  additional fields provided by a custom
+  :rbtconfig:`COMMIT_MESSAGE_PARSER`. When set, it takes precedence over
+  :option:`--guess-summary` and :option:`--guess-description`.
+
+  Values provided explicitly on the command line always take precedence over
+  guessed values.
+
+
+Bug Fixes
+=========
+
+General
+-------
+
+* Running a command with subcommands, such as :rbtcommand:`rbt review` or
+  :rbtcommand:`rbt status-update`, without a subcommand now shows help text
+  instead of crashing.
+
+
+rbt info
+--------
+
+.. program:: rbt info
+
+* Fixed a crash when a review request has a repository but no published
+  diffs.
+
+* A non-numeric or non-existent diff revision now shows a clear error,
+  instead of the raw HTML of an error page.
+
+
+rbt install
+-----------
+
+.. program:: rbt install
+
+* Fixed fetching signing keys from the keyserver when verifying downloads.
+
+
+rbt patch
+---------
+
+.. program:: rbt patch
+
+* Fixed a crash when applying patches with binary files that were posted
+  with RBTools 5.x or older.
+
+  This also affected binary files that were not uploaded when posting, such
+  as very large files.
+
+* Fixed applying patches with moved or copied binary files.
+
+  This mainly affected systems using Apple's :command:`diff` outside of Git
+  repositories.
+
+* Fixed applying patches with moved binary files when using GNU
+  :command:`patch` 2.7 or newer.
+
+* Fixed a crash when using :option:`--json` and a patch had conflicts.
+
+
+rbt review
+----------
+
+.. program:: rbt review
+
+* Fixed :rbtcommand:`rbt review add-diff-comment <rbt review>` failing with
+  "Could not find a file" on diffs containing more than 25 files.
+
+  Only the first page of files in the diff was searched when matching
+  :option:`--filename`. All pages are now searched.
+
+
+rbt status-update get
+---------------------
+
+* Fixed a crash in :rbtcommand:`rbt status-update get <rbt status-update>`.
+
+  Patch by Conor Burgess.
+
+
+ClearCase / VersionVault
+------------------------
+
+* Fixed diff paths when running inside a view entered with
+  :command:`cleartool setview`.
+
+  Paths were computed relative to the current directory, which caused
+  file-not-found errors when posting. This could appear to happen at random,
+  since the same change would post fine from a view entered through
+  :file:`/view/{tag}`.
+
+* Fixed label-based diffs, which previously treated every file as
+  ``/main/0``.
+
+* Improved performance of VOB lookups on installations with many regions and
+  VOBs.
+
+
+Jujutsu
+-------
+
+* Fixed compatibility with Jujutsu 0.42 and newer.
+
+  Jujutsu 0.42 removed the ``--author`` option from :command:`jj describe`.
+  This broke setting the author when creating commits with
+  :rbtcommand:`rbt patch` and :rbtcommand:`rbt land`.
+
+* Improved error messages for invalid revisions.
+
+  Passing a mistyped change ID or an empty revset to :rbtcommand:`rbt diff`
+  or :rbtcommand:`rbt post` now shows the error reported by Jujutsu, instead
+  of a generic error or crash.
+
+* Fixed a crash when a change had multiple fork points from the upstream
+  branch.
+
+* Fixed creating unnecessary parent diffs in some cases.
+
+* Fixed using RBTools in workspaces that reference the main repository with a
+  relative path.
+
+* Fixed :rbtcommand:`rbt patch` truncating newly-added files to zero bytes.
+
+* Fixed diffs for files with names containing fileset syntax characters, such
+  as ``,``, ``(``, ``|``, or ``~``. This affected diffs when
+  :rbtconfig:`EXCLUDE_PATTERNS` was set.
+
+* Fixed an extra blank line after ``index`` lines for added and deleted files
+  in generated diffs.
+
+
+API Changes
+===========
+
+Removed
+-------
+
+The following features were deprecated in earlier releases and have now been
+removed.
+
+* Removed the ``rbtools.clients.base.patch`` module. Use
+  :py:class:`rbtools.diffs.patches.PatchAuthor` and
+  :py:class:`rbtools.diffs.patches.PatchResult` instead.
+
+* Removed the ``PatchAuthor`` and ``PatchResult`` forwarding classes from
+  :py:mod:`rbtools.clients`.
+
+* Removed legacy patching support for SCMClients that only override
+  ``apply_patch()``. SCMClients must now set
+  :py:attr:`~rbtools.clients.base.scmclient.BaseSCMClient.patcher_cls`.
+
+* Removed ``BaseSCMClient.apply_patch_for_empty_files()``.
+
+* Removed the ``PatchAuthor.fullname`` property. Use
+  :py:attr:`PatchAuthor.full_name
+  <rbtools.diffs.patches.PatchAuthor.full_name>` instead.
+
+* :py:class:`~rbtools.diffs.patches.Patch` no longer accepts a string for
+  ``prefix_level``.
+
+* :py:class:`~rbtools.diffs.patches.PatchAuthor`,
+  :py:class:`~rbtools.diffs.patches.PatchResult`,
+  :py:func:`~rbtools.utils.mimetypes.guess_mimetype`, and
+  :py:meth:`CommandTestsMixin.create_command
+  <rbtools.testing.commands.CommandTestsMixin.create_command>` now require
+  keyword arguments.
+
+
+New
+---
+
+* Added :py:mod:`rbtools.utils.commit_messages`, with
+  :py:func:`~rbtools.utils.commit_messages.parse_commit_message` and
+  :py:func:`~rbtools.utils.commit_messages.format_commit_message`.
+
+* Added :py:class:`rbtools.ui.console.RBToolsConsole` for rich console output
+  in commands.
+
+
+Deprecated
+----------
+
+* ``rbtools.utils.commands.extract_commit_message()`` has been moved to
+  :py:func:`rbtools.utils.commit_messages.format_commit_message`. The old
+  name will be removed in RBTools 9.
+
+* ``rbtools.utils.commands.STAMP_STRING_FORMAT`` has been moved to
+  :py:data:`rbtools.utils.commit_messages.STAMP_STRING_FORMAT`.
+
+* :py:class:`~rbtools.clients.base.scmclient.SCMClientCommitMessage` is now
+  an alias for
+  :py:class:`~rbtools.utils.commit_messages.ParsedCommitMessage`. The alias
+  will be removed in RBTools 9.
+
+
+Contributors
+============
+
+* Christian Hammond
+* Conor Burgess
+* David Trowbridge
+* Michelle Aubin

@@ -242,6 +242,7 @@ intersphinx_mapping = {
     'rbt4.x': (f'{rbwebsite_url}/docs/rbtools/4.x/', None),
     'rbt5.x': (f'{rbwebsite_url}/docs/rbtools/5.x/', None),
     'rbt6.x': (f'{rbwebsite_url}/docs/rbtools/6.x/', None),
+    'rbt7.x': (f'{rbwebsite_url}/docs/rbtools/7.x/', None),
     'rbt-latest': (f'{rbwebsite_url}/docs/rbtools/latest/', None),
 }
 
