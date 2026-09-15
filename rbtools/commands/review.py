@@ -214,7 +214,7 @@ class AddDiffComment(AddCommentSubCommand):
 
         file_to_comment = None
 
-        for file in diffset.get_files():
+        for file in diffset.get_files().all_items:
             if file.dest_file.endswith(options.filename):
                 if file_to_comment:
                     raise CommandError(
