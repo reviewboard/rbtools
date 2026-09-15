@@ -72,7 +72,9 @@ class SetupCompletionTest(CommandTestsMixin[SetupCompletion], TestCase):
 
     def test_with_shell_unknown(self) -> None:
         """Testing SetupCompletion with shell unknown"""
-        with self.env({'SHELL': ''}):
+        # Pin the width so the wrapped output is stable regardless of the
+        # terminal running the tests.
+        with self.env({'COLUMNS': '80', 'SHELL': ''}):
             result = self.run_command()
 
         self.assertEqual(result['exit_code'], 1)

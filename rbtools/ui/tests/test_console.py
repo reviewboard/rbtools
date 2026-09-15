@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import logging
+from contextlib import ExitStack
 from typing import TYPE_CHECKING
 
 import kgb
@@ -25,6 +26,17 @@ class RBToolsConsoleTests(kgb.SpyAgency, TestCase):
     Version Added:
         7.0
     """
+
+    def setUp(self) -> None:
+        """Set up the test case."""
+        super().setUp()
+
+        # Rich disables color and live displays when TERM is "dumb", which
+        # is what the CI image sets. Pin it so these tests don't depend on
+        # the environment.
+        stack = ExitStack()
+        stack.enter_context(self.env({'TERM': 'xterm'}))
+        self.addCleanup(stack.close)
 
     def test_enabled_for_color_mode(self) -> None:
         """Testing RBToolsConsole.enabled for each color mode"""
