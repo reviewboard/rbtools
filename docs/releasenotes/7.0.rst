@@ -4,7 +4,7 @@
 RBTools 7.0 Release Notes
 =========================
 
-**Release date:** TBD
+**Release date:** September 30, 2026
 
 
 Installation
