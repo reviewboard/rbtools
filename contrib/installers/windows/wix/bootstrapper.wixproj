@@ -59,12 +59,14 @@
  </Target>
 
  <!-- Sign the bundled installer. -->
- <Target Name="SignBundleEngine">
-  <Exec Command='"$(SignToolPath)" sign /fd SHA256 /sha1 $(CertificateThumbprint) /t $(TimestampUrl) "@(SignBundleEngine)"' />
+ <Target Name="SignBundleEngine"
+         DependsOnTargets="EnsureSignToolInstalled;EnsureAzureSignConfigured">
+  <Exec Command='"$(SignToolPath)" sign /fd SHA256 /tr $(TimestampUrl) /td SHA256 /dlib "$(AzureSignDlibPath)" /dmdf "$(AzureSignMetadataFile)" "@(SignBundleEngine)"' />
  </Target>
 
- <Target Name="SignBundle">
-  <Exec Command='"$(SignToolPath)" sign /fd SHA256 /sha1 $(CertificateThumbprint) /t $(TimestampUrl) "@(SignBundle)"' />
+ <Target Name="SignBundle"
+         DependsOnTargets="EnsureSignToolInstalled;EnsureAzureSignConfigured">
+  <Exec Command='"$(SignToolPath)" sign /fd SHA256 /tr $(TimestampUrl) /td SHA256 /dlib "$(AzureSignDlibPath)" /dmdf "$(AzureSignMetadataFile)" "@(SignBundle)"' />
  </Target>
 
  <!-- Copy the built installer to the output directory. -->

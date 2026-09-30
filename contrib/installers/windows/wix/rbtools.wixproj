@@ -55,14 +55,14 @@
  </Target>
 
  <!-- Sign the bundled cabinet files -->
- <Target Name="SignCabs">
-  <SignFile CertificateThumbprint="$(CertificateThumbprint)"
-            TimestampUrl="$(TimestampUrl)"
-            SigningTarget="%(SignCabs.FullPath)"/>
+ <Target Name="SignCabs"
+         DependsOnTargets="EnsureSignToolInstalled;EnsureAzureSignConfigured">
+  <Exec Command='"$(SignToolPath)" sign /fd SHA256 /tr $(TimestampUrl) /td SHA256 /dlib "$(AzureSignDlibPath)" /dmdf "$(AzureSignMetadataFile)" "%(SignCabs.FullPath)"' />
  </Target>
 
  <!-- Sign the installer -->
- <Target Name="SignMsi">
-  <Exec Command='"$(SignToolPath)" sign /debug /fd SHA256 /sha1 $(CertificateThumbprint) /t $(TimestampUrl) "%(SignMsi.FullPath)"' />
+ <Target Name="SignMsi"
+         DependsOnTargets="EnsureSignToolInstalled;EnsureAzureSignConfigured">
+  <Exec Command='"$(SignToolPath)" sign /debug /fd SHA256 /tr $(TimestampUrl) /td SHA256 /dlib "$(AzureSignDlibPath)" /dmdf "$(AzureSignMetadataFile)" "%(SignMsi.FullPath)"' />
  </Target>
 </Project>
