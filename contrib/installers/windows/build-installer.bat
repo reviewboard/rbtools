@@ -30,14 +30,24 @@ set DEPS_DIR=%BUILD_BASE%\deps
 ::-------------------------------------------------------------------------
 :: Dependencies
 ::-------------------------------------------------------------------------
-set PYTHON_VERSION=3.10.11
+set PYTHON_VERSION=3.13.15
 
 set PYTHON_URL_BASE=https://www.python.org/ftp/python
 
 set PYTHON_X64_FILENAME=python-%PYTHON_VERSION%-amd64.exe
 set PYTHON_X64_URL=%PYTHON_URL_BASE%/%PYTHON_VERSION%/%PYTHON_X64_FILENAME%
-set PYTHON_X64_MD5=a55e9c1e6421c84a4bd8b4be41492f51
+set PYTHON_X64_SHA256=edec09c4853aeae9ac36efb8c9f95b6b8e2fee65eee56d9767a8b7c69c574403
 set PYTHON_X64_DEP=%DEPS_DIR%\python-%PYTHON_VERSION%-x64
+
+set NUGET_VERSION=6.9.1
+set NUGET_URL=https://dist.nuget.org/win-x86-commandline/v%NUGET_VERSION%/nuget.exe
+set NUGET_SHA256=82bb13e2365e1e5ee7d0975618dcf90b279427de8a7ecb338b9b78bfc457d51b
+set NUGET_DIR=%DEPS_DIR%\nuget-%NUGET_VERSION%
+set NUGET_EXE=%NUGET_DIR%\nuget.exe
+
+set TRUSTED_SIGNING_CLIENT_VERSION=1.0.60
+set TRUSTED_SIGNING_CLIENT_DIR=%DEPS_DIR%\Microsoft.Trusted.Signing.Client.%TRUSTED_SIGNING_CLIENT_VERSION%
+set AZURE_SIGN_DLIB_PATH=%TRUSTED_SIGNING_CLIENT_DIR%\bin\x64\Azure.CodeSigning.Dlib.dll
 
 
 ::-------------------------------------------------------------------------
@@ -50,12 +60,6 @@ call :SetMSBuildPath || goto :Abort
 
 
 ::-------------------------------------------------------------------------
-:: Signing certificate
-::-------------------------------------------------------------------------
-set CERT_THUMBPRINT_SHA1=88b278d63d192543884faa8cd97cc77ef74ef897
-
-
-::-------------------------------------------------------------------------
 :: Begin the installation process
 ::-------------------------------------------------------------------------
 if not exist "%DEPS_DIR%" mkdir "%DEPS_DIR%"
@@ -63,9 +67,12 @@ if not exist "%BUILD_STAGE%" mkdir "%BUILD_STAGE%"
 
 call :InstallPython ^
     x64 %PYTHON_X64_DEP% %PYTHON_X64_FILENAME% ^
-    %PYTHON_X64_URL% %PYTHON_X64_MD5% ^
+    %PYTHON_X64_URL% %PYTHON_X64_SHA256% ^
     || goto :Abort
 
+call :InstallNuGet || goto :Abort
+call :InstallTrustedSigningClient || goto :Abort
+call :GenerateSigningMetadata || goto :Abort
 call :CreateBuildDirectory || goto :Abort
 call :InstallPackages || goto :Abort
 call :InstallRBTools || goto :Abort
@@ -80,14 +87,14 @@ exit /B 0
 ::-------------------------------------------------------------------------
 :: Installs Python
 ::-------------------------------------------------------------------------
-:InstallPython arch dep_path python_filename url md5
+:InstallPython arch dep_path python_filename url sha256
 setlocal
 
 set _arch=%~1
 set _dep_path=%~2
 set _python_filename=%~3
 set _url=%~4
-set _md5=%~5
+set _sha256=%~5
 
 echo.
 echo == Installing Python [%_arch%] ==
@@ -99,7 +106,7 @@ if not exist "%_dep_path%" (
     if not exist "%_PYTHON_INSTALLER%" (
         echo Preparing to download Python v%PYTHON_VERSION% [%_arch%]...
 
-        call :DownloadAndVerify %_url% "%_PYTHON_INSTALLER%" %_md5%
+        call :DownloadAndVerify %_url% "%_PYTHON_INSTALLER%" SHA256 %_sha256%
         if %errorlevel% neq 0 exit /b 1
 
         echo Downloaded to %_PYTHON_INSTALLER%
@@ -127,6 +134,158 @@ if not exist "%_dep_path%" (
     echo Python installer is complete.
 )
 
+exit /B 0
+
+
+::-------------------------------------------------------------------------
+:: Download nuget.exe.
+::
+:: This is needed for part of the Azure Artifact Signing setup.
+::-------------------------------------------------------------------------
+:InstallNuGet
+setlocal
+
+echo.
+echo == Installing NuGet [%NUGET_VERSION%] ==
+
+if not exist "%NUGET_DIR%" mkdir "%NUGET_DIR%"
+
+call :DownloadAndVerify %NUGET_URL% "%NUGET_EXE%" SHA256 %NUGET_SHA256%
+
+if ERRORLEVEL 1 (
+    call :DeleteIfExists "%NUGET_EXE%"
+    exit /B 1
+)
+
+exit /B 0
+
+
+::-------------------------------------------------------------------------
+:: Install the Azure Trusted Signing client.
+::
+:: This installs to the dependency tree so signtool.exe can find it.
+::-------------------------------------------------------------------------
+:InstallTrustedSigningClient
+setlocal
+
+echo.
+echo == Installing Microsoft.Trusted.Signing.Client [%TRUSTED_SIGNING_CLIENT_VERSION%] ==
+
+if not exist "%TRUSTED_SIGNING_CLIENT_DIR%" (
+    "%NUGET_EXE%" install Microsoft.Trusted.Signing.Client ^
+        -Version %TRUSTED_SIGNING_CLIENT_VERSION% ^
+        -OutputDirectory "%DEPS_DIR%" ^
+        -NonInteractive
+    if %errorlevel% neq 0 exit /B 1
+)
+
+if not exist "%AZURE_SIGN_DLIB_PATH%" (
+    echo Could not find the Azure Trusted Signing dlib at:
+    echo %AZURE_SIGN_DLIB_PATH%
+    exit /B 1
+)
+
+exit /B 0
+
+
+::-------------------------------------------------------------------------
+:: Generate the Azure Trusted Signing metadata JSON file.
+::
+:: This will populate the file from environment variables describing the
+:: Artifact Signing account and certificate profile to use. The result will
+:: be passed to signtool.exe in the build stage.
+::-------------------------------------------------------------------------
+:GenerateSigningMetadata
+setlocal
+
+echo.
+echo == Generating Azure Trusted Signing metadata ==
+
+call :TrimTrailingSpaces "%AZURE_TRUSTED_SIGNING_ENDPOINT%" _endpoint
+call :TrimTrailingSpaces "%AZURE_TRUSTED_SIGNING_ACCOUNT%" _account
+call :TrimTrailingSpaces "%AZURE_TRUSTED_SIGNING_CERT_PROFILE%" _cert_profile
+
+if "%_endpoint%" == "" (
+    echo AZURE_TRUSTED_SIGNING_ENDPOINT must be set.
+    exit /B 1
+)
+
+if "%_account%" == "" (
+    echo AZURE_TRUSTED_SIGNING_ACCOUNT must be set.
+    exit /B 1
+)
+
+if "%_cert_profile%" == "" (
+    echo AZURE_TRUSTED_SIGNING_CERT_PROFILE must be set.
+    exit /B 1
+)
+
+set _metadata_file=%DEPS_DIR%\trusted-signing-metadata.json
+
+(
+    echo {
+    echo   "Endpoint": "%_endpoint%",
+    echo   "CodeSigningAccountName": "%_account%",
+    echo   "CertificateProfileName": "%_cert_profile%"
+    echo }
+) > "%_metadata_file%"
+
+endlocal & set AZURE_SIGN_METADATA_FILE=%_metadata_file%
+exit /B 0
+
+
+::-------------------------------------------------------------------------
+:: Get a token for communicating with Azure.
+::
+:: This assumes the build process is running within an EC2 instance. It
+:: will exchange the instance's identity for an Azure AD federated token,
+:: which lets signtool.exe talk to Azure.
+::
+:: The resulting token is good for a period of time, and is considered
+:: sensitive data. It's stored under a non-guessable name in the temp
+:: directory, and should be deleted once done.
+::-------------------------------------------------------------------------
+:GetFederatedToken
+setlocal
+
+echo.
+echo == Requesting an Azure federated token via AWS ==
+
+call :TrimTrailingSpaces "%AZURE_TENANT_ID%" _tenant_id
+call :TrimTrailingSpaces "%AZURE_CLIENT_ID%" _client_id
+
+if "%_tenant_id%" == "" (
+    echo AZURE_TENANT_ID must be set.
+    exit /B 1
+)
+
+if "%_client_id%" == "" (
+    echo AZURE_CLIENT_ID must be set.
+    exit /B 1
+)
+
+where aws >NUL 2>&1
+if %errorlevel% neq 0 (
+    echo The AWS CLI ^(aws.exe^) must be installed and on PATH.
+    exit /B 1
+)
+
+set _token_file=%TEMP%\rbtools-azure-token-%RANDOM%%RANDOM%.jwt
+
+aws sts get-web-identity-token ^
+    --audience "api://AzureADTokenExchange" ^
+    --signing-algorithm RS256 ^
+    --duration-seconds 3600 ^
+    --query WebIdentityToken ^
+    --output text > "%_token_file%"
+
+if %errorlevel% neq 0 (
+    echo Failed to obtain an AWS web identity token.
+    call :DeleteIfExists "%_token_file%"
+    exit /B 1
+)
+
+endlocal & set "AZURE_FEDERATED_TOKEN_FILE=%_token_file%" & set "AZURE_TENANT_ID=%_tenant_id%" & set "AZURE_CLIENT_ID=%_client_id%"
 exit /B 0
 
 
@@ -247,9 +406,14 @@ if ERRORLEVEL 1 exit /B 1
 
 set _rbtools_version=%_return1%
 
+:: Fetch the token as late as possible, so nothing can fail and accidentally
+:: leave it sitting around before we get a chance to clean it up.
+call :GetFederatedToken
+if ERRORLEVEL 1 exit /B 1
+
 set _wix_path=%CD%\wix
 set _sln_file=%_wix_path%\rbtools.sln
-set _timestamp_url=http://timestamp.sectigo.com
+set _timestamp_url=http://timestamp.acs.microsoft.com
 
 echo.
 echo == Building the RBTools installer [x64] ==
@@ -261,11 +425,16 @@ echo == Building the RBTools installer [x64] ==
     /p:Root="%BUILD_ROOT_X64%" ^
     /p:OutputPath="%BUILD_STAGE%\\" ^
     /p:SourcePath="%_wix_path%" ^
-    /p:CertificateThumbprint=%CERT_THUMBPRINT_SHA1% ^
+    /p:AzureSignDlibPath="%AZURE_SIGN_DLIB_PATH%" ^
+    /p:AzureSignMetadataFile="%AZURE_SIGN_METADATA_FILE%" ^
     /p:TimestampUrl=%_timestamp_url% ^
     "%_sln_file%"
 
-if ERRORLEVEL 1 exit /B 1
+set _msbuild_result=%ERRORLEVEL%
+
+call :DeleteIfExists "%AZURE_FEDERATED_TOKEN_FILE%"
+
+if %_msbuild_result% neq 0 exit /B 1
 
 mkdir "%BUILD_DEST%" 2>&1
 dir "%BUILD_STAGE%" /S
@@ -345,18 +514,19 @@ exit /B 0
 ::-------------------------------------------------------------------------
 :: Downloads and verifies a file from a URL.
 ::-------------------------------------------------------------------------
-:DownloadAndVerify url dest expected_hash
+:DownloadAndVerify url dest algorithm expected_hash
 setlocal
 
 set _url=%~1
 set _dest=%~2
-set _expected_hash=%~3
+set _algorithm=%~3
+set _expected_hash=%~4
 
 if not exist "%_dest%" (
     call :DownloadFile %_url% "%_dest%" || exit /B 1
 )
 
-call :VerifyMD5 "%_dest%" %_expected_hash% || exit /B 1
+call :VerifyHash "%_dest%" %_algorithm% %_expected_hash% || exit /B 1
 
 exit /B 0
 
@@ -380,21 +550,20 @@ exit /B 0
 
 
 ::-------------------------------------------------------------------------
-:: Verifies the MD5 checksum of a file.
+:: Verifies the checksum of a file against a given hash algorithm.
 ::-------------------------------------------------------------------------
-:VerifyMD5 filename expected_hash
+:VerifyHash filename algorithm expected_hash
 setlocal
 
 set _filename=%~1
-set _expected_hash=%~2
+set _algorithm=%~2
+set _expected_hash=%~3
 
-echo Verifying that %_filename% has MD5 hash %_expected_hash%...
+echo Verifying that %_filename% has %_algorithm% hash %_expected_hash%...
 
 PowerShell -NoProfile -Command ^
- "$md5 = New-Object Security.Cryptography.MD5CryptoServiceProvider;"^
- "$file = [System.IO.File]::ReadAllBytes('%_filename%');"^
- "$hash = [System.BitConverter]::ToString($md5.ComputeHash($file));"^
- "$hash = $hash.toLower().Replace('-', '');"^
+ "$hash = (Get-FileHash -Path '%_filename%' -Algorithm %_algorithm%).Hash;"^
+ "$hash = $hash.ToLower();"^
  "if ($hash -eq '%_expected_hash%') {"^
  "    Write-Host '%_filename% has a valid hash.';"^
  "    exit 0;"^
@@ -405,6 +574,29 @@ PowerShell -NoProfile -Command ^
 
 echo Hash verified.
 
+exit /B 0
+
+
+::-------------------------------------------------------------------------
+:: Trims trailing spaces from a value.
+::
+:: This is used with environment variables to strip any trailing spaces.
+:: This can happen pretty easily, since `set A=B && set C=D` will set
+:: `A="B "`, and Azure can't handle this.
+::-------------------------------------------------------------------------
+:TrimTrailingSpaces value varname
+setlocal EnableDelayedExpansion
+
+set "_str=%~1"
+
+:TrimTrailingSpacesLoop
+
+if defined _str if "!_str:~-1!" == " " (
+    set "_str=!_str:~0,-1!"
+    goto :TrimTrailingSpacesLoop
+)
+
+endlocal & set "%~2=%_str%"
 exit /B 0
 
 
