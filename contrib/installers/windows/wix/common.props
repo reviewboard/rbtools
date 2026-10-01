@@ -10,8 +10,8 @@
 
  <!-- Code Signing Parameters -->
  <PropertyGroup>
-  <SignOutput Condition="'$(CertificateThumbprint)' != ''">true</SignOutput>
-  <TimestampUrl Condition="'$(TimestampUrl)' == ''">http://timestamp.verisign.com/scripts/timstamp.dll</TimestampUrl>
+  <SignOutput Condition="'$(AzureSignDlibPath)' != ''">true</SignOutput>
+  <TimestampUrl Condition="'$(TimestampUrl)' == ''">http://timestamp.acs.microsoft.com</TimestampUrl>
  </PropertyGroup>
 
  <!-- Code Signing Paths -->
@@ -25,5 +25,10 @@
  <Target Name="EnsureSignToolInstalled"
          Condition=" '$(SignToolPath)' == '' OR !Exists('$(SignToolPath)') ">
   <Error Text="signtool.exe must be installed. It was expected at '$(SignToolPath)'. This may require an update to the list of supported SDK paths in the WiX installer." />
+ </Target>
+
+ <Target Name="EnsureAzureSignConfigured"
+         Condition=" '$(AzureSignDlibPath)' == '' OR !Exists('$(AzureSignDlibPath)') OR '$(AzureSignMetadataFile)' == '' OR !Exists('$(AzureSignMetadataFile)') ">
+  <Error Text="Azure Trusted Signing is not configured correctly. AzureSignDlibPath ('$(AzureSignDlibPath)') and AzureSignMetadataFile ('$(AzureSignMetadataFile)') must both point to existing files." />
  </Target>
 </Project>
