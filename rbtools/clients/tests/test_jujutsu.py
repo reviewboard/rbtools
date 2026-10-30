@@ -280,6 +280,31 @@ class JujutsuClientTests(BaseJujutsuClientTests):
                 'tip': tip,
             })
 
+    def test_parse_revision_spec_one_revision_on_remote_bookmark(
+        self,
+    ) -> None:
+        """Testing JujutsuClient.parse_revision_spec with one specified
+        revision whose parent is a remote bookmark
+        """
+        client = self.build_client()
+
+        # master@origin is an ancestor of not-master@origin. It must not be
+        # picked over the bookmark on the base itself.
+        run_process(['jj', 'new', 'not-master@origin'])
+        self._add_file_to_repo(filename='foo.txt',
+                               data=FOO1,
+                               message='Commit 1',
+                               commit=False)
+        tip = client._get_change_id('@')
+
+        self.assertEqual(
+            client.parse_revision_spec([tip]),
+            {
+                'base': client._get_change_id('not-master@origin'),
+                'commit_id': tip,
+                'tip': tip,
+            })
+
     def test_parse_revision_spec_one_revision_with_parent(self) -> None:
         """Testing JujutsuClient.parse_revision_spec with one specified
         revision and a parent diff
