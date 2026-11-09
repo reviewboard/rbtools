@@ -717,15 +717,17 @@ class JujutsuClient(BaseSCMClient):
         assert isinstance(base, str)
         assert isinstance(tip, str)
 
+        date_format = '%Y-%m-%dT%H:%M:%S%:z'
+
         log_fields = {
             'commit_id': 'change_id',
             'parent_id': 'parents.map(|c| c.change_id())',
             'author_name': 'author.name()',
             'author_email': 'author.email()',
-            'author_date': 'author.timestamp().format("%+")',
+            'author_date': f'author.timestamp().format("{date_format}")',
             'committer_name': 'committer.name()',
             'committer_email': 'committer.email()',
-            'committer_date': 'committer.timestamp().format("%+")',
+            'committer_date': f'committer.timestamp().format("{date_format}")',
             'commit_message': 'description',
         }
 
