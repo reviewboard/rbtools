@@ -6,7 +6,8 @@ Using RBTools With Perforce
 
 This guide covers how you can use RBTools to post changes to Perforce_.
 
-A typical workflow looks like this:
+A typical workflow, whether you're using the command line or P4V_,
+looks like this:
 
 1. :ref:`Create a changeset for each review request
    <rbtools-workflow-perforce-step1>`
@@ -24,6 +25,7 @@ We'll go over these concepts and then
 :ref:`show you an example session <rbtools-workflow-perforce-example>`.
 
 
+.. _P4V: https://www.perforce.com/products/p4/p4v-visual-client
 .. _Perforce: https://www.perforce.com/
 
 
@@ -41,7 +43,10 @@ This guide assumes the following are already set up:
 * RBTools is installed and the p4_ command line tool is in your
   system path.
 
+* If using P4V, the `custom P4V tool`_ has been installed.
 
+
+.. _custom P4V tool: https://github.com/reviewboard/rbtools/tree/master/contrib/P4V
 .. _p4: https://www.perforce.com/products/helix-core-apps/command-line-client
 
 
@@ -72,6 +77,9 @@ will be used to populate the review request's own summary and description.
 Step 2: Post your change for review
 ===================================
 
+Posting from the command line
+-----------------------------
+
 Once you have a change with modifications to the depot, and you're ready to
 post it for review, you can run :rbtcommand:`post` and include the change
 number:
@@ -101,6 +109,22 @@ Once you're done filling out fields on the review request, click
 :guilabel:`Publish` to send it out for review.
 
 
+Posting from P4V
+----------------
+
+If you use P4V_, you can install our `custom P4V tool`_ to post changes
+directly from the client. Once installed, you can right-click on a changeset
+and choose :guilabel:`Review Board - Post for Review`.
+
+This creates a new review request (or updates an existing one) and opens it
+in your web browser. The posted review request will be populated with your
+changeset's summary and description. If you have :ref:`default reviewers
+<rb:default-reviewers>` set up, they'll be assigned.
+
+Once you're done filling out fields on the review request, click
+:guilabel:`Publish` to send it out for review.
+
+
 .. _rbtools-workflow-perforce-step3:
 
 Step 3: Update from reviewer feedback and re-post
@@ -110,7 +134,9 @@ Got some reviewer feedback to incorporate into your change? Easy.
 
 1. Update the files in your change, and/or the information in your changeset.
 
-2. Re-run :option:`rbt post <changenum>` to update your review request.
+2. Re-run :option:`rbt post <changenum>` or click
+   :guilabel:`Review Board - Post for Review` from P4V again to update your
+   review request.
 
    This will update the same review request already associated with your
    change number, and will also update the review request details (such as
