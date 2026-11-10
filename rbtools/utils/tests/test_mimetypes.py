@@ -38,6 +38,12 @@ class MIMETypeTests(TestCase):
         with self.assertRaises(ValueError):
             parse_mimetype('broken')
 
+    def test_parse_invalid_empty_parts(self) -> None:
+        """Testing parse_mimetype with empty main or sub type"""
+        for mime_type in ('text/', '/json', '/'):
+            with self.assertRaises(ValueError, msg=f'mime_type={mime_type!r}'):
+                parse_mimetype(mime_type)
+
     def test_match_mimetype(self) -> None:
         """Testing match_mimetype"""
         mimetype = parse_mimetype('application/vnd.reviewboard.org.test+json')

@@ -90,6 +90,9 @@ def parse_mimetype(
 
     main_type, sub_type = parts
 
+    if not main_type or not sub_type:
+        raise ValueError(f'"{mime_type}" is not a valid MIME type')
+
     sub_type_parts = sub_type.split('+', 1)
 
     if len(sub_type_parts) == 1:
