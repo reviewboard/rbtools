@@ -280,6 +280,31 @@ class JujutsuClientTests(BaseJujutsuClientTests):
                 'tip': tip,
             })
 
+    def test_parse_revision_spec_one_revision_on_remote_bookmark(
+        self,
+    ) -> None:
+        """Testing JujutsuClient.parse_revision_spec with one specified
+        revision whose parent is a remote bookmark
+        """
+        client = self.build_client()
+
+        # master@origin is an ancestor of not-master@origin. It must not be
+        # picked over the bookmark on the base itself.
+        run_process(['jj', 'new', 'not-master@origin'])
+        self._add_file_to_repo(filename='foo.txt',
+                               data=FOO1,
+                               message='Commit 1',
+                               commit=False)
+        tip = client._get_change_id('@')
+
+        self.assertEqual(
+            client.parse_revision_spec([tip]),
+            {
+                'base': client._get_change_id('not-master@origin'),
+                'commit_id': tip,
+                'tip': tip,
+            })
+
     def test_parse_revision_spec_one_revision_with_parent(self) -> None:
         """Testing JujutsuClient.parse_revision_spec with one specified
         revision and a parent diff
@@ -420,7 +445,8 @@ class JujutsuClientTests(BaseJujutsuClientTests):
                     b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
                     b'--- a/foo.txt\n'
                     b'+++ b/foo.txt\n'
-                    b'@@ -6,7 +6,4 @@\n'
+                    b'@@ -6,7 +6,4 @@ inferretque deos Latio, genus unde '
+                    b'Latinum,\n'
                     b' inferretque deos Latio, genus unde Latinum,\n'
                     b' Albanique patres, atque altae moenia Romae.\n'
                     b' Musa, mihi causas memora, quo numine laeso,\n'
@@ -461,7 +487,9 @@ class JujutsuClientTests(BaseJujutsuClientTests):
                     b'63036ed3fcafe870d567a14dd5884f4fed70126c 100644\n'
                     b'--- a/foo.txt\n'
                     b'+++ b/foo.txt\n'
-                    b'@@ -1,12 +1,11 @@\n ARMA virumque cano, Troiae '
+                    b'@@ -1,12 +1,11 @@ ARMA virumque cano, Troiae qui '
+                    b'primus ab oris\n'
+                    b' ARMA virumque cano, Troiae '
                     b'qui primus ab oris\n'
                     b'+ARMA virumque cano, Troiae qui primus ab oris\n'
                     b' Italiam, fato profugus, Laviniaque venit\n'
@@ -507,7 +535,8 @@ class JujutsuClientTests(BaseJujutsuClientTests):
                     b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
                     b'--- a/foo.txt\n'
                     b'+++ b/foo.txt\n'
-                    b'@@ -6,7 +6,4 @@\n'
+                    b'@@ -6,7 +6,4 @@ inferretque deos Latio, genus unde '
+                    b'Latinum,\n'
                     b' inferretque deos Latio, genus unde Latinum,\n'
                     b' Albanique patres, atque altae moenia Romae.\n'
                     b' Musa, mihi causas memora, quo numine laeso,\n'
@@ -572,7 +601,8 @@ class JujutsuClientTests(BaseJujutsuClientTests):
                     b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
                     b'--- a/foo.txt\n'
                     b'+++ b/foo.txt\n'
-                    b'@@ -6,7 +6,4 @@\n'
+                    b'@@ -6,7 +6,4 @@ inferretque deos Latio, genus unde '
+                    b'Latinum,\n'
                     b' inferretque deos Latio, genus unde Latinum,\n'
                     b' Albanique patres, atque altae moenia Romae.\n'
                     b' Musa, mihi causas memora, quo numine laeso,\n'
@@ -609,7 +639,8 @@ class JujutsuClientTests(BaseJujutsuClientTests):
                     b'0000000000000000000000000000000000000000\n'
                     b'--- a/foo.txt\n'
                     b'+++ /dev/null\n'
-                    b'@@ -1,12 +0,0 @@\n'
+                    b'@@ -1,12 +0,0 @@ ARMA virumque cano, Troiae qui '
+                    b'primus ab oris\n'
                     b'-ARMA virumque cano, Troiae qui primus ab oris\n'
                     b'-Italiam, fato profugus, Laviniaque venit\n'
                     b'-litora, multum ille et terris iactatus et alto\n'
@@ -654,7 +685,8 @@ class JujutsuClientTests(BaseJujutsuClientTests):
                     b'5e98e9540e1b741b5be24fcb33c40c1c8069c1fb 100644\n'
                     b'--- a/foo.txt\n'
                     b'+++ b/foo.txt\n'
-                    b'@@ -6,7 +6,4 @@\n'
+                    b'@@ -6,7 +6,4 @@ inferretque deos Latio, genus unde '
+                    b'Latinum,\n'
                     b' inferretque deos Latio, genus unde Latinum,\n'
                     b' Albanique patres, atque altae moenia Romae.\n'
                     b' Musa, mihi causas memora, quo numine laeso,\n'

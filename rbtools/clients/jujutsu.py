@@ -717,15 +717,17 @@ class JujutsuClient(BaseSCMClient):
         assert isinstance(base, str)
         assert isinstance(tip, str)
 
+        date_format = '%Y-%m-%dT%H:%M:%S%:z'
+
         log_fields = {
             'commit_id': 'change_id',
             'parent_id': 'parents.map(|c| c.change_id())',
             'author_name': 'author.name()',
             'author_email': 'author.email()',
-            'author_date': 'author.timestamp().format("%+")',
+            'author_date': f'author.timestamp().format("{date_format}")',
             'committer_name': 'committer.name()',
             'committer_email': 'committer.email()',
-            'committer_date': 'committer.timestamp().format("%+")',
+            'committer_date': f'committer.timestamp().format("{date_format}")',
             'commit_message': 'description',
         }
 
@@ -1312,38 +1314,21 @@ class JujutsuClient(BaseSCMClient):
             'remote_bookmarks.filter(|b| b.remote() != "git")'
 
         try:
-            reachable = [
-                line
-                for line in run_process([
+            # This includes tip itself, which may be the remote bookmark.
+            remote_bookmarks = (
+                run_process([
                     'jj', 'log',
-                    '-r', f'(remote_bookmarks()::{tip})-',
-                    '-T', f'{bookmarks_template} ++ "\n"',
+                    '-r', f'latest(::{tip} & remote_bookmarks())',
+                    '-T', bookmarks_template,
                     '--no-graph',
                 ])
                 .stdout
                 .read()
-                .splitlines()
-                if line
-            ]
+                .split()
+            )
 
-            if reachable:
-                remote_bookmarks = [
-                    line
-                    for line in run_process([
-                        'jj', 'log',
-                        '-r', f'latest({" | ".join(reachable)})',
-                        '-T', bookmarks_template,
-                        '--no-graph',
-                        '-n', '1',
-                    ])
-                    .stdout
-                    .read()
-                    .splitlines()
-                    if line
-                ]
-
-                if remote_bookmarks:
-                    return remote_bookmarks[0]
+            if remote_bookmarks:
+                return remote_bookmarks[0]
         except RunProcessError as e:
             logger.warning(
                 'Unable to get log for reachable commits on remote '
